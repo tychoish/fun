@@ -80,35 +80,6 @@ func (iter *multiIterImpl[T]) Close(ctx context.Context) error {
 	return errs.Resolve()
 }
 
-// Convert an arbitrary iterator to a channel.
-func Channel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
-	out := make(chan T)
-	go func() {
-		for iter.Next(ctx) {
-			select {
-			case <-ctx.Done():
-			case out <- iter.Value():
-			}
-		}
-	}()
-	return out
-}
-
-// ForEach passes each item in the iterator through the specified
-// handler function, return an error if the handler function errors.
-func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(T) error) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	for iter.Next(ctx) {
-		if err := fn(iter.Value()); err != nil {
-			return err
-		}
-	}
-
-	return iter.Close(ctx)
-}
-
 type sliceIterImpl[T any] struct {
 	vals []T
 	idx  int
@@ -139,6 +110,7 @@ func (iter *sliceIterImpl[T]) Close(_ context.Context) error { return nil }
 type channelIterImpl[T any] struct {
 	pipe  <-chan T
 	value T
+	err   error
 }
 
 // ChannelIterator produces an aterator for a specified channel. The
@@ -162,4 +134,16 @@ func (iter *channelIterImpl[T]) Next(ctx context.Context) bool {
 }
 
 func (iter *channelIterImpl[T]) Value() T                      { return iter.value }
-func (iter *channelIterImpl[T]) Close(_ context.Context) error { return nil }
+func (iter *channelIterImpl[T]) Close(_ context.Context) error { return iter.err }
+
+type mapIterImpl[T any] struct {
+	channelIterImpl[T]
+	wg     WaitGroup
+	closer context.CancelFunc
+}
+
+func (iter *mapIterImpl[T]) Close(ctx context.Context) error {
+	iter.closer()
+	iter.wg.Wait(ctx)
+	return iter.channelIterImpl.Close(ctx)
+}
