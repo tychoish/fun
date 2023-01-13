@@ -129,7 +129,7 @@ func TestIteratorImplementations(t *testing.T) {
 								t.Run("Channel", func(t *testing.T) {
 									seen := make(map[string]struct{}, len(elems))
 									iter := builder()
-									ch := Channel(ctx, iter)
+									ch := CollectIteratorChannel(ctx, iter)
 									for str := range ch {
 										seen[str] = struct{}{}
 									}
@@ -140,7 +140,7 @@ func TestIteratorImplementations(t *testing.T) {
 								})
 								t.Run("Collect", func(t *testing.T) {
 									iter := builder()
-									vals, err := Collect(ctx, iter)
+									vals, err := CollectIterator(ctx, iter)
 									if err != nil {
 										t.Fatal(err)
 									}
@@ -148,13 +148,13 @@ func TestIteratorImplementations(t *testing.T) {
 								})
 								t.Run("Map", func(t *testing.T) {
 									iter := builder()
-									out := Map(ctx, iter,
+									out := MapIterator(ctx, iter,
 										func(ctx context.Context, str string) (string, error) {
 											return str, nil
 										},
 									)
 
-									vals, err := Collect(ctx, out)
+									vals, err := CollectIterator(ctx, out)
 									if err != nil {
 										t.Fatal(err)
 									}
@@ -163,7 +163,7 @@ func TestIteratorImplementations(t *testing.T) {
 								t.Run("Reduce", func(t *testing.T) {
 									iter := builder()
 									seen := make(map[string]struct{}, len(elems))
-									sum, err := Reduce(ctx, iter,
+									sum, err := ReduceIterator(ctx, iter,
 										func(ctx context.Context, in string, val int) (int, error) {
 											seen[in] = struct{}{}
 											val += len(in)

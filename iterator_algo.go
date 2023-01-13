@@ -2,8 +2,8 @@ package fun
 
 import "context"
 
-// Convert an arbitrary iterator to a channel.
-func Channel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
+// CollectIteratorChannel converts and iterator to a channel.
+func CollectIteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
 	out := make(chan T)
 	go func() {
 		defer close(out)

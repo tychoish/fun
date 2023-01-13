@@ -123,7 +123,7 @@ func TestSet(t *testing.T) {
 					t.Run("InqualitySize", func(t *testing.T) {
 						set := builder()
 						populator(set)
-						elems, err := Collect(ctx, set.Iterator(ctx))
+						elems, err := CollectIterator(ctx, set.Iterator(ctx))
 						if err != nil {
 							t.Fatal(err)
 						} else if len(elems) == 0 {
