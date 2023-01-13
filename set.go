@@ -111,6 +111,16 @@ type Pair[K comparable, V comparable] struct {
 // Pairs implements a collection of key-value pairs.
 type Pairs[K comparable, V comparable] []Pair[K, V]
 
+// Add adds a new value to the underlying slice.
+func (p *Pairs[K, V]) Add(k K, v V) { *p = p.Append(Pair[K, V]{Key: k, Value: v}) }
+
+// Append, mirroring the semantics of the built in append() function
+// adds one or more Pair items to a Pairs slice, and returns the new
+// slice without changing the value of the original slice:
+//
+//	p = p.Append(pair, pare, pear)
+func (p Pairs[K, V]) Append(new ...Pair[K, V]) Pairs[K, V] { return append(p, new...) }
+
 // MakePairs converts a map type into a slice of Pair types
 // that can be usable in a set.
 func MakePairs[K comparable, V comparable](in map[K]V) Pairs[K, V] {

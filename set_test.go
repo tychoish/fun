@@ -185,8 +185,20 @@ func TestSet(t *testing.T) {
 			t.Log(set)
 			t.Log(set2)
 			t.Error("pairs should be equal")
-
 		}
+
+		pairs = pairs.Append(Pair[string, int]{"kip", 14})
+		newItem := pairs[len(pairs)-1]
+		if newItem.Key != "kip" {
+			t.Error("wrong key value", newItem.Key)
+		}
+
+		pairs.Add("merlin", 14)
+		newItem = pairs[len(pairs)-1]
+		if newItem.Key != "merlin" {
+			t.Error("wrong key value", newItem.Key)
+		}
+
 	})
 
 }
