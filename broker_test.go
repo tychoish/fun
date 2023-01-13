@@ -79,15 +79,15 @@ func TestBroker(t *testing.T) {
 				}
 			})
 			t.Run("BufferedBroker", func(t *testing.T) {
-
+				t.Skip("test not implemented")
 			})
 			t.Run("NonBlockingSends", func(t *testing.T) {
-
+				t.Skip("test not implemented")
 			})
 			t.Run("ParallelPublishing", func(t *testing.T) {
 				// TODO: run with race detector
+				t.Skip("test not implemented")
 			})
-
 		})
 	}
 }
