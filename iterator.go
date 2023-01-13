@@ -1,6 +1,9 @@
 package fun
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 // Iterator provides a safe, context-respecting iterator paradigm for
 // iterable objects, along with a set of consumer functions and basic
@@ -114,4 +117,39 @@ func (iter *mapIterImpl[T]) Close(ctx context.Context) error {
 	iter.closer()
 	iter.wg.Wait(ctx)
 	return iter.channelIterImpl.Close(ctx)
+}
+
+type syncIterImpl[T any] struct {
+	mtx  sync.RWMutex
+	iter Iterator[T]
+}
+
+// MakeSynchronizedIterator produces wraps an existing iterator with
+// one that is protected by a mutex. The underling implementation
+// provides an Unwrap method.
+func MakeSynchronizedIterator[T any](in Iterator[T]) Iterator[T] {
+	return &syncIterImpl[T]{iter: in}
+}
+
+func (iter *syncIterImpl[T]) Unwrap() Iterator[T] { return iter.iter }
+
+func (iter *syncIterImpl[T]) Next(ctx context.Context) bool {
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	return iter.iter.Next(ctx)
+}
+
+func (iter *syncIterImpl[T]) Close(ctx context.Context) error {
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	return iter.iter.Close(ctx)
+}
+
+func (iter *syncIterImpl[T]) Value() T {
+	iter.mtx.RLock()
+	defer iter.mtx.RUnlock()
+
+	return iter.iter.Value()
 }

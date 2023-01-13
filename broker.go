@@ -129,6 +129,10 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 // buffer size. You *must* call Unsubcribe on this channel when you
 // are no longer listening to this channel.
 func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
+	if ctx.Err() != nil {
+		return nil
+	}
+
 	msgCh := make(chan T, b.opts.BufferSize)
 	select {
 	case <-ctx.Done():
@@ -140,6 +144,10 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 
 // Unsubscribe removes a channel from the broker.
 func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
+	if ctx.Err() != nil {
+		return
+	}
+
 	select {
 	case <-ctx.Done():
 	case b.unsubCh <- msgCh:

@@ -19,8 +19,8 @@ func Channel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
 	return out
 }
 
-// Collect converts an iterator to the slice of it's values.
-func Collect[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
+// CollectIterator converts an iterator to the slice of it's values.
+func CollectIterator[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
 	out := []T{}
 	err := ForEach(ctx, iter, func(in T) error { out = append(out, in); return nil })
 	if err != nil {
@@ -44,10 +44,10 @@ func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(T) error) err
 	return iter.Close(ctx)
 }
 
-// Map provides an orthodox functional map implementation based around
+// MapIterator provides an orthodox functional map implementation based around
 // fun.Iterator. Operates in asynchronous/streaming manner, so that
 // the output Iterator must be consumed.
-func Map[T any, O any](
+func MapIterator[T any, O any](
 	ctx context.Context,
 	iter Iterator[T],
 	mapper func(context.Context, T) (O, error),
@@ -83,10 +83,10 @@ func Map[T any, O any](
 	return out
 }
 
-// Reduce processes an input iterator with a reduce function and
+// ReduceIterator processes an input iterator with a reduce function and
 // outputs the final value. The initial value may be a zero or nil
 // value.
-func Reduce[T any, O any](
+func ReduceIterator[T any, O any](
 	ctx context.Context,
 	iter Iterator[T],
 	reducer func(context.Context, T, O) (O, error),

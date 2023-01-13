@@ -55,3 +55,12 @@ func (ec *ErrorCollector) Resolve() error {
 
 	return ec.cache
 }
+
+func (ec *ErrorCollector) Len() int {
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
+
+	return len(ec.errs)
+}
+
+func (ec *ErrorCollector) HasErrors() bool { return ec.Len() > 0 }
