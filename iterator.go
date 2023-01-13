@@ -11,29 +11,18 @@ type Iterator[T any] interface {
 	Value() T
 }
 
-type multiIterImpl[T any] struct {
-	iters []Iterator[T]
-	pipe  chan T
-	value T
-	wg    WaitGroup
-	close context.CancelFunc
-}
-
-// Combine a set of related iterators into a single iterator. Starts a
-// thread to consume from each iterator and does not
-// otherwise guarantee the iterator's order.
+// MergeIterators combines a set of related iterators into a single
+// iterator. Starts a thread to consume from each iterator and does
+// not otherwise guarantee the iterator's order.
 func MergeIterators[T any](ctx context.Context, iters ...Iterator[T]) Iterator[T] {
-	iter := &multiIterImpl[T]{
-		iters: iters,
-		pipe:  make(chan T),
-	}
-	iter.run(ctx)
-	return iter
-}
+	pipe := make(chan T)
 
-func (iter *multiIterImpl[T]) run(ctx context.Context) {
-	ctx, iter.close = context.WithCancel(ctx)
-	for _, it := range iter.iters {
+	iter := &mapIterImpl[T]{
+		channelIterImpl: channelIterImpl[T]{pipe: pipe},
+	}
+
+	ctx, iter.closer = context.WithCancel(ctx)
+	for _, it := range iters {
 		iter.wg.Add(1)
 		go func(itr Iterator[T]) {
 			defer iter.wg.Done()
@@ -41,43 +30,17 @@ func (iter *multiIterImpl[T]) run(ctx context.Context) {
 				select {
 				case <-ctx.Done():
 					return
-				case iter.pipe <- itr.Value():
+				case pipe <- itr.Value():
 					continue
 				}
 			}
 		}(it)
 	}
-}
 
-func (iter *multiIterImpl[T]) Next(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case item := <-iter.pipe:
-		iter.value = item
-		return true
-	}
-}
+	// when all workers conclude, close the pipe.
+	go func() { iter.wg.Wait(ctx); close(pipe) }()
 
-func (iter *multiIterImpl[T]) Value() T { return iter.value }
-
-func (iter *multiIterImpl[T]) Close(ctx context.Context) error {
-	iter.close()
-	iter.wg.Wait(ctx)
-
-	errs := &ErrorCollector{errs: make([]error, 0, len(iter.iters))}
-	wg := &WaitGroup{}
-	for _, i := range iter.iters {
-		wg.Add(1)
-		go func(i Iterator[T]) {
-			defer wg.Done()
-			errs.Add(i.Close(ctx))
-
-		}(i)
-	}
-	wg.Wait(ctx)
-
-	return errs.Resolve()
+	return iter
 }
 
 type sliceIterImpl[T any] struct {
@@ -89,6 +52,7 @@ type sliceIterImpl[T any] struct {
 func SliceIterator[T any](in []T) Iterator[T] {
 	return &sliceIterImpl[T]{
 		vals: in,
+		idx:  -1,
 	}
 }
 
@@ -96,7 +60,7 @@ func (iter *sliceIterImpl[T]) Next(ctx context.Context) bool {
 	if ctx.Err() != nil {
 		return false
 	}
-	if iter.idx+2 > len(iter.vals) {
+	if iter.idx+1 >= len(iter.vals) {
 		return false
 	}
 	iter.idx++
@@ -120,6 +84,10 @@ func ChannelIterator[T any](pipe <-chan T) Iterator[T] {
 }
 
 func (iter *channelIterImpl[T]) Next(ctx context.Context) bool {
+	// check first because select statement ordering is non-deterministic
+	if ctx.Err() != nil {
+		return false
+	}
 	select {
 	case <-ctx.Done():
 		return false

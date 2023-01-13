@@ -6,14 +6,27 @@ import "context"
 func Channel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
 	out := make(chan T)
 	go func() {
+		defer close(out)
 		for iter.Next(ctx) {
 			select {
 			case <-ctx.Done():
+				return
 			case out <- iter.Value():
+				continue
 			}
 		}
 	}()
 	return out
+}
+
+// Collect converts an iterator to the slice of it's values.
+func Collect[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
+	out := []T{}
+	err := ForEach(ctx, iter, func(in T) error { out = append(out, in); return nil })
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ForEach passes each item in the iterator through the specified
@@ -49,6 +62,7 @@ func Map[T any, O any](
 	out.wg.Add(1)
 	go func() {
 		defer out.wg.Done()
+		defer close(pipe)
 		for iter.Next(iterCtx) {
 			o, err := mapper(iterCtx, iter.Value())
 			if err != nil {

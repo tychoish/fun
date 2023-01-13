@@ -5,8 +5,12 @@ import (
 	"sync"
 )
 
-// stole this from https://stackoverflow.com/questions/36417199/how-to-broadcast-message-using-channel
+// stole this from
+// https://stackoverflow.com/questions/36417199/how-to-broadcast-message-using-channel
+// with some modifications and additional features.
 
+// Broker is a simple message broker that provides a useable interface
+// for distributing messages of a given type to many channels.
 type Broker[T any] struct {
 	wg        WaitGroup
 	publishCh chan T
@@ -18,11 +22,20 @@ type Broker[T any] struct {
 	close context.CancelFunc
 }
 
-// BrokerOptions
+// BrokerOptions configures the semantics of a broker. The zero-values
+// produce a blocking unbuffered queue message broker with every
 type BrokerOptions struct {
+	// NonBlockingSubscriptions, when true, allows the broker to
+	// skip sending messags to subscribers with filled queues.
 	NonBlockingSubscriptions bool
-	BufferSize               int
-	ParallelDispatch         bool
+	// BufferSize controls the buffer size of all internal broker
+	// channels.
+	BufferSize int
+	// ParallelDispatch, when true, sends each message to
+	// subscribers in parallel, and (pending the behavior of
+	// NonBlockingSubscriptions) waits for all messages to be
+	// delivered before continuing.
+	ParallelDispatch bool
 }
 
 func NewBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -34,6 +47,8 @@ func NewBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 }
 
+// Start initiates the background worker for the Broker, ignoring
+// subsequent calls.
 func (b *Broker[T]) Start(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -93,6 +108,7 @@ func (b *Broker[T]) send(ctx context.Context, m T, ch chan T) {
 	}
 }
 
+// Stop cancels the broker, allowing background work to stop.
 func (b *Broker[T]) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -100,6 +116,8 @@ func (b *Broker[T]) Stop() {
 	b.close()
 }
 
+// Wait blocks until either the context has been canceled, or all work
+// has been completed.
 func (b *Broker[T]) Wait(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -107,8 +125,11 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 	b.wg.Wait(ctx)
 }
 
-func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
-	msgCh := make(chan T)
+// Subscribe generates a new subscription channel, of the specified
+// buffer size. You *must* call Unsubcribe on this channel when you
+// are no longer listening to this channel.
+func (b *Broker[T]) Subscribe(ctx context.Context) <-chan T {
+	msgCh := make(chan T, b.opts.BufferSize)
 	select {
 	case <-ctx.Done():
 		return nil
@@ -117,6 +138,7 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 	}
 }
 
+// Unsubscribe removes a channel from the broker.
 func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 	select {
 	case <-ctx.Done():
@@ -124,6 +146,7 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 	}
 }
 
+// Publish distributes a message to all subscribers.
 func (b *Broker[T]) Publish(ctx context.Context, msg T) {
 	select {
 	case <-ctx.Done():
