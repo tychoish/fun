@@ -24,6 +24,10 @@ type Broker[T any] struct {
 
 // BrokerOptions configures the semantics of a broker. The zero-values
 // produce a blocking unbuffered queue message broker with every
+// message distributed to every subscriber. While the default settings
+// make it possible for one subscriber to block another subscriber,
+// they guarantee that all messages will be delivered. NonBlocking and
+// Buffered brokers may lose messages.
 type BrokerOptions struct {
 	// NonBlockingSubscriptions, when true, allows the broker to
 	// skip sending messags to subscribers with filled queues.
@@ -38,6 +42,8 @@ type BrokerOptions struct {
 	ParallelDispatch bool
 }
 
+// NewBroker constructs a new message broker. The default options are
+// ideal for most use cases.
 func NewBroker[T any](opts BrokerOptions) *Broker[T] {
 	return &Broker[T]{
 		opts:      opts,
