@@ -128,7 +128,7 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 // Subscribe generates a new subscription channel, of the specified
 // buffer size. You *must* call Unsubcribe on this channel when you
 // are no longer listening to this channel.
-func (b *Broker[T]) Subscribe(ctx context.Context) <-chan T {
+func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 	msgCh := make(chan T, b.opts.BufferSize)
 	select {
 	case <-ctx.Done():
