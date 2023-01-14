@@ -29,47 +29,6 @@ func MakeSet[T comparable](len int) Set[T] { return make(mapSetImpl[T], len) }
 // NewSet constructs a set object for the given type, without prealocation.
 func NewSet[T comparable]() Set[T] { return MakeSet[T](0) }
 
-// SetAddCheck adds an item from a set, returning a value if
-// that item was already in the set.
-func SetAddCheck[T comparable](s Set[T], item T) bool { ok := s.Check(item); s.Add(item); return ok }
-
-// SetDeleteCheck deletes an item from a set, returning a value if
-// that item was in the set.
-func SetDeleteCheck[T comparable](s Set[T], item T) bool {
-	ok := s.Check(item)
-	s.Delete(item)
-	return ok
-}
-
-// SetEqualCtx tests two sets, returning true if the sets have equal
-// values, but will return early (and false) if the context is canceled.
-func SetEqualCtx[T comparable](ctx context.Context, s1, s2 Set[T]) bool {
-	if s1.Len() != s2.Len() {
-		return false
-	}
-
-	iter1 := s1.Iterator(ctx)
-	for iter1.Next(ctx) {
-		if !s2.Check(iter1.Value()) {
-			return false
-		}
-	}
-
-	if err := iter1.Close(ctx); err != nil {
-		return false
-	}
-
-	return true
-}
-
-// SetEqual tests two sets, returning true if the sets have equal
-// values.
-func SetEqual[T comparable](s1, s2 Set[T]) bool {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	return SetEqualCtx(ctx, s1, s2)
-}
-
 type mapSetImpl[T comparable] map[T]struct{}
 
 func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }
@@ -133,7 +92,7 @@ func MakePairs[K comparable, V comparable](in map[K]V) Pairs[K, V] {
 
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
-// key
+// key is retained.
 func (p Pairs[K, V]) Map() map[K]V {
 	out := make(map[K]V, len(p))
 	for idx := range p {
@@ -145,6 +104,17 @@ func (p Pairs[K, V]) Map() map[K]V {
 // Set converts a Pairs object into a set.
 func (p Pairs[K, V]) Set() Set[Pair[K, V]] {
 	set := MakeSet[Pair[K, V]](len(p))
+
+	for idx := range p {
+		set.Add(p[idx])
+	}
+
+	return set
+}
+
+// OrderedSet produces an order-preserving set based on the Pairs.
+func (p Pairs[K, V]) OrderedSet() Set[Pair[K, V]] {
+	set := MakeOrderedSet[Pair[K, V]](len(p))
 
 	for idx := range p {
 		set.Add(p[idx])
