@@ -13,30 +13,42 @@ func TestBroker(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	for scope, elems := range map[string][]string{
-		"Basic": {"a", "b", "c", "d", "e", "f", "g"},
-		"ExtraLarge": func() []string {
-			out := make([]string, 50)
-			for idx := range out {
-				out[idx] = fmt.Sprint("value=", idx)
-			}
-			return out
-		}(),
+	for _, scope := range []struct {
+		Name  string
+		Elems []string
+	}{
+		{
+			Name:  "Basic",
+			Elems: []string{"a", "b", "c", "d", "e", "f", "g"},
+		},
+		{
+			Name: "ExtraLarge",
+			Elems: func() []string {
+				out := make([]string, 50)
+				for idx := range out {
+					out[idx] = fmt.Sprint("value=", idx)
+				}
+				return out
+			}()},
 	} {
-		t.Run(scope, func(t *testing.T) {
+		t.Run(scope.Name, func(t *testing.T) {
+			elems := scope.Elems
 			t.Run("Simple", func(t *testing.T) {
-				for optName, opts := range map[string]BrokerOptions{
-					"Parallel/ZeroBuffer":     {ParallelDispatch: true},
-					"Serial/ZeroBuffer":       {ParallelDispatch: false},
-					"Parallel/FullyBuffered":  {ParallelDispatch: true, BufferSize: len(elems)},
-					"Serial/FullyBuffered":    {ParallelDispatch: false, BufferSize: len(elems)},
-					"Parallel/HalfBuffered":   {ParallelDispatch: true, BufferSize: len(elems) / 2},
-					"Serial/HalfBuffered":     {ParallelDispatch: false, BufferSize: len(elems) / 2},
-					"Parallel/DoubleBuffered": {ParallelDispatch: true, BufferSize: len(elems) * 2},
-					"Serial/DoubleBuffered":   {ParallelDispatch: false, BufferSize: len(elems) * 2},
+				for _, opts := range []struct {
+					Name string
+					Opts BrokerOptions
+				}{
+					{Name: "Parallel/ZeroBuffer", Opts: BrokerOptions{ParallelDispatch: true}},
+					{Name: "Serial/ZeroBuffer", Opts: BrokerOptions{ParallelDispatch: false}},
+					{Name: "Parallel/FullyBuffered", Opts: BrokerOptions{ParallelDispatch: true, BufferSize: len(elems)}},
+					{Name: "Serial/FullyBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems)}},
+					{Name: "Parallel/HalfBuffered", Opts: BrokerOptions{ParallelDispatch: true, BufferSize: len(elems) / 2}},
+					{Name: "Serial/HalfBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems) / 2}},
+					{Name: "Parallel/DoubleBuffered", Opts: BrokerOptions{ParallelDispatch: true, BufferSize: len(elems) * 2}},
+					{Name: "Serial/DoubleBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems) * 2}},
 				} {
-					t.Run(optName, func(t *testing.T) {
-						broker := NewBroker[string](opts)
+					t.Run(opts.Name, func(t *testing.T) {
+						broker := NewBroker[string](opts.Opts)
 						broker.Start(ctx)
 
 						// sometimes start it
@@ -123,7 +135,7 @@ func TestBroker(t *testing.T) {
 						}()
 
 						wg.Wait(ctx)
-						if opts.BufferSize == 0 {
+						if opts.Opts.BufferSize == 0 {
 							checkMatchingSets(t, seen1, seen2)
 						} else if len(seen1) == 0 && len(seen2) == 0 {
 							t.Error("should observe some events")
@@ -139,10 +151,10 @@ func TestBroker(t *testing.T) {
 						}
 						broker.Unsubscribe(cctx, ch1)
 					})
-					t.Run(optName+"/NonBlocking", func(t *testing.T) {
-						opts.NonBlockingSubscriptions = true
-						defer func() { opts.NonBlockingSubscriptions = false }()
-						broker := NewBroker[string](opts)
+					t.Run(opts.Name+"/NonBlocking", func(t *testing.T) {
+						opts.Opts.NonBlockingSubscriptions = true
+						defer func() { opts.Opts.NonBlockingSubscriptions = false }()
+						broker := NewBroker[string](opts.Opts)
 						broker.Start(ctx)
 
 						wg := &WaitGroup{}
