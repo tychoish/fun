@@ -10,10 +10,14 @@ func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for name, builder := range map[string]func() Set[string]{
-		"Basic":          func() Set[string] { return NewSet[string]() },
-		"BasicLarge":     func() Set[string] { return MakeSet[string](100) },
-		"SyncBasic":      func() Set[string] { return MakeSynchronizedSet(NewSet[string]()) },
-		"SyncBasicLarge": func() Set[string] { return MakeSynchronizedSet(MakeSet[string](100)) },
+		"Unordered/Basic":          func() Set[string] { return NewSet[string]() },
+		"Unordered/BasicLarge":     func() Set[string] { return MakeSet[string](100) },
+		"Unordered/SyncBasic":      func() Set[string] { return MakeSynchronizedSet(NewSet[string]()) },
+		"Unordered/SyncBasicLarge": func() Set[string] { return MakeSynchronizedSet(MakeSet[string](100)) },
+		"Ordered/Basic":            func() Set[string] { return NewOrderedSet[string]() },
+		"Ordered/BasicLarge":       func() Set[string] { return MakeOrderedSet[string](100) },
+		"Ordered/SyncBasic":        func() Set[string] { return MakeSynchronizedSet(NewOrderedSet[string]()) },
+		"Ordered/SyncBasicLarge":   func() Set[string] { return MakeSynchronizedSet(MakeOrderedSet[string](100)) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("Initialization", func(t *testing.T) {
@@ -110,7 +114,7 @@ func TestSet(t *testing.T) {
 							t.Fatal("sets should be equal")
 						}
 					})
-					t.Run("InqualitySize", func(t *testing.T) {
+					t.Run("InqualitySizeSimple", func(t *testing.T) {
 						set := builder()
 						populator(set)
 
@@ -120,7 +124,7 @@ func TestSet(t *testing.T) {
 							t.Fatal("sets should not be equal")
 						}
 					})
-					t.Run("InqualitySize", func(t *testing.T) {
+					t.Run("InqualitySizeComplex", func(t *testing.T) {
 						set := builder()
 						populator(set)
 						elems, err := CollectIterator(ctx, set.Iterator(ctx))
@@ -168,10 +172,45 @@ func TestSet(t *testing.T) {
 
 		extraPair := Pair[string, int]{"foo", 89}
 		pairs = append(pairs, extraPair)
+		set = pairs.OrderedSet()
+		if set.Len() != 3 {
+			t.Fatal("now three items in set")
+		}
+		osetIter := set.Iterator(ctx)
+		idx := 0
+		seen := 0
+		for osetIter.Next(ctx) {
+			val := osetIter.Value()
+			switch idx {
+			case 0:
+				seen++
+				if val.Key != "foo" || val.Value != 42 {
+					t.Errorf("unexpeded @ idx=%d, %+v", idx, val)
+				}
+			case 1:
+				seen++
+				if val.Key != "bar" || val.Value != 31 {
+					t.Errorf("unexpeded @ idx=%d, %+v", idx, val)
+				}
+			case 2:
+				seen++
+				if val.Key != "foo" || val.Value != 89 {
+					t.Errorf("unexpeded @ idx=%d, %+v", idx, val)
+				}
+			default:
+				t.Error("unexepected item")
+			}
+			idx++
+		}
+		if seen != 3 {
+			t.Errorf("saw=%d not 3", seen)
+		}
+
 		set = pairs.Set()
 		if set.Len() != 3 {
 			t.Fatal("now three items in set")
 		}
+
 		pmap = pairs.Map()
 		if len(pmap) != 2 {
 			t.Fatal("deduplication of keys", pmap)
@@ -198,7 +237,6 @@ func TestSet(t *testing.T) {
 		if newItem.Key != "merlin" {
 			t.Error("wrong key value", newItem.Key)
 		}
-
 	})
 
 }
