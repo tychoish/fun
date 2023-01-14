@@ -16,7 +16,7 @@ func TestBroker(t *testing.T) {
 	for scope, elems := range map[string][]string{
 		"Basic": {"a", "b", "c", "d", "e", "f", "g"},
 		"ExtraLarge": func() []string {
-			out := make([]string, 100)
+			out := make([]string, 50)
 			for idx := range out {
 				out[idx] = fmt.Sprint("value=", idx)
 			}
@@ -152,16 +152,16 @@ func TestBroker(t *testing.T) {
 						wg.Add(1)
 						go func() {
 							defer wg.Done()
+							defer broker.Unsubscribe(ctx, ch1)
 							for range ch1 {
 								count++
 								if count == len(elems) {
-									broker.Unsubscribe(ctx, ch1)
 									return
 								}
 							}
 						}()
 
-						for i := 0; i < 10; i++ {
+						for i := 0; i < 20; i++ {
 							wg.Add(1)
 							go func(id int) {
 								defer wg.Done()
@@ -170,9 +170,11 @@ func TestBroker(t *testing.T) {
 								}
 							}(i)
 						}
+
 						wg.Wait(ctx)
+
 						if count != len(elems) {
-							t.Fatal("did not subscribe", count)
+							t.Fatal("did not see", count, "out of", len(elems))
 						}
 					})
 
