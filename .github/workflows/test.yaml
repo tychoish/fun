@@ -28,4 +28,5 @@ jobs:
       - name: Run Go Tests
         if: env.GIT_DIFF
         run: |
+          export GOMAXPROCS=$(($(nproc) + 2))
           go list -f "{{ if (or .TestGoFiles .XTestGoFiles) }}{{ .ImportPath }}{{ end }}" ./... | xargs -t go test -v -timeout=1m
