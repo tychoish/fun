@@ -12,5 +12,6 @@ interest:
 - A channel-based message broker (for one-to-many channel patterns).
 - An error collector implementation for threadsafe error aggregation.
 - A set type and associated tools.
+- A burstable load-shedding queue.
 
 Have fun!

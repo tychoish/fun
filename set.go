@@ -96,6 +96,9 @@ func MakePairs[K comparable, V comparable](in map[K]V) Pairs[K, V] {
 func (p Pairs[K, V]) Map() map[K]V {
 	out := make(map[K]V, len(p))
 	for idx := range p {
+		if _, ok := out[p[idx].Key]; ok {
+			continue
+		}
 		out[p[idx].Key] = p[idx].Value
 	}
 	return out
@@ -117,6 +120,9 @@ func (p Pairs[K, V]) OrderedSet() Set[Pair[K, V]] {
 	set := MakeOrderedSet[Pair[K, V]](len(p))
 
 	for idx := range p {
+		if set.Check(p[idx]) {
+			continue
+		}
 		set.Add(p[idx])
 	}
 

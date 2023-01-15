@@ -76,7 +76,6 @@ func TestSet(t *testing.T) {
 					t.Error("set item should have been present")
 				}
 			})
-
 			for populatorName, populator := range map[string]func(Set[string]){
 				"Three": func(set Set[string]) {
 					set.Add("a")
@@ -238,5 +237,32 @@ func TestSet(t *testing.T) {
 			t.Error("wrong key value", newItem.Key)
 		}
 	})
+	t.Run("OrderedSetCleanup", func(t *testing.T) {
+		set := NewOrderedSet[int]()
+		for i := range make([]int, 300) {
+			set.Add(i)
+		}
 
+		os := set.(*orderedSetImpl[int])
+		for i := range make([]int, 300) {
+			if i < 100 {
+				if len(os.elems) != 300 {
+					t.Error("lazy delete", len(os.elems))
+				}
+			}
+			if i%2 == 0 || i%3 == 0 {
+				set.Delete(i)
+			}
+		}
+		if l := len(os.set); l != 100 {
+			t.Fatal("unexpected size", l)
+		}
+		if l := len(os.elems); l != 100 {
+			t.Fatal("unexpected size", l)
+		}
+		if os.deletedCount != 0 {
+			t.Fatal("unexpected delete count", os.deletedCount)
+		}
+
+	})
 }

@@ -1,6 +1,8 @@
 package fun
 
-import "context"
+import (
+	"context"
+)
 
 // CollectIteratorChannel converts and iterator to a channel.
 func CollectIteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
@@ -20,28 +22,83 @@ func CollectIteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan
 }
 
 // CollectIterator converts an iterator to the slice of it's values.
+//
+// In the case of an error in the underlying iterator the output slice
+// will have the values encountered before the error.
 func CollectIterator[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
 	out := []T{}
-	err := ForEach(ctx, iter, func(in T) error { out = append(out, in); return nil })
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
+	err := ForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
+	return out, err
 }
 
 // ForEach passes each item in the iterator through the specified
 // handler function, return an error if the handler function errors.
-func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(T) error) error {
+func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(context.Context, T) error) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	catcher := &ErrorCollector{}
+
+	defer func() { err = catcher.Resolve() }()
+	defer catcher.Recover()
+	defer catcher.CheckCtx(ctx, iter.Close)
+
 	for iter.Next(ctx) {
-		if err := fn(iter.Value()); err != nil {
-			return err
+		if ferr := fn(ctx, iter.Value()); ferr != nil {
+			catcher.Add(ferr)
+			break
 		}
 	}
 
-	return iter.Close(ctx)
+	return
+}
+
+// FilterIterator passes all objects in an iterator through the
+// specified filter function. If the filter function errors, the
+// operation aborts and the error is reported by the returned
+// iterator's Close method. If the include boolean is true the result
+// of the function is included in the output iterator, otherwise the
+// operation is skipped.
+//
+// The output iterator is produced iteratively as the returned
+// iterator is consumed.
+func FilterIterator[T any](
+	ctx context.Context,
+	iter Iterator[T],
+	fn func(ctx context.Context, input T) (output T, include bool, err error),
+) Iterator[T] {
+	out := new(mapIterImpl[T])
+	pipe := make(chan T)
+	out.pipe = pipe
+
+	var iterCtx context.Context
+	iterCtx, out.closer = context.WithCancel(ctx)
+
+	out.wg.Add(1)
+	go func() {
+		catcher := &ErrorCollector{}
+		defer out.wg.Done()
+		defer func() { out.err = catcher.Resolve() }()
+		defer catcher.Recover()
+		defer catcher.CheckCtx(ctx, iter.Close)
+		defer close(pipe)
+
+		for iter.Next(iterCtx) {
+			o, include, err := fn(iterCtx, iter.Value())
+			if err != nil {
+				catcher.Add(err)
+				break
+			}
+			if !include {
+				continue
+			}
+			select {
+			case <-iterCtx.Done():
+			case pipe <- o:
+			}
+		}
+	}()
+	return out
 }
 
 // MapIterator provides an orthodox functional map implementation based around
@@ -55,14 +112,19 @@ func MapIterator[T any, O any](
 	out := new(mapIterImpl[O])
 	pipe := make(chan O)
 	out.pipe = pipe
-	catcher := &ErrorCollector{}
 	var iterCtx context.Context
 	iterCtx, out.closer = context.WithCancel(ctx)
 
 	out.wg.Add(1)
 	go func() {
+		catcher := &ErrorCollector{}
+
 		defer out.wg.Done()
+		defer func() { out.err = catcher.Resolve() }()
+		defer catcher.Recover()
+		defer catcher.CheckCtx(ctx, iter.Close)
 		defer close(pipe)
+
 		for iter.Next(iterCtx) {
 			o, err := mapper(iterCtx, iter.Value())
 			if err != nil {
@@ -71,13 +133,10 @@ func MapIterator[T any, O any](
 			}
 			select {
 			case <-iterCtx.Done():
+				return
 			case pipe <- o:
 			}
 		}
-		// use parent context to avoid not being able to close
-		// the input iterator
-		catcher.Add(iter.Close(ctx))
-		out.err = catcher.Resolve()
 	}()
 
 	return out
@@ -91,18 +150,21 @@ func ReduceIterator[T any, O any](
 	iter Iterator[T],
 	reducer func(context.Context, T, O) (O, error),
 	initalValue O,
-) (O, error) {
-	value := initalValue
-	var err error
+) (value O, err error) {
+	value = initalValue
+	catcher := &ErrorCollector{}
+
+	defer func() { err = catcher.Resolve() }()
+	defer catcher.Recover()
+	defer catcher.CheckCtx(ctx, iter.Close)
+
 	for iter.Next(ctx) {
 		value, err = reducer(ctx, iter.Value(), value)
 		if err != nil {
-			return *new(O), err
+			catcher.Add(err)
+			return
 		}
 	}
-	if err = iter.Close(ctx); err != nil {
-		return *new(O), err
-	}
 
-	return value, nil
+	return
 }

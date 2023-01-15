@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -27,6 +28,220 @@ func slicesAreEqual[T comparable](t *testing.T, in []T, out []T) {
 		if in[idx] != out[idx] {
 			t.Error("mismatch values at index", idx)
 		}
+	}
+}
+
+func TestIteratorAlgoInts(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	elems := func() []int {
+		e := make([]int, 100)
+		for idx := range e {
+			e[idx] = idx
+		}
+		return e
+	}
+	for name, baseBuilder := range map[string]func() Iterator[int]{
+		"SliceIterator": func() Iterator[int] {
+			return SliceIterator(elems())
+		},
+		"ChannelIterator": func() Iterator[int] {
+			e := elems()
+			vals := make(chan int, len(e))
+			for idx := range e {
+				vals <- e[idx]
+			}
+			close(vals)
+			return ChannelIterator(vals)
+		},
+		"SetIterator": func() Iterator[int] {
+			e := elems()
+			set := MakeSet[int](len(e))
+			for idx := range e {
+				set.Add(e[idx])
+			}
+
+			return set.Iterator(ctx)
+		},
+		"OrderedSetIterator": func() Iterator[int] {
+			e := elems()
+			set := MakeOrderedSet[int](len(e))
+			for idx := range e {
+				set.Add(e[idx])
+			}
+
+			return set.Iterator(ctx)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for wrapperName, wrapper := range map[string]func(Iterator[int]) Iterator[int]{
+				"UnSynchronized": func(in Iterator[int]) Iterator[int] { return in },
+				"Synchronized": func(in Iterator[int]) Iterator[int] {
+					return MakeSynchronizedIterator(in)
+				},
+			} {
+				t.Run(wrapperName, func(t *testing.T) {
+					t.Run("Filter", func(t *testing.T) {
+						t.Run("Evens", func(t *testing.T) {
+							outIter := FilterIterator(
+								ctx,
+								wrapper(baseBuilder()),
+								func(ctx context.Context, input int) (int, bool, error) {
+									if input%2 == 0 {
+										return input, true, nil
+									}
+									return 0, false, nil
+								},
+							)
+							out, err := CollectIterator(ctx, outIter)
+							if err != nil {
+								t.Fatal(err)
+							}
+							if len(out) != 50 { // half 100
+								t.Fatal("output had", len(out))
+							}
+						})
+						t.Run("PanicSafety", func(t *testing.T) {
+							outIter := FilterIterator(
+								ctx,
+								wrapper(baseBuilder()),
+								func(ctx context.Context, input int) (int, bool, error) {
+									panic("whoop")
+								},
+							)
+							out, err := CollectIterator(ctx, outIter)
+							if err == nil {
+								t.Fatal("expectged error")
+							}
+							if err.Error() != "panic: whoop" {
+								t.Fatal(err)
+							}
+							if len(out) != 0 {
+								t.Fatal("unexpected output", out)
+							}
+						})
+						t.Run("ErrorAborts", func(t *testing.T) {
+							outIter := FilterIterator(
+								ctx,
+								wrapper(baseBuilder()),
+								func(ctx context.Context, input int) (int, bool, error) {
+									if input < 10 {
+										return input, true, nil
+									}
+									// include value is ignored for error cases
+									return 0, true, errors.New("abort")
+								},
+							)
+							out, err := CollectIterator(ctx, outIter)
+							if err == nil {
+								t.Fatal("expectged error", err)
+							}
+							if err.Error() != "abort" {
+								t.Fatal(err)
+							}
+							// the default set uses a map, which has randomized
+							// iteration order. Skip this implementation.
+							if name != "SetIterator" {
+								if len(out) != 10 {
+									t.Fatal("unexpected output", out)
+								}
+							}
+						})
+					})
+					t.Run("ForEach", func(t *testing.T) {
+						t.Run("PanicSafety", func(t *testing.T) {
+							err := ForEach(
+								ctx,
+								wrapper(baseBuilder()),
+								func(ctx context.Context, input int) error {
+									panic("whoop")
+								},
+							)
+
+							if err == nil {
+								t.Fatal("expectged error")
+							}
+							if err.Error() != "panic: whoop" {
+								t.Fatal(err)
+							}
+						})
+						t.Run("ErrorAborts", func(t *testing.T) {
+							var count int
+							seen := NewSet[int]()
+							err := ForEach(
+								ctx,
+								wrapper(baseBuilder()),
+								func(ctx context.Context, in int) error {
+									count++
+									seen.Add(in)
+									if count >= 60 {
+										return errors.New("whoop")
+									}
+
+									return nil
+								})
+
+							if err == nil {
+								t.Fatal("expected error")
+							}
+							if err.Error() != "whoop" {
+								t.Error(err)
+							}
+							if count != 60 {
+								t.Error("count should have been 60, but was", count)
+							}
+							if count != seen.Len() {
+								t.Error("impossible", count, seen.Len())
+							}
+						})
+					})
+					t.Run("Map", func(t *testing.T) {
+						t.Run("PanicSafety", func(t *testing.T) {
+							out, err := CollectIterator(ctx,
+								MapIterator(ctx,
+									wrapper(baseBuilder()),
+									func(ctx context.Context, input int) (int, error) {
+										panic("whoop")
+									},
+								),
+							)
+							if err == nil {
+								t.Fatal("expected error")
+							}
+							if err.Error() != "panic: whoop" {
+								t.Fatal(err)
+							}
+							if len(out) != 0 {
+								t.Fatal("unexpected output", out)
+							}
+						})
+						t.Run("ErrorDoesNotAbort", func(t *testing.T) {
+							out, err := CollectIterator(ctx,
+								MapIterator(ctx,
+									wrapper(baseBuilder()),
+									func(ctx context.Context, input int) (int, error) {
+										if input == 42 {
+											return 0, errors.New("whoop")
+										}
+										return input, nil
+									},
+								),
+							)
+							if err == nil {
+								t.Fatal("expected error")
+							}
+							if err.Error() != "whoop" {
+								t.Fatal(err)
+							}
+							if len(out) != 99 {
+								t.Fatal("unexpected output", len(out), "->", out)
+							}
+						})
+
+					})
+				})
+			}
+		})
 	}
 }
 
@@ -56,6 +271,22 @@ func TestIteratorImplementations(t *testing.T) {
 					}
 					close(vals)
 					return ChannelIterator(vals)
+				},
+				"SetIterator": func() Iterator[string] {
+					set := MakeSet[string](len(elems))
+					for idx := range elems {
+						set.Add(elems[idx])
+					}
+
+					return set.Iterator(ctx)
+				},
+				"OrderedSetIterator": func() Iterator[string] {
+					set := MakeOrderedSet[string](len(elems))
+					for idx := range elems {
+						set.Add(elems[idx])
+					}
+
+					return set.Iterator(ctx)
 				},
 			} {
 				for filterName, filter := range map[string]func(Iterator[string]) Iterator[string]{
@@ -115,11 +346,14 @@ func TestIteratorImplementations(t *testing.T) {
 								t.Run("ForEach", func(t *testing.T) {
 									var count int
 									seen := make(map[string]struct{}, len(elems))
-									err := ForEach(ctx, builder(), func(str string) error {
-										count++
-										seen[str] = struct{}{}
-										return nil
-									})
+									err := ForEach(
+										ctx,
+										builder(),
+										func(ctx context.Context, str string) error {
+											count++
+											seen[str] = struct{}{}
+											return nil
+										})
 									if err != nil {
 										t.Fatal(err)
 									}
@@ -144,7 +378,10 @@ func TestIteratorImplementations(t *testing.T) {
 									if err != nil {
 										t.Fatal(err)
 									}
-									slicesAreEqual(t, elems, vals)
+									// skip implementation with random order
+									if name != "SetIterator" {
+										slicesAreEqual(t, elems, vals)
+									}
 								})
 								t.Run("Map", func(t *testing.T) {
 									iter := builder()
@@ -157,8 +394,12 @@ func TestIteratorImplementations(t *testing.T) {
 									vals, err := CollectIterator(ctx, out)
 									if err != nil {
 										t.Fatal(err)
+
 									}
-									slicesAreEqual(t, elems, vals)
+									// skip implementation with random order
+									if name != "SetIterator" {
+										slicesAreEqual(t, elems, vals)
+									}
 								})
 								t.Run("Reduce", func(t *testing.T) {
 									iter := builder()

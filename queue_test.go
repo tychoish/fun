@@ -132,7 +132,7 @@ func TestQueueWait(t *testing.T) {
 
 	// A wait on an empty queue should time out.
 	t.Run("WaitTimeout", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 		got, err := q.Wait(ctx)
 		if err == nil {
