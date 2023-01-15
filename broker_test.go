@@ -12,6 +12,7 @@ import (
 func TestBroker(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	t.Parallel()
 
 	for _, scope := range []struct {
 		Name  string
@@ -48,6 +49,9 @@ func TestBroker(t *testing.T) {
 					{Name: "Serial/DoubleBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems) * 2}},
 				} {
 					t.Run(opts.Name, func(t *testing.T) {
+						elems := scope.Elems
+						opts := opts
+						t.Parallel()
 						broker := NewBroker[string](opts.Opts)
 						broker.Start(ctx)
 
@@ -70,6 +74,7 @@ func TestBroker(t *testing.T) {
 						wgState := &atomic.Int32{}
 						wgState.Add(2)
 
+						total := len(elems)
 						go func() {
 							defer wgState.Add(-1)
 							defer wg.Done()
@@ -82,7 +87,10 @@ func TestBroker(t *testing.T) {
 								case str := <-ch1:
 									seen1[str] = struct{}{}
 								}
-								if len(seen1) == len(elems) {
+								if opts.Opts.BufferSize == 0 && len(seen1) == total {
+									return
+								}
+								if len(seen1)/2 > total {
 									return
 								}
 							}
@@ -100,7 +108,10 @@ func TestBroker(t *testing.T) {
 								case str := <-ch2:
 									seen2[str] = struct{}{}
 								}
-								if len(seen2) == len(elems) {
+								if opts.Opts.BufferSize == 0 && len(seen2) == total {
+									return
+								}
+								if len(seen2)/2 > total {
 									return
 								}
 							}
@@ -111,9 +122,9 @@ func TestBroker(t *testing.T) {
 							for idx := range elems {
 								broker.Publish(ctx, elems[idx])
 							}
-							timer := time.NewTimer(time.Second)
+							timer := time.NewTimer(500 * time.Millisecond)
 							defer timer.Stop()
-							ticker := time.NewTicker(10 * time.Millisecond)
+							ticker := time.NewTicker(20 * time.Millisecond)
 							defer ticker.Stop()
 
 						WAITLOOP:

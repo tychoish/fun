@@ -30,18 +30,12 @@ func (e *ErrorStack) append(err error) *ErrorStack {
 	if e == nil {
 		e = &ErrorStack{}
 	}
-	defer func() {
-		e.mtx.Lock()
-		defer e.mtx.Unlock()
-
-		e.cached = nil
-		e.errs = nil
-	}()
-
 	switch werr := err.(type) {
 	case *ErrorStack:
 		if werr.next == nil {
 			werr.next = e
+			werr.cached = nil
+			werr.errs = nil
 			return werr
 		}
 
@@ -91,15 +85,15 @@ func (e *ErrorStack) Error() string {
 }
 
 func (e *ErrorStack) Is(err error) bool {
-	e.mtx.Lock()
-	defer e.mtx.Unlock()
+	e.mtx.RLock()
+	defer e.mtx.RUnlock()
 
-	return errors.Is(e.err, err) || (e.next != nil && e.next.Is(err))
+	return errors.Is(e.err, err)
 }
 
 func (e *ErrorStack) Unwrap() error {
-	e.mtx.Lock()
-	defer e.mtx.Unlock()
+	e.mtx.RLock()
+	defer e.mtx.RUnlock()
 
 	if e.next != nil {
 		return e.next

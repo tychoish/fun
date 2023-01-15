@@ -32,6 +32,7 @@ func slicesAreEqual[T comparable](t *testing.T, in []T, out []T) {
 }
 
 func TestIteratorAlgoInts(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	elems := func() []int {
@@ -246,6 +247,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 }
 
 func TestIteratorImplementations(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

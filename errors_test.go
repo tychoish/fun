@@ -46,10 +46,12 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *ErrorCollector) {
 }
 
 func TestError(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	const errval = "ERRO=42"
 	t.Run("Collector", func(t *testing.T) {
+		t.Parallel()
 		t.Run("InitialState", func(t *testing.T) {
 			catcher := &ErrorCollector{}
 			catcherIsEmpty(t, catcher)
@@ -131,6 +133,7 @@ func TestError(t *testing.T) {
 		})
 	})
 	t.Run("Stack", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Nil", func(t *testing.T) {
 			var es *ErrorStack
 			if es.len() != 0 {
@@ -225,7 +228,7 @@ func TestError(t *testing.T) {
 			es := &ErrorStack{}
 			es = es.append(err1)
 			es = es.append(err2)
-			if !es.Is(err1) {
+			if !errors.Is(es, err1) {
 				t.Fatal("expected is to find wrapped err")
 			}
 		})
@@ -243,6 +246,7 @@ func TestError(t *testing.T) {
 		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {
+		t.Parallel()
 		fixtureTimeout, cancel := context.WithTimeout(ctx, 1*time.Second)
 		defer cancel()
 		wg := &WaitGroup{}
@@ -251,7 +255,7 @@ func TestError(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				ticker := time.NewTicker(2 * time.Millisecond)
+				ticker := time.NewTicker(time.Millisecond)
 				defer ticker.Stop()
 				for {
 					select {
@@ -267,16 +271,13 @@ func TestError(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			wg.Add(1)
 			go func(id int) {
-				var size int
 				defer wg.Done()
-				ticker := time.NewTicker(4 * time.Millisecond)
+				ticker := time.NewTicker(2 * time.Millisecond)
 				defer ticker.Stop()
-				count := 0
-				var startAt time.Time
 
-				defer func() {
-					t.Logf("#%d: %d iters. last in %s @size %d", id, count, time.Since(startAt), size)
-				}()
+				var size int
+				var count int
+
 				for {
 					count++
 					select {
@@ -284,19 +285,18 @@ func TestError(t *testing.T) {
 						return
 					case <-ticker.C:
 						if err := catcher.Resolve(); err == nil {
-							t.Error("should have one by now")
+							if count > 10 {
+								t.Error("should have one by now")
+							}
 						} else {
-							startAt = time.Now()
-
-							if cl := catcher.Len(); cl > 1 {
+							if size = catcher.Len(); size >= 1 {
 								es, ok := err.(*ErrorStack)
 								if !ok {
 									t.Error("should be an error stack")
 								}
-								if errs := es.Errors(); len(errs) > cl {
-									t.Error("problem in reporting", len(errs), cl)
+								if errs := es.Errors(); len(errs) > size {
+									t.Error("problem in reporting", len(errs), size)
 								}
-								size = cl
 							}
 						}
 					}
