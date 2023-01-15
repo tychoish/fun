@@ -94,7 +94,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 									return 0, false, nil
 								},
 							)
-							out, err := CollectIterator(ctx, outIter)
+							out, err := IteratorCollect(ctx, outIter)
 							if err != nil {
 								t.Fatal(err)
 							}
@@ -110,7 +110,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 									panic("whoop")
 								},
 							)
-							out, err := CollectIterator(ctx, outIter)
+							out, err := IteratorCollect(ctx, outIter)
 							if err == nil {
 								t.Fatal("expectged error")
 							}
@@ -133,7 +133,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 									return 0, true, errors.New("abort")
 								},
 							)
-							out, err := CollectIterator(ctx, outIter)
+							out, err := IteratorCollect(ctx, outIter)
 							if err == nil {
 								t.Fatal("expectged error", err)
 							}
@@ -198,8 +198,8 @@ func TestIteratorAlgoInts(t *testing.T) {
 					})
 					t.Run("Map", func(t *testing.T) {
 						t.Run("PanicSafety", func(t *testing.T) {
-							out, err := CollectIterator(ctx,
-								MapIterator(ctx,
+							out, err := IteratorCollect(ctx,
+								IteratorMap(ctx,
 									wrapper(baseBuilder()),
 									func(ctx context.Context, input int) (int, error) {
 										panic("whoop")
@@ -217,8 +217,8 @@ func TestIteratorAlgoInts(t *testing.T) {
 							}
 						})
 						t.Run("ErrorDoesNotAbort", func(t *testing.T) {
-							out, err := CollectIterator(ctx,
-								MapIterator(ctx,
+							out, err := IteratorCollect(ctx,
+								IteratorMap(ctx,
 									wrapper(baseBuilder()),
 									func(ctx context.Context, input int) (int, error) {
 										if input == 42 {
@@ -365,7 +365,7 @@ func TestIteratorImplementations(t *testing.T) {
 								t.Run("Channel", func(t *testing.T) {
 									seen := make(map[string]struct{}, len(elems))
 									iter := builder()
-									ch := CollectIteratorChannel(ctx, iter)
+									ch := IteratorChannel(ctx, iter)
 									for str := range ch {
 										seen[str] = struct{}{}
 									}
@@ -376,7 +376,7 @@ func TestIteratorImplementations(t *testing.T) {
 								})
 								t.Run("Collect", func(t *testing.T) {
 									iter := builder()
-									vals, err := CollectIterator(ctx, iter)
+									vals, err := IteratorCollect(ctx, iter)
 									if err != nil {
 										t.Fatal(err)
 									}
@@ -387,13 +387,13 @@ func TestIteratorImplementations(t *testing.T) {
 								})
 								t.Run("Map", func(t *testing.T) {
 									iter := builder()
-									out := MapIterator(ctx, iter,
+									out := IteratorMap(ctx, iter,
 										func(ctx context.Context, str string) (string, error) {
 											return str, nil
 										},
 									)
 
-									vals, err := CollectIterator(ctx, out)
+									vals, err := IteratorCollect(ctx, out)
 									if err != nil {
 										t.Fatal(err)
 
@@ -406,7 +406,7 @@ func TestIteratorImplementations(t *testing.T) {
 								t.Run("Reduce", func(t *testing.T) {
 									iter := builder()
 									seen := make(map[string]struct{}, len(elems))
-									sum, err := ReduceIterator(ctx, iter,
+									sum, err := IteratorReduce(ctx, iter,
 										func(ctx context.Context, in string, val int) (int, error) {
 											seen[in] = struct{}{}
 											val += len(in)

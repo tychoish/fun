@@ -63,7 +63,7 @@ type Queue[T any] struct {
 
 // New constructs a new empty queue with the specified options.  It reports an
 // error if any of the option values are invalid.
-func New[T any](opts Options) (*Queue[T], error) {
+func New[T any](opts QueueOptions) (*Queue[T], error) {
 	if opts.HardLimit <= 0 || opts.HardLimit < opts.SoftQuota {
 		return nil, errHardLimit
 	}
@@ -207,8 +207,8 @@ func (q *Queue[T]) popFront() T {
 	return e.item
 }
 
-// Options are the initial settings for a Queue.
-type Options struct {
+// QueueOptions are the initial settings for a Queue.
+type QueueOptions struct {
 	// The maximum number of items the queue will ever be permitted to hold.
 	// This value must be positive, and greater than or equal to SoftQuota. The
 	// hard limit is fixed and does not change as the queue is used.

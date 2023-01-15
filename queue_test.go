@@ -10,17 +10,17 @@ import (
 func TestQueueNew(t *testing.T) {
 	tests := []struct {
 		desc string
-		opts Options
+		opts QueueOptions
 		want error
 	}{
-		{"empty options", Options{}, errHardLimit},
-		{"zero limit negative quota", Options{SoftQuota: -1}, errHardLimit},
-		{"zero limit and quota", Options{SoftQuota: 0}, errHardLimit},
-		{"zero limit", Options{SoftQuota: 1, HardLimit: 0}, errHardLimit},
-		{"limit less than quota", Options{SoftQuota: 5, HardLimit: 3}, errHardLimit},
-		{"negative credit", Options{SoftQuota: 1, HardLimit: 1, BurstCredit: -6}, errBurstCredit},
-		{"valid default credit", Options{SoftQuota: 1, HardLimit: 2, BurstCredit: 0}, nil},
-		{"valid explicit credit", Options{SoftQuota: 1, HardLimit: 5, BurstCredit: 10}, nil},
+		{"empty options", QueueOptions{}, errHardLimit},
+		{"zero limit negative quota", QueueOptions{SoftQuota: -1}, errHardLimit},
+		{"zero limit and quota", QueueOptions{SoftQuota: 0}, errHardLimit},
+		{"zero limit", QueueOptions{SoftQuota: 1, HardLimit: 0}, errHardLimit},
+		{"limit less than quota", QueueOptions{SoftQuota: 5, HardLimit: 3}, errHardLimit},
+		{"negative credit", QueueOptions{SoftQuota: 1, HardLimit: 1, BurstCredit: -6}, errBurstCredit},
+		{"valid default credit", QueueOptions{SoftQuota: 1, HardLimit: 2, BurstCredit: 0}, nil},
+		{"valid explicit credit", QueueOptions{SoftQuota: 1, HardLimit: 5, BurstCredit: 10}, nil},
 	}
 
 	for _, test := range tests {
@@ -55,7 +55,7 @@ func (q testQueue) mustRemove(want string) {
 	}
 }
 
-func mustQueue(t *testing.T, opts Options) testQueue {
+func mustQueue(t *testing.T, opts QueueOptions) testQueue {
 	t.Helper()
 
 	q, err := New[string](opts)
@@ -66,7 +66,7 @@ func mustQueue(t *testing.T, opts Options) testQueue {
 }
 
 func TestQueueHardLimit(t *testing.T) {
-	q := mustQueue(t, Options{SoftQuota: 1, HardLimit: 1})
+	q := mustQueue(t, QueueOptions{SoftQuota: 1, HardLimit: 1})
 	q.mustAdd("foo")
 	if err := q.Add("bar"); err != ErrQueueFull {
 		t.Errorf("Add: got err=%v, want %v", err, ErrQueueFull)
@@ -74,7 +74,7 @@ func TestQueueHardLimit(t *testing.T) {
 }
 
 func TestQueueSoftQuota(t *testing.T) {
-	q := mustQueue(t, Options{SoftQuota: 1, HardLimit: 4})
+	q := mustQueue(t, QueueOptions{SoftQuota: 1, HardLimit: 4})
 	q.mustAdd("foo")
 	q.mustAdd("bar")
 	if err := q.Add("baz"); err != ErrQueueNoCredit {
@@ -83,7 +83,7 @@ func TestQueueSoftQuota(t *testing.T) {
 }
 
 func TestQueueBurstCredit(t *testing.T) {
-	q := mustQueue(t, Options{SoftQuota: 2, HardLimit: 5})
+	q := mustQueue(t, QueueOptions{SoftQuota: 2, HardLimit: 5})
 	q.mustAdd("foo")
 	q.mustAdd("bar")
 
@@ -108,7 +108,7 @@ func TestQueueBurstCredit(t *testing.T) {
 }
 
 func TestQueueClose(t *testing.T) {
-	q := mustQueue(t, Options{SoftQuota: 2, HardLimit: 10})
+	q := mustQueue(t, QueueOptions{SoftQuota: 2, HardLimit: 10})
 	q.mustAdd("alpha")
 	q.mustAdd("bravo")
 	q.mustAdd("charlie")
@@ -129,7 +129,7 @@ func TestQueueWait(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	q := mustQueue(t, Options{SoftQuota: 2, HardLimit: 2})
+	q := mustQueue(t, QueueOptions{SoftQuota: 2, HardLimit: 2})
 
 	// A wait on an empty queue should time out.
 	t.Run("WaitTimeout", func(t *testing.T) {

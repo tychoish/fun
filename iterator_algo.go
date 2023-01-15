@@ -4,8 +4,8 @@ import (
 	"context"
 )
 
-// CollectIteratorChannel converts and iterator to a channel.
-func CollectIteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
+// IteratorChannel converts and iterator to a channel.
+func IteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
 	out := make(chan T)
 	go func() {
 		defer close(out)
@@ -21,11 +21,11 @@ func CollectIteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan
 	return out
 }
 
-// CollectIterator converts an iterator to the slice of it's values.
+// IteratorCollect converts an iterator to the slice of it's values.
 //
 // In the case of an error in the underlying iterator the output slice
 // will have the values encountered before the error.
-func CollectIterator[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
+func IteratorCollect[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
 	out := []T{}
 	err := ForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
 	return out, err
@@ -101,10 +101,10 @@ func FilterIterator[T any](
 	return out
 }
 
-// MapIterator provides an orthodox functional map implementation based around
+// IteratorMap provides an orthodox functional map implementation based around
 // fun.Iterator. Operates in asynchronous/streaming manner, so that
 // the output Iterator must be consumed.
-func MapIterator[T any, O any](
+func IteratorMap[T any, O any](
 	ctx context.Context,
 	iter Iterator[T],
 	mapper func(context.Context, T) (O, error),
@@ -142,10 +142,10 @@ func MapIterator[T any, O any](
 	return out
 }
 
-// ReduceIterator processes an input iterator with a reduce function and
+// IteratorReduce processes an input iterator with a reduce function and
 // outputs the final value. The initial value may be a zero or nil
 // value.
-func ReduceIterator[T any, O any](
+func IteratorReduce[T any, O any](
 	ctx context.Context,
 	iter Iterator[T],
 	reducer func(context.Context, T, O) (O, error),
