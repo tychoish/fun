@@ -49,8 +49,12 @@ func TestBroker(t *testing.T) {
 					{Name: "Serial/DoubleBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems) * 2}},
 				} {
 					t.Run(opts.Name, func(t *testing.T) {
+						ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+						defer cancel()
+
 						elems := scope.Elems
 						opts := opts
+
 						t.Parallel()
 						broker := NewBroker[string](opts.Opts)
 						broker.Start(ctx)
@@ -75,9 +79,12 @@ func TestBroker(t *testing.T) {
 						wgState.Add(2)
 
 						total := len(elems)
+						started1 := make(chan struct{})
+						started2 := make(chan struct{})
 						go func() {
 							defer wgState.Add(-1)
 							defer wg.Done()
+							close(started1)
 							for {
 								select {
 								case <-ctx.Done():
@@ -99,6 +106,7 @@ func TestBroker(t *testing.T) {
 						go func() {
 							defer wgState.Add(-1)
 							defer wg.Done()
+							close(started2)
 							for {
 								select {
 								case <-ctx.Done():
@@ -116,7 +124,16 @@ func TestBroker(t *testing.T) {
 								}
 							}
 						}()
-
+						select {
+						case <-ctx.Done():
+							return
+						case <-started1:
+						}
+						select {
+						case <-ctx.Done():
+							return
+						case <-started2:
+						}
 						go func() {
 							defer wg.Done()
 							for idx := range elems {
@@ -163,8 +180,15 @@ func TestBroker(t *testing.T) {
 						broker.Unsubscribe(cctx, ch1)
 					})
 					t.Run(opts.Name+"/NonBlocking", func(t *testing.T) {
+						elems := scope.Elems
+						opts := opts
+
+						t.Parallel()
+
+						ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+						defer cancel()
+
 						opts.Opts.NonBlockingSubscriptions = true
-						defer func() { opts.Opts.NonBlockingSubscriptions = false }()
 						broker := NewBroker[string](opts.Opts)
 						broker.Start(ctx)
 

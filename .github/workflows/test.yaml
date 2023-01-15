@@ -10,7 +10,7 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     strategy:
       fail-fast: false
     steps:
@@ -28,5 +28,5 @@ jobs:
       - name: Run Go Tests
         if: env.GIT_DIFF
         run: |
-          export GOMAXPROCS=$(($(nproc) + 3))
-          go list -f "{{ if (or .TestGoFiles .XTestGoFiles) }}{{ .ImportPath }}{{ end }}" ./... | xargs -t go test -timeout=4m
+          export GOMAXPROCS=$(($(nproc) + 2))
+          go list -f "{{ if (or .TestGoFiles .XTestGoFiles) }}{{ .ImportPath }}{{ end }}" ./... | xargs -t go test -race -timeout=2m
