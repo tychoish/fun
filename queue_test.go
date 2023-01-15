@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -137,8 +138,8 @@ func TestQueueWait(t *testing.T) {
 		got, err := q.Wait(ctx)
 		if err == nil {
 			t.Errorf("Wait: got %v, want error", got)
-		} else {
-			t.Logf("Wait correctly failed: %v", err)
+		} else if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Wait should have encountered a timeout, but got: %v", err)
 		}
 	})
 
