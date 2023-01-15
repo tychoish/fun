@@ -84,7 +84,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 				t.Run(wrapperName, func(t *testing.T) {
 					t.Run("Filter", func(t *testing.T) {
 						t.Run("Evens", func(t *testing.T) {
-							outIter := FilterIterator(
+							outIter := IteratorFilter(
 								ctx,
 								wrapper(baseBuilder()),
 								func(ctx context.Context, input int) (int, bool, error) {
@@ -103,7 +103,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 							}
 						})
 						t.Run("PanicSafety", func(t *testing.T) {
-							outIter := FilterIterator(
+							outIter := IteratorFilter(
 								ctx,
 								wrapper(baseBuilder()),
 								func(ctx context.Context, input int) (int, bool, error) {
@@ -122,7 +122,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 							}
 						})
 						t.Run("ErrorAborts", func(t *testing.T) {
-							outIter := FilterIterator(
+							outIter := IteratorFilter(
 								ctx,
 								wrapper(baseBuilder()),
 								func(ctx context.Context, input int) (int, bool, error) {
@@ -151,7 +151,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 					})
 					t.Run("ForEach", func(t *testing.T) {
 						t.Run("PanicSafety", func(t *testing.T) {
-							err := ForEach(
+							err := IteratorForEach(
 								ctx,
 								wrapper(baseBuilder()),
 								func(ctx context.Context, input int) error {
@@ -169,7 +169,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 						t.Run("ErrorAborts", func(t *testing.T) {
 							var count int
 							seen := NewSet[int]()
-							err := ForEach(
+							err := IteratorForEach(
 								ctx,
 								wrapper(baseBuilder()),
 								func(ctx context.Context, in int) error {
@@ -348,7 +348,7 @@ func TestIteratorImplementations(t *testing.T) {
 								t.Run("ForEach", func(t *testing.T) {
 									var count int
 									seen := make(map[string]struct{}, len(elems))
-									err := ForEach(
+									err := IteratorForEach(
 										ctx,
 										builder(),
 										func(ctx context.Context, str string) error {

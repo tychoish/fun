@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -138,6 +139,7 @@ func TestBroker(t *testing.T) {
 							defer wg.Done()
 							for idx := range elems {
 								broker.Publish(ctx, elems[idx])
+								runtime.Gosched()
 							}
 							timer := time.NewTimer(500 * time.Millisecond)
 							defer timer.Stop()
@@ -208,12 +210,13 @@ func TestBroker(t *testing.T) {
 							}
 						}()
 
-						for i := 0; i < 20; i++ {
+						for i := 0; i < 30; i++ {
 							wg.Add(1)
 							go func(id int) {
 								defer wg.Done()
 								for idx := range elems {
 									broker.Publish(ctx, fmt.Sprint(id, "=>", elems[idx]))
+									runtime.Gosched()
 								}
 							}(i)
 						}
@@ -221,7 +224,8 @@ func TestBroker(t *testing.T) {
 						wg.Wait(ctx)
 
 						if count != len(elems) {
-							t.Fatal("did not see", count, "out of", len(elems))
+							t.Log(ctx.Err())
+							t.Fatal("saw", count, "out of", len(elems))
 						}
 					})
 

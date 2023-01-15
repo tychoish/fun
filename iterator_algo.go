@@ -27,13 +27,13 @@ func IteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
 // will have the values encountered before the error.
 func IteratorCollect[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
 	out := []T{}
-	err := ForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
+	err := IteratorForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
 	return out, err
 }
 
-// ForEach passes each item in the iterator through the specified
+// IteratorForEach passes each item in the iterator through the specified
 // handler function, return an error if the handler function errors.
-func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(context.Context, T) error) (err error) {
+func IteratorForEach[T any](ctx context.Context, iter Iterator[T], fn func(context.Context, T) error) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -53,7 +53,7 @@ func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(context.Conte
 	return
 }
 
-// FilterIterator passes all objects in an iterator through the
+// IteratorFilter passes all objects in an iterator through the
 // specified filter function. If the filter function errors, the
 // operation aborts and the error is reported by the returned
 // iterator's Close method. If the include boolean is true the result
@@ -62,7 +62,7 @@ func ForEach[T any](ctx context.Context, iter Iterator[T], fn func(context.Conte
 //
 // The output iterator is produced iteratively as the returned
 // iterator is consumed.
-func FilterIterator[T any](
+func IteratorFilter[T any](
 	ctx context.Context,
 	iter Iterator[T],
 	fn func(ctx context.Context, input T) (output T, include bool, err error),
