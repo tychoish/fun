@@ -25,7 +25,7 @@ func TestQueueNew(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := New[string](test.opts)
+			got, err := NewQueue[string](test.opts)
 			if err != test.want {
 				t.Errorf("New(%+v): got (%+v, %v), want err=%v", test.opts, got, err, test.want)
 			}
@@ -58,7 +58,7 @@ func (q testQueue) mustRemove(want string) {
 func mustQueue(t *testing.T, opts QueueOptions) testQueue {
 	t.Helper()
 
-	q, err := New[string](opts)
+	q, err := NewQueue[string](opts)
 	if err != nil {
 		t.Fatalf("New(%+v): unexpected error: %v", opts, err)
 	}

@@ -61,21 +61,13 @@ type Queue[T any] struct {
 	// to the newest entry. The oldest entry is front.link if it exists.
 }
 
-// New constructs a new empty queue with the specified options.  It reports an
+// NewQueue constructs a new empty queue with the specified options.  It reports an
 // error if any of the option values are invalid.
-func New[T any](opts QueueOptions) (*Queue[T], error) {
-	if opts.HardLimit <= 0 || opts.HardLimit < opts.SoftQuota {
-		return nil, errHardLimit
+func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
 	}
-	if opts.BurstCredit < 0 {
-		return nil, errBurstCredit
-	}
-	if opts.SoftQuota <= 0 {
-		opts.SoftQuota = opts.HardLimit
-	}
-	if opts.BurstCredit == 0 {
-		opts.BurstCredit = float64(opts.SoftQuota)
-	}
+
 	sentinel := new(entry[T])
 	q := &Queue[T]{
 		softQuota: opts.SoftQuota,
@@ -226,6 +218,23 @@ type QueueOptions struct {
 	// The initial burst credit score.  This value must be greater than or equal
 	// to zero. If it is zero, the soft quota is used.
 	BurstCredit float64
+}
+
+func (opts *QueueOptions) Validate() error {
+	if opts.HardLimit <= 0 || opts.HardLimit < opts.SoftQuota {
+		return errHardLimit
+	}
+	if opts.BurstCredit < 0 {
+		return errBurstCredit
+	}
+	if opts.SoftQuota <= 0 {
+		opts.SoftQuota = opts.HardLimit
+	}
+	if opts.BurstCredit == 0 {
+		opts.BurstCredit = float64(opts.SoftQuota)
+	}
+	return nil
+
 }
 
 type entry[T any] struct {
