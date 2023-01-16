@@ -91,7 +91,67 @@ func TestBroker(t *testing.T) {
 						Name: "Serial/DoubleBuffered",
 						Opts: BrokerOptions{
 							ParallelDispatch: false,
-							BufferSize:       len(elems) * 2},
+							BufferSize:       len(elems) * 2,
+						},
+					},
+					{
+						Name: "Queue/Serial/Unbuffered/OneWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							QueueOptions: &QueueOptions{
+								HardLimit:   10,
+								SoftQuota:   5,
+								BurstCredit: 2,
+							},
+						},
+					},
+					{
+						Name: "Queue/Serial/Unbuffered/TwoWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							WorkerPoolSize:   2,
+							QueueOptions: &QueueOptions{
+								HardLimit:   10,
+								SoftQuota:   5,
+								BurstCredit: 2,
+							},
+						},
+					},
+					{
+						Name: "Queue/Parallel/Unbuffered/TwoWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							WorkerPoolSize:   2,
+							QueueOptions: &QueueOptions{
+								HardLimit:   10,
+								SoftQuota:   5,
+								BurstCredit: 2,
+							},
+						},
+					},
+					{
+						Name: "Queue/Serial/Unbuffered/EightWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							WorkerPoolSize:   8,
+							QueueOptions: &QueueOptions{
+								HardLimit:   4,
+								SoftQuota:   2,
+								BurstCredit: 1,
+							},
+						},
+					},
+					{
+						Name: "Queue/Parallel/Unbuffered/EightWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							WorkerPoolSize:   8,
+							QueueOptions: &QueueOptions{
+								HardLimit:   4,
+								SoftQuota:   2,
+								BurstCredit: 1,
+							},
+						},
 					},
 				} {
 					t.Run(opts.Name, func(t *testing.T) {
@@ -232,7 +292,7 @@ func TestBroker(t *testing.T) {
 
 						t.Parallel()
 
-						ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+						ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 						defer cancel()
 
 						opts.Opts.NonBlockingSubscriptions = true
