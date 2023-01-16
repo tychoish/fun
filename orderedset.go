@@ -83,11 +83,15 @@ func (s *orderedSetImpl[T]) Iterator(ctx context.Context) Iterator[T] {
 type orderedSetIterImpl[T comparable] struct {
 	set     *orderedSetImpl[T]
 	lastIdx int
+	value   T
 }
 
 func (iter *orderedSetIterImpl[T]) Next(ctx context.Context) bool {
 	for i := iter.lastIdx + 1; i < len(iter.set.elems); i++ {
 		if ctx.Err() != nil {
+			return false
+		}
+		if len(iter.set.elems) <= i {
 			return false
 		}
 		if iter.set.elems[i].deleted {
@@ -97,10 +101,11 @@ func (iter *orderedSetIterImpl[T]) Next(ctx context.Context) bool {
 			return false
 		}
 		iter.lastIdx = i
+		iter.value = iter.set.elems[i].item
 		return true
 	}
 	return false
 }
 
-func (iter *orderedSetIterImpl[T]) Value() T                      { return iter.set.elems[iter.lastIdx].item }
+func (iter *orderedSetIterImpl[T]) Value() T                      { return iter.value }
 func (iter *orderedSetIterImpl[T]) Close(_ context.Context) error { return nil }

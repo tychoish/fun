@@ -120,7 +120,7 @@ func (iter *mapIterImpl[T]) Close(ctx context.Context) error {
 }
 
 type syncIterImpl[T any] struct {
-	mtx  sync.RWMutex
+	mtx  *sync.RWMutex
 	iter Iterator[T]
 }
 
@@ -128,26 +128,29 @@ type syncIterImpl[T any] struct {
 // one that is protected by a mutex. The underling implementation
 // provides an Unwrap method.
 func MakeSynchronizedIterator[T any](in Iterator[T]) Iterator[T] {
-	return &syncIterImpl[T]{iter: in}
+	return syncIterImpl[T]{
+		mtx:  &sync.RWMutex{},
+		iter: in,
+	}
 }
 
-func (iter *syncIterImpl[T]) Unwrap() Iterator[T] { return iter.iter }
+func (iter syncIterImpl[T]) Unwrap() Iterator[T] { return iter.iter }
 
-func (iter *syncIterImpl[T]) Next(ctx context.Context) bool {
+func (iter syncIterImpl[T]) Next(ctx context.Context) bool {
 	iter.mtx.Lock()
 	defer iter.mtx.Unlock()
 
 	return iter.iter.Next(ctx)
 }
 
-func (iter *syncIterImpl[T]) Close(ctx context.Context) error {
+func (iter syncIterImpl[T]) Close(ctx context.Context) error {
 	iter.mtx.Lock()
 	defer iter.mtx.Unlock()
 
 	return iter.iter.Close(ctx)
 }
 
-func (iter *syncIterImpl[T]) Value() T {
+func (iter syncIterImpl[T]) Value() T {
 	iter.mtx.RLock()
 	defer iter.mtx.RUnlock()
 

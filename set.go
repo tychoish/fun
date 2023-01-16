@@ -130,52 +130,60 @@ func (p Pairs[K, V]) OrderedSet() Set[Pair[K, V]] {
 }
 
 type syncSetImpl[T comparable] struct {
-	mtx sync.RWMutex
+	mtx *sync.RWMutex
 	set Set[T]
 }
 
 // MakeSynchronizedSet wraps an existing set instance with a
 // mutex. The underlying implementation provides an Unwrap method.
-func MakeSynchronizedSet[T comparable](s Set[T]) Set[T] { return &syncSetImpl[T]{set: s} }
+func MakeSynchronizedSet[T comparable](s Set[T]) Set[T] {
+	return syncSetImpl[T]{
+		set: s,
+		mtx: &sync.RWMutex{},
+	}
+}
 
-func (s *syncSetImpl[T]) Unwrap() Set[T] {
+func (s syncSetImpl[T]) Unwrap() Set[T] {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
 	return s.set
 }
 
-func (s *syncSetImpl[T]) Add(in T) {
+func (s syncSetImpl[T]) Add(in T) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
 	s.set.Add(in)
 }
 
-func (s *syncSetImpl[T]) Len() int {
+func (s syncSetImpl[T]) Len() int {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
 	return s.set.Len()
 }
 
-func (s *syncSetImpl[T]) Check(item T) bool {
+func (s syncSetImpl[T]) Check(item T) bool {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
 	return s.set.Check(item)
 }
 
-func (s *syncSetImpl[T]) Delete(in T) {
+func (s syncSetImpl[T]) Delete(in T) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
 	s.set.Delete(in)
 }
 
-func (s *syncSetImpl[T]) Iterator(ctx context.Context) Iterator[T] {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
+func (s syncSetImpl[T]) Iterator(ctx context.Context) Iterator[T] {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 
-	return MakeSynchronizedIterator(s.set.Iterator(ctx))
+	return syncIterImpl[T]{
+		iter: s.set.Iterator(ctx),
+		mtx:  s.mtx,
+	}
 }
