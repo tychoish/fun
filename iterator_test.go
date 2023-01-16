@@ -291,15 +291,18 @@ func TestIteratorImplementations(t *testing.T) {
 					return set.Iterator(ctx)
 				},
 			} {
-				for filterName, filter := range map[string]func(Iterator[string]) Iterator[string]{
-					"UnSynchronized": func(in Iterator[string]) Iterator[string] { return in },
-					"Synchronized": func(in Iterator[string]) Iterator[string] {
-						return MakeSynchronizedIterator(in)
-					},
-				} {
-					t.Run(filterName, func(t *testing.T) {
-						builder := func() Iterator[string] { return filter(baseBuilder()) }
-						t.Run(name, func(t *testing.T) {
+				t.Run(name, func(t *testing.T) {
+					elems := elems
+					t.Parallel()
+
+					for filterName, filter := range map[string]func(Iterator[string]) Iterator[string]{
+						"UnSynchronized": func(in Iterator[string]) Iterator[string] { return in },
+						"Synchronized": func(in Iterator[string]) Iterator[string] {
+							return MakeSynchronizedIterator(in)
+						},
+					} {
+						t.Run(filterName, func(t *testing.T) {
+							builder := func() Iterator[string] { return filter(baseBuilder()) }
 							t.Run("Single", func(t *testing.T) {
 								seen := make(map[string]struct{}, len(elems))
 								iter := builder()
@@ -428,8 +431,8 @@ func TestIteratorImplementations(t *testing.T) {
 								})
 							})
 						})
-					})
-				}
+					}
+				})
 			}
 		})
 	}
