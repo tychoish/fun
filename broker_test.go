@@ -40,14 +40,59 @@ func TestBroker(t *testing.T) {
 					Name string
 					Opts BrokerOptions
 				}{
-					{Name: "Parallel/ZeroBuffer", Opts: BrokerOptions{ParallelDispatch: true}},
-					{Name: "Serial/ZeroBuffer", Opts: BrokerOptions{ParallelDispatch: false}},
-					{Name: "Parallel/FullyBuffered", Opts: BrokerOptions{ParallelDispatch: true, BufferSize: len(elems)}},
-					{Name: "Serial/FullyBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems)}},
-					{Name: "Parallel/HalfBuffered", Opts: BrokerOptions{ParallelDispatch: true, BufferSize: len(elems) / 2}},
-					{Name: "Serial/HalfBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems) / 2}},
-					{Name: "Parallel/DoubleBuffered", Opts: BrokerOptions{ParallelDispatch: true, BufferSize: len(elems) * 2}},
-					{Name: "Serial/DoubleBuffered", Opts: BrokerOptions{ParallelDispatch: false, BufferSize: len(elems) * 2}},
+					{
+						Name: "Parallel/ZeroBuffer",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+						},
+					},
+					{
+						Name: "Serial/ZeroBuffer",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+						},
+					},
+					{
+						Name: "Parallel/FullyBuffered",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							BufferSize:       len(elems),
+						},
+					},
+					{
+						Name: "Serial/FullyBuffered",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							BufferSize:       len(elems),
+						},
+					},
+					{
+						Name: "Parallel/HalfBuffered",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							BufferSize:       len(elems) / 2,
+						},
+					},
+					{
+						Name: "Serial/HalfBuffered",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							BufferSize:       len(elems) / 2,
+						},
+					},
+					{
+						Name: "Parallel/DoubleBuffered",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							BufferSize:       len(elems) * 2,
+						},
+					},
+					{
+						Name: "Serial/DoubleBuffered",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							BufferSize:       len(elems) * 2},
+					},
 				} {
 					t.Run(opts.Name, func(t *testing.T) {
 						ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
