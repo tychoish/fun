@@ -22,7 +22,7 @@ func checkSeenMap(t *testing.T, elems []string, seen map[string]struct{}) {
 func slicesAreEqual[T comparable](t *testing.T, in []T, out []T) {
 	t.Helper()
 	if len(in) != len(out) {
-		t.Fatal("collected values are not equal")
+		t.Fatalf("collected values are not equal, in=%d, out=%d", len(in), len(out))
 	}
 	for idx := range in {
 		if in[idx] != out[idx] {
@@ -200,6 +200,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 						t.Run("PanicSafety", func(t *testing.T) {
 							out, err := IteratorCollect(ctx,
 								IteratorMap(ctx,
+									IteratorMapOptions{ContinueOnError: false},
 									wrapper(baseBuilder()),
 									func(ctx context.Context, input int) (int, error) {
 										panic("whoop")
@@ -219,6 +220,9 @@ func TestIteratorAlgoInts(t *testing.T) {
 						t.Run("ErrorDoesNotAbort", func(t *testing.T) {
 							out, err := IteratorCollect(ctx,
 								IteratorMap(ctx,
+									IteratorMapOptions{
+										ContinueOnError: true,
+									},
 									wrapper(baseBuilder()),
 									func(ctx context.Context, input int) (int, error) {
 										if input == 42 {
@@ -238,7 +242,86 @@ func TestIteratorAlgoInts(t *testing.T) {
 								t.Fatal("unexpected output", len(out), "->", out)
 							}
 						})
-
+						t.Run("PanicDoesNotAbort", func(t *testing.T) {
+							out, err := IteratorCollect(ctx,
+								IteratorMap(ctx,
+									IteratorMapOptions{
+										ContinueOnPanic: true,
+										NumWorkers:      1,
+									},
+									wrapper(baseBuilder()),
+									func(ctx context.Context, input int) (int, error) {
+										if input == 42 {
+											panic("whoop")
+										}
+										return input, nil
+									},
+								),
+							)
+							if err == nil {
+								t.Fatal("expected error")
+							}
+							if err.Error() != "panic: whoop" {
+								t.Fatal(err)
+							}
+							if len(out) != 99 {
+								t.Fatal("unexpected output", len(out), "->", out)
+							}
+						})
+						t.Run("ParallelErrorDoesNotAbort", func(t *testing.T) {
+							expectedErr := errors.New("whoop")
+							out, err := IteratorCollect(ctx,
+								IteratorMap(ctx,
+									IteratorMapOptions{
+										NumWorkers:      4,
+										ContinueOnError: true,
+									},
+									wrapper(baseBuilder()),
+									func(ctx context.Context, input int) (int, error) {
+										if input == 42 {
+											return 0, expectedErr
+										}
+										return input, nil
+									},
+								),
+							)
+							if err == nil {
+								t.Error("expected error")
+							}
+							if !errors.Is(err, expectedErr) {
+								t.Error(err)
+							}
+							if len(out) != 99 {
+								t.Error("unexpected output", len(out), "->", out)
+							}
+						})
+						t.Run("ErrorAborts", func(t *testing.T) {
+							out, err := IteratorCollect(ctx,
+								IteratorMap(ctx,
+									IteratorMapOptions{
+										NumWorkers:      1,
+										ContinueOnError: false,
+									},
+									wrapper(baseBuilder()),
+									func(ctx context.Context, input int) (int, error) {
+										if input >= 10 {
+											return 0, errors.New("whoop")
+										}
+										return input, nil
+									},
+								),
+							)
+							if err == nil {
+								t.Fatal("expected error")
+							}
+							if err.Error() != "whoop" {
+								t.Fatal(err)
+							}
+							// we should abort, but there's some asynchronicity.
+							if len(out) > 10 {
+								t.Fatal("unexpected output", len(out), "->", out)
+							}
+						})
 					})
 				})
 			}
@@ -390,7 +473,10 @@ func TestIteratorImplementations(t *testing.T) {
 								})
 								t.Run("Map", func(t *testing.T) {
 									iter := builder()
-									out := IteratorMap(ctx, iter,
+									out := IteratorMap(
+										ctx,
+										IteratorMapOptions{},
+										iter,
 										func(ctx context.Context, str string) (string, error) {
 											return str, nil
 										},

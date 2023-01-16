@@ -2,6 +2,8 @@ package fun
 
 import (
 	"context"
+	"fmt"
+	"sync"
 )
 
 // IteratorChannel converts and iterator to a channel.
@@ -101,45 +103,151 @@ func IteratorFilter[T any](
 	return out
 }
 
-// IteratorMap provides an orthodox functional map implementation based around
-// fun.Iterator. Operates in asynchronous/streaming manner, so that
-// the output Iterator must be consumed.
+// IteratorMapOptions describes the runtime options to the IteratorMap
+// operation. The zero value of this struct provides a usable strict operation.
+type IteratorMapOptions struct {
+	// ContinueOnPanic forces the entire IteratorMap operation to
+	// halt when a single map function panics. All panics are
+	// converted to errors and propagated to the output iterator's
+	// Close() method.
+	ContinueOnPanic bool
+	// ContinueOnError allows a map function to return an error
+	// and allow the work of the IteratorMap operation to
+	// continue. Errors are aggregated propagated to the output
+	// iterator's Close() method.
+	ContinueOnError bool
+	// NumWorkers describes the number of parallel workers
+	// processing the incoming iterator items and running the map
+	// function. All values less than 1 are converted to 1. Any
+	// value greater than 1 will result in out-of-sequence results
+	// in the output iterator.
+	NumWorkers int
+}
+
+// IteratorMap provides an orthodox functional map implementation
+// based around fun.Iterator. Operates in asynchronous/streaming
+// manner, so that the output Iterator must be consumed. The zero
+// values of IteratorMapOptions provide reasonable defaults for
+// abort-on-error and single-threaded map operation.
+//
+// If the mapper function errors, the result isn't included, but the
+// errors would be aggregated and propagated to the `Close()` method
+// of the resulting iterator. If there are more than one error (as is
+// the case with a panic or with ContinueOnError semantics,) the error
+// is an *ErrorStack object. Panics in the map function are converted
+// to errors and handled according to the ContinueOnPanic option.
 func IteratorMap[T any, O any](
 	ctx context.Context,
+	opts IteratorMapOptions,
 	iter Iterator[T],
 	mapper func(context.Context, T) (O, error),
 ) Iterator[O] {
 	out := new(mapIterImpl[O])
-	pipe := make(chan O)
-	out.pipe = pipe
+	safeOut := &syncIterImpl[O]{
+		iter: out,
+		mtx:  &sync.RWMutex{},
+	}
+	toOutput := make(chan O)
+	catcher := &ErrorCollector{}
+	out.pipe = toOutput
+
+	abortCtx, abort := context.WithCancel(ctx)
 	var iterCtx context.Context
-	iterCtx, out.closer = context.WithCancel(ctx)
+	iterCtx, out.closer = context.WithCancel(abortCtx)
+
+	if opts.NumWorkers <= 0 {
+		opts.NumWorkers = 1
+	}
+
+	fromInput := make(chan T, opts.NumWorkers)
 
 	out.wg.Add(1)
+	signal := make(chan struct{})
 	go func() {
-		catcher := &ErrorCollector{}
-
+		defer close(signal)
 		defer out.wg.Done()
-		defer func() { out.err = catcher.Resolve() }()
 		defer catcher.Recover()
 		defer catcher.CheckCtx(ctx, iter.Close)
-		defer close(pipe)
+		defer close(fromInput)
+		defer catcher.Recover()
 
-		for iter.Next(iterCtx) {
-			o, err := mapper(iterCtx, iter.Value())
-			if err != nil {
-				catcher.Add(err)
-				continue
-			}
+		for iter.Next(abortCtx) {
 			select {
-			case <-iterCtx.Done():
+			case <-abortCtx.Done():
 				return
-			case pipe <- o:
+			case fromInput <- iter.Value():
+				continue
 			}
 		}
 	}()
 
-	return out
+	wg := &WaitGroup{}
+	for i := 0; i < opts.NumWorkers; i++ {
+		go mapWorker(iterCtx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
+	}
+
+	out.wg.Add(1)
+	go func() {
+		defer out.wg.Done()
+		defer func() { out.err = catcher.Resolve() }()
+		defer catcher.Recover()
+		<-signal
+		wg.Wait(ctx)
+		abort()
+		close(toOutput)
+	}()
+
+	return safeOut
+}
+
+func mapWorker[T any, O any](
+	ctx context.Context,
+	catcher *ErrorCollector,
+	wg *WaitGroup,
+	opts IteratorMapOptions,
+	mapper func(context.Context, T) (O, error),
+	abort func(),
+	fromInput <-chan T,
+	toOutput chan<- O,
+) {
+	wg.Add(1)
+	defer wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			catcher.Add(fmt.Errorf("panic: %v", r))
+			if opts.ContinueOnPanic {
+				go mapWorker(ctx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
+				return
+			}
+			abort()
+			return
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case value, ok := <-fromInput:
+			if !ok {
+				return
+			}
+			o, err := mapper(ctx, value)
+			if err != nil {
+				catcher.Add(err)
+				if opts.ContinueOnError {
+					continue
+				}
+				abort()
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case toOutput <- o:
+			}
+		}
+	}
+
 }
 
 // IteratorReduce processes an input iterator with a reduce function and
