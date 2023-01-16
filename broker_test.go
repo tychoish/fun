@@ -295,7 +295,7 @@ func TestBroker(t *testing.T) {
 
 						t.Parallel()
 
-						ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+						ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 						defer cancel()
 
 						opts.Opts.NonBlockingSubscriptions = true
@@ -307,15 +307,15 @@ func TestBroker(t *testing.T) {
 
 						wg := &WaitGroup{}
 						ch1 := broker.Subscribe(ctx)
-						var count int
+						count := &atomic.Int32{}
 
 						wg.Add(1)
 						go func() {
 							defer wg.Done()
 							defer broker.Unsubscribe(ctx, ch1)
 							for range ch1 {
-								count++
-								if count == len(elems) {
+								count.Add(1)
+								if int(count.Load()) == len(elems) {
 									return
 								}
 							}
@@ -328,13 +328,18 @@ func TestBroker(t *testing.T) {
 								for idx := range elems {
 									broker.Publish(ctx, fmt.Sprint(id, "=>", elems[idx]))
 									runtime.Gosched()
+
+									if int(count.Load()) == len(elems) {
+										return
+									}
 								}
 							}(i)
 						}
 
 						wg.Wait(ctx)
-
-						if count != len(elems) {
+						broker.Stop()
+						broker.Wait(ctx)
+						if int(count.Load()) != len(elems) {
 							t.Log(ctx.Err())
 							t.Fatal("saw", count, "out of", len(elems))
 						}

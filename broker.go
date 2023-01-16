@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
@@ -18,9 +19,8 @@ type Broker[T any] struct {
 	unsubCh   chan chan T
 	opts      BrokerOptions
 
-	mu        sync.Mutex
-	close     context.CancelFunc
-	queueWait func(context.Context)
+	mu    sync.Mutex
+	close context.CancelFunc
 }
 
 // BrokerOptions configures the semantics of a broker. The zero-values
@@ -126,12 +126,11 @@ func (b *Broker[T]) Start(ctx context.Context) {
 			}
 		}()
 	default:
-		b.wg.Add(1)
+		b.wg.Add(2)
 
 		queue := Must(NewQueue[T](*b.opts.QueueOptions))
 		subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
-		go func() { <-ctx.Done(); _ = queue.Close() }()
-
+		go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
 		go func() {
 			defer b.wg.Done()
 			for {
@@ -143,20 +142,25 @@ func (b *Broker[T]) Start(ctx context.Context) {
 				case msgCh := <-b.unsubCh:
 					subs.Delete(msgCh)
 				case msg := <-b.publishCh:
-					switch queue.Add(msg) {
-					case ErrQueueClosed:
-						b.close()
-						return
-					case ErrQueueFull, ErrQueueNoCredit:
-						// we've dropped this message.
+					if err := queue.Add(msg); err != nil {
+						switch {
+						case errors.Is(err, ErrQueueNoCredit) || errors.Is(err, ErrQueueFull):
+							// we should drop messages while the queue is full.
+							continue
+						default:
+							// likely impossible
+							// queue is closed or encounters other error
+							b.close()
+							return
+						}
 					}
 				}
 			}
 		}()
 
 		numWorkers := b.opts.WorkerPoolSize
-		if numWorkers == 0 {
-			numWorkers++
+		if numWorkers <= 0 {
+			numWorkers = 1
 		}
 
 		for i := 0; i < numWorkers; i++ {
@@ -231,15 +235,7 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.queueWait != nil {
-		lwg := WaitGroup{}
-		lwg.Add(2)
-		go func() { defer lwg.Done(); b.wg.Wait(ctx) }()
-		go func() { defer lwg.Done(); b.queueWait(ctx) }()
-		lwg.Wait(ctx)
-	} else {
-		b.wg.Wait(ctx)
-	}
+	b.wg.Wait(ctx)
 }
 
 // Subscribe generates a new subscription channel, of the specified

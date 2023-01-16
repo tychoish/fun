@@ -30,6 +30,7 @@ func (e *ErrorStack) append(err error) *ErrorStack {
 	if e == nil {
 		e = &ErrorStack{}
 	}
+
 	switch werr := err.(type) {
 	case *ErrorStack:
 		if werr.next == nil {
