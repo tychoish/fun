@@ -18,8 +18,9 @@ type Broker[T any] struct {
 	unsubCh   chan chan T
 	opts      BrokerOptions
 
-	mu    sync.Mutex
-	close context.CancelFunc
+	mu        sync.Mutex
+	close     context.CancelFunc
+	queueWait func(context.Context)
 }
 
 // BrokerOptions configures the semantics of a broker. The zero-values
@@ -129,7 +130,7 @@ func (b *Broker[T]) Start(ctx context.Context) {
 
 		queue := Must(NewQueue[T](*b.opts.QueueOptions))
 		subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
-		b.close = func() { b.close(); _ = queue.Close() }
+		go func() { <-ctx.Done(); _ = queue.Close() }()
 
 		go func() {
 			defer b.wg.Done()
@@ -230,7 +231,15 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.wg.Wait(ctx)
+	if b.queueWait != nil {
+		lwg := WaitGroup{}
+		lwg.Add(2)
+		go func() { defer lwg.Done(); b.wg.Wait(ctx) }()
+		go func() { defer lwg.Done(); b.queueWait(ctx) }()
+		lwg.Wait(ctx)
+	} else {
+		b.wg.Wait(ctx)
+	}
 }
 
 // Subscribe generates a new subscription channel, of the specified

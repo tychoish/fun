@@ -162,7 +162,10 @@ func TestBroker(t *testing.T) {
 						opts := opts
 
 						t.Parallel()
-						broker := NewBroker[string](opts.Opts)
+						broker, err := NewBroker[string](opts.Opts)
+						if err != nil {
+							t.Fatal(err)
+						}
 						broker.Start(ctx)
 
 						// sometimes start it
@@ -296,7 +299,10 @@ func TestBroker(t *testing.T) {
 						defer cancel()
 
 						opts.Opts.NonBlockingSubscriptions = true
-						broker := NewBroker[string](opts.Opts)
+						broker, err := NewBroker[string](opts.Opts)
+						if err != nil {
+							t.Fatal(err)
+						}
 						broker.Start(ctx)
 
 						wg := &WaitGroup{}
