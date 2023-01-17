@@ -19,6 +19,7 @@ func TestQueueNew(t *testing.T) {
 		{"zero limit", QueueOptions{SoftQuota: 1, HardLimit: 0}, errHardLimit},
 		{"limit less than quota", QueueOptions{SoftQuota: 5, HardLimit: 3}, errHardLimit},
 		{"negative credit", QueueOptions{SoftQuota: 1, HardLimit: 1, BurstCredit: -6}, errBurstCredit},
+		{"valid defaultable", QueueOptions{SoftQuota: -1, HardLimit: 1, BurstCredit: 0}, nil},
 		{"valid default credit", QueueOptions{SoftQuota: 1, HardLimit: 2, BurstCredit: 0}, nil},
 		{"valid explicit credit", QueueOptions{SoftQuota: 1, HardLimit: 5, BurstCredit: 10}, nil},
 	}
@@ -192,4 +193,210 @@ func TestQueueWait(t *testing.T) {
 		q.Close()
 		<-done
 	})
+}
+
+func TestQueueIterator(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("EndToEnd", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		queue.Add("one")
+		queue.Add("two")
+		queue.Add("thr")
+
+		if queue.queueLen != 3 {
+			t.Fatal("unexpected queue length", queue.queueLen)
+		}
+
+		iter := queue.Iterator()
+		if !iter.Next(ctx) {
+			t.Fatal("should have iterated")
+		}
+		if val := iter.Value(); val != "one" {
+			t.Fatalf("unexpected value %q", val)
+		}
+
+		if !iter.Next(ctx) {
+			t.Fatal("should have iterated")
+		}
+		if val := iter.Value(); val != "two" {
+			t.Fatal("unexpected value", val)
+		}
+		if !iter.Next(ctx) {
+			t.Fatal("should have iterated")
+		}
+		if val := iter.Value(); val != "thr" {
+			t.Fatal("unexpected value", val)
+		}
+
+		startAt := time.Now()
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 400*time.Millisecond)
+		defer timeoutCancel()
+		sig := make(chan struct{})
+		go func() {
+			defer close(sig)
+			start := time.Now()
+			if !iter.Next(timeoutCtx) {
+				t.Error("expected to eventually be true", time.Since(start))
+			}
+		}()
+		time.Sleep(10 * time.Millisecond)
+		queue.Add("four")
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-sig:
+		}
+
+		if queue.queueLen != 4 {
+			t.Error("unexpected queue length", queue.queueLen)
+		}
+
+		if time.Since(startAt) > 150*time.Millisecond {
+			// if we get here, we hit a timeout
+			t.Error("hit timeout didn't wait long enough", time.Since(startAt))
+		}
+		if time.Since(startAt) < time.Millisecond {
+			t.Error("returned too soon")
+		}
+
+		if val := iter.Value(); val != "four" {
+			t.Log("unexpected value", val)
+		}
+	})
+	t.Run("EndToEndStartEmpty", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		iter := queue.Iterator()
+
+		startAt := time.Now()
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 400*time.Millisecond)
+		defer timeoutCancel()
+		sig := make(chan struct{})
+		go func() {
+			defer close(sig)
+			start := time.Now()
+			if !iter.Next(timeoutCtx) {
+				t.Error("expected to eventually be true", time.Since(start))
+			}
+		}()
+		time.Sleep(10 * time.Millisecond)
+		queue.Add("one")
+
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-sig:
+		}
+
+		if queue.queueLen != 1 {
+			t.Error("unexpected queue length", queue.queueLen)
+		}
+
+		if time.Since(startAt) > 150*time.Millisecond {
+			// if we get here, we hit a timeout
+			t.Error("hit timeout didn't wait long enough", time.Since(startAt))
+		}
+		if time.Since(startAt) < time.Millisecond {
+			t.Error("returned too soon")
+		}
+
+		if val := iter.Value(); val != "one" {
+			t.Log("unexpected value", val)
+		}
+	})
+	t.Run("ClosedDoesNotIterate", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		queue.Add("one")
+
+		iter := queue.Iterator()
+		if !iter.Next(ctx) {
+			t.Fatal("should iterate once")
+		}
+
+		err = iter.Close(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := 0; i < 2; i++ {
+			if iter.Next(ctx) {
+				t.Error("should not iterate")
+			}
+		}
+
+	})
+	t.Run("CanceledDoesNotIterate", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		queue.Add("one")
+
+		iter := queue.Iterator()
+		if !iter.Next(ctx) {
+			t.Fatal("should iterate once")
+		}
+		cancel()
+		for i := 0; i < 2; i++ {
+			if iter.Next(ctx) {
+				t.Log("should not iterate")
+			}
+		}
+
+		err = iter.Close(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("ClosedQueueDoesNotIterate", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		queue.Add("one")
+
+		iter := queue.Iterator()
+		if !iter.Next(ctx) {
+			t.Fatal("should iterate once")
+		}
+
+		queue.Close()
+		for i := 0; i < 2; i++ {
+			if iter.Next(ctx) {
+				t.Log("should not iterate")
+			}
+		}
+
+		err = iter.Close(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
 }

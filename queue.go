@@ -52,10 +52,11 @@ type Queue[T any] struct {
 	queueLen  int     // number of entries in the queue list
 	credit    float64 // current burst credit
 
-	closed bool
-	nempty *sync.Cond
-	back   *entry[T]
-	front  *entry[T]
+	closed   bool
+	nempty   *sync.Cond
+	nupdates *sync.Cond
+	back     *entry[T]
+	front    *entry[T]
 
 	// The queue is singly-linked. Front points to the sentinel and back points
 	// to the newest entry. The oldest entry is front.link if it exists.
@@ -77,6 +78,7 @@ func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
 		front:     sentinel,
 	}
 	q.nempty = sync.NewCond(&q.mu)
+	q.nupdates = sync.NewCond(&q.mu)
 	return q, nil
 }
 
@@ -112,6 +114,10 @@ func (q *Queue[T]) Add(item T) error {
 	if q.queueLen == 1 { // was empty
 		q.nempty.Signal()
 	}
+
+	// for the iterator, signal for any updates
+	q.nupdates.Signal()
+
 	return nil
 }
 
@@ -133,26 +139,57 @@ func (q *Queue[T]) Remove() (T, bool) {
 // returns a nil value and a context error. If the queue is closed while it is
 // still empty, Wait returns nil, ErrQueueClosed.
 func (q *Queue[T]) Wait(ctx context.Context) (T, error) {
-	// If the context terminates, wake the waiter.
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
-
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	if err := q.unsafeWaitWhileEmpty(ctx); err != nil {
+		return *new(T), err
+	}
+
+	return q.popFront(), nil
+}
+
+// caller must hold the lock with the waitCtx, but implements the wait
+// behavior without modifying the queue.
+func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
+	// If the context terminates, wake the waiter.
+	ctx, cancel := context.WithCancel(ctx)
+	go func() { <-ctx.Done(); q.nupdates.Broadcast() }()
+	defer cancel()
+
 	for q.queueLen == 0 {
 		if q.closed {
-			return *new(T), ErrQueueClosed
+			return ErrQueueClosed
 		}
 		select {
 		case <-ctx.Done():
-			return *new(T), ctx.Err()
+			return ctx.Err()
 		default:
-			q.nempty.Wait()
+			q.nupdates.Wait()
 		}
 	}
-	return q.popFront(), nil
+	return nil
+}
+
+func (q *Queue[T]) unsafeWaitForNew(ctx context.Context) error {
+	// If the context terminates, wake the waiter.
+	ctx, cancel := context.WithCancel(ctx)
+	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
+	defer cancel()
+
+	head := q.back
+	for head == q.back {
+		if q.closed {
+			return ErrQueueClosed
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			q.nupdates.Wait()
+		}
+	}
+	return nil
 }
 
 // Close closes the queue. After closing, any further Add calls will report an
@@ -163,6 +200,7 @@ func (q *Queue[T]) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
+	q.nupdates.Broadcast()
 	q.nempty.Broadcast()
 	return nil
 }
@@ -240,4 +278,90 @@ func (opts *QueueOptions) Validate() error {
 type entry[T any] struct {
 	item T
 	link *entry[T]
+}
+
+// internal implementation of the queue iterator, operations must hold
+// the queue's mutex.
+type queueIterImpl[T any] struct {
+	queue  *Queue[T]
+	item   *entry[T]
+	err    error
+	closed bool
+}
+
+// Iterator produces an iterator implementation that wraps the
+// underlying queue linked list. The iterator respects the Queue's
+// mutex and is safe for concurrent access and current queue
+// operations, without additional locking. The iterator does not
+// modify the contents of the queue, and will only terminate when the
+// queue has been closed via the Close() method.
+func (q *Queue[T]) Iterator() Iterator[T] {
+	iter := &queueIterImpl[T]{
+		queue: q,
+	}
+
+	return iter
+}
+
+func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
+	iter.queue.mu.Lock()
+	defer iter.queue.mu.Unlock()
+
+	if iter.closed || iter.err != nil {
+		return false
+	}
+
+	if iter.item == nil {
+		iter.item = iter.queue.front
+		// the sentinal is always non-nil, but the link has to
+		// be non-nil and so we bump here as a special case
+		if iter.item.link != nil {
+			iter.item = iter.item.link
+			return true
+		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+			if iter.item.link == nil {
+				if err := iter.queue.unsafeWaitForNew(ctx); err != nil {
+					if errors.Is(err, ErrQueueClosed) {
+						iter.closed = true
+						return false
+					}
+					// the context might be
+					// canceled, but we wouldn't
+					// loop very far, and there
+					// are no other possible
+					// returns, and if there were,
+					// it'd probably be reasonable
+					// to retry.
+				}
+			}
+			// seperate statement because things could
+			// have changed while we wait
+			if iter.item.link != nil {
+				iter.item = iter.item.link
+				return true
+			}
+
+		}
+	}
+}
+
+func (iter *queueIterImpl[T]) Close(_ context.Context) error {
+	iter.queue.mu.Lock()
+	defer iter.queue.mu.Unlock()
+	iter.closed = true
+	return iter.err
+}
+
+func (iter *queueIterImpl[T]) Value() T {
+	iter.queue.mu.Lock()
+	defer iter.queue.mu.Unlock()
+
+	return iter.item.item
 }

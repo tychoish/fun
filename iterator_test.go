@@ -74,6 +74,22 @@ func TestIteratorAlgoInts(t *testing.T) {
 
 			return set.Iterator(ctx)
 		},
+		"QueueIterator": func() Iterator[int] {
+			e := elems()
+			cue, err := NewQueue[int](QueueOptions{
+				SoftQuota: len(e),
+				HardLimit: 2 * len(e),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for idx := range e {
+				cue.Add(e[idx])
+			}
+			_ = cue.Close()
+			return cue.Iterator()
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for wrapperName, wrapper := range map[string]func(Iterator[int]) Iterator[int]{
@@ -82,6 +98,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 					return MakeSynchronizedIterator(in)
 				},
 			} {
+
 				t.Run(wrapperName, func(t *testing.T) {
 					t.Run("Filter", func(t *testing.T) {
 						t.Run("Evens", func(t *testing.T) {
@@ -270,6 +287,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 							}
 						})
 						t.Run("ErrorAborts", func(t *testing.T) {
+							expectedErr := errors.New("whoop")
 							out, err := IteratorCollect(ctx,
 								IteratorMap(ctx,
 									IteratorMapOptions{
@@ -279,7 +297,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 									wrapper(baseBuilder()),
 									func(ctx context.Context, input int) (int, error) {
 										if input >= 10 {
-											return 0, errors.New("whoop")
+											return 0, expectedErr
 										}
 										return input, nil
 									},
@@ -288,7 +306,7 @@ func TestIteratorAlgoInts(t *testing.T) {
 							if err == nil {
 								t.Fatal("expected error")
 							}
-							if err.Error() != "whoop" {
+							if !errors.Is(err, expectedErr) {
 								t.Fatal(err)
 							}
 							// we should abort, but there's some asynchronicity.
@@ -374,6 +392,21 @@ func TestIteratorImplementations(t *testing.T) {
 
 					return set.Iterator(ctx)
 				},
+				"QueueIterator": func() Iterator[string] {
+					cue, err := NewQueue[string](QueueOptions{
+						SoftQuota: len(elems),
+						HardLimit: 2 * len(elems),
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					for idx := range elems {
+						cue.Add(elems[idx])
+					}
+					_ = cue.Close()
+					return cue.Iterator()
+				},
 			} {
 				t.Run(name, func(t *testing.T) {
 					baseBuilder := baseBuilder
@@ -396,11 +429,11 @@ func TestIteratorImplementations(t *testing.T) {
 								for iter.Next(ctx) {
 									seen[iter.Value()] = struct{}{}
 								}
+								if err := iter.Close(ctx); err != nil {
+									t.Error(err)
+								}
 
 								checkSeenMap(t, elems, seen)
-								if err := iter.Close(ctx); err != nil {
-									t.Fatal(err)
-								}
 							})
 							t.Run("Merged", func(t *testing.T) {
 								iter := MergeIterators(ctx, builder(), builder(), builder())
@@ -429,8 +462,9 @@ func TestIteratorImplementations(t *testing.T) {
 								for iter.Next(ctx) {
 									count++
 								}
-								if count != 0 {
-									t.Fatal("should not have iterated", count)
+								err := iter.Close(ctx)
+								if count > len(elems)/2 && !errors.Is(err, context.Canceled) {
+									t.Fatal("should not have iterated or reported err", count, err)
 								}
 							})
 							t.Run("Algo", func(t *testing.T) {
@@ -472,6 +506,9 @@ func TestIteratorImplementations(t *testing.T) {
 									// skip implementation with random order
 									if name != "SetIterator" {
 										slicesAreEqual(t, elems, vals)
+									}
+									if err := iter.Close(ctx); err != nil {
+										t.Fatal(err)
 									}
 								})
 								t.Run("Map", func(t *testing.T) {

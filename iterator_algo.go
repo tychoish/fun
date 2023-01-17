@@ -183,6 +183,7 @@ func IteratorMap[T any, O any](
 
 	wg := &WaitGroup{}
 	for i := 0; i < opts.NumWorkers; i++ {
+		wg.Add(1)
 		go mapWorker(iterCtx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
 	}
 
@@ -210,12 +211,12 @@ func mapWorker[T any, O any](
 	fromInput <-chan T,
 	toOutput chan<- O,
 ) {
-	wg.Add(1)
 	defer wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
 			catcher.Add(fmt.Errorf("panic: %v", r))
 			if opts.ContinueOnPanic {
+				wg.Add(1)
 				go mapWorker(ctx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
 				return
 			}
