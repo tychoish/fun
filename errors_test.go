@@ -131,6 +131,22 @@ func TestError(t *testing.T) {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
+		t.Run("PanicRecovery", func(t *testing.T) {
+			es := &ErrorCollector{}
+			sig := make(chan struct{})
+			go func() {
+				defer close(sig)
+				defer es.Recover()
+				panic("boop")
+			}()
+			<-sig
+			if l := es.Len(); l != 1 {
+				t.Error("no panic recovered")
+			}
+			if e := es.stack.Error(); e != "panic: boop" {
+				t.Error(e)
+			}
+		})
 	})
 	t.Run("Stack", func(t *testing.T) {
 		t.Parallel()
@@ -242,6 +258,40 @@ func TestError(t *testing.T) {
 			const expected = "one; two; three"
 			if output != expected {
 				t.Error(output, "!=", expected)
+			}
+		})
+		t.Run("ErrorsMethodCaches", func(t *testing.T) {
+			es := &ErrorStack{}
+			es = es.append(errors.New("one"))
+			es = es.append(errors.New("two"))
+			es = es.append(errors.New("three"))
+
+			if es.size != 0 {
+				t.Error("lenght should not be cached yet", es.size)
+			}
+			if l := es.len(); l != 3 {
+				t.Fatalf("%d, %+v", l, es)
+			}
+			if es.size == 0 {
+				t.Error("lenght should be cached")
+			}
+
+			if l := es.len(); l != 3 {
+				t.Fatalf("%d, %+v", l, es)
+			}
+
+			if es.errs != nil {
+				t.Error("should be nil now")
+			}
+
+			errs0 := es.Errors()
+			if es.errs == nil {
+				t.Error("should not be nil now")
+			}
+
+			errs1 := es.Errors()
+			if fmt.Sprintf("%p", errs0) != fmt.Sprintf("%p", errs1) {
+				t.Error("pointer to the same")
 			}
 		})
 	})

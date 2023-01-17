@@ -120,9 +120,6 @@ func (p Pairs[K, V]) OrderedSet() Set[Pair[K, V]] {
 	set := MakeOrderedSet[Pair[K, V]](len(p))
 
 	for idx := range p {
-		if set.Check(p[idx]) {
-			continue
-		}
 		set.Add(p[idx])
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -268,33 +269,6 @@ func TestIteratorAlgoInts(t *testing.T) {
 								t.Fatal("unexpected output", len(out), "->", out)
 							}
 						})
-						t.Run("ParallelErrorDoesNotAbort", func(t *testing.T) {
-							expectedErr := errors.New("whoop")
-							out, err := IteratorCollect(ctx,
-								IteratorMap(ctx,
-									IteratorMapOptions{
-										NumWorkers:      4,
-										ContinueOnError: true,
-									},
-									wrapper(baseBuilder()),
-									func(ctx context.Context, input int) (int, error) {
-										if input == 42 {
-											return 0, expectedErr
-										}
-										return input, nil
-									},
-								),
-							)
-							if err == nil {
-								t.Error("expected error")
-							}
-							if !errors.Is(err, expectedErr) {
-								t.Error(err)
-							}
-							if len(out) != 99 {
-								t.Error("unexpected output", len(out), "->", out)
-							}
-						})
 						t.Run("ErrorAborts", func(t *testing.T) {
 							out, err := IteratorCollect(ctx,
 								IteratorMap(ctx,
@@ -320,6 +294,33 @@ func TestIteratorAlgoInts(t *testing.T) {
 							// we should abort, but there's some asynchronicity.
 							if len(out) > 10 {
 								t.Fatal("unexpected output", len(out), "->", out)
+							}
+						})
+						t.Run("ParallelErrorDoesNotAbort", func(t *testing.T) {
+							expectedErr := errors.New("whoop")
+							out, err := IteratorCollect(ctx,
+								IteratorMap(ctx,
+									IteratorMapOptions{
+										NumWorkers:      4,
+										ContinueOnError: true,
+									},
+									wrapper(baseBuilder()),
+									func(ctx context.Context, input int) (int, error) {
+										if input == 42 {
+											return 0, expectedErr
+										}
+										return input, nil
+									},
+								),
+							)
+							if err == nil {
+								t.Error("expected error")
+							}
+							if !errors.Is(err, expectedErr) {
+								t.Error(err)
+							}
+							if len(out) != 99 {
+								t.Error("unexpected output", len(out), "->", out)
 							}
 						})
 					})
@@ -375,7 +376,9 @@ func TestIteratorImplementations(t *testing.T) {
 				},
 			} {
 				t.Run(name, func(t *testing.T) {
+					baseBuilder := baseBuilder
 					elems := elems
+					name := name
 					t.Parallel()
 
 					for filterName, filter := range map[string]func(Iterator[string]) Iterator[string]{
@@ -492,6 +495,39 @@ func TestIteratorImplementations(t *testing.T) {
 										slicesAreEqual(t, elems, vals)
 									}
 								})
+								t.Run("ParallelMap", func(t *testing.T) {
+									out := IteratorMap(
+										ctx,
+										IteratorMapOptions{
+											NumWorkers: 4,
+										},
+										MergeIterators(ctx, builder(), builder(), builder()),
+										func(ctx context.Context, str string) (string, error) {
+											for _, c := range []string{"a", "e", "i", "o", "u"} {
+												str = strings.ReplaceAll(str, c, "")
+											}
+											return strings.TrimSpace(str), nil
+										},
+									)
+
+									vals, err := IteratorCollect(ctx, out)
+									if err != nil {
+										t.Fatal(err)
+									}
+									longString := strings.Join(vals, "")
+									count := 0
+									for _, i := range longString {
+										switch i {
+										case 'a', 'e', 'i', 'o', 'u':
+											count++
+										case '\n', '\t':
+											count += 100
+										}
+									}
+									if count != 0 {
+										t.Error("unexpected result", count)
+									}
+								})
 								t.Run("Reduce", func(t *testing.T) {
 									iter := builder()
 									seen := make(map[string]struct{}, len(elems))
@@ -515,6 +551,38 @@ func TestIteratorImplementations(t *testing.T) {
 										t.Errorf("incorrect seen %d, reduced %d", seenSum, sum)
 									}
 								})
+								t.Run("ReduceError", func(t *testing.T) {
+									iter := builder()
+
+									seen := MakeSet[string](2)
+
+									total, err := IteratorReduce(ctx, iter,
+										func(ctx context.Context, in string, val int) (int, error) {
+											seen.Add(in)
+											val++
+											if seen.Len() == 2 {
+												return val, errors.New("boop")
+											}
+											return val, nil
+										},
+										0,
+									)
+
+									if err == nil {
+										t.Fatal("expected error")
+									}
+
+									if e := err.Error(); e != "boop" {
+										t.Error("unexpected error:", e)
+									}
+									if l := seen.Len(); l != 2 {
+										t.Error("seen", l, seen)
+									}
+									if total != 2 {
+										t.Error("unexpected total value", total)
+									}
+								})
+
 							})
 						})
 					}

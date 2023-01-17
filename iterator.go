@@ -49,6 +49,7 @@ func MergeIterators[T any](ctx context.Context, iters ...Iterator[T]) Iterator[T
 type sliceIterImpl[T any] struct {
 	vals []T
 	idx  int
+	val  *T
 }
 
 // SliceIterator produces an iterator for an arbitrary slice.
@@ -67,11 +68,12 @@ func (iter *sliceIterImpl[T]) Next(ctx context.Context) bool {
 		return false
 	}
 	iter.idx++
+	iter.val = &iter.vals[iter.idx]
 
 	return true
 }
 
-func (iter *sliceIterImpl[T]) Value() T                      { return iter.vals[iter.idx] }
+func (iter *sliceIterImpl[T]) Value() T                      { return *iter.val }
 func (iter *sliceIterImpl[T]) Close(_ context.Context) error { return nil }
 
 type channelIterImpl[T any] struct {

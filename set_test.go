@@ -153,7 +153,7 @@ func TestSet(t *testing.T) {
 			}
 		})
 	}
-	t.Run("Pairs", func(t *testing.T) {
+	t.Run("Pairs/Basic", func(t *testing.T) {
 		pairs := Pairs[string, int]{
 			{"foo", 42},
 			{"bar", 31},
@@ -235,6 +235,40 @@ func TestSet(t *testing.T) {
 		newItem = pairs[len(pairs)-1]
 		if newItem.Key != "merlin" {
 			t.Error("wrong key value", newItem.Key)
+		}
+	})
+	t.Run("Pairs/DuplicateKey", func(t *testing.T) {
+		pairs := Pairs[string, string]{}
+		pairs.Add("aaa", "bbb")
+		pairs.Add("aaa", "bbb")
+		pairs.Add("aaa", "ccc")
+
+		if len(pairs) != 3 {
+			t.Fatal("unexpected pairs value")
+		}
+
+		for _, tt := range []struct {
+			Name    string
+			MakeSet func() Set[Pair[string, string]]
+		}{
+			{
+				Name:    "Map",
+				MakeSet: pairs.Set,
+			},
+			{
+				Name:    "Ordered",
+				MakeSet: pairs.OrderedSet,
+			},
+		} {
+			t.Run(tt.Name, func(t *testing.T) {
+				set := tt.MakeSet()
+				if set.Len() != 2 {
+					t.Error("set conversion didn't work")
+				}
+				// if they're comparably equal in the
+				// set there's no way to know which
+				// index from the pair was chosen.
+			})
 		}
 	})
 	t.Run("OrderedSetCleanup", func(t *testing.T) {
