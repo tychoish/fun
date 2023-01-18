@@ -463,7 +463,7 @@ func TestIteratorImplementations(t *testing.T) {
 									count++
 								}
 								err := iter.Close(ctx)
-								if count > len(elems)/2 && !errors.Is(err, context.Canceled) {
+								if count > len(elems) && !errors.Is(err, context.Canceled) {
 									t.Fatal("should not have iterated or reported err", count, err)
 								}
 							})

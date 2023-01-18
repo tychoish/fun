@@ -172,7 +172,7 @@ func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 }
 
 func (q *Queue[T]) unsafeWaitForNew(ctx context.Context) error {
-	// If the context terminates, wake the waiter.
+	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
 	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
 	defer cancel()
@@ -189,6 +189,7 @@ func (q *Queue[T]) unsafeWaitForNew(ctx context.Context) error {
 			q.nupdates.Wait()
 		}
 	}
+
 	return nil
 }
 
@@ -285,7 +286,6 @@ type entry[T any] struct {
 type queueIterImpl[T any] struct {
 	queue  *Queue[T]
 	item   *entry[T]
-	err    error
 	closed bool
 }
 
@@ -307,7 +307,7 @@ func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 	iter.queue.mu.Lock()
 	defer iter.queue.mu.Unlock()
 
-	if iter.closed || iter.err != nil {
+	if iter.closed || ctx.Err() != nil {
 		return false
 	}
 
@@ -321,42 +321,25 @@ func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 		}
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
+	if iter.item.link == nil {
+		if err := iter.queue.unsafeWaitForNew(ctx); err != nil {
+			if errors.Is(err, ErrQueueClosed) {
+				iter.closed = true
+				return false
+			}
 			return false
-		default:
-			if iter.item.link == nil {
-				if err := iter.queue.unsafeWaitForNew(ctx); err != nil {
-					if errors.Is(err, ErrQueueClosed) {
-						iter.closed = true
-						return false
-					}
-					// the context might be
-					// canceled, but we wouldn't
-					// loop very far, and there
-					// are no other possible
-					// returns, and if there were,
-					// it'd probably be reasonable
-					// to retry.
-				}
-			}
-			// seperate statement because things could
-			// have changed while we wait
-			if iter.item.link != nil {
-				iter.item = iter.item.link
-				return true
-			}
-
 		}
 	}
+
+	iter.item = iter.item.link
+	return true
 }
 
 func (iter *queueIterImpl[T]) Close(_ context.Context) error {
 	iter.queue.mu.Lock()
 	defer iter.queue.mu.Unlock()
 	iter.closed = true
-	return iter.err
+	return nil
 }
 
 func (iter *queueIterImpl[T]) Value() T {

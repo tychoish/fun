@@ -50,7 +50,9 @@ type BrokerOptions struct {
 	// queue provides a "load shedding" buffer between publishers
 	// (so that they're not blocked) and the subscribers. If the
 	// queue is full, messages are dropped for all subscribers.
-	// When using the queue
+	// When using the queue, messages are processed in na FIFO
+	// order, and if the queue is full, incoming messages are
+	// dropped until the queue empties.
 	QueueOptions *QueueOptions
 	// WorkerPoolSize controls the number of go routines used for
 	// sending messages to subscribers, when using Queue-backed
@@ -106,82 +108,91 @@ func (b *Broker[T]) Start(ctx context.Context) {
 	ctx, b.close = context.WithCancel(ctx)
 
 	switch {
-	case b.opts.QueueOptions == nil:
+	case b.opts.QueueOptions != nil:
+		b.startQueueWorkers(ctx)
+	default:
+		b.startDefaultWorkers(ctx)
+	}
+}
+
+func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msgCh := <-b.subCh:
+				subs.Add(msgCh)
+			case msgCh := <-b.unsubCh:
+				subs.Delete(msgCh)
+			case msg := <-b.publishCh:
+				// do sending
+				b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
+			}
+		}
+	}()
+}
+
+func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
+	b.wg.Add(2)
+
+	queue := Must(NewQueue[T](*b.opts.QueueOptions))
+	subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
+	go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
+	go func() {
+		defer b.wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msgCh := <-b.subCh:
+				subs.Add(msgCh)
+			case msgCh := <-b.unsubCh:
+				subs.Delete(msgCh)
+			case msg := <-b.publishCh:
+				if err := queue.Add(msg); err != nil {
+					switch {
+					case errors.Is(err, ErrQueueNoCredit) || errors.Is(err, ErrQueueFull):
+						// we should drop messages while the queue is full.
+						continue
+					default:
+						// likely impossible
+						// queue encounters other error
+						b.close()
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	numWorkers := b.opts.WorkerPoolSize
+	if numWorkers <= 0 {
+		numWorkers = 1
+	}
+
+	for i := 0; i < numWorkers; i++ {
 		b.wg.Add(1)
 		go func() {
 			defer b.wg.Done()
-			subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
 			for {
-				select {
-				case <-ctx.Done():
-					return
-				case msgCh := <-b.subCh:
-					subs.Add(msgCh)
-				case msgCh := <-b.unsubCh:
-					subs.Delete(msgCh)
-				case msg := <-b.publishCh:
-					// do sending
+				msg, ok := queue.Remove()
+				if ok {
 					b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
+					continue
 				}
+				msg, err := queue.Wait(ctx)
+				if err != nil {
+					return
+				}
+				b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
 			}
 		}()
-	default:
-		b.wg.Add(2)
-
-		queue := Must(NewQueue[T](*b.opts.QueueOptions))
-		subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
-		go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
-		go func() {
-			defer b.wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case msgCh := <-b.subCh:
-					subs.Add(msgCh)
-				case msgCh := <-b.unsubCh:
-					subs.Delete(msgCh)
-				case msg := <-b.publishCh:
-					if err := queue.Add(msg); err != nil {
-						switch {
-						case errors.Is(err, ErrQueueNoCredit) || errors.Is(err, ErrQueueFull):
-							// we should drop messages while the queue is full.
-							continue
-						default:
-							// likely impossible
-							// queue is closed or encounters other error
-							b.close()
-							return
-						}
-					}
-				}
-			}
-		}()
-
-		numWorkers := b.opts.WorkerPoolSize
-		if numWorkers <= 0 {
-			numWorkers = 1
-		}
-
-		for i := 0; i < numWorkers; i++ {
-			b.wg.Add(1)
-			go func() {
-				defer b.wg.Done()
-				for {
-					msg, ok := queue.Remove()
-					if ok {
-						b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
-						continue
-					}
-					msg, err := queue.Wait(ctx)
-					if err != nil {
-						return
-					}
-					b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
-				}
-			}()
-		}
 	}
+
 }
 
 func (b *Broker[T]) dispatchMessage(ctx context.Context, iter Iterator[chan T], msg T) {
