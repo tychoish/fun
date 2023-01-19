@@ -1,23 +1,25 @@
-package fun
+package set
 
 import (
 	"context"
 	"fmt"
 	"testing"
+
+	"github.com/tychoish/fun"
 )
 
 func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for name, builder := range map[string]func() Set[string]{
-		"Unordered/Basic":          func() Set[string] { return NewSet[string]() },
-		"Unordered/BasicLarge":     func() Set[string] { return MakeSet[string](100) },
-		"Unordered/SyncBasic":      func() Set[string] { return MakeSynchronizedSet(NewSet[string]()) },
-		"Unordered/SyncBasicLarge": func() Set[string] { return MakeSynchronizedSet(MakeSet[string](100)) },
-		"Ordered/Basic":            func() Set[string] { return NewOrderedSet[string]() },
-		"Ordered/BasicLarge":       func() Set[string] { return MakeOrderedSet[string](100) },
-		"Ordered/SyncBasic":        func() Set[string] { return MakeSynchronizedSet(NewOrderedSet[string]()) },
-		"Ordered/SyncBasicLarge":   func() Set[string] { return MakeSynchronizedSet(MakeOrderedSet[string](100)) },
+		"Unordered/Basic":          func() Set[string] { return NewUnordered[string]() },
+		"Unordered/BasicLarge":     func() Set[string] { return MakeUnordered[string](100) },
+		"Unordered/SyncBasic":      func() Set[string] { return Synchronize(NewUnordered[string]()) },
+		"Unordered/SyncBasicLarge": func() Set[string] { return Synchronize(MakeUnordered[string](100)) },
+		"Ordered/Basic":            func() Set[string] { return NewOrdered[string]() },
+		"Ordered/BasicLarge":       func() Set[string] { return MakeOrdered[string](100) },
+		"Ordered/SyncBasic":        func() Set[string] { return Synchronize(NewOrdered[string]()) },
+		"Ordered/SyncBasicLarge":   func() Set[string] { return Synchronize(MakeOrdered[string](100)) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("Initialization", func(t *testing.T) {
@@ -58,21 +60,21 @@ func TestSet(t *testing.T) {
 				set := builder()
 				set.Add("abc")
 
-				if !SetDeleteCheck(set, "abc") {
+				if !DeleteCheck(set, "abc") {
 					t.Error("set item should have been present")
 				}
 
-				if SetDeleteCheck(set, "abc") {
+				if DeleteCheck(set, "abc") {
 					t.Error("set item should not have been present")
 				}
 			})
 			t.Run("AddCheck", func(t *testing.T) {
 				set := builder()
 
-				if SetAddCheck(set, "abc") {
+				if AddCheck(set, "abc") {
 					t.Error("set item should not have been present")
 				}
-				if !SetAddCheck(set, "abc") {
+				if !AddCheck(set, "abc") {
 					t.Error("set item should have been present")
 				}
 			})
@@ -109,7 +111,7 @@ func TestSet(t *testing.T) {
 
 						set2 := builder()
 						populator(set2)
-						if !SetEqual(set, set2) {
+						if !Equal(ctx, set, set2) {
 							t.Fatal("sets should be equal")
 						}
 					})
@@ -119,33 +121,43 @@ func TestSet(t *testing.T) {
 
 						set2 := builder()
 						set2.Add("foo")
-						if SetEqual(set, set2) {
+						if Equal(ctx, set, set2) {
 							t.Fatal("sets should not be equal")
 						}
 					})
 					t.Run("InqualitySizeComplex", func(t *testing.T) {
 						set := builder()
 						populator(set)
-						elems, err := IteratorCollect(ctx, set.Iterator(ctx))
-						if err != nil {
+						count := 0
+						iter := set.Iterator(ctx)
+						collected := []string{}
+						for iter.Next(ctx) {
+							count++
+							if iter.Value() == "" {
+								continue
+							}
+							collected = append(collected, iter.Value())
+						}
+
+						if err := iter.Close(ctx); err != nil {
 							t.Fatal(err)
-						} else if len(elems) == 0 {
+						} else if len(collected) == 0 {
 							t.Fatal("should have items")
 						}
 
 						set2 := builder()
 						populator(set2)
 
-						if !SetEqual(set, set2) {
+						if !Equal(ctx, set, set2) {
 							t.Fatal("sets should be equal")
 						}
 
-						set2.Delete(elems[1])
+						set2.Delete(collected[1])
 						set2.Add("foo")
 						if set.Len() != set2.Len() {
 							t.Fatal("test bug")
 						}
-						if SetEqual(set, set2) {
+						if Equal(ctx, set, set2) {
 							t.Fatal("sets should not be equal")
 						}
 					})
@@ -218,7 +230,7 @@ func TestSet(t *testing.T) {
 
 		pairsFromMap := MakePairs(map[string]int{"foo": 42, "bar": 31})
 		set2 := pairsFromMap.Set()
-		if !SetEqualCtx(ctx, set, set2) {
+		if !Equal(ctx, set, set2) {
 			t.Log(pairsFromMap)
 			t.Log(set)
 			t.Log(set2)
@@ -272,7 +284,7 @@ func TestSet(t *testing.T) {
 		}
 	})
 	t.Run("OrderedSetCleanup", func(t *testing.T) {
-		set := NewOrderedSet[int]()
+		set := NewOrdered[int]()
 		for i := range make([]int, 300) {
 			set.Add(i)
 		}
@@ -297,6 +309,25 @@ func TestSet(t *testing.T) {
 		if os.deletedCount != 0 {
 			t.Fatal("unexpected delete count", os.deletedCount)
 		}
-
+	})
+	t.Run("Unwrap", func(t *testing.T) {
+		t.Run("Set", func(t *testing.T) {
+			base := MakeUnordered[string](1)
+			base.Add("abc")
+			wrapped := Synchronize(base)
+			maybeBase := wrapped.(interface{ Unwrap() Set[string] }).Unwrap()
+			if maybeBase == nil {
+				t.Fatal("should not be nil")
+			}
+		})
+		t.Run("SetIter", func(t *testing.T) {
+			base := MakeUnordered[string](1)
+			base.Add("abc")
+			wrapped := Synchronize(base).Iterator(ctx)
+			maybeBase := wrapped.(interface{ Unwrap() fun.Iterator[string] }).Unwrap()
+			if maybeBase == nil {
+				t.Fatal("should not be nil")
+			}
+		})
 	})
 }

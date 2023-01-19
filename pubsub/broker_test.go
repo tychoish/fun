@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -252,7 +253,7 @@ func TestBroker(t *testing.T) {
 
 						seen1 := make(map[string]struct{}, len(elems))
 						seen2 := make(map[string]struct{}, len(elems))
-						wg := &fun.WaitGroup{}
+						wg := &sync.WaitGroup{}
 						wg.Add(3)
 						sig := make(chan struct{})
 
@@ -344,7 +345,7 @@ func TestBroker(t *testing.T) {
 							close(sig)
 						}()
 
-						wg.Wait(ctx)
+						fun.Wait(ctx, wg)
 						if opts.Opts.BufferSize == 0 {
 							checkMatchingSets(t, seen1, seen2)
 						} else if len(seen1) == 0 && len(seen2) == 0 {
@@ -377,7 +378,7 @@ func TestBroker(t *testing.T) {
 						}
 						broker.Start(ctx)
 
-						wg := &fun.WaitGroup{}
+						wg := &sync.WaitGroup{}
 						ch1 := broker.Subscribe(ctx)
 						count := &atomic.Int32{}
 
@@ -408,7 +409,7 @@ func TestBroker(t *testing.T) {
 							}(i)
 						}
 
-						wg.Wait(ctx)
+						fun.Wait(ctx, wg)
 						broker.Stop()
 						broker.Wait(ctx)
 						if int(count.Load()) != len(elems) {

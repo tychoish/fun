@@ -1,13 +1,16 @@
-package fun
+package itertool
 
 import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
 )
 
-// IteratorChannel converts and iterator to a channel.
-func IteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
+// CollectChannel converts and iterator to a channel.
+func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 	out := make(chan T)
 	go func() {
 		defer close(out)
@@ -23,23 +26,23 @@ func IteratorChannel[T any](ctx context.Context, iter Iterator[T]) <-chan T {
 	return out
 }
 
-// IteratorCollect converts an iterator to the slice of it's values.
+// CollectSlice converts an iterator to the slice of it's values.
 //
 // In the case of an error in the underlying iterator the output slice
 // will have the values encountered before the error.
-func IteratorCollect[T any](ctx context.Context, iter Iterator[T]) ([]T, error) {
+func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error) {
 	out := []T{}
-	err := IteratorForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
+	err := ForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
 	return out, err
 }
 
-// IteratorForEach passes each item in the iterator through the specified
+// ForEach passes each item in the iterator through the specified
 // handler function, return an error if the handler function errors.
-func IteratorForEach[T any](ctx context.Context, iter Iterator[T], fn func(context.Context, T) error) (err error) {
+func ForEach[T any](ctx context.Context, iter fun.Iterator[T], fn func(context.Context, T) error) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	catcher := &ErrorCollector{}
+	catcher := &fun.ErrorCollector{}
 
 	defer func() { err = catcher.Resolve() }()
 	defer catcher.Recover()
@@ -55,7 +58,7 @@ func IteratorForEach[T any](ctx context.Context, iter Iterator[T], fn func(conte
 	return
 }
 
-// IteratorFilter passes all objects in an iterator through the
+// Filter passes all objects in an iterator through the
 // specified filter function. If the filter function errors, the
 // operation aborts and the error is reported by the returned
 // iterator's Close method. If the include boolean is true the result
@@ -64,23 +67,23 @@ func IteratorForEach[T any](ctx context.Context, iter Iterator[T], fn func(conte
 //
 // The output iterator is produced iteratively as the returned
 // iterator is consumed.
-func IteratorFilter[T any](
+func Filter[T any](
 	ctx context.Context,
-	iter Iterator[T],
+	iter fun.Iterator[T],
 	fn func(ctx context.Context, input T) (output T, include bool, err error),
-) Iterator[T] {
-	out := new(mapIterImpl[T])
+) fun.Iterator[T] {
+	out := new(internal.MapIterImpl[T])
 	pipe := make(chan T)
-	out.pipe = pipe
+	out.Pipe = pipe
 
 	var iterCtx context.Context
-	iterCtx, out.closer = context.WithCancel(ctx)
+	iterCtx, out.Closer = context.WithCancel(ctx)
 
-	out.wg.Add(1)
+	out.WG.Add(1)
 	go func() {
-		catcher := &ErrorCollector{}
-		defer out.wg.Done()
-		defer func() { out.err = catcher.Resolve() }()
+		catcher := &fun.ErrorCollector{}
+		defer out.WG.Done()
+		defer func() { out.Error = catcher.Resolve() }()
 		defer catcher.Recover()
 		defer catcher.CheckCtx(ctx, iter.Close)
 		defer close(pipe)
@@ -103,9 +106,9 @@ func IteratorFilter[T any](
 	return out
 }
 
-// IteratorMapOptions describes the runtime options to the IteratorMap
+// MapOptions describes the runtime options to the IteratorMap
 // operation. The zero value of this struct provides a usable strict operation.
-type IteratorMapOptions struct {
+type MapOptions struct {
 	// ContinueOnPanic forces the entire IteratorMap operation to
 	// halt when a single map function panics. All panics are
 	// converted to errors and propagated to the output iterator's
@@ -124,7 +127,7 @@ type IteratorMapOptions struct {
 	NumWorkers int
 }
 
-// IteratorMap provides an orthodox functional map implementation
+// Map provides an orthodox functional map implementation
 // based around fun.Iterator. Operates in asynchronous/streaming
 // manner, so that the output Iterator must be consumed. The zero
 // values of IteratorMapOptions provide reasonable defaults for
@@ -136,24 +139,21 @@ type IteratorMapOptions struct {
 // the case with a panic or with ContinueOnError semantics,) the error
 // is an *ErrorStack object. Panics in the map function are converted
 // to errors and handled according to the ContinueOnPanic option.
-func IteratorMap[T any, O any](
+func Map[T any, O any](
 	ctx context.Context,
-	opts IteratorMapOptions,
-	iter Iterator[T],
+	opts MapOptions,
+	iter fun.Iterator[T],
 	mapper func(context.Context, T) (O, error),
-) Iterator[O] {
-	out := new(mapIterImpl[O])
-	safeOut := &syncIterImpl[O]{
-		iter: out,
-		mtx:  &sync.RWMutex{},
-	}
+) fun.Iterator[O] {
+	out := new(internal.MapIterImpl[O])
+	safeOut := Synchronize[O](out)
 	toOutput := make(chan O)
-	catcher := &ErrorCollector{}
-	out.pipe = toOutput
+	catcher := &fun.ErrorCollector{}
+	out.Pipe = toOutput
 
 	abortCtx, abort := context.WithCancel(ctx)
 	var iterCtx context.Context
-	iterCtx, out.closer = context.WithCancel(abortCtx)
+	iterCtx, out.Closer = context.WithCancel(abortCtx)
 
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
@@ -161,11 +161,11 @@ func IteratorMap[T any, O any](
 
 	fromInput := make(chan T, opts.NumWorkers)
 
-	out.wg.Add(1)
+	out.WG.Add(1)
 	signal := make(chan struct{})
 	go func() {
 		defer close(signal)
-		defer out.wg.Done()
+		defer out.WG.Done()
 		defer catcher.Recover()
 		defer catcher.CheckCtx(ctx, iter.Close)
 		defer close(fromInput)
@@ -181,19 +181,19 @@ func IteratorMap[T any, O any](
 		}
 	}()
 
-	wg := &WaitGroup{}
+	wg := &sync.WaitGroup{}
 	for i := 0; i < opts.NumWorkers; i++ {
 		wg.Add(1)
 		go mapWorker(iterCtx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
 	}
 
-	out.wg.Add(1)
+	out.WG.Add(1)
 	go func() {
-		defer out.wg.Done()
-		defer func() { out.err = catcher.Resolve() }()
+		defer out.WG.Done()
+		defer func() { out.Error = catcher.Resolve() }()
 		defer catcher.Recover()
 		<-signal
-		wg.Wait(ctx)
+		fun.Wait(ctx, wg)
 		abort()
 		close(toOutput)
 	}()
@@ -203,9 +203,9 @@ func IteratorMap[T any, O any](
 
 func mapWorker[T any, O any](
 	ctx context.Context,
-	catcher *ErrorCollector,
-	wg *WaitGroup,
-	opts IteratorMapOptions,
+	catcher *fun.ErrorCollector,
+	wg *sync.WaitGroup,
+	opts MapOptions,
 	mapper func(context.Context, T) (O, error),
 	abort func(),
 	fromInput <-chan T,
@@ -251,17 +251,17 @@ func mapWorker[T any, O any](
 
 }
 
-// IteratorReduce processes an input iterator with a reduce function and
+// Reduce processes an input iterator with a reduce function and
 // outputs the final value. The initial value may be a zero or nil
 // value.
-func IteratorReduce[T any, O any](
+func Reduce[T any, O any](
 	ctx context.Context,
-	iter Iterator[T],
+	iter fun.Iterator[T],
 	reducer func(context.Context, T, O) (O, error),
 	initalValue O,
 ) (value O, err error) {
 	value = initalValue
-	catcher := &ErrorCollector{}
+	catcher := &fun.ErrorCollector{}
 
 	defer func() { err = catcher.Resolve() }()
 	defer catcher.Recover()

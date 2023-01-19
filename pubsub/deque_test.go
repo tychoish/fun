@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/set"
 )
 
 type fixture[T any] struct {
@@ -235,7 +236,7 @@ func TestLinkedListImplementations(t *testing.T) {
 					t.Fatal("add did not work")
 				}
 
-				set := fun.NewSet[string]()
+				set := set.NewUnordered[string]()
 				for i := len(fix.elems); i > 0; i-- {
 					out, ok := fix.remove()
 					if !ok {

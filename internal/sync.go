@@ -1,4 +1,4 @@
-package fun
+package internal
 
 import (
 	"context"

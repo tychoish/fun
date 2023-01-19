@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -20,27 +21,6 @@ func TestWrap(t *testing.T) {
 		if nl != nil {
 			t.Fatal("should be nil")
 		}
-		t.Run("SyncIter", func(t *testing.T) {
-			base := SliceIterator([]string{"a", "b"})
-			wrapped := MakeSynchronizedIterator(base)
-			maybeBase := Unwrap(wrapped)
-			if maybeBase == nil {
-				t.Fatal("should not be nil")
-			}
-			if maybeBase != base {
-				t.Error("should be the same object")
-			}
-		})
-		t.Run("SyncSet", func(t *testing.T) {
-			base := MakeSet[string](1)
-			base.Add("abc")
-			wrapped := MakeSynchronizedSet(base)
-			maybeBase := Unwrap(wrapped)
-			if maybeBase == nil {
-				t.Fatal("should not be nil")
-			}
-		})
-
 	})
 	t.Run("Is", func(t *testing.T) {
 		if Is[*testing.T](5) {
@@ -48,6 +28,14 @@ func TestWrap(t *testing.T) {
 		}
 		if !Is[int](100) {
 			t.Error("Is should return true when types match")
+		}
+	})
+	t.Run("Errors", func(t *testing.T) {
+		err := errors.New("root")
+		wrapped := fmt.Errorf("wrap: %w", err)
+		unwrapped := Unwrap(wrapped)
+		if unwrapped != err {
+			t.Fatal("unexpected unrwapping")
 		}
 	})
 	t.Run("Panics", func(t *testing.T) {

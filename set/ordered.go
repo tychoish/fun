@@ -1,7 +1,9 @@
-package fun
+package set
 
 import (
 	"context"
+
+	"github.com/tychoish/fun"
 )
 
 type orderedSetItem[T comparable] struct {
@@ -16,14 +18,14 @@ type orderedSetImpl[T comparable] struct {
 	deletedCount int
 }
 
-// NewOrderedSet produces an order-preserving set implementation.
-func NewOrderedSet[T comparable]() Set[T] {
-	return MakeOrderedSet[T](0)
+// NewOrdered produces an order-preserving set implementation.
+func NewOrdered[T comparable]() Set[T] {
+	return MakeOrdered[T](0)
 }
 
-// MakeOrderedSet produces an order-preserving set implementation,
+// MakeOrdered produces an order-preserving set implementation,
 // with pre-allocated capacity to the specified size.
-func MakeOrderedSet[T comparable](size int) Set[T] {
+func MakeOrdered[T comparable](size int) Set[T] {
 	return &orderedSetImpl[T]{
 		set:   make(map[T]orderedSetItem[T], size),
 		elems: make([]orderedSetItem[T], 0, size),
@@ -75,7 +77,7 @@ func (s *orderedSetImpl[T]) Delete(it T) {
 
 	s.lazyDelete()
 }
-func (s *orderedSetImpl[T]) Iterator(ctx context.Context) Iterator[T] {
+func (s *orderedSetImpl[T]) Iterator(ctx context.Context) fun.Iterator[T] {
 	s.lazyDelete()
 	return &orderedSetIterImpl[T]{set: s, lastIdx: -1}
 }

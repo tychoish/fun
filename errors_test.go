@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -299,7 +300,7 @@ func TestError(t *testing.T) {
 		t.Parallel()
 		fixtureTimeout, cancel := context.WithTimeout(ctx, 1*time.Second)
 		defer cancel()
-		wg := &WaitGroup{}
+		wg := &sync.WaitGroup{}
 		catcher := &ErrorCollector{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
@@ -354,8 +355,7 @@ func TestError(t *testing.T) {
 			}(i)
 		}
 
-		wg.Wait(ctx)
-
+		Wait(ctx, wg)
 	})
 
 }

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/set"
 )
 
 // stole this from
@@ -15,7 +16,7 @@ import (
 // Broker is a simple message broker that provides a useable interface
 // for distributing messages of a given type to many channels.
 type Broker[T any] struct {
-	wg        fun.WaitGroup
+	wg        sync.WaitGroup
 	publishCh chan T
 	subCh     chan chan T
 	unsubCh   chan chan T
@@ -139,7 +140,7 @@ func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		subs := fun.MakeSynchronizedSet(fun.NewOrderedSet[chan T]())
+		subs := set.Synchronize(set.NewOrdered[chan T]())
 		for {
 			select {
 			case <-ctx.Done():
@@ -160,7 +161,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
 	b.wg.Add(2)
 
 	queue := fun.Must(NewQueue[T](*b.opts.QueueOptions))
-	subs := fun.MakeSynchronizedSet(fun.NewOrderedSet[chan T]())
+	subs := set.Synchronize(set.NewOrdered[chan T]())
 	go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
 	go func() {
 		defer b.wg.Done()
@@ -219,7 +220,7 @@ func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
 	b.wg.Add(2)
 
 	deque := fun.Must(NewDeque[T](*b.opts.DequeOptions))
-	subs := fun.MakeSynchronizedSet(fun.NewOrderedSet[chan T]())
+	subs := set.Synchronize(set.NewOrdered[chan T]())
 	go func() { defer b.wg.Done(); <-ctx.Done(); _ = deque.Close() }()
 	go func() {
 		defer b.wg.Done()
@@ -273,7 +274,7 @@ func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
 func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
-		wg := &fun.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		for iter.Next(ctx) {
 			wg.Add(1)
 			go func(msg T, ch chan T) {
@@ -282,7 +283,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan 
 			}(msg, iter.Value())
 		}
 		_ = iter.Close(ctx)
-		wg.Wait(ctx)
+		fun.Wait(ctx, wg)
 	} else {
 		for iter.Next(ctx) {
 			b.sendMsg(ctx, msg, iter.Value())
@@ -321,7 +322,7 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.wg.Wait(ctx)
+	fun.Wait(ctx, &b.wg)
 }
 
 // Subscribe generates a new subscription channel, of the specified
