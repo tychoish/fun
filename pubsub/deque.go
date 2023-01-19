@@ -88,11 +88,6 @@ func makeDeque[T any]() *Deque[T] {
 
 func (dq *Deque[T]) withLock() func() { dq.mtx.Lock(); return dq.mtx.Unlock }
 
-func (dq *Deque[T]) IsFull() bool {
-	defer dq.withLock()()
-	return dq.tracker.len() >= dq.tracker.cap()
-}
-
 func (dq *Deque[T]) Len() int             { defer dq.withLock()(); return dq.tracker.len() }
 func (dq *Deque[T]) Close() error         { defer dq.withLock()(); dq.closed = true; return nil }
 func (dq *Deque[T]) PushFront(it T) error { defer dq.withLock()(); return dq.addAfter(it, dq.root) }
@@ -100,12 +95,12 @@ func (dq *Deque[T]) PushBack(it T) error  { defer dq.withLock()(); return dq.add
 func (dq *Deque[T]) PopFront() (T, bool)  { defer dq.withLock()(); return dq.pop(dq.root.next) }
 func (dq *Deque[T]) PopBack() (T, bool)   { defer dq.withLock()(); return dq.pop(dq.root.prev) }
 
-func (dq *Deque[T]) WaitPopFront(ctx context.Context) (T, bool) {
+func (dq *Deque[T]) WaitFront(ctx context.Context) (T, error) {
 	defer dq.withLock()()
 	return dq.waitPop(ctx, dqNext)
 }
 
-func (dq *Deque[T]) WaitPopBack(ctx context.Context) (T, bool) {
+func (dq *Deque[T]) WaitBack(ctx context.Context) (T, error) {
 	defer dq.withLock()()
 	return dq.waitPop(ctx, dqPrev)
 }
@@ -219,17 +214,21 @@ func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
 	return it.item, true
 }
 
-func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, bool) {
+func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, error) {
 	if err := dq.root.getNextOrPrevious(direction).wait(ctx, direction); err != nil {
-		return *new(T), false
+		return *new(T), err
 	}
 
 	next := dq.root.getNextOrPrevious(direction)
 	if next.isRoot() {
-		return *new(T), false
+		return *new(T), errors.New("end of iteration")
 	}
 
-	return dq.pop(next)
+	it, ok := dq.pop(next)
+	if !ok {
+		return *new(T), errors.New("end of iteration")
+	}
+	return it, nil
 }
 
 type dqIterator[T any] struct {

@@ -21,6 +21,10 @@ type fixture[T any] struct {
 	reverse  bool
 }
 
+func convertContextPop[T any](ctx context.Context, fn func(context.Context) (T, bool)) func() (T, bool) {
+	return func() (T, bool) { return fn(ctx) }
+}
+
 func generateRandomElems(size int) []string {
 	elems := make([]string, 50)
 

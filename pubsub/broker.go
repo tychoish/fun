@@ -156,13 +156,14 @@ func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
 		}
 	}()
 }
+func (b *Broker[T]) runQueueWorkers(
+	ctx context.Context,
+	push func(msg T) error,
+	pop func(ctx context.Context) (T, error),
+) {
 
-func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
-	b.wg.Add(2)
-
-	queue := fun.Must(NewQueue[T](*b.opts.QueueOptions))
 	subs := set.Synchronize(set.NewOrdered[chan T]())
-	go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
+	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
 		for {
@@ -174,66 +175,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
 			case msgCh := <-b.unsubCh:
 				subs.Delete(msgCh)
 			case msg := <-b.publishCh:
-				if err := queue.Add(msg); err != nil {
-					switch {
-					case errors.Is(err, ErrQueueNoCredit) || errors.Is(err, ErrQueueFull):
-						// we should drop messages while the queue is full.
-						continue
-					default:
-						// likely impossible
-						// queue encounters other error
-						b.close()
-						return
-					}
-				}
-			}
-		}
-	}()
-
-	numWorkers := b.opts.WorkerPoolSize
-	if numWorkers <= 0 {
-		numWorkers = 1
-	}
-
-	for i := 0; i < numWorkers; i++ {
-		b.wg.Add(1)
-		go func() {
-			defer b.wg.Done()
-			for {
-				msg, ok := queue.Remove()
-				if ok {
-					b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
-					continue
-				}
-				msg, err := queue.Wait(ctx)
-				if err != nil {
-					return
-				}
-				b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
-			}
-		}()
-	}
-
-}
-
-func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
-	b.wg.Add(2)
-
-	deque := fun.Must(NewDeque[T](*b.opts.DequeOptions))
-	subs := set.Synchronize(set.NewOrdered[chan T]())
-	go func() { defer b.wg.Done(); <-ctx.Done(); _ = deque.Close() }()
-	go func() {
-		defer b.wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msgCh := <-b.subCh:
-				subs.Add(msgCh)
-			case msgCh := <-b.unsubCh:
-				subs.Delete(msgCh)
-			case msg := <-b.publishCh:
-				if err := deque.ForcePushBack(msg); err != nil {
+				if err := push(msg); err != nil {
 					switch {
 					case errors.Is(err, ErrQueueFull) || errors.Is(err, ErrQueueNoCredit):
 						continue
@@ -258,17 +200,41 @@ func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
 		go func() {
 			defer b.wg.Done()
 			for {
-				msg, ok := deque.WaitPopFront(ctx)
-				if ok {
-					b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
-					continue
-				}
-				if ctx.Err() != nil {
+				msg, err := pop(ctx)
+				if err != nil {
 					return
 				}
+				b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
 			}
 		}()
 	}
+}
+
+func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
+	queue := fun.Must(NewQueue[T](*b.opts.QueueOptions))
+	b.wg.Add(1)
+	go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
+
+	b.runQueueWorkers(ctx,
+		// enqueue:
+		queue.Add,
+		// dispatch:
+		func(ctx context.Context) (T, error) {
+			msg, ok := queue.Remove()
+			if ok {
+				return msg, nil
+			}
+			return queue.Wait(ctx)
+		})
+
+}
+
+func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
+	b.wg.Add(1)
+	deque := fun.Must(NewDeque[T](*b.opts.DequeOptions))
+	go func() { defer b.wg.Done(); <-ctx.Done(); _ = deque.Close() }()
+
+	b.runQueueWorkers(ctx, deque.ForcePushBack, deque.WaitFront)
 }
 
 func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan T], msg T) {
