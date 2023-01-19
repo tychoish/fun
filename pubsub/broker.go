@@ -1,9 +1,11 @@
-package fun
+package pubsub
 
 import (
 	"context"
 	"errors"
 	"sync"
+
+	"github.com/tychoish/fun"
 )
 
 // stole this from
@@ -13,7 +15,7 @@ import (
 // Broker is a simple message broker that provides a useable interface
 // for distributing messages of a given type to many channels.
 type Broker[T any] struct {
-	wg        WaitGroup
+	wg        fun.WaitGroup
 	publishCh chan T
 	subCh     chan chan T
 	unsubCh   chan chan T
@@ -36,8 +38,8 @@ type BrokerOptions struct {
 	// on their own processing time.
 	NonBlockingSubscriptions bool
 	// BufferSize controls the buffer size of all internal broker
-	// channels and channel subscriptions. When using a
-	// queue-backed broker, the buffer size is only used for the
+	// channels and channel subscriptions. When using a queue or
+	// deque backed broker, the buffer size is only used for the
 	// subscription channels.
 	BufferSize int
 	// ParallelDispatch, when true, sends each message to
@@ -49,11 +51,17 @@ type BrokerOptions struct {
 	// messages to subscribers via the queue implementation. The
 	// queue provides a "load shedding" buffer between publishers
 	// (so that they're not blocked) and the subscribers. If the
-	// queue is full, messages are dropped for all subscribers.
-	// When using the queue, messages are processed in na FIFO
+	// queue is full, new messages are dropped for all subscribers.
+	//
+	// When using the queue, messages are processed in a FIFO
 	// order, and if the queue is full, incoming messages are
 	// dropped until the queue empties.
 	QueueOptions *QueueOptions
+	// DequeOptions, when set, is similar to the Queue, messages
+	// are processed in FIFO order, and uses the same
+	// "load-shedding" semantics; however, when the queue is at
+	// capacity, the oldest messages are dropped.
+	DequeOptions *DequeOptions
 	// WorkerPoolSize controls the number of go routines used for
 	// sending messages to subscribers, when using Queue-backed
 	// brokers. If unset this defaults to 1.
@@ -64,14 +72,24 @@ type BrokerOptions struct {
 }
 
 func (opts *BrokerOptions) Validate() error {
+	if opts.DequeOptions != nil && opts.QueueOptions != nil {
+		return errors.New("brokers may not have both queue and deque options")
+	}
 	if opts.QueueOptions != nil {
 		if err := opts.QueueOptions.Validate(); err != nil {
 			return err
 		}
 	}
+	if opts.DequeOptions != nil {
+		if err := opts.DequeOptions.Validate(); err != nil {
+			return err
+		}
+	}
+
 	if opts.BufferSize < 0 {
 		opts.BufferSize = 0
 	}
+
 	return nil
 }
 
@@ -110,6 +128,8 @@ func (b *Broker[T]) Start(ctx context.Context) {
 	switch {
 	case b.opts.QueueOptions != nil:
 		b.startQueueWorkers(ctx)
+	case b.opts.DequeOptions != nil:
+		b.startDequeWorkers(ctx)
 	default:
 		b.startDefaultWorkers(ctx)
 	}
@@ -119,7 +139,7 @@ func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
+		subs := fun.MakeSynchronizedSet(fun.NewOrderedSet[chan T]())
 		for {
 			select {
 			case <-ctx.Done():
@@ -139,8 +159,8 @@ func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
 func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
 	b.wg.Add(2)
 
-	queue := Must(NewQueue[T](*b.opts.QueueOptions))
-	subs := MakeSynchronizedSet(NewOrderedSet[chan T]())
+	queue := fun.Must(NewQueue[T](*b.opts.QueueOptions))
+	subs := fun.MakeSynchronizedSet(fun.NewOrderedSet[chan T]())
 	go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
 	go func() {
 		defer b.wg.Done()
@@ -195,10 +215,65 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
 
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, iter Iterator[chan T], msg T) {
+func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
+	b.wg.Add(2)
+
+	deque := fun.Must(NewDeque[T](*b.opts.DequeOptions))
+	subs := fun.MakeSynchronizedSet(fun.NewOrderedSet[chan T]())
+	go func() { defer b.wg.Done(); <-ctx.Done(); _ = deque.Close() }()
+	go func() {
+		defer b.wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msgCh := <-b.subCh:
+				subs.Add(msgCh)
+			case msgCh := <-b.unsubCh:
+				subs.Delete(msgCh)
+			case msg := <-b.publishCh:
+				if err := deque.ForcePushBack(msg); err != nil {
+					switch {
+					case errors.Is(err, ErrQueueFull) || errors.Is(err, ErrQueueNoCredit):
+						continue
+					default:
+						// likely impossible
+						// queue encounters other error
+						b.close()
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	numWorkers := b.opts.WorkerPoolSize
+	if numWorkers <= 0 {
+		numWorkers = 1
+	}
+
+	for i := 0; i < numWorkers; i++ {
+		b.wg.Add(1)
+		go func() {
+			defer b.wg.Done()
+			for {
+				msg, ok := deque.WaitPopFront(ctx)
+				if ok {
+					b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
+					continue
+				}
+				if ctx.Err() != nil {
+					return
+				}
+			}
+		}()
+	}
+}
+
+func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
-		wg := &WaitGroup{}
+		wg := &fun.WaitGroup{}
 		for iter.Next(ctx) {
 			wg.Add(1)
 			go func(msg T, ch chan T) {

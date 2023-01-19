@@ -1,9 +1,12 @@
-package fun
+package pubsub
 
 import (
 	"context"
 	"errors"
+	"math"
 	"sync"
+
+	"github.com/tychoish/fun"
 )
 
 // stolen shamelessly from https://github.com/tendermint/tendermint/tree/master/internal/libs/queue
@@ -28,6 +31,104 @@ var (
 	errBurstCredit = errors.New("burst credit must be non-negative")
 )
 
+type queueLimitTracker interface {
+	len() int
+	cap() int
+	add() error
+	remove()
+}
+
+type queueNoLimitTrackerImpl struct {
+	length int
+}
+
+func (q *queueNoLimitTrackerImpl) len() int   { return q.length }
+func (q *queueNoLimitTrackerImpl) cap() int   { return math.MaxInt }
+func (q *queueNoLimitTrackerImpl) add() error { q.length++; return nil }
+func (q *queueNoLimitTrackerImpl) remove()    { q.length-- }
+
+type queueHardLimitTracker struct {
+	capacity int
+	length   int
+}
+
+func (q *queueHardLimitTracker) len() int { return q.length }
+func (q *queueHardLimitTracker) cap() int { return q.capacity }
+func (q *queueHardLimitTracker) remove() {
+	if q.length == 0 {
+		return
+	}
+
+	q.length--
+}
+
+func (q *queueHardLimitTracker) add() error {
+	if q.length == q.capacity {
+		return ErrQueueFull
+	}
+	q.length++
+	return nil
+}
+
+type queueLimitTrackerImpl struct {
+	softQuota int     // adjusted dynamically (see Add, Remove)
+	hardLimit int     // fixed for the lifespan of the queue
+	length    int     // number of entries in the queue list
+	credit    float64 // current burst credit
+}
+
+func newQueueLimitTracker(opts QueueOptions) queueLimitTracker {
+	return &queueLimitTrackerImpl{
+		softQuota: opts.SoftQuota,
+		hardLimit: opts.HardLimit,
+		credit:    opts.BurstCredit,
+	}
+}
+
+func (q *queueLimitTrackerImpl) cap() int { return q.softQuota }
+func (q *queueLimitTrackerImpl) len() int { return q.length }
+func (q *queueLimitTrackerImpl) add() error {
+	if q.length >= q.softQuota {
+		if q.length == q.hardLimit {
+			return ErrQueueFull
+		} else if q.credit < 1 {
+			return ErrQueueNoCredit
+		}
+
+		// Successfully exceeding the soft quota deducts burst credit and raises
+		// the soft quota. This has the effect of reducing the credit cap and the
+		// amount of credit given for removing items to better approximate the
+		// rate at which the consumer is servicing the queue.
+		q.credit--
+		q.softQuota = q.length + 1
+	}
+
+	q.length++
+	return nil
+}
+
+func (q *queueLimitTrackerImpl) remove() {
+	q.length--
+
+	if q.length < q.softQuota {
+		// Successfully removing items from the queue below half the soft quota
+		// lowers the soft quota. This has the effect of increasing the credit cap
+		// and the amount of credit given for removing items to better approximate
+		// the rate at which the consumer is servicing the queue.
+		if q.softQuota > 1 && q.length < q.softQuota/2 {
+			q.softQuota--
+		}
+
+		// Give credit for being below the soft quota. Note we do this after
+		// adjusting the quota so the credit reflects the item we just removed.
+		q.credit += float64(q.softQuota-q.length) / float64(q.softQuota)
+		if cap := float64(q.hardLimit - q.softQuota); q.credit > cap {
+			q.credit = cap
+		}
+	}
+
+}
+
 // A Queue is a limited-capacity FIFO queue of arbitrary data items.
 //
 // A queue has a soft quota and a hard limit on the number of items that may be
@@ -45,21 +146,16 @@ var (
 //
 // A Queue is safe for concurrent use by multiple goroutines.
 type Queue[T any] struct {
-	mu sync.Mutex // protects the fields below
-
-	softQuota int     // adjusted dynamically (see Add, Remove)
-	hardLimit int     // fixed for the lifespan of the queue
-	queueLen  int     // number of entries in the queue list
-	credit    float64 // current burst credit
-
+	mu       sync.Mutex // protects the fields below
+	tracker  queueLimitTracker
 	closed   bool
 	nempty   *sync.Cond
 	nupdates *sync.Cond
-	back     *entry[T]
-	front    *entry[T]
 
 	// The queue is singly-linked. Front points to the sentinel and back points
 	// to the newest entry. The oldest entry is front.link if it exists.
+	back  *entry[T]
+	front *entry[T]
 }
 
 // NewQueue constructs a new empty queue with the specified options.  It reports an
@@ -69,17 +165,26 @@ func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
 		return nil, err
 	}
 
+	q := makeQueue[T]()
+	q.tracker = newQueueLimitTracker(opts)
+	return q, nil
+}
+
+func NewUnlimitedQueue[T any]() *Queue[T] {
+	q := makeQueue[T]()
+	q.tracker = &queueNoLimitTrackerImpl{}
+	return q
+}
+
+func makeQueue[T any]() *Queue[T] {
 	sentinel := new(entry[T])
 	q := &Queue[T]{
-		softQuota: opts.SoftQuota,
-		hardLimit: opts.HardLimit,
-		credit:    opts.BurstCredit,
-		back:      sentinel,
-		front:     sentinel,
+		back:  sentinel,
+		front: sentinel,
 	}
 	q.nempty = sync.NewCond(&q.mu)
 	q.nupdates = sync.NewCond(&q.mu)
-	return q, nil
+	return q
 }
 
 // Add adds item to the back of the queue. It reports an error and does not
@@ -93,25 +198,14 @@ func (q *Queue[T]) Add(item T) error {
 		return ErrQueueClosed
 	}
 
-	if q.queueLen >= q.softQuota {
-		if q.queueLen == q.hardLimit {
-			return ErrQueueFull
-		} else if q.credit < 1 {
-			return ErrQueueNoCredit
-		}
-
-		// Successfully exceeding the soft quota deducts burst credit and raises
-		// the soft quota. This has the effect of reducing the credit cap and the
-		// amount of credit given for removing items to better approximate the
-		// rate at which the consumer is servicing the queue.
-		q.credit--
-		q.softQuota = q.queueLen + 1
+	if err := q.tracker.add(); err != nil {
+		return err
 	}
+
 	e := &entry[T]{item: item}
 	q.back.link = e
 	q.back = e
-	q.queueLen++
-	if q.queueLen == 1 { // was empty
+	if q.tracker.len() == 1 { // was empty
 		q.nempty.Signal()
 	}
 
@@ -128,7 +222,7 @@ func (q *Queue[T]) Remove() (T, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if q.queueLen == 0 {
+	if q.tracker.len() == 0 {
 		return *new(T), false
 	}
 	return q.popFront(), true
@@ -149,15 +243,15 @@ func (q *Queue[T]) Wait(ctx context.Context) (T, error) {
 	return q.popFront(), nil
 }
 
-// caller must hold the lock with the waitCtx, but implements the wait
-// behavior without modifying the queue.
+// caller must hold the lock, but this implements the wait behavior
+// without modifying the queue for use in the iterator.
 func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 	// If the context terminates, wake the waiter.
 	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); q.nupdates.Broadcast() }()
+	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
 	defer cancel()
 
-	for q.queueLen == 0 {
+	for q.tracker.len() == 0 {
 		if q.closed {
 			return ErrQueueClosed
 		}
@@ -165,7 +259,7 @@ func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			q.nupdates.Wait()
+			q.nempty.Wait()
 		}
 	}
 	return nil
@@ -174,7 +268,7 @@ func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 func (q *Queue[T]) unsafeWaitForNew(ctx context.Context) error {
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
+	go func() { <-ctx.Done(); q.nupdates.Broadcast() }()
 	defer cancel()
 
 	head := q.back
@@ -216,46 +310,33 @@ func (q *Queue[T]) popFront() T {
 	if e == q.back {
 		q.back = q.front
 	}
-	q.queueLen--
 
-	if q.queueLen < q.softQuota {
-		// Successfully removing items from the queue below half the soft quota
-		// lowers the soft quota. This has the effect of increasing the credit cap
-		// and the amount of credit given for removing items to better approximate
-		// the rate at which the consumer is servicing the queue.
-		if q.softQuota > 1 && q.queueLen < q.softQuota/2 {
-			q.softQuota--
-		}
-
-		// Give credit for being below the soft quota. Note we do this after
-		// adjusting the quota so the credit reflects the item we just removed.
-		q.credit += float64(q.softQuota-q.queueLen) / float64(q.softQuota)
-		if cap := float64(q.hardLimit - q.softQuota); q.credit > cap {
-			q.credit = cap
-		}
-	}
+	q.tracker.remove()
 
 	return e.item
 }
 
-// QueueOptions are the initial settings for a Queue.
+// QueueOptions are the initial settings for a Queue or Deque.
 type QueueOptions struct {
-	// The maximum number of items the queue will ever be permitted to hold.
-	// This value must be positive, and greater than or equal to SoftQuota. The
-	// hard limit is fixed and does not change as the queue is used.
+	// The maximum number of items the queue will ever be
+	// permitted to hold. This value must be positive, and greater
+	// than or equal to SoftQuota. The hard limit is fixed and
+	// does not change as the queue is used.
 	//
-	// The hard limit should be chosen to exceed the largest burst size expected
-	// under normal operating conditions.
+	// The hard limit should be chosen to exceed the largest burst
+	// size expected under normal operating conditions.
 	HardLimit int
 
-	// The initial expected maximum number of items the queue should contain on
-	// an average workload. If this value is zero, it is initialized to the hard
-	// limit. The soft quota is adjusted from the initial value dynamically as
-	// the queue is used.
+	// The initial expected maximum number of items the queue
+	// should contain on an average workload. If this value is
+	// zero, it is initialized to the hard limit. The soft quota
+	// is adjusted from the initial value dynamically as the queue
+	// is used.
 	SoftQuota int
 
-	// The initial burst credit score.  This value must be greater than or equal
-	// to zero. If it is zero, the soft quota is used.
+	// The initial burst credit score.  This value must be greater
+	// than or equal to zero. If it is zero, the soft quota is
+	// used.
 	BurstCredit float64
 }
 
@@ -295,7 +376,7 @@ type queueIterImpl[T any] struct {
 // operations, without additional locking. The iterator does not
 // modify the contents of the queue, and will only terminate when the
 // queue has been closed via the Close() method.
-func (q *Queue[T]) Iterator() Iterator[T] {
+func (q *Queue[T]) Iterator() fun.Iterator[T] {
 	iter := &queueIterImpl[T]{
 		queue: q,
 	}

@@ -74,22 +74,22 @@ func TestIteratorAlgoInts(t *testing.T) {
 
 			return set.Iterator(ctx)
 		},
-		"QueueIterator": func() Iterator[int] {
-			e := elems()
-			cue, err := NewQueue[int](QueueOptions{
-				SoftQuota: len(e),
-				HardLimit: 2 * len(e),
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
+		// "QueueIterator": func() Iterator[int] {
+		// 	e := elems()
+		// 	cue, err := NewQueue[int](QueueOptions{
+		// 		SoftQuota: len(e),
+		// 		HardLimit: 2 * len(e),
+		// 	})
+		// 	if err != nil {
+		// 		t.Fatal(err)
+		// 	}
 
-			for idx := range e {
-				cue.Add(e[idx])
-			}
-			_ = cue.Close()
-			return cue.Iterator()
-		},
+		// 	for idx := range e {
+		// 		cue.Add(e[idx])
+		// 	}
+		// 	_ = cue.Close()
+		// 	return cue.Iterator()
+		// },
 	} {
 		t.Run(name, func(t *testing.T) {
 			for wrapperName, wrapper := range map[string]func(Iterator[int]) Iterator[int]{
@@ -392,21 +392,21 @@ func TestIteratorImplementations(t *testing.T) {
 
 					return set.Iterator(ctx)
 				},
-				"QueueIterator": func() Iterator[string] {
-					cue, err := NewQueue[string](QueueOptions{
-						SoftQuota: len(elems),
-						HardLimit: 2 * len(elems),
-					})
-					if err != nil {
-						t.Fatal(err)
-					}
+				// "QueueIterator": func() Iterator[string] {
+				// 	cue, err := NewQueue[string](QueueOptions{
+				// 		SoftQuota: len(elems),
+				// 		HardLimit: 2 * len(elems),
+				// 	})
+				// 	if err != nil {
+				// 		t.Fatal(err)
+				// 	}
 
-					for idx := range elems {
-						cue.Add(elems[idx])
-					}
-					_ = cue.Close()
-					return cue.Iterator()
-				},
+				// 	for idx := range elems {
+				// 		cue.Add(elems[idx])
+				// 	}
+				// 	_ = cue.Close()
+				// 	return cue.Iterator()
+				// },
 			} {
 				t.Run(name, func(t *testing.T) {
 					baseBuilder := baseBuilder

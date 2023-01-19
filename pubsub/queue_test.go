@@ -1,4 +1,4 @@
-package fun
+package pubsub
 
 import (
 	"context"
@@ -87,24 +87,27 @@ func TestQueueBurstCredit(t *testing.T) {
 	q := mustQueue(t, QueueOptions{SoftQuota: 2, HardLimit: 5})
 	q.mustAdd("foo")
 	q.mustAdd("bar")
+	getTracker := func() *queueLimitTrackerImpl {
+		return q.tracker.(*queueLimitTrackerImpl)
+	}
 
 	// We should still have all our initial credit.
-	if q.credit < 2 {
-		t.Errorf("Wrong credit: got %f, want ≥ 2", q.credit)
+	if getTracker().credit < 2 {
+		t.Errorf("Wrong credit: got %f, want ≥ 2", getTracker().credit)
 	}
 
 	// Removing an item below soft quota should increase our credit.
 	q.mustRemove("foo")
-	if q.credit <= 2 {
-		t.Errorf("wrong credit: got %f, want > 2", q.credit)
+	if getTracker().credit <= 2 {
+		t.Errorf("wrong credit: got %f, want > 2", getTracker().credit)
 	}
 
 	// Credit should be capped by the hard limit.
 	q.mustRemove("bar")
 	q.mustAdd("baz")
 	q.mustRemove("baz")
-	if cap := float64(q.hardLimit - q.softQuota); q.credit > cap {
-		t.Errorf("Wrong credit: got %f, want ≤ %f", q.credit, cap)
+	if cap := float64(getTracker().hardLimit - getTracker().softQuota); getTracker().credit > cap {
+		t.Errorf("Wrong credit: got %f, want ≤ %f", getTracker().credit, cap)
 	}
 }
 
@@ -211,8 +214,8 @@ func TestQueueIterator(t *testing.T) {
 		queue.Add("two")
 		queue.Add("thr")
 
-		if queue.queueLen != 3 {
-			t.Fatal("unexpected queue length", queue.queueLen)
+		if queue.tracker.len() != 3 {
+			t.Fatal("unexpected queue length", queue.tracker.len())
 		}
 
 		iter := queue.Iterator()
@@ -255,8 +258,8 @@ func TestQueueIterator(t *testing.T) {
 		case <-sig:
 		}
 
-		if queue.queueLen != 4 {
-			t.Error("unexpected queue length", queue.queueLen)
+		if queue.tracker.len() != 4 {
+			t.Error("unexpected queue length", queue.tracker.len())
 		}
 
 		if time.Since(startAt) > 150*time.Millisecond {
@@ -302,8 +305,8 @@ func TestQueueIterator(t *testing.T) {
 		case <-sig:
 		}
 
-		if queue.queueLen != 1 {
-			t.Error("unexpected queue length", queue.queueLen)
+		if queue.tracker.len() != 1 {
+			t.Error("unexpected queue length", queue.tracker.len())
 		}
 
 		if time.Since(startAt) > 150*time.Millisecond {

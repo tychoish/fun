@@ -1,4 +1,4 @@
-package fun
+package pubsub
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun"
 )
 
 func TestBroker(t *testing.T) {
@@ -153,6 +155,76 @@ func TestBroker(t *testing.T) {
 							},
 						},
 					},
+					// deque cases
+					{
+						Name: "Deque/Serial/Unbuffered/OneWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							DequeOptions: &DequeOptions{
+								QueueOptions: &QueueOptions{
+									HardLimit:   100,
+									SoftQuota:   50,
+									BurstCredit: 5,
+								},
+							},
+						},
+					},
+					{
+						Name: "Deque/Serial/Unbuffered/TwoWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							WorkerPoolSize:   2,
+							DequeOptions: &DequeOptions{
+								QueueOptions: &QueueOptions{
+									HardLimit:   100,
+									SoftQuota:   50,
+									BurstCredit: 5,
+								},
+							},
+						},
+					},
+					{
+						Name: "Deque/Parallel/Unbuffered/TwoWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							WorkerPoolSize:   2,
+							DequeOptions: &DequeOptions{
+								QueueOptions: &QueueOptions{
+									HardLimit:   100,
+									SoftQuota:   50,
+									BurstCredit: 5,
+								},
+							},
+						},
+					},
+					{
+						Name: "Deque/Serial/Unbuffered/EightWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: false,
+							WorkerPoolSize:   8,
+							DequeOptions: &DequeOptions{
+								QueueOptions: &QueueOptions{
+									HardLimit:   40,
+									SoftQuota:   20,
+									BurstCredit: 5,
+								},
+							},
+						},
+					},
+					{
+						Name: "Deque/Parallel/Unbuffered/EightWorker",
+						Opts: BrokerOptions{
+							ParallelDispatch: true,
+							WorkerPoolSize:   8,
+							DequeOptions: &DequeOptions{
+								QueueOptions: &QueueOptions{
+									HardLimit:   40,
+									SoftQuota:   20,
+									BurstCredit: 5,
+								},
+							},
+						},
+					},
 				} {
 					t.Run(opts.Name, func(t *testing.T) {
 						ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -180,7 +252,7 @@ func TestBroker(t *testing.T) {
 
 						seen1 := make(map[string]struct{}, len(elems))
 						seen2 := make(map[string]struct{}, len(elems))
-						wg := &WaitGroup{}
+						wg := &fun.WaitGroup{}
 						wg.Add(3)
 						sig := make(chan struct{})
 
@@ -305,7 +377,7 @@ func TestBroker(t *testing.T) {
 						}
 						broker.Start(ctx)
 
-						wg := &WaitGroup{}
+						wg := &fun.WaitGroup{}
 						ch1 := broker.Subscribe(ctx)
 						count := &atomic.Int32{}
 
