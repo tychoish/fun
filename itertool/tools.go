@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -42,11 +43,11 @@ func ForEach[T any](ctx context.Context, iter fun.Iterator[T], fn func(context.C
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	catcher := &fun.ErrorCollector{}
+	catcher := &erc.Collector{}
 
 	defer func() { err = catcher.Resolve() }()
-	defer catcher.Recover()
-	defer catcher.CheckCtx(ctx, iter.Close)
+	defer erc.Recover(catcher)
+	defer erc.CheckCtx(ctx, catcher, iter.Close)
 
 	for iter.Next(ctx) {
 		if ferr := fn(ctx, iter.Value()); ferr != nil {
@@ -81,11 +82,11 @@ func Filter[T any](
 
 	out.WG.Add(1)
 	go func() {
-		catcher := &fun.ErrorCollector{}
+		catcher := &erc.Collector{}
 		defer out.WG.Done()
 		defer func() { out.Error = catcher.Resolve() }()
-		defer catcher.Recover()
-		defer catcher.CheckCtx(ctx, iter.Close)
+		defer erc.Recover(catcher)
+		defer erc.CheckCtx(ctx, catcher, iter.Close)
 		defer close(pipe)
 
 		for iter.Next(iterCtx) {
@@ -137,7 +138,7 @@ type MapOptions struct {
 // errors would be aggregated and propagated to the `Close()` method
 // of the resulting iterator. If there are more than one error (as is
 // the case with a panic or with ContinueOnError semantics,) the error
-// is an *ErrorStack object. Panics in the map function are converted
+// is an *erc.Stack object. Panics in the map function are converted
 // to errors and handled according to the ContinueOnPanic option.
 func Map[T any, O any](
 	ctx context.Context,
@@ -148,7 +149,7 @@ func Map[T any, O any](
 	out := new(internal.MapIterImpl[O])
 	safeOut := Synchronize[O](out)
 	toOutput := make(chan O)
-	catcher := &fun.ErrorCollector{}
+	catcher := &erc.Collector{}
 	out.Pipe = toOutput
 
 	abortCtx, abort := context.WithCancel(ctx)
@@ -166,10 +167,10 @@ func Map[T any, O any](
 	go func() {
 		defer close(signal)
 		defer out.WG.Done()
-		defer catcher.Recover()
-		defer catcher.CheckCtx(ctx, iter.Close)
+		defer erc.Recover(catcher)
+		defer erc.CheckCtx(ctx, catcher, iter.Close)
 		defer close(fromInput)
-		defer catcher.Recover()
+		defer erc.Recover(catcher)
 
 		for iter.Next(abortCtx) {
 			select {
@@ -191,7 +192,7 @@ func Map[T any, O any](
 	go func() {
 		defer out.WG.Done()
 		defer func() { out.Error = catcher.Resolve() }()
-		defer catcher.Recover()
+		defer erc.Recover(catcher)
 		<-signal
 		fun.Wait(ctx, wg)
 		abort()
@@ -203,7 +204,7 @@ func Map[T any, O any](
 
 func mapWorker[T any, O any](
 	ctx context.Context,
-	catcher *fun.ErrorCollector,
+	catcher *erc.Collector,
 	wg *sync.WaitGroup,
 	opts MapOptions,
 	mapper func(context.Context, T) (O, error),
@@ -261,11 +262,11 @@ func Reduce[T any, O any](
 	initalValue O,
 ) (value O, err error) {
 	value = initalValue
-	catcher := &fun.ErrorCollector{}
+	catcher := &erc.Collector{}
 
 	defer func() { err = catcher.Resolve() }()
-	defer catcher.Recover()
-	defer catcher.CheckCtx(ctx, iter.Close)
+	defer erc.Recover(catcher)
+	defer erc.CheckCtx(ctx, catcher, iter.Close)
 
 	for iter.Next(ctx) {
 		value, err = reducer(ctx, iter.Value(), value)

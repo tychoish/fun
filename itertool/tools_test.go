@@ -5,8 +5,73 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/set"
 )
+
+func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureIteratorConstuctors[T] {
+	return []FixtureIteratorConstuctors[T]{
+		{
+			Name: "SliceIterator",
+			Constructor: func(elems []T) fun.Iterator[T] {
+				return Slice(elems)
+			},
+		},
+		{
+			Name: "ChannelIterator",
+			Constructor: func(elems []T) fun.Iterator[T] {
+				vals := make(chan T, len(elems))
+				for idx := range elems {
+					vals <- elems[idx]
+				}
+				close(vals)
+				return Channel(vals)
+			},
+		},
+		{
+			Name: "SetIterator",
+			Constructor: func(elems []T) fun.Iterator[T] {
+				set := set.MakeUnordered[T](len(elems))
+				for idx := range elems {
+					set.Add(elems[idx])
+				}
+
+				return set.Iterator(ctx)
+			},
+		},
+		{
+			Name: "OrderedSetIterator",
+			Constructor: func(elems []T) fun.Iterator[T] {
+				set := set.MakeOrdered[T](len(elems))
+				for idx := range elems {
+					set.Add(elems[idx])
+				}
+
+				return set.Iterator(ctx)
+			},
+		},
+		{
+			Name: "QueueIterator",
+			Constructor: func(elems []T) fun.Iterator[T] {
+				cue, err := pubsub.NewQueue[T](pubsub.QueueOptions{
+					SoftQuota: len(elems),
+					HardLimit: 2 * len(elems),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				for idx := range elems {
+					cue.Add(elems[idx])
+				}
+
+				_ = cue.Close()
+				return cue.Iterator()
+			},
+		},
+	}
+
+}
 
 func TestIteratorImplementations(t *testing.T) {
 	t.Parallel()
@@ -24,62 +89,6 @@ func TestIteratorImplementations(t *testing.T) {
 		},
 	}
 
-	builders := []FixtureIteratorConstuctors[string]{
-		{
-			Name: "SliceIterator",
-			Constructor: func(elems []string) fun.Iterator[string] {
-				return Slice(elems)
-			},
-		},
-		{
-			Name: "ChannelIterator",
-			Constructor: func(elems []string) fun.Iterator[string] {
-				vals := make(chan string, len(elems))
-				for idx := range elems {
-					vals <- elems[idx]
-				}
-				close(vals)
-				return Channel(vals)
-			},
-		},
-		{
-			Name: "SetIterator",
-			Constructor: func(elems []string) fun.Iterator[string] {
-				set := set.MakeUnordered[string](len(elems))
-				for idx := range elems {
-					set.Add(elems[idx])
-				}
-
-				return set.Iterator(ctx)
-			},
-		},
-		{
-			Name: "OrderedSetIterator",
-			Constructor: func(elems []string) fun.Iterator[string] {
-				set := set.MakeOrdered[string](len(elems))
-				for idx := range elems {
-					set.Add(elems[idx])
-				}
-
-				return set.Iterator(ctx)
-			},
-		},
-		// "QueueIterator": func(elems string) fun.Iterator[string] {
-		// 	cue, err := NewQueue[string](QueueOptions{
-		// 		SoftQuota: len(elements.Elements),
-		// 		HardLimit: 2 * len(elements.Elements),
-		// 	})
-		// 	if err != nil {
-		// 		t.Fatal(err)
-		// 	}
-
-		// 	for idx := range elements.Elements {
-		// 		cue.Add(elements.Elements[idx])
-		// 	}
-		// 	_ = cue.Close()
-		// 	return cue.Iterator()
-		// },
-	}
 	filters := []FixtureIteratorFilter[string]{
 		{
 			Name:   "Unsynchronized",
@@ -95,11 +104,11 @@ func TestIteratorImplementations(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(ctx, t, elems, builders, filters)
+		RunIteratorImplementationTests(ctx, t, elems, getConstructors[string](t, ctx), filters)
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorStringAlgoTests(ctx, t, elems, builders, filters)
+		RunIteratorStringAlgoTests(ctx, t, elems, getConstructors[string](t, ctx), filters)
 	})
 }
 
@@ -126,62 +135,6 @@ func TestIteratorAlgoInts(t *testing.T) {
 		},
 	}
 
-	builders := []FixtureIteratorConstuctors[int]{
-		{
-			Name: "SliceIterator",
-			Constructor: func(elems []int) fun.Iterator[int] {
-				return Slice(elems)
-			},
-		},
-		{
-			Name: "ChannelIterator",
-			Constructor: func(elems []int) fun.Iterator[int] {
-				vals := make(chan int, len(elems))
-				for idx := range elems {
-					vals <- elems[idx]
-				}
-				close(vals)
-				return Channel(vals)
-			},
-		},
-		{
-			Name: "SetIterator",
-			Constructor: func(elems []int) fun.Iterator[int] {
-				set := set.MakeUnordered[int](len(elems))
-				for idx := range elems {
-					set.Add(elems[idx])
-				}
-
-				return set.Iterator(ctx)
-			},
-		},
-		{
-			Name: "OrderedSetIterator",
-			Constructor: func(elems []int) fun.Iterator[int] {
-				set := set.MakeOrdered[int](len(elems))
-				for idx := range elems {
-					set.Add(elems[idx])
-				}
-
-				return set.Iterator(ctx)
-			},
-		},
-		// "QueueIterator": func(elems []int) fun.Iterator[int] {
-		// 	cue, err := NewQueue[int](QueueOptions{
-		// 		SoftQuota: len(elements.Elements),
-		// 		HardLimit: 2 * len(elements.Elements),
-		// 	})
-		// 	if err != nil {
-		// 		t.Fatal(err)
-		// 	}
-
-		// 	for idx := range elements.Elements {
-		// 		cue.Add(elements.Elements[idx])
-		// 	}
-		// 	_ = cue.Close()
-		// 	return cue.Iterator()
-		// },
-	}
 	filters := []FixtureIteratorFilter[int]{
 		{
 			Name:   "Unsynchronized",
@@ -197,11 +150,11 @@ func TestIteratorAlgoInts(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(ctx, t, elems, builders, filters)
+		RunIteratorImplementationTests(ctx, t, elems, getConstructors[int](t, ctx), filters)
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorIntegerAlgoTests(ctx, t, elems, builders, filters)
+		RunIteratorIntegerAlgoTests(ctx, t, elems, getConstructors[int](t, ctx), filters)
 	})
 }
 
