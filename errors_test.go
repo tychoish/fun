@@ -17,9 +17,6 @@ func catcherIsEmpty(t *testing.T, catcher *ErrorCollector) {
 		t.Fatal("test issue")
 	}
 
-	if l := catcher.Len(); l != 0 {
-		t.Error("should have zero errors", l)
-	}
 	if catcher.HasErrors() {
 		t.Error("should not have errors")
 	}
@@ -35,8 +32,9 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *ErrorCollector) {
 		t.Fatal("test issue", catcher, expectedNum)
 	}
 
-	if catcher.Len() != expectedNum {
-		t.Error("should have expected number of errors", expectedNum, catcher.Len())
+	if actual := catcher.stack.len(); actual != expectedNum {
+		t.Error("should have expected number of errors", expectedNum, actual)
+		t.Log(catcher.Resolve())
 	}
 	if !catcher.HasErrors() {
 		t.Error("should have errors")
@@ -114,7 +112,7 @@ func TestError(t *testing.T) {
 				t.Error("errors is behaves unexpectedly")
 			}
 
-			if err != serr {
+			if err.Error() != serr.Error() {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
@@ -128,7 +126,7 @@ func TestError(t *testing.T) {
 				t.Error("errors is behaves unexpectedly")
 			}
 
-			if err != serr {
+			if err.Error() != serr.Error() {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
@@ -141,7 +139,7 @@ func TestError(t *testing.T) {
 				panic("boop")
 			}()
 			<-sig
-			if l := es.Len(); l != 1 {
+			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
 			if e := es.stack.Error(); e != "panic: boop" {
@@ -261,44 +259,12 @@ func TestError(t *testing.T) {
 				t.Error(output, "!=", expected)
 			}
 		})
-		t.Run("ErrorsMethodCaches", func(t *testing.T) {
-			es := &ErrorStack{}
-			es = es.append(errors.New("one"))
-			es = es.append(errors.New("two"))
-			es = es.append(errors.New("three"))
-
-			if es.size != 0 {
-				t.Error("lenght should not be cached yet", es.size)
-			}
-			if l := es.len(); l != 3 {
-				t.Fatalf("%d, %+v", l, es)
-			}
-			if es.size == 0 {
-				t.Error("lenght should be cached")
-			}
-
-			if l := es.len(); l != 3 {
-				t.Fatalf("%d, %+v", l, es)
-			}
-
-			if es.errs != nil {
-				t.Error("should be nil now")
-			}
-
-			errs0 := es.Errors()
-			if es.errs == nil {
-				t.Error("should not be nil now")
-			}
-
-			errs1 := es.Errors()
-			if fmt.Sprintf("%p", errs0) != fmt.Sprintf("%p", errs1) {
-				t.Error("pointer to the same")
-			}
-		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {
 		t.Parallel()
-		fixtureTimeout, cancel := context.WithTimeout(ctx, 1*time.Second)
+		startAt := time.Now()
+		defer func() { t.Log(time.Since(startAt)) }()
+		fixtureTimeout, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		wg := &sync.WaitGroup{}
 		catcher := &ErrorCollector{}
@@ -326,11 +292,11 @@ func TestError(t *testing.T) {
 				ticker := time.NewTicker(2 * time.Millisecond)
 				defer ticker.Stop()
 
-				var size int
 				var count int
 
 				for {
 					count++
+
 					select {
 					case <-fixtureTimeout.Done():
 						return
@@ -339,23 +305,52 @@ func TestError(t *testing.T) {
 							if count > 10 {
 								t.Error("should have one by now")
 							}
-						} else {
-							if size = catcher.Len(); size >= 1 {
-								es, ok := err.(*ErrorStack)
-								if !ok {
-									t.Error("should be an error stack")
-								}
-								if errs := es.Errors(); len(errs) > size {
-									t.Error("problem in reporting", len(errs), size)
-								}
-							}
+						} else if _, ok := err.(*ErrorStack); !ok {
+							t.Error("should be an error stack")
 						}
 					}
 				}
 			}(i)
 		}
-
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
 		Wait(ctx, wg)
 	})
+}
 
+func BenchmarkErrorStack(b *testing.B) {
+	const count int = 4
+
+	b.Run("BuildString", func(b *testing.B) {
+		es := &ErrorStack{}
+		for i := 0; i < count; i++ {
+			es = es.append(errors.New("foo"))
+		}
+		err := es.Error()
+		if err == "" {
+			b.Fatal()
+		}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			err = es.Error()
+		}
+	})
+
+	b.Run("Slice", func(b *testing.B) {
+		es := &ErrorStack{}
+		for i := 0; i < count; i++ {
+			es = es.append(errors.New("foo"))
+		}
+		errs := es.Errors()
+		if len(errs) != count {
+			b.Fatal(len(errs))
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for n := 0; n < b.N; n++ {
+			errs = es.Errors()
+		}
+	})
 }

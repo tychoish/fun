@@ -14,12 +14,8 @@ import (
 // method which returns a slice of the constituent errors for
 // additional use.
 type ErrorStack struct {
-	mtx    sync.RWMutex
-	err    error
-	next   *ErrorStack
-	cached *string
-	size   int
-	errs   []error
+	err  error
+	next *ErrorStack
 }
 
 func (e *ErrorStack) append(err error) *ErrorStack {
@@ -35,12 +31,20 @@ func (e *ErrorStack) append(err error) *ErrorStack {
 	case *ErrorStack:
 		if werr.next == nil {
 			werr.next = e
-			werr.cached = nil
-			werr.errs = nil
 			return werr
 		}
 
-		return e.append(werr.next).append(werr.err)
+		for werr.next != nil {
+			if werr.err != nil {
+				e = &ErrorStack{
+					err:  werr.err,
+					next: e,
+				}
+			}
+			werr = werr.next
+		}
+
+		return e
 	case interface{ Unwrap() error }:
 		for {
 			e = &ErrorStack{
@@ -62,40 +66,20 @@ func (e *ErrorStack) append(err error) *ErrorStack {
 }
 
 func (e *ErrorStack) Error() string {
-	e.mtx.Lock()
-	defer e.mtx.Unlock()
-
-	if e.cached != nil {
-		return *e.cached
-	}
-
 	if e.err == nil && e.next == nil {
 		return "empty error"
 	}
 
-	var out string
 	if e.next != nil && e.next.err != nil {
-		out = strings.Join([]string{e.next.Error(), e.err.Error()}, "; ")
-	} else {
-		out = e.err.Error()
+		return strings.Join([]string{e.next.Error(), e.err.Error()}, "; ")
 	}
 
-	e.cached = &out
-
-	return out
+	return e.err.Error()
 }
 
-func (e *ErrorStack) Is(err error) bool {
-	e.mtx.RLock()
-	defer e.mtx.RUnlock()
-
-	return errors.Is(e.err, err)
-}
+func (e *ErrorStack) Is(err error) bool { return errors.Is(e.err, err) }
 
 func (e *ErrorStack) Unwrap() error {
-	e.mtx.RLock()
-	defer e.mtx.RUnlock()
-
 	if e.next != nil {
 		return e.next
 	}
@@ -103,57 +87,38 @@ func (e *ErrorStack) Unwrap() error {
 }
 
 func (e *ErrorStack) Errors() []error {
-	e.mtx.Lock()
-	defer e.mtx.Unlock()
-
 	if e.err == nil {
 		return nil
 	}
+
 	if e.next == nil {
 		return []error{e.err}
 	}
 
-	if len(e.errs) > 1 {
-		return e.errs
-	}
-
-	e.errs = append([]error{e.err}, e.next.Errors()...)
-	return e.errs
+	return append([]error{e.err}, e.next.Errors()...)
 }
 
 func (e *ErrorStack) len() int {
-	if e == nil {
-		return 0
-	}
-	if e.err == nil {
+	if e == nil || e.err == nil {
 		return 0
 	}
 	if e.next == nil {
 		return 1
 	}
-	if e.size > 0 {
-		return e.size
-	}
 
-	var out int
-	if e.err != nil {
-		out++
-	}
+	var out int = 1
 	for item := e.next; item != nil; item = item.next {
 		if item.err != nil {
 			out++
 		}
 	}
-	e.mtx.Lock()
-	defer e.mtx.Unlock()
 
-	e.size = out
 	return out
 }
 
 // ErrorCollector is a simplified version of the error collector in
-// github.com/tychoish/emt. This is thread safe and aggregates errors
-// producing a single error.
+// github.com/tychoish/emt. The collector is thread safe and
+// aggregates errors producing a single error.
 type ErrorCollector struct {
 	mu    sync.Mutex
 	stack *ErrorStack
@@ -167,10 +132,7 @@ func (ec *ErrorCollector) Add(err error) {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 	if ec.stack == nil {
-		ec.stack = &ErrorStack{
-			err: err,
-		}
-		return
+		ec.stack = &ErrorStack{}
 	}
 
 	ec.stack = ec.stack.append(err)
@@ -200,6 +162,7 @@ func (ec *ErrorCollector) CheckCtx(ctx context.Context, fn func(context.Context)
 func (ec *ErrorCollector) Resolve() error {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
+
 	if ec.stack == nil {
 		return nil
 	}
@@ -208,17 +171,6 @@ func (ec *ErrorCollector) Resolve() error {
 	}
 
 	return ec.stack
-}
-
-func (ec *ErrorCollector) Len() int {
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
-
-	if ec.stack == nil {
-		return 0
-	}
-
-	return ec.stack.len()
 }
 
 func (ec *ErrorCollector) HasErrors() bool {
