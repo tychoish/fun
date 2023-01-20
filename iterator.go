@@ -1,3 +1,7 @@
+// Package fun is a zero-dependency collection of tools and idoms that
+// takes advantage of generics. Iterators, error handling, a
+// native-feeling Set type, and a simple pub-sub framework for
+// distributing messages in fan-out patterns.
 package fun
 
 import (
