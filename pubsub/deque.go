@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -13,8 +14,10 @@ import (
 // limits and soft quotas, as well as iterators, that safe for access
 // from multiple concurrent go-routines.
 //
-// Use the NewDeque or NewUnlimitedDeque constructor to instantiate a
-// Deque object.
+// Furthermore, the implementation safely handles multiple concurrent
+// blocking operations (e.g. Wait, iterators).
+//
+// Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
 	mtx     sync.Mutex
 	nfront  *sync.Cond
@@ -26,12 +29,25 @@ type Deque[T any] struct {
 	closed  bool
 }
 
+// DequeOptions configure the semantics of the deque. The Validate()
+// method ensures that you do not produce a configuration that is
+// impossible.
+//
+// Capcaity puts a firm upper cap on the number of items in the deque,
+// while the Unlimited options
 type DequeOptions struct {
 	Unlimited    bool
 	Capacity     int
 	QueueOptions *QueueOptions
 }
 
+// ErrConfigurationError is the returned by the queue and deque
+// constructors if their configurations are malformed.
+var ErrConfigurationMalformed = errors.New("configuration error")
+
+// Validate ensures that the options are consistent. Exported as a
+// convenience function. All errors have ErrConfigurationMalformed as
+// their root.
 func (opts *DequeOptions) Validate() error {
 	if opts.QueueOptions != nil {
 		if err := opts.QueueOptions.Validate(); err != nil {
@@ -40,16 +56,22 @@ func (opts *DequeOptions) Validate() error {
 	} else if opts.Unlimited && opts.Capacity == 0 {
 		return nil
 	} else if opts.Capacity <= 0 {
-		return errors.New("capacity cannot be negative or empty")
+		return fmt.Errorf("capacity cannot be negative or empty: %w", ErrConfigurationMalformed)
+	}
+
+	if opts.Capacity > 0 && opts.QueueOptions != nil {
+		return fmt.Errorf("cannot specify a capcity with queue options: %w", ErrConfigurationMalformed)
 	}
 
 	// positive capcity and another valid configuration
 	if opts.Unlimited {
-		return errors.New("cannot specify with another configuration")
+		return fmt.Errorf("cannot specify unlimited with another configuration: %w", ErrConfigurationMalformed)
 	}
 	return nil
 }
 
+// NewDeque constructs a Deque according to the options, and errors if
+// there are any problems with the configuration.
 func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
@@ -88,18 +110,44 @@ func makeDeque[T any]() *Deque[T] {
 
 func (dq *Deque[T]) withLock() func() { dq.mtx.Lock(); return dq.mtx.Unlock }
 
-func (dq *Deque[T]) Len() int             { defer dq.withLock()(); return dq.tracker.len() }
-func (dq *Deque[T]) Close() error         { defer dq.withLock()(); dq.closed = true; return nil }
-func (dq *Deque[T]) PushFront(it T) error { defer dq.withLock()(); return dq.addAfter(it, dq.root) }
-func (dq *Deque[T]) PushBack(it T) error  { defer dq.withLock()(); return dq.addAfter(it, dq.root.prev) }
-func (dq *Deque[T]) PopFront() (T, bool)  { defer dq.withLock()(); return dq.pop(dq.root.next) }
-func (dq *Deque[T]) PopBack() (T, bool)   { defer dq.withLock()(); return dq.pop(dq.root.prev) }
+// Len returns the length of the queue. This is an O(1) operation in
+// this implementation.
+func (dq *Deque[T]) Len() int { defer dq.withLock()(); return dq.tracker.len() }
 
+// Close marks the deque as closed, after which point all iterators
+// will stop and no more operations will succeed. The error value is
+// not used in the current operation.
+func (dq *Deque[T]) Close() error { defer dq.withLock()(); dq.closed = true; return nil }
+
+// PushFront adds an item to the front or head of the deque, and
+// erroring if the queue is closed, at capacity, or has reached its
+// limit.
+func (dq *Deque[T]) PushFront(it T) error { defer dq.withLock()(); return dq.addAfter(it, dq.root) }
+
+// PushFront adds an item to the back or end of the deque, and
+// erroring if the queue is closed, at capacity, or has reached its
+// limit.
+func (dq *Deque[T]) PushBack(it T) error { defer dq.withLock()(); return dq.addAfter(it, dq.root.prev) }
+
+// PopFront removes the first (head) item of the queue, with the
+// second value being false if the queue is empty or closed.
+func (dq *Deque[T]) PopFront() (T, bool) { defer dq.withLock()(); return dq.pop(dq.root.next) }
+
+// PopBack removes the last (tail) item of the queue, with the
+// second value being false if the queue is empty or closed.
+func (dq *Deque[T]) PopBack() (T, bool) { defer dq.withLock()(); return dq.pop(dq.root.prev) }
+
+// WaitFront pops the first (head) item in the deque, and if the queue is
+// empty, will block until an item is added, returning an error if the
+// context canceled or the queue is closed.
 func (dq *Deque[T]) WaitFront(ctx context.Context) (T, error) {
 	defer dq.withLock()()
 	return dq.waitPop(ctx, dqNext)
 }
 
+// WaitBack pops the last (tail) item in the deque, and if the queue
+// is empty, will block until an item is added, returning an error if
+// the context canceled or the queue is closed.
 func (dq *Deque[T]) WaitBack(ctx context.Context) (T, error) {
 	defer dq.withLock()()
 	return dq.waitPop(ctx, dqPrev)
@@ -133,11 +181,17 @@ func (dq *Deque[T]) ForcePushBack(it T) error {
 	return dq.addAfter(it, dq.root.prev)
 }
 
+// IteratorReverse starts at the back of the queue and iterates
+// towards the front. When the iterator reaches the beginning of the queue
+// it ends.
 func (dq *Deque[T]) Iterator() fun.Iterator[T] {
 	defer dq.withLock()()
 	return &dqIterator[T]{list: dq, item: dq.root, direction: dqNext}
 }
 
+// IteratorReverse starts at the back of the queue and iterates
+// towards the front. When the iterator reaches the end of the queue
+// it ends.
 func (dq *Deque[T]) IteratorReverse() fun.Iterator[T] {
 	defer dq.withLock()()
 	return &dqIterator[T]{list: dq, item: dq.root, direction: dqPrev}
@@ -145,21 +199,20 @@ func (dq *Deque[T]) IteratorReverse() fun.Iterator[T] {
 
 // IteratorBlocking starts at the front of the deque, iterates to the
 // end and then waits for a new item to be pushed to the back of the
-// queue or the context has been canceled.
+// queue, the queue to be closed or the context to be canceled.
 func (dq *Deque[T]) IteratorBlocking() fun.Iterator[T] {
 	defer dq.withLock()()
 	return &dqIterator[T]{list: dq, blocking: true, item: dq.root, direction: dqNext}
 }
 
-// IteratorBlockingReverse starts at the back/end of the deque and
-// iterates toward the front, waiting at the beginning for a new item
-// to be PushedFront.
+// IteratorBlockingReverse starts at the back of the deque and
+// iterates toward the front, and then waits for a new item to be
+// pushed to the front of the queue, the queue to be closed or the
+// context to be canceled.
 func (dq *Deque[T]) IteratorBlockingReverse() fun.Iterator[T] {
 	defer dq.withLock()()
 	return &dqIterator[T]{list: dq, blocking: true, item: dq.root, direction: dqPrev}
 }
-
-// TODO: implement destructive iterators
 
 func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
 	if dq.closed {
@@ -343,7 +396,8 @@ func (it *element[T]) wait(ctx context.Context, direction dqDirection) error {
 	var cond *sync.Cond
 
 	// use the cond var for the head or tail if we're waiting for
-	// a new item
+	// a new item. The addAfter method signals both forward and
+	// reverse waiters when the queue is empty.
 	switch {
 	case (direction == dqPrev) && it.prev.isRoot():
 		cond = it.list.nback

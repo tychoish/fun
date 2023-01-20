@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -26,8 +27,8 @@ var (
 	ErrQueueClosed = errors.New("queue is closed")
 
 	// Sentinel errors reported by the New constructor.
-	errHardLimit   = errors.New("hard limit must be > 0 and ≥ soft quota")
-	errBurstCredit = errors.New("burst credit must be non-negative")
+	errHardLimit   = fmt.Errorf("hard limit must be > 0 and ≥ soft quota: %w", ErrConfigurationMalformed)
+	errBurstCredit = fmt.Errorf("burst credit must be non-negative: %w", ErrConfigurationMalformed)
 )
 
 // A Queue is a limited-capacity FIFO queue of arbitrary data items.
@@ -59,8 +60,8 @@ type Queue[T any] struct {
 	front *entry[T]
 }
 
-// NewQueue constructs a new empty queue with the specified options.  It reports an
-// error if any of the option values are invalid.
+// NewQueue constructs a new empty queue with the specified options.
+// It reports an error if any of the option values are invalid.
 func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
@@ -71,6 +72,7 @@ func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
 	return q, nil
 }
 
+// NewUnlimitedQueue produces an unbounded queue.
 func NewUnlimitedQueue[T any]() *Queue[T] {
 	q := makeQueue[T]()
 	q.tracker = &queueNoLimitTrackerImpl{}
@@ -241,6 +243,9 @@ type QueueOptions struct {
 	BurstCredit float64
 }
 
+// Validate ensures that the options are consistent. Exported as a
+// convenience function. All errors have ErrConfigurationMalformed as
+// their root.
 func (opts *QueueOptions) Validate() error {
 	if opts.HardLimit <= 0 || opts.HardLimit < opts.SoftQuota {
 		return errHardLimit
