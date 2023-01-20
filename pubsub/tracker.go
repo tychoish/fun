@@ -34,7 +34,7 @@ func (q *queueHardLimitTracker) remove() {
 }
 
 func (q *queueHardLimitTracker) add() error {
-	if q.length == q.capacity {
+	if q.length >= q.capacity {
 		return ErrQueueFull
 	}
 	q.length++

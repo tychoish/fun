@@ -14,7 +14,7 @@ import (
 // with some modifications and additional features.
 
 // Broker is a simple message broker that provides a useable interface
-// for distributing messages of a given type to many channels.
+// for distributing messages to an arbitrary group of channels.
 type Broker[T any] struct {
 	wg        sync.WaitGroup
 	publishCh chan T
@@ -48,21 +48,6 @@ type BrokerOptions struct {
 	// NonBlockingSubscriptions) waits for all messages to be
 	// delivered before continuing.
 	ParallelDispatch bool
-	// QueueOptions, when set, instructs the Broker to dispatch
-	// messages to subscribers via the queue implementation. The
-	// queue provides a "load shedding" buffer between publishers
-	// (so that they're not blocked) and the subscribers. If the
-	// queue is full, new messages are dropped for all subscribers.
-	//
-	// When using the queue, messages are processed in a FIFO
-	// order, and if the queue is full, incoming messages are
-	// dropped until the queue empties.
-	QueueOptions *QueueOptions
-	// DequeOptions, when set, is similar to the Queue, messages
-	// are processed in FIFO order, and uses the same
-	// "load-shedding" semantics; however, when the queue is at
-	// capacity, the oldest messages are dropped.
-	DequeOptions *DequeOptions
 	// WorkerPoolSize controls the number of go routines used for
 	// sending messages to subscribers, when using Queue-backed
 	// brokers. If unset this defaults to 1.
@@ -72,67 +57,118 @@ type BrokerOptions struct {
 	WorkerPoolSize int
 }
 
-func (opts *BrokerOptions) Validate() error {
-	if opts.DequeOptions != nil && opts.QueueOptions != nil {
-		return errors.New("brokers may not have both queue and deque options")
-	}
-	if opts.QueueOptions != nil {
-		if err := opts.QueueOptions.Validate(); err != nil {
-			return err
-		}
-	}
-	if opts.DequeOptions != nil {
-		if err := opts.DequeOptions.Validate(); err != nil {
-			return err
-		}
+// NewBroker constructs with a simple distrubtion scheme: incoming
+// messages are buffered in a channel, and then distributed to
+// subscribers channels, which may also be buffered.
+//
+// All brokers respect the BrokerOptions, which control how messages
+// are set to subscribers (e.g. concurrently with a worker pool, with
+// buffered channels, and if sends can be non-blocking.) Consider how
+// these settings may interact.
+func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
+	b := makeBroker[T](opts)
+
+	ctx, b.close = context.WithCancel(ctx)
+
+	b.startDefaultWorkers(ctx)
+
+	return b
+}
+
+// NewQueueBroker constructs a broker that uses the queue object to
+// buffer incoming requests if subscribers are slow to process
+// requests. Queue have a system for sheding load when the queue's
+// limits have been exceeded. In general the messages are distributed
+// in FIFO order, and Publish calls will drop messages if the queue is
+// full.
+//
+// All brokers respect the BrokerOptions, which control the size of
+// the worker pool used to send messages to senders and if the Broker
+// should use non-blocking sends. All channels between the broker and
+// the subscribers are un-buffered.
+func NewQueueBroker[T any](ctx context.Context, opts BrokerOptions, queue *Queue[T]) *Broker[T] {
+	b := makeBroker[T](opts)
+
+	b.opts.BufferSize = 0
+
+	ctx, b.close = context.WithCancel(ctx)
+
+	b.startQueueWorkers(ctx,
+		// enqueue:
+		queue.Add,
+		// dispatch:
+		func(ctx context.Context) (T, error) {
+			msg, ok := queue.Remove()
+			if ok {
+				return msg, nil
+			}
+			return queue.Wait(ctx)
+		},
+	)
+
+	return b
+}
+
+// NewDequeBroker constructs a broker that uses the queue object to
+// buffer incoming requests if subscribers are slow to process
+// requests. The semantics of the Deque depends a bit on the
+// configuration of it's limits and capacity.
+//
+// This broker distributes messages in a FIFO order, dropping older
+// messages to make room for new messages.
+//
+// All brokers respect the BrokerOptions, which control the size of
+// the worker pool used to send messages to senders and if the Broker
+// should use non-blocking sends. All channels between the broker and
+// the subscribers are un-buffered.
+func NewDequeBroker[T any](ctx context.Context, opts BrokerOptions, deque *Deque[T]) *Broker[T] {
+	b := makeBroker[T](opts)
+
+	b.opts.BufferSize = 0
+
+	ctx, b.close = context.WithCancel(ctx)
+	b.startQueueWorkers(ctx, deque.ForcePushBack, deque.WaitFront)
+
+	return b
+}
+
+// NewDequeBroker constructs a broker that uses the queue object to
+// buffer incoming requests if subscribers are slow to process
+// requests. The semantics of the Deque depends a bit on the
+// configuration of it's limits and capacity.
+//
+// This broker distributes messages in a LIFO order, dropping older
+// messages to make room for new messages. The capacity of the queue
+// is fixed, and must be a positive integer, greater than 0.
+//
+// All brokers respect the BrokerOptions, which control the size of
+// the worker pool used to send messages to senders and if the Broker
+// should use non-blocking sends. All channels between the broker and
+// the subscribers are un-buffered.
+func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) (*Broker[T], error) {
+	b := makeBroker[T](opts)
+
+	deque, err := NewDeque[T](DequeOptions{Capacity: capacity})
+	if err != nil {
+		return nil, err
 	}
 
+	ctx, b.close = context.WithCancel(ctx)
+	b.startQueueWorkers(ctx, deque.ForcePushFront, deque.WaitFront)
+
+	return b, nil
+}
+
+func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	if opts.BufferSize < 0 {
 		opts.BufferSize = 0
 	}
 
-	return nil
-}
-
-// NewBroker constructs a new message broker. The default options are
-// ideal for most use cases.
-func NewBroker[T any](opts BrokerOptions) (*Broker[T], error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	var bufSize int
-	if opts.QueueOptions == nil {
-		bufSize = opts.BufferSize
-	}
-
 	return &Broker[T]{
 		opts:      opts,
-		publishCh: make(chan T, bufSize),
-		subCh:     make(chan chan T, bufSize),
-		unsubCh:   make(chan chan T, bufSize),
-	}, nil
-}
-
-// Start initiates the background worker for the Broker, ignoring
-// subsequent calls.
-func (b *Broker[T]) Start(ctx context.Context) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.close != nil {
-		return
-	}
-
-	ctx, b.close = context.WithCancel(ctx)
-
-	switch {
-	case b.opts.QueueOptions != nil:
-		b.startQueueWorkers(ctx)
-	case b.opts.DequeOptions != nil:
-		b.startDequeWorkers(ctx)
-	default:
-		b.startDefaultWorkers(ctx)
+		publishCh: make(chan T, opts.BufferSize),
+		subCh:     make(chan chan T, opts.BufferSize),
+		unsubCh:   make(chan chan T, opts.BufferSize),
 	}
 }
 
@@ -156,12 +192,12 @@ func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
 		}
 	}()
 }
-func (b *Broker[T]) runQueueWorkers(
+
+func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
 	push func(msg T) error,
 	pop func(ctx context.Context) (T, error),
 ) {
-
 	subs := set.Synchronize(set.NewOrdered[chan T]())
 	b.wg.Add(1)
 	go func() {
@@ -208,33 +244,6 @@ func (b *Broker[T]) runQueueWorkers(
 			}
 		}()
 	}
-}
-
-func (b *Broker[T]) startQueueWorkers(ctx context.Context) {
-	queue := fun.Must(NewQueue[T](*b.opts.QueueOptions))
-	b.wg.Add(1)
-	go func() { defer b.wg.Done(); <-ctx.Done(); _ = queue.Close() }()
-
-	b.runQueueWorkers(ctx,
-		// enqueue:
-		queue.Add,
-		// dispatch:
-		func(ctx context.Context) (T, error) {
-			msg, ok := queue.Remove()
-			if ok {
-				return msg, nil
-			}
-			return queue.Wait(ctx)
-		})
-
-}
-
-func (b *Broker[T]) startDequeWorkers(ctx context.Context) {
-	b.wg.Add(1)
-	deque := fun.Must(NewDeque[T](*b.opts.DequeOptions))
-	go func() { defer b.wg.Done(); <-ctx.Done(); _ = deque.Close() }()
-
-	b.runQueueWorkers(ctx, deque.ForcePushBack, deque.WaitFront)
 }
 
 func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan T], msg T) {
@@ -301,7 +310,6 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 	if ctx.Err() != nil {
 		return nil
 	}
-
 	msgCh := make(chan T, b.opts.BufferSize)
 	select {
 	case <-ctx.Done():

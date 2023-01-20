@@ -210,9 +210,15 @@ func TestQueueIterator(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		queue.Add("one")
-		queue.Add("two")
-		queue.Add("thr")
+		if err := queue.Add("one"); err != nil {
+			t.Fatal(err)
+		}
+		if err := queue.Add("two"); err != nil {
+			t.Fatal(err)
+		}
+		if err := queue.Add("thr"); err != nil {
+			t.Fatal(err)
+		}
 
 		if queue.tracker.len() != 3 {
 			t.Fatal("unexpected queue length", queue.tracker.len())
@@ -251,7 +257,9 @@ func TestQueueIterator(t *testing.T) {
 			}
 		}()
 		time.Sleep(10 * time.Millisecond)
-		queue.Add("four")
+		if err := queue.Add("four"); err != nil {
+			t.Fatal(err)
+		}
 		select {
 		case <-ctx.Done():
 			t.Fatal(ctx.Err())
@@ -297,7 +305,10 @@ func TestQueueIterator(t *testing.T) {
 			}
 		}()
 		time.Sleep(10 * time.Millisecond)
-		queue.Add("one")
+
+		if err := queue.Add("one"); err != nil {
+			t.Fatal(err)
+		}
 
 		select {
 		case <-ctx.Done():
@@ -329,7 +340,10 @@ func TestQueueIterator(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		queue.Add("one")
+
+		if err := queue.Add("one"); err != nil {
+			t.Fatal(err)
+		}
 
 		iter := queue.Iterator()
 		if !iter.Next(ctx) {
@@ -356,7 +370,10 @@ func TestQueueIterator(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		queue.Add("one")
+
+		if err := queue.Add("one"); err != nil {
+			t.Fatal(err)
+		}
 
 		iter := queue.Iterator()
 		if !iter.Next(ctx) {
@@ -382,8 +399,9 @@ func TestQueueIterator(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		queue.Add("one")
-
+		if err := queue.Add("one"); err != nil {
+			t.Fatal(err)
+		}
 		iter := queue.Iterator()
 		if !iter.Next(ctx) {
 			t.Fatal("should iterate once")

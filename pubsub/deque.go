@@ -143,9 +143,9 @@ func (dq *Deque[T]) IteratorReverse() fun.Iterator[T] {
 	return &dqIterator[T]{list: dq, item: dq.root, direction: dqPrev}
 }
 
-// IteratorBlocking starts at the front of the deque, iterates to
-// to the end and then waits for a new item to be pushed to the back
-// of the queue or the context has been canceled.
+// IteratorBlocking starts at the front of the deque, iterates to the
+// end and then waits for a new item to be pushed to the back of the
+// queue or the context has been canceled.
 func (dq *Deque[T]) IteratorBlocking() fun.Iterator[T] {
 	defer dq.withLock()()
 	return &dqIterator[T]{list: dq, blocking: true, item: dq.root, direction: dqNext}
@@ -337,8 +337,6 @@ func (it *element[T]) getNextOrPrevious(direction dqDirection) *element[T] {
 	}
 	return it.next
 }
-
-var errIterationComplete = errors.New("iteration complete")
 
 // callers must hold the *list's* lock
 func (it *element[T]) wait(ctx context.Context, direction dqDirection) error {
