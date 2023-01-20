@@ -379,7 +379,9 @@ func BenchmarkErrorStack(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
-				err = es.Error()
+				if err = es.Error(); err == "" {
+					b.Fatal()
+				}
 			}
 		})
 		b.Run("StackIterator", func(b *testing.B) {
@@ -395,6 +397,10 @@ func BenchmarkErrorStack(b *testing.B) {
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
 				errs = collectIter(ctx, b, es.Iterator())
+				if len(errs) == 0 {
+					b.Fatal()
+				}
+
 			}
 		})
 		b.Run("Collector", func(b *testing.B) {
@@ -409,7 +415,9 @@ func BenchmarkErrorStack(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
-				err = ec.Resolve().Error()
+				if err = ec.Resolve().Error(); err == "" {
+					b.Fatal()
+				}
 			}
 		})
 	})

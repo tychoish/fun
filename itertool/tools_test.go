@@ -62,10 +62,14 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 				}
 
 				for idx := range elems {
-					cue.Add(elems[idx])
+					if err := cue.Add(elems[idx]); err != nil {
+						t.Fatal(err)
+					}
 				}
 
-				_ = cue.Close()
+				if err = cue.Close(); err != nil {
+					t.Fatal(err)
+				}
 				return cue.Iterator()
 			},
 		},
