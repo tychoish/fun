@@ -503,7 +503,9 @@ func TestDeque(t *testing.T) {
 		}
 
 		for i := 0; i < 5; i++ {
-			dq.PushFront(i)
+			if err := dq.PushFront(i); err != nil {
+				t.Fatal(err)
+			}
 		}
 		startAt := time.Now()
 		iter := dq.IteratorBlocking()
@@ -535,7 +537,9 @@ func TestDeque(t *testing.T) {
 		}
 
 		for i := 0; i < 5; i++ {
-			dq.PushBack(i)
+			if err := dq.PushBack(i); err != nil {
+				t.Fatal(err)
+			}
 		}
 		startAt := time.Now()
 		iter := dq.IteratorBlockingReverse()

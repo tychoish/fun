@@ -2,6 +2,9 @@ package internal
 
 import (
 	"context"
+	"sync"
+
+	"github.com/tychoish/fun"
 )
 
 type SliceIterImpl[T any] struct {
@@ -53,12 +56,14 @@ func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 
 type MapIterImpl[T any] struct {
 	ChannelIterImpl[T]
-	WG     WaitGroup
+	WG     sync.WaitGroup
 	Closer context.CancelFunc
 }
 
 func (iter *MapIterImpl[T]) Close(ctx context.Context) error {
 	iter.Closer()
-	iter.WG.Wait(ctx)
+
+	fun.Wait(ctx, &iter.WG)
+
 	return iter.ChannelIterImpl.Close(ctx)
 }

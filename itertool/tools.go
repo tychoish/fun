@@ -2,6 +2,7 @@ package itertool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -10,7 +11,8 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// CollectChannel converts and iterator to a channel.
+// CollectChannel converts and iterator to a channel. The iterator is
+// not closed.
 func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 	out := make(chan T)
 	go func() {
@@ -27,19 +29,27 @@ func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 	return out
 }
 
-// CollectSlice converts an iterator to the slice of it's values.
+// CollectSlice converts an iterator to the slice of it's values, and
+// closes the iterator at the when the iterator has been exhausted..
 //
 // In the case of an error in the underlying iterator the output slice
 // will have the values encountered before the error.
 func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error) {
 	out := []T{}
-	err := ForEach(ctx, iter, func(_ context.Context, in T) error { out = append(out, in); return nil })
-	return out, err
+	for iter.Next(ctx) {
+		out = append(out, iter.Value())
+	}
+
+	return out, iter.Close(ctx)
 }
 
 // ForEach passes each item in the iterator through the specified
 // handler function, return an error if the handler function errors.
-func ForEach[T any](ctx context.Context, iter fun.Iterator[T], fn func(context.Context, T) error) (err error) {
+func ForEach[T any](
+	ctx context.Context,
+	iter fun.Iterator[T],
+	fn func(context.Context, T) error,
+) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -107,16 +117,16 @@ func Filter[T any](
 	return out
 }
 
-// MapOptions describes the runtime options to the IteratorMap
-// operation. The zero value of this struct provides a usable strict operation.
-type MapOptions struct {
+// Options describes the runtime options to the Map or Generate
+// operations. The zero value of this struct provides a usable strict operation.
+type Options struct {
 	// ContinueOnPanic forces the entire IteratorMap operation to
 	// halt when a single map function panics. All panics are
 	// converted to errors and propagated to the output iterator's
 	// Close() method.
 	ContinueOnPanic bool
-	// ContinueOnError allows a map function to return an error
-	// and allow the work of the IteratorMap operation to
+	// ContinueOnError allows a map or generate function to return
+	// an error and allow the work of the broader operation to
 	// continue. Errors are aggregated propagated to the output
 	// iterator's Close() method.
 	ContinueOnError bool
@@ -126,6 +136,18 @@ type MapOptions struct {
 	// value greater than 1 will result in out-of-sequence results
 	// in the output iterator.
 	NumWorkers int
+	// OutputBufferSize controls how buffered the output pipe on the
+	// iterator should be. Typically this should be zero, but
+	// there are workloads for which a moderate buffer may be
+	// useful.
+	OutputBufferSize int
+	// IncludeContextExpirationErrors changes the default handling
+	// of context cancellation errors. By default all errors
+	// rooted in context cancellation are not propagated to the
+	// Close() method, however, when true, these errors are
+	// captured. All other error handling semantics
+	// (e.g. ContinueOnError) are applicable.
+	IncludeContextExpirationErrors bool
 }
 
 // Map provides an orthodox functional map implementation
@@ -142,7 +164,7 @@ type MapOptions struct {
 // to errors and handled according to the ContinueOnPanic option.
 func Map[T any, O any](
 	ctx context.Context,
-	opts MapOptions,
+	opts Options,
 	iter fun.Iterator[T],
 	mapper func(context.Context, T) (O, error),
 ) fun.Iterator[O] {
@@ -164,6 +186,7 @@ func Map[T any, O any](
 
 	out.WG.Add(1)
 	signal := make(chan struct{})
+
 	go func() {
 		defer close(signal)
 		defer out.WG.Done()
@@ -206,7 +229,7 @@ func mapWorker[T any, O any](
 	ctx context.Context,
 	catcher *erc.Collector,
 	wg *sync.WaitGroup,
-	opts MapOptions,
+	opts Options,
 	mapper func(context.Context, T) (O, error),
 	abort func(),
 	fromInput <-chan T,
@@ -235,7 +258,11 @@ func mapWorker[T any, O any](
 			}
 			o, err := mapper(ctx, value)
 			if err != nil {
-				catcher.Add(err)
+				if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
+					// when the option is true, include all errors.
+					// when false, only include not cancellation errors.
+					catcher.Add(err)
+				}
 				if opts.ContinueOnError {
 					continue
 				}
@@ -249,7 +276,6 @@ func mapWorker[T any, O any](
 			}
 		}
 	}
-
 }
 
 // Reduce processes an input iterator with a reduce function and
@@ -277,4 +303,99 @@ func Reduce[T any, O any](
 	}
 
 	return
+}
+
+// ErrAbortGenerator is a sentinel error returned by generators to
+// abort. This error is never propagated to calling functions.
+var ErrAbortGenerator = errors.New("abort generator signal")
+
+// Generate creates an iterator using a generator pattern which
+// produces items until the context is canceled or the generator
+// function returns ErrAbortGenerator. Parallel operation is also
+// available and Generate shares configuration and semantics with the
+// Map operation.
+func Generate[T any](ctx context.Context, opts Options, fn func(context.Context) (T, error)) fun.Iterator[T] {
+	if opts.OutputBufferSize < 0 {
+		opts.OutputBufferSize = 0
+	}
+
+	out := new(internal.MapIterImpl[T])
+	pipe := make(chan T, opts.OutputBufferSize)
+	catcher := &erc.Collector{}
+	out.Pipe = pipe
+
+	gctx, abort := context.WithCancel(ctx)
+	out.Closer = abort
+
+	if opts.NumWorkers <= 0 {
+		opts.NumWorkers = 1
+	}
+
+	wg := &sync.WaitGroup{}
+	for i := 0; i < opts.NumWorkers; i++ {
+		wg.Add(1)
+		go generator(gctx, catcher, wg, opts, fn, abort, pipe)
+	}
+	out.WG.Add(1)
+	go func() {
+		defer out.WG.Done()
+		defer func() { out.Error = catcher.Resolve() }()
+		defer erc.Recover(catcher)
+		wg.Wait()
+		abort()
+		// can't wait against a context here becase it's canceled
+		close(pipe)
+	}()
+
+	return Synchronize[T](out)
+}
+
+func generator[T any](
+	ctx context.Context,
+	catcher *erc.Collector,
+	wg *sync.WaitGroup,
+	opts Options,
+	fn func(context.Context) (T, error),
+	abort func(),
+	out chan<- T,
+) {
+	defer wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			catcher.Add(fmt.Errorf("panic: %v", r))
+			if opts.ContinueOnPanic {
+				wg.Add(1)
+				go generator(ctx, catcher, wg, opts, fn, abort, out)
+				return
+			}
+			abort()
+			return
+		}
+	}()
+	for {
+		value, err := fn(ctx)
+		if err != nil {
+			if errors.Is(err, ErrAbortGenerator) {
+				abort()
+				return
+			}
+			if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
+				// when the option is true, include all errors.
+				// when false, only include not cancellation errors.
+				catcher.Add(err)
+			}
+			if opts.ContinueOnError {
+				continue
+			}
+			abort()
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case out <- value:
+			continue
+		}
+	}
 }

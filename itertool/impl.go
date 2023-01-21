@@ -37,7 +37,7 @@ func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T]
 	}
 
 	// when all workers conclude, close the pipe.
-	go func() { iter.WG.Wait(ctx); close(pipe) }()
+	go func() { fun.Wait(ctx, &iter.WG); close(pipe) }()
 
 	return iter
 }

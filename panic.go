@@ -16,7 +16,7 @@ func Must[T any](arg T, err error) T {
 func Safe[T any](fn func() T) (out T, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("caught panic: %v", r)
+			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
 	out = fn()

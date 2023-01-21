@@ -188,6 +188,86 @@ func TestError(t *testing.T) {
 				t.Error("iterator was incomplete", len(errs))
 			}
 		})
+		t.Run("When", func(t *testing.T) {
+			ec := &Collector{}
+			When(ec, false, "no error")
+			if ec.stack != nil {
+				t.Error("should not error")
+			}
+			if err := ec.Resolve(); err != nil {
+				t.Fatal(err)
+			}
+
+			When(ec, true, errval)
+			if ec.stack == nil {
+				t.Error("should not error")
+			}
+			if err := ec.Resolve(); err == nil {
+				t.Fatal(err)
+			} else if err.Error() != errval {
+				t.Fatal(err)
+			}
+		})
+		t.Run("When", func(t *testing.T) {
+			serr := errors.New(errval)
+			ec := &Collector{}
+			Whenf(ec, false, "no error %w", serr)
+			if ec.stack != nil {
+				t.Error("should not error")
+			}
+			if err := ec.Resolve(); err != nil {
+				t.Fatal(err)
+			}
+
+			Whenf(ec, true, "no error: %w", serr)
+			if ec.stack == nil {
+				t.Error("should not error")
+			}
+			if err := ec.Resolve(); err == nil {
+				t.Fatal(err)
+			} else if !errors.Is(err, serr) {
+				t.Fatal(err)
+			}
+		})
+		t.Run("ContextHelper", func(t *testing.T) {
+			ec := &Collector{}
+			ec.Add(errors.New("foo"))
+			if ContextExpired(ec.Resolve()) {
+				t.Fatal(ec.Resolve())
+			}
+
+			ec.Add(context.Canceled)
+			ec.Add(errors.New("foo"))
+			if !ContextExpired(ec.Resolve()) {
+				t.Fatal(ec.Resolve())
+			}
+			ec = &Collector{}
+			ec.Add(errors.New("foo"))
+			if ContextExpired(ec.Resolve()) {
+				t.Fatal(ec.Resolve())
+			}
+
+			ec.Add(context.DeadlineExceeded)
+			ec.Add(errors.New("foo"))
+			if !ContextExpired(ec.Resolve()) {
+				t.Fatal(ec.Resolve())
+			}
+		})
+		t.Run("Safe", func(t *testing.T) {
+			ec := &Collector{}
+
+			out := Safe(ec, func() string { panic("foo") })
+			if !ec.HasErrors() {
+				t.Fatal("empty collector")
+			}
+			if ec.Resolve().Error() != "panic: foo" {
+				t.Fatal(ec.Resolve())
+			}
+
+			if out != "" {
+				t.Fatal("output:", out)
+			}
+		})
 	})
 	t.Run("Stack", func(t *testing.T) {
 		t.Parallel()
@@ -448,5 +528,4 @@ func BenchmarkErrorStack(b *testing.B) {
 			})
 		}
 	})
-
 }

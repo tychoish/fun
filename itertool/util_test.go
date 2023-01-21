@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/tychoish/fun"
@@ -36,7 +38,7 @@ func SlicesAreEqual[T comparable](t *testing.T, in []T, out []T) {
 }
 
 func GenerateRandomStringSlice(size int) []string {
-	out := make([]string, 100)
+	out := make([]string, size)
 	for idx := range out {
 		out[idx] = fmt.Sprint("value=", idx)
 	}
@@ -162,7 +164,7 @@ func RunIteratorImplementationTests[T comparable](
 								t.Run("Map", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											MapOptions{ContinueOnError: false},
+											Options{ContinueOnError: false},
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input T) (T, error) {
 												panic("whoop")
@@ -182,7 +184,7 @@ func RunIteratorImplementationTests[T comparable](
 								t.Run("ParallelMap", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											MapOptions{
+											Options{
 												ContinueOnError: true,
 												ContinueOnPanic: false,
 												NumWorkers:      2,
@@ -314,7 +316,7 @@ func RunIteratorIntegerAlgoTests(
 								t.Run("ErrorDoesNotAbort", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											MapOptions{
+											Options{
 												ContinueOnError: true,
 											},
 											filter.Filter(baseBuilder(elems)),
@@ -339,7 +341,7 @@ func RunIteratorIntegerAlgoTests(
 								t.Run("PanicDoesNotAbort", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											MapOptions{
+											Options{
 												ContinueOnPanic: true,
 												NumWorkers:      1,
 											},
@@ -366,7 +368,7 @@ func RunIteratorIntegerAlgoTests(
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											MapOptions{
+											Options{
 												NumWorkers:      1,
 												ContinueOnError: false,
 											},
@@ -394,7 +396,7 @@ func RunIteratorIntegerAlgoTests(
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											MapOptions{
+											Options{
 												NumWorkers:      4,
 												ContinueOnError: true,
 											},
@@ -493,7 +495,7 @@ func RunIteratorStringAlgoTests(
 								iter := builder()
 								out := Map(
 									ctx,
-									MapOptions{},
+									Options{},
 									iter,
 									func(ctx context.Context, str string) (string, error) {
 										return str, nil
@@ -513,7 +515,7 @@ func RunIteratorStringAlgoTests(
 							t.Run("ParallelMap", func(t *testing.T) {
 								out := Map(
 									ctx,
-									MapOptions{
+									Options{
 										NumWorkers: 4,
 									},
 									Merge(ctx, builder(), builder(), builder()),
@@ -543,6 +545,170 @@ func RunIteratorStringAlgoTests(
 									t.Error("unexpected result", count)
 								}
 							})
+
+							t.Run("Generate", func(t *testing.T) {
+								t.Run("Basic", func(t *testing.T) {
+									inputs := GenerateRandomStringSlice(512)
+									count := &atomic.Int32{}
+									out := Generate(
+										ctx,
+										Options{
+											// should just become zero
+											OutputBufferSize: -1,
+										},
+										func(ctx context.Context) (string, error) {
+											count.Add(1)
+											if int(count.Load()) > len(inputs) {
+												return "", ErrAbortGenerator
+											}
+											return inputs[rand.Intn(511)], nil
+										},
+									)
+									sig := make(chan struct{})
+									go func() {
+										defer close(sig)
+										vals, err := CollectSlice(ctx, out)
+										if err != nil {
+											t.Error(err)
+										}
+										if len(vals) != len(inputs) {
+											t.Error("unexpected result", count.Load(), len(vals), len(inputs))
+										}
+									}()
+									<-sig
+								})
+								t.Run("GenerateParallel", func(t *testing.T) {
+									inputs := GenerateRandomStringSlice(512)
+									count := &atomic.Int32{}
+									out := Generate(
+										ctx,
+										Options{
+											NumWorkers: 4,
+										},
+										func(ctx context.Context) (string, error) {
+											count.Add(1)
+											if int(count.Load()) > len(inputs) {
+												return "", ErrAbortGenerator
+											}
+											return inputs[rand.Intn(511)], nil
+										},
+									)
+									sig := make(chan struct{})
+									go func() {
+										defer close(sig)
+										vals, err := CollectSlice(ctx, out)
+										if err != nil {
+											t.Error(err)
+										}
+										// aborting may not happen at the same moment, given this locking model
+										if len(vals)+16 < len(inputs) {
+											t.Error("unexpected result", len(vals), len(inputs))
+										}
+									}()
+									<-sig
+								})
+								t.Run("PanicSafety", func(t *testing.T) {
+									out := Generate(
+										ctx,
+										Options{},
+										func(ctx context.Context) (string, error) {
+											panic("foo")
+										},
+									)
+									if out.Next(ctx) {
+										t.Fatal("should not iterate when panic")
+									}
+									if err := out.Close(ctx); err.Error() != "panic: foo" {
+										t.Fatalf("unexpected panic %q", err.Error())
+									}
+								})
+								t.Run("ContinueOnPanic", func(t *testing.T) {
+									count := 0
+									out := Generate(
+										ctx,
+										Options{
+											ContinueOnPanic: true,
+										},
+										func(ctx context.Context) (string, error) {
+											count++
+											if count == 3 {
+												panic("foo")
+											}
+
+											if count == 5 {
+												return "", ErrAbortGenerator
+											}
+											return fmt.Sprint(count), nil
+										},
+									)
+									output, err := CollectSlice(ctx, out)
+									if l := len(output); l != 3 {
+										t.Error(l)
+									}
+									if err == nil {
+										t.Fatal("should have errored")
+									}
+									if err.Error() != "panic: foo" {
+										t.Fatalf("unexpected panic %q", err.Error())
+									}
+								})
+								t.Run("ArbitraryErrorAborts", func(t *testing.T) {
+
+									count := 0
+									out := Generate(
+										ctx,
+										Options{},
+										func(ctx context.Context) (string, error) {
+											count++
+											if count == 4 {
+												return "", errors.New("beep")
+											}
+											return "foo", nil
+										},
+									)
+									output, err := CollectSlice(ctx, out)
+									if l := len(output); l != 3 {
+										t.Error(l)
+									}
+									if err == nil {
+										t.Fatal("should have errored")
+									}
+									if err.Error() != "beep" {
+										t.Fatalf("unexpected panic %q", err.Error())
+									}
+								})
+								t.Run("ContinueOnError", func(t *testing.T) {
+
+									count := 0
+									out := Generate(
+										ctx,
+										Options{
+											ContinueOnError: true,
+										},
+										func(ctx context.Context) (string, error) {
+											count++
+											if count == 3 {
+												return "", errors.New("beep")
+											}
+											if count == 5 {
+												return "", ErrAbortGenerator
+											}
+											return "foo", nil
+										},
+									)
+									output, err := CollectSlice(ctx, out)
+									if l := len(output); l != 3 {
+										t.Error(l)
+									}
+									if err == nil {
+										t.Fatal("should have errored")
+									}
+									if err.Error() != "beep" {
+										t.Fatalf("unexpected panic %q", err.Error())
+									}
+								})
+							})
+
 							t.Run("Reduce", func(t *testing.T) {
 								iter := builder()
 								seen := make(map[string]struct{}, len(elems))
