@@ -1,3 +1,5 @@
+// Package Set provides ordered and unordered set implementations for
+// arbitrary comparable types.
 package set
 
 import (

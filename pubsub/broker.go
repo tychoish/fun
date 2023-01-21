@@ -1,3 +1,6 @@
+// Package pubsub provides a message broker for one-to-many or
+// many-to-many message distribution. In addition pubsub includes a
+// generic deque and queue implementations suited to concurrent use.
 package pubsub
 
 import (
