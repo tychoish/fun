@@ -495,6 +495,71 @@ func TestDeque(t *testing.T) {
 			t.Error("100 !=", out)
 		}
 	})
+	t.Run("BlockingIteratorForward", func(t *testing.T) {
+		t.Parallel()
+		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := 0; i < 5; i++ {
+			dq.PushFront(i)
+		}
+		startAt := time.Now()
+		iter := dq.IteratorBlocking()
+		seen := 0
+		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		t.Cleanup(cancel)
+		for iter.Next(ctx) {
+			seen++
+			if time.Since(startAt) > 250*time.Millisecond {
+				t.Error("took to long to iterate", time.Since(startAt))
+			}
+			t.Log(time.Since(startAt))
+		}
+		if time.Since(startAt) <= 500*time.Millisecond {
+			t.Error("should have waited for the context to timeout", time.Since(startAt))
+		}
+		if ctx.Err() == nil {
+			t.Error("context should have canceled")
+		}
+		if seen != 5 {
+			t.Error("should have seen all items")
+		}
+	})
+	t.Run("BlockingIteratorReverse", func(t *testing.T) {
+		t.Parallel()
+		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := 0; i < 5; i++ {
+			dq.PushBack(i)
+		}
+		startAt := time.Now()
+		iter := dq.IteratorBlockingReverse()
+		seen := 0
+		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		t.Cleanup(cancel)
+		for iter.Next(ctx) {
+			seen++
+			if time.Since(startAt) > 250*time.Millisecond {
+				t.Error("took to long to iterate", time.Since(startAt))
+			}
+			t.Log(time.Since(startAt))
+		}
+		if time.Since(startAt) <= 500*time.Millisecond {
+			t.Error("should have waited for the context to timeout", time.Since(startAt))
+		}
+		if ctx.Err() == nil {
+			t.Error("context should have canceled")
+		}
+		if seen != 5 {
+			t.Error("should have seen all items")
+		}
+	})
+
 	t.Run("Closed", func(t *testing.T) {
 		dq, err := NewDeque[int](DequeOptions{Capacity: 40})
 		if err != nil {
