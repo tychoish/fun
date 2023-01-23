@@ -39,7 +39,7 @@ func (s *orderedSetImpl[T]) lazyDelete() {
 		return
 	}
 
-	newElems := make([]orderedSetItem[T], len(s.set)-s.deletedCount)
+	newElems := make([]orderedSetItem[T], len(s.set))
 	newIdx := 0
 	for oldIdx := range s.elems {
 		newItem := s.elems[oldIdx]

@@ -13,11 +13,14 @@ import (
 // implementations.
 //
 // The itertool package provides a number of tools and paradigms for
-// creating and processing Iterator objects. In general, Iterators
-// cannot be safe for access from multiple concurrent goroutines,
-// because it is impossible to synchronize calls to Next() and
-// Value(); however, itertool.Range() and itertool.Split provide
-// support for these workloads.
+// creating and processing Iterator objects, including Generators, Map
+// and Reduce, Filter as well as Split and Merge to combine or divide
+// iterators.
+//
+// In general, Iterators cannot be safe for access from multiple
+// concurrent goroutines, because it is impossible to synchronize
+// calls to Next() and Value(); however, itertool.Range() and
+// itertool.Split() provide support for these workloads.
 type Iterator[T any] interface {
 	Next(context.Context) bool
 	Close(context.Context) error

@@ -10,12 +10,11 @@ import (
 )
 
 // Deque proves a basic double ended queue backed by a doubly linked
-// list, with features to support a maximum capacity, burstable
-// limits and soft quotas, as well as iterators, that safe for access
-// from multiple concurrent go-routines.
-//
-// Furthermore, the implementation safely handles multiple concurrent
-// blocking operations (e.g. Wait, iterators).
+// list, with features to support a maximum capacity, burstable limits
+// and soft quotas, as well as iterators, that safe for access from
+// multiple concurrent go-routines. Furthermore, the implementation
+// safely handles multiple concurrent blocking operations (e.g. Wait,
+// iterators).
 //
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
