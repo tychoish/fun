@@ -2,6 +2,7 @@ package itertool
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/tychoish/fun"
@@ -172,4 +173,92 @@ func TestWrap(t *testing.T) {
 	if maybeBase.Unwrap() != base {
 		t.Error("should be the same object")
 	}
+}
+
+func TestRangeSplit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("Range", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			input := Slice(GenerateRandomStringSlice(10))
+
+			rf := Range(ctx, input)
+
+			set := set.MakeOrdered[string](10)
+
+			var st string
+			for rf(ctx, &st) {
+				set.Add(st)
+			}
+
+			if set.Len() != 10 {
+				t.Error("did not sufficently iteratre", set.Len())
+			}
+		})
+		t.Run("Parallel", func(t *testing.T) {
+			input := Slice(GenerateRandomStringSlice(100))
+
+			rf := Range(ctx, input)
+
+			set := set.Synchronize(set.MakeOrdered[string](100))
+
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+
+				go func() {
+					defer wg.Done()
+
+					var st string
+					for rf(ctx, &st) {
+						set.Add(st)
+					}
+				}()
+			}
+
+			fun.Wait(ctx, wg)
+
+			if set.Len() != 100 {
+				t.Error("did not iterate enough")
+
+			}
+		})
+	})
+	t.Run("Split", func(t *testing.T) {
+		input := Slice(GenerateRandomStringSlice(100))
+
+		splits := Split(ctx, 0, input)
+		if splits != nil {
+			t.Fatal("should be nil if empty")
+		}
+
+		splits = Split(ctx, 10, input)
+		if len(splits) != 10 {
+			t.Fatal("didn't make enough split")
+		}
+
+		set := set.Synchronize(set.MakeOrdered[string](100))
+
+		wg := &sync.WaitGroup{}
+		for _, iter := range splits {
+			wg.Add(1)
+
+			go func(it fun.Iterator[string]) {
+				defer wg.Done()
+
+				for it.Next(ctx) {
+					set.Add(it.Value())
+				}
+			}(iter)
+		}
+
+		fun.Wait(ctx, wg)
+
+		if set.Len() != 100 {
+			t.Error("did not iterate enough")
+
+		}
+
+	})
 }

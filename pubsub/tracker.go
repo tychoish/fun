@@ -16,7 +16,12 @@ type queueNoLimitTrackerImpl struct {
 func (q *queueNoLimitTrackerImpl) len() int   { return q.length }
 func (q *queueNoLimitTrackerImpl) cap() int   { return math.MaxInt }
 func (q *queueNoLimitTrackerImpl) add() error { q.length++; return nil }
-func (q *queueNoLimitTrackerImpl) remove()    { q.length-- }
+func (q *queueNoLimitTrackerImpl) remove() {
+	if q.length == 0 {
+		return
+	}
+	q.length--
+}
 
 type queueHardLimitTracker struct {
 	capacity int

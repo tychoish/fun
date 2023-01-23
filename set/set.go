@@ -23,12 +23,12 @@ type Set[T comparable] interface {
 	// Check returns true if the item is in the set.
 	Check(T) bool
 	// Iterator produces an Iterator implementation for the
-	// elements in the set. There are no ordering guarantees.
+	// elements in the set.
 	Iterator(context.Context) fun.Iterator[T]
 }
 
 // MakeUnordered constructs a set object, pre-allocating the specified
-// length.
+// length. Iteration order is randomized.
 func MakeUnordered[T comparable](len int) Set[T] { return make(mapSetImpl[T], len) }
 
 // NewUnordered constructs a set object for the given type, without prealocation.

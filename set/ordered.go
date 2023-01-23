@@ -18,13 +18,15 @@ type orderedSetImpl[T comparable] struct {
 	deletedCount int
 }
 
-// NewOrdered produces an order-preserving set implementation.
+// NewOrdered produces an order-preserving set
+// implementation. Iteration order will reflect insertion order.
 func NewOrdered[T comparable]() Set[T] {
 	return MakeOrdered[T](0)
 }
 
-// MakeOrdered produces an order-preserving set implementation,
-// with pre-allocated capacity to the specified size.
+// MakeOrdered produces an order-preserving set implementation, with
+// pre-allocated capacity to the specified size. Iteration will
+// reflect insertion order.
 func MakeOrdered[T comparable](size int) Set[T] {
 	return &orderedSetImpl[T]{
 		set:   make(map[T]orderedSetItem[T], size),
@@ -37,7 +39,7 @@ func (s *orderedSetImpl[T]) lazyDelete() {
 		return
 	}
 
-	newElems := make([]orderedSetItem[T], len(s.set))
+	newElems := make([]orderedSetItem[T], len(s.set)-s.deletedCount)
 	newIdx := 0
 	for oldIdx := range s.elems {
 		newItem := s.elems[oldIdx]
@@ -90,15 +92,14 @@ type orderedSetIterImpl[T comparable] struct {
 
 func (iter *orderedSetIterImpl[T]) Next(ctx context.Context) bool {
 	for i := iter.lastIdx + 1; i < len(iter.set.elems); i++ {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || i >= len(iter.set.elems) {
 			return false
 		}
+
 		if iter.set.elems[i].deleted {
 			continue
 		}
-		if i >= len(iter.set.elems) {
-			return false
-		}
+
 		iter.lastIdx = i
 		iter.value = &iter.set.elems[i].item
 		return true

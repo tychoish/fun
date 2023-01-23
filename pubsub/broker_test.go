@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/set"
 )
 
 type BrokerFixture[T comparable] struct {
@@ -554,6 +556,57 @@ func TestBroker(t *testing.T) {
 			t.Error("subscription should be nil with a canceled context")
 		}
 	})
+	t.Run("Populate", func(t *testing.T) {
+		input := randomIntSlice(100)
+
+		iter := itertool.Slice(input)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+
+		broker := NewBroker[int](ctx, BrokerOptions{})
+		seen := set.Synchronize(set.MakeUnordered[int](100))
+		sig := make(chan struct{})
+		sub := broker.Subscribe(ctx)
+		go func() {
+			defer close(sig)
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case item := <-sub:
+					seen.Add(item)
+				}
+				if seen.Len() == 100 {
+					break
+				}
+			}
+		}()
+		popsig := make(chan struct{})
+		go func() {
+			defer close(popsig)
+			if err := Populate(ctx, iter, broker); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("should not have exited")
+		case <-sig:
+		}
+
+		if seen.Len() != 100 {
+			t.Error("unexpected items received", seen.Len())
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("should not have exited")
+		case <-popsig:
+		}
+	})
+
 }
 
 func randomIntSlice(size int) []int {
