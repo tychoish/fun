@@ -3,7 +3,6 @@ package itertool
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -236,18 +235,15 @@ func mapWorker[T any, O any](
 	toOutput chan<- O,
 ) {
 	defer wg.Done()
-	defer func() {
-		if r := recover(); r != nil {
-			catcher.Add(fmt.Errorf("panic: %v", r))
-			if opts.ContinueOnPanic {
-				wg.Add(1)
-				go mapWorker(ctx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
-				return
-			}
+	defer erc.RecoverHook(catcher, func() {
+		if !opts.ContinueOnPanic {
 			abort()
 			return
 		}
-	}()
+
+		wg.Add(1)
+		go mapWorker(ctx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
+	})
 	for {
 		select {
 		case <-ctx.Done():
@@ -360,18 +356,15 @@ func generator[T any](
 	out chan<- T,
 ) {
 	defer wg.Done()
-	defer func() {
-		if r := recover(); r != nil {
-			catcher.Add(fmt.Errorf("panic: %v", r))
-			if opts.ContinueOnPanic {
-				wg.Add(1)
-				go generator(ctx, catcher, wg, opts, fn, abort, out)
-				return
-			}
+	defer erc.RecoverHook(catcher, func() {
+		if !opts.ContinueOnPanic {
 			abort()
 			return
 		}
-	}()
+
+		wg.Add(1)
+		go generator(ctx, catcher, wg, opts, fn, abort, out)
+	})
 	for {
 		value, err := fn(ctx)
 		if err != nil {

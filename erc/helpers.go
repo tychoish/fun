@@ -12,7 +12,6 @@ import (
 func ContextExpired(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return true
-
 	}
 
 	return false
@@ -45,4 +44,32 @@ func Whenf(ec *Collector, cond bool, val string, args ...any) {
 func Safe[T any](ec *Collector, fn func() T) T {
 	defer Recover(ec)
 	return fn()
+}
+
+// Recover calls the builtin recover() function and converts it to an
+// error that is populated in the collector. Run RecoverHook in defer
+// statements.
+func Recover(ec *Collector) {
+	if r := recover(); r != nil {
+		ec.Add(fmt.Errorf("panic: %v", r))
+	}
+}
+
+// RecoverHook runs adds the output of recover() to the error
+// collector, and runs the specified hook if. If there was no panic,
+// this function is a noop. Run RecoverHook in defer statements.
+func RecoverHook(ec *Collector, hook func()) {
+	if r := recover(); r != nil {
+		ec.Add(fmt.Errorf("panic: %v", r))
+		if hook != nil {
+			hook()
+		}
+	}
+}
+
+// CheckCtx executes a simple function that takes a context and if it
+// returns an error, adds it to the collector, primarily for use in
+// defer statements.
+func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error) {
+	ec.Check(func() error { return fn(ctx) })
 }

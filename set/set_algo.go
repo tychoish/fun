@@ -28,7 +28,8 @@ func Equal[T comparable](ctx context.Context, s1, s2 Set[T]) bool {
 		}
 	}
 
-	if err := iter1.Close(ctx); err != nil {
+	err := iter1.Close(ctx)
+	if err != nil || ctx.Err() != nil {
 		return false
 	}
 

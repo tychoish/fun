@@ -8,7 +8,6 @@ package erc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -86,12 +85,17 @@ func (e *Stack) Error() string {
 // with errors.Is, which takes advantage of this interface.
 func (e *Stack) Is(err error) bool { return errors.Is(e.err, err) }
 
+// As calls errors.As on the underlying error to provied compatibility
+// with errors.As, which takes advantage of this interface.
+func (e *Stack) As(target any) bool { return errors.As(e.err, target) }
+
 // Unwrap returns the next iterator in the stack, and is compatible
 // with errors.Unwrap.
 func (e *Stack) Unwrap() error {
 	if e.next != nil {
 		return e.next
 	}
+
 	return nil
 }
 
@@ -144,36 +148,9 @@ func (ec *Collector) Add(err error) {
 	ec.stack = ec.stack.append(err)
 }
 
-// Recover calls the builtin recover() function and converts it to an
-// error that is populated in the collector.
-func Recover(ec *Collector) {
-	if r := recover(); r != nil {
-		ec.Add(fmt.Errorf("panic: %v", r))
-	}
-}
-
-// RecoverAction calls the builtin recover() function and converts it to an
-// error in the collector, for direct use in defers. The callback
-// function is only called if the panic is non-nil.
-func (ec *Collector) Recover(callback func()) {
-	if r := recover(); r != nil {
-		ec.Add(fmt.Errorf("panic: %v", r))
-		if callback != nil {
-			callback()
-		}
-	}
-}
-
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
 func (ec *Collector) Check(fn func() error) { ec.Add(fn()) }
-
-// CheckCtx executes a simple function that takes a context and if it
-// returns an error, adds it to the collector, primarily for use in
-// defer statements.
-func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error) {
-	ec.Check(func() error { return fn(ctx) })
-}
 
 // Iterator produces an iterator for all errors present in the
 // collector. The iterator proceeds from the current error to the

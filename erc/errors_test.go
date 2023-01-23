@@ -159,7 +159,7 @@ func TestError(t *testing.T) {
 			counter := 0
 			go func() {
 				defer close(sig)
-				defer es.Recover(func() { counter++ })
+				defer RecoverHook(es, func() { counter++ })
 				panic("boop")
 			}()
 			<-sig

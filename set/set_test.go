@@ -115,6 +115,20 @@ func TestSet(t *testing.T) {
 							t.Fatal("sets should be equal")
 						}
 					})
+					t.Run("EqualityCancelation", func(t *testing.T) {
+						cctx, ccancel := context.WithCancel(ctx)
+						ccancel()
+
+						set := builder()
+						populator(set)
+
+						set2 := builder()
+						populator(set2)
+
+						if Equal(cctx, set, set2) {
+							t.Fatal("context cancellation disrupts iteration")
+						}
+					})
 					t.Run("InqualitySizeSimple", func(t *testing.T) {
 						set := builder()
 						populator(set)
@@ -327,6 +341,58 @@ func TestSet(t *testing.T) {
 			maybeBase := wrapped.(interface{ Unwrap() fun.Iterator[string] }).Unwrap()
 			if maybeBase == nil {
 				t.Fatal("should not be nil")
+			}
+		})
+	})
+	t.Run("IteratorEdgeCases", func(t *testing.T) {
+		t.Run("DeletedElementIsSkipped", func(t *testing.T) {
+			base := MakeOrdered[string](2).(*orderedSetImpl[string])
+			base.Add("abc")
+			base.Add("123")
+			base.elems[1].deleted = true
+
+			count := 0
+			iter := base.Iterator(ctx)
+			for iter.Next(ctx) {
+				count++
+				if iter.Value() == "123" {
+					t.Error("unexpected value", iter.Value())
+				}
+			}
+			if count != 1 {
+				t.Error("iteration count", count)
+			}
+		})
+		t.Run("CanceledContext", func(t *testing.T) {
+			cctx, ccancel := context.WithCancel(ctx)
+			ccancel()
+
+			base := MakeOrdered[string](2).(*orderedSetImpl[string])
+			base.Add("abc")
+			base.Add("123")
+
+			count := 0
+			iter := base.Iterator(cctx)
+			for iter.Next(cctx) {
+				count++
+			}
+			if count != 0 {
+				t.Error("iteration count", count)
+			}
+		})
+		t.Run("OffTheEnd", func(t *testing.T) {
+			base := MakeOrdered[string](2).(*orderedSetImpl[string])
+			base.Add("abc")
+			base.Add("123")
+
+			count := 0
+			iter := base.Iterator(ctx).(*orderedSetIterImpl[string])
+			iter.lastIdx = 43
+			for iter.Next(ctx) {
+				count++
+			}
+			if count != 0 {
+				t.Error("iteration count", count)
 			}
 		})
 	})
