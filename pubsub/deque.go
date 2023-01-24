@@ -93,16 +93,13 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 }
 
 func makeDeque[T any]() *Deque[T] {
-	sentinel := &element[T]{}
 	q := &Deque[T]{}
 	q.updates = sync.NewCond(&q.mtx)
 	q.nfront = sync.NewCond(&q.mtx)
 	q.nback = sync.NewCond(&q.mtx)
-	q.root = sentinel
-	sentinel.next = sentinel
-	sentinel.prev = sentinel
-	sentinel.root = true
-	sentinel.list = q
+	q.root = &element[T]{root: true, list: q}
+	q.root.next = q.root
+	q.root.prev = q.root
 
 	return q
 }

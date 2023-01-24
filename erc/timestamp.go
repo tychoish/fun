@@ -3,7 +3,6 @@ package erc
 import (
 	"errors"
 	"fmt"
-	"io"
 	"time"
 )
 
@@ -61,7 +60,7 @@ func (e *timestamped) Format(s fmt.State, verb rune) {
 		}
 		fallthrough
 	case 's':
-		io.WriteString(s, e.Error())
+		_, _ = fmt.Fprint(s, e.Error())
 	case 'q':
 		fmt.Fprintf(s, "%q", e.Error())
 	}
