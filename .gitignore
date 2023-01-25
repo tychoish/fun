@@ -1,2 +1,4 @@
 coverage.out
 coverage.html
+*.out
+*.test

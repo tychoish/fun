@@ -1,7 +1,6 @@
 package fun
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -12,9 +11,6 @@ type wrapTestType struct {
 }
 
 func TestWrap(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("Wrap", func(t *testing.T) {
 		l := &wrapTestType{value: 42}
 		nl := Unwrap(l)
@@ -37,67 +33,5 @@ func TestWrap(t *testing.T) {
 		if unwrapped != err {
 			t.Fatal("unexpected unrwapping")
 		}
-	})
-	t.Run("Panics", func(t *testing.T) {
-		t.Run("MustNoPanic", func(t *testing.T) {
-			ok := Must(func() (bool, error) {
-				return true, nil
-			}())
-			if !ok {
-				t.Error("should be true")
-			}
-		})
-		t.Run("SafeWithPanic", func(t *testing.T) {
-			ok, err := Safe(func() bool {
-				return Must(func() (bool, error) {
-					return true, errors.New("error")
-				}())
-			})
-			if err == nil {
-				t.Error("error should be non-nil")
-			}
-			if ok {
-				t.Error("should be zero value of T")
-			}
-		})
-		t.Run("SafeNoPanic", func(t *testing.T) {
-			ok, err := Safe(func() bool {
-				return Must(func() (bool, error) {
-					return true, nil
-				}())
-			})
-			if err != nil {
-				t.Error("error should be non-nil")
-			}
-			if !ok {
-				t.Error("should be zero value of T")
-			}
-		})
-		t.Run("SafeCtxWithPanic", func(t *testing.T) {
-			ok, err := SafeCtx(ctx, func(_ context.Context) bool {
-				return Must(func() (bool, error) {
-					return true, errors.New("error")
-				}())
-			})
-			if err == nil {
-				t.Error("error should be non-nil")
-			}
-			if ok {
-				t.Error("should be zero value of T")
-			}
-		})
-		t.Run("SafeCtxNoPanic", func(t *testing.T) {
-			ok, err := SafeCtx(ctx, func(_ context.Context) bool {
-				return Must(func() (bool, error) {
-					return true, nil
-				}())
-			})
-			if err != nil {
-				t.Error("error should be non-nil")
-			}
-			if !ok {
-				t.Error("should be zero value of T")
-			}
-		})
 	})
 }

@@ -1,0 +1,639 @@
+package seq_test
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math"
+	"testing"
+
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/seq"
+)
+
+func TestList(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("Constructor", func(t *testing.T) {
+		list := &seq.List[int]{}
+		if list.Len() != 0 {
+			t.Fatal("should initialize to zero")
+		}
+		list.PushBack(42)
+		if list.Len() != 1 {
+			t.Fatal("should initialize to zero", list.Len())
+		}
+		if v := list.PopFront().Value(); v != 42 {
+			t.Fatal(v)
+		}
+	})
+	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
+		ok, err := fun.Safe(func() bool {
+			var list *seq.List[string]
+			list.PushBack("hi")
+			return true
+		})
+		if ok {
+			t.Error("should have errored")
+		}
+		if err == nil {
+			t.Fatal("should have gotten failure")
+		}
+		if !errors.Is(err, seq.ErrUninitialized) {
+			t.Error(err)
+		}
+		if expected := fmt.Sprint("panic: ", seq.ErrUninitialized.Error()); expected != err.Error() {
+			t.Fatal(expected, "->", err)
+		}
+	})
+	t.Run("LengthTracks", func(t *testing.T) {
+		list := &seq.List[int]{}
+
+		list.PushBack(1)
+		if list.Len() != 1 {
+			t.Fatal("append didn't track", list.Len())
+		}
+
+		one := list.PopBack()
+		if list.Len() != 0 {
+			t.Fatal("pop didn't track", list.Len())
+		}
+
+		if one.In(list) {
+			t.Fatal("remove didn't work")
+		}
+
+		for i := 1; i <= 100; i++ {
+			if i%2 == 0 {
+				list.PushBack(i)
+			} else {
+				list.PushFront(i)
+			}
+
+			if l := list.Len(); i != l {
+				t.Error("unexpected length during adding", i, l)
+			}
+		}
+	})
+
+	t.Run("FrontAndBack", func(t *testing.T) {
+		list := &seq.List[int]{}
+
+		if list.Front().Ok() {
+			t.Error(list.Front())
+		}
+
+		list.PushBack(1)
+		list.PushBack(2)
+		// list is [1, 2]
+
+		if list.Front().Value() != 1 {
+			t.Fatal(list.Front().Next())
+		}
+		if list.Back().Value() != 2 {
+			t.Fatal(list.Back().Value())
+		}
+	})
+	t.Run("WrapAroundEffects", func(t *testing.T) {
+		list := &seq.List[int]{}
+		for i := 0; i < 21; i++ {
+			if i%2 == 0 {
+				list.PushBack(i)
+			} else {
+				list.PushFront(i)
+			}
+		}
+		expected := []int{19, 17, 15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20}
+
+		seen := 0
+		for item := list.Front(); item.Ok(); item = item.Next() {
+			if expected[seen] != item.Value() {
+				t.Error(seen, expected[seen], item.Value())
+			}
+			seen++
+		}
+		if seen != list.Len() {
+			t.Error(list.Len(), seen)
+		}
+		if seen != len(expected) {
+			t.Log(seen, list.Len(), fun.Must(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator()))))
+			t.Error(seen, len(expected), expected)
+
+		}
+	})
+	t.Run("CStyleIteration", func(t *testing.T) {
+		list := &seq.List[int]{}
+		for i := 1; i <= 100; i++ {
+			list.PushBack(i)
+		}
+		if list.Len() != 100 {
+			t.Fatal(list.Len())
+		}
+		t.Run("Forwards", func(t *testing.T) {
+			seen := 0
+			last := -1 * (math.MaxInt - 1)
+			// front to back
+			for item := list.Front(); item.Ok(); item = item.Next() {
+				if item.Value() < 0 && item.Value() > 100 {
+					t.Fatal(item.Value())
+				}
+				if last >= item.Value() {
+					t.Fatal(last, ">=", item.Value())
+				}
+
+				last = item.Value()
+				seen++
+			}
+			if seen != list.Len() {
+				t.Error(seen, "!=", list.Len())
+			}
+
+		})
+		t.Run("Backwards", func(t *testing.T) {
+			seen := 0
+			last := math.MaxInt
+			// front to back
+			for item := list.Back(); item.Ok(); item = item.Previous() {
+				if item.Value() < 0 && item.Value() > 100 {
+					t.Fatal(item.Value())
+				}
+				if last < item.Value() {
+					t.Fatal(last, "<", item.Value())
+				}
+
+				last = item.Value()
+				seen++
+			}
+			if seen != list.Len() {
+				t.Error(seen, "!=", list.Len())
+			}
+		})
+	})
+	t.Run("CStyleIterationDestructive", func(t *testing.T) {
+		list := &seq.List[int]{}
+		for i := 1; i <= 100; i++ {
+			list.PushBack(i)
+		}
+		if list.Len() != 100 {
+			t.Fatal(list.Len())
+		}
+		t.Run("Forwards", func(t *testing.T) {
+			seen := 0
+			last := -1 * (math.MaxInt - 1)
+			// front to back
+			for item := list.PopFront(); item.Ok(); item = list.PopFront() {
+				if item.Value() < 0 && item.Value() > 100 {
+					t.Fatal(item.Value())
+				}
+				if last >= item.Value() {
+					t.Fatal(last, "<", item.Value())
+				}
+
+				last = item.Value()
+				seen++
+			}
+			if seen != 100 {
+				t.Error(seen, "!=", list.Len())
+			}
+			if list.Len() != 0 {
+				t.Fatal(list.Len())
+			}
+		})
+
+		list = &seq.List[int]{}
+		for i := 1; i <= 100; i++ {
+			list.PushBack(i)
+		}
+		if list.Len() != 100 {
+			t.Fatal(list.Len())
+		}
+		t.Run("Backwards", func(t *testing.T) {
+			seen := 0
+			last := (math.MaxInt)
+			// front to back
+			for item := list.PopBack(); item.Ok(); item = list.PopBack() {
+				if item.Value() < 0 && item.Value() > 100 {
+					t.Fatal(item.Value())
+				}
+				if last < item.Value() {
+					t.Fatal(last, "<", item.Value())
+				}
+
+				last = item.Value()
+				seen++
+			}
+			if seen != 100 {
+				t.Error(seen, "!=", list.Len())
+			}
+			if list.Len() != 0 {
+				t.Fatal(list.Len())
+			}
+		})
+	})
+	t.Run("Iterators", func(t *testing.T) {
+		t.Run("Forward", func(t *testing.T) {
+			list := &seq.List[int]{}
+			for i := 1; i <= 100; i++ {
+				list.PushBack(i)
+			}
+			// list is [1, 2, ... 100]
+			if list.Front().Value() != 1 {
+				t.Error(list.Front().Value())
+			}
+
+			iter := seq.ListValues(list.Iterator())
+			seen := 0
+			last := -1*math.MaxInt - 1
+			t.Log(list.Front().Value(), "->", list.Back().Value())
+			for iter.Next(ctx) {
+				if iter.Value() < 0 && iter.Value() > 100 {
+					t.Fatal(iter.Value())
+				}
+				if last > iter.Value() {
+					t.Fatal(last, ">", iter.Value())
+				}
+
+				last = iter.Value()
+				seen++
+			}
+			if err := iter.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+		})
+		t.Run("ForwardPop", func(t *testing.T) {
+			list := &seq.List[int]{}
+			for i := 1; i <= 100; i++ {
+				list.PushBack(i)
+			}
+			// list is [1, 2, ... 100]
+			if list.Front().Value() != 1 {
+				t.Error(list.Front().Value())
+			}
+
+			iter := seq.ListValues(list.IteratorPop())
+			seen := 0
+			last := -1*math.MaxInt - 1
+			t.Log(list.Front().Value(), "->", list.Back().Value())
+			for iter.Next(ctx) {
+				if iter.Value() < 0 && iter.Value() > 100 {
+					t.Fatal(iter.Value())
+				}
+				if last > iter.Value() {
+					t.Fatal(last, ">", iter.Value())
+				}
+
+				last = iter.Value()
+				seen++
+			}
+			if err := iter.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if seen != 100 {
+				t.Error("didn't observe enough items")
+			}
+			if list.Len() != 0 {
+				t.Error("did not consume enough items")
+			}
+		})
+		t.Run("Reverse", func(t *testing.T) {
+			list := &seq.List[int]{}
+			for i := 1; i <= 100; i++ {
+				list.PushBack(i)
+			}
+			// list is [1, 2, ... 100]
+			if list.Front().Value() != 1 {
+				t.Error(list.Front().Value())
+			}
+
+			iter := seq.ListValues(list.Reverse())
+			seen := 0
+			last := math.MaxInt - 1
+			t.Log(list.Front().Value(), "->", list.Back().Value())
+			for iter.Next(ctx) {
+				if iter.Value() < 0 && iter.Value() > 100 {
+					t.Fatal(iter.Value())
+				}
+				if last < iter.Value() {
+					t.Fatal(last, ">", iter.Value())
+				}
+
+				last = iter.Value()
+				seen++
+			}
+			if err := iter.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+		})
+		t.Run("ReversePop", func(t *testing.T) {
+			list := &seq.List[int]{}
+			for i := 1; i <= 100; i++ {
+				list.PushBack(i)
+			}
+			// list is [1, 2, ... 100]
+			if list.Front().Value() != 1 {
+				t.Error(list.Front().Value())
+			}
+
+			iter := seq.ListValues(list.ReversePop())
+			seen := 0
+			last := math.MaxInt - 1
+			t.Log(list.Front().Value(), "->", list.Back().Value())
+			for iter.Next(ctx) {
+				if iter.Value() < 0 && iter.Value() > 100 {
+					t.Fatal(iter.Value())
+				}
+				if last < iter.Value() {
+					t.Fatal(last, ">", iter.Value())
+				}
+
+				last = iter.Value()
+				seen++
+			}
+			if err := iter.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if seen != 100 {
+				t.Error("didn't observe enough items")
+			}
+			if list.Len() != 0 {
+				t.Error("did not consume enough items")
+			}
+		})
+		t.Run("Closed", func(t *testing.T) {
+			list := &seq.List[int]{}
+			for i := 1; i <= 100; i++ {
+				list.PushBack(i)
+			}
+			iter := list.Iterator()
+			for i := 0; i < 50; i++ {
+				if !iter.Next(ctx) {
+					t.Error("iterator should be open", i)
+				}
+			}
+			fun.Invariant(iter.Close(ctx) == nil)
+			for i := 0; i < 50; i++ {
+				if iter.Next(ctx) {
+					t.Error("iterator should be closed", i)
+				}
+			}
+
+		})
+
+	})
+	t.Run("Element", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			elem := seq.NewElement("hi")
+			if fmt.Sprint(elem) != "hi" {
+				t.Fatal(fmt.Sprint(elem))
+			}
+			if fmt.Sprint(elem) != fmt.Sprintf("%+v", elem) {
+				t.Fatal(fmt.Sprint(elem), fmt.Sprintf("%+v", elem))
+			}
+		})
+		t.Run("ChainAppending", func(t *testing.T) {
+			list := &seq.List[int]{}
+			head := list.Front()
+			for i := 1; i <= 100; i++ {
+				head.Append(seq.NewElement(i))
+			}
+			if list.Len() != 100 {
+				t.Fatal(list.Len())
+			}
+			for i := 1; i <= 100; i++ {
+				head.Append(&seq.Element[int]{})
+			}
+			if list.Len() != 100 {
+				t.Fatal(list.Len())
+			}
+			for i := 1; i <= 100; i++ {
+				head.Append(nil)
+			}
+			if list.Len() != 100 {
+				t.Fatal(list.Len())
+			}
+		})
+		t.Run("Remove", func(t *testing.T) {
+			list := &seq.List[int]{}
+			head := list.Front()
+			for i := 1; i <= 100; i++ {
+				head.Append(seq.NewElement(i))
+			}
+
+			if list.Len() != 100 {
+				t.Fatal(list.Len())
+			}
+			back := list.Back()
+
+			if back.Remove() && list.Len() != 99 {
+				t.Fatal(list.Len())
+			}
+
+			if back.In(list) {
+				t.Error("should not be in list")
+			}
+
+			if !back.Ok() {
+				t.Error("value should exist")
+			}
+			if back.Value() != 1 {
+				t.Error(back.Value())
+			}
+		})
+		t.Run("RemoveRoot", func(t *testing.T) {
+			list := &seq.List[int]{}
+			// this is the sentinel
+			head := list.Front()
+			if head.Ok() {
+				t.Error("should not be a value")
+			}
+			if head.Remove() {
+				t.Error("should not be able to remove the root")
+			}
+			if !head.In(list) {
+				t.Error("root should be in the list still")
+			}
+			if head.Set(100) {
+				t.Error("should not report success at setting sentinel")
+			}
+			if head.Ok() {
+				t.Error("should not set root to a value value")
+			}
+			if head.Value() != 0 {
+				t.Error("unexpected value")
+			}
+			if head != list.Back() {
+				t.Error("sentinel has incorrect links")
+			}
+		})
+		t.Run("SetOrphan", func(t *testing.T) {
+			elem := seq.NewElement("hello world!")
+			if !elem.Ok() || elem.Value() != "hello world!" {
+				t.Fatal(elem.Value())
+			}
+			elem.Set("hi globe!")
+			if !elem.Ok() || elem.Value() != "hi globe!" {
+				t.Fatal(elem.Value())
+			}
+		})
+		t.Run("SetListMember", func(t *testing.T) {
+			list := &seq.List[int]{}
+			list.PushFront(4242)
+			elem := list.Front()
+			if !elem.Ok() || elem.Value() != 4242 {
+				t.Fatal(elem.Value())
+			}
+			elem.Set(100)
+			if !elem.Ok() || elem.Value() != 100 {
+				t.Fatal(elem.Value())
+			}
+			list.Front().Set(100)
+
+			if list.Front().Value() != 100 {
+				t.Fatal(list.Front())
+			}
+			if list.Front() != elem {
+				t.Fatal("identity shouldn't change if values doe")
+			}
+		})
+		t.Run("Drop", func(t *testing.T) {
+			list := &seq.List[int]{}
+			list.PushFront(4242)
+			list.PushFront(4242)
+			if list.Len() != 2 {
+				t.Fatal(list.Len())
+			}
+
+			list.Front().Drop()
+			if list.Len() != 1 {
+				t.Fatal(list.Len())
+			}
+
+			list.Front().Drop()
+			if list.Len() != 0 {
+				t.Fatal(list.Len())
+			}
+
+			for i := 0; i < 100; i++ {
+				list.Front().Drop()
+			}
+
+			if list.Len() != 0 {
+				t.Fatal(list.Len())
+			}
+		})
+	})
+	t.Run("Swap", func(t *testing.T) {
+		t.Run("Flip", func(t *testing.T) {
+			list := &seq.List[string]{}
+			list.PushBack("hello")
+			list.PushBack("world")
+			// ["hello", "world"]
+			if list.Front().Value() != "hello" && list.Front().Next().Value() != "world" {
+				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			}
+			if !list.Front().Swap(list.Back()) {
+				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			}
+			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
+				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			}
+		})
+		t.Run("Self", func(t *testing.T) {
+			list := &seq.List[string]{}
+			list.PushBack("hello")
+			list.PushBack("world")
+
+			if list.Front().Swap(list.Front()) {
+				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			}
+		})
+		t.Run("NilList", func(t *testing.T) {
+			list := &seq.List[string]{}
+			list.PushFront("hello")
+
+			if list.Front().Swap(seq.NewElement("world")) {
+				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			}
+		})
+		t.Run("DifferentLists", func(t *testing.T) {
+			one := &seq.List[string]{}
+			two := &seq.List[string]{}
+			one.PushBack("hello")
+			two.PushBack("world")
+			if one.Front().Swap(two.Front()) {
+				t.Fatal("unallowable swap")
+			}
+		})
+		t.Run("Root", func(t *testing.T) {
+			one := &seq.List[string]{}
+			one.PushBack("hello")
+			one.PushBack("world")
+			if one.Front().Swap(one.Front().Previous()) {
+				t.Fatal("unallowable swap")
+			}
+		})
+		t.Run("Nil", func(t *testing.T) {
+			one := &seq.List[string]{}
+			one.PushBack("hello")
+			one.PushBack("world")
+			if one.Front().Swap(nil) {
+				t.Fatal("unallowable swap")
+			}
+		})
+
+	})
+	t.Run("Merge", func(t *testing.T) {
+		t.Run("Extend", func(t *testing.T) {
+			l1 := seq.GetPopulatedList(t, 100)
+			l2 := seq.GetPopulatedList(t, 100)
+			l2tail := l2.Back()
+
+			l1.Extend(l2)
+			if l1.Len() != 200 {
+				t.Error(l1.Len())
+			}
+
+			if l1.Back().Value() != l2tail.Value() {
+				t.Error(l1.Front().Value(), l2tail.Value())
+			}
+
+			if l2.Len() != 0 {
+				t.Error(l2.Len())
+			}
+		})
+		t.Run("Order", func(t *testing.T) {
+			lOne := seq.GetPopulatedList(t, 100)
+			itemsOne := fun.Must(itertool.CollectSlice(ctx, seq.ListValues(lOne.Iterator())))
+
+			lTwo := seq.GetPopulatedList(t, 100)
+			itemsTwo := fun.Must(itertool.CollectSlice(ctx, seq.ListValues(lTwo.Iterator())))
+
+			if len(itemsOne) != lOne.Len() {
+				t.Fatal("incorrect items", len(itemsOne), lOne.Len())
+			}
+			if len(itemsTwo) != lTwo.Len() {
+				t.Fatal("incorrect items")
+			}
+
+			lOne.Extend(lTwo)
+			combined := append(itemsOne, itemsTwo...)
+			iter := seq.ListValues(lOne.Iterator())
+			idx := 0
+			for iter.Next(ctx) {
+				if combined[idx] != iter.Value() {
+					t.Error("missmatch", idx, combined[idx], iter.Value())
+				}
+
+				idx++
+			}
+			if len(combined) != lOne.Len() {
+				t.Fatal("incorrect items")
+			}
+			if lTwo.Len() != 0 {
+				t.Fatal("incorrect items", lTwo.Len())
+			}
+		})
+	})
+}
