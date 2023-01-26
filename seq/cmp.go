@@ -93,7 +93,7 @@ func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 	return true
 }
 
-func Sort[T any](list *List[T], lt LessThan[T]) { *list = *mergeSort(list, lt) }
+func SortList[T any](list *List[T], lt LessThan[T]) { *list = *mergeSort(list, lt) }
 
 func mergeSort[T any](head *List[T], lt LessThan[T]) *List[T] {
 	if head.Len() < 2 {
@@ -105,25 +105,7 @@ func mergeSort[T any](head *List[T], lt LessThan[T]) *List[T] {
 	head = mergeSort(head, lt)
 	tail = mergeSort(tail, lt)
 
-	return func(a, b *List[T]) *List[T] {
-		out := &List[T]{}
-		for a.Front().Ok() && b.Front().Ok() {
-			if lt(a.Front().Value(), b.Front().Value()) {
-				unsafeRemoveAndPush(a.Front(), out.Back())
-			} else {
-				unsafeRemoveAndPush(b.Front(), out.Back())
-			}
-		}
-		for e := a.Front(); e.Ok(); e = a.Front() {
-			unsafeRemoveAndPush(e, out.Back())
-		}
-		for e := b.Front(); e.Ok(); e = b.Front() {
-			unsafeRemoveAndPush(e, out.Back())
-		}
-
-		return out
-
-	}(head, tail)
+	return merge(lt, head, tail)
 }
 
 func split[T any](list *List[T]) *List[T] {
@@ -132,6 +114,25 @@ func split[T any](list *List[T]) *List[T] {
 	for list.Len() > total/2 {
 		out.Back().Append(list.PopFront())
 	}
+	return out
+}
+
+func merge[T any](lt LessThan[T], a, b *List[T]) *List[T] {
+	out := &List[T]{}
+	for a.Len() != 0 && b.Len() != 0 {
+		if lt(a.Front().Value(), b.Front().Value()) {
+			unsafeRemoveAndPush(a.Front(), out.Back())
+		} else {
+			unsafeRemoveAndPush(b.Front(), out.Back())
+		}
+	}
+	for e := a.Front(); e.Ok(); e = a.Front() {
+		unsafeRemoveAndPush(e, out.Back())
+	}
+	for e := b.Front(); e.Ok(); e = b.Front() {
+		unsafeRemoveAndPush(e, out.Back())
+	}
+
 	return out
 }
 

@@ -124,6 +124,7 @@ func (l *List[T]) Front() *Element[T]                  { l.lazySetup(); return l
 func (l *List[T]) Back() *Element[T]                   { l.lazySetup(); return l.root.prev }
 func (l *List[T]) Iterator() fun.Iterator[*Element[T]] { return &elemIter[T]{elem: l.root, dir: next} }
 func (l *List[T]) Reverse() fun.Iterator[*Element[T]]  { return &elemIter[T]{elem: l.root, dir: prev} }
+
 func (l *List[T]) IteratorPop() fun.Iterator[*Element[T]] {
 	return &elemIter[T]{elem: l.root, dir: next, pop: true}
 }
@@ -135,6 +136,14 @@ func (l *List[T]) Extend(input *List[T]) {
 	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
 		l.Back().Append(elem)
 	}
+}
+
+func (l *List[T]) Copy() *List[T] {
+	out := &List[T]{}
+	for elem := l.Front(); elem.Ok(); elem = elem.Next() {
+		out.PushBack(elem.Value())
+	}
+	return out
 }
 
 func (l *List[T]) lazySetup() {

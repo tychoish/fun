@@ -12,16 +12,17 @@ import (
 	"github.com/tychoish/fun/itertool"
 )
 
-func quickSortInternal[T any](list *List[T], lt LessThan[T]) {
+func quickSortInternal[T any](list *List[T], lt LessThan[T]) *List[T] {
 	elems := make([]*Element[T], 0, list.Len())
 
 	for list.Len() > 0 {
 		elems = append(elems, list.PopFront())
 	}
-	sort.Slice(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
+	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
 	for idx := range elems {
-		list.Front().Append(elems[idx])
+		list.Back().Append(elems[idx])
 	}
+	return list
 }
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
@@ -200,7 +201,7 @@ func TestSort(t *testing.T) {
 			if IsSorted(list, LessThanNative[int]) {
 				t.Fatal("should not be sorted")
 			}
-			Sort(list, LessThanNative[int])
+			SortList(list, LessThanNative[int])
 			if !stdCheckSortedIntsFromList(ctx, t, list) {
 				t.Log(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
 				t.Fatal("sort should be verified, externally")
@@ -208,6 +209,19 @@ func TestSort(t *testing.T) {
 			if !IsSorted(list, LessThanNative[int]) {
 				t.Log(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
 				t.Fatal("should be sorted")
+			}
+		})
+		t.Run("ComparisonValidation", func(t *testing.T) {
+			list := GetPopulatedList(t, 10)
+			lcopy := list.Copy()
+			SortList(list, LessThanNative[int])
+			quickSortInternal(lcopy, LessThanNative[int])
+			listVals := fun.Must(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
+			copyVals := fun.Must(itertool.CollectSlice(ctx, ListValues(lcopy.Iterator())))
+			for i := 0; i < 10; i++ {
+				if listVals[i] != copyVals[i] {
+					t.Error("sort missmatch", i, listVals[i], copyVals[i])
+				}
 			}
 		})
 	})
@@ -300,27 +314,21 @@ func randomIntSlice(size int) []int {
 }
 
 func BenchmarkSorts(b *testing.B) {
-	list := &List[int]{}
-	list.lazySetup()
-
 	b.Run("Baseline", func(b *testing.B) {
-		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			PopulateList(b, 100, list)
-			quickSortInternal(list, LessThanNative[int])
-			ClearList(b, list)
+			b.StopTimer()
+			list := GetPopulatedList(b, 100)
+			b.StartTimer()
+			list = quickSortInternal(list, LessThanNative[int])
 		}
 	})
 
-	ClearList(b, list)
-
 	b.Run("Merge", func(b *testing.B) {
-		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			PopulateList(b, 100, list)
-			Sort(list, LessThanNative[int])
-			ClearList(b, list)
-
+			b.StopTimer()
+			list := GetPopulatedList(b, 100)
+			b.StartTimer()
+			list = mergeSort(list, LessThanNative[int])
 		}
 	})
 }
