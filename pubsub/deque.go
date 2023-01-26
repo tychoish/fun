@@ -274,9 +274,9 @@ func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, erro
 	}
 
 	it, ok := dq.pop(next)
-	if !ok {
-		return *new(T), errors.New("end of iteration")
-	}
+
+	fun.Invariant(ok, "deque can not be empty")
+
 	return it, nil
 }
 

@@ -344,10 +344,22 @@ func TestDeque(t *testing.T) {
 				t.Fatal()
 			}
 		})
-		t.Run("ConflictingOptions", func(t *testing.T) {
+		t.Run("ConflictingOptionsUnlimited", func(t *testing.T) {
 			conf := DequeOptions{
 				Capacity:  100,
 				Unlimited: true,
+			}
+			if err := conf.Validate(); err == nil {
+				t.Fatal()
+			}
+			if _, err := NewDeque[string](conf); err == nil {
+				t.Fatal()
+			}
+		})
+		t.Run("ConflictingOptionsQueue", func(t *testing.T) {
+			conf := DequeOptions{
+				Capacity:     100,
+				QueueOptions: &QueueOptions{HardLimit: 50, SoftQuota: 24},
 			}
 			if err := conf.Validate(); err == nil {
 				t.Fatal()
@@ -368,6 +380,7 @@ func TestDeque(t *testing.T) {
 				}
 			}
 		})
+
 	})
 	t.Run("ForcePush", func(t *testing.T) {
 		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
@@ -626,6 +639,27 @@ func TestDeque(t *testing.T) {
 						seen++
 					}
 					if seen != 2 {
+						t.Fatalf("iterator had %d and saw %d", dq.Len(), seen)
+					}
+				})
+			}
+		})
+		t.Run("IteratorClosed", func(t *testing.T) {
+			for idx, iter := range []fun.Iterator[int]{
+				dq.Iterator(),
+				dq.IteratorReverse(),
+				dq.IteratorBlocking(),
+				dq.IteratorBlockingReverse(),
+			} {
+				t.Run(fmt.Sprint(idx), func(t *testing.T) {
+					seen := 0
+					if err := iter.Close(ctx); err != nil {
+						t.Fatal(err)
+					}
+					for iter.Next(ctx) {
+						seen++
+					}
+					if seen != 0 {
 						t.Fatalf("iterator had %d and saw %d", dq.Len(), seen)
 					}
 				})
