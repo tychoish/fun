@@ -292,7 +292,6 @@ func (l *List[T]) lazySetup() {
 		l.root = &Element[T]{list: l}
 		l.root.next = l.root
 		l.root.prev = l.root
-		l.root.list = l
 	}
 }
 

@@ -679,6 +679,9 @@ func TestList(t *testing.T) {
 }
 
 func BenchmarkList(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	const size = 100
 	b.Run("Append", func(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
@@ -724,5 +727,77 @@ func BenchmarkList(b *testing.B) {
 			}
 		})
 	})
+	b.Run("Deletion", func(b *testing.B) {
+		b.Run("Slice", func(b *testing.B) {
+			slice := []int{}
+			for i := 0; i < size; i++ {
+				slice = append([]int{i}, slice...)
+			}
 
+			b.ResetTimer()
+			for j := 0; j < b.N; j++ {
+				for i := 0; i < len(slice)-1; i++ {
+					if i > 2 && i%2 != 0 {
+						slice = append(slice[:i], slice[i+1:]...)
+					}
+				}
+			}
+		})
+		b.Run("List", func(b *testing.B) {
+			b.Run("Drop", func(b *testing.B) {
+				list := &seq.List[int]{}
+				for i := 0; i < size; i++ {
+					list.PushFront(i)
+				}
+
+				b.ResetTimer()
+				for j := 0; j < b.N; j++ {
+					idx := 0
+					for e := list.Front(); e.Ok(); e = e.Next() {
+						if idx > 2 && idx%2 != 0 {
+							e.Previous().Drop()
+						}
+						idx++
+					}
+				}
+			})
+			b.Run("Remove", func(b *testing.B) {
+				list := &seq.List[int]{}
+				for i := 0; i < size; i++ {
+					list.PushFront(i)
+				}
+
+				b.ResetTimer()
+				for j := 0; j < b.N; j++ {
+					idx := 0
+					for e := list.Front(); e.Ok(); e = e.Next() {
+						if idx > 2 && idx%2 != 0 {
+							e.Previous().Remove()
+						}
+						idx++
+					}
+				}
+			})
+			b.Run("Iterator", func(b *testing.B) {
+				list := &seq.List[int]{}
+				for i := 0; i < size; i++ {
+					list.PushFront(i)
+				}
+
+				b.ResetTimer()
+				iter := list.Iterator()
+				for j := 0; j < b.N; j++ {
+					idx := 0
+					for iter.Next(ctx) {
+						if idx > 2 && idx%2 != 0 {
+							iter.Value().Remove()
+						}
+						idx++
+					}
+				}
+			})
+
+		})
+
+	})
 }
