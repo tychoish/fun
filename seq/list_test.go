@@ -558,12 +558,29 @@ func TestList(t *testing.T) {
 				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
 			}
 		})
+		t.Run("Root", func(t *testing.T) {
+			list := &seq.List[int]{}
+			list.PushBack(42)
+			list.PushBack(84)
+
+			if !list.Front().Previous().Swap(list.Back()) {
+				t.Fatal("sholdn't object to swapping root")
+			}
+			if list.Front().Value() != 84 {
+				t.Fatal("unexpected outcome front")
+			}
+			if list.Back().Value() != 42 {
+				t.Fatal("unexpected outcome back")
+			}
+
+		})
 		t.Run("NonAdjacent", func(t *testing.T) {
 			list := &seq.List[int]{}
 			list.PushBack(42)
 			list.PushBack(84)
 			list.PushBack(420)
 			list.PushBack(840)
+
 			// [ 42, 84, 420, 840 ]
 
 			if !list.Back().Swap(list.Front().Next()) {
