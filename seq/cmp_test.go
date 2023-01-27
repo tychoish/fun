@@ -2,6 +2,8 @@ package seq
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"sort"
@@ -12,25 +14,11 @@ import (
 	"github.com/tychoish/fun/itertool"
 )
 
-func quickSortInternal[T any](list *List[T], lt LessThan[T]) *List[T] {
-	elems := make([]*Element[T], 0, list.Len())
-
-	for list.Len() > 0 {
-		elems = append(elems, list.PopFront())
-	}
-	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
-	for idx := range elems {
-		list.Back().Append(elems[idx])
-	}
-	return list
-}
-
 func GetPopulatedList(t testing.TB, size int) *List[int] {
 	t.Helper()
 	list := &List[int]{}
 	PopulateList(t, size, list)
 	return list
-
 }
 
 func ClearList(t testing.TB, list *List[int]) {
@@ -201,7 +189,7 @@ func TestSort(t *testing.T) {
 			if IsSorted(list, LessThanNative[int]) {
 				t.Fatal("should not be sorted")
 			}
-			SortList(list, LessThanNative[int])
+			SortListMerge(list, LessThanNative[int])
 			if !stdCheckSortedIntsFromList(ctx, t, list) {
 				t.Log(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
 				t.Fatal("sort should be verified, externally")
@@ -214,10 +202,12 @@ func TestSort(t *testing.T) {
 		t.Run("ComparisonValidation", func(t *testing.T) {
 			list := GetPopulatedList(t, 10)
 			lcopy := list.Copy()
-			SortList(list, LessThanNative[int])
-			quickSortInternal(lcopy, LessThanNative[int])
+			SortListMerge(list, LessThanNative[int])
+			SortListQuick(lcopy, LessThanNative[int])
 			listVals := fun.Must(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
 			copyVals := fun.Must(itertool.CollectSlice(ctx, ListValues(lcopy.Iterator())))
+			t.Log("merge", listVals)
+			t.Log("quick", copyVals)
 			for i := 0; i < 10; i++ {
 				if listVals[i] != copyVals[i] {
 					t.Error("sort missmatch", i, listVals[i], copyVals[i])
@@ -226,6 +216,25 @@ func TestSort(t *testing.T) {
 		})
 	})
 	t.Run("Heap", func(t *testing.T) {
+		t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
+			ok, err := fun.Safe(func() bool {
+				var list *Heap[string]
+				list.Push("hi")
+				return true
+			})
+			if ok {
+				t.Error("should have errored")
+			}
+			if err == nil {
+				t.Fatal("should have gotten failure")
+			}
+			if !errors.Is(err, ErrUninitialized) {
+				t.Error(err)
+			}
+			if expected := fmt.Sprint("panic: ", ErrUninitialized.Error()); expected != err.Error() {
+				t.Fatal(expected, "->", err)
+			}
+		})
 		t.Run("Iterator", func(t *testing.T) {
 			heap := &Heap[int]{LT: LessThanNative[int]}
 			if heap.Len() != 0 {
@@ -239,7 +248,7 @@ func TestSort(t *testing.T) {
 				heap.Push(val)
 			}
 			if heap.Len() != 100 {
-				t.Fatal("heap should have expected number of items")
+				t.Fatal("heap should have expected number of items", heap.Len())
 			}
 			var last = math.MinInt
 			iter := heap.Iterator()
@@ -319,10 +328,9 @@ func BenchmarkSorts(b *testing.B) {
 			b.StopTimer()
 			list := GetPopulatedList(b, 100)
 			b.StartTimer()
-			list = quickSortInternal(list, LessThanNative[int])
+			SortListQuick(list, LessThanNative[int])
 		}
 	})
-
 	b.Run("Merge", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()

@@ -2,6 +2,7 @@ package seq_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -15,6 +16,25 @@ func TestStack(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
+		ok, err := fun.Safe(func() bool {
+			var list *seq.Stack[string]
+			list.Push("hi")
+			return true
+		})
+		if ok {
+			t.Error("should have errored")
+		}
+		if err == nil {
+			t.Fatal("should have gotten failure")
+		}
+		if !errors.Is(err, seq.ErrUninitialized) {
+			t.Error(err)
+		}
+		if expected := fmt.Sprint("panic: ", seq.ErrUninitialized.Error()); expected != err.Error() {
+			t.Fatal(expected, "->", err)
+		}
+	})
 	t.Run("Constructor", func(t *testing.T) {
 		stack := &seq.Stack[int]{}
 

@@ -525,7 +525,7 @@ func TestList(t *testing.T) {
 		})
 	})
 	t.Run("Swap", func(t *testing.T) {
-		t.Run("Flip", func(t *testing.T) {
+		t.Run("FlipAdjacent", func(t *testing.T) {
 			list := &seq.List[string]{}
 			list.PushBack("hello")
 			list.PushBack("world")
@@ -536,6 +536,7 @@ func TestList(t *testing.T) {
 			if !list.Front().Swap(list.Back()) {
 				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
 			}
+
 			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
 				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
 			}
@@ -557,20 +558,43 @@ func TestList(t *testing.T) {
 				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
 			}
 		})
+		t.Run("NonAdjacent", func(t *testing.T) {
+			list := &seq.List[int]{}
+			list.PushBack(42)
+			list.PushBack(84)
+			list.PushBack(420)
+			list.PushBack(840)
+			// [ 42, 84, 420, 840 ]
+
+			if !list.Back().Swap(list.Front().Next()) {
+				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal("should have swapped")
+			}
+			// expected: [42, 840, 420, 84]
+			slice := fun.Must(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			if list.Len() != 4 {
+				t.Log(list.Len(), slice)
+				t.Fatal(list.Len())
+			}
+
+			idx := 0
+			iter := list.Iterator()
+			for iter.Next(ctx) {
+				if slice[idx] != iter.Value().Value() {
+					t.Error(idx, slice[idx], iter.Value().Value())
+				}
+				idx++
+			}
+			if idx != 3 {
+				t.Fatal("did not iterate correctly", idx)
+			}
+		})
 		t.Run("DifferentLists", func(t *testing.T) {
 			one := &seq.List[string]{}
 			two := &seq.List[string]{}
 			one.PushBack("hello")
 			two.PushBack("world")
 			if one.Front().Swap(two.Front()) {
-				t.Fatal("unallowable swap")
-			}
-		})
-		t.Run("Root", func(t *testing.T) {
-			one := &seq.List[string]{}
-			one.PushBack("hello")
-			one.PushBack("world")
-			if one.Front().Swap(one.Front().Previous()) {
 				t.Fatal("unallowable swap")
 			}
 		})
@@ -582,7 +606,6 @@ func TestList(t *testing.T) {
 				t.Fatal("unallowable swap")
 			}
 		})
-
 	})
 	t.Run("Merge", func(t *testing.T) {
 		t.Run("Extend", func(t *testing.T) {
@@ -636,4 +659,53 @@ func TestList(t *testing.T) {
 			}
 		})
 	})
+}
+
+func BenchmarkList(b *testing.B) {
+	const size = 100
+	b.Run("Append", func(b *testing.B) {
+		b.Run("Slice", func(b *testing.B) {
+			for j := 0; j < b.N; j++ {
+				slice := []int{}
+				for i := 0; i < size; i++ {
+					slice = append(slice, i)
+				}
+			}
+		})
+		b.Run("SlicePrealloc", func(b *testing.B) {
+			for j := 0; j < b.N; j++ {
+				slice := make([]int, 0, 100)
+				for i := 0; i < size; i++ {
+					slice = append(slice, i)
+				}
+			}
+		})
+		b.Run("List", func(b *testing.B) {
+			for j := 0; j < b.N; j++ {
+				list := &seq.List[int]{}
+				for i := 0; i < size; i++ {
+					list.PushBack(i)
+				}
+			}
+		})
+	})
+	b.Run("Prepend", func(b *testing.B) {
+		b.Run("Slice", func(b *testing.B) {
+			for j := 0; j < b.N; j++ {
+				slice := []int{}
+				for i := 0; i < size; i++ {
+					slice = append([]int{i}, slice...)
+				}
+			}
+		})
+		b.Run("List", func(b *testing.B) {
+			for j := 0; j < b.N; j++ {
+				list := &seq.List[int]{}
+				for i := 0; i < size; i++ {
+					list.PushFront(i)
+				}
+			}
+		})
+	})
+
 }

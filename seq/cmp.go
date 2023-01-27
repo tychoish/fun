@@ -10,6 +10,7 @@
 package seq
 
 import (
+	"sort"
 	"time"
 
 	"github.com/tychoish/fun"
@@ -29,25 +30,41 @@ type OrderableUser[T any] interface{ LessThan(T) bool }
 // of the following operations.
 type LessThan[T any] func(a, b T) bool
 
-func LessThanNative[T Orderable](a, b T) bool        { return a < b }
+// LessThanNative provides a wrapper around the < operator for types
+// that support it, and can be used for sorting lists of compatible
+// types.
+func LessThanNative[T Orderable](a, b T) bool { return a < b }
+
+// LessThanCustom converts types that implement OrderableUser
+// interface.
 func LessThanCustom[T OrderableUser[T]](a, b T) bool { return a.LessThan(b) }
-func LessThanTime(a, b time.Time) bool               { return a.Before(b) }
+
+// LessThanTime compares time using the time.Time.Before() method.
+func LessThanTime(a, b time.Time) bool { return a.Before(b) }
 
 // Reverse wraps an existing LessThan operator and reverses it's
 // direction.
 func Reverse[T any](fn LessThan[T]) LessThan[T] { return func(a, b T) bool { return !fn(a, b) } }
 
+// Heap provides a min-order heap using the Heap.LT comparison
+// operator to sort from lowest to highest. Push operations will panic
+// if LT is not set.
 type Heap[T any] struct {
 	LT   LessThan[T]
 	list *List[T]
 }
 
 func (h *Heap[T]) lazySetup() {
+	if h == nil || h.LT == nil {
+		panic(ErrUninitialized)
+	}
+
 	if h.list == nil {
 		h.list = &List[T]{}
 	}
 }
 
+// Push adds an item to the heap.
 func (h *Heap[T]) Push(t T) {
 	h.lazySetup()
 	if h.list.length == 0 {
@@ -67,6 +84,8 @@ func (h *Heap[T]) Push(t T) {
 	h.list.PushFront(t)
 }
 
+// Len reports the size of the heap. Because the heap tracks its size
+// with Push/Pop operations, this is a constant time operation.
 func (h *Heap[T]) Len() int {
 	if h.list == nil {
 		return 0
@@ -77,9 +96,15 @@ func (h *Heap[T]) Len() int {
 
 // Pop removes the element from the underlying list and returns
 // it, with an OK value, which is true when the value returned is valid.
-func (h *Heap[T]) Pop() (T, bool)            { h.lazySetup(); e := h.list.PopFront(); return e.Value(), e.Ok() }
+func (h *Heap[T]) Pop() (T, bool) { h.lazySetup(); e := h.list.PopFront(); return e.Value(), e.Ok() }
+
+// Iterator provides an fun.Iterator interface to the heap. The
+// iterator consumes items from the heap, and will return when the
+// heap is empty.
 func (h *Heap[T]) Iterator() fun.Iterator[T] { h.lazySetup(); return ListValues(h.list.IteratorPop()) }
 
+// IsSorted reports if the list is sorted from low to high, according
+// to the LessThan function.
 func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 	if list == nil || list.Len() <= 1 {
 		return true
@@ -93,7 +118,31 @@ func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 	return true
 }
 
-func SortList[T any](list *List[T], lt LessThan[T]) { *list = *mergeSort(list, lt) }
+// SortListMerge sorts the list, using the provided comparison
+// function and a Merge Sort operation. This is something of a novelty
+// in most cases, as removing the elements from the list, adding to a
+// slice and then using sort.Slice() from the standard library, and
+// then re-adding those elements to the list, will perform better.
+//
+// One caveat, in addition to slower performance is that this modifies
+// the value of the list, so while it appears in place, the list
+// object itself will change during this operation.
+func SortListMerge[T any](list *List[T], lt LessThan[T]) { *list = *mergeSort(list, lt) }
+
+// SortListQuick sorts the list, by removing the elements, adding them
+// to a slice, and then using sort.SliceStable(). In many cases this
+// performs better than the merge sort implementation.
+func SortListQuick[T any](list *List[T], lt LessThan[T]) {
+	elems := make([]*Element[T], 0, list.Len())
+
+	for list.Len() > 0 {
+		elems = append(elems, list.PopFront())
+	}
+	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
+	for idx := range elems {
+		list.Back().Append(elems[idx])
+	}
+}
 
 func mergeSort[T any](head *List[T], lt LessThan[T]) *List[T] {
 	if head.Len() < 2 {
@@ -126,12 +175,8 @@ func merge[T any](lt LessThan[T], a, b *List[T]) *List[T] {
 			unsafeRemoveAndPush(b.Front(), out.Back())
 		}
 	}
-	for e := a.Front(); e.Ok(); e = a.Front() {
-		unsafeRemoveAndPush(e, out.Back())
-	}
-	for e := b.Front(); e.Ok(); e = b.Front() {
-		unsafeRemoveAndPush(e, out.Back())
-	}
+	out.Extend(a)
+	out.Extend(b)
 
 	return out
 }
