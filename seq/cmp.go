@@ -124,9 +124,8 @@ func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 // slice and then using sort.Slice() from the standard library, and
 // then re-adding those elements to the list, will perform better.
 //
-// One caveat, in addition to slower performance is that this modifies
-// the value of the list, so while it appears in place, the list
-// object itself will change during this operation.
+// The operation will modify the input list, replacing it with an new
+// list operation.
 func SortListMerge[T any](list *List[T], lt LessThan[T]) { *list = *mergeSort(list, lt) }
 
 // SortListQuick sorts the list, by removing the elements, adding them
@@ -170,18 +169,13 @@ func merge[T any](lt LessThan[T], a, b *List[T]) *List[T] {
 	out := &List[T]{}
 	for a.Len() != 0 && b.Len() != 0 {
 		if lt(a.Front().Value(), b.Front().Value()) {
-			unsafeRemoveAndPush(a.Front(), out.Back())
+			out.Back().Append(a.PopFront())
 		} else {
-			unsafeRemoveAndPush(b.Front(), out.Back())
+			out.Back().Append(b.PopFront())
 		}
 	}
 	out.Extend(a)
 	out.Extend(b)
 
 	return out
-}
-
-func unsafeRemoveAndPush[T any](a, b *Element[T]) {
-	a.Remove()
-	b.Append(a)
 }
