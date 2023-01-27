@@ -4,7 +4,52 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/seq"
 )
+
+type orderedLLSet[T comparable] struct {
+	set   map[T]*seq.Element[T]
+	elems *seq.List[T]
+}
+
+// MakeNewOrdered constructs a "new" ordered set implementation. This
+// is a more simple implementation based around a linked list, with
+// identical semantics. Items are deleted from the list
+// synchronously--the "old" implementation does a lazy deletion that
+// batches--and this implementation may perform more predictably for
+// use cases that do a large number of deletions.
+func MakeNewOrdered[T comparable]() Set[T] {
+	return &orderedLLSet[T]{
+		set:   map[T]*seq.Element[T]{},
+		elems: &seq.List[T]{},
+	}
+}
+
+func (lls *orderedLLSet[T]) Add(it T) {
+	if _, ok := lls.set[it]; ok {
+		return
+	}
+
+	lls.elems.PushBack(it)
+
+	lls.set[it] = lls.elems.Back()
+}
+
+func (lls *orderedLLSet[T]) Len() int        { return lls.elems.Len() }
+func (lls *orderedLLSet[T]) Check(it T) bool { _, ok := lls.set[it]; return ok }
+func (lls *orderedLLSet[T]) Delete(it T) {
+	e, ok := lls.set[it]
+	if !ok {
+		return
+	}
+
+	e.Remove()
+	delete(lls.set, it)
+}
+
+func (lls orderedLLSet[T]) Iterator(_ context.Context) fun.Iterator[T] {
+	return seq.ListValues(lls.elems.Iterator())
+}
 
 type orderedSetItem[T comparable] struct {
 	idx     int
@@ -35,7 +80,7 @@ func MakeOrdered[T comparable](size int) Set[T] {
 }
 
 func (s *orderedSetImpl[T]) lazyDelete() {
-	if s.deletedCount < len(s.set)*2 {
+	if s.deletedCount < 64 {
 		return
 	}
 

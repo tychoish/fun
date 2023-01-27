@@ -20,6 +20,7 @@ func TestSet(t *testing.T) {
 		"Ordered/BasicLarge":       func() Set[string] { return MakeOrdered[string](100) },
 		"Ordered/SyncBasic":        func() Set[string] { return Synchronize(NewOrdered[string]()) },
 		"Ordered/SyncBasicLarge":   func() Set[string] { return Synchronize(MakeOrdered[string](100)) },
+		"Ordered/Linked":           func() Set[string] { return MakeNewOrdered[string]() },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("Initialization", func(t *testing.T) {
@@ -396,4 +397,134 @@ func TestSet(t *testing.T) {
 			}
 		})
 	})
+}
+
+func BenchmarkSet(b *testing.B) {
+	ctx := context.Background()
+
+	const size = 10000
+	b.Run("Append", func(b *testing.B) {
+		operation := func(set Set[int]) {
+			for i := 0; i < size; i++ {
+				set.Add(i * i)
+			}
+		}
+		b.Run("Map", func(b *testing.B) {
+			set := NewUnordered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("Ordered", func(b *testing.B) {
+			set := NewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("NewOrdered", func(b *testing.B) {
+			set := MakeNewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+	})
+	b.Run("Mixed", func(b *testing.B) {
+		operation := func(set Set[int]) {
+			var last int
+			for i := 0; i < size; i++ {
+				val := i * i * size
+				set.Add(val)
+				if i%3 == 0 {
+					set.Delete(last)
+				}
+				last = val
+			}
+		}
+		b.Run("Map", func(b *testing.B) {
+			set := NewUnordered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("Ordered", func(b *testing.B) {
+			set := NewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("NewOrdered", func(b *testing.B) {
+			set := MakeNewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+	})
+
+	b.Run("Deletion", func(b *testing.B) {
+		operation := func(set Set[int]) {
+			for i := 0; i < size; i++ {
+				set.Add(i)
+				set.Add(i * size)
+			}
+			for i := 0; i < size; i++ {
+				set.Delete(i)
+				set.Delete(i + 1)
+				if i%3 == 0 {
+					set.Delete(i * size)
+				}
+			}
+
+		}
+		b.Run("Map", func(b *testing.B) {
+			set := NewUnordered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("Ordered", func(b *testing.B) {
+			set := NewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("NewOrdered", func(b *testing.B) {
+			set := MakeNewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+	})
+
+	b.Run("Iteration", func(b *testing.B) {
+		operation := func(set Set[int]) {
+			for i := 0; i < size; i++ {
+				set.Add(i * size)
+			}
+			iter := set.Iterator(ctx)
+			for iter.Next(ctx) {
+				set.Check(iter.Value())
+				set.Check(iter.Value())
+			}
+			iter.Close(ctx)
+		}
+		b.Run("Map", func(b *testing.B) {
+			set := NewUnordered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("Ordered", func(b *testing.B) {
+			set := NewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+		b.Run("NewOrdered", func(b *testing.B) {
+			set := MakeNewOrdered[int]()
+			for j := 0; j < b.N; j++ {
+				operation(set)
+			}
+		})
+	})
+
 }
