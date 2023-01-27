@@ -14,6 +14,8 @@ Packages:
   and queues)
 - [set](https://pkg.go.dev/github.com/tychoish/fun/set) (generic
   ordered and unordered sets)
+- [seq](https://pkg.go.dev/github.com/tychoish/fun/set) (generic
+  linked lists.)
 
 For more information, see the documentation, but of general interest:
 
@@ -25,10 +27,12 @@ For more information, see the documentation, but of general interest:
 - In `erc`, an error collector implementation for threadsafe error
   aggregation and introspection, particularly in worker-pool,
   applications.
-- In set, a `Set` type, with ordered and unordered implementations.
+- In `set`, a `Set` type, with ordered and unordered implementations.
 - Queue and Deque implementations (in `pubsub`) that provide
   thread-safe linked-list based implementations and `Wait` methods to
   block until new items added.
+- In `seq`, general purpose linked list implementations, with a
+  healthy feature set and flexible interface.
 
 Contributions welcome, the general goals of the project:
 
