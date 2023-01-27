@@ -14,7 +14,7 @@ Packages:
   and queues)
 - [set](https://pkg.go.dev/github.com/tychoish/fun/set) (generic
   ordered and unordered sets)
-- [seq](https://pkg.go.dev/github.com/tychoish/fun/set) (generic
+- [seq](https://pkg.go.dev/github.com/tychoish/fun/seq) (generic
   linked lists.)
 
 For more information, see the documentation, but of general interest:
