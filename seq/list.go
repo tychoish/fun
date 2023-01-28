@@ -19,8 +19,9 @@ var ErrUninitialized = errors.New("initialized container")
 // The Deque implementation in the pubsub package provides a similar
 // implementation with locking and a notification system.
 type List[T any] struct {
-	root   *Element[T]
-	length int
+	root           *Element[T]
+	length         int
+	elementCreator func(val T) *Element[T]
 }
 
 // Element is the underlying component of a list, provided by
@@ -38,7 +39,7 @@ type Element[T any] struct {
 // NewElement produces an unattached Element that you can use with
 // Append. Element.Append(NewElement()) is essentially the same as
 // List.PushBack().
-func NewElement[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
+func NewElement[T any](val T) *Element[T] { return makeElement(val) }
 
 // String returns the string form of the value of the element.
 func (e *Element[T]) String() string { return fmt.Sprint(e.item) }
@@ -49,7 +50,9 @@ func (e *Element[T]) Value() T { return e.item }
 // Ok checks that an element is valid. Invalid elements can be
 // produced at the end of iterations (e.g. the list's root object,) or
 // if you attempt to Pop an element off of an empty list.
-func (e *Element[T]) Ok() bool { return e.ok }
+//
+// Returns false when the element is nil.
+func (e *Element[T]) Ok() bool { return e != nil && e.ok }
 
 // Next produces the next element. This is always non-nil, *unless*
 // the element is not a member of a list. At the ends of a list, the
@@ -63,13 +66,17 @@ func (e *Element[T]) Previous() *Element[T] { return e.prev }
 
 // In checks to see if an element is in the specified list. Because
 // elements hold a pointer to their list, this is an O(1) operation.
-func (e *Element[T]) In(l *List[T]) bool { return e.list == l }
+//
+// Returns false when the element is nil.
+func (e *Element[T]) In(l *List[T]) bool { return e.list != nil && e.list == l }
 
 // Set allows you to change set the value of an item in place. Returns
 // true if the operation is successful. The operation fails if the Element is the
 // root item in a list or not a member of a list.
+//
+// Set is safe to call on nil elements.
 func (e *Element[T]) Set(v T) bool {
-	if e.list != nil && e.list.root == e {
+	if e == nil || (e.list != nil && e.list.root == e) {
 		return false
 	}
 
@@ -167,16 +174,16 @@ func (l *List[T]) Len() int { return l.length }
 
 // PushFront creates an element and prepends it to the list. The
 // performance of PushFront and PushBack are the same.
-func (l *List[T]) PushFront(it T) { l.lazySetup(); l.root.Append(NewElement(it)) }
+func (l *List[T]) PushFront(it T) { l.lazySetup(); l.root.Append(l.elementCreator(it)) }
 
 // PushBack creates an element and appends it to the list. The
 // performance of PushFront and PushBack are the same.
-func (l *List[T]) PushBack(it T) { l.lazySetup(); l.root.prev.Append(NewElement(it)) }
+func (l *List[T]) PushBack(it T) { l.lazySetup(); l.root.prev.Append(l.elementCreator(it)) }
 
 // PopFront removes the first element from the list. If the list is
-// empty, this returns a detached non-nil value, that will report an Ok()
-// false value. You can use this element to produce a C-style iterator
-// over the list, that removes items during the iteration:
+// empty, this returns a nil value, that will report an Ok() false
+// You can use this element to produce a C-style iterator over
+// the list, that removes items during the iteration:
 //
 //	for e := list.PopFront(); e.Ok(); e = input.PopFront() {
 //		// do work
@@ -289,15 +296,20 @@ func (l *List[T]) lazySetup() {
 	}
 
 	if l.root == nil {
-		l.root = &Element[T]{list: l}
+
+		val := *new(T)
+		l.elementCreator = func(val T) *Element[T] { return &Element[T]{item: val, ok: true} }
+		l.root = l.elementCreator(val)
 		l.root.next = l.root
 		l.root.prev = l.root
+		l.root.list = l
+		l.root.ok = false
 	}
 }
 
 func (l *List[T]) pop(it *Element[T]) *Element[T] {
 	if !it.removable() || it.list != l {
-		return &Element[T]{}
+		return nil
 	}
 
 	it.uncheckedRemove()

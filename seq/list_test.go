@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"testing"
 
 	"github.com/tychoish/fun"
@@ -15,7 +16,7 @@ import (
 func TestList(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	defer runtime.GC()
 	t.Run("Constructor", func(t *testing.T) {
 		list := &seq.List[int]{}
 		if list.Len() != 0 {
@@ -679,6 +680,18 @@ func TestList(t *testing.T) {
 }
 
 func BenchmarkList(b *testing.B) {
+	var e *seq.Element[int]
+	b.Run("SeedElemPool", func(b *testing.B) {
+		for i := 0; i < 200; i++ {
+			e = seq.NewElement(i)
+		}
+		b.StopTimer()
+		if !e.Ok() {
+			b.Fatal(e)
+		}
+		runtime.GC()
+	})
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -702,7 +715,11 @@ func BenchmarkList(b *testing.B) {
 		})
 		b.Run("List", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
+				b.StopTimer()
 				list := &seq.List[int]{}
+				list.PushBack(0)
+				list.PopBack()
+				b.StartTimer()
 				for i := 0; i < size; i++ {
 					list.PushBack(i)
 				}
@@ -720,7 +737,12 @@ func BenchmarkList(b *testing.B) {
 		})
 		b.Run("List", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
+				b.StopTimer()
 				list := &seq.List[int]{}
+				list.PushBack(0)
+				list.PopBack()
+				b.StartTimer()
+
 				for i := 0; i < size; i++ {
 					list.PushFront(i)
 				}
@@ -796,8 +818,6 @@ func BenchmarkList(b *testing.B) {
 					}
 				}
 			})
-
 		})
-
 	})
 }

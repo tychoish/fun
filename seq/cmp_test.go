@@ -323,20 +323,45 @@ func randomIntSlice(size int) []int {
 }
 
 func BenchmarkSorts(b *testing.B) {
-	b.Run("Baseline", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			list := GetPopulatedList(b, 100)
-			b.StartTimer()
-			SortListQuick(list, LessThanNative[int])
+	const size = 100
+
+	var e *Element[int]
+	b.Run("SeedElemPool", func(b *testing.B) {
+		for i := 0; i < 10*size; i++ {
+			e = NewElement(i)
+		}
+		b.StopTimer()
+		if !e.Ok() {
+			b.Fatal(e)
 		}
 	})
-	b.Run("Merge", func(b *testing.B) {
+	b.Run("Slice", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()
-			list := GetPopulatedList(b, 100)
+			slice := make([]int, 0, size)
+			for i := 0; i < size; i++ {
+				slice = append(slice, rand.Intn(size))
+			}
 			b.StartTimer()
-			list = mergeSort(list, LessThanNative[int])
+			sort.Ints(slice)
 		}
+	})
+	b.Run("Lists", func(b *testing.B) {
+		b.Run("Baseline", func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				list := GetPopulatedList(b, size)
+				b.StartTimer()
+				SortListQuick(list, LessThanNative[int])
+			}
+		})
+		b.Run("Merge", func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				list := GetPopulatedList(b, size)
+				b.StartTimer()
+				list = mergeSort(list, LessThanNative[int])
+			}
+		})
 	})
 }

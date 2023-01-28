@@ -61,6 +61,7 @@ func (h *Heap[T]) lazySetup() {
 
 	if h.list == nil {
 		h.list = &List[T]{}
+		h.list.lazySetup()
 	}
 }
 
@@ -110,8 +111,8 @@ func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 		return true
 	}
 
-	for item := list.root.next; item.next.ok; item = item.next {
-		if lt(item.item, item.prev.item) {
+	for item := list.root.Next(); item.next.Ok(); item = item.Next() {
+		if lt(item.Value(), item.Previous().Value()) {
 			return false
 		}
 	}
@@ -159,6 +160,7 @@ func mergeSort[T any](head *List[T], lt LessThan[T]) *List[T] {
 func split[T any](list *List[T]) *List[T] {
 	total := list.Len()
 	out := &List[T]{}
+	out.lazySetup()
 	for list.Len() > total/2 {
 		out.Back().Append(list.PopFront())
 	}
@@ -167,6 +169,7 @@ func split[T any](list *List[T]) *List[T] {
 
 func merge[T any](lt LessThan[T], a, b *List[T]) *List[T] {
 	out := &List[T]{}
+	out.lazySetup()
 	for a.Len() != 0 && b.Len() != 0 {
 		if lt(a.Front().Value(), b.Front().Value()) {
 			out.Back().Append(a.PopFront())

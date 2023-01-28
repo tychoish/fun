@@ -10,8 +10,9 @@ import (
 // Stack provides a generic singly linked list, with an interface that
 // is broadly similar to seq.List.
 type Stack[T any] struct {
-	head   *Item[T]
-	length int
+	head            *Item[T]
+	length          int
+	itemConstructor func(val T) *Item[T]
 }
 
 // Item is a common wrapper for the elements in a stack.
@@ -23,7 +24,7 @@ type Item[T any] struct {
 }
 
 // NewItem produces a valid Item object for the specified value.
-func NewItem[T any](in T) *Item[T] { return &Item[T]{value: in, ok: true} }
+func NewItem[T any](in T) *Item[T] { return makeItem(in) }
 
 // String implements fmt.Stringer, and returns the string value of the
 // item's value.
@@ -35,7 +36,9 @@ func (it *Item[T]) Value() T { return it.value }
 
 // Ok return true if the Value() has been set. Returns false for
 // incompletely initialized values.
-func (it *Item[T]) Ok() bool { return it.ok }
+//
+// Returns false when the item is nil.
+func (it *Item[T]) Ok() bool { return it != nil && it.ok }
 
 // Next returns the following item in the stack.
 func (it *Item[T]) Next() *Item[T] { return it.next }
@@ -75,7 +78,7 @@ func (it *Item[T]) Append(n *Item[T]) *Item[T] {
 // deeper in the stack.) If the operation isn't successful or possible
 // the operation returns false.
 func (it *Item[T]) Remove() bool {
-	if it.stack == nil || !it.ok {
+	if it == nil || it.stack == nil || !it.ok {
 		return false
 	}
 
@@ -161,8 +164,12 @@ func (s *Stack[T]) lazyInit() {
 	}
 
 	if s.head == nil {
-		s.head = &Item[T]{stack: s}
+		val := *new(T)
+		s.itemConstructor = func(val T) *Item[T] { return &Item[T]{value: val, ok: true} }
 		s.length = 0
+		s.head = s.itemConstructor(val)
+		s.head.ok = false
+		s.head.stack = s
 	}
 }
 
@@ -171,7 +178,7 @@ func (s *Stack[T]) lazyInit() {
 func (s *Stack[T]) Len() int { return s.length }
 
 // Push appends an item to the stack.
-func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(NewItem(it)) }
+func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(s.itemConstructor(it)) }
 
 // Head returns the item at the top of this stack. This is a non
 // destructive operation.
