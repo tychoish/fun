@@ -695,7 +695,7 @@ func BenchmarkList(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	const size = 100
+	const size = 1000
 	b.Run("Append", func(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
@@ -735,6 +735,19 @@ func BenchmarkList(b *testing.B) {
 				}
 			}
 		})
+		b.Run("ListElement", func(b *testing.B) {
+			for j := 0; j < b.N; j++ {
+				b.StopTimer()
+				list := &seq.List[int]{}
+				list.PushBack(0)
+				list.PopBack()
+				b.StartTimer()
+				for i := 0; i < size; i++ {
+					list.Back().Append(seq.NewElement(i))
+				}
+			}
+		})
+
 	})
 	b.Run("Prepend", func(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
@@ -827,6 +840,42 @@ func BenchmarkList(b *testing.B) {
 						idx++
 					}
 				}
+			})
+
+			b.Run("RoundTrip", func(b *testing.B) {
+				b.Run("PooledElements", func(b *testing.B) {
+					list := &seq.List[int]{}
+					for i := 0; i < size; i++ {
+						list.Front().Previous().Append(seq.NewElement(i))
+					}
+
+					for j := 0; j < b.N; j++ {
+						idx := 0
+						for e := list.Front(); e.Ok(); e = e.Next() {
+							if idx > 2 && idx%2 != 0 {
+								e.Previous().Remove()
+							}
+							idx++
+						}
+					}
+				})
+				b.Run("Values", func(b *testing.B) {
+					list := &seq.List[int]{}
+					for i := 0; i < size; i++ {
+						list.PushFront(i)
+					}
+
+					for j := 0; j < b.N; j++ {
+						idx := 0
+						for e := list.Front(); e.Ok(); e = e.Next() {
+							if idx > 2 && idx%2 != 0 {
+								e.Previous().Remove()
+							}
+							idx++
+						}
+
+					}
+				})
 			})
 		})
 	})
