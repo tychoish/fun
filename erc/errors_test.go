@@ -354,7 +354,7 @@ func TestError(t *testing.T) {
 			err := fmt.Errorf("foo: %w", errors.New("bar"))
 			es := &Stack{}
 			es = es.append(err)
-			if l := es.len(); l != 2 {
+			if l := es.len(); l != 1 {
 				t.Fatalf("%d, %+v", l, es)
 			}
 		})

@@ -47,18 +47,6 @@ func (e *Stack) append(err error) *Stack {
 		}
 
 		return e
-	case interface{ Unwrap() error }:
-		for {
-			e = &Stack{
-				err:  err,
-				next: e,
-			}
-			err = errors.Unwrap(err)
-			if err == nil {
-				break
-			}
-		}
-		return e
 	default:
 		return &Stack{
 			next: e,
