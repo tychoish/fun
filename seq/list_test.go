@@ -13,6 +13,10 @@ import (
 	"github.com/tychoish/fun/seq"
 )
 
+type jsonMarshlerError struct{}
+
+func (jsonMarshlerError) MarshalJSON() ([]byte, error) { return nil, errors.New("always") }
+
 func TestList(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -677,6 +681,67 @@ func TestList(t *testing.T) {
 			}
 		})
 	})
+	t.Run("JSON", func(t *testing.T) {
+		t.Run("RoundTrip", func(t *testing.T) {
+			list := &seq.List[int]{}
+			list.PushBack(400)
+			list.PushBack(300)
+			list.PushBack(42)
+			out, err := list.MarshalJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(out) != "[400,300,42]" {
+				t.Error(string(out))
+			}
+			nl := &seq.List[int]{}
+
+			if err := nl.UnmarshalJSON(out); err != nil {
+				t.Error(err)
+			}
+			fun.Invariant(nl.Front().Value() == list.Front().Value())
+			fun.Invariant(nl.Front().Next().Value() == list.Front().Next().Value())
+			fun.Invariant(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
+		})
+		t.Run("TypeMismatch", func(t *testing.T) {
+			list := &seq.List[int]{}
+			list.PushBack(400)
+			list.PushBack(300)
+			list.PushBack(42)
+
+			out, err := list.MarshalJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nl := &seq.List[string]{}
+
+			if err := nl.UnmarshalJSON(out); err == nil {
+				t.Error("should have errored", nl.Front())
+			}
+		})
+		t.Run("ListUnmarshalNil", func(t *testing.T) {
+			list := &seq.List[int]{}
+
+			if err := list.UnmarshalJSON(nil); err == nil {
+				t.Error("should error")
+			}
+		})
+		t.Run("ElementUnmarshalNil", func(t *testing.T) {
+			elem := seq.NewElement(0)
+
+			if err := elem.UnmarshalJSON(nil); err == nil {
+				t.Error("should error")
+			}
+		})
+		t.Run("NilPointerSafety", func(t *testing.T) {
+			list := &seq.List[jsonMarshlerError]{}
+			list.PushBack(jsonMarshlerError{})
+			if out, err := list.MarshalJSON(); err == nil {
+				t.Fatal("expected error", string(out))
+			}
+		})
+	})
 }
 
 func BenchmarkList(b *testing.B) {
@@ -841,7 +906,6 @@ func BenchmarkList(b *testing.B) {
 					}
 				}
 			})
-
 			b.Run("RoundTrip", func(b *testing.B) {
 				b.Run("PooledElements", func(b *testing.B) {
 					list := &seq.List[int]{}

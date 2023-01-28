@@ -335,6 +335,67 @@ func TestStack(t *testing.T) {
 			}
 		})
 	})
+	t.Run("JSON", func(t *testing.T) {
+		t.Run("RoundTrip", func(t *testing.T) {
+			stack := &seq.Stack[int]{}
+			stack.Push(400)
+			stack.Push(300)
+			stack.Push(42)
+			out, err := stack.MarshalJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(out) != "[42,300,400]" {
+				t.Error(string(out))
+			}
+			nl := &seq.Stack[int]{}
+
+			if err := nl.UnmarshalJSON(out); err != nil {
+				t.Error(err)
+			}
+			fun.Invariant(nl.Head().Value() == stack.Head().Value())
+			fun.Invariant(nl.Head().Next().Value() == stack.Head().Next().Value())
+			fun.Invariant(nl.Head().Next().Next().Value() == stack.Head().Next().Next().Value())
+		})
+		t.Run("TypeMismatch", func(t *testing.T) {
+			stack := &seq.Stack[int]{}
+			stack.Push(400)
+			stack.Push(300)
+			stack.Push(42)
+
+			out, err := stack.MarshalJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nl := &seq.Stack[string]{}
+
+			if err := nl.UnmarshalJSON(out); err == nil {
+				t.Error("should have errored", nl.Head())
+			}
+		})
+		t.Run("StackUnmarshalNil", func(t *testing.T) {
+			stack := &seq.Stack[int]{}
+
+			if err := stack.UnmarshalJSON(nil); err == nil {
+				t.Error("should error")
+			}
+		})
+		t.Run("ItemUnmarshalNil", func(t *testing.T) {
+			elem := seq.NewItem(0)
+
+			if err := elem.UnmarshalJSON(nil); err == nil {
+				t.Error("should error")
+			}
+		})
+		t.Run("NilPointerSafety", func(t *testing.T) {
+			stack := &seq.Stack[jsonMarshlerError]{}
+			stack.Push(jsonMarshlerError{})
+			if out, err := stack.MarshalJSON(); err == nil {
+				t.Fatal("expected error", string(out))
+			}
+		})
+	})
 }
 
 func GenerateStack(t *testing.T, size int) *seq.Stack[int] {

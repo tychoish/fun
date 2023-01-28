@@ -1,7 +1,9 @@
 package seq
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/tychoish/fun"
@@ -49,7 +51,7 @@ func (it *Item[T]) In(s *Stack[T]) bool { return it.stack == s }
 
 // Set mutates the value of an Item, returning true if the operation
 // has been successful. The operation fails if the Item is the
-// head item in a stack or not a member of a list.
+// head item in a stack or not a member of a stack.
 func (it *Item[T]) Set(v T) bool {
 	if it.stack != nil && it.next == nil {
 		return false
@@ -74,7 +76,7 @@ func (it *Item[T]) Append(n *Item[T]) *Item[T] {
 	return n
 }
 
-// Remove removes the item from the list, (at some expense, for items
+// Remove removes the item from the stack, (at some expense, for items
 // deeper in the stack.) If the operation isn't successful or possible
 // the operation returns false.
 func (it *Item[T]) Remove() bool {
@@ -156,6 +158,72 @@ func (it *Item[T]) Attach(stack *Stack[T]) bool {
 	}
 
 	return true
+}
+
+// MarshalJSON returns the result of json.Marshal on the value of the
+// item. By supporting json.Marshaler and json.Unmarshaler,
+// Items and stacks can behave as arrays in larger json objects, and
+// can be as the output/input of json.Marshal and json.Unmarshal.
+func (it *Item[T]) MarshalJSON() ([]byte, error) { return json.Marshal(it.Value()) }
+
+// UnmarshalJSON reads the json value, and sets the value of the
+// item to the value in the json, potentially overriding an
+// existing value. By supporting json.Marshaler and json.Unmarshaler,
+// Items and stacks can behave as arrays in larger json objects, and
+// can be as the output/input of json.Marshal and json.Unmarshal.
+func (it *Item[T]) UnmarshalJSON(in []byte) error {
+	var val T
+	if err := json.Unmarshal(in, &val); err != nil {
+		return err
+	}
+	it.Set(val)
+	return nil
+}
+
+// MarshalJSON produces a JSON array representing the items in the
+// stack. By supporting json.Marshaler and json.Unmarshaler, Items
+// and stacks can behave as arrays in larger json objects, and
+// can be as the output/input of json.Marshal and json.Unmarshal.
+func (s *Stack[T]) MarshalJSON() ([]byte, error) {
+	elems := make([][]byte, 0, s.Len())
+	for i := s.Head(); i.Ok(); i = i.Next() {
+		e, err := i.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		elems = append(elems, e)
+	}
+	out := append([]byte("["), bytes.Join(elems, []byte(","))...)
+	out = append(out, []byte("]")...)
+	return out, nil
+}
+
+// UnmarshalJSON reads json input and adds that to values in the
+// stack. If there are items in the stack, they are not removed. By
+// supporting json.Marshaler and json.Unmarshaler, Items and stacks
+// can behave as arrays in larger json objects, and can be as the
+// output/input of json.Marshal and json.Unmarshal.
+func (s *Stack[T]) UnmarshalJSON(in []byte) error {
+	rv := []json.RawMessage{}
+
+	if err := json.Unmarshal(in, &rv); err != nil {
+		return err
+	}
+	zero := *new(T)
+	ns := &Stack[T]{}
+	head := ns.Head()
+	for idx := range rv {
+		elem := NewItem(zero)
+		if err := elem.UnmarshalJSON(rv[idx]); err != nil {
+			return err
+		}
+		head = head.Append(elem)
+	}
+	head = s.Head()
+	for it := ns.Pop(); it.Ok(); it = ns.Pop() {
+		head.Append(it)
+	}
+	return nil
 }
 
 func (s *Stack[T]) lazyInit() {
