@@ -25,7 +25,13 @@ func TestStackInternal(t *testing.T) {
 		for i := 0; i < 10000; i++ {
 			elems = append(elems, makeItem("hi"))
 		}
+		if len(elems) != 10000 {
+			t.Error("incorrect size")
+		}
 		elems = nil
+		if len(elems) != 0 {
+			t.Error("incorrect size")
+		}
 		time.Sleep(time.Millisecond)
 
 		runtime.GC() // kick the finalizers

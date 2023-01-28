@@ -357,10 +357,13 @@ func BenchmarkSorts(b *testing.B) {
 		})
 		b.Run("Merge", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				b.StopTimer()
 				list := GetPopulatedList(b, size)
 				b.StartTimer()
 				list = mergeSort(list, LessThanNative[int])
+				b.StopTimer()
+				if list.Len() != size {
+					b.Fatal("incorrect size")
+				}
 			}
 		})
 	})

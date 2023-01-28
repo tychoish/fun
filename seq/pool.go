@@ -6,6 +6,13 @@ import (
 	"sync"
 )
 
+// this is a some what experimental pool for element objects.
+//
+// it doesn't particularly improve performance in the common case (as
+// the element objects themselves are pretty small,) and by default
+// list/stack don't use them for Push operations. (the
+// NewElement/NewItem) methods do, just to prevent bitrot.
+
 var elemPoolsMtx *sync.Mutex
 var elemPools map[any]*sync.Pool
 
@@ -21,6 +28,8 @@ func init() {
 }
 
 func getElementPool[T any](val T) *sync.Pool {
+	// beause types aren't comparble/values you can't use them as
+	// keys in maps, this is just a trick to get a string that's usable.
 	key := fmt.Sprintf("%T", val)
 
 	elemPoolsMtx.Lock()

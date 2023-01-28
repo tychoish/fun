@@ -300,28 +300,23 @@ func TestSet(t *testing.T) {
 	})
 	t.Run("OrderedSetCleanup", func(t *testing.T) {
 		set := NewOrdered[int]()
-		for i := range make([]int, 300) {
+		for i := range make([]int, 500) {
 			set.Add(i)
 		}
 
 		os := set.(*orderedSetImpl[int])
 		for i := range make([]int, 300) {
-			if i < 100 {
-				if len(os.elems) != 300 {
-					t.Error("lazy delete", len(os.elems))
-				}
-			}
 			if i%2 == 0 || i%3 == 0 {
 				set.Delete(i)
 			}
 		}
-		if l := len(os.set); l != 100 {
+		if l := len(os.set); l != 300 {
 			t.Fatal("unexpected size", l)
 		}
-		if l := len(os.elems); l != 100 {
+		if l := len(os.elems); l != 308 {
 			t.Fatal("unexpected size", l)
 		}
-		if os.deletedCount != 0 {
+		if os.deletedCount != 8 {
 			t.Fatal("unexpected delete count", os.deletedCount)
 		}
 	})

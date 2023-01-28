@@ -459,7 +459,7 @@ func TestList(t *testing.T) {
 				t.Error("should not report success at setting sentinel")
 			}
 			if head.Ok() {
-				t.Error("should not set root to a value value")
+				t.Error("should not set root to a value")
 			}
 			if head.Value() != 0 {
 				t.Error("unexpected value")
@@ -699,17 +699,27 @@ func BenchmarkList(b *testing.B) {
 	b.Run("Append", func(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
+				b.StartTimer()
 				slice := []int{}
 				for i := 0; i < size; i++ {
 					slice = append(slice, i)
+				}
+				b.StopTimer()
+				if len(slice) != size {
+					b.Fatal("incorrect size")
 				}
 			}
 		})
 		b.Run("SlicePrealloc", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
+				b.StartTimer()
 				slice := make([]int, 0, 100)
 				for i := 0; i < size; i++ {
 					slice = append(slice, i)
+				}
+				b.StopTimer()
+				if len(slice) != size {
+					b.Error("incorrect size")
 				}
 			}
 		})
