@@ -547,6 +547,27 @@ func TestBroker(t *testing.T) {
 			})
 		}
 	})
+	t.Run("MakeBrokerFixesNegativeBufferSizes", func(t *testing.T) {
+		opts := BrokerOptions{BufferSize: -1}
+		broker := makeBroker[string](opts)
+		if broker.opts.BufferSize != 0 {
+			t.Fatal("buffer size can't be less than 0")
+		}
+		if cap(broker.publishCh) != 0 {
+			t.Fatal("channel capacity should be the buffer size")
+		}
+		opts = BrokerOptions{BufferSize: 40}
+		broker = makeBroker[string](opts)
+		if cap(broker.publishCh) != 40 {
+			t.Fatal("channel capacity should be the buffer size")
+		}
+	})
+	t.Run("NewLifoBrokerRejectsNegativeCapacity", func(t *testing.T) {
+		_, err := NewLIFOBroker[string](ctx, BrokerOptions{}, -42)
+		if err == nil {
+			t.Fatal("expected broker to error for negative capacity")
+		}
+	})
 
 	t.Run("SubscribeBlocking", func(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
@@ -554,6 +575,41 @@ func TestBroker(t *testing.T) {
 		ncancel()
 		if broker.Subscribe(nctx) != nil {
 			t.Error("subscription should be nil with a canceled context")
+		}
+	})
+	t.Run("ClosedQueue", func(t *testing.T) {
+		queue := NewUnlimitedQueue[string]()
+		fun.Invariant(queue.Close() == nil, "cannot error")
+		broker := NewQueueBroker(ctx, BrokerOptions{}, queue)
+
+		sa := time.Now()
+		nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer ncancel()
+		broker.Publish(nctx, "foo")
+		broker.Publish(nctx, "foo")
+		if dur := time.Since(sa); dur < 10*time.Millisecond {
+			t.Error(dur)
+		}
+	})
+
+	t.Run("ClosedQueue", func(t *testing.T) {
+		queue := NewUnlimitedQueue[string]()
+		fun.Invariant(queue.Close() == nil, "cannot error")
+		broker := NewQueueBroker(ctx, BrokerOptions{}, queue)
+
+		sa := time.Now()
+		nctx, ncancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer ncancel()
+		for {
+			ch := broker.Subscribe(nctx)
+			if ch == nil {
+				break
+			}
+			broker.Publish(nctx, "foo")
+		}
+		// broker.Publish(nctx, "foo")
+		if dur := time.Since(sa); dur < 10*time.Millisecond {
+			t.Error(dur)
 		}
 	})
 	t.Run("Populate", func(t *testing.T) {

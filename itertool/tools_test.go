@@ -4,8 +4,10 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/set"
 )
@@ -260,5 +262,114 @@ func TestRangeSplit(t *testing.T) {
 
 		}
 
+	})
+}
+
+func TestTools(t *testing.T) {
+	t.Run("CancelCollectChannel", func(t *testing.T) {
+		bctx, bcancel := context.WithCancel(context.Background())
+		defer bcancel()
+
+		ctx, cancel := context.WithCancel(bctx)
+		defer cancel()
+
+		pipe := make(chan string, 1)
+		sig := make(chan struct{})
+
+		go func() {
+			defer close(sig)
+			for {
+				select {
+				case <-bctx.Done():
+					return
+				case pipe <- t.Name():
+					continue
+				}
+			}
+		}()
+
+		output := CollectChannel(ctx, Channel(pipe))
+
+		count := 0
+	CONSUME:
+		for {
+			select {
+			case _, ok := <-output:
+				if ok {
+					count++
+					cancel()
+				}
+				if !ok {
+					break CONSUME
+				}
+			case <-sig:
+				break CONSUME
+			case <-time.After(10 * time.Millisecond):
+				break CONSUME
+			}
+		}
+		if count != 1 {
+			t.Error(count)
+		}
+	})
+	t.Run("MapWorkerSendingBlocking", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		pipe := make(chan string, 1)
+		output := make(chan int)
+		catcher := &erc.Collector{}
+		wg := &sync.WaitGroup{}
+		pipe <- t.Name()
+		wg.Add(1)
+		go mapWorker(
+			ctx,
+			catcher,
+			wg,
+			Options{},
+			func(ctx context.Context, in string) (int, error) { return 53, nil },
+			func() {},
+			pipe,
+			output,
+		)
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+		wg.Wait()
+
+		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+
+		count := 0
+	CONSUME:
+		for {
+			select {
+			case _, ok := <-output:
+				if ok {
+					count++
+					continue
+				}
+				break CONSUME
+			case <-ctx.Done():
+				break CONSUME
+			}
+		}
+	})
+	t.Run("MergeReleases", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		pipe := make(chan string)
+		iter := Merge(ctx, Channel(pipe), Channel(pipe), Channel(pipe))
+		pipe <- t.Name()
+
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+
+		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		if iter.Next(ctx) {
+			t.Error("no iteration", iter.Value())
+		}
 	})
 }

@@ -671,4 +671,24 @@ func TestDeque(t *testing.T) {
 			}
 		})
 	})
+	t.Run("IteratorBlockingOnEmpty", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		queue := fun.Must(NewDeque[int](DequeOptions{Unlimited: true}))
+
+		iter := queue.IteratorBlocking()
+		toctx, toccancel := context.WithTimeout(ctx, time.Millisecond)
+		defer toccancel()
+		sa := time.Now()
+		if iter.Next(toctx) {
+			t.Error("should have reported false early", time.Since(sa))
+		}
+		go func() {
+			time.Sleep(2 * time.Millisecond)
+			_ = queue.PushFront(31)
+		}()
+		if !iter.Next(ctx) {
+			t.Error("should have reported item", time.Since(sa), iter.Value())
+		}
+	})
 }

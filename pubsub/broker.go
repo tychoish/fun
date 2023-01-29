@@ -201,7 +201,7 @@ func (b *Broker[T]) startQueueWorkers(
 	push func(msg T) error,
 	pop func(ctx context.Context) (T, error),
 ) {
-	subs := set.Synchronize(set.NewOrdered[chan T]())
+	subs := set.Synchronize(set.MakeNewOrdered[chan T]())
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
@@ -215,17 +215,22 @@ func (b *Broker[T]) startQueueWorkers(
 				subs.Delete(msgCh)
 			case msg := <-b.publishCh:
 				if err := push(msg); err != nil {
+					// ignore most push errors: either they're queue full issues, which are the
+					// result of user configuration (and we don't log anyway,) or
+					// the queue has been closed (return), but otherwise
+					// some amount of load shedding is fine here, and
+					// we should avoid exiting too soon.
+
 					switch {
 					case errors.Is(err, ErrQueueFull) || errors.Is(err, ErrQueueNoCredit):
 						continue
-					default:
-						// likely impossible
-						// queue encounters other error
+					case errors.Is(err, ErrQueueClosed):
 						b.close()
 						return
 					}
 				}
 			}
+
 		}
 	}()
 

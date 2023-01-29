@@ -21,11 +21,12 @@ func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T]
 		ChannelIterImpl: internal.ChannelIterImpl[T]{Pipe: pipe},
 	}
 
+	wg := &iter.WG
 	ctx, iter.Closer = context.WithCancel(ctx)
 	for _, it := range iters {
-		iter.WG.Add(1)
+		wg.Add(1)
 		go func(itr fun.Iterator[T]) {
-			defer iter.WG.Done()
+			defer wg.Done()
 			for itr.Next(ctx) {
 				select {
 				case <-ctx.Done():
@@ -38,7 +39,7 @@ func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T]
 	}
 
 	// when all workers conclude, close the pipe.
-	go func() { fun.Wait(ctx, &iter.WG); close(pipe) }()
+	go func() { wg.Wait(); close(pipe) }()
 
 	return iter
 }

@@ -229,7 +229,7 @@ func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
 	if after.isRoot() {
 		dq.nfront.Signal()
 	}
-	if after.next.isRoot() {
+	if after.prev.isRoot() {
 		dq.nback.Signal()
 	}
 	dq.updates.Signal()
@@ -344,12 +344,7 @@ func (iter *dqIterator[T]) Next(ctx context.Context) bool {
 	// or the root item, it means we've reached the end of the
 	// iterator.
 	if next == iter.item || next.isRoot() {
-		// if this happens to a blocking queue, there's been
-		// an error.
-		if iter.blocking {
-			iter.err = errors.New("unrecoverable iteration error")
-		}
-
+		_ = iter.Close(ctx)
 		return false
 	}
 
