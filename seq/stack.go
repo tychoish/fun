@@ -185,17 +185,24 @@ func (it *Item[T]) UnmarshalJSON(in []byte) error {
 // and stacks can behave as arrays in larger json objects, and
 // can be as the output/input of json.Marshal and json.Unmarshal.
 func (s *Stack[T]) MarshalJSON() ([]byte, error) {
-	elems := make([][]byte, 0, s.Len())
+	buf := &bytes.Buffer{}
+	_, _ = buf.Write([]byte("["))
+
 	for i := s.Head(); i.Ok(); i = i.Next() {
+		if i != s.Head() {
+			_, _ = buf.Write([]byte(","))
+		}
+
 		e, err := i.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
-		elems = append(elems, e)
+
+		_, _ = buf.Write(e)
 	}
-	out := append([]byte("["), bytes.Join(elems, []byte(","))...)
-	out = append(out, []byte("]")...)
-	return out, nil
+	_, _ = buf.Write([]byte("]"))
+
+	return buf.Bytes(), nil
 }
 
 // UnmarshalJSON reads json input and adds that to values in the

@@ -13,24 +13,28 @@ import (
 // json.Marshal method, it produces a byte array of encoded JSON
 // documents.
 func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, error) {
-	items := [][]byte{}
-	var size int
+	buf := &bytes.Buffer{}
+	_, _ = buf.Write([]byte("["))
+	first := true
 	for iter.Next(ctx) {
+		if first {
+			first = false
+		} else {
+			_, _ = buf.Write([]byte(","))
+		}
+
 		it, err := json.Marshal(iter.Value())
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, it)
-		size += len(it) + 1
+		_, _ = buf.Write(it)
 	}
 	if err := iter.Close(ctx); err != nil {
 		return nil, err
 	}
+	_, _ = buf.Write([]byte("]"))
 
-	out := make([]byte, 0, size+2)
-	out = append([]byte("["), bytes.Join(items, []byte(","))...)
-	out = append(out, []byte("]")...)
-	return out, nil
+	return buf.Bytes(), nil
 }
 
 type errIter[T any] struct{ err error }
