@@ -166,9 +166,9 @@ func RunIteratorImplementationTests[T comparable](
 										Map(ctx,
 											Options{ContinueOnError: false},
 											filter.Filter(baseBuilder(elems)),
-											func(ctx context.Context, input T) (T, error) {
+											MapperFunction(func(ctx context.Context, input T) (T, error) {
 												panic("whoop")
-											},
+											}),
 										),
 									)
 									if err == nil {
@@ -190,9 +190,9 @@ func RunIteratorImplementationTests[T comparable](
 												NumWorkers:      2,
 											},
 											filter.Filter(baseBuilder(elems)),
-											func(ctx context.Context, input T) (T, error) {
+											MapperFunction(func(ctx context.Context, input T) (T, error) {
 												panic("whoop")
-											},
+											}),
 										),
 									)
 									if err == nil {
@@ -320,12 +320,12 @@ func RunIteratorIntegerAlgoTests(
 												ContinueOnError: true,
 											},
 											filter.Filter(baseBuilder(elems)),
-											func(ctx context.Context, input int) (int, error) {
+											MapperFunction(func(ctx context.Context, input int) (int, error) {
 												if input == elems[2] {
 													return 0, errors.New("whoop")
 												}
 												return input, nil
-											},
+											}),
 										),
 									)
 									if err == nil {
@@ -338,6 +338,7 @@ func RunIteratorIntegerAlgoTests(
 										t.Fatal("unexpected output", len(out), "->", out)
 									}
 								})
+
 								t.Run("PanicDoesNotAbort", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
@@ -346,12 +347,12 @@ func RunIteratorIntegerAlgoTests(
 												NumWorkers:      1,
 											},
 											filter.Filter(baseBuilder(elems)),
-											func(ctx context.Context, input int) (int, error) {
+											MapperFunction(func(ctx context.Context, input int) (int, error) {
 												if input == elems[3] {
 													panic("whoop")
 												}
 												return input, nil
-											},
+											}),
 										),
 									)
 									if err == nil {
@@ -373,12 +374,12 @@ func RunIteratorIntegerAlgoTests(
 												ContinueOnError: false,
 											},
 											filter.Filter(baseBuilder(elems)),
-											func(ctx context.Context, input int) (int, error) {
+											MapperFunction(func(ctx context.Context, input int) (int, error) {
 												if input >= elems[2] {
 													return 0, expectedErr
 												}
 												return input, nil
-											},
+											}),
 										),
 									)
 									if err == nil {
@@ -401,12 +402,12 @@ func RunIteratorIntegerAlgoTests(
 												ContinueOnError: true,
 											},
 											filter.Filter(baseBuilder(elems)),
-											func(ctx context.Context, input int) (int, error) {
+											MapperFunction(func(ctx context.Context, input int) (int, error) {
 												if input == len(elems)/2+1 {
 													return 0, expectedErr
 												}
 												return input, nil
-											},
+											}),
 										),
 									)
 									if err == nil {
@@ -497,9 +498,30 @@ func RunIteratorStringAlgoTests(
 									ctx,
 									Options{},
 									iter,
-									func(ctx context.Context, str string) (string, error) {
+									MapperFunction(func(ctx context.Context, str string) (string, error) {
 										return str, nil
-									},
+									}),
+								)
+
+								vals, err := CollectSlice(ctx, out)
+								if err != nil {
+									t.Fatal(err)
+
+								}
+								// skip implementation with random order
+								if name != "SetIterator" {
+									SlicesAreEqual(t, elems, vals)
+								}
+							})
+							t.Run("MapCheckedFunction", func(t *testing.T) {
+								iter := builder()
+								out := Map(
+									ctx,
+									Options{},
+									iter,
+									CheckedFunction(func(ctx context.Context, str string) (string, bool) {
+										return str, true
+									}),
 								)
 
 								vals, err := CollectSlice(ctx, out)
@@ -519,12 +541,45 @@ func RunIteratorStringAlgoTests(
 										NumWorkers: 4,
 									},
 									Merge(ctx, builder(), builder(), builder()),
-									func(ctx context.Context, str string) (string, error) {
+									MapperFunction(func(ctx context.Context, str string) (string, error) {
 										for _, c := range []string{"a", "e", "i", "o", "u"} {
 											str = strings.ReplaceAll(str, c, "")
 										}
 										return strings.TrimSpace(str), nil
+									}),
+								)
+
+								vals, err := CollectSlice(ctx, out)
+								if err != nil {
+									t.Fatal(err)
+								}
+								longString := strings.Join(vals, "")
+								count := 0
+								for _, i := range longString {
+									switch i {
+									case 'a', 'e', 'i', 'o', 'u':
+										count++
+									case '\n', '\t':
+										count += 100
+									}
+								}
+								if count != 0 {
+									t.Error("unexpected result", count)
+								}
+							})
+							t.Run("ParallelMapChecked", func(t *testing.T) {
+								out := Map(
+									ctx,
+									Options{
+										NumWorkers: 4,
 									},
+									Merge(ctx, builder(), builder(), builder()),
+									CheckedFunction(func(ctx context.Context, str string) (string, bool) {
+										for _, c := range []string{"a", "e", "i", "o", "u"} {
+											str = strings.ReplaceAll(str, c, "")
+										}
+										return strings.TrimSpace(str), true
+									}),
 								)
 
 								vals, err := CollectSlice(ctx, out)
@@ -770,4 +825,12 @@ func RunIteratorStringAlgoTests(
 			}
 		})
 	}
+}
+
+func makeIntSlice(size int) []int {
+	out := make([]int, size)
+	for i := 0; i < size; i++ {
+		out[i] = i
+	}
+	return out
 }

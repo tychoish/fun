@@ -68,6 +68,129 @@ func ForEach[T any](
 	return
 }
 
+// ParallelForEach processes the iterator in parallel, and is
+// essentially an iterator-driven worker pool. The input iterator is
+// split dynamically into iterators for every worker (determined by
+// Options.NumWorkers,) with the division between workers determined
+// by their processing speed (e.g. workers should not suffer from
+// head-of-line blocking,) and input iterators are consumed (safely)
+// as work is processed.
+//
+// Because there is no output in these operations
+// Options.OutputBufferSize is ignored.
+func ParallelForEach[T any](
+	ctx context.Context,
+	iter fun.Iterator[T],
+	opts Options,
+	fn func(context.Context, T) error,
+) (err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	catcher := &erc.Collector{}
+	wg := &sync.WaitGroup{}
+	defer func() { err = catcher.Resolve() }()
+	defer erc.Recover(catcher)
+	defer erc.CheckCtx(ctx, catcher, iter.Close)
+
+	if opts.NumWorkers <= 0 {
+		opts.NumWorkers = 1
+	}
+
+	splits := Split(ctx, opts.NumWorkers, iter)
+
+	for idx := range splits {
+		wg.Add(1)
+		go forEachWorker(ctx, catcher, wg, opts, splits[idx], fn, cancel)
+	}
+
+	wg.Wait()
+	return
+}
+
+func forEachWorker[T any](
+	ctx context.Context,
+	catcher *erc.Collector,
+	wg *sync.WaitGroup,
+	opts Options,
+	iter fun.Iterator[T],
+	fn func(context.Context, T) error,
+	abort func(),
+) {
+	defer wg.Done()
+	defer erc.RecoverHook(catcher, func() {
+		if ctx.Err() != nil {
+			return
+		}
+		if !opts.ContinueOnPanic {
+			abort()
+			return
+		}
+
+		wg.Add(1)
+		go forEachWorker(ctx, catcher, wg, opts, iter, fn, abort)
+	})
+	for iter.Next(ctx) {
+		if err := fn(ctx, iter.Value()); err != nil {
+			if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
+				// when the option is true, include all errors.
+				// when false, only include not cancellation errors.
+				catcher.Add(err)
+			}
+			if opts.ContinueOnError {
+				continue
+			}
+			abort()
+			return
+		}
+	}
+}
+
+// ProcessingFunction represents the underlying type used by many
+// processing tools. Use the ProcessingFunction constructors to
+// be able to write business logic more ergonomically.
+//
+// While the generic for ProcessingFunction allows for IN and OUT to
+// be different types, they may be of the same type for Filtering
+// operations.
+type ProcessingFunction[IN any, OUT any] func(ctx context.Context, input IN) (output OUT, include bool, err error)
+
+// MapperFunction wraps a simple function to provide a
+// ProcessingFunction that will include the output of all mapped
+// functions, but propagates errors (which usually abort processing)
+// to the larger operation.
+func MapperFunction[IN any, OUT any](fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
+	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
+		out, err := fn(ctx, input)
+		return out, true, err
+	}
+}
+
+// CheckedFunction wraps a function, and *never* propogates an error
+// to the calling operation but will include or exclude output based
+// on the second boolean output.
+func CheckedFunction[IN any, OUT any](fn func(context.Context, IN) (OUT, bool)) ProcessingFunction[IN, OUT] {
+	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
+		out, ok := fn(ctx, input)
+		return out, ok, nil
+	}
+}
+
+// CollectErrors makes adds all errors to the error collector (instructing
+// the iterator to skip these results,) but does not return an error
+// to the outer processing operation. This would be the same as using
+// "ContinueOnError" with the Map() operation.
+func CollectErrors[IN any, OUT any](ec *erc.Collector, fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
+	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
+		out, err := fn(ctx, input)
+		if err != nil {
+			ec.Add(err)
+			return *new(OUT), false, nil
+		}
+		return out, true, nil
+	}
+}
+
 // Filter passes all objects in an iterator through the
 // specified filter function. If the filter function errors, the
 // operation aborts and the error is reported by the returned
@@ -75,15 +198,36 @@ func ForEach[T any](
 // of the function is included in the output iterator, otherwise the
 // operation is skipped.
 //
+// Filter is equivalent to Transform with the same input and output
+// types. Filter operations are processed in a different thread, but
+// are not cached or buffered: to process all options, you must
+// consume the output iterator.
+//
 // The output iterator is produced iteratively as the returned
 // iterator is consumed.
 func Filter[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
-	fn func(ctx context.Context, input T) (output T, include bool, err error),
+	fn ProcessingFunction[T, T],
 ) fun.Iterator[T] {
-	out := new(internal.MapIterImpl[T])
-	pipe := make(chan T)
+	return Transform(ctx, iter, fn)
+}
+
+// Transform processes the input iterator of type T into an output
+// iterator of type O. This is the same as a Filter, but with
+// different input and output types.
+//
+// While the transformations themselves are processed in a different
+// go routine, the operations are not buffered or cached and the
+// output iterator must be consumed to process all of the results. For
+// concurrent processing, use the Map() operation.
+func Transform[T any, O any](
+	ctx context.Context,
+	iter fun.Iterator[T],
+	fn ProcessingFunction[T, O],
+) fun.Iterator[O] {
+	out := new(internal.MapIterImpl[O])
+	pipe := make(chan O)
 	out.Pipe = pipe
 
 	var iterCtx context.Context
@@ -149,11 +293,11 @@ type Options struct {
 	IncludeContextExpirationErrors bool
 }
 
-// Map provides an orthodox functional map implementation
-// based around fun.Iterator. Operates in asynchronous/streaming
-// manner, so that the output Iterator must be consumed. The zero
-// values of IteratorMapOptions provide reasonable defaults for
-// abort-on-error and single-threaded map operation.
+// Map provides an orthodox functional map implementation based around
+// fun.Iterator. Operates in asynchronous/streaming manner, so that
+// the output Iterator must be consumed. The zero values of Options
+// provide reasonable defaults for abort-on-error and single-threaded
+// map operation.
 //
 // If the mapper function errors, the result isn't included, but the
 // errors would be aggregated and propagated to the `Close()` method
@@ -165,7 +309,7 @@ func Map[T any, O any](
 	ctx context.Context,
 	opts Options,
 	iter fun.Iterator[T],
-	mapper func(context.Context, T) (O, error),
+	mapper ProcessingFunction[T, O],
 ) fun.Iterator[O] {
 	out := new(internal.MapIterImpl[O])
 	safeOut := Synchronize[O](out)
@@ -229,7 +373,7 @@ func mapWorker[T any, O any](
 	catcher *erc.Collector,
 	wg *sync.WaitGroup,
 	opts Options,
-	mapper func(context.Context, T) (O, error),
+	mapper ProcessingFunction[T, O],
 	abort func(),
 	fromInput <-chan T,
 	toOutput chan<- O,
@@ -252,7 +396,10 @@ func mapWorker[T any, O any](
 			if !ok {
 				return
 			}
-			o, err := mapper(ctx, value)
+			o, include, err := mapper(ctx, value)
+			if !include {
+				continue
+			}
 			if err != nil {
 				if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
 					// when the option is true, include all errors.
@@ -339,7 +486,7 @@ func Generate[T any](ctx context.Context, opts Options, fn func(context.Context)
 		defer erc.Recover(catcher)
 		wg.Wait()
 		abort()
-		// can't wait against a context here becase it's canceled
+		// can't wait against a context here because it's canceled
 		close(pipe)
 	}()
 
