@@ -112,7 +112,7 @@ func TestError(t *testing.T) {
 		t.Run("Check", func(t *testing.T) {
 			catcher := &Collector{}
 			serr := errors.New(errval)
-			catcher.Check(func() error { return serr })
+			Check(catcher, func() error { return serr })
 			catcherHasErrors(t, 1, catcher)
 			err := catcher.Resolve()
 			if !errors.Is(err, serr) {

@@ -71,5 +71,38 @@ func RecoverHook(ec *Collector, hook func()) {
 // returns an error, adds it to the collector, primarily for use in
 // defer statements.
 func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error) {
-	ec.Check(func() error { return fn(ctx) })
+	Check(ec, func() error { return fn(ctx) })
+}
+
+// Check executes a simple function and if it returns an error, adds
+// it to the collector, primarily for use in defer statements.
+func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
+
+var internalIterContext = context.Background()
+
+// Collect converts an error into a slice of errors in two cases:
+// First, if an error is an *erc.Stack, Collect will return a slice
+// with all constituent errors. Second, if the error is wrapped,
+// Collect will unwrap the error object adding every intermediate
+// error.
+func Collect(err error) []error {
+	if err == nil {
+		return nil
+	}
+
+	out := []error{}
+	if es, ok := err.(*Stack); ok {
+		iter := es.Iterator()
+		for iter.Next(internalIterContext) {
+			out = append(out, iter.Value())
+		}
+		return out
+	}
+
+	out = append(out, err)
+	for e := errors.Unwrap(err); e != nil; e = errors.Unwrap(e) {
+		out = append(out, e)
+	}
+
+	return out
 }

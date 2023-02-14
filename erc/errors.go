@@ -136,10 +136,6 @@ func (ec *Collector) Add(err error) {
 	ec.stack = ec.stack.append(err)
 }
 
-// Check executes a simple function and if it returns an error, adds
-// it to the collector, primarily for use in defer statements.
-func (ec *Collector) Check(fn func() error) { ec.Add(fn()) }
-
 // Iterator produces an iterator for all errors present in the
 // collector. The iterator proceeds from the current error to the
 // oldest error, and will not observe new errors added to the
