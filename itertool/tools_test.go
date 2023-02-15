@@ -620,11 +620,11 @@ func TestParallelForEach(t *testing.T) {
 			}
 			return 42, nil
 		})
-		out, ok, err := pf(ctx, "hello")
+		_, ok, err := pf(ctx, "hello")
 		if err != nil || !ok || ec.HasErrors() {
 			t.Error("should not error", ok, err, ec.Resolve())
 		}
-		out, ok, err = pf(ctx, "hi")
+		out, ok, err := pf(ctx, "hi")
 		if err != nil {
 			t.Error("collect errors shouldn't transmit errors", err)
 		}

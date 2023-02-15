@@ -80,12 +80,12 @@ func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
 var internalIterContext = context.Background()
 
-// Collect converts an error into a slice of errors in two cases:
-// First, if an error is an *erc.Stack, Collect will return a slice
+// Unwind converts an error into a slice of errors in two cases:
+// First, if an error is an *erc.Stack, Unwind will return a slice
 // with all constituent errors. Second, if the error is wrapped,
-// Collect will unwrap the error object adding every intermediate
+// Unwind will unwrap the error object adding every intermediate
 // error.
-func Collect(err error) []error {
+func Unwind(err error) []error {
 	if err == nil {
 		return nil
 	}
