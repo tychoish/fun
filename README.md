@@ -16,6 +16,8 @@ Packages:
   ordered and unordered sets)
 - [seq](https://pkg.go.dev/github.com/tychoish/fun/seq) (generic
   linked lists.)
+- [srv](https://pkg.go.dev/github.com/tychoish/fun/seq) (service
+  orchestration and management framework.)
 
 For more information, see the documentation, but of general interest:
 
@@ -33,11 +35,13 @@ For more information, see the documentation, but of general interest:
   block until new items added.
 - In `seq`, general purpose linked list implementations, with a
   healthy feature set and flexible interface.
+- In `srv`, a service orchestration toolkit.
 
 Contributions welcome, the general goals of the project:
 
 - superior API ergonomics.
 - great high-level abstractions.
 - obvious and clear implementations.
+- minimal dependencies.
 
 Have fun!
