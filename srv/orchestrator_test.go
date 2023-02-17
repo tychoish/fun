@@ -1,0 +1,285 @@
+package srv
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/tychoish/fun/erc"
+)
+
+func TestOrchestrator(t *testing.T) {
+	t.Parallel()
+	t.Run("Stringer", func(t *testing.T) {
+		orc := &Orchestrator{}
+		if orc.String() != "Orchestrator<>" {
+			t.Error(orc.String())
+		}
+		orc.Name = "funtime"
+		if orc.String() != "Orchestrator<funtime>" {
+			t.Error(orc.String())
+		}
+	})
+	t.Run("Add", func(t *testing.T) {
+		t.Run("BeforeStart", func(t *testing.T) {
+			counter := &atomic.Int64{}
+			orc := &Orchestrator{}
+			for i := 0; i < 100; i++ {
+				orc.Add(&Service{
+					Name: fmt.Sprint(i),
+					Run: func(ctx context.Context) error {
+						counter.Add(1)
+						return nil
+					},
+				})
+			}
+			if counter.Load() != 0 {
+				t.Error(counter.Load())
+			}
+			if orc.srv != nil {
+				t.Error("service is created lazily, later")
+			}
+			if orc.pipe == nil {
+				t.Error("pipe should be created")
+			}
+		})
+		t.Run("NilServices", func(t *testing.T) {
+			orc := &Orchestrator{}
+			for i := 0; i < 100; i++ {
+				orc.Add(nil)
+			}
+			if orc.pipe == nil {
+				t.Error("pipe should be created")
+			}
+			if orc.pipe.Len() != 0 {
+				t.Error(orc.pipe.Len())
+			}
+		})
+	})
+	t.Run("Service", func(t *testing.T) {
+		t.Run("MultipleCalls", func(t *testing.T) {
+			orc := &Orchestrator{}
+			if orc.srv != nil {
+				t.Error("service is created lazily, later")
+			}
+
+			s := orc.Service()
+			if s == nil {
+				t.Fatal("service should always be produced")
+			}
+			if orc.srv == nil {
+				t.Error("service is created lazily, by now")
+			}
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				go func(id int) {
+					defer wg.Done()
+					time.Sleep(time.Duration(id*10) * time.Millisecond)
+					s2 := orc.Service()
+					if s != s2 {
+						t.Error("service is cached and the same", id)
+					}
+				}(i)
+			}
+			wg.Wait()
+		})
+		t.Run("RunEndToEnd", func(t *testing.T) {
+			counter := &atomic.Int64{}
+			orc := &Orchestrator{}
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				orc.Add(&Service{
+					Name: fmt.Sprint(i),
+					Run: func(ctx context.Context) error {
+						counter.Add(1)
+						wg.Done()
+						return nil
+					},
+				})
+			}
+			s := orc.Service()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err := s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			// wait for all services to return
+			wg.Wait()
+			// close wrapper service
+			s.Close()
+			if err := s.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if counter.Load() != 100 {
+				t.Error("all services did not run")
+			}
+			t.Run("Reset", func(t *testing.T) {
+				if orc.pipe.Len() != 100 {
+					t.Error(orc.pipe.Len())
+				}
+				orc.Add(nil)
+				if orc.pipe.Len() != 0 {
+					t.Error(orc.pipe.Len())
+				}
+				ns := orc.Service()
+				if ns == nil {
+					t.Error("should be a valid service")
+				}
+				if ns == s {
+					t.Error("should be a different service")
+				}
+			})
+		})
+		t.Run("PropogateErrors", func(t *testing.T) {
+			orc := &Orchestrator{}
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				orc.Add(&Service{
+					Name: fmt.Sprint(i),
+					Run: func(ctx context.Context) error {
+						defer wg.Done()
+						return errors.New("42")
+					},
+				})
+			}
+			s := orc.Service()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err := s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			// wait for all services to return
+			wg.Wait()
+			// close wrapper service
+			s.Close()
+
+			err := s.Wait()
+			if err == nil {
+				t.Fatal("should have errors")
+			}
+			if errs := erc.Unwind(err); len(errs) != 100 {
+				t.Fatal(len(errs))
+			}
+		})
+		t.Run("StartRunningServices", func(t *testing.T) {
+			orc := &Orchestrator{}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			defer cancel()
+			for i := 0; i < 100; i++ {
+				s := makeBlockingService(t)
+				s.Start(ctx)
+				orc.Add(s)
+			}
+			startAt := time.Now()
+			s := orc.Service()
+			if err := s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Wait(); err != nil {
+				t.Error(err)
+			}
+			// the fixture ensures that all sub-services run
+			if dur := time.Since(startAt); dur > 20*time.Millisecond {
+				t.Error(dur)
+			}
+		})
+		t.Run("FinishedServicesError", func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			s := &Service{Name: "base", Run: func(context.Context) error { return nil }}
+			if err := s.Start(ctx); err != nil {
+				t.Fatal()
+			}
+			if err := s.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			orc := &Orchestrator{}
+			osrv := orc.Service()
+			if err := osrv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 100; i++ {
+				orc.Add(s)
+			}
+			if !osrv.Running() {
+				t.Error("should still be running")
+			}
+
+			time.Sleep(5 * time.Millisecond)
+
+			osrv.Close()
+			err := osrv.Wait()
+			if err == nil {
+				t.Fatal("should error")
+			}
+			if osrv.Running() {
+				t.Error("should not be running")
+			}
+			errs := erc.Unwind(err)
+			if len(errs) != 100 {
+				t.Log(errs)
+				t.Error(len(errs))
+			}
+		})
+		t.Run("PanicSafely", func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			orc := &Orchestrator{}
+			osrv := orc.Service()
+			if err := osrv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 100; i++ {
+				orc.Add(&Service{Name: fmt.Sprint(i)})
+			}
+
+			time.Sleep(5 * time.Millisecond)
+
+			osrv.Close()
+			err := osrv.Wait()
+			if err == nil {
+				t.Fatal("should error")
+			}
+			errs := erc.Unwind(err)
+			if len(errs) != 100 {
+				t.Log(errs)
+				t.Error(len(errs))
+			}
+		})
+		t.Run("LogRunningServices", func(t *testing.T) {
+			orc := &Orchestrator{}
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				orc.Add(makeBlockingService(t))
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			defer cancel()
+			startAt := time.Now()
+			s := orc.Service()
+			if err := s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Wait(); err != nil {
+				t.Error(err)
+			}
+			// the fixture ensures that all sub-services run
+			if dur := time.Since(startAt); dur > 20*time.Millisecond {
+				t.Error(dur)
+			}
+		})
+	})
+}

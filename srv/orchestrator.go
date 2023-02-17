@@ -18,12 +18,18 @@ import (
 // new services to added to the orchestrator and start them (if
 // needed.)
 type Orchestrator struct {
+	// Name is used in the string format of the Orchestrator
+	// object and also propagated to the name of services.
+	Name string
 	// mutex protects the struct. while the deque is threadsafe,
 	// we want to be able to avoid adding new threads during shutdown
 	mtx  sync.Mutex
 	pipe *pubsub.Deque[*Service]
 	srv  *Service
 }
+
+// String implements fmt.Stringer and returns the type name and
+func (or *Orchestrator) String() string { return fmt.Sprintf("Orchestrator<%s>", or.Name) }
 
 func (or *Orchestrator) setup() {
 	if or.srv != nil {
@@ -87,6 +93,7 @@ func (or *Orchestrator) Service() *Service {
 	or.setup()
 
 	or.srv = &Service{
+		Name: or.Name,
 		Run: func(ctx context.Context) error {
 			ec := &erc.Collector{}
 
