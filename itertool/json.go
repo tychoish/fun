@@ -29,7 +29,7 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 		}
 		_, _ = buf.Write(it)
 	}
-	if err := iter.Close(ctx); err != nil {
+	if err := iter.Close(); err != nil {
 		return nil, err
 	}
 	_, _ = buf.Write([]byte("]"))
@@ -39,9 +39,9 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 
 type errIter[T any] struct{ err error }
 
-func (e errIter[T]) Close(context.Context) error { return e.err }
-func (_ errIter[T]) Next(context.Context) bool   { return false }
-func (_ errIter[T]) Value() T                    { return *new(T) }
+func (e errIter[T]) Close() error              { return e.err }
+func (_ errIter[T]) Next(context.Context) bool { return false }
+func (_ errIter[T]) Value() T                  { return *new(T) }
 
 // UnmarshalJSON reads a JSON input and produces an iterator of the
 // items. The implementation reads all items from the slice before

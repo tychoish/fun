@@ -36,7 +36,7 @@ func TestJSON(t *testing.T) {
 		if iter.Next(ctx) {
 			t.Error("shouldn't iterate")
 		}
-		if err := iter.Close(ctx); err == nil {
+		if err := iter.Close(); err == nil {
 			t.Error("expected error")
 		}
 		if iter.Value() != "" {

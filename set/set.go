@@ -24,7 +24,7 @@ type Set[T comparable] interface {
 	Check(T) bool
 	// Iterator produces an Iterator implementation for the
 	// elements in the set.
-	Iterator(context.Context) fun.Iterator[T]
+	Iterator() fun.Iterator[T]
 }
 
 // MakeUnordered constructs a set object, pre-allocating the specified
@@ -40,13 +40,13 @@ func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }
 func (s mapSetImpl[T]) Len() int          { return len(s) }
 func (s mapSetImpl[T]) Delete(item T)     { delete(s, item) }
 func (s mapSetImpl[T]) Check(item T) bool { _, ok := s[item]; return ok }
-func (s mapSetImpl[T]) Iterator(ctx context.Context) fun.Iterator[T] {
+func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	pipe := make(chan T)
 
 	iter := &internal.MapIterImpl[T]{
 		ChannelIterImpl: internal.ChannelIterImpl[T]{Pipe: pipe},
 	}
-	ctx, iter.Closer = context.WithCancel(ctx)
+	iter.Ctx, iter.Closer = context.WithCancel(context.Background())
 	iter.WG.Add(1)
 
 	go func() {
@@ -55,7 +55,7 @@ func (s mapSetImpl[T]) Iterator(ctx context.Context) fun.Iterator[T] {
 
 		for item := range s {
 			select {
-			case <-ctx.Done():
+			case <-iter.Ctx.Done():
 				return
 			case pipe <- item:
 				continue
@@ -129,11 +129,11 @@ func (iter syncIterImpl[T]) Next(ctx context.Context) bool {
 	return iter.iter.Next(ctx)
 }
 
-func (iter syncIterImpl[T]) Close(ctx context.Context) error {
+func (iter syncIterImpl[T]) Close() error {
 	iter.mtx.Lock()
 	defer iter.mtx.Unlock()
 
-	return iter.iter.Close(ctx)
+	return iter.iter.Close()
 }
 
 func (iter syncIterImpl[T]) Value() T {
@@ -143,9 +143,9 @@ func (iter syncIterImpl[T]) Value() T {
 	return iter.iter.Value()
 }
 
-func (s syncSetImpl[T]) Iterator(ctx context.Context) fun.Iterator[T] {
+func (s syncSetImpl[T]) Iterator() fun.Iterator[T] {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	return syncIterImpl[T]{mtx: s.mtx, iter: s.set.Iterator(ctx)}
+	return syncIterImpl[T]{mtx: s.mtx, iter: s.set.Iterator()}
 }

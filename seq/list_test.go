@@ -263,7 +263,7 @@ func TestList(t *testing.T) {
 				last = iter.Value()
 				seen++
 			}
-			if err := iter.Close(ctx); err != nil {
+			if err := iter.Close(); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -292,7 +292,7 @@ func TestList(t *testing.T) {
 				last = iter.Value()
 				seen++
 			}
-			if err := iter.Close(ctx); err != nil {
+			if err := iter.Close(); err != nil {
 				t.Fatal(err)
 			}
 			if seen != 100 {
@@ -327,7 +327,7 @@ func TestList(t *testing.T) {
 				last = iter.Value()
 				seen++
 			}
-			if err := iter.Close(ctx); err != nil {
+			if err := iter.Close(); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -356,7 +356,7 @@ func TestList(t *testing.T) {
 				last = iter.Value()
 				seen++
 			}
-			if err := iter.Close(ctx); err != nil {
+			if err := iter.Close(); err != nil {
 				t.Fatal(err)
 			}
 			if seen != 100 {
@@ -377,7 +377,7 @@ func TestList(t *testing.T) {
 					t.Error("iterator should be open", i)
 				}
 			}
-			fun.Invariant(iter.Close(ctx) == nil)
+			fun.Invariant(iter.Close() == nil)
 			for i := 0; i < 50; i++ {
 				if iter.Next(ctx) {
 					t.Error("iterator should be closed", i)

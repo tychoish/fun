@@ -23,6 +23,6 @@ import (
 // itertool.Split() provide support for these workloads.
 type Iterator[T any] interface {
 	Next(context.Context) bool
-	Close(context.Context) error
+	Close() error
 	Value() T
 }

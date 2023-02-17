@@ -190,7 +190,7 @@ func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
 				subs.Delete(msgCh)
 			case msg := <-b.publishCh:
 				// do sending
-				b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
+				b.dispatchMessage(ctx, subs.Iterator(), msg)
 			}
 		}
 	}()
@@ -248,7 +248,7 @@ func (b *Broker[T]) startQueueWorkers(
 				if err != nil {
 					return
 				}
-				b.dispatchMessage(ctx, subs.Iterator(ctx), msg)
+				b.dispatchMessage(ctx, subs.Iterator(), msg)
 			}
 		}()
 	}
@@ -265,13 +265,13 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan 
 				b.sendMsg(ctx, msg, ch)
 			}(msg, iter.Value())
 		}
-		_ = iter.Close(ctx)
+		_ = iter.Close()
 		fun.Wait(ctx, wg)
 	} else {
 		for iter.Next(ctx) {
 			b.sendMsg(ctx, msg, iter.Value())
 		}
-		_ = iter.Close(ctx)
+		_ = iter.Close()
 	}
 
 }

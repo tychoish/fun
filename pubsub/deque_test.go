@@ -286,7 +286,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 			if err := ctx.Err(); err != nil {
 				t.Error("shouldn't cancel", err)
 			}
-			if err := iter.Close(ctx); err != nil {
+			if err := iter.Close(); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -653,7 +653,7 @@ func TestDeque(t *testing.T) {
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
 					seen := 0
-					if err := iter.Close(ctx); err != nil {
+					if err := iter.Close(); err != nil {
 						t.Fatal(err)
 					}
 					for iter.Next(ctx) {

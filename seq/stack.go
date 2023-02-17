@@ -300,8 +300,8 @@ type itemIter[T any] struct {
 	closed bool
 }
 
-func (iter *itemIter[T]) Value() *Item[T]                 { return iter.next }
-func (iter *itemIter[T]) Close(ctx context.Context) error { iter.closed = true; return nil }
+func (iter *itemIter[T]) Value() *Item[T] { return iter.next }
+func (iter *itemIter[T]) Close() error    { iter.closed = true; return nil }
 func (iter *itemIter[T]) Next(ctx context.Context) bool {
 	if iter.closed || ctx.Err() != nil || iter.next == nil {
 		return false

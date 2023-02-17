@@ -20,11 +20,11 @@ func (iter syncIterImpl[T]) Next(ctx context.Context) bool {
 	return iter.iter.Next(ctx)
 }
 
-func (iter syncIterImpl[T]) Close(ctx context.Context) error {
+func (iter syncIterImpl[T]) Close() error {
 	iter.mtx.Lock()
 	defer iter.mtx.Unlock()
 
-	return iter.iter.Close(ctx)
+	return iter.iter.Close()
 }
 
 func (iter syncIterImpl[T]) Value() T {

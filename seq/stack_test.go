@@ -300,7 +300,7 @@ func TestStack(t *testing.T) {
 				seen++
 				iter.Value()
 			}
-			fun.Invariant(iter.Close(ctx) == nil)
+			fun.Invariant(iter.Close() == nil)
 			if seen != stack.Len() {
 				t.Fatal("did not see all values")
 			}
@@ -313,7 +313,7 @@ func TestStack(t *testing.T) {
 				seen++
 				iter.Value()
 			}
-			fun.Invariant(iter.Close(ctx) == nil)
+			fun.Invariant(iter.Close() == nil)
 			if seen != 50 {
 				t.Fatal("did not see all values")
 			}
@@ -329,7 +329,7 @@ func TestStack(t *testing.T) {
 				seen++
 				iter.Value()
 			}
-			fun.Invariant(iter.Close(ctx) == nil)
+			fun.Invariant(iter.Close() == nil)
 			if seen != 0 {
 				t.Fatal("stack should be empty", stack.Len())
 			}

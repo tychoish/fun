@@ -68,7 +68,7 @@ func collectIter[T any](ctx context.Context, t testing.TB, iter fun.Iterator[T])
 		out = append(out, iter.Value())
 	}
 
-	if err := iter.Close(ctx); err != nil {
+	if err := iter.Close(); err != nil {
 		t.Error(err)
 	}
 
@@ -437,6 +437,48 @@ func TestError(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		fun.Wait(ctx, wg)
+	})
+	t.Run("Unwind", func(t *testing.T) {
+		t.Run("NoErrors", func(t *testing.T) {
+			errs := Unwind(nil)
+			if errs != nil {
+				t.Fail()
+			}
+			if len(errs) != 0 {
+				t.Fail()
+			}
+		})
+		t.Run("OneError", func(t *testing.T) {
+			err := errors.New("42")
+			errs := Unwind(err)
+			if len(errs) != 1 {
+				t.Fatal(len(errs))
+			}
+		})
+		t.Run("Stack", func(t *testing.T) {
+			ec := &Collector{}
+			for i := 0; i < 100; i++ {
+				ec.Add(fmt.Errorf("%d", i))
+			}
+			errs := Unwind(ec.Resolve())
+			if len(errs) != 100 {
+				t.Fatal(len(errs))
+			}
+		})
+		t.Run("Wrapped", func(t *testing.T) {
+			err := errors.New("base")
+			for i := 0; i < 100; i++ {
+				err = fmt.Errorf("wrap %d: %w", i, err)
+			}
+
+			errs := Unwind(err)
+			if len(errs) != 101 {
+				t.Error(len(errs))
+			}
+			if errs[100].Error() != "base" {
+				t.Error(errs[100])
+			}
+		})
 	})
 }
 

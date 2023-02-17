@@ -431,8 +431,8 @@ func (iter *elemIter[T]) getNext(next direction) *Element[T] {
 	return elem
 }
 
-func (iter *elemIter[T]) Close(_ context.Context) error { iter.closed = true; return nil }
-func (iter *elemIter[T]) Value() *Element[T]            { return iter.elem }
+func (iter *elemIter[T]) Close() error       { iter.closed = true; return nil }
+func (iter *elemIter[T]) Value() *Element[T] { return iter.elem }
 func (iter *elemIter[T]) Next(ctx context.Context) bool {
 	if iter.list == nil {
 		iter.list = iter.elem.list

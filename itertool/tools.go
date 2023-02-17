@@ -39,7 +39,7 @@ func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error)
 		out = append(out, iter.Value())
 	}
 
-	return out, iter.Close(ctx)
+	return out, iter.Close()
 }
 
 // ForEach passes each item in the iterator through the specified
@@ -56,7 +56,7 @@ func ForEach[T any](
 
 	defer func() { err = catcher.Resolve() }()
 	defer erc.Recover(catcher)
-	defer erc.CheckCtx(ctx, catcher, iter.Close)
+	defer erc.Check(catcher, iter.Close)
 
 	for iter.Next(ctx) {
 		if ferr := fn(ctx, iter.Value()); ferr != nil {
@@ -91,7 +91,7 @@ func ParallelForEach[T any](
 	wg := &sync.WaitGroup{}
 	defer func() { err = catcher.Resolve() }()
 	defer erc.Recover(catcher)
-	defer erc.CheckCtx(ctx, catcher, iter.Close)
+	defer erc.Check(catcher, iter.Close)
 
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
@@ -146,7 +146,7 @@ func forEachWorker[T any](
 	}
 }
 
-// ProcessingFunction represents the underlying type used by many
+// ProcessingFunction represents the underlying type used by serveral
 // processing tools. Use the ProcessingFunction constructors to
 // be able to write business logic more ergonomically.
 //
@@ -239,7 +239,7 @@ func Transform[T any, O any](
 		defer out.WG.Done()
 		defer func() { out.Error = catcher.Resolve() }()
 		defer erc.Recover(catcher)
-		defer erc.CheckCtx(ctx, catcher, iter.Close)
+		defer erc.Check(catcher, iter.Close)
 		defer close(pipe)
 
 		for iter.Next(iterCtx) {
@@ -334,7 +334,7 @@ func Map[T any, O any](
 		defer close(signal)
 		defer out.WG.Done()
 		defer erc.Recover(catcher)
-		defer erc.CheckCtx(ctx, catcher, iter.Close)
+		defer erc.Check(catcher, iter.Close)
 		defer close(fromInput)
 		defer erc.Recover(catcher)
 
@@ -435,7 +435,7 @@ func Reduce[T any, O any](
 
 	defer func() { err = catcher.Resolve() }()
 	defer erc.Recover(catcher)
-	defer erc.CheckCtx(ctx, catcher, iter.Close)
+	defer erc.Check(catcher, iter.Close)
 
 	for iter.Next(ctx) {
 		value, err = reducer(ctx, iter.Value(), value)

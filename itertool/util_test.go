@@ -87,7 +87,7 @@ func RunIteratorImplementationTests[T comparable](
 								for iter.Next(ctx) {
 									seen[iter.Value()] = struct{}{}
 								}
-								if err := iter.Close(ctx); err != nil {
+								if err := iter.Close(); err != nil {
 									t.Error(err)
 								}
 
@@ -107,7 +107,7 @@ func RunIteratorImplementationTests[T comparable](
 
 								CheckSeenMap(t, elems, seen)
 
-								if err := iter.Close(ctx); err != nil {
+								if err := iter.Close(); err != nil {
 									t.Fatal(err)
 								}
 							})
@@ -120,7 +120,7 @@ func RunIteratorImplementationTests[T comparable](
 								for iter.Next(ctx) {
 									count++
 								}
-								err := iter.Close(ctx)
+								err := iter.Close()
 								if count > len(elems) && !errors.Is(err, context.Canceled) {
 									t.Fatal("should not have iterated or reported err", count, err)
 								}
@@ -474,7 +474,7 @@ func RunIteratorStringAlgoTests(
 									seen[str] = struct{}{}
 								}
 								CheckSeenMap(t, elems, seen)
-								if err := iter.Close(ctx); err != nil {
+								if err := iter.Close(); err != nil {
 									t.Fatal(err)
 								}
 							})
@@ -488,7 +488,7 @@ func RunIteratorStringAlgoTests(
 								if name != "SetIterator" {
 									SlicesAreEqual(t, elems, vals)
 								}
-								if err := iter.Close(ctx); err != nil {
+								if err := iter.Close(); err != nil {
 									t.Fatal(err)
 								}
 							})
@@ -673,7 +673,7 @@ func RunIteratorStringAlgoTests(
 									if out.Next(ctx) {
 										t.Fatal("should not iterate when panic")
 									}
-									if err := out.Close(ctx); err.Error() != "panic: foo" {
+									if err := out.Close(); err.Error() != "panic: foo" {
 										t.Fatalf("unexpected panic %q", err.Error())
 									}
 								})

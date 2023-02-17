@@ -3,8 +3,6 @@ package internal
 import (
 	"context"
 	"sync"
-
-	"github.com/tychoish/fun"
 )
 
 type SliceIterImpl[T any] struct {
@@ -13,8 +11,8 @@ type SliceIterImpl[T any] struct {
 	val   *T
 }
 
-func (iter *SliceIterImpl[T]) Value() T                      { return *iter.val }
-func (iter *SliceIterImpl[T]) Close(_ context.Context) error { return nil }
+func (iter *SliceIterImpl[T]) Value() T     { return *iter.val }
+func (iter *SliceIterImpl[T]) Close() error { return nil }
 func (iter *SliceIterImpl[T]) Next(ctx context.Context) bool {
 	if ctx.Err() != nil {
 		return false
@@ -30,13 +28,21 @@ func (iter *SliceIterImpl[T]) Next(ctx context.Context) bool {
 }
 
 type ChannelIterImpl[T any] struct {
-	Pipe  <-chan T
-	value T
-	Error error
+	Pipe   <-chan T
+	value  T
+	Error  error
+	Ctx    context.Context
+	Closer context.CancelFunc
 }
 
-func (iter *ChannelIterImpl[T]) Value() T                      { return iter.value }
-func (iter *ChannelIterImpl[T]) Close(_ context.Context) error { return iter.Error }
+func (iter *ChannelIterImpl[T]) Value() T { return iter.value }
+func (iter *ChannelIterImpl[T]) Close() error {
+	if iter.Closer != nil {
+		iter.Closer()
+	}
+
+	return iter.Error
+}
 func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 	// check first because select statement ordering is non-deterministic
 	if ctx.Err() != nil {
@@ -56,14 +62,11 @@ func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 
 type MapIterImpl[T any] struct {
 	ChannelIterImpl[T]
-	WG     sync.WaitGroup
-	Closer context.CancelFunc
+	WG sync.WaitGroup
 }
 
-func (iter *MapIterImpl[T]) Close(ctx context.Context) error {
+func (iter *MapIterImpl[T]) Close() error {
 	iter.Closer()
-
-	fun.Wait(ctx, &iter.WG)
-
-	return iter.ChannelIterImpl.Close(ctx)
+	iter.WG.Wait()
+	return iter.ChannelIterImpl.Close()
 }

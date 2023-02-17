@@ -91,8 +91,8 @@ type esIterImpl struct {
 	current *Stack
 }
 
-func (_ *esIterImpl) Close(_ context.Context) error { return nil }
-func (e *esIterImpl) Value() error                  { return e.current.err }
+func (_ *esIterImpl) Close() error { return nil }
+func (e *esIterImpl) Value() error { return e.current.err }
 func (e *esIterImpl) Next(ctx context.Context) bool {
 	if e.current.next == nil || ctx.Err() != nil {
 		return false

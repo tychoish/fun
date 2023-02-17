@@ -350,7 +350,7 @@ func TestQueueIterator(t *testing.T) {
 			t.Fatal("should iterate once")
 		}
 
-		err = iter.Close(ctx)
+		err = iter.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -386,7 +386,7 @@ func TestQueueIterator(t *testing.T) {
 			}
 		}
 
-		err = iter.Close(context.Background())
+		err = iter.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -414,7 +414,7 @@ func TestQueueIterator(t *testing.T) {
 			}
 		}
 
-		err = iter.Close(context.Background())
+		err = iter.Close()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -15,5 +15,5 @@ func Populate[T any](ctx context.Context, iter fun.Iterator[T], broker *Broker[T
 	for iter.Next(ctx) {
 		broker.Publish(ctx, iter.Value())
 	}
-	return iter.Close(ctx)
+	return iter.Close()
 }

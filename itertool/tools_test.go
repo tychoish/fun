@@ -24,6 +24,12 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 			},
 		},
 		{
+			Name: "VariadicIterator",
+			Constructor: func(elems []T) fun.Iterator[T] {
+				return Variadic(elems...)
+			},
+		},
+		{
 			Name: "ChannelIterator",
 			Constructor: func(elems []T) fun.Iterator[T] {
 				vals := make(chan T, len(elems))
@@ -42,7 +48,7 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 					set.Add(elems[idx])
 				}
 
-				return set.Iterator(ctx)
+				return set.Iterator()
 			},
 		},
 		{
@@ -53,7 +59,7 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 					set.Add(elems[idx])
 				}
 
-				return set.Iterator(ctx)
+				return set.Iterator()
 			},
 		},
 		{
@@ -423,7 +429,7 @@ func TestParallelForEach(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out, err := CollectSlice(ctx, seen.Iterator(ctx))
+				out, err := CollectSlice(ctx, seen.Iterator())
 				if err != nil {
 					t.Fatal(err)
 				}

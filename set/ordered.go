@@ -47,7 +47,7 @@ func (lls *orderedLLSet[T]) Delete(it T) {
 	delete(lls.set, it)
 }
 
-func (lls orderedLLSet[T]) Iterator(_ context.Context) fun.Iterator[T] {
+func (lls orderedLLSet[T]) Iterator() fun.Iterator[T] {
 	return seq.ListValues(lls.elems.Iterator())
 }
 
@@ -124,7 +124,7 @@ func (s *orderedSetImpl[T]) Delete(it T) {
 
 	s.lazyDelete()
 }
-func (s *orderedSetImpl[T]) Iterator(ctx context.Context) fun.Iterator[T] {
+func (s *orderedSetImpl[T]) Iterator() fun.Iterator[T] {
 	s.lazyDelete()
 	return &orderedSetIterImpl[T]{set: s, lastIdx: -1}
 }
@@ -152,5 +152,5 @@ func (iter *orderedSetIterImpl[T]) Next(ctx context.Context) bool {
 	return false
 }
 
-func (iter *orderedSetIterImpl[T]) Value() T                      { return *iter.value }
-func (iter *orderedSetIterImpl[T]) Close(_ context.Context) error { return nil }
+func (iter *orderedSetIterImpl[T]) Value() T     { return *iter.value }
+func (iter *orderedSetIterImpl[T]) Close() error { return nil }

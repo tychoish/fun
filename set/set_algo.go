@@ -21,14 +21,14 @@ func Equal[T comparable](ctx context.Context, s1, s2 Set[T]) bool {
 		return false
 	}
 
-	iter1 := s1.Iterator(ctx)
+	iter1 := s1.Iterator()
 	for iter1.Next(ctx) {
 		if !s2.Check(iter1.Value()) {
 			return false
 		}
 	}
 
-	err := iter1.Close(ctx)
+	err := iter1.Close()
 	if err != nil || ctx.Err() != nil {
 		return false
 	}

@@ -322,7 +322,7 @@ func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 	return true
 }
 
-func (iter *queueIterImpl[T]) Close(_ context.Context) error {
+func (iter *queueIterImpl[T]) Close() error {
 	iter.queue.mu.Lock()
 	defer iter.queue.mu.Unlock()
 	iter.closed = true

@@ -294,7 +294,7 @@ type dqIterator[T any] struct {
 	cache  T
 }
 
-func (iter *dqIterator[T]) Close(_ context.Context) error {
+func (iter *dqIterator[T]) Close() error {
 	iter.mtx.Lock()
 	defer iter.mtx.Unlock()
 
@@ -330,7 +330,7 @@ func (iter *dqIterator[T]) Next(ctx context.Context) bool {
 		// new item or someone to close the queue.
 		if err := iter.item.wait(ctx, dqNext); err != nil {
 			if errors.Is(err, ErrQueueClosed) {
-				_ = iter.Close(ctx)
+				_ = iter.Close()
 				return false
 			}
 			// if we get here the context is probably canceled.
@@ -344,7 +344,7 @@ func (iter *dqIterator[T]) Next(ctx context.Context) bool {
 	// or the root item, it means we've reached the end of the
 	// iterator.
 	if next == iter.item || next.isRoot() {
-		_ = iter.Close(ctx)
+		_ = iter.Close()
 		return false
 	}
 

@@ -144,7 +144,7 @@ func TestSet(t *testing.T) {
 						set := builder()
 						populator(set)
 						count := 0
-						iter := set.Iterator(ctx)
+						iter := set.Iterator()
 						collected := []string{}
 						for iter.Next(ctx) {
 							count++
@@ -154,7 +154,7 @@ func TestSet(t *testing.T) {
 							collected = append(collected, iter.Value())
 						}
 
-						if err := iter.Close(ctx); err != nil {
+						if err := iter.Close(); err != nil {
 							t.Fatal(err)
 						} else if len(collected) == 0 {
 							t.Fatal("should have items")
@@ -202,7 +202,7 @@ func TestSet(t *testing.T) {
 		if set.Len() != 3 {
 			t.Fatal("now three items in set")
 		}
-		osetIter := set.Iterator(ctx)
+		osetIter := set.Iterator()
 		idx := 0
 		seen := 0
 		for osetIter.Next(ctx) {
@@ -333,7 +333,7 @@ func TestSet(t *testing.T) {
 		t.Run("SetIter", func(t *testing.T) {
 			base := MakeUnordered[string](1)
 			base.Add("abc")
-			wrapped := Synchronize(base).Iterator(ctx)
+			wrapped := Synchronize(base).Iterator()
 			maybeBase := wrapped.(interface{ Unwrap() fun.Iterator[string] }).Unwrap()
 			if maybeBase == nil {
 				t.Fatal("should not be nil")
@@ -348,7 +348,7 @@ func TestSet(t *testing.T) {
 			base.elems[1].deleted = true
 
 			count := 0
-			iter := base.Iterator(ctx)
+			iter := base.Iterator()
 			for iter.Next(ctx) {
 				count++
 				if iter.Value() == "123" {
@@ -368,7 +368,7 @@ func TestSet(t *testing.T) {
 			base.Add("123")
 
 			count := 0
-			iter := base.Iterator(cctx)
+			iter := base.Iterator()
 			for iter.Next(cctx) {
 				count++
 			}
@@ -382,7 +382,7 @@ func TestSet(t *testing.T) {
 			base.Add("123")
 
 			count := 0
-			iter := base.Iterator(ctx).(*orderedSetIterImpl[string])
+			iter := base.Iterator().(*orderedSetIterImpl[string])
 			iter.lastIdx = 43
 			for iter.Next(ctx) {
 				count++
@@ -495,12 +495,12 @@ func BenchmarkSet(b *testing.B) {
 			for i := 0; i < size; i++ {
 				set.Add(i * size)
 			}
-			iter := set.Iterator(ctx)
+			iter := set.Iterator()
 			for iter.Next(ctx) {
 				set.Check(iter.Value())
 				set.Check(iter.Value())
 			}
-			iter.Close(ctx)
+			iter.Close()
 		}
 		b.Run("Map", func(b *testing.B) {
 			set := NewUnordered[int]()
