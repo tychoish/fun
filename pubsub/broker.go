@@ -135,7 +135,7 @@ func NewDequeBroker[T any](ctx context.Context, opts BrokerOptions, deque *Deque
 	return b
 }
 
-// NewDequeBroker constructs a broker that uses the queue object to
+// NewLIFOBroker constructs a broker that uses the queue object to
 // buffer incoming requests if subscribers are slow to process
 // requests. The semantics of the Deque depends a bit on the
 // configuration of it's limits and capacity.
