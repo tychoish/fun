@@ -67,6 +67,10 @@ func Variadic[T any](in ...T) fun.Iterator[T] { return Slice(in) }
 // of output iterators, but every item from the input iterator is sent
 // to exactly one output iterator, each of which can be safely used
 // from a different go routine.
+//
+// The input iterator is not closed after the output iterators are
+// exhausted. If the context passed to split is closed, Split will no
+// stop populating the output iterators.
 func Split[T any](ctx context.Context, numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
 	if numSplits <= 0 {
 		return nil
@@ -83,6 +87,9 @@ func Split[T any](ctx context.Context, numSplits int, input fun.Iterator[T]) []f
 	return output
 }
 
+// RangeFunction describes a function that operates similar to the
+// range keyword in the language specification, but that bridges the
+// gap between fun.Iterators and range statements.
 type RangeFunction[T any] func(context.Context, *T) bool
 
 // Range produces a function that can be used like an iterator, but
