@@ -56,9 +56,9 @@ type Service struct {
 	// than doing potentially blocking work.
 	Cleanup func() error
 
-	// Shutdown is optional, but  provides a hook that
+	// Shutdown is optional, but provides a hook that
 	// implementations can be used to trigger a shutdown while a
-	// Service is r
+	// Service is running.
 	Shutdown func() error
 
 	isRunning  atomic.Bool
@@ -66,7 +66,11 @@ type Service struct {
 	doStart    sync.Once
 	cancel     context.CancelFunc
 	ec         erc.Collector
-	sig        chan struct{}
+
+	// the mutex just protects the signal. this is a race in some
+	// tests, but should generally not be an issue.
+	mtx sync.Mutex
+	sig chan struct{}
 }
 
 // use in the group shutdown.
@@ -115,6 +119,10 @@ func Group(services fun.Iterator[*Service]) *Service {
 		// have the same semantics as a single service, however.
 		iter := waiters.Iterator()
 
+		// because we know that the implementation of the
+		// waiters iterator won't block in this context, it's
+		// safe to call it with a background context, though
+		// it's worth being careful here
 		for iter.Next(internalIterContext) {
 			wg.Add(1)
 			go func(wait func() error) {
@@ -176,9 +184,9 @@ func (s *Service) Start(ctx context.Context) error {
 
 	s.doStart.Do(func() {
 		ec := &s.ec
-
 		shutdownSignal := make(chan struct{})
-		s.sig = make(chan struct{})
+
+		s.setSignal()
 		ctx, s.cancel = context.WithCancel(ctx)
 
 		// set running to true here so that close is always safe
@@ -198,13 +206,13 @@ func (s *Service) Start(ctx context.Context) error {
 		}
 
 		go func() {
-			defer close(s.sig)
+			defer s.fireSignal()
 			defer s.isRunning.Store(false)
-			defer s.isFinished.Swap(true)
+			defer s.isFinished.Store(true)
 
 			if s.Cleanup != nil {
-				// this catches a panic during shutdown
 				cleanup := s.Cleanup
+				// this catches a panic during shutdown
 				defer erc.Recover(ec)
 				defer func() { ec.Add(cleanup()) }()
 			}
@@ -241,11 +249,27 @@ func (s *Service) Close() {
 // running the service, the shutdown hook, and any panics encountered
 // during the service's execution.
 func (s *Service) Wait() error {
-	if !s.isRunning.Load() && !s.isFinished.Load() {
+	s.mtx.Lock()
+	if s.sig == nil {
+		s.mtx.Unlock()
 		return ErrServiceNotStarted
 	}
+	s.mtx.Unlock()
 
 	<-s.sig
-
 	return s.ec.Resolve()
+}
+
+func (s *Service) setSignal() {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	s.sig = make(chan struct{})
+}
+
+func (s *Service) fireSignal() {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	close(s.sig)
 }
