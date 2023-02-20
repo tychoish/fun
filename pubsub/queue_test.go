@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun"
 )
 
 func TestQueueNew(t *testing.T) {
@@ -456,4 +458,101 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 
+	t.Run("WaitAdd", func(t *testing.T) {
+		t.Run("ContextCanceled", func(t *testing.T) {
+			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
+
+			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+
+			canceled, trigger := context.WithCancel(context.Background())
+			trigger()
+
+			err := tt.BlockingAdd(canceled, 4)
+			if err == nil {
+				t.Fatal("should be error")
+			}
+			if !errors.Is(err, context.Canceled) {
+				t.Fatal(err)
+			}
+		})
+		t.Run("Closed", func(t *testing.T) {
+			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
+			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+
+			if err := tt.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			err := tt.BlockingAdd(ctx, 4)
+			if err == nil {
+				t.Fatal("should be error")
+			}
+			if !errors.Is(err, ErrQueueClosed) {
+				t.Fatal(err)
+			}
+		})
+		t.Run("RealWait", func(t *testing.T) {
+			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
+			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			start := time.Now()
+			sig := make(chan struct{})
+			var end time.Time
+			go func() {
+				defer close(sig)
+				defer func() { end = time.Now() }()
+				if err := tt.BlockingAdd(ctx, 42); err != nil {
+					t.Error(err)
+				}
+			}()
+			time.Sleep(100 * time.Millisecond)
+			sig2 := make(chan struct{})
+			go func() {
+				defer close(sig2)
+				one, ok := tt.Remove()
+				if !ok {
+					t.Error("should have popped")
+				}
+				if one != 1 {
+					t.Error(one)
+				}
+				one, ok = tt.Remove()
+				if !ok {
+					t.Error("should have popped")
+				}
+				if one != 1 {
+					t.Error(one)
+				}
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+			select {
+			case <-sig2:
+			case <-time.After(10 * time.Millisecond):
+				t.Error("should not have timed out")
+			}
+			select {
+			case <-time.After(10 * time.Millisecond):
+				t.Error("should not have timed out")
+			case <-sig:
+				out, ok := tt.Remove()
+				if !ok {
+					t.Error("should have popped")
+				}
+				if out != 42 {
+					t.Error(out)
+				}
+				if time.Since(end) < 20*time.Millisecond {
+					t.Error(time.Since(end))
+				}
+				if time.Since(start)-time.Since(end) < 100*time.Millisecond {
+					t.Error(time.Since(end) - time.Since(start))
+
+				}
+				return
+			}
+		})
+	})
 }

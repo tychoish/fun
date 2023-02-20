@@ -97,6 +97,10 @@ func (q *Queue[T]) Add(item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	return q.doAdd(item)
+}
+
+func (q *Queue[T]) doAdd(item T) error {
 	if q.closed {
 		return ErrQueueClosed
 	}
@@ -116,6 +120,40 @@ func (q *Queue[T]) Add(item T) error {
 	q.nupdates.Signal()
 
 	return nil
+}
+
+// BlockingAdd attempts to add an item to the queue, as with Add, but
+// if the queue is full, blocks until the queue has capacity, is
+// closed, or the context is canceled. Returns an error if the context
+// is canceled or the queue is closed.
+func (q *Queue[T]) BlockingAdd(ctx context.Context, item T) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if q.closed {
+		return ErrQueueClosed
+	}
+
+	if q.tracker.cap() > q.tracker.len() {
+		return q.doAdd(item)
+	}
+
+	cond := q.nupdates
+
+	// If the context terminates, wake the waiter.
+	ctx, cancel := context.WithCancel(ctx)
+	go func() { <-ctx.Done(); cond.Broadcast() }()
+	defer cancel()
+
+	for q.tracker.cap() <= q.tracker.len() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			cond.Wait()
+		}
+	}
+	return q.doAdd(item)
 }
 
 // Remove removes and returns the frontmost (oldest) item in the queue and
@@ -215,6 +253,7 @@ func (q *Queue[T]) popFront() T {
 	}
 
 	q.tracker.remove()
+	q.nupdates.Broadcast()
 
 	return e.item
 }
