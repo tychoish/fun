@@ -177,6 +177,55 @@ func (dq *Deque[T]) ForcePushBack(it T) error {
 	return dq.addAfter(it, dq.root.prev)
 }
 
+// WaitPushFront performs a blocking add to the deque: if the deque is
+// at capacity, this operation blocks until the deque is closed or
+// there is capacity to add an item. The new item is added to the
+// front of the deque.
+func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
+	defer dq.withLock()()
+
+	return dq.waitPushAfter(ctx, it, func() *element[T] { return dq.root })
+}
+
+// WaitPushBack performs a blocking add to the deque: if the deque is
+// at capacity, this operation blocks until the deque is closed or
+// there is capacity to add an item. The new item is added to the
+// back of the deque.
+func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
+	defer dq.withLock()()
+
+	return dq.waitPushAfter(ctx, it, func() *element[T] { return dq.root.prev })
+}
+
+func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() *element[T]) error {
+	if dq.tracker.cap() > dq.tracker.len() {
+		return dq.addAfter(it, afterGetter())
+	}
+
+	cond := dq.updates
+	// If the context terminates, wake the waiter.
+	ctx, cancel := context.WithCancel(ctx)
+	go func() { <-ctx.Done(); cond.Broadcast() }()
+	defer cancel()
+
+	for dq.tracker.cap() <= dq.tracker.len() {
+		if dq.closed {
+			return ErrQueueClosed
+		}
+		cond.Signal()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			cond.Wait()
+		}
+
+	}
+
+	return dq.addAfter(it, afterGetter())
+}
+
 // IteratorReverse starts at the back of the queue and iterates
 // towards the front. When the iterator reaches the beginning of the queue
 // it ends.

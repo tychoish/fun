@@ -12,6 +12,36 @@ import (
 	"github.com/tychoish/fun/set"
 )
 
+type waitPushCase struct {
+	Name string
+	Push func(context.Context, int) error
+	Pop  func() (int, bool)
+	dq   *Deque[int]
+}
+
+func (tt *waitPushCase) check(t *testing.T) {
+	t.Helper()
+	if tt.dq.Len() != 0 {
+		t.Error(tt.dq.Len())
+	}
+}
+
+func makeWaitPushCases() []*waitPushCase {
+	var cases []*waitPushCase
+
+	front := &waitPushCase{Name: "Front", dq: fun.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
+	front.Push = front.dq.WaitPushFront
+	front.Pop = front.dq.PopBack
+	cases = append(cases, front)
+
+	back := &waitPushCase{Name: "Back", dq: fun.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
+	back.Push = back.dq.WaitPushBack
+	back.Pop = back.dq.PopFront
+	cases = append(cases, back)
+
+	return cases
+}
+
 type fixture[T any] struct {
 	name     string
 	add      func(T) error
@@ -431,6 +461,114 @@ func TestDeque(t *testing.T) {
 		if !ok || val != 9 {
 			t.Error(val)
 		}
+	})
+	t.Run("WaitPush", func(t *testing.T) {
+		t.Run("ContextCanceled", func(t *testing.T) {
+			for _, tt := range makeWaitPushCases() {
+				t.Run(tt.Name, func(t *testing.T) {
+					tt.check(t)
+					fun.Invariant(tt.Push(ctx, 1) == nil)
+					fun.Invariant(tt.Push(ctx, 1) == nil)
+
+					canceled, trigger := context.WithCancel(context.Background())
+					trigger()
+
+					err := tt.Push(canceled, 4)
+					if err == nil {
+						t.Fatal("should be error")
+					}
+					if !errors.Is(err, context.Canceled) {
+						t.Fatal(err)
+					}
+				})
+			}
+		})
+		t.Run("Closed", func(t *testing.T) {
+			for _, tt := range makeWaitPushCases() {
+				t.Run(tt.Name, func(t *testing.T) {
+					tt.check(t)
+					fun.Invariant(tt.Push(ctx, 1) == nil)
+					fun.Invariant(tt.Push(ctx, 1) == nil)
+
+					if err := tt.dq.Close(); err != nil {
+						t.Fatal(err)
+					}
+
+					err := tt.Push(ctx, 4)
+					if err == nil {
+						t.Fatal("should be error")
+					}
+					if !errors.Is(err, ErrQueueClosed) {
+						t.Fatal(err)
+					}
+				})
+			}
+		})
+		t.Run("RealWait", func(t *testing.T) {
+			for _, tt := range makeWaitPushCases() {
+				t.Run(tt.Name, func(t *testing.T) {
+					tt.check(t)
+					fun.Invariant(tt.Push(ctx, 1) == nil)
+					fun.Invariant(tt.Push(ctx, 1) == nil)
+					start := time.Now()
+					sig := make(chan struct{})
+					var end time.Time
+					go func() {
+						defer close(sig)
+						defer func() { end = time.Now() }()
+						if err := tt.Push(ctx, 42); err != nil {
+							t.Error(err)
+						}
+					}()
+					time.Sleep(100 * time.Millisecond)
+					sig2 := make(chan struct{})
+					go func() {
+						defer close(sig2)
+						one, ok := tt.Pop()
+						if !ok {
+							t.Error("should have popped")
+						}
+						if one != 1 {
+							t.Error(one)
+						}
+						one, ok = tt.Pop()
+						if !ok {
+							t.Error("should have popped")
+						}
+						if one != 1 {
+							t.Error(one)
+						}
+					}()
+
+					time.Sleep(100 * time.Millisecond)
+					select {
+					case <-sig2:
+					case <-time.After(10 * time.Millisecond):
+						t.Error("should not have timed out")
+					}
+					select {
+					case <-time.After(10 * time.Millisecond):
+						t.Error("should not have timed out")
+					case <-sig:
+						out, ok := tt.Pop()
+						if !ok {
+							t.Error("should have popped")
+						}
+						if out != 42 {
+							t.Error(out)
+						}
+						if time.Since(end) < 20*time.Millisecond {
+							t.Error(time.Since(end))
+						}
+						if time.Since(start)-time.Since(end) < 100*time.Millisecond {
+							t.Error(time.Since(end) - time.Since(start))
+
+						}
+						return
+					}
+				})
+			}
+		})
 	})
 	t.Run("Empty", func(t *testing.T) {
 		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
