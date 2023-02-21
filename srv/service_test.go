@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -161,7 +162,7 @@ func TestService(t *testing.T) {
 		})
 		t.Run("Run", func(t *testing.T) {
 			s := &Service{
-				Run: func(context.Context) error { panic("whoops"); return nil },
+				Run: func(context.Context) error { panic("whoops") },
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -340,13 +341,19 @@ func TestService(t *testing.T) {
 			s := HTTP("test", time.Millisecond, hs)
 			testCheckOrderingEffects(t, s)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
+			sig := make(chan struct{})
 			go func() {
-				resp, err := http.DefaultClient.Get("http://127.0.0.2:2340/")
+				defer close(sig)
+				resp, err := http.DefaultClient.Do(
+					fun.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
+				)
 				if err != nil {
-					t.Log(resp)
 					t.Error(err)
+				}
+				if err := resp.Body.Close(); err != nil {
+					t.Log(err)
 				}
 			}()
 
@@ -355,6 +362,7 @@ func TestService(t *testing.T) {
 			}
 			time.Sleep(10 * time.Millisecond)
 			s.Close()
+			<-sig
 			if err := s.Wait(); err == nil {
 				t.Fatal("expected no error")
 			}

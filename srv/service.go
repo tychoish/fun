@@ -97,7 +97,7 @@ func Group(services fun.Iterator[*Service]) *Service {
 			go func(s *Service) {
 				defer erc.Recover(&srv.ec)
 				defer wg.Done()
-				defer waiters.PushBack(s.Wait)
+				defer func() { fun.Invariant(waiters.PushBack(s.Wait) == nil) }()
 				srv.ec.Add(s.Start(ctx))
 			}(services.Value())
 		}

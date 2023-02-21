@@ -29,13 +29,15 @@ func TestOrchestrator(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
 			for i := 0; i < 100; i++ {
-				orc.Add(&Service{
+				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
 					Run: func(ctx context.Context) error {
 						counter.Add(1)
 						return nil
 					},
-				})
+				}); err != nil {
+					t.Error(err)
+				}
 			}
 			if counter.Load() != 0 {
 				t.Error(counter.Load())
@@ -50,7 +52,9 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("NilServices", func(t *testing.T) {
 			orc := &Orchestrator{}
 			for i := 0; i < 100; i++ {
-				orc.Add(nil)
+				if err := orc.Add(nil); err != nil {
+					t.Error(err)
+				}
 			}
 			if orc.pipe == nil {
 				t.Error("pipe should be created")
@@ -94,14 +98,16 @@ func TestOrchestrator(t *testing.T) {
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
-				orc.Add(&Service{
+				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
 					Run: func(ctx context.Context) error {
 						counter.Add(1)
 						wg.Done()
 						return nil
 					},
-				})
+				}); err != nil {
+					t.Error(err)
+				}
 			}
 			s := orc.Service()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -124,7 +130,9 @@ func TestOrchestrator(t *testing.T) {
 				if orc.pipe.Len() != 100 {
 					t.Error(orc.pipe.Len())
 				}
-				orc.Add(nil)
+				if err := orc.Add(nil); err != nil {
+					t.Error(err)
+				}
 				if orc.pipe.Len() != 0 {
 					t.Error(orc.pipe.Len())
 				}
@@ -142,13 +150,15 @@ func TestOrchestrator(t *testing.T) {
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
-				orc.Add(&Service{
+				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
 					Run: func(ctx context.Context) error {
 						defer wg.Done()
 						return errors.New("42")
 					},
-				})
+				}); err != nil {
+					t.Error(err)
+				}
 			}
 			s := orc.Service()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -176,8 +186,12 @@ func TestOrchestrator(t *testing.T) {
 			defer cancel()
 			for i := 0; i < 100; i++ {
 				s := makeBlockingService(t)
-				s.Start(ctx)
-				orc.Add(s)
+				if err := s.Start(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err := orc.Add(s); err != nil {
+					t.Fatal(err)
+				}
 			}
 			startAt := time.Now()
 			s := orc.Service()
@@ -210,7 +224,9 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			for i := 0; i < 100; i++ {
-				orc.Add(s)
+				if err := orc.Add(s); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if !osrv.Running() {
 				t.Error("should still be running")
@@ -243,7 +259,9 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			for i := 0; i < 100; i++ {
-				orc.Add(&Service{Name: fmt.Sprint(i)})
+				if err := orc.Add(&Service{Name: fmt.Sprint(i)}); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			time.Sleep(5 * time.Millisecond)
@@ -264,7 +282,9 @@ func TestOrchestrator(t *testing.T) {
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
-				orc.Add(makeBlockingService(t))
+				if err := orc.Add(makeBlockingService(t)); err != nil {
+					t.Error(err)
+				}
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 			defer cancel()
