@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -113,6 +114,29 @@ func TestPanics(t *testing.T) {
 				t.Error("invariant violation detection")
 			}
 		})
+		t.Run("Error", func(t *testing.T) {
+			err := errors.New("kip")
+			se := Check(func() { Invariant(false, err) })
+			if !errors.Is(se, err) {
+				t.Fatal(err, se)
+			}
+		})
+		t.Run("ErrorPlus", func(t *testing.T) {
+			err := errors.New("kip")
+			se := Check(func() { Invariant(false, err, 42) })
+			if !errors.Is(se, err) {
+				t.Fatal(err, se)
+			}
+			if !strings.Contains(se.Error(), "42") {
+				t.Error(err)
+			}
+		})
+		t.Run("NoError", func(t *testing.T) {
+			err := Check(func() { Invariant(false, 42) })
+			if !strings.Contains(err.Error(), "42") {
+				t.Error(err)
+			}
+		})
 		t.Run("WithoutArgs", func(t *testing.T) {
 			err := Check(func() { Invariant(1 == 2) })
 			if errors.Unwrap(err) != ErrInvariantViolation {
@@ -146,6 +170,103 @@ func TestPanics(t *testing.T) {
 			}
 
 		})
-
+	})
+	t.Run("MergedError", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
+			e := &errorTest{}
+			err := &doubleWrappedError{}
+			if errors.As(err, &e) {
+				t.Fatal("should not validate")
+			}
+		})
+		t.Run("Current", func(t *testing.T) {
+			e := &errorTest{}
+			err := &doubleWrappedError{
+				current: &errorTest{val: 100},
+			}
+			if !errors.As(err, &e) {
+				t.Fatal("should not validate")
+			}
+			if e.val != 100 {
+				t.Fatal(e)
+			}
+		})
+		t.Run("Wrapped", func(t *testing.T) {
+			e := &errorTest{}
+			err := &doubleWrappedError{
+				wrapped: &errorTest{val: 100},
+			}
+			if !errors.As(err, &e) {
+				t.Fatal("should not validate")
+			}
+			if e.val != 100 {
+				t.Fatal(e)
+			}
+		})
+		t.Run("WrappedAndCurrent", func(t *testing.T) {
+			e := &errorTest{}
+			err := &doubleWrappedError{
+				wrapped: &errorTest{val: 1000},
+				current: &errorTest{val: 9000},
+			}
+			if !errors.As(err, &e) {
+				t.Fatal("should not validate")
+			}
+			if e.val != 9000 {
+				t.Fatal(e)
+			}
+		})
+	})
+	t.Run("InvariantMust", func(t *testing.T) {
+		t.Run("Nil", func(t *testing.T) {
+			err := Check(func() { InvariantMust(nil, "hello") })
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+		t.Run("Expected", func(t *testing.T) {
+			root := errors.New("kip")
+			err := Check(func() { InvariantMust(root, "hello") })
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	})
+	t.Run("InvariantCheck", func(t *testing.T) {
+		t.Run("Propogate", func(t *testing.T) {
+			root := errors.New("kip")
+			err := Check(func() {
+				InvariantCheck(func() error { return root }, "annotate")
+			})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !errors.Is(err, ErrInvariantViolation) {
+				t.Error(err)
+			}
+			if !errors.Is(err, root) {
+				t.Error(err)
+			}
+			if !strings.Contains(err.Error(), "panic:") {
+				t.Error(err)
+			}
+			if !strings.Contains(err.Error(), "annotate") {
+				t.Error(err)
+			}
+		})
+		t.Run("Nil", func(t *testing.T) {
+			err := Check(func() {
+				InvariantCheck(func() error { return nil }, "annotate")
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	})
 }
+
+type errorTest struct {
+	val int
+}
+
+func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }

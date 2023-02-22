@@ -51,7 +51,12 @@ func Safe[T any](ec *Collector, fn func() T) T {
 // statements.
 func Recover(ec *Collector) {
 	if r := recover(); r != nil {
-		ec.Add(fmt.Errorf("panic: %v", r))
+		switch err := r.(type) {
+		case error:
+			ec.Add(fmt.Errorf("panic: %w", err))
+		default:
+			ec.Add(fmt.Errorf("panic: %v", err))
+		}
 	}
 }
 
@@ -60,7 +65,13 @@ func Recover(ec *Collector) {
 // this function is a noop. Run RecoverHook in defer statements.
 func RecoverHook(ec *Collector, hook func()) {
 	if r := recover(); r != nil {
-		ec.Add(fmt.Errorf("panic: %v", r))
+		switch err := r.(type) {
+		case error:
+			ec.Add(fmt.Errorf("panic: %w", err))
+		default:
+			ec.Add(fmt.Errorf("panic: %v", err))
+		}
+
 		if hook != nil {
 			hook()
 		}

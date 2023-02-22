@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -141,10 +142,19 @@ func Group(services fun.Iterator[*Service]) *Service {
 // HTTP wraps an http.Server object in a Service, both for common use
 // and convenience, and as an example for implementing arbitrary
 // services.
+//
+// If the http.Server's BaseContext method is not set, it is
+// overridden with a function that provides a copy of the context
+// passed to the service's Start method: this ensures that requests
+// have access to the same underlying context as the service.
 func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service {
 	return &Service{
 		Name: name,
 		Run: func(ctx context.Context) error {
+			if hs.BaseContext == nil {
+				hs.BaseContext = func(net.Listener) context.Context { return ctx }
+			}
+
 			if err := hs.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 				return err
 			}

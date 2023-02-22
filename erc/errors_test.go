@@ -153,6 +153,27 @@ func TestError(t *testing.T) {
 				t.Error(e)
 			}
 		})
+
+		t.Run("PanicRecoveryWithError", func(t *testing.T) {
+			es := &Collector{}
+			sig := make(chan struct{})
+			err := errors.New("kip")
+			go func() {
+				defer close(sig)
+				defer Recover(es)
+				panic(err)
+			}()
+			<-sig
+			if errr := es.Resolve(); errr == nil {
+				t.Error("no panic recovered")
+			}
+			if e := es.stack.Error(); e != "panic: kip" {
+				t.Error(e)
+			}
+			if !errors.Is(es.Resolve(), err) {
+				t.Error(es.Resolve(), "error not propogated")
+			}
+		})
 		t.Run("PanicRecoveryCallback", func(t *testing.T) {
 			es := &Collector{}
 			sig := make(chan struct{})
@@ -171,7 +192,30 @@ func TestError(t *testing.T) {
 			}
 			if counter != 1 {
 				t.Error("callback not called")
-
+			}
+		})
+		t.Run("PanicRecoveryCallback", func(t *testing.T) {
+			es := &Collector{}
+			sig := make(chan struct{})
+			counter := 0
+			err := errors.New("kip")
+			go func() {
+				defer close(sig)
+				defer RecoverHook(es, func() { counter++ })
+				panic(err)
+			}()
+			<-sig
+			if err := es.Resolve(); err == nil {
+				t.Error("no panic recovered")
+			}
+			if e := es.stack.Error(); e != "panic: kip" {
+				t.Error(e)
+			}
+			if counter != 1 {
+				t.Error("callback not called")
+			}
+			if !errors.Is(es.Resolve(), err) {
+				t.Error(es.Resolve(), "error not propogated")
 			}
 		})
 		t.Run("Iterator", func(t *testing.T) {
