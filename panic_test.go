@@ -176,14 +176,14 @@ func TestPanics(t *testing.T) {
 	t.Run("MergedError", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			e := &errorTest{}
-			err := &internal.DoubleWrappedError{}
+			err := &internal.MergedError{}
 			if errors.As(err, &e) {
 				t.Fatal("should not validate")
 			}
 		})
 		t.Run("Current", func(t *testing.T) {
 			e := &errorTest{}
-			err := &internal.DoubleWrappedError{
+			err := &internal.MergedError{
 				Current: &errorTest{val: 100},
 			}
 			if !errors.As(err, &e) {
@@ -195,7 +195,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Wrapped", func(t *testing.T) {
 			e := &errorTest{}
-			err := &internal.DoubleWrappedError{
+			err := &internal.MergedError{
 				Wrapped: &errorTest{val: 100},
 			}
 			if !errors.As(err, &e) {
@@ -207,7 +207,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("WrappedAndCurrent", func(t *testing.T) {
 			e := &errorTest{}
-			err := &internal.DoubleWrappedError{
+			err := &internal.MergedError{
 				Wrapped: &errorTest{val: 1000},
 				Current: &errorTest{val: 9000},
 			}
