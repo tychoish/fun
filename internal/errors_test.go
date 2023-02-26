@@ -17,7 +17,7 @@ func TestMerge(t *testing.T) {
 	e1 := &errorTest{val: 100}
 	e2 := &errorTest{val: 200}
 
-	err := &DoubleWrappedError{Current: e1, Wrapped: e2}
+	err := &MergedError{Current: e1, Wrapped: e2}
 
 	if !errors.Is(err, e1) {
 		t.Error("shold be er1", err, e1)

@@ -127,7 +127,7 @@ func Unwind(err error) []error {
 //
 // If both errors are of the same root type and you investigate the
 // output error with errors.As, the first error's value will be used.
-func Merge(err1, err2 error) error { return &internal.DoubleWrappedError{Current: err1, Wrapped: err2} }
+func Merge(err1, err2 error) error { return &internal.MergedError{Current: err1, Wrapped: err2} }
 
 // Collapse takes a slice of errors and converts it into an *erc.Stack
 // typed error.

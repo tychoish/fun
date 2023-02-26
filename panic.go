@@ -22,17 +22,17 @@ func Invariant(cond bool, args ...any) {
 		case 1:
 			switch ei := args[0].(type) {
 			case error:
-				panic(&internal.DoubleWrappedError{Current: ei, Wrapped: ErrInvariantViolation})
+				panic(&internal.MergedError{Current: ei, Wrapped: ErrInvariantViolation})
 			case string:
-				panic(&internal.DoubleWrappedError{Current: errors.New(ei), Wrapped: ErrInvariantViolation})
+				panic(&internal.MergedError{Current: errors.New(ei), Wrapped: ErrInvariantViolation})
 			default:
 				panic(fmt.Errorf("[%v]: %w", args[0], ErrInvariantViolation))
 			}
 		default:
 			if err, ok := args[0].(error); ok {
-				panic(&internal.DoubleWrappedError{
+				panic(&internal.MergedError{
 					Current: fmt.Errorf("[%s]", args[1:]),
-					Wrapped: &internal.DoubleWrappedError{Current: err, Wrapped: ErrInvariantViolation},
+					Wrapped: &internal.MergedError{Current: err, Wrapped: ErrInvariantViolation},
 				})
 			}
 			panic(fmt.Errorf("[%s]: %w", fmt.Sprintln(args...), ErrInvariantViolation))
@@ -48,7 +48,7 @@ func InvariantMust(err error, args ...any) {
 		return
 	}
 
-	panic(&internal.DoubleWrappedError{
+	panic(&internal.MergedError{
 		Current: fmt.Errorf("%s: %w", fmt.Sprint(args...), err),
 		Wrapped: ErrInvariantViolation,
 	})
