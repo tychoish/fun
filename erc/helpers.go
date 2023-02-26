@@ -178,10 +178,9 @@ func StreamInto(ctx context.Context, ec *Collector, errCh <-chan error) {
 		case <-ctx.Done():
 			return
 		case err, ok := <-errCh:
-			if !ok {
+			if !ok || ctx.Err() != nil {
 				return
 			}
-
 			ec.Add(err)
 		}
 	}

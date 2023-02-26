@@ -66,7 +66,9 @@ type MapIterImpl[T any] struct {
 }
 
 func (iter *MapIterImpl[T]) Close() error {
-	iter.Closer()
+	if iter.Closer != nil {
+		iter.Closer()
+	}
 	iter.WG.Wait()
-	return iter.ChannelIterImpl.Close()
+	return iter.Error
 }
