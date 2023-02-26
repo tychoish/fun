@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/tychoish/fun/internal"
 )
 
 // ErrInvariantViolation is the root error of the error object that is
@@ -20,35 +22,23 @@ func Invariant(cond bool, args ...any) {
 		case 1:
 			switch ei := args[0].(type) {
 			case error:
-				panic(&doubleWrappedError{current: ei, wrapped: ErrInvariantViolation})
+				panic(&internal.DoubleWrappedError{Current: ei, Wrapped: ErrInvariantViolation})
 			case string:
-				panic(&doubleWrappedError{current: errors.New(ei), wrapped: ErrInvariantViolation})
+				panic(&internal.DoubleWrappedError{Current: errors.New(ei), Wrapped: ErrInvariantViolation})
 			default:
 				panic(fmt.Errorf("[%v]: %w", args[0], ErrInvariantViolation))
 			}
 		default:
 			if err, ok := args[0].(error); ok {
-				panic(&doubleWrappedError{
-					current: fmt.Errorf("[%s]", args[1:]),
-					wrapped: &doubleWrappedError{current: err, wrapped: ErrInvariantViolation},
+				panic(&internal.DoubleWrappedError{
+					Current: fmt.Errorf("[%s]", args[1:]),
+					Wrapped: &internal.DoubleWrappedError{Current: err, Wrapped: ErrInvariantViolation},
 				})
 			}
 			panic(fmt.Errorf("[%s]: %w", fmt.Sprintln(args...), ErrInvariantViolation))
 		}
 	}
 }
-
-type doubleWrappedError struct {
-	current error
-	wrapped error
-}
-
-var _ error = &doubleWrappedError{}
-
-func (dwe *doubleWrappedError) Error() string        { return fmt.Sprintf("%v: %v", dwe.current, dwe.wrapped) }
-func (dwe *doubleWrappedError) Is(target error) bool { return errors.Is(dwe.current, target) }
-func (dwe *doubleWrappedError) As(target any) bool   { return errors.As(dwe.current, target) }
-func (dwe *doubleWrappedError) Unwrap() error        { return dwe.wrapped }
 
 // InvariantMust raises an invariant error if the error is not
 // nil. The content of the panic is both--via wrapping--an
@@ -58,9 +48,9 @@ func InvariantMust(err error, args ...any) {
 		return
 	}
 
-	panic(&doubleWrappedError{
-		current: fmt.Errorf("%s: %w", fmt.Sprint(args...), err),
-		wrapped: ErrInvariantViolation,
+	panic(&internal.DoubleWrappedError{
+		Current: fmt.Errorf("%s: %w", fmt.Sprint(args...), err),
+		Wrapped: ErrInvariantViolation,
 	})
 }
 

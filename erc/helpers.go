@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
+	"github.com/tychoish/fun/internal"
 )
 
 // ContextExpired checks an error to see if it, or any of it's parent
@@ -116,4 +119,82 @@ func Unwind(err error) []error {
 	}
 
 	return out
+}
+
+// Merge produces a single error from two input errors. The output
+// error behaves correctly for errors.Is and errors.As and Unwrap()
+// calls, for both errors, checked in order.
+//
+// If both errors are of the same root type and you investigate the
+// output error with errors.As, the first error's value will be used.
+func Merge(err1, err2 error) error { return &internal.DoubleWrappedError{Current: err1, Wrapped: err2} }
+
+// Collapse takes a slice of errors and converts it into an *erc.Stack
+// typed error.
+func Collapse(errs ...error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+
+	ec := &Collector{}
+
+	CollapseFrom(ec, errs)
+
+	return ec.Resolve()
+}
+
+// CollapseInto is a helper that has the same semantics and calling
+// pattern as Collapse, but collapses those errors into the provided
+// Collector.
+func CollapseInto(ec *Collector, errs ...error) { CollapseFrom(ec, errs) }
+
+// CollapseFrom is a helper that adds a slice of errors to the
+// provided Collector.
+func CollapseFrom(ec *Collector, errs []error) {
+	for idx := range errs {
+		ec.Add(errs[idx])
+	}
+}
+
+// Stream collects all errors from an error channel, and returns the
+// aggregated error. Stream blocks until the context expires (but
+// does not add a context cancellation error) or the error channel is
+// closed.
+func Stream(ctx context.Context, errCh <-chan error) error {
+	ec := &Collector{}
+
+	StreamInto(ctx, ec, errCh)
+
+	return ec.Resolve()
+}
+
+// StreamInto collects all errors from an error channel and adds them
+// to the provided collector. StreamInto blocks until the context
+// expires (but does not add a context cancellation error) or the
+// error channel is closed.
+func StreamInto(ctx context.Context, ec *Collector, errCh <-chan error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err, ok := <-errCh:
+			if !ok || ctx.Err() != nil {
+				return
+			}
+			ec.Add(err)
+		}
+	}
+}
+
+// StreamProcess is a non-blocking helper that starts a background
+// goroutine to process the contents of an error channel, and uses the
+// provided wait group to account for the lifecycle of the goroutine.
+func StreamProcess(ctx context.Context, wg *sync.WaitGroup, ec *Collector, errCh <-chan error) {
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		defer Recover(ec)
+		StreamInto(ctx, ec, errCh)
+	}()
 }

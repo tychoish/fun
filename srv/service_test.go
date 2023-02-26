@@ -316,7 +316,7 @@ func TestService(t *testing.T) {
 			hs2 := &http.Server{
 				Addr: "127.0.0.2:2340",
 			}
-			s2 := HTTP("test", time.Millisecond, hs2)
+			s2 := HTTP("test", 2*time.Millisecond, hs2)
 			if err := s2.Start(ctx); err != nil {
 				t.Error(err)
 			}

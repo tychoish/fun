@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/tychoish/fun/internal"
 )
 
 func TestPanics(t *testing.T) {
@@ -174,15 +176,15 @@ func TestPanics(t *testing.T) {
 	t.Run("MergedError", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			e := &errorTest{}
-			err := &doubleWrappedError{}
+			err := &internal.DoubleWrappedError{}
 			if errors.As(err, &e) {
 				t.Fatal("should not validate")
 			}
 		})
 		t.Run("Current", func(t *testing.T) {
 			e := &errorTest{}
-			err := &doubleWrappedError{
-				current: &errorTest{val: 100},
+			err := &internal.DoubleWrappedError{
+				Current: &errorTest{val: 100},
 			}
 			if !errors.As(err, &e) {
 				t.Fatal("should not validate")
@@ -193,8 +195,8 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Wrapped", func(t *testing.T) {
 			e := &errorTest{}
-			err := &doubleWrappedError{
-				wrapped: &errorTest{val: 100},
+			err := &internal.DoubleWrappedError{
+				Wrapped: &errorTest{val: 100},
 			}
 			if !errors.As(err, &e) {
 				t.Fatal("should not validate")
@@ -205,9 +207,9 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("WrappedAndCurrent", func(t *testing.T) {
 			e := &errorTest{}
-			err := &doubleWrappedError{
-				wrapped: &errorTest{val: 1000},
-				current: &errorTest{val: 9000},
+			err := &internal.DoubleWrappedError{
+				Wrapped: &errorTest{val: 1000},
+				Current: &errorTest{val: 9000},
 			}
 			if !errors.As(err, &e) {
 				t.Fatal("should not validate")
