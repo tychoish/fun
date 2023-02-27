@@ -445,12 +445,10 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 			})
 			if fix.NonBlocking {
 				t.Run("NonBlocking", func(t *testing.T) {
-					t.Skip()
 					elems := elems
 					opts := fix
 
 					t.Parallel()
-
 					ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 					defer cancel()
 
@@ -467,7 +465,6 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 						for range ch1 {
 							count.Add(1)
 							if int(count.Load()) == len(elems) {
-								t.Log("foo")
 								return
 							}
 						}
@@ -481,7 +478,6 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 								broker.Publish(ctx, elems[idx])
 
 								if int(count.Load()) == len(elems) {
-									t.Log("here")
 									return
 								}
 							}

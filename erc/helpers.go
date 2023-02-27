@@ -105,17 +105,20 @@ func Unwind(err error) []error {
 	}
 
 	out := []error{}
-	if es, ok := err.(*Stack); ok {
-		iter := es.Iterator()
+	switch e := err.(type) {
+	case *Stack:
+		iter := e.Iterator()
 		for iter.Next(internalIterContext) {
 			out = append(out, iter.Value())
 		}
-		return out
-	}
-
-	out = append(out, err)
-	for e := errors.Unwrap(err); e != nil; e = errors.Unwrap(e) {
-		out = append(out, e)
+	default:
+		out = append(out, err)
+		for e := errors.Unwrap(err); e != nil; e = errors.Unwrap(e) {
+			// the first error might not be unwrappable
+			if e != nil {
+				out = append(out, e)
+			}
+		}
 	}
 
 	return out

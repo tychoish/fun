@@ -232,7 +232,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should still be running")
 			}
 
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			osrv.Close()
 			err := osrv.Wait()
@@ -244,8 +244,7 @@ func TestOrchestrator(t *testing.T) {
 			}
 			errs := erc.Unwind(err)
 			if len(errs) != 100 {
-				t.Log(errs)
-				t.Error(len(errs))
+				t.Error(len(errs), " != 100")
 			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
