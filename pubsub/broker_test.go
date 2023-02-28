@@ -136,9 +136,9 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewQueueBroker[T](ctx, BrokerOptions{
+				return NewQueueBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -152,10 +152,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewQueueBroker[T](ctx, BrokerOptions{
+				return NewQueueBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 					WorkerPoolSize:   2,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -169,10 +169,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewQueueBroker[T](ctx, BrokerOptions{
+				return NewQueueBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
 					WorkerPoolSize:   2,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -186,10 +186,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewQueueBroker[T](ctx, BrokerOptions{
+				return NewQueueBroker[T](ctx, queue, BrokerOptions{
 					WorkerPoolSize:   8,
 					ParallelDispatch: false,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -203,10 +203,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewQueueBroker[T](ctx, BrokerOptions{
+				return NewQueueBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
 					WorkerPoolSize:   8,
-				}, queue)
+				})
 			},
 		},
 		// deque cases
@@ -223,9 +223,9 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewDequeBroker[T](ctx, BrokerOptions{
+				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -241,10 +241,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewDequeBroker[T](ctx, BrokerOptions{
+				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 					WorkerPoolSize:   2,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -260,10 +260,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewDequeBroker[T](ctx, BrokerOptions{
+				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
 					WorkerPoolSize:   2,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -279,10 +279,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewDequeBroker[T](ctx, BrokerOptions{
+				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 					WorkerPoolSize:   8,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -298,10 +298,10 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewDequeBroker[T](ctx, BrokerOptions{
+				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
 					WorkerPoolSize:   8,
-				}, queue)
+				})
 			},
 		},
 		{
@@ -582,7 +582,7 @@ func TestBroker(t *testing.T) {
 	t.Run("ClosedQueue", func(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 		fun.Invariant(queue.Close() == nil, "cannot error")
-		broker := NewQueueBroker(ctx, BrokerOptions{}, queue)
+		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
 		sa := time.Now()
 		nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -597,7 +597,7 @@ func TestBroker(t *testing.T) {
 	t.Run("ClosedQueue", func(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 		fun.Invariant(queue.Close() == nil, "cannot error")
-		broker := NewQueueBroker(ctx, BrokerOptions{}, queue)
+		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
 		sa := time.Now()
 		nctx, ncancel := context.WithTimeout(context.Background(), 20*time.Millisecond)

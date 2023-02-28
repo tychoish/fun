@@ -80,7 +80,7 @@ func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
 // the worker pool used to send messages to senders and if the Broker
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
-func NewQueueBroker[T any](ctx context.Context, opts BrokerOptions, queue *Queue[T]) *Broker[T] {
+func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
 	opts.BufferSize = 0
 	return MakeDistributorBroker(ctx, DistributorQueue(queue), opts)
 }
@@ -107,7 +107,7 @@ func MakeDistributorBroker[T any](ctx context.Context, dist *Distributor[T], opt
 // the worker pool used to send messages to senders and if the Broker
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
-func NewDequeBroker[T any](ctx context.Context, opts BrokerOptions, deque *Deque[T]) *Broker[T] {
+func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
 	opts.BufferSize = 0
 	return MakeDistributorBroker(ctx, DistributorDeque(deque), opts)
 }
@@ -153,7 +153,7 @@ func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
 	dist *Distributor[T],
 ) {
-	subs := set.Synchronize(set.MakeNewOrdered[chan T]())
+	subs := set.Synchronize(set.NewUnordered[chan T]())
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
@@ -182,7 +182,6 @@ func (b *Broker[T]) startQueueWorkers(
 					}
 				}
 			}
-
 		}
 	}()
 
