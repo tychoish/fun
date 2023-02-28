@@ -22,6 +22,21 @@ type WaitFunc func(context.Context)
 // expire. Use with extreme caution.
 func (wf WaitFunc) Block() { wf(internal.BackgroundContext) }
 
+// WaitBlocking is a convenience function to use simple blocking
+// functions into WaitFunc objects. Because these WaitFunc functions
+// do not resepct the WaitFunc context, use with care and caution.
+func WaitBlocking(fn func()) WaitFunc { return func(context.Context) { fn() } }
+
+// WaitBlockingObserve is a convenience function that creates a
+// WaitFunc that wraps a simple function that returns a single value,
+// and observes that output with the observer function.
+//
+// Because these WaitFunc functions do not resepct the WaitFunc
+// context, use with care and caution.
+func WaitBlockingObserve[T any](observe func(T), wait func() T) WaitFunc {
+	return func(context.Context) { observe(wait()) }
+}
+
 // WaitGroup converts a WaitGroup into a fun.WaitFunc.
 //
 // This operation will leak a go routine if the WaitGroup

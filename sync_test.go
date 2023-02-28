@@ -128,5 +128,39 @@ func TestWait(t *testing.T) {
 			t.Error(time.Since(start))
 		}
 	})
+	t.Run("Blocking", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			start := time.Now()
+			WaitBlocking(func() { time.Sleep(10 * time.Millisecond) }).Block()
+			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Second {
+				t.Error(time.Since(start))
+			}
+		})
+		t.Run("Context", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			start := time.Now()
+			WaitBlocking(func() { time.Sleep(10 * time.Millisecond) })(ctx)
+			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Second {
+				t.Error(time.Since(start))
+			}
+		})
+		t.Run("Observe", func(t *testing.T) {
+			var seen int
+			start := time.Now()
+			WaitBlockingObserve(
+				func(in int) { seen = in },
+				func() int { time.Sleep(10 * time.Millisecond); return 42 },
+			).Block()
+
+			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Second {
+				t.Error(time.Since(start))
+			}
+			if seen != 42 {
+				t.Error(seen)
+			}
+		})
+	})
 
 }
