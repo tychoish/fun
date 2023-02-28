@@ -67,6 +67,14 @@ func (or *Orchestrator) Add(s *Service) error {
 	return or.pipe.PushBack(s)
 }
 
+// Start is a convenience function that run's the service's start
+// function.
+func (or *Orchestrator) Start(ctx context.Context) error { return or.Service().Start(ctx) }
+
+// Wait is a convenience function that blocks until the Orchestrator's
+// service completes.
+func (or *Orchestrator) Wait() error { return or.Service().Wait() }
+
 // Service returns a service that runs all of the constituent services
 // of the orchestrator. The service must be started by the
 // caller.
