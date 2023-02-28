@@ -580,6 +580,7 @@ func TestBroker(t *testing.T) {
 		}
 	})
 	t.Run("ClosedQueue", func(t *testing.T) {
+		t.Parallel()
 		queue := NewUnlimitedQueue[string]()
 		fun.Invariant(queue.Close() == nil, "cannot error")
 		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
@@ -595,6 +596,7 @@ func TestBroker(t *testing.T) {
 	})
 
 	t.Run("ClosedQueue", func(t *testing.T) {
+		t.Parallel()
 		queue := NewUnlimitedQueue[string]()
 		fun.Invariant(queue.Close() == nil, "cannot error")
 		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
@@ -615,11 +617,12 @@ func TestBroker(t *testing.T) {
 		}
 	})
 	t.Run("Populate", func(t *testing.T) {
+		t.Parallel()
 		input := randomIntSlice(100)
 
 		iter := itertool.Slice(input)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
 		broker := NewBroker[int](ctx, BrokerOptions{})

@@ -85,7 +85,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 	return MakeDistributorBroker(ctx, DistributorQueue(queue), opts)
 }
 
-func MakeDistributorBroker[T any](ctx context.Context, dist *Distributor[T], opts BrokerOptions) *Broker[T] {
+func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts BrokerOptions) *Broker[T] {
 	b := makeBroker[T](opts)
 
 	ctx, b.close = context.WithCancel(ctx)
@@ -151,9 +151,9 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 
 func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
-	dist *Distributor[T],
+	dist Distributor[T],
 ) {
-	subs := set.Synchronize(set.NewUnordered[chan T]())
+	subs := set.Synchronize(set.NewOrdered[chan T]())
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
@@ -232,7 +232,6 @@ func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T) {
 	case <-ctx.Done():
 	case ch <- m:
 	}
-
 }
 
 // Stop cancels the broker, allowing background work to stop.

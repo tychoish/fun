@@ -9,15 +9,30 @@ import (
 	"github.com/tychoish/fun/erc"
 )
 
-type Distributor[T any] struct {
+// Distributor provides a layer of indirection above queue-like
+// implementations (e.g. Queue, Deque and channels) for buffering and
+// queuing objects for use by higher level pubsub mechanisms like the
+// Broker.
+//
+// Implementations should provide Push/Pop operations that are
+// blocking and wait for the underlying structure to be "closed", the
+// context to be canceled, or have capacity (Push), or new objects
+// (Pop). These operations *should* mutate the underlying data
+// structure or service.
+type Distributor[T any] interface {
+	Push(context.Context, T) error
+	Pop(context.Context) (T, error)
+}
+
+type distributorImpl[T any] struct {
 	pushImpl func(context.Context, T) error
 	popImpl  func(context.Context) (T, error)
 }
 
-func (d *Distributor[T]) Push(ctx context.Context, in T) error {
+func (d *distributorImpl[T]) Push(ctx context.Context, in T) error {
 	return d.pushImpl(ctx, in)
 }
-func (d *Distributor[T]) Pop(ctx context.Context) (T, error) {
+func (d *distributorImpl[T]) Pop(ctx context.Context) (T, error) {
 	return d.popImpl(ctx)
 }
 
@@ -25,22 +40,33 @@ func ignorePopContext[T any](in func(T) error) func(context.Context, T) error {
 	return func(_ context.Context, obj T) error { return in(obj) }
 }
 
-func DistributorLIFO[T any](d *Deque[T]) *Distributor[T] {
-	return &Distributor[T]{
+// DistributorLIFO produces a Deque-based Distributor that, when the
+// user attempts to Push onto a full Deque, it will remove the first
+// element in the list, while all Pop operations are also to the front
+// of the Deque.
+func DistributorLIFO[T any](d *Deque[T]) Distributor[T] {
+	return &distributorImpl[T]{
 		pushImpl: ignorePopContext(d.ForcePushFront),
 		popImpl:  d.WaitFront,
 	}
 }
 
-func DistributorDeque[T any](d *Deque[T]) *Distributor[T] {
-	return &Distributor[T]{
+// DistributorDeque produces a Distributor that always accepts new
+// Push operations by removing the oldest element in the queue, with
+// Pop operations returning the oldest elements first (FIFO).
+func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
+	return &distributorImpl[T]{
 		pushImpl: ignorePopContext(d.ForcePushBack),
 		popImpl:  d.WaitFront,
 	}
 }
 
-func DistributorQueue[T any](q *Queue[T]) *Distributor[T] {
-	return &Distributor[T]{
+// DistributorQueue uses a Queue implementation for FIFO distribution
+// of items. If the queue is at capacity, push operations will return
+// ErrQueueFull errors, effectively allowing the user of the
+// distributor to drop new messages before they enter the queue..
+func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
+	return &distributorImpl[T]{
 		pushImpl: ignorePopContext(q.Add),
 		popImpl: func(ctx context.Context) (T, error) {
 			msg, ok := q.Remove()
@@ -52,30 +78,36 @@ func DistributorQueue[T any](q *Queue[T]) *Distributor[T] {
 	}
 }
 
-func DistributorBuffer[T any](d *Deque[T]) *Distributor[T] {
-	return &Distributor[T]{
+// DistributorBuffer produces a Distributor with FIFO semantics and
+// blocking Push/Pop operations when the Queue is at capacity. This
+// should have similar semantics as a channel, but callers may
+// (carefully) interact with the Deque structure while it's in use.
+func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
+	return &distributorImpl[T]{
 		pushImpl: d.WaitPushBack,
 		popImpl:  d.WaitFront,
 	}
 }
 
-func DistributorChannel[T any](ch chan T) *Distributor[T] {
+// DistributorChannel provides a bridge between channels and
+// distributors, and has expected FIFO semantics with blocking reads
+// and writes.
+func DistributorChannel[T any](ch chan T) Distributor[T] {
 	ec := &erc.Collector{}
-	return &Distributor[T]{
-		pushImpl: func(ctx context.Context, in T) error {
+	return &distributorImpl[T]{
+		pushImpl: func(ctx context.Context, in T) (err error) {
 			// this only happens if we've already paniced
 			// so we shouldn't get too many errors.
 			if ec.HasErrors() {
 				return ec.Resolve()
 			}
-
 			defer erc.Recover(ec)
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				ec.Add(ctx.Err())
 			case ch <- in:
-				return ec.Resolve()
 			}
+			return ec.Resolve()
 		},
 		popImpl: func(ctx context.Context) (T, error) {
 			val, err := fun.ReadOne(ctx, ch)
@@ -85,4 +117,42 @@ func DistributorChannel[T any](ch chan T) *Distributor[T] {
 			return val, err
 		},
 	}
+}
+
+// DistributorIterator allows iterator-like access to a
+// distributor. These iterators are blocking and destructive. The
+// iterator's close method does *not* close the distributor's
+// underlying structure.
+func DistributorIterator[T any](dist Distributor[T]) fun.Iterator[T] {
+	return &distIter[T]{dist: dist}
+}
+
+type distIter[T any] struct {
+	dist   Distributor[T]
+	closed bool
+	value  T
+}
+
+func (d *distIter[T]) Close() error {
+	if !d.closed {
+		d.value = *new(T)
+		d.closed = true
+	}
+	return nil
+}
+
+func (d *distIter[T]) Value() T { return d.value }
+
+func (d *distIter[T]) Next(ctx context.Context) bool {
+	if d.closed || ctx.Err() != nil {
+		return false
+	}
+	val, err := d.dist.Pop(ctx)
+	if err != nil {
+		_ = d.Close()
+		return false
+	}
+	d.value = val
+
+	return true
 }

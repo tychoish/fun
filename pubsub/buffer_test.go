@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/set"
 )
 
 func TestDistributor(t *testing.T) {
@@ -94,5 +97,45 @@ func TestDistributor(t *testing.T) {
 				t.Error(time.Since(start))
 			}
 		})
+	})
+	t.Run("Iterator", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		queue := NewUnlimitedQueue[string]()
+		_ = queue.Add("string")
+		_ = queue.Add("strong")
+		_ = queue.Add("strung")
+
+		dist := DistributorQueue(queue)
+
+		set := set.MakeNewOrdered[string]()
+		seen := 0
+		if queue.tracker.len() != 3 {
+			t.Fatal(queue.tracker.len())
+		}
+
+		iter := DistributorIterator(dist)
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			queue.Close()
+		}()
+		fun.Observe(ctx, iter, func(in string) { set.Add(in); seen++ })
+		if iter.Next(ctx) {
+			t.Error("iterator should be empty")
+		}
+		if set.Len() != 3 {
+			t.Log(itertool.CollectSlice(ctx, (set.Iterator())))
+			t.Error(set.Len())
+		}
+		if seen != 3 {
+			t.Error(seen)
+		}
+		if queue.tracker.len() != 0 {
+			t.Fatal(queue.tracker.len())
+		}
+		if iter.Value() != "" {
+			t.Error(iter.Value())
+		}
 	})
 }
