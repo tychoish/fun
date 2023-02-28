@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -129,6 +130,29 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 			return nil
 		},
 		Cleanup: func() error { wg.Wait(); return ec.Resolve() },
+	}
+}
+
+// ProcessIterator runs the itertool.ParallelForEach operation as a *Service.
+func ProcessIterator[T any](
+	iter fun.Iterator[T],
+	mapper func(context.Context, T) error,
+	opts itertool.Options,
+) *Service {
+	return &Service{
+		Run: func(ctx context.Context) error {
+			return itertool.ParallelForEach(ctx, iter, mapper, opts)
+		},
+	}
+}
+
+// Broker creates a Service implementation that wraps a
+// pubsub.Broker[T] implementation for integration into service
+// orchestration frameworks.
+func Broker[T any](broker *pubsub.Broker[T]) *Service {
+	return &Service{
+		Run:      func(ctx context.Context) error { broker.Wait(ctx); return nil },
+		Shutdown: func() error { broker.Stop(); return nil },
 	}
 }
 
