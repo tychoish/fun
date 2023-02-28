@@ -134,7 +134,9 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 	}
 }
 
-// ProcessIterator runs an itertool.ParallelForEach operation as a *Service.
+// ProcessIterator runs an itertool.ParallelForEach operation as a
+// *Service. For a long running service, use an iterator that is
+// blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessIterator[T any](
 	iter fun.Iterator[T],
 	mapper func(context.Context, T) error,

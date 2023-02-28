@@ -303,6 +303,7 @@ func TestOrchestrator(t *testing.T) {
 	})
 	t.Run("ServicePassthrough", func(t *testing.T) {
 		t.Run("RunEndToEnd", func(t *testing.T) {
+			t.Parallel()
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
 			wg := &sync.WaitGroup{}
@@ -337,6 +338,7 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("PropogateErrors", func(t *testing.T) {
+			t.Parallel()
 			orc := &Orchestrator{}
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
@@ -371,6 +373,7 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("StartRunningServices", func(t *testing.T) {
+			t.Parallel()
 			orc := &Orchestrator{}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 			defer cancel()
@@ -420,7 +423,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should still be running")
 			}
 
-			time.Sleep(250 * time.Millisecond)
+			time.Sleep(time.Second)
 
 			orc.Service().Close()
 			err := orc.Wait()
@@ -464,6 +467,7 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("LogRunningServices", func(t *testing.T) {
+			t.Parallel()
 			orc := &Orchestrator{}
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {

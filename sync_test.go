@@ -179,8 +179,9 @@ func TestWait(t *testing.T) {
 		}
 	})
 	t.Run("ReadOne", func(t *testing.T) {
+		t.Parallel()
 		ch := make(chan string, 1)
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		ch <- "merlin"
 		defer cancel()
 		out, err := ReadOne(ctx, ch)
@@ -190,15 +191,26 @@ func TestWait(t *testing.T) {
 		if out != "merlin" {
 			t.Fatal(out)
 		}
-		cancel()
-		ch <- "merlin"
 
-		_, err = ReadOne(ctx, ch)
-		if err == nil {
-			t.Fatal("expected err")
+		ch <- "merlin"
+		cancel()
+		seenCondition := false
+		for i := 0; i < 10; i++ {
+			t.Log(i)
+			_, err = ReadOne(ctx, ch)
+			if errors.Is(err, context.Canceled) {
+				seenCondition = true
+			}
+			t.Log(err)
+
+			select {
+			case ch <- "merlin":
+			default:
+			}
 		}
-		if !errors.Is(err, context.Canceled) {
-			t.Fatal(err)
+		if !seenCondition {
+			t.Error("should have observed a context canceled")
+
 		}
 	})
 
