@@ -47,14 +47,16 @@ type Service struct {
 	Run func(context.Context) error
 
 	// Cleanup is optional, but if defined is always called after the
-	// service returned. Cleanup operations should all return
+	// Run function returned. Cleanup operations should all return
 	// relatively quickly and be used for releasing state rather
 	// than doing potentially blocking work.
 	Cleanup func() error
 
 	// Shutdown is optional, but provides a hook that
-	// implementations can be used to trigger a shutdown while a
-	// Service is running.
+	// implementations can be used to trigger a shutdown when the
+	// context passed to Start is canceled but before the Run
+	// function returns. The shutdown function, when defined,
+	// must return before the Cleanup function runs.
 	Shutdown func() error
 
 	isRunning  atomic.Bool

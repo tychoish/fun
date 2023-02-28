@@ -124,6 +124,7 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 					defer wg.Done()
 					fn(ctx)
 				}(iter.Value())
+
 			}
 			ec.Add(iter.Close())
 			fun.Wait(ctx, wg)
@@ -133,7 +134,7 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 	}
 }
 
-// ProcessIterator runs the itertool.ParallelForEach operation as a *Service.
+// ProcessIterator runs an itertool.ParallelForEach operation as a *Service.
 func ProcessIterator[T any](
 	iter fun.Iterator[T],
 	mapper func(context.Context, T) error,
