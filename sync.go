@@ -87,6 +87,8 @@ func doWaitObserve[T any](ctx context.Context, observe func(T), ch <-chan T) boo
 }
 
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a
+// WaitFunc. The WaitFunc blocks till it's context is canceled or the
+// channel is either closed or returns one item.
 func WaitChannel[T any](ch <-chan T) WaitFunc { return WaitObserve(func(T) {}, ch) }
 
 // WaitContext wait's for the context to be canceled before
