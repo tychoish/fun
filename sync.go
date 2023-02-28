@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -21,6 +22,13 @@ type WaitFunc func(context.Context)
 // Block executes the wait function with a context that will never
 // expire. Use with extreme caution.
 func (wf WaitFunc) Block() { wf(internal.BackgroundContext) }
+
+// WithTimeout runs the wait function with an explicit timeout.
+func (wf WaitFunc) WithTimeout(timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(internal.BackgroundContext, timeout)
+	defer cancel()
+	wf(ctx)
+}
 
 // WaitBlocking is a convenience function to use simple blocking
 // functions into WaitFunc objects. Because these WaitFunc functions

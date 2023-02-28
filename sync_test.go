@@ -162,5 +162,20 @@ func TestWait(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Timeout", func(t *testing.T) {
+		wf := WaitFunc(func(ctx context.Context) {
+			timer := time.NewTimer(time.Second)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+			case <-timer.C:
+			}
+		})
+		start := time.Now()
+		wf.WithTimeout(10 * time.Millisecond)
+		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Millisecond {
+			t.Error(time.Since(start))
+		}
+	})
 
 }
