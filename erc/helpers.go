@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -44,10 +44,7 @@ func Whenf(ec *Collector, cond bool, val string, args ...any) {
 
 // Safe provides similar semantics fun.Safe, but creates an error from
 // the panic value and adds it to the error collector.
-func Safe[T any](ec *Collector, fn func() T) T {
-	defer Recover(ec)
-	return fn()
-}
+func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() }
 
 // Recover calls the builtin recover() function and converts it to an
 // error that is populated in the collector. Run RecoverHook in defer
@@ -164,40 +161,65 @@ func CollapseFrom(ec *Collector, errs []error) {
 // does not add a context cancellation error) or the error channel is
 // closed.
 func Stream(ctx context.Context, errCh <-chan error) error {
-	ec := &Collector{}
-
-	StreamInto(ctx, ec, errCh)
-
-	return ec.Resolve()
+	return Consume(ctx, &internal.ChannelIterImpl[error]{Pipe: errCh})
 }
 
-// StreamInto collects all errors from an error channel and adds them
-// to the provided collector. StreamInto blocks until the context
-// expires (but does not add a context cancellation error) or the
-// error channel is closed.
-func StreamInto(ctx context.Context, ec *Collector, errCh <-chan error) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err, ok := <-errCh:
-			if !ok || ctx.Err() != nil {
-				return
-			}
-			ec.Add(err)
-		}
-	}
+// StreamAll collects all errors from an error channel and adds them
+// to the provided collector. StreamAll returns a fun.WaitFunc that
+// blocks the error channel is closed or its context is canceled.
+func StreamAll(ec *Collector, errCh <-chan error) fun.WaitFunc {
+	return fun.WaitObserveAll(ec.Add, errCh)
+}
+
+// StreamOne returns a fun.WaitFunc that blocks until a single
+// error is set to the error channel and adds that to the
+// collector.
+func StreamOne(ec *Collector, errCh <-chan error) fun.WaitFunc {
+	return fun.WaitObserve(ec.Add, errCh)
 }
 
 // StreamProcess is a non-blocking helper that starts a background
-// goroutine to process the contents of an error channel, and uses the
-// provided wait group to account for the lifecycle of the goroutine.
-func StreamProcess(ctx context.Context, wg *sync.WaitGroup, ec *Collector, errCh <-chan error) {
-	wg.Add(1)
+// goroutine to process the contents of an error channel. The function
+// returned will block until the channel is closed or the context is
+// canceled and can be used to wait for the background operation to be
+// complete.
+func StreamProcess(ctx context.Context, ec *Collector, errCh <-chan error) fun.WaitFunc {
+	return ConsumeProcess(ctx, ec, &internal.ChannelIterImpl[error]{Pipe: errCh})
+}
+
+// Consume iterates through all errors in the fun.Iterator and
+// returning the aggregated (*erc.Stack) error for these errors.
+func Consume(ctx context.Context, iter fun.Iterator[error]) error {
+	ec := &Collector{}
+	ConsumeAll(ec, iter)(ctx)
+	return ec.Resolve()
+}
+
+// ConsumeAll adds all errors in the input iterator and returns a wait
+// function that blocks until the iterator is exhausted. ConsumeAll
+// does not begin processing the iterator until the wait function is called.
+func ConsumeAll(ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
+	return func(ctx context.Context) {
+		for iter.Next(ctx) {
+			ec.Add(iter.Value())
+		}
+		ec.Add(iter.Close())
+	}
+}
+
+// ConsumeProcess adds all errors in the iterator to the
+// provided collector and returns a wait function that blocks until
+// the iterator has been exhausted. This error processing work happens
+// in a different go routine, and the fun.WaitFunc blocks until this
+// goroutine has returned.
+func ConsumeProcess(ctx context.Context, ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
+	sig := make(chan struct{})
 
 	go func() {
-		defer wg.Done()
+		defer close(sig)
 		defer Recover(ec)
-		StreamInto(ctx, ec, errCh)
+		ConsumeAll(ec, iter)(ctx)
 	}()
+
+	return fun.WaitChannel(sig)
 }

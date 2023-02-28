@@ -45,12 +45,7 @@ func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T]
 }
 
 // Slice produces an iterator for an arbitrary slice.
-func Slice[T any](in []T) fun.Iterator[T] {
-	return &internal.SliceIterImpl[T]{
-		Vals:  in,
-		Index: -1,
-	}
-}
+func Slice[T any](in []T) fun.Iterator[T] { return internal.NewSliceIter(in) }
 
 // Channel produces an iterator for a specified channel. The
 // iterator does not start any background threads.

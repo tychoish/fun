@@ -5,10 +5,20 @@ import (
 	"sync"
 )
 
+// use internally for iterations we know are cannot block. USE WITH CAUTION
+var BackgroundContext = context.Background()
+
 type SliceIterImpl[T any] struct {
 	Vals  []T
 	Index int
 	val   *T
+}
+
+func NewSliceIter[T any](in []T) *SliceIterImpl[T] {
+	return &SliceIterImpl[T]{
+		Vals:  in,
+		Index: -1,
+	}
 }
 
 func (iter *SliceIterImpl[T]) Value() T     { return *iter.val }

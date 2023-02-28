@@ -21,7 +21,7 @@ func TestIterators(t *testing.T) {
 
 	t.Run("Slice", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
-			iter := &SliceIterImpl[int]{Index: -1, Vals: []int{1, 2, 3, 4}}
+			iter := NewSliceIter([]int{1, 2, 3, 4})
 			seen := 0
 			for iter.Next(ctx) {
 				seen++

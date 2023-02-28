@@ -4,15 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/pubsub"
 )
 
 var (
@@ -72,101 +67,6 @@ type Service struct {
 	// tests, but should generally not be an issue.
 	mtx sync.Mutex
 	sig chan struct{}
-}
-
-// use in the group shutdown.
-var internalIterContext = context.Background()
-
-// Group makes it possible to have a collection of services, provided
-// via an iterator, that behave as a single service. All services are
-// started concurrently (and without order) and shutdown concurrently
-// (and without order). The Service produced by group, has the same
-// semantics as any other Service.
-//
-// Use Group(itertool.Slice([]*Service)) to produce a group from a
-// slice of *Services,
-func Group(services fun.Iterator[*Service]) *Service {
-	srv := &Service{}
-	sig := make(chan struct{})
-	waiters := fun.Must(pubsub.NewDeque[func() error](pubsub.DequeOptions{Unlimited: true}))
-
-	srv.Run = func(ctx context.Context) error {
-		defer close(sig)
-		wg := &sync.WaitGroup{}
-		for services.Next(ctx) {
-			wg.Add(1)
-			go func(s *Service) {
-				defer erc.Recover(&srv.ec)
-				defer wg.Done()
-				defer func() { fun.Invariant(waiters.PushBack(s.Wait) == nil) }()
-				srv.ec.Add(s.Start(ctx))
-			}(services.Value())
-		}
-		fun.Wait(ctx, wg)
-		return nil
-	}
-
-	srv.Cleanup = func() error {
-		defer erc.Recover(&srv.ec)
-		// wait for shutdown to return
-		<-sig
-
-		wg := &sync.WaitGroup{}
-
-		// we're calling each service's wait() here, which
-		// might be a recipe for deadlocks, but it gives us
-		// the chance to collect all errors from the contained
-		// services. This will cause our "group service" to
-		// have the same semantics as a single service, however.
-		iter := waiters.Iterator()
-
-		// because we know that the implementation of the
-		// waiters iterator won't block in this context, it's
-		// safe to call it with a background context, though
-		// it's worth being careful here
-		for iter.Next(internalIterContext) {
-			wg.Add(1)
-			go func(wait func() error) {
-				defer erc.Recover(&srv.ec)
-				defer wg.Done()
-				srv.ec.Add(wait())
-			}(iter.Value())
-		}
-
-		wg.Wait()
-		return nil
-	}
-	return srv
-}
-
-// HTTP wraps an http.Server object in a Service, both for common use
-// and convenience, and as an example for implementing arbitrary
-// services.
-//
-// If the http.Server's BaseContext method is not set, it is
-// overridden with a function that provides a copy of the context
-// passed to the service's Start method: this ensures that requests
-// have access to the same underlying context as the service.
-func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service {
-	return &Service{
-		Name: name,
-		Run: func(ctx context.Context) error {
-			if hs.BaseContext == nil {
-				hs.BaseContext = func(net.Listener) context.Context { return ctx }
-			}
-
-			if err := hs.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-				return err
-			}
-			return nil
-		},
-		Shutdown: func() error {
-			sctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-			defer cancel()
-
-			return hs.Shutdown(sctx)
-		},
-	}
 }
 
 // String implements fmt.Stringer and includes value of s.Name.

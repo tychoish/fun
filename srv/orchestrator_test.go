@@ -232,7 +232,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should still be running")
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(250 * time.Millisecond)
 
 			osrv.Close()
 			err := osrv.Wait()

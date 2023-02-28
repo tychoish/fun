@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
 )
 
 type errorTest struct {
@@ -195,13 +195,28 @@ func TestCollections(t *testing.T) {
 				}
 			})
 		})
+		t.Run("WaitOne", func(t *testing.T) {
+			ch := getPopulatedErrChan(1)
+			close(ch)
+			ec := &Collector{}
+			StreamOne(ec, ch)(ctx)
+			err := ec.Resolve()
+			if err == nil {
+				t.Logf("%T", err)
+				t.Error("nil expected", err)
+			}
+			errs := Unwind(err)
+			if len(errs) != 1 {
+				t.Error(errs)
+			}
+		})
 		t.Run("Into", func(t *testing.T) {
 			t.Run("Many", func(t *testing.T) {
 				ch := getPopulatedErrChan(10)
 				close(ch)
 				fun.Invariant(len(ch) == 10)
 				ec := &Collector{}
-				StreamInto(ctx, ec, ch)
+				StreamAll(ec, ch)(ctx)
 				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
@@ -219,7 +234,7 @@ func TestCollections(t *testing.T) {
 				close(ch)
 				fun.Invariant(len(ch) == 10)
 				ec := &Collector{}
-				StreamInto(ctx, ec, ch)
+				StreamAll(ec, ch)(ctx)
 				err := ec.Resolve()
 				if err != nil {
 					t.Error(err)
@@ -236,7 +251,7 @@ func TestCollections(t *testing.T) {
 				cancel()
 				ch := getPopulatedErrChan(0)
 				ec := &Collector{}
-				StreamInto(ctx, ec, ch)
+				StreamAll(ec, ch)(ctx)
 				err := ec.Resolve()
 				if err != nil {
 					t.Error(err)
@@ -255,10 +270,9 @@ func TestCollections(t *testing.T) {
 				close(ch)
 				fun.Invariant(len(ch) == 10)
 				fun.Invariant(ctx.Err() == nil, ctx.Err())
-				wg := &sync.WaitGroup{}
 				ec := &Collector{}
-				StreamProcess(ctx, wg, ec, ch)
-				wg.Wait()
+				wait := StreamProcess(ctx, ec, ch)
+				wait(ctx)
 				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
@@ -275,10 +289,9 @@ func TestCollections(t *testing.T) {
 				ch := getPopulatedErrChan(10)
 				close(ch)
 				fun.Invariant(len(ch) == 10)
-				wg := &sync.WaitGroup{}
 				ec := &Collector{}
-				StreamProcess(ctx, wg, ec, ch)
-				wg.Wait()
+				wait := StreamProcess(ctx, ec, ch)
+				wait(internal.BackgroundContext)
 				err := ec.Resolve()
 				if err != nil {
 					t.Error(err)
