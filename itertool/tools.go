@@ -81,8 +81,8 @@ func ForEach[T any](
 func ParallelForEach[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
-	opts Options,
 	fn func(context.Context, T) error,
+	opts Options,
 ) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -155,32 +155,32 @@ func forEachWorker[T any](
 // operations.
 type ProcessingFunction[IN any, OUT any] func(ctx context.Context, input IN) (output OUT, include bool, err error)
 
-// MapperFunction wraps a simple function to provide a
+// Mapper wraps a simple function to provide a
 // ProcessingFunction that will include the output of all mapped
 // functions, but propagates errors (which usually abort processing)
 // to the larger operation.
-func MapperFunction[IN any, OUT any](fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
+func Mapper[IN any, OUT any](fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
 	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
 		out, err := fn(ctx, input)
 		return out, true, err
 	}
 }
 
-// CheckedFunction wraps a function, and *never* propogates an error
+// Checker wraps a function, and *never* propogates an error
 // to the calling operation but will include or exclude output based
 // on the second boolean output.
-func CheckedFunction[IN any, OUT any](fn func(context.Context, IN) (OUT, bool)) ProcessingFunction[IN, OUT] {
+func Checker[IN any, OUT any](fn func(context.Context, IN) (OUT, bool)) ProcessingFunction[IN, OUT] {
 	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
 		out, ok := fn(ctx, input)
 		return out, ok, nil
 	}
 }
 
-// CollectErrors makes adds all errors to the error collector (instructing
+// Collector makes adds all errors to the error collector (instructing
 // the iterator to skip these results,) but does not return an error
 // to the outer processing operation. This would be the same as using
 // "ContinueOnError" with the Map() operation.
-func CollectErrors[IN any, OUT any](ec *erc.Collector, fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
+func Collector[IN any, OUT any](ec *erc.Collector, fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
 	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
 		out, err := fn(ctx, input)
 		if err != nil {
@@ -260,8 +260,28 @@ func Transform[T any, O any](
 	return out
 }
 
-// Options describes the runtime options to the Map or Generate
-// operations. The zero value of this struct provides a usable strict operation.
+// Observe is a special case of ForEach to support observer pattern
+// functions. Observe functions should be short running as they do not
+// take a context, and could block unexpectedly.
+func Observe[T any](ctx context.Context, iter fun.Iterator[T], obfn func(T)) error {
+	return ForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil })
+}
+
+// ParallelObserve is a special case of ParallelObserve to support observer pattern
+// functions. Observe functions should be short running as they do not
+// take a context, and could block unexpectedly.
+func ParallelObserve[T any](
+	ctx context.Context,
+	iter fun.Iterator[T],
+	obfn func(T),
+	opts Options,
+) error {
+	return ParallelForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil }, opts)
+}
+
+// Options describes the runtime options to the Map, Generate,
+// ParallelForEach, or ParallelObserve operations. The zero value of
+// this struct provides a usable strict operation.
 type Options struct {
 	// ContinueOnPanic forces the entire IteratorMap operation to
 	// halt when a single map function panics. All panics are
@@ -307,9 +327,9 @@ type Options struct {
 // to errors and handled according to the ContinueOnPanic option.
 func Map[T any, O any](
 	ctx context.Context,
-	opts Options,
 	iter fun.Iterator[T],
 	mapper ProcessingFunction[T, O],
+	opts Options,
 ) fun.Iterator[O] {
 	out := new(internal.MapIterImpl[O])
 	safeOut := Synchronize[O](out)
@@ -457,7 +477,11 @@ var ErrAbortGenerator = errors.New("abort generator signal")
 // function returns ErrAbortGenerator. Parallel operation is also
 // available and Generate shares configuration and semantics with the
 // Map operation.
-func Generate[T any](ctx context.Context, opts Options, fn func(context.Context) (T, error)) fun.Iterator[T] {
+func Generate[T any](
+	ctx context.Context,
+	fn func(context.Context) (T, error),
+	opts Options,
+) fun.Iterator[T] {
 	if opts.OutputBufferSize < 0 {
 		opts.OutputBufferSize = 0
 	}

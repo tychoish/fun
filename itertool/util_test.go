@@ -161,14 +161,30 @@ func RunIteratorImplementationTests[T comparable](
 										t.Fatal(err)
 									}
 								})
+								t.Run("Observe", func(t *testing.T) {
+									err := Observe(
+										ctx,
+										filter.Filter(baseBuilder(elems)),
+										func(input T) {
+											panic("whoop")
+										},
+									)
+
+									if err == nil {
+										t.Fatal("expectged error")
+									}
+									if err.Error() != "panic: whoop" {
+										t.Fatal(err)
+									}
+								})
 								t.Run("Map", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											Options{ContinueOnError: false},
 											filter.Filter(baseBuilder(elems)),
-											MapperFunction(func(ctx context.Context, input T) (T, error) {
+											Mapper(func(ctx context.Context, input T) (T, error) {
 												panic("whoop")
 											}),
+											Options{ContinueOnError: false},
 										),
 									)
 									if err == nil {
@@ -184,15 +200,15 @@ func RunIteratorImplementationTests[T comparable](
 								t.Run("ParallelMap", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
+											filter.Filter(baseBuilder(elems)),
+											Mapper(func(ctx context.Context, input T) (T, error) {
+												panic("whoop")
+											}),
 											Options{
 												ContinueOnError: true,
 												ContinueOnPanic: false,
 												NumWorkers:      2,
 											},
-											filter.Filter(baseBuilder(elems)),
-											MapperFunction(func(ctx context.Context, input T) (T, error) {
-												panic("whoop")
-											}),
 										),
 									)
 									if err == nil {
@@ -316,16 +332,16 @@ func RunIteratorIntegerAlgoTests(
 								t.Run("ErrorDoesNotAbort", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											Options{
-												ContinueOnError: true,
-											},
 											filter.Filter(baseBuilder(elems)),
-											MapperFunction(func(ctx context.Context, input int) (int, error) {
+											Mapper(func(ctx context.Context, input int) (int, error) {
 												if input == elems[2] {
 													return 0, errors.New("whoop")
 												}
 												return input, nil
 											}),
+											Options{
+												ContinueOnError: true,
+											},
 										),
 									)
 									if err == nil {
@@ -342,17 +358,17 @@ func RunIteratorIntegerAlgoTests(
 								t.Run("PanicDoesNotAbort", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											Options{
-												ContinueOnPanic: true,
-												NumWorkers:      1,
-											},
 											filter.Filter(baseBuilder(elems)),
-											MapperFunction(func(ctx context.Context, input int) (int, error) {
+											Mapper(func(ctx context.Context, input int) (int, error) {
 												if input == elems[3] {
 													panic("whoop")
 												}
 												return input, nil
 											}),
+											Options{
+												ContinueOnPanic: true,
+												NumWorkers:      1,
+											},
 										),
 									)
 									if err == nil {
@@ -369,17 +385,17 @@ func RunIteratorIntegerAlgoTests(
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											Options{
-												NumWorkers:      1,
-												ContinueOnError: false,
-											},
 											filter.Filter(baseBuilder(elems)),
-											MapperFunction(func(ctx context.Context, input int) (int, error) {
+											Mapper(func(ctx context.Context, input int) (int, error) {
 												if input >= elems[2] {
 													return 0, expectedErr
 												}
 												return input, nil
 											}),
+											Options{
+												NumWorkers:      1,
+												ContinueOnError: false,
+											},
 										),
 									)
 									if err == nil {
@@ -397,17 +413,17 @@ func RunIteratorIntegerAlgoTests(
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
 										Map(ctx,
-											Options{
-												NumWorkers:      4,
-												ContinueOnError: true,
-											},
 											filter.Filter(baseBuilder(elems)),
-											MapperFunction(func(ctx context.Context, input int) (int, error) {
+											Mapper(func(ctx context.Context, input int) (int, error) {
 												if input == len(elems)/2+1 {
 													return 0, expectedErr
 												}
 												return input, nil
 											}),
+											Options{
+												NumWorkers:      4,
+												ContinueOnError: true,
+											},
 										),
 									)
 									if err == nil {
@@ -466,6 +482,22 @@ func RunIteratorStringAlgoTests(
 
 								CheckSeenMap(t, elems, seen)
 							})
+							t.Run("Observe", func(t *testing.T) {
+								var count int
+								seen := make(map[string]struct{}, len(elems))
+								err := Observe(
+									ctx,
+									builder(),
+									func(str string) {
+										count++
+										seen[str] = struct{}{}
+									})
+								if err != nil {
+									t.Fatal(err)
+								}
+
+								CheckSeenMap(t, elems, seen)
+							})
 							t.Run("Channel", func(t *testing.T) {
 								seen := make(map[string]struct{}, len(elems))
 								iter := builder()
@@ -496,11 +528,11 @@ func RunIteratorStringAlgoTests(
 								iter := builder()
 								out := Map(
 									ctx,
-									Options{},
 									iter,
-									MapperFunction(func(ctx context.Context, str string) (string, error) {
+									Mapper(func(ctx context.Context, str string) (string, error) {
 										return str, nil
 									}),
+									Options{},
 								)
 
 								vals, err := CollectSlice(ctx, out)
@@ -517,11 +549,11 @@ func RunIteratorStringAlgoTests(
 								iter := builder()
 								out := Map(
 									ctx,
-									Options{},
 									iter,
-									CheckedFunction(func(ctx context.Context, str string) (string, bool) {
+									Checker(func(ctx context.Context, str string) (string, bool) {
 										return str, true
 									}),
+									Options{},
 								)
 
 								vals, err := CollectSlice(ctx, out)
@@ -537,16 +569,16 @@ func RunIteratorStringAlgoTests(
 							t.Run("ParallelMap", func(t *testing.T) {
 								out := Map(
 									ctx,
-									Options{
-										NumWorkers: 4,
-									},
 									Merge(ctx, builder(), builder(), builder()),
-									MapperFunction(func(ctx context.Context, str string) (string, error) {
+									Mapper(func(ctx context.Context, str string) (string, error) {
 										for _, c := range []string{"a", "e", "i", "o", "u"} {
 											str = strings.ReplaceAll(str, c, "")
 										}
 										return strings.TrimSpace(str), nil
 									}),
+									Options{
+										NumWorkers: 4,
+									},
 								)
 
 								vals, err := CollectSlice(ctx, out)
@@ -570,16 +602,16 @@ func RunIteratorStringAlgoTests(
 							t.Run("ParallelMapChecked", func(t *testing.T) {
 								out := Map(
 									ctx,
-									Options{
-										NumWorkers: 4,
-									},
 									Merge(ctx, builder(), builder(), builder()),
-									CheckedFunction(func(ctx context.Context, str string) (string, bool) {
+									Checker(func(ctx context.Context, str string) (string, bool) {
 										for _, c := range []string{"a", "e", "i", "o", "u"} {
 											str = strings.ReplaceAll(str, c, "")
 										}
 										return strings.TrimSpace(str), true
 									}),
+									Options{
+										NumWorkers: 4,
+									},
 								)
 
 								vals, err := CollectSlice(ctx, out)
@@ -607,16 +639,16 @@ func RunIteratorStringAlgoTests(
 									count := &atomic.Int32{}
 									out := Generate(
 										ctx,
-										Options{
-											// should just become zero
-											OutputBufferSize: -1,
-										},
 										func(ctx context.Context) (string, error) {
 											count.Add(1)
 											if int(count.Load()) > len(inputs) {
 												return "", ErrAbortGenerator
 											}
 											return inputs[rand.Intn(511)], nil
+										},
+										Options{
+											// should just become zero
+											OutputBufferSize: -1,
 										},
 									)
 									sig := make(chan struct{})
@@ -637,15 +669,15 @@ func RunIteratorStringAlgoTests(
 									count := &atomic.Int32{}
 									out := Generate(
 										ctx,
-										Options{
-											NumWorkers: 4,
-										},
 										func(ctx context.Context) (string, error) {
 											count.Add(1)
 											if int(count.Load()) > len(inputs) {
 												return "", ErrAbortGenerator
 											}
 											return inputs[rand.Intn(511)], nil
+										},
+										Options{
+											NumWorkers: 4,
 										},
 									)
 									sig := make(chan struct{})
@@ -665,10 +697,10 @@ func RunIteratorStringAlgoTests(
 								t.Run("PanicSafety", func(t *testing.T) {
 									out := Generate(
 										ctx,
-										Options{},
 										func(ctx context.Context) (string, error) {
 											panic("foo")
 										},
+										Options{},
 									)
 									if out.Next(ctx) {
 										t.Fatal("should not iterate when panic")
@@ -681,9 +713,6 @@ func RunIteratorStringAlgoTests(
 									count := 0
 									out := Generate(
 										ctx,
-										Options{
-											ContinueOnPanic: true,
-										},
 										func(ctx context.Context) (string, error) {
 											count++
 											if count == 3 {
@@ -694,6 +723,9 @@ func RunIteratorStringAlgoTests(
 												return "", ErrAbortGenerator
 											}
 											return fmt.Sprint(count), nil
+										},
+										Options{
+											ContinueOnPanic: true,
 										},
 									)
 									output, err := CollectSlice(ctx, out)
@@ -712,7 +744,6 @@ func RunIteratorStringAlgoTests(
 									count := 0
 									out := Generate(
 										ctx,
-										Options{},
 										func(ctx context.Context) (string, error) {
 											count++
 											if count == 4 {
@@ -720,6 +751,7 @@ func RunIteratorStringAlgoTests(
 											}
 											return "foo", nil
 										},
+										Options{},
 									)
 									output, err := CollectSlice(ctx, out)
 									if l := len(output); l != 3 {
@@ -737,9 +769,6 @@ func RunIteratorStringAlgoTests(
 									count := 0
 									out := Generate(
 										ctx,
-										Options{
-											ContinueOnError: true,
-										},
 										func(ctx context.Context) (string, error) {
 											count++
 											if count == 3 {
@@ -749,6 +778,9 @@ func RunIteratorStringAlgoTests(
 												return "", ErrAbortGenerator
 											}
 											return "foo", nil
+										},
+										Options{
+											ContinueOnError: true,
 										},
 									)
 									output, err := CollectSlice(ctx, out)

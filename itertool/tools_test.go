@@ -187,6 +187,8 @@ func TestWrap(t *testing.T) {
 }
 
 func TestRangeSplit(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -275,6 +277,7 @@ func TestRangeSplit(t *testing.T) {
 }
 
 func TestTools(t *testing.T) {
+	t.Parallel()
 	t.Run("CancelCollectChannel", func(t *testing.T) {
 		bctx, bcancel := context.WithCancel(context.Background())
 		defer bcancel()
@@ -336,7 +339,7 @@ func TestTools(t *testing.T) {
 			catcher,
 			wg,
 			Options{},
-			MapperFunction(func(ctx context.Context, in string) (int, error) { return 53, nil }),
+			Mapper(func(ctx context.Context, in string) (int, error) { return 53, nil }),
 			func() {},
 			pipe,
 			output,
@@ -386,13 +389,16 @@ func TestTools(t *testing.T) {
 		defer cancel()
 
 		strs := makeIntSlice(100)
-		output := Map(ctx, Options{NumWorkers: 5}, Slice(strs),
+		output := Map(ctx,
+			Slice(strs),
 			func(ctx context.Context, in int) (int, bool, error) {
 				if in%2 == 0 {
 					return math.MaxInt, false, nil
 				}
 				return in, true, nil
-			})
+			},
+			Options{NumWorkers: 5},
+		)
 		vals, err := CollectSlice(ctx, output)
 		if err != nil {
 			t.Fatal(err)
@@ -410,6 +416,7 @@ func TestTools(t *testing.T) {
 }
 
 func TestParallelForEach(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -420,11 +427,11 @@ func TestParallelForEach(t *testing.T) {
 				seen := set.Synchronize(set.MakeNewOrdered[int]())
 				err := ParallelForEach(ctx,
 					Slice(elems),
-					Options{NumWorkers: i},
 					func(ctx context.Context, in int) error {
 						seen.Add(in)
 						return nil
 					},
+					Options{NumWorkers: i},
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -458,16 +465,16 @@ func TestParallelForEach(t *testing.T) {
 		seen := set.Synchronize(set.MakeNewOrdered[int]())
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(200)),
-			Options{
-				NumWorkers:      3,
-				ContinueOnPanic: true,
-			},
 			func(ctx context.Context, in int) error {
 				seen.Add(in)
 				if in >= 100 {
 					panic("error")
 				}
 				return nil
+			},
+			Options{
+				NumWorkers:      3,
+				ContinueOnPanic: true,
 			},
 		)
 		if err == nil {
@@ -486,10 +493,6 @@ func TestParallelForEach(t *testing.T) {
 		seen := set.Synchronize(set.MakeNewOrdered[int]())
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(10)),
-			Options{
-				NumWorkers:      10,
-				ContinueOnPanic: false,
-			},
 			func(ctx context.Context, in int) error {
 				if in == 4 {
 					seen.Add(in)
@@ -500,6 +503,10 @@ func TestParallelForEach(t *testing.T) {
 
 				<-ctx.Done()
 				return nil
+			},
+			Options{
+				NumWorkers:      10,
+				ContinueOnPanic: false,
 			},
 		)
 		if err == nil {
@@ -524,16 +531,16 @@ func TestParallelForEach(t *testing.T) {
 
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(10)),
-			Options{
-				NumWorkers:      4,
-				ContinueOnPanic: false,
-			},
 			func(ctx context.Context, in int) error {
 				if in == 8 {
 					cancel()
 					panic("gotcha")
 				}
 				return nil
+			},
+			Options{
+				NumWorkers:      4,
+				ContinueOnPanic: false,
 			},
 		)
 		if err == nil {
@@ -546,12 +553,12 @@ func TestParallelForEach(t *testing.T) {
 
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(10)),
+			func(ctx context.Context, in int) error {
+				return fmt.Errorf("errored=%d", in)
+			},
 			Options{
 				NumWorkers:      4,
 				ContinueOnError: true,
-			},
-			func(ctx context.Context, in int) error {
-				return fmt.Errorf("errored=%d", in)
 			},
 		)
 		if err == nil {
@@ -573,12 +580,12 @@ func TestParallelForEach(t *testing.T) {
 
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(100)),
+			func(ctx context.Context, in int) error {
+				return fmt.Errorf("errored=%d", in)
+			},
 			Options{
 				NumWorkers:      2,
 				ContinueOnError: false,
-			},
-			func(ctx context.Context, in int) error {
-				return fmt.Errorf("errored=%d", in)
 			},
 		)
 		if err == nil {
@@ -598,15 +605,15 @@ func TestParallelForEach(t *testing.T) {
 	t.Run("MapCheckedFunction", func(t *testing.T) {
 		out := Map(
 			ctx,
-			Options{},
 			Slice(makeIntSlice(100)),
-			CheckedFunction(func(ctx context.Context, num int) (int, bool) {
+			Checker(func(ctx context.Context, num int) (int, bool) {
 				if num%2 == 0 {
 					return math.MaxInt, false
 				}
 
 				return num, true
 			}),
+			Options{},
 		)
 
 		vals, err := CollectSlice(ctx, out)
@@ -620,7 +627,7 @@ func TestParallelForEach(t *testing.T) {
 	})
 	t.Run("CollectErrors", func(t *testing.T) {
 		ec := &erc.Collector{}
-		pf := CollectErrors(ec, func(ctx context.Context, in string) (int, error) {
+		pf := Collector(ec, func(ctx context.Context, in string) (int, error) {
 			if in == "hi" {
 				return 400, errors.New(in)
 			}
@@ -647,5 +654,133 @@ func TestParallelForEach(t *testing.T) {
 			t.Error("wrapper should not propgate value in error case")
 		}
 	})
+}
 
+func TestParallelObserve(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("Basic", func(t *testing.T) {
+		for i := 0; i <= 8; i++ {
+			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
+				elems := makeIntSlice(200)
+				seen := set.Synchronize(set.MakeNewOrdered[int]())
+				err := ParallelObserve(ctx,
+					Slice(elems),
+					func(in int) {
+						seen.Add(in)
+					},
+					Options{NumWorkers: i},
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				out, err := CollectSlice(ctx, seen.Iterator())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(out) != len(elems) {
+					t.Log("output", out)
+					t.Log("input", elems)
+					t.Error("unequal length slices")
+				}
+
+				matches := 0
+				for idx := range out {
+					if out[idx] == elems[idx] {
+						matches++
+					}
+				}
+				if i < 2 && matches != len(out) {
+					t.Error("should  all with 1 worker", matches, len(out))
+				} else if i >= 2 && matches == len(out) {
+					t.Error("should not all match", matches, len(out))
+				}
+			})
+		}
+	})
+
+	t.Run("ContinueOnPanic", func(t *testing.T) {
+		seen := set.Synchronize(set.MakeNewOrdered[int]())
+		err := ParallelObserve(ctx,
+			Slice(makeIntSlice(200)),
+			func(in int) {
+				seen.Add(in)
+				if in >= 100 {
+					panic("error")
+				}
+			},
+			Options{
+				NumWorkers:      3,
+				ContinueOnPanic: true,
+			},
+		)
+		if err == nil {
+			t.Fatal("should not have errored", err)
+		}
+		var es *erc.Stack
+		if !errors.As(err, &es) {
+			t.Fatal(err)
+		}
+		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+		if len(errs) != 100 {
+			t.Error(len(errs))
+		}
+	})
+	t.Run("AbortOnPanic", func(t *testing.T) {
+		seen := set.Synchronize(set.MakeNewOrdered[int]())
+		err := ParallelObserve(ctx,
+			Slice(makeIntSlice(10)),
+			func(in int) {
+				if in == 4 {
+					seen.Add(in)
+				}
+				if in == 8 {
+					panic("gotcha")
+				}
+			},
+			Options{
+				NumWorkers:      10,
+				ContinueOnPanic: false,
+			},
+		)
+		if err == nil {
+			t.Fatal("should not have errored", err)
+		}
+		if seen.Len() != 1 {
+			t.Error("should have only seen one", seen.Len())
+
+		}
+		var es *erc.Stack
+		if !errors.As(err, &es) {
+			t.Fatal(err)
+		}
+		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+		if len(errs) != 1 {
+			t.Error(len(errs))
+		}
+	})
+	t.Run("CancelAndPanic", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := ParallelObserve(ctx,
+			Slice(makeIntSlice(10)),
+			func(in int) {
+				if in == 8 {
+					cancel()
+					panic("gotcha")
+				}
+			},
+			Options{
+				NumWorkers:      4,
+				ContinueOnPanic: false,
+			},
+		)
+		if err == nil {
+			t.Error("should have propogated an error")
+		}
+	})
 }
