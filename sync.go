@@ -2,7 +2,6 @@ package fun
 
 import (
 	"context"
-	"io"
 	"sync"
 	"time"
 
@@ -94,19 +93,7 @@ func WaitObserveAll[T any](observe func(T), ch <-chan T) WaitFunc {
 // returns early if the context is canceled (ctx.Err()) or the channel
 // is closed (io.EOF).
 func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
-	select {
-	case <-ctx.Done():
-		return *new(T), ctx.Err()
-	case obj, ok := <-ch:
-		if !ok {
-			return *new(T), io.EOF
-		}
-		if err := ctx.Err(); err != nil {
-			return *new(T), err
-		}
-
-		return obj, nil
-	}
+	return internal.ReadOne(ctx, ch)
 }
 
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a

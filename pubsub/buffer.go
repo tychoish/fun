@@ -107,7 +107,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 		},
 		pop: func(ctx context.Context) (T, error) {
 			val, err := fun.ReadOne(ctx, ch)
-			if errors.Is(err, io.EOF) {
+			if err != nil && errors.Is(err, io.EOF) {
 				return val, ErrQueueClosed
 			}
 			return val, err

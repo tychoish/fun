@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"io"
 	"sync"
 )
 
@@ -58,16 +59,12 @@ func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 	if ctx.Err() != nil {
 		return false
 	}
-	select {
-	case <-ctx.Done():
+	v, err := ReadOne(ctx, iter.Pipe)
+	if err != nil {
 		return false
-	case val, ok := <-iter.Pipe:
-		if !ok {
-			return false
-		}
-		iter.value = val
-		return true
 	}
+	iter.value = v
+	return true
 }
 
 type MapIterImpl[T any] struct {
@@ -81,4 +78,20 @@ func (iter *MapIterImpl[T]) Close() error {
 	}
 	iter.WG.Wait()
 	return iter.Error
+}
+
+func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
+	select {
+	case <-ctx.Done():
+		return *new(T), ctx.Err()
+	case obj, ok := <-ch:
+		if !ok {
+			return *new(T), io.EOF
+		}
+		if err := ctx.Err(); err != nil {
+			return *new(T), err
+		}
+
+		return obj, nil
+	}
 }
