@@ -29,7 +29,8 @@ type Iterator[T any] interface {
 
 // Observe processes an iterator calling the observer function for
 // every element in the iterator and retruning when the iterator is
-// exhausted.
+// exhausted. Take care to ensure that the Observe function does not
+// block.
 //
 // Use itertool.Observe and itertool.ParallelObserve for more advanced
 // execution patterns.
