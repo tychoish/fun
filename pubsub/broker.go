@@ -33,22 +33,16 @@ type Broker[T any] struct {
 // produce a blocking unbuffered queue message broker with every
 // message distributed to every subscriber. While the default settings
 // make it possible for one subscriber to block another subscriber,
-// they guarantee that all messages will be delivered. NonBlocking and
-// Buffered brokers may lose messages.
+// they guarantee that all messages will be delivered.  Buffered
+// brokers may lose messages.
 type BrokerOptions struct {
-	// NonBlockingSubscriptions, when true, allows the broker to
-	// skip sending messags to subscriber channels are filled. In
-	// this system, some subscribers will miss some messages based
-	// on their own processing time.
-	NonBlockingSubscriptions bool
 	// BufferSize controls the buffer size of all internal broker
 	// channels and channel subscriptions. When using a queue or
 	// deque backed broker, the buffer size is only used for the
 	// subscription channels.
 	BufferSize int
 	// ParallelDispatch, when true, sends each message to
-	// subscribers in parallel, and (pending the behavior of
-	// NonBlockingSubscriptions) waits for all messages to be
+	// subscribers in parallel, and waits for all messages to be
 	// delivered before continuing.
 	ParallelDispatch bool
 	// WorkerPoolSize controls the number of go routines used for
@@ -70,11 +64,8 @@ type BrokerOptions struct {
 // these settings may interact.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
 	b := makeBroker[T](opts)
-
 	ctx, b.close = context.WithCancel(ctx)
-
-	b.startDefaultWorkers(ctx)
-
+	b.startQueueWorkers(ctx, DistributorChannel(b.publishCh))
 	return b
 }
 
@@ -90,24 +81,16 @@ func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, opts BrokerOptions, queue *Queue[T]) *Broker[T] {
-	b := makeBroker[T](opts)
+	opts.BufferSize = 0
+	return MakeDistributorBroker(ctx, DistributorQueue(queue), opts)
+}
 
-	b.opts.BufferSize = 0
+func MakeDistributorBroker[T any](ctx context.Context, dist *Distributor[T], opts BrokerOptions) *Broker[T] {
+	b := makeBroker[T](opts)
 
 	ctx, b.close = context.WithCancel(ctx)
 
-	b.startQueueWorkers(ctx,
-		// enqueue:
-		queue.Add,
-		// dispatch:
-		func(ctx context.Context) (T, error) {
-			msg, ok := queue.Remove()
-			if ok {
-				return msg, nil
-			}
-			return queue.Wait(ctx)
-		},
-	)
+	b.startQueueWorkers(ctx, dist)
 
 	return b
 }
@@ -125,14 +108,8 @@ func NewQueueBroker[T any](ctx context.Context, opts BrokerOptions, queue *Queue
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewDequeBroker[T any](ctx context.Context, opts BrokerOptions, deque *Deque[T]) *Broker[T] {
-	b := makeBroker[T](opts)
-
-	b.opts.BufferSize = 0
-
-	ctx, b.close = context.WithCancel(ctx)
-	b.startQueueWorkers(ctx, deque.ForcePushBack, deque.WaitFront)
-
-	return b
+	opts.BufferSize = 0
+	return MakeDistributorBroker(ctx, DistributorDeque(deque), opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -149,17 +126,14 @@ func NewDequeBroker[T any](ctx context.Context, opts BrokerOptions, deque *Deque
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) (*Broker[T], error) {
-	b := makeBroker[T](opts)
-
 	deque, err := NewDeque[T](DequeOptions{Capacity: capacity})
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, b.close = context.WithCancel(ctx)
-	b.startQueueWorkers(ctx, deque.ForcePushFront, deque.WaitFront)
+	opts.BufferSize = 0
 
-	return b, nil
+	return MakeDistributorBroker(ctx, DistributorLIFO(deque), opts), nil
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -175,31 +149,9 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 }
 
-func (b *Broker[T]) startDefaultWorkers(ctx context.Context) {
-	b.wg.Add(1)
-	go func() {
-		defer b.wg.Done()
-		subs := set.Synchronize(set.NewOrdered[chan T]())
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msgCh := <-b.subCh:
-				subs.Add(msgCh)
-			case msgCh := <-b.unsubCh:
-				subs.Delete(msgCh)
-			case msg := <-b.publishCh:
-				// do sending
-				b.dispatchMessage(ctx, subs.Iterator(), msg)
-			}
-		}
-	}()
-}
-
 func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
-	push func(msg T) error,
-	pop func(ctx context.Context) (T, error),
+	dist *Distributor[T],
 ) {
 	subs := set.Synchronize(set.MakeNewOrdered[chan T]())
 	b.wg.Add(1)
@@ -214,7 +166,7 @@ func (b *Broker[T]) startQueueWorkers(
 			case msgCh := <-b.unsubCh:
 				subs.Delete(msgCh)
 			case msg := <-b.publishCh:
-				if err := push(msg); err != nil {
+				if err := dist.Push(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
 					// result of user configuration (and we don't log anyway,) or
 					// the queue has been closed (return), but otherwise
@@ -244,7 +196,7 @@ func (b *Broker[T]) startQueueWorkers(
 		go func() {
 			defer b.wg.Done()
 			for {
-				msg, err := pop(ctx)
+				msg, err := dist.Pop(ctx)
 				if err != nil {
 					return
 				}
@@ -277,18 +229,11 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan 
 }
 
 func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T) {
-	if b.opts.NonBlockingSubscriptions {
-		select {
-		case <-ctx.Done():
-		case ch <- m:
-		default:
-		}
-	} else {
-		select {
-		case <-ctx.Done():
-		case ch <- m:
-		}
+	select {
+	case <-ctx.Done():
+	case ch <- m:
 	}
+
 }
 
 // Stop cancels the broker, allowing background work to stop.

@@ -30,6 +30,16 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 			},
 		},
 		{
+			Name: "DistributorBuffer",
+			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+				d, err := NewDeque[T](DequeOptions{Unlimited: true})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return MakeDistributorBroker(ctx, DistributorBuffer(d), BrokerOptions{})
+			},
+		},
+		{
 			Name: "Serial/ZeroBuffer",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{ParallelDispatch: false})
@@ -39,25 +49,21 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 			Name: "Parallel/FullyBuffered/NoBlock",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch:         true,
-					BufferSize:               len(elems),
-					NonBlockingSubscriptions: true,
+					ParallelDispatch: true,
+					BufferSize:       len(elems),
 				})
 			},
-			NonBlocking: true,
-			BufferSize:  len(elems),
+			BufferSize: len(elems),
 		},
 		{
 			Name: "Parallel/HalfBuffered/NoBlock",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch:         true,
-					BufferSize:               len(elems) / 2,
-					NonBlockingSubscriptions: true,
+					ParallelDispatch: true,
+					BufferSize:       len(elems) / 2,
 				})
 			},
-			NonBlocking: true,
-			BufferSize:  len(elems) / 2,
+			BufferSize: len(elems) / 2,
 		},
 		{
 			Name: "Parallel/FullyBuffered",

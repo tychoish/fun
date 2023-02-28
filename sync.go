@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"io"
 	"sync"
 	"time"
 
@@ -64,7 +65,13 @@ func WaitGroup(wg *sync.WaitGroup) WaitFunc {
 // WaitObserve consumes and observes, at most, one item from the
 // channel. Callers must call the WaitFunc.
 func WaitObserve[T any](observe func(T), ch <-chan T) WaitFunc {
-	return func(ctx context.Context) { doWaitObserve(ctx, observe, ch) }
+	return func(ctx context.Context) {
+		val, err := ReadOne(ctx, ch)
+		if err != nil {
+			return
+		}
+		observe(val)
+	}
 }
 
 // WaitObserveAll passes the output of the channel into the observer
@@ -74,24 +81,32 @@ func WaitObserve[T any](observe func(T), ch <-chan T) WaitFunc {
 func WaitObserveAll[T any](observe func(T), ch <-chan T) WaitFunc {
 	return func(ctx context.Context) {
 		for {
-			if doWaitObserve(ctx, observe, ch) {
+			val, err := ReadOne(ctx, ch)
+			if err != nil {
 				return
 			}
+			observe(val)
 		}
 	}
 }
 
-func doWaitObserve[T any](ctx context.Context, observe func(T), ch <-chan T) bool {
+// ReadOnce reads one item from the channel, and returns it. ReadOne
+// returns early if the context is canceled (ctx.Err()) or the channel
+// is closed (io.EOF).
+func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
 	select {
 	case <-ctx.Done():
-		return true
+		return *new(T), ctx.Err()
 	case obj, ok := <-ch:
-		if !ok || ctx.Err() != nil {
-			return true
+		if !ok {
+			return *new(T), io.EOF
 		}
-		observe(obj)
+		if err := ctx.Err(); err != nil {
+			return *new(T), err
+		}
+
+		return obj, nil
 	}
-	return false
 }
 
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a
@@ -122,12 +137,20 @@ func WaitAdd(ctx context.Context, wg *sync.WaitGroup, fn WaitFunc) {
 // return. The constituent WaitFunc are passed WaitMerge's context,
 // while the returned WaitFunc respects its own context.
 //
-// User itertool.Variadic, itertool.Slice, or itertool.Channel to
+// Use itertool.Variadic, itertool.Slice, or itertool.Channel to
 // convert common container types/calling patterns to an iterator.
+//
+// In combination with erc.CheckWait, you can use WaitMerge to create
+// and pubsub.Queue or pubsub.Deque blocking iterators to create
+// worker pools.
 func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 	wg := &sync.WaitGroup{}
 
-	Observe(ctx, iter, func(fn WaitFunc) { WaitAdd(ctx, wg, fn) })
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		Observe(ctx, iter, func(fn WaitFunc) { WaitAdd(ctx, wg, fn) })
+	}()
 
 	return WaitGroup(wg)
 }

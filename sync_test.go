@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -175,6 +176,29 @@ func TestWait(t *testing.T) {
 		wf.WithTimeout(10 * time.Millisecond)
 		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Millisecond {
 			t.Error(time.Since(start))
+		}
+	})
+	t.Run("ReadOne", func(t *testing.T) {
+		ch := make(chan string, 1)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ch <- "merlin"
+		defer cancel()
+		out, err := ReadOne(ctx, ch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out != "merlin" {
+			t.Fatal(out)
+		}
+		cancel()
+		ch <- "merlin"
+
+		_, err = ReadOne(ctx, ch)
+		if err == nil {
+			t.Fatal("expected err")
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
 		}
 	})
 

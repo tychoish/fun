@@ -82,12 +82,18 @@ func RecoverHook(ec *Collector, hook func()) {
 // returns an error, adds it to the collector, primarily for use in
 // defer statements.
 func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error) {
-	Check(ec, func() error { return fn(ctx) })
+	CheckWait(ec, fn)(ctx)
 }
 
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
+
+// CheckWait returns a fun.WaitFunc for a function that returns an
+// error, with the error consumed by the collector.
+func CheckWait(ec *Collector, fn func(context.Context) error) fun.WaitFunc {
+	return func(ctx context.Context) { ec.Add(fn(ctx)) }
+}
 
 // Unwind converts an error into a slice of errors in two cases:
 // First, if an error is an *erc.Stack, Unwind will return a slice
