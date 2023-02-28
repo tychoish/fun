@@ -22,15 +22,15 @@ func TestDistributor(t *testing.T) {
 
 			ch := make(chan string, 100)
 			buf := DistributorChannel(ch)
-			if err := buf.Push(ctx, "merlin"); err != nil {
+			if err := buf.Send(ctx, "merlin"); err != nil {
 				t.Error(err)
 			}
-			_, err := buf.Pop(ctx)
+			_, err := buf.Receive(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
 			close(ch)
-			_, err = buf.Pop(ctx)
+			_, err = buf.Receive(ctx)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -40,7 +40,7 @@ func TestDistributor(t *testing.T) {
 			}
 
 			// repeat to make sure we don't accumulate
-			_, err = buf.Pop(ctx)
+			_, err = buf.Receive(ctx)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -50,11 +50,11 @@ func TestDistributor(t *testing.T) {
 			}
 
 			// add another so that the rest of the test works
-			err = buf.Push(ctx, "merlin")
+			err = buf.Send(ctx, "merlin")
 			if err != nil {
 				t.Error(err)
 			}
-			err = buf.Push(ctx, "kip")
+			err = buf.Send(ctx, "kip")
 			if err == nil {
 				t.Error("expected error")
 			}
@@ -63,7 +63,7 @@ func TestDistributor(t *testing.T) {
 			if len(errs) != 1 {
 				t.Error(len(errs))
 			}
-			err = buf.Push(ctx, "kip")
+			err = buf.Send(ctx, "kip")
 			if err == nil {
 				t.Error("expected error")
 			}
@@ -83,7 +83,7 @@ func TestDistributor(t *testing.T) {
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
-				err := buf.Push(ctx, "kip")
+				err := buf.Send(ctx, "kip")
 				if err == nil {
 					t.Error("expected error")
 				}

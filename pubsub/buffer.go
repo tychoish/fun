@@ -14,27 +14,23 @@ import (
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
 //
-// Implementations should provide Push/Pop operations that are
+// Implementations should provide Send/Recieve operations that are
 // blocking and wait for the underlying structure to be "closed", the
-// context to be canceled, or have capacity (Push), or new objects
-// (Pop). These operations *should* mutate the underlying data
+// context to be canceled, or have capacity (Send), or new objects
+// (Recieve). These operations *should* mutate the underlying data
 // structure or service.
 type Distributor[T any] interface {
-	Push(context.Context, T) error
-	Pop(context.Context) (T, error)
+	Send(context.Context, T) error
+	Receive(context.Context) (T, error)
 }
 
 type distributorImpl[T any] struct {
-	pushImpl func(context.Context, T) error
-	popImpl  func(context.Context) (T, error)
+	push func(context.Context, T) error
+	pop  func(context.Context) (T, error)
 }
 
-func (d *distributorImpl[T]) Push(ctx context.Context, in T) error {
-	return d.pushImpl(ctx, in)
-}
-func (d *distributorImpl[T]) Pop(ctx context.Context) (T, error) {
-	return d.popImpl(ctx)
-}
+func (d *distributorImpl[T]) Send(ctx context.Context, in T) error   { return d.push(ctx, in) }
+func (d *distributorImpl[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
 
 func ignorePopContext[T any](in func(T) error) func(context.Context, T) error {
 	return func(_ context.Context, obj T) error { return in(obj) }
@@ -46,8 +42,8 @@ func ignorePopContext[T any](in func(T) error) func(context.Context, T) error {
 // of the Deque.
 func DistributorLIFO[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
-		pushImpl: ignorePopContext(d.ForcePushFront),
-		popImpl:  d.WaitFront,
+		push: ignorePopContext(d.ForcePushFront),
+		pop:  d.WaitFront,
 	}
 }
 
@@ -56,8 +52,8 @@ func DistributorLIFO[T any](d *Deque[T]) Distributor[T] {
 // Pop operations returning the oldest elements first (FIFO).
 func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
-		pushImpl: ignorePopContext(d.ForcePushBack),
-		popImpl:  d.WaitFront,
+		push: ignorePopContext(d.ForcePushBack),
+		pop:  d.WaitFront,
 	}
 }
 
@@ -67,8 +63,8 @@ func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
 // distributor to drop new messages before they enter the queue..
 func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
 	return &distributorImpl[T]{
-		pushImpl: ignorePopContext(q.Add),
-		popImpl: func(ctx context.Context) (T, error) {
+		push: ignorePopContext(q.Add),
+		pop: func(ctx context.Context) (T, error) {
 			msg, ok := q.Remove()
 			if ok {
 				return msg, nil
@@ -84,8 +80,8 @@ func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
 // (carefully) interact with the Deque structure while it's in use.
 func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
-		pushImpl: d.WaitPushBack,
-		popImpl:  d.WaitFront,
+		push: d.WaitPushBack,
+		pop:  d.WaitFront,
 	}
 }
 
@@ -95,7 +91,7 @@ func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
 func DistributorChannel[T any](ch chan T) Distributor[T] {
 	ec := &erc.Collector{}
 	return &distributorImpl[T]{
-		pushImpl: func(ctx context.Context, in T) (err error) {
+		push: func(ctx context.Context, in T) (err error) {
 			// this only happens if we've already paniced
 			// so we shouldn't get too many errors.
 			if ec.HasErrors() {
@@ -109,7 +105,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 			}
 			return ec.Resolve()
 		},
-		popImpl: func(ctx context.Context) (T, error) {
+		pop: func(ctx context.Context) (T, error) {
 			val, err := fun.ReadOne(ctx, ch)
 			if errors.Is(err, io.EOF) {
 				return val, ErrQueueClosed
@@ -147,7 +143,7 @@ func (d *distIter[T]) Next(ctx context.Context) bool {
 	if d.closed || ctx.Err() != nil {
 		return false
 	}
-	val, err := d.dist.Pop(ctx)
+	val, err := d.dist.Receive(ctx)
 	if err != nil {
 		_ = d.Close()
 		return false

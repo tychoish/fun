@@ -147,13 +147,12 @@ func (b *Broker[T]) startQueueWorkers(
 			case msgCh := <-b.unsubCh:
 				subs.Delete(msgCh)
 			case msg := <-b.publishCh:
-				if err := dist.Push(ctx, msg); err != nil {
+				if err := dist.Send(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
 					// result of user configuration (and we don't log anyway,) or
 					// the queue has been closed (return), but otherwise
 					// some amount of load shedding is fine here, and
 					// we should avoid exiting too soon.
-
 					switch {
 					case errors.Is(err, ErrQueueFull) || errors.Is(err, ErrQueueNoCredit):
 						continue
@@ -176,7 +175,7 @@ func (b *Broker[T]) startQueueWorkers(
 		go func() {
 			defer b.wg.Done()
 			for {
-				msg, err := dist.Pop(ctx)
+				msg, err := dist.Receive(ctx)
 				if err != nil {
 					return
 				}
