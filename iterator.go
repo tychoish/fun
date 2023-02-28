@@ -26,3 +26,15 @@ type Iterator[T any] interface {
 	Close() error
 	Value() T
 }
+
+// Observe processes an iterator calling the observer function for
+// every element in the iterator and retruning when the iterator is
+// exhausted.
+//
+// Use itertool.Observe and itertool.ParallelObserve for more advanced
+// execution patterns.
+func Observe[T any](ctx context.Context, iter Iterator[T], observe func(T)) {
+	for iter.Next(ctx) {
+		observe(iter.Value())
+	}
+}

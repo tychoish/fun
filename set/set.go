@@ -36,9 +36,7 @@ func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T](0) }
 
 // PopulateSet adds all elements in the iterator to the provided Set.
 func PopulateSet[T comparable](ctx context.Context, set Set[T], iter fun.Iterator[T]) {
-	for iter.Next(ctx) {
-		set.Add(iter.Value())
-	}
+	fun.Observe(ctx, iter, set.Add)
 }
 
 // BuildUnordered produces a new unordered set from the elements in

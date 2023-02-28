@@ -263,6 +263,10 @@ func Transform[T any, O any](
 // Observe is a special case of ForEach to support observer pattern
 // functions. Observe functions should be short running as they do not
 // take a context, and could block unexpectedly.
+//
+// Unlike fun.Observe, itertool.Observe collects errors from the
+// iterator's Close method and recovers from panics in the
+// observer function, propagating them in the returned error.
 func Observe[T any](ctx context.Context, iter fun.Iterator[T], obfn func(T)) error {
 	return ForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil })
 }

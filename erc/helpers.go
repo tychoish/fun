@@ -89,8 +89,6 @@ func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
-var internalIterContext = context.Background()
-
 // Unwind converts an error into a slice of errors in two cases:
 // First, if an error is an *erc.Stack, Unwind will return a slice
 // with all constituent errors. Second, if the error is wrapped,
@@ -105,9 +103,9 @@ func Unwind(err error) []error {
 	switch e := err.(type) {
 	case *Stack:
 		iter := e.Iterator()
-		for iter.Next(internalIterContext) {
-			out = append(out, iter.Value())
-		}
+		fun.Observe(internal.BackgroundContext, iter, func(err error) {
+			out = append(out, err)
+		})
 	default:
 		out = append(out, err)
 		for e := errors.Unwrap(err); e != nil; e = errors.Unwrap(e) {
@@ -199,12 +197,7 @@ func Consume(ctx context.Context, iter fun.Iterator[error]) error {
 // function that blocks until the iterator is exhausted. ConsumeAll
 // does not begin processing the iterator until the wait function is called.
 func ConsumeAll(ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
-	return func(ctx context.Context) {
-		for iter.Next(ctx) {
-			ec.Add(iter.Value())
-		}
-		ec.Add(iter.Close())
-	}
+	return func(ctx context.Context) { fun.Observe(ctx, iter, ec.Add) }
 }
 
 // ConsumeProcess adds all errors in the iterator to the

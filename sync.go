@@ -127,9 +127,7 @@ func WaitAdd(ctx context.Context, wg *sync.WaitGroup, fn WaitFunc) {
 func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 	wg := &sync.WaitGroup{}
 
-	for iter.Next(ctx) {
-		WaitAdd(ctx, wg, iter.Value())
-	}
+	Observe(ctx, iter, func(fn WaitFunc) { WaitAdd(ctx, wg, fn) })
 
 	return WaitGroup(wg)
 }
