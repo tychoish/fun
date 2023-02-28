@@ -358,20 +358,20 @@ func TestDeque(t *testing.T) {
 			conf := DequeOptions{
 				Capacity: -1,
 			}
-			if err := conf.Validate(); err == nil {
+			if err := conf.Validate(); err != nil {
 				t.Fatal()
 			}
-			if _, err := NewDeque[string](conf); err == nil {
+			if _, err := NewDeque[string](conf); err != nil {
 				t.Fatal()
 			}
 		})
 		t.Run("Zero", func(t *testing.T) {
 			conf := DequeOptions{}
-			if err := conf.Validate(); err == nil {
-				t.Fatal()
+			if err := conf.Validate(); err != nil {
+				t.Fatal("validate", err)
 			}
-			if _, err := NewDeque[string](conf); err == nil {
-				t.Fatal()
+			if _, err := NewDeque[string](conf); err != nil {
+				t.Fatal("create", err)
 			}
 		})
 		t.Run("ConflictingOptionsUnlimited", func(t *testing.T) {

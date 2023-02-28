@@ -80,7 +80,7 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 }
 
 type syncSetImpl[T comparable] struct {
-	mtx *sync.RWMutex
+	mtx *sync.Mutex
 	set Set[T]
 }
 
@@ -89,13 +89,13 @@ type syncSetImpl[T comparable] struct {
 func Synchronize[T comparable](s Set[T]) Set[T] {
 	return syncSetImpl[T]{
 		set: s,
-		mtx: &sync.RWMutex{},
+		mtx: &sync.Mutex{},
 	}
 }
 
 func (s syncSetImpl[T]) Unwrap() Set[T] {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 
 	return s.set
 }
@@ -108,15 +108,15 @@ func (s syncSetImpl[T]) Add(in T) {
 }
 
 func (s syncSetImpl[T]) Len() int {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 
 	return s.set.Len()
 }
 
 func (s syncSetImpl[T]) Check(item T) bool {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 
 	return s.set.Check(item)
 }
@@ -130,8 +130,15 @@ func (s syncSetImpl[T]) Delete(in T) {
 
 type syncIterImpl[T any] struct {
 	// this is duplicated from itertool to avoid an import cycle
-	mtx  *sync.RWMutex
+	mtx  sync.Locker
 	iter fun.Iterator[T]
+}
+
+func (s syncSetImpl[T]) Iterator() fun.Iterator[T] {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	return syncIterImpl[T]{mtx: s.mtx, iter: s.set.Iterator()}
 }
 
 func (iter syncIterImpl[T]) Unwrap() fun.Iterator[T] { return iter.iter }
@@ -150,15 +157,8 @@ func (iter syncIterImpl[T]) Close() error {
 }
 
 func (iter syncIterImpl[T]) Value() T {
-	iter.mtx.RLock()
-	defer iter.mtx.RUnlock()
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
 
 	return iter.iter.Value()
-}
-
-func (s syncSetImpl[T]) Iterator() fun.Iterator[T] {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	return syncIterImpl[T]{mtx: s.mtx, iter: s.set.Iterator()}
 }

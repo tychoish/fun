@@ -136,7 +136,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewQueueBroker[T](ctx, queue, BrokerOptions{
+				return NewQueueBroker(ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 				})
 			},
@@ -307,10 +307,12 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		{
 			Name: "Lifo/Parallel/Unbuffered/EightWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				broker, err := NewLIFOBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: true,
-					WorkerPoolSize:   8,
-				}, len(elems)-5)
+				broker, err := fun.Safe(func() *Broker[T] {
+					return NewLIFOBroker[T](ctx, BrokerOptions{
+						ParallelDispatch: true,
+						WorkerPoolSize:   8,
+					}, len(elems)-5)
+				})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -549,7 +551,7 @@ func TestBroker(t *testing.T) {
 			})
 		}
 	})
-	t.Run("MakeBrokerFixesNegativeBufferSizes", func(t *testing.T) {
+	t.Run("MakeBrokerDetectsNegativeBufferSizes", func(t *testing.T) {
 		opts := BrokerOptions{BufferSize: -1}
 		broker := makeBroker[string](opts)
 		if broker.opts.BufferSize != 0 {
@@ -558,19 +560,16 @@ func TestBroker(t *testing.T) {
 		if cap(broker.publishCh) != 0 {
 			t.Fatal("channel capacity should be the buffer size")
 		}
-		opts = BrokerOptions{BufferSize: 40}
-		broker = makeBroker[string](opts)
-		if cap(broker.publishCh) != 40 {
-			t.Fatal("channel capacity should be the buffer size")
-		}
 	})
 	t.Run("NewLifoBrokerRejectsNegativeCapacity", func(t *testing.T) {
-		_, err := NewLIFOBroker[string](ctx, BrokerOptions{}, -42)
-		if err == nil {
-			t.Fatal("expected broker to error for negative capacity")
+		_, err := fun.Safe(func() *Broker[string] {
+			return NewLIFOBroker[string](ctx, BrokerOptions{}, -42)
+		})
+		if err != nil {
+			// we round all capacities up to 1
+			t.Fatal(err)
 		}
 	})
-
 	t.Run("SubscribeBlocking", func(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
 		nctx, ncancel := context.WithCancel(context.Background())

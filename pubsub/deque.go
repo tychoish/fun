@@ -55,7 +55,7 @@ func (opts *DequeOptions) Validate() error {
 	} else if opts.Unlimited && opts.Capacity == 0 {
 		return nil
 	} else if opts.Capacity <= 0 {
-		return fmt.Errorf("capacity cannot be negative or empty: %w", ErrConfigurationMalformed)
+		opts.Capacity = 1
 	}
 
 	if opts.Capacity > 0 && opts.QueueOptions != nil {

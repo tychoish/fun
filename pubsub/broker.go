@@ -36,10 +36,9 @@ type Broker[T any] struct {
 // they guarantee that all messages will be delivered.  Buffered
 // brokers may lose messages.
 type BrokerOptions struct {
-	// BufferSize controls the buffer size of all internal broker
-	// channels and channel subscriptions. When using a queue or
-	// deque backed broker, the buffer size is only used for the
-	// subscription channels.
+	// BufferSize controls the buffer size of the internal broker
+	// channels that handle subscription creation and deletion
+	// (unsubscribe.) Buffering
 	BufferSize int
 	// ParallelDispatch, when true, sends each message to
 	// subscribers in parallel, and waits for all messages to be
@@ -54,18 +53,28 @@ type BrokerOptions struct {
 	WorkerPoolSize int
 }
 
-// NewBroker constructs with a simple distrubtion scheme: incoming
-// messages are buffered in a channel, and then distributed to
-// subscribers channels, which may also be buffered.
+// NewBroker constructs with a simple distrubtion scheme: the incoming
+// and outgoing messages are not buffered, but the client subscription
+// channels are not buffered.
 //
 // All brokers respect the BrokerOptions, which control how messages
-// are set to subscribers (e.g. concurrently with a worker pool, with
-// buffered channels, and if sends can be non-blocking.) Consider how
-// these settings may interact.
+// are set to subscribers. The specific configuration of these
+// settings can have profound impacts on the semantics and ordering of
+// messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
+	return MakeDistributorBroker(ctx, DistributorChannel(make(chan T)), opts)
+}
+
+// MakeDistributorBroker constructs a Broker that uses the provided
+// distributor to handle the buffering between the sending half and
+// the receiving half.
+//
+// In general, you should configure the distributor to provide
+// whatever buffering requirements you have, and
+func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts BrokerOptions) *Broker[T] {
 	b := makeBroker[T](opts)
 	ctx, b.close = context.WithCancel(ctx)
-	b.startQueueWorkers(ctx, DistributorChannel(b.publishCh))
+	b.startQueueWorkers(ctx, dist)
 	return b
 }
 
@@ -81,18 +90,7 @@ func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	opts.BufferSize = 0
 	return MakeDistributorBroker(ctx, DistributorQueue(queue), opts)
-}
-
-func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts BrokerOptions) *Broker[T] {
-	b := makeBroker[T](opts)
-
-	ctx, b.close = context.WithCancel(ctx)
-
-	b.startQueueWorkers(ctx, dist)
-
-	return b
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to
@@ -102,13 +100,7 @@ func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts
 //
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
-//
-// All brokers respect the BrokerOptions, which control the size of
-// the worker pool used to send messages to senders and if the Broker
-// should use non-blocking sends. All channels between the broker and
-// the subscribers are un-buffered.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	opts.BufferSize = 0
 	return MakeDistributorBroker(ctx, DistributorDeque(deque), opts)
 }
 
@@ -119,21 +111,10 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 //
 // This broker distributes messages in a LIFO order, dropping older
 // messages to make room for new messages. The capacity of the queue
-// is fixed, and must be a positive integer, greater than 0.
-//
-// All brokers respect the BrokerOptions, which control the size of
-// the worker pool used to send messages to senders and if the Broker
-// should use non-blocking sends. All channels between the broker and
-// the subscribers are un-buffered.
-func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) (*Broker[T], error) {
-	deque, err := NewDeque[T](DequeOptions{Capacity: capacity})
-	if err != nil {
-		return nil, err
-	}
-
-	opts.BufferSize = 0
-
-	return MakeDistributorBroker(ctx, DistributorLIFO(deque), opts), nil
+// is fixed, and must be a positive integer greater than 0,
+// NewLIFOBroker will panic if the capcity is less than or equal to 0.
+func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
+	return MakeDistributorBroker(ctx, DistributorLIFO(fun.Must(NewDeque[T](DequeOptions{Capacity: capacity}))), opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -143,7 +124,7 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 
 	return &Broker[T]{
 		opts:      opts,
-		publishCh: make(chan T, opts.BufferSize),
+		publishCh: make(chan T),
 		subCh:     make(chan chan T, opts.BufferSize),
 		unsubCh:   make(chan chan T, opts.BufferSize),
 	}
@@ -153,7 +134,7 @@ func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
 	dist Distributor[T],
 ) {
-	subs := set.Synchronize(set.NewOrdered[chan T]())
+	subs := set.Synchronize(set.MakeNewOrdered[chan T]())
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
