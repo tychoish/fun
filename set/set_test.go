@@ -6,7 +6,17 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/itertool"
 )
+
+func generateIter(ctx context.Context, size int) fun.Iterator[string] {
+	out := make([]string, size)
+	for i := 0; i < size; i++ {
+		out[i] = fmt.Sprintf("iter=%d", i)
+
+	}
+	return itertool.Slice(out)
+}
 
 func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -90,6 +100,9 @@ func TestSet(t *testing.T) {
 						set.Add(fmt.Sprint(i))
 					}
 				},
+				"Populator": func(set Set[string]) {
+					PopulateSet(ctx, set, generateIter(ctx, 100))
+				},
 			} {
 				t.Run(populatorName, func(t *testing.T) {
 					t.Run("Uniqueness", func(t *testing.T) {
@@ -103,7 +116,7 @@ func TestSet(t *testing.T) {
 						size := set.Len()
 						populator(set)
 						if set.Len() != size {
-							t.Fatal("size should not change")
+							t.Fatal("size should not change", size, set.Len())
 						}
 					})
 					t.Run("Equality", func(t *testing.T) {

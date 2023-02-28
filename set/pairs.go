@@ -1,5 +1,10 @@
 package set
 
+import (
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
+)
+
 // Pair represents a key-value pair.
 type Pair[K comparable, V comparable] struct {
 	Key   K
@@ -45,22 +50,10 @@ func (p Pairs[K, V]) Map() map[K]V {
 
 // Set converts a Pairs object into a set.
 func (p Pairs[K, V]) Set() Set[Pair[K, V]] {
-	set := MakeUnordered[Pair[K, V]](len(p))
-
-	for idx := range p {
-		set.Add(p[idx])
-	}
-
-	return set
+	return BuildUnordered(internal.BackgroundContext, fun.Iterator[Pair[K, V]](internal.NewSliceIter(p)))
 }
 
 // OrderedSet produces an order-preserving set based on the Pairs.
 func (p Pairs[K, V]) OrderedSet() Set[Pair[K, V]] {
-	set := MakeOrdered[Pair[K, V]](len(p))
-
-	for idx := range p {
-		set.Add(p[idx])
-	}
-
-	return set
+	return BuildOrdered(internal.BackgroundContext, fun.Iterator[Pair[K, V]](internal.NewSliceIter(p)))
 }

@@ -34,6 +34,21 @@ func MakeUnordered[T comparable](len int) Set[T] { return make(mapSetImpl[T], le
 // NewUnordered constructs a set object for the given type, without prealocation.
 func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T](0) }
 
+// PopulateSet adds all elements in the iterator to the provided Set.
+func PopulateSet[T comparable](ctx context.Context, set Set[T], iter fun.Iterator[T]) {
+	for iter.Next(ctx) {
+		set.Add(iter.Value())
+	}
+}
+
+// BuildUnordered produces a new unordered set from the elements in
+// the iterator.
+func BuildUnordered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set[T] {
+	set := NewUnordered[T]()
+	PopulateSet(ctx, set, iter)
+	return set
+}
+
 type mapSetImpl[T comparable] map[T]struct{}
 
 func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }

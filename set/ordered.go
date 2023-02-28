@@ -25,6 +25,14 @@ func MakeNewOrdered[T comparable]() Set[T] {
 	}
 }
 
+// BuildOrdered creates an ordered set (new implementation) from
+// the contents of the input iterator.
+func BuildOrdered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set[T] {
+	set := MakeNewOrdered[T]()
+	PopulateSet(ctx, set, iter)
+	return set
+}
+
 func (lls *orderedLLSet[T]) Add(it T) {
 	if _, ok := lls.set[it]; ok {
 		return
