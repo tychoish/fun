@@ -59,7 +59,7 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	iter := &internal.MapIterImpl[T]{
 		ChannelIterImpl: internal.ChannelIterImpl[T]{Pipe: pipe},
 	}
-	iter.Ctx, iter.Closer = context.WithCancel(context.Background())
+	iter.Ctx, iter.Closer = context.WithCancel(internal.BackgroundContext)
 	iter.WG.Add(1)
 
 	go func() {
