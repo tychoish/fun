@@ -67,23 +67,20 @@ func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
 		return nil, err
 	}
 
-	q := makeQueue[T]()
-	q.tracker = newQueueLimitTracker(opts)
-	return q, nil
+	return makeQueue[T](newQueueLimitTracker(opts)), nil
 }
 
 // NewUnlimitedQueue produces an unbounded queue.
 func NewUnlimitedQueue[T any]() *Queue[T] {
-	q := makeQueue[T]()
-	q.tracker = &queueNoLimitTrackerImpl{}
-	return q
+	return makeQueue[T](&queueNoLimitTrackerImpl{})
 }
 
-func makeQueue[T any]() *Queue[T] {
+func makeQueue[T any](tracker queueLimitTracker) *Queue[T] {
 	sentinel := new(entry[T])
 	q := &Queue[T]{
-		back:  sentinel,
-		front: sentinel,
+		back:    sentinel,
+		front:   sentinel,
+		tracker: tracker,
 	}
 	q.nempty = sync.NewCond(&q.mu)
 	q.nupdates = sync.NewCond(&q.mu)
