@@ -1,5 +1,4 @@
 // GENERATED FILE FROM ASSERTION PACKAGE
-//
 package check
 
 import (
