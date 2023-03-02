@@ -134,7 +134,7 @@ func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
 	dist Distributor[T],
 ) {
-	subs := set.Synchronize(set.MakeNewOrdered[chan T]())
+	subs := set.Synchronize(set.NewOrdered[chan T]())
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()

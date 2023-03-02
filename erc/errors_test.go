@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 )
 
 func (e *Stack) len() int {
@@ -238,14 +240,10 @@ func TestError(t *testing.T) {
 			if ec.stack != nil {
 				t.Error("should not error")
 			}
-			if err := ec.Resolve(); err != nil {
-				t.Fatal(err)
-			}
+			assert.NotError(t, ec.Resolve())
 
 			When(ec, true, errval)
-			if ec.stack == nil {
-				t.Error("should not error")
-			}
+			check.NotZero(t, ec.stack) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
 			} else if err.Error() != errval {

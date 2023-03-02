@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -18,9 +20,7 @@ func TestPanics(t *testing.T) {
 		ok := Must(func() (bool, error) {
 			return true, nil
 		}())
-		if !ok {
-			t.Error("should be true")
-		}
+		assert.True(t, ok)
 	})
 	t.Run("SafeWithPanic", func(t *testing.T) {
 		ok, err := Safe(func() bool {
@@ -28,12 +28,8 @@ func TestPanics(t *testing.T) {
 				return true, errors.New("error")
 			}())
 		})
-		if err == nil {
-			t.Error("error should be non-nil")
-		}
-		if ok {
-			t.Error("should be zero value of T")
-		}
+		assert.Error(t, err)
+		check.True(t, !ok)
 	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
 		ok, err := Safe(func() bool {
@@ -96,32 +92,22 @@ func TestPanics(t *testing.T) {
 			err := Check(func() {
 				Invariant(1 == 2, "math is a construct")
 			})
-			if err == nil {
-				t.Error("expected error")
-			}
+			assert.Error(t, err)
 			t.Log(err)
-			if !strings.Contains(err.Error(), "math is a construct") {
-				t.Error(err)
-			}
+
+			assert.ErrorIs(t, err, ErrInvariantViolation)
+
+			assert.True(t, IsInvariantViolation(err))
+
 			if !strings.HasPrefix(err.Error(), "panic:") {
 				t.Error(err)
-			}
-			if !strings.Contains(err.Error(), "invariant violation") {
-				t.Error(err)
-			}
-			if !errors.Is(err, ErrInvariantViolation) {
-				t.Error("invariant violation wrapping")
-			}
-			if !IsInvariantViolation(err) {
-				t.Error("invariant violation detection")
 			}
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
 			se := Check(func() { Invariant(false, err) })
-			if !errors.Is(se, err) {
-				t.Fatal(err, se)
-			}
+
+			assert.ErrorIs(t, se, err)
 		})
 		t.Run("ErrorPlus", func(t *testing.T) {
 			err := errors.New("kip")
