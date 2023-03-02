@@ -89,13 +89,6 @@ func WaitObserveAll[T any](observe func(T), ch <-chan T) WaitFunc {
 	}
 }
 
-// ReadOnce reads one item from the channel, and returns it. ReadOne
-// returns early if the context is canceled (ctx.Err()) or the channel
-// is closed (io.EOF).
-func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
-	return internal.ReadOne(ctx, ch)
-}
-
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a
 // WaitFunc. The WaitFunc blocks till it's context is canceled or the
 // channel is either closed or returns one item.
