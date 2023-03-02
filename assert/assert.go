@@ -1,0 +1,193 @@
+// Package assert provides an incredibly simple assertion framework,
+// that relies on generics and simplicity. All assertions are "fatal"
+// and cause the test to abort at the failure line (rather than
+// continue on error).
+package assert
+
+import (
+	"errors"
+	"strings"
+	"testing"
+)
+
+// True causes a test to fail if the condition is false.
+func True(t *testing.T, cond bool) {
+	t.Helper()
+	if !cond {
+		t.Fatal("assertion failure")
+	}
+}
+
+// Equal causes a test to fail if the two (comparable) values are not
+// equal. Be aware that two different pointers and objects passed as
+// interfaces that are implemented by pointer receivers are comparable
+// as equal and will fail this assertion even if their *values* are
+// equal.
+func Equal[T comparable](t *testing.T, valOne, valTwo T) {
+	t.Helper()
+	if valOne != valTwo {
+		t.Fatalf("values unequal: <%v> != <%v>", valOne, valTwo)
+	}
+}
+
+// NotEqual causes a test to fail if two (comparable) values are not
+// equal. Be aware that pointers to objects (including objects passed
+// as interfaces implemented by pointers) will pass this test, even if
+// their values are equal.
+func NotEqual[T comparable](t *testing.T, valOne, valTwo T) {
+	t.Helper()
+	if valOne == valTwo {
+		t.Fatalf("values equal: <%v>", valOne)
+	}
+}
+
+func zeroOf[T any]() T { return *new(T) }
+
+// Zero fails a test if the value is not the zero-value for its type.
+func Zero[T comparable](t *testing.T, val T) {
+	t.Helper()
+	if zeroOf[T]() != val {
+		t.Fatalf("expected zero for value of type %T <%v>", val, val)
+	}
+}
+
+// NotZero fails a test if the value is the zero for its type.
+func NotZero[T comparable](t *testing.T, val T) {
+	t.Helper()
+	if zeroOf[T]() == val {
+		t.Fatalf("expected non-zero for value of type %T", val)
+	}
+}
+
+// Error fails the test if the error is nil.
+func Error(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+}
+
+// NotError fails the test if the error is non-nil.
+func NotError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ErrorIs is an assertion form of errors.Is, and fails the test if
+// the error (or its wrapped values) are not equal to the target
+// error.
+func ErrorIs(t *testing.T, err, target error) {
+	t.Helper()
+	if !errors.Is(err, target) {
+		t.Fatalf("error <%v>, is not <%v>", err, target)
+	}
+}
+
+// Panic asserts that the function raises a panic.
+func Panic(t *testing.T, fn func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected a panic but got none")
+		}
+	}()
+	fn()
+}
+
+// NotPanic asserts that the function does not panic.
+func NotPanic(t *testing.T, fn func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatal("panic: ", r)
+		}
+	}()
+	fn()
+}
+
+// PanicValue asserts that the function raises a panic and that the
+// value, as returned by recover() is equal to the value provided.
+func PanicValue[T comparable](t *testing.T, fn func(), value T) {
+	t.Helper()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected a panic but got none")
+		}
+		pval, ok := r.(T)
+		if !ok {
+			t.Fatalf("panic [%v], not of expected type %T", r, *new(T))
+		}
+		Equal(t, pval, value)
+	}()
+
+	fn()
+}
+
+// Contains asserts that the item is in the slice provided. Empty or
+// nil slices always cause failure.
+func Contains[T comparable](t *testing.T, slice []T, item T) {
+	t.Helper()
+	if len(slice) == 0 {
+		t.Fatal("slice was empty")
+	}
+
+	for _, it := range slice {
+		if it == item {
+			return
+		}
+	}
+
+	t.Fatalf("item <%v> is not in %v", item, slice)
+}
+
+// Contains asserts that the item is *not* in the slice provided. If
+// the input slice is empty, this assertion will never error.
+func NotContains[T comparable](t *testing.T, slice []T, item T) {
+	t.Helper()
+
+	for _, it := range slice {
+		if it == item {
+			t.Fatalf("item <%v> is in %v", item, slice)
+		}
+	}
+}
+
+// Substring asserts that the substring is present in the string.
+func Substring(t *testing.T, str, substr string) {
+	t.Helper()
+	if !strings.Contains(str, substr) {
+		t.Fatalf("expected %q to contain substring %q", str, substr)
+	}
+}
+
+// NotSubstring asserts that the substring is not present in the
+// outer string.
+func NotSubstring(t *testing.T, str, substr string) {
+	t.Helper()
+	if strings.Contains(str, substr) {
+		t.Fatalf("expected %q to contain substring %q", str, substr)
+	}
+}
+
+// Failing asserts that the specified test fails. This was required
+// for validating the behavior of the assertion, and may be useful in
+// your own testing.
+func Failing(t *testing.T, test func(*testing.T)) {
+	t.Helper()
+	sig := make(chan bool)
+	go func() {
+		defer close(sig)
+		tt := &testing.T{}
+		test(tt)
+		if !tt.Failed() {
+			sig <- true
+		}
+	}()
+
+	if <-sig {
+		t.Fatalf("expected test to fail in %s", t.Name())
+	}
+}
