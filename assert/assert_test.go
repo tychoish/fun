@@ -32,6 +32,7 @@ func TestAssertion(t *testing.T) {
 		assert.NotSubstring(t, "the cat", strVal)
 	})
 	t.Run("Failures", func(t *testing.T) {
+		assert.Failing(&testing.B{}, func(b *testing.B) { assert.Failing(b, func(*testing.B) {}) })
 		assert.Failing(t, func(t *testing.T) { assert.Failing(t, func(*testing.T) {}) })
 		assert.Failing(t, func(t *testing.T) { assert.True(t, false) })
 		assert.Failing(t, func(t *testing.T) { assert.Equal(t, 1, 2) })
