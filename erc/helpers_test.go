@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -18,28 +19,45 @@ func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }
 
 func TestCollections(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
-		e1 := &errorTest{val: 100}
-		e2 := &errorTest{val: 200}
+		t.Run("Both", func(t *testing.T) {
+			e1 := &errorTest{val: 100}
+			e2 := &errorTest{val: 200}
 
-		err := Merge(e1, e2)
+			err := Merge(e1, e2)
 
-		if err == nil {
-			t.Fatal("should be an error")
-		}
-		if !errors.Is(err, e1) {
-			t.Error("shold be er1", err, e1)
-		}
+			if err == nil {
+				t.Fatal("should be an error")
+			}
+			if !errors.Is(err, e1) {
+				t.Error("shold be er1", err, e1)
+			}
 
-		if !errors.Is(err, e2) {
-			t.Error("shold be er2", err, e2)
-		}
-		cp := &errorTest{}
-		if !errors.As(err, &cp) {
-			t.Error("should err as", err, cp)
-		}
-		if cp.val != e1.val {
-			t.Error(cp.val)
-		}
+			if !errors.Is(err, e2) {
+				t.Error("shold be er2", err, e2)
+			}
+			cp := &errorTest{}
+			if !errors.As(err, &cp) {
+				t.Error("should err as", err, cp)
+			}
+			if cp.val != e1.val {
+				t.Error(cp.val)
+			}
+		})
+		t.Run("FirstOnly", func(t *testing.T) {
+			e1 := error(&errorTest{val: 100})
+			err := Merge(e1, nil)
+			assert.True(t, err == e1)
+		})
+
+		t.Run("SecondOnly", func(t *testing.T) {
+			e1 := error(&errorTest{val: 100})
+			err := Merge(nil, e1)
+			assert.True(t, err == e1)
+		})
+		t.Run("Neither", func(t *testing.T) {
+			err := Merge(nil, nil)
+			assert.NotError(t, err)
+		})
 	})
 	t.Run("Collapse", func(t *testing.T) {
 		t.Run("From", func(t *testing.T) {
