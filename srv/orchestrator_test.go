@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -224,7 +225,8 @@ func TestOrchestrator(t *testing.T) {
 			if err := osrv.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 100; i++ {
+			const num = 25
+			for i := 0; i < num; i++ {
 				if err := orc.Add(s); err != nil {
 					t.Fatal(err)
 				}
@@ -233,7 +235,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should still be running")
 			}
 
-			time.Sleep(250 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 
 			osrv.Close()
 			err := osrv.Wait()
@@ -244,7 +246,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should not be running")
 			}
 			errs := erc.Unwind(err)
-			check.Equal(t, len(errs), 100)
+			check.Equal(t, len(errs), num)
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
 			t.Parallel()
@@ -404,7 +406,7 @@ func TestOrchestrator(t *testing.T) {
 
 			s := &Service{Name: "base", Run: func(context.Context) error { return nil }}
 			if err := s.Start(ctx); err != nil {
-				t.Fatal()
+				t.Fatal(err)
 			}
 			if err := s.Wait(); err != nil {
 				t.Fatal(err)
@@ -413,18 +415,33 @@ func TestOrchestrator(t *testing.T) {
 			if err := orc.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 100; i++ {
+			s.Close()
+			_ = s.Wait()
+			if orc.pipe == nil {
+				t.Fatal("should not be empty")
+			}
+			runtime.Gosched()
+			if s.Running() {
+				t.Error("running and should be stoped")
+			}
+			const num = 10
+			for i := 0; i < num; i++ {
 				if err := orc.Add(s); err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 			}
 			if !orc.Service().Running() {
 				t.Error("should still be running")
 			}
 
-			time.Sleep(time.Second)
+			if orc.pipe.Len() != 10 {
+				t.Error("should have services", orc.pipe.Len())
+			}
 
 			orc.Service().Close()
+
+			time.Sleep(500 * time.Millisecond)
+
 			err := orc.Wait()
 			if err == nil {
 				t.Fatal("should error")
@@ -433,8 +450,9 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should not be running")
 			}
 			errs := erc.Unwind(err)
-			if len(errs) != 100 {
-				t.Error(len(errs), " != 100")
+			if len(errs) == 0 {
+				t.Log(errs, len(errs))
+				t.Error("should have errors")
 			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {

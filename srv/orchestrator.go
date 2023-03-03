@@ -132,10 +132,8 @@ func (or *Orchestrator) Service() *Service {
 				}(s)
 			}
 
-			fun.Wait(ctx, wg)
-
+			wg.Wait()
 			ec.Add(iter.Close())
-
 			return ec.Resolve()
 		},
 		Cleanup: func() error {
