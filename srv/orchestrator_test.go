@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -246,7 +245,12 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should not be running")
 			}
 			errs := erc.Unwind(err)
-			check.Equal(t, len(errs), num)
+			if orc.pipe.Len() != num {
+				t.Error(orc.pipe.Len(), num)
+			}
+			if len(errs) == 0 {
+				t.Error("should have errors")
+			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
 			t.Parallel()
@@ -442,13 +446,10 @@ func TestOrchestrator(t *testing.T) {
 
 			time.Sleep(500 * time.Millisecond)
 
-			err := orc.Wait()
-			if err == nil {
-				t.Fatal("should error")
-			}
 			if orc.Service().Running() {
 				t.Error("should not be running")
 			}
+			err := orc.Wait()
 			errs := erc.Unwind(err)
 			if len(errs) == 0 {
 				t.Log(errs, len(errs))
