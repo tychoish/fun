@@ -52,7 +52,7 @@ type mapSetImpl[T comparable] map[T]struct{}
 func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }
 func (s mapSetImpl[T]) Len() int          { return len(s) }
 func (s mapSetImpl[T]) Delete(item T)     { delete(s, item) }
-func (s mapSetImpl[T]) Check(item T) bool { _, ok := s[item]; return ok }
+func (s mapSetImpl[T]) Check(item T) bool { return checkInMap(item, s) }
 func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	pipe := make(chan T)
 

@@ -18,6 +18,9 @@ type orderedLLSet[T comparable] struct {
 // synchronously--the "old" implementation does a lazy deletion that
 // batches--and this implementation may perform more predictably for
 // use cases that do a large number of deletions.
+//
+// This implementation does not permit iteration with concurrent
+// deletes, as is the case with the old ordered implementation.
 func MakeNewOrdered[T comparable]() Set[T] {
 	return &orderedLLSet[T]{
 		set:   map[T]*seq.Element[T]{},
@@ -33,8 +36,10 @@ func BuildOrdered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set[T
 	return set
 }
 
+func checkInMap[K comparable, V any](key K, mp map[K]V) bool { _, ok := mp[key]; return ok }
+
 func (lls *orderedLLSet[T]) Add(it T) {
-	if _, ok := lls.set[it]; ok {
+	if checkInMap(it, lls.set) {
 		return
 	}
 
@@ -43,8 +48,9 @@ func (lls *orderedLLSet[T]) Add(it T) {
 	lls.set[it] = lls.elems.Back()
 }
 
-func (lls *orderedLLSet[T]) Len() int        { return lls.elems.Len() }
-func (lls *orderedLLSet[T]) Check(it T) bool { _, ok := lls.set[it]; return ok }
+func (lls *orderedLLSet[T]) Iterator() fun.Iterator[T] { return seq.ListValues(lls.elems.Iterator()) }
+func (lls *orderedLLSet[T]) Len() int                  { return lls.elems.Len() }
+func (lls *orderedLLSet[T]) Check(it T) bool           { return checkInMap(it, lls.set) }
 func (lls *orderedLLSet[T]) Delete(it T) {
 	e, ok := lls.set[it]
 	if !ok {
@@ -53,10 +59,6 @@ func (lls *orderedLLSet[T]) Delete(it T) {
 
 	e.Remove()
 	delete(lls.set, it)
-}
-
-func (lls orderedLLSet[T]) Iterator() fun.Iterator[T] {
-	return seq.ListValues(lls.elems.Iterator())
 }
 
 type orderedSetItem[T comparable] struct {
@@ -118,7 +120,7 @@ func (s *orderedSetImpl[T]) Add(in T) {
 	s.elems = append(s.elems, val)
 }
 
-func (s *orderedSetImpl[T]) Check(in T) bool { _, ok := s.set[in]; return ok }
+func (s *orderedSetImpl[T]) Check(in T) bool { return checkInMap(in, s.set) }
 func (s *orderedSetImpl[T]) Len() int        { return len(s.set) }
 func (s *orderedSetImpl[T]) Delete(it T) {
 	val, ok := s.set[it]

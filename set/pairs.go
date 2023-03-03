@@ -40,7 +40,7 @@ func MakePairs[K comparable, V comparable](in map[K]V) Pairs[K, V] {
 func (p Pairs[K, V]) Map() map[K]V {
 	out := make(map[K]V, len(p))
 	for idx := range p {
-		if _, ok := out[p[idx].Key]; ok {
+		if checkInMap(p[idx].Key, out) {
 			continue
 		}
 		out[p[idx].Key] = p[idx].Value
