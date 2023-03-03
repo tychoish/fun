@@ -12,18 +12,27 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/testt"
 )
 
-func Has[T comparable](t *testing.T, ctx context.Context, iter fun.Iterator[T], item T) {
+func Has[T comparable](t testing.TB, iter fun.Iterator[T], item T) {
 	t.Helper()
 
-	fun.Observe(ctx, iter, func(val T) { assert.Equal(t, item, val) })
+	ctx := testt.Context(t)
+
+	for iter.Next(ctx) {
+		if iter.Value() == item {
+			return
+		}
+	}
+
+	t.Fatalf("did not observe %v in iterator", item)
 }
 
-func NotHas[T comparable](t *testing.T, ctx context.Context, iter fun.Iterator[T], item T) {
+func NotHas[T comparable](t testing.TB, iter fun.Iterator[T], item T) {
 	t.Helper()
 
-	fun.Observe(ctx, iter, func(val T) { assert.NotEqual(t, item, val) })
+	fun.Observe(testt.Context(t), iter, func(val T) { assert.NotEqual(t, item, val) })
 }
 
 func CheckSeenMap[T comparable](t *testing.T, elems []T, seen map[T]struct{}) {
