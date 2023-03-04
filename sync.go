@@ -78,13 +78,21 @@ func WaitObserve[T any](observe func(T), ch <-chan T) WaitFunc {
 // WaitFunc's context to be canceled. WaitObserveAll does not begin
 // processing the channel until the WaitFunc is called.
 func WaitObserveAll[T any](observe func(T), ch <-chan T) WaitFunc {
+	return WaitObserveAllCtx(func(_ context.Context, in T) { observe(in) }, ch)
+}
+
+// WaitObserveAllCtx passes the output of the channel into the observer
+// function with a context, waiting for the input channel to be closed or the
+// WaitFunc's context to be canceled. WaitObserveAll does not begin
+// processing the channel until the WaitFunc is called.
+func WaitObserveAllCtx[T any](observe func(context.Context, T), ch <-chan T) WaitFunc {
 	return func(ctx context.Context) {
 		for {
 			val, err := ReadOne(ctx, ch)
 			if err != nil {
 				return
 			}
-			observe(val)
+			observe(ctx, val)
 		}
 	}
 }
