@@ -110,7 +110,9 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // fun.WaitMerge function, but that can be more easily integrated into
 // existing orchestration tools.
 //
-// When the service returns all worker Goroutines will have returned.
+// When the service returns all worker Goroutines as well as the input
+// worker will have returned. Use a blocking pubsub iterator to
+// dispatch wait functions throughout the lifecycle of your program.
 func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
@@ -130,7 +132,8 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 			fun.Wait(ctx, wg)
 			return nil
 		},
-		Cleanup: func() error { wg.Wait(); return ec.Resolve() },
+		Cleanup:  func() error { wg.Wait(); return ec.Resolve() },
+		Shutdown: iter.Close,
 	}
 }
 
@@ -146,6 +149,7 @@ func ProcessIterator[T any](
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx, iter, mapper, opts)
 		},
+		Shutdown: iter.Close,
 	}
 }
 
