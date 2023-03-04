@@ -109,7 +109,6 @@ func Safe[T any](fn func() T) (out T, err error) {
 func buildRecoverError(r any) error {
 	switch in := r.(type) {
 	case error:
-		fmt.Println(r, errors.Is(in, ErrInvariantViolation))
 		return fmt.Errorf("panic: %w", in)
 	default:
 		return fmt.Errorf("panic: %v", in)
