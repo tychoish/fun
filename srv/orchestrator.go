@@ -111,9 +111,7 @@ func (or *Orchestrator) Service() *Service {
 			iter := or.pipe.IteratorBlocking()
 
 			wg := &sync.WaitGroup{}
-			seen := 0
 			for iter.Next(ctx) {
-				seen++
 				s := iter.Value()
 				if s.Running() {
 					continue
