@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -176,5 +177,21 @@ func TestWait(t *testing.T) {
 		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Millisecond {
 			t.Error(time.Since(start))
 		}
+	})
+}
+
+func TestAtomic(t *testing.T) {
+	t.Run("Default", func(t *testing.T) {
+		at := NewAtomic(1000)
+		assert.Equal(t, at.Get(), 1000)
+	})
+	t.Run("Zero", func(t *testing.T) {
+		at := &Atomic[int]{}
+		assert.Equal(t, at.Get(), 0)
+	})
+	t.Run("RoundTrip", func(t *testing.T) {
+		at := &Atomic[int]{}
+		at.Set(42)
+		assert.Equal(t, at.Get(), 42)
 	})
 }

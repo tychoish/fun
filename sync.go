@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/internal"
@@ -142,3 +143,21 @@ func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 
 	return WaitGroup(wg)
 }
+
+// Atomic is a very simple atomic Get/Set operation, providing a
+// generic type-safe implementation wrapping
+// sync/atomic.Value.
+type Atomic[T any] struct {
+	atomic.Value
+}
+
+// NewAtomic creates a new Atomic Get/Set value with the initial value
+// already set.
+func NewAtomic[T any](initial T) *Atomic[T] { a := &Atomic[T]{}; a.Set(initial); return a }
+
+// Set atomically sets the value of the Atomic.
+func (a *Atomic[T]) Set(in T) { a.Value.Store(in) }
+
+// Get resolves the atomic value, returning the zero value of the type
+// T if the value is unset.
+func (a *Atomic[T]) Get() T { return ZeroWhenNil[T](a.Value.Load()) }
