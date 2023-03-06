@@ -182,7 +182,6 @@ func Failing[T testing.TB](t T, test func(T)) {
 		defer close(sig)
 
 		var tt testing.TB
-		tt = t
 
 		switch testing.TB(t).(type) {
 		case *testing.T:
