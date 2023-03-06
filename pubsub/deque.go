@@ -136,7 +136,7 @@ func (dq *Deque[T]) PopBack() (T, bool) { defer dq.withLock()(); return dq.pop(d
 // WaitFront pops the first (head) item in the deque, and if the queue is
 // empty, will block until an item is added, returning an error if the
 // context canceled or the queue is closed.
-func (dq *Deque[T]) WaitFront(ctx context.Context) (T, error) {
+func (dq *Deque[T]) WaitFront(ctx context.Context) (v T, err error) {
 	defer dq.withLock()()
 	return dq.waitPop(ctx, dqNext)
 }
@@ -199,6 +199,9 @@ func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 
 func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() *element[T]) error {
 	if dq.tracker.cap() > dq.tracker.len() {
+		if dq.tracker.len() == 0 {
+			defer dq.updates.Signal()
+		}
 		return dq.addAfter(it, afterGetter())
 	}
 
@@ -325,7 +328,6 @@ func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, erro
 	it, ok := dq.pop(next)
 
 	fun.Invariant(ok, "deque can not be empty")
-
 	return it, nil
 }
 

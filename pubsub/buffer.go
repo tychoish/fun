@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -74,17 +75,6 @@ func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
 	}
 }
 
-// DistributorBuffer produces a Distributor with FIFO semantics and
-// blocking Push/Pop operations when the Queue is at capacity. This
-// should have similar semantics as a channel, but callers may
-// (carefully) interact with the Deque structure while it's in use.
-func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
-	return &distributorImpl[T]{
-		push: d.WaitPushBack,
-		pop:  d.WaitFront,
-	}
-}
-
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
@@ -125,14 +115,13 @@ func DistributorIterator[T any](dist Distributor[T]) fun.Iterator[T] {
 
 type distIter[T any] struct {
 	dist   Distributor[T]
-	closed bool
+	closed atomic.Bool
 	value  T
 }
 
 func (d *distIter[T]) Close() error {
-	if !d.closed {
+	if !d.closed.Swap(true) {
 		d.value = *new(T)
-		d.closed = true
 	}
 	return nil
 }
@@ -140,7 +129,7 @@ func (d *distIter[T]) Close() error {
 func (d *distIter[T]) Value() T { return d.value }
 
 func (d *distIter[T]) Next(ctx context.Context) bool {
-	if d.closed || ctx.Err() != nil {
+	if d.closed.Load() || ctx.Err() != nil {
 		return false
 	}
 	val, err := d.dist.Receive(ctx)

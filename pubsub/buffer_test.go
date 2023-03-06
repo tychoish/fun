@@ -11,6 +11,17 @@ import (
 	"github.com/tychoish/fun/set"
 )
 
+// DistributorBuffer produces a Distributor with FIFO semantics and
+// blocking Push/Pop operations when the Queue is at capacity. This
+// should have similar semantics as a channel, but callers may
+// (carefully) interact with the Deque structure while it's in use.
+func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
+	return &distributorImpl[T]{
+		push: d.WaitPushBack,
+		pop:  d.WaitFront,
+	}
+}
+
 func TestDistributor(t *testing.T) {
 	// TODO: add specific unit tests, most of the distributor code
 	// is tested via the broker.
