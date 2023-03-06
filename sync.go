@@ -147,9 +147,7 @@ func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 // Atomic is a very simple atomic Get/Set operation, providing a
 // generic type-safe implementation wrapping
 // sync/atomic.Value.
-type Atomic[T any] struct {
-	atomic.Value
-}
+type Atomic[T any] struct{ atomic.Value }
 
 // NewAtomic creates a new Atomic Get/Set value with the initial value
 // already set.
