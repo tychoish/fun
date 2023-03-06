@@ -103,8 +103,8 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 
 // Wait creates a service that runs until *both* all wait functions
 // have returned *and* the iterator is exhausted. The Service's wait
-// function returns an error that aggregates all errors encountered by
-// the constituent wait functions.
+// function returns an error that aggregates all errors (e.g. panics)
+// encountered by the constituent wait functions.
 //
 // Wait produces a service that fills the same role as the
 // fun.WaitMerge function, but that can be more easily integrated into
