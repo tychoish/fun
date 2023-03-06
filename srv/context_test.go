@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/pubsub"
 )
 
 func TestContext(t *testing.T) {
@@ -61,6 +65,29 @@ func TestContext(t *testing.T) {
 				t.Error("should have replaced context")
 			}
 		})
+		t.Run("HasOrchestrator", func(t *testing.T) {
+			orc := &Orchestrator{}
+
+			ctx := context.Background()
+			assert.True(t, !HasOrchestrator(ctx))
+
+			ctx = SetOrchestrator(ctx, orc)
+			assert.True(t, HasOrchestrator(ctx))
+		})
+		t.Run("DoubleSetNoop", func(t *testing.T) {
+			orc := &Orchestrator{}
+
+			ctx := context.Background()
+
+			ctx = SetOrchestrator(ctx, orc)
+			assert.True(t, HasOrchestrator(ctx))
+			_, err := fun.Safe(func() context.Context { return SetOrchestrator(ctx, nil) })
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, fun.ErrInvariantViolation)
+
+			rtorc := GetOrchestrator(ctx)
+			assert.Equal(t, rtorc, orc)
+		})
 	})
 	t.Run("BaseContext", func(t *testing.T) {
 		t.Run("Root", func(t *testing.T) {
@@ -107,7 +134,7 @@ func TestContext(t *testing.T) {
 
 			ctx, cancel1 := context.WithCancel(rctx)
 			defer cancel1()
-			ctx = SetShutdown(ctx)
+			ctx = SetShutdownSignal(ctx)
 
 			ctx2, cancel2 := context.WithCancel(ctx)
 			defer cancel2()
@@ -115,7 +142,7 @@ func TestContext(t *testing.T) {
 			ctx3, cancel3 := context.WithCancel(ctx2)
 			defer cancel3()
 
-			GetShutdown(ctx2)()
+			GetShutdownSignal(ctx2)()
 			if ctx3.Err() == nil {
 				t.Error("shutdown did not propogate")
 			}
@@ -132,7 +159,7 @@ func TestContext(t *testing.T) {
 
 			ctxleft, cancelleft := context.WithCancel(ctx)
 			defer cancelleft()
-			ctxleft = SetShutdown(ctxleft)
+			ctxleft = SetShutdownSignal(ctxleft)
 			ctxright, cancelright := context.WithCancel(ctx)
 			defer cancelright()
 
@@ -144,7 +171,7 @@ func TestContext(t *testing.T) {
 			cl3, cl3cancel := context.WithCancel(cl2)
 			defer cl3cancel()
 
-			GetShutdown(cl2)()
+			GetShutdownSignal(cl2)()
 			if cl3.Err() == nil {
 				t.Error("should be canceled")
 			}
@@ -179,7 +206,7 @@ func TestContext(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		ctx = SetShutdown(ctx)
+		ctx = SetShutdownSignal(ctx)
 		ctx = SetBaseContext(ctx)
 		ctx = WithOrchestrator(ctx)
 
@@ -193,9 +220,101 @@ func TestContext(t *testing.T) {
 		} else {
 			var _ context.Context = bctx
 		}
-		if shutdown := GetShutdown(ctx); shutdown != nil {
+		if shutdown := GetShutdownSignal(ctx); shutdown != nil {
 			var _ context.CancelFunc = shutdown
 		}
 	})
+}
 
+func TestShutdownManager(t *testing.T) {
+	t.Run("Initializer", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		assert.True(t, !HasOrchestrator(ctx))
+		assert.True(t, !HasShutdownSignal(ctx))
+		assert.True(t, !HasBaseContext(ctx))
+		assert.True(t, !HasShutdownManager(ctx))
+
+		// setup shutdown manager
+		ctx = WithShutdownManager(ctx)
+
+		// we have to set at least these two
+		assert.True(t, HasOrchestrator(ctx))
+		assert.True(t, HasShutdownManager(ctx))
+
+		// some are not set
+		assert.True(t, !HasShutdownSignal(ctx))
+		assert.True(t, !HasBaseContext(ctx))
+	})
+	t.Run("WithShutdownManager", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = WithShutdownManager(ctx)
+		assert.True(t, HasShutdownManager(ctx))
+
+		called := &atomic.Bool{}
+		AddToShutdownManager(ctx, func(ctx context.Context) {
+			called.Store(true)
+		})
+
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+		assert.NotError(t, GetOrchestrator(ctx).Wait())
+		assert.True(t, called.Load())
+	})
+	t.Run("AddToQueue", func(t *testing.T) {
+		t.Run("Channel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan fun.WaitFunc)
+			queue := pubsub.DistributorChannel(ch)
+
+			ctx = context.WithValue(ctx, shutdownWaitQueueCtxKey{}, queue)
+			srvc := Wait(pubsub.DistributorIterator(queue))
+			assert.NotError(t, srvc.Start(ctx))
+
+			called := &atomic.Bool{}
+			AddToShutdownManager(ctx, func(ctx context.Context) {
+				called.Store(true)
+			})
+			time.Sleep(10 * time.Millisecond)
+			srvc.Close()
+			if err := srvc.Wait(); err != nil {
+				t.Error(err)
+			}
+
+			if !called.Load() {
+				t.Error("should have been called")
+			}
+
+		})
+		t.Run("Deque", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cue := pubsub.NewUnlimitedQueue[fun.WaitFunc]()
+
+			queue := pubsub.DistributorQueue(cue)
+			ctx = context.WithValue(ctx, shutdownWaitQueueCtxKey{}, queue)
+
+			srvc := Wait(pubsub.DistributorIterator(queue))
+			assert.NotError(t, srvc.Start(ctx))
+
+			called := &atomic.Bool{}
+			AddToShutdownManager(ctx, func(ctx context.Context) {
+				called.Store(true)
+			})
+
+			time.Sleep(100 * time.Millisecond)
+			srvc.Close()
+			if err := srvc.Wait(); err != nil {
+				t.Error(err)
+			}
+
+			if !called.Load() {
+				t.Error("should have been called")
+			}
+		})
+	})
 }
