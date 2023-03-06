@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -59,16 +60,25 @@ type Service struct {
 	// must return before the Cleanup function runs.
 	Shutdown func() error
 
+	// ErrorHandler functions, if specified, are called when the
+	// service returns, with the output of the Service's error
+	// output. This is always the result of an
+	// erc.Collector.Resolve() method, and so contains the
+	// aggregated errors and panics collected during the service's
+	// execution (e.g. Run, Shutdown, Cleanup). Caller's may use
+	// this during
+	ErrorHandler fun.Atomic[func(error)]
+
 	isRunning  atomic.Bool
 	isFinished atomic.Bool
+	isStarted  atomic.Bool
 	doStart    sync.Once
 	cancel     context.CancelFunc
 	ec         erc.Collector
 
 	// the mutex just protects the signal. this is a race in some
 	// tests, but should generally not be an issue.
-	mtx sync.Mutex
-	sig chan struct{}
+	wg sync.WaitGroup
 }
 
 // String implements fmt.Stringer and includes value of s.Name.
@@ -95,46 +105,65 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	s.doStart.Do(func() {
+		defer s.isStarted.Store(true)
 		ec := &s.ec
-		shutdownSignal := make(chan struct{})
+		ehSignal := make(chan struct{})
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			defer erc.Recover(ec)
+			<-ehSignal
+			eh := s.ErrorHandler.Get()
+			if eh != nil {
+				defer erc.Recover(ec)
+				eh(ec.Resolve())
+			}
+		}()
 
-		s.setSignal()
 		ctx, s.cancel = context.WithCancel(ctx)
 
 		// set running to true here so that close is always safe
 		s.isRunning.Store(true)
-
+		shutdownSignal := make(chan struct{})
 		if s.Shutdown != nil {
 			// capture it just to be safe.
 			shutdown := s.Shutdown
+			s.wg.Add(1)
 			go func() {
+				defer s.wg.Done()
 				defer close(shutdownSignal)
 				defer erc.Recover(ec)
 				<-ctx.Done()
 				s.ec.Add(shutdown())
 			}()
 		} else {
-			close(shutdownSignal)
+			s.wg.Add(1)
+			go func() {
+				defer s.wg.Done()
+				defer close(shutdownSignal)
+				defer erc.Recover(ec)
+				<-ctx.Done()
+			}()
 		}
 
+		s.wg.Add(1)
 		go func() {
-			defer s.fireSignal()
+			defer s.wg.Done()
 			defer s.isRunning.Store(false)
 			defer s.isFinished.Store(true)
-
 			if s.Cleanup != nil {
 				cleanup := s.Cleanup
 				// this catches a panic during shutdown
 				defer erc.Recover(ec)
 				defer func() { ec.Add(cleanup()) }()
 			}
-			defer func() { <-shutdownSignal }()
+			defer func() { defer close(ehSignal); <-shutdownSignal }()
 			// this catches a panic in the execution of
 			// the startup/op hook
 			defer erc.Recover(ec)
 
+			defer s.cancel()
 			ec.Add(s.Run(ctx))
-			s.cancel()
 		}()
 	})
 
@@ -161,27 +190,9 @@ func (s *Service) Close() {
 // running the service, the shutdown hook, and any panics encountered
 // during the service's execution.
 func (s *Service) Wait() error {
-	s.mtx.Lock()
-	if s.sig == nil {
-		s.mtx.Unlock()
+	if !s.isStarted.Load() {
 		return ErrServiceNotStarted
 	}
-	s.mtx.Unlock()
-
-	<-s.sig
+	s.wg.Wait()
 	return s.ec.Resolve()
-}
-
-func (s *Service) setSignal() {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.sig = make(chan struct{})
-}
-
-func (s *Service) fireSignal() {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	close(s.sig)
 }

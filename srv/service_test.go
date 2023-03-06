@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -308,14 +311,14 @@ func TestService(t *testing.T) {
 			hs1 := &http.Server{
 				Addr: "127.0.0.2:2340",
 			}
-			s1 := HTTP("test", 100*time.Millisecond, hs1)
+			s1 := HTTP("test", 500*time.Millisecond, hs1)
 			if err := s1.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if !s1.Running() {
 				t.Error("should be running")
 			}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			if !s1.Running() {
 				t.Error("should STILL be running")
 			}
@@ -374,5 +377,24 @@ func TestService(t *testing.T) {
 			}
 		})
 	})
+	t.Run("ErrorHandler", func(t *testing.T) {
+		var oberr error
+		s := &Service{
+			Run:          func(context.Context) error { return errors.New("run") },
+			Shutdown:     func() error { return errors.New("shutdown") },
+			Cleanup:      func() error { panic("cleanup") },
+			ErrorHandler: *fun.NewAtomic(func(err error) { oberr = err }),
+		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		assert.NotError(t, s.Start(ctx))
+		err := s.Wait()
+		errs := erc.Unwind(err)
+		assert.Error(t, err)
+		check.True(t, len(errs) == 3)
+		assert.Error(t, oberr)
+		assert.Equal(t, err.Error(), oberr.Error())
+	})
 }
