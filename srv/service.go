@@ -108,10 +108,12 @@ func (s *Service) Start(ctx context.Context) error {
 		defer s.isStarted.Store(true)
 		ec := &s.ec
 		ehSignal := make(chan struct{})
+		mainSignal := make(chan struct{})
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
 			defer erc.Recover(ec)
+			<-mainSignal
 			<-ehSignal
 			eh := s.ErrorHandler.Get()
 			if eh != nil {
@@ -149,6 +151,7 @@ func (s *Service) Start(ctx context.Context) error {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
+			defer close(mainSignal)
 			defer s.isRunning.Store(false)
 			defer s.isFinished.Store(true)
 			if s.Cleanup != nil {
