@@ -29,4 +29,4 @@ jobs:
         if: env.GIT_DIFF
         run: |
           export GOMAXPROCS=$(($(nproc) + 2))
-          go list -f "{{ if (or .TestGoFiles .XTestGoFiles) }}{{ .ImportPath }}{{ end }}" ./... | xargs -t go test -race -timeout=2m
+          go test -race -timeout=2m ./...
