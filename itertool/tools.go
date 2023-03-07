@@ -3,7 +3,6 @@ package itertool
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -85,7 +84,7 @@ func ParallelForEach[T any](
 	defer cancel()
 
 	catcher := &erc.Collector{}
-	wg := &sync.WaitGroup{}
+	wg := &fun.WaitGroup{}
 	defer func() { err = catcher.Resolve() }()
 	defer erc.Recover(catcher)
 	defer erc.Check(catcher, iter.Close)
@@ -101,14 +100,14 @@ func ParallelForEach[T any](
 		go forEachWorker(ctx, catcher, wg, opts, splits[idx], fn, cancel)
 	}
 
-	wg.Wait()
+	wg.Wait(internal.BackgroundContext)
 	return
 }
 
 func forEachWorker[T any](
 	ctx context.Context,
 	catcher *erc.Collector,
-	wg *sync.WaitGroup,
+	wg *fun.WaitGroup,
 	opts Options,
 	iter fun.Iterator[T],
 	fn func(context.Context, T) error,
@@ -369,7 +368,7 @@ func Map[T any, O any](
 		}
 	}()
 
-	wg := &sync.WaitGroup{}
+	wg := &fun.WaitGroup{}
 	for i := 0; i < opts.NumWorkers; i++ {
 		wg.Add(1)
 		go mapWorker(iterCtx, catcher, wg, opts, mapper, abort, fromInput, toOutput)
@@ -381,7 +380,7 @@ func Map[T any, O any](
 		defer func() { out.Error = catcher.Resolve() }()
 		defer erc.Recover(catcher)
 		<-signal
-		fun.Wait(ctx, wg)
+		wg.Wait(ctx)
 		abort()
 		close(toOutput)
 	}()
@@ -392,7 +391,7 @@ func Map[T any, O any](
 func mapWorker[T any, O any](
 	ctx context.Context,
 	catcher *erc.Collector,
-	wg *sync.WaitGroup,
+	wg *fun.WaitGroup,
 	opts Options,
 	mapper ProcessingFunction[T, O],
 	abort func(),
@@ -499,7 +498,7 @@ func Generate[T any](
 		opts.NumWorkers = 1
 	}
 
-	wg := &sync.WaitGroup{}
+	wg := &fun.WaitGroup{}
 	for i := 0; i < opts.NumWorkers; i++ {
 		wg.Add(1)
 		go generator(gctx, catcher, wg, opts, fn, abort, pipe)
@@ -509,7 +508,7 @@ func Generate[T any](
 		defer out.WG.Done()
 		defer func() { out.Error = catcher.Resolve() }()
 		defer erc.Recover(catcher)
-		wg.Wait()
+		wg.Wait(ctx)
 		abort()
 		// can't wait against a context here because it's canceled
 		close(pipe)
@@ -521,7 +520,7 @@ func Generate[T any](
 func generator[T any](
 	ctx context.Context,
 	catcher *erc.Collector,
-	wg *sync.WaitGroup,
+	wg *fun.WaitGroup,
 	opts Options,
 	fn func(context.Context) (T, error),
 	abort func(),

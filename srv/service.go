@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/internal"
 )
 
 var (
@@ -78,7 +79,7 @@ type Service struct {
 
 	// the mutex just protects the signal. this is a race in some
 	// tests, but should generally not be an issue.
-	wg sync.WaitGroup
+	wg fun.WaitGroup
 }
 
 // String implements fmt.Stringer and includes value of s.Name.
@@ -193,9 +194,14 @@ func (s *Service) Close() {
 // running the service, the shutdown hook, and any panics encountered
 // during the service's execution.
 func (s *Service) Wait() error {
+	return s.waitFor(internal.BackgroundContext)
+}
+
+func (s *Service) waitFor(ctx context.Context) error {
 	if !s.isStarted.Load() {
 		return ErrServiceNotStarted
 	}
-	s.wg.Wait()
+	s.wg.Wait(ctx)
 	return s.ec.Resolve()
+
 }

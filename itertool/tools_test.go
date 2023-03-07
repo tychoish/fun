@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"testing"
 	"time"
 
@@ -216,7 +215,7 @@ func TestRangeSplit(t *testing.T) {
 
 			set := set.Synchronize(set.MakeOrdered[string](100))
 
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 10; i++ {
 				wg.Add(1)
 
@@ -230,7 +229,7 @@ func TestRangeSplit(t *testing.T) {
 				}()
 			}
 
-			fun.Wait(ctx, wg)
+			wg.Wait(ctx)
 
 			if set.Len() != 100 {
 				t.Error("did not iterate enough")
@@ -253,7 +252,7 @@ func TestRangeSplit(t *testing.T) {
 
 		set := set.Synchronize(set.MakeOrdered[string](100))
 
-		wg := &sync.WaitGroup{}
+		wg := &fun.WaitGroup{}
 		for _, iter := range splits {
 			wg.Add(1)
 
@@ -266,7 +265,7 @@ func TestRangeSplit(t *testing.T) {
 			}(iter)
 		}
 
-		fun.Wait(ctx, wg)
+		wg.Wait(ctx)
 
 		if set.Len() != 100 {
 			t.Error("did not iterate enough")
@@ -331,7 +330,7 @@ func TestTools(t *testing.T) {
 		pipe := make(chan string, 1)
 		output := make(chan int)
 		catcher := &erc.Collector{}
-		wg := &sync.WaitGroup{}
+		wg := &fun.WaitGroup{}
 		pipe <- t.Name()
 		wg.Add(1)
 		go mapWorker(
@@ -346,10 +345,10 @@ func TestTools(t *testing.T) {
 		)
 		time.Sleep(10 * time.Millisecond)
 		cancel()
-		wg.Wait()
 
-		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Millisecond)
+		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
+		wg.Wait(ctx)
 
 		count := 0
 	CONSUME:

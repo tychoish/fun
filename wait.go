@@ -38,11 +38,12 @@ func WaitBlockingObserve[T any](observe func(T), wait func() T) WaitFunc {
 	return func(context.Context) { observe(wait()) }
 }
 
-// WaitGroup converts a WaitGroup into a fun.WaitFunc.
+// WaitForGroup converts a WaitGroup into a fun.WaitFunc.
 //
 // This operation will leak a go routine if the WaitGroup
-// never returns and the context is canceled.
-func WaitGroup(wg *sync.WaitGroup) WaitFunc {
+// never returns and the context is canceled. To avoid a leaked
+// goroutine, use the fun.WaitGroup type.
+func WaitForGroup(wg *sync.WaitGroup) WaitFunc {
 	sig := make(chan struct{})
 
 	go func() { defer close(sig); wg.Wait() }()
@@ -104,7 +105,7 @@ func WaitContext(ctx context.Context) WaitFunc { return WaitChannel(ctx.Done()) 
 // WaitAdd starts a goroutine that waits for the WaitFunc to return,
 // incrementing and decrementing the sync.WaitGroup as
 // appropriate. This WaitFunc blocks on WaitAdd's context.
-func WaitAdd(ctx context.Context, wg *sync.WaitGroup, fn WaitFunc) {
+func WaitAdd(ctx context.Context, wg *WaitGroup, fn WaitFunc) {
 	wg.Add(1)
 
 	go func() {
@@ -125,7 +126,7 @@ func WaitAdd(ctx context.Context, wg *sync.WaitGroup, fn WaitFunc) {
 // and pubsub.Queue or pubsub.Deque blocking iterators to create
 // worker pools.
 func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
-	wg := &sync.WaitGroup{}
+	wg := &WaitGroup{}
 
 	wg.Add(1)
 	go func() {
@@ -133,5 +134,5 @@ func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 		Observe(ctx, iter, func(fn WaitFunc) { WaitAdd(ctx, wg, fn) })
 	}()
 
-	return WaitGroup(wg)
+	return wg.Wait
 }

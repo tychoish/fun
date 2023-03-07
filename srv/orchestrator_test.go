@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -67,6 +67,9 @@ func TestOrchestrator(t *testing.T) {
 	})
 	t.Run("Service", func(t *testing.T) {
 		t.Run("MultipleCalls", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			orc := &Orchestrator{}
 			if orc.srv != nil {
 				t.Error("service is created lazily, later")
@@ -79,7 +82,7 @@ func TestOrchestrator(t *testing.T) {
 			if orc.srv == nil {
 				t.Error("service is created lazily, by now")
 			}
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				go func(id int) {
@@ -91,12 +94,12 @@ func TestOrchestrator(t *testing.T) {
 					}
 				}(i)
 			}
-			wg.Wait()
+			wg.Wait(ctx)
 		})
 		t.Run("RunEndToEnd", func(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -118,7 +121,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			// wait for all services to return
-			wg.Wait()
+			wg.Wait(ctx)
 			// close wrapper service
 			s.Close()
 			if err := s.Wait(); err != nil {
@@ -148,7 +151,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("PropogateErrors", func(t *testing.T) {
 			orc := &Orchestrator{}
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -169,7 +172,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			// wait for all services to return
-			wg.Wait()
+			wg.Wait(ctx)
 			// close wrapper service
 			s.Close()
 
@@ -283,7 +286,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("LogRunningServices", func(t *testing.T) {
 			orc := &Orchestrator{}
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(makeBlockingService(t)); err != nil {
@@ -311,7 +314,7 @@ func TestOrchestrator(t *testing.T) {
 			t.Parallel()
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -332,7 +335,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			// wait for all services to return
-			wg.Wait()
+			wg.Wait(ctx)
 			// close wrapper service
 			orc.Service().Close()
 			if err := orc.Wait(); err != nil {
@@ -345,7 +348,7 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("PropogateErrors", func(t *testing.T) {
 			t.Parallel()
 			orc := &Orchestrator{}
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -365,7 +368,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			// wait for all services to return
-			wg.Wait()
+			wg.Wait(ctx)
 			// close wrapper service
 			orc.Service().Close()
 
@@ -428,7 +431,7 @@ func TestOrchestrator(t *testing.T) {
 			if s.Running() {
 				t.Error("running and should be stoped")
 			}
-			const num = 10
+			const num = 100
 			for i := 0; i < num; i++ {
 				if err := orc.Add(s); err != nil {
 					t.Error(err)
@@ -438,7 +441,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should still be running")
 			}
 
-			if orc.pipe.Len() != 10 {
+			if orc.pipe.Len() != num {
 				t.Error("should have services", orc.pipe.Len())
 			}
 
@@ -452,7 +455,7 @@ func TestOrchestrator(t *testing.T) {
 			err := orc.Wait()
 			errs := erc.Unwind(err)
 			if len(errs) == 0 {
-				t.Log(errs, len(errs))
+				t.Log(err, errs, len(errs))
 				t.Error("should have errors")
 			}
 		})
@@ -487,14 +490,14 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("LogRunningServices", func(t *testing.T) {
 			t.Parallel()
 			orc := &Orchestrator{}
-			wg := &sync.WaitGroup{}
+			// wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
-				wg.Add(1)
+				// wg.Add(1)
 				if err := orc.Add(makeBlockingService(t)); err != nil {
 					t.Error(err)
 				}
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 			startAt := time.Now()
 			if err := orc.Start(ctx); err != nil {
@@ -504,7 +507,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error(err)
 			}
 			// the fixture ensures that all sub-services run
-			if dur := time.Since(startAt); dur > 20*time.Millisecond {
+			if dur := time.Since(startAt); dur > 105*time.Millisecond {
 				t.Error(dur)
 			}
 		})

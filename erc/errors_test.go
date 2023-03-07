@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -430,7 +429,7 @@ func TestError(t *testing.T) {
 		defer func() { t.Log(time.Since(startAt)) }()
 		fixtureTimeout, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		wg := &sync.WaitGroup{}
+		wg := &fun.WaitGroup{}
 		catcher := &Collector{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
@@ -478,7 +477,7 @@ func TestError(t *testing.T) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		fun.Wait(ctx, wg)
+		wg.Wait(ctx)
 	})
 	t.Run("Unwind", func(t *testing.T) {
 		t.Run("NoErrors", func(t *testing.T) {

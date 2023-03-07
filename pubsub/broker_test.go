@@ -4,12 +4,12 @@ import (
 	"context"
 	"math/rand"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/set"
 )
@@ -346,7 +346,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 
 				seen1 := make(map[T]struct{}, len(elems))
 				seen2 := make(map[T]struct{}, len(elems))
-				wg := &sync.WaitGroup{}
+				wg := &fun.WaitGroup{}
 				wg.Add(3)
 				sig := make(chan struct{})
 
@@ -439,7 +439,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 					close(sig)
 				}()
 
-				fun.Wait(ctx, wg)
+				wg.Wait(ctx)
 				if len(seen1) == len(seen2) {
 					checkMatchingSets(t, seen1, seen2)
 				} else if len(seen1) == 0 && len(seen2) == 0 {
@@ -455,6 +455,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 					t.Error("should not subscribe with canceled context", cctx.Err())
 				}
 				broker.Unsubscribe(cctx, ch1)
+				check.Zero(t, broker.Stats(cctx))
 			})
 			if fix.NonBlocking {
 				t.Run("NonBlocking", func(t *testing.T) {
@@ -467,7 +468,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 
 					broker := opts.Construtor(pctx, t)
 
-					wg := &sync.WaitGroup{}
+					wg := &fun.WaitGroup{}
 					ch1 := broker.Subscribe(ctx)
 					count := &atomic.Int32{}
 
@@ -505,7 +506,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 						t.Error(stat)
 					}
 
-					fun.Wait(ctx, wg)
+					wg.Wait(ctx)
 					broker.Stop()
 					broker.Wait(ctx)
 					if int(count.Load()) != len(elems) {

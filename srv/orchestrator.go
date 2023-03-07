@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -110,7 +111,7 @@ func (or *Orchestrator) Service() *Service {
 			// pushed or the context is canceled.
 			iter := or.pipe.IteratorBlocking()
 
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 			for iter.Next(ctx) {
 				s := iter.Value()
 				if s.Running() {
@@ -130,7 +131,7 @@ func (or *Orchestrator) Service() *Service {
 				}(s)
 			}
 
-			wg.Wait()
+			wg.Wait(ctx)
 			ec.Add(iter.Close())
 			return ec.Resolve()
 		},
@@ -149,11 +150,11 @@ func (or *Orchestrator) Service() *Service {
 			// know that the non-blocking iterator won't
 			// cause a hang and we want to get through all
 			// services' waiters.
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(internal.BackgroundContext)
 			defer cancel()
 
 			iter := or.pipe.Iterator()
-			wg := &sync.WaitGroup{}
+			wg := &fun.WaitGroup{}
 
 			for iter.Next(ctx) {
 				s := iter.Value()
@@ -167,7 +168,7 @@ func (or *Orchestrator) Service() *Service {
 				}
 			}
 			ec.Add(iter.Close())
-			wg.Wait()
+			wg.Wait(ctx)
 			return ec.Resolve()
 		},
 	}

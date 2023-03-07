@@ -19,7 +19,7 @@ import (
 // Broker is a simple message broker that provides a useable interface
 // for distributing messages to an arbitrary group of channels.
 type Broker[T any] struct {
-	wg        sync.WaitGroup
+	wg        fun.WaitGroup
 	publishCh chan T
 	subCh     chan chan T
 	unsubCh   chan chan T
@@ -200,7 +200,7 @@ func (b *Broker[T]) startQueueWorkers(
 func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
-		wg := &sync.WaitGroup{}
+		wg := &fun.WaitGroup{}
 		for iter.Next(ctx) {
 			wg.Add(1)
 			go func(msg T, ch chan T) {
@@ -209,7 +209,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan 
 			}(msg, iter.Value())
 		}
 		_ = iter.Close()
-		fun.Wait(ctx, wg)
+		wg.Wait(ctx)
 	} else {
 		for iter.Next(ctx) {
 			b.sendMsg(ctx, msg, iter.Value())
@@ -259,7 +259,7 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	fun.Wait(ctx, &b.wg)
+	b.wg.Wait(ctx)
 }
 
 // Subscribe generates a new subscription channel, of the specified

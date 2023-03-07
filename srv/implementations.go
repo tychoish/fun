@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/tychoish/fun"
@@ -25,7 +24,7 @@ import (
 // slice of *Services,
 func Group(services fun.Iterator[*Service]) *Service {
 	waiters := fun.Must(pubsub.NewDeque[func() error](pubsub.DequeOptions{Unlimited: true}))
-	wg := &sync.WaitGroup{}
+	wg := &fun.WaitGroup{}
 	ec := &erc.Collector{}
 
 	return &Service{
@@ -39,7 +38,7 @@ func Group(services fun.Iterator[*Service]) *Service {
 					ec.Add(s.Start(ctx))
 				}(services.Value())
 			}
-			fun.Wait(ctx, wg)
+			wg.Wait(ctx)
 			return nil
 		},
 		Cleanup: func() error {
@@ -64,7 +63,7 @@ func Group(services fun.Iterator[*Service]) *Service {
 				}(iter.Value())
 			}
 
-			wg.Wait()
+			wg.Wait(internal.BackgroundContext)
 			return ec.Resolve()
 		},
 	}
@@ -114,7 +113,7 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // worker will have returned. Use a blocking pubsub iterator to
 // dispatch wait functions throughout the lifecycle of your program.
 func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
-	wg := &sync.WaitGroup{}
+	wg := &fun.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
 		Run: func(ctx context.Context) error {
@@ -129,10 +128,10 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 
 			}
 			ec.Add(iter.Close())
-			fun.Wait(ctx, wg)
+			wg.Wait(ctx)
 			return nil
 		},
-		Cleanup:  func() error { wg.Wait(); return ec.Resolve() },
+		Cleanup:  func() error { wg.Wait(internal.BackgroundContext); return ec.Resolve() },
 		Shutdown: iter.Close,
 	}
 }
@@ -167,7 +166,7 @@ func Broker[T any](broker *pubsub.Broker[T]) *Service {
 // passing the error that the Service's Wait() method to the
 // observer.
 func RunWaitObserve(observe func(error), s *Service) fun.WaitFunc {
-	return func(ctx context.Context) { observe(s.Start(ctx)); observe(s.Wait()) }
+	return func(ctx context.Context) { observe(s.Start(ctx)); observe(s.waitFor(ctx)) }
 }
 
 // RunWaitCollect produces a fun.WaitFunc that runs the service and
