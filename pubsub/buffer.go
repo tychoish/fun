@@ -23,13 +23,16 @@ import (
 type Distributor[T any] interface {
 	Send(context.Context, T) error
 	Receive(context.Context) (T, error)
+	Len() int
 }
 
 type distributorImpl[T any] struct {
 	push func(context.Context, T) error
 	pop  func(context.Context) (T, error)
+	size func() int
 }
 
+func (d *distributorImpl[T]) Len() int                               { return d.size() }
 func (d *distributorImpl[T]) Send(ctx context.Context, in T) error   { return d.push(ctx, in) }
 func (d *distributorImpl[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
 
@@ -45,6 +48,7 @@ func DistributorLIFO[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
 		push: ignorePopContext(d.ForcePushFront),
 		pop:  d.WaitFront,
+		size: d.Len,
 	}
 }
 
@@ -55,6 +59,7 @@ func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
 		push: ignorePopContext(d.ForcePushBack),
 		pop:  d.WaitFront,
+		size: d.Len,
 	}
 }
 
@@ -72,6 +77,7 @@ func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
 			}
 			return q.Wait(ctx)
 		},
+		size: q.tracker.len,
 	}
 }
 
@@ -102,6 +108,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 			}
 			return val, err
 		},
+		size: func() int { return len(ch) },
 	}
 }
 

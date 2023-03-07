@@ -24,9 +24,15 @@ type Broker[T any] struct {
 	subCh     chan chan T
 	unsubCh   chan chan T
 	opts      BrokerOptions
+	stats     chan func(BrokerStats)
 
 	mu    sync.Mutex
 	close context.CancelFunc
+}
+
+type BrokerStats struct {
+	Subscriptions int
+	BufferDepth   int
 }
 
 // BrokerOptions configures the semantics of a broker. The zero-values
@@ -127,6 +133,7 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 		publishCh: make(chan T),
 		subCh:     make(chan chan T, opts.BufferSize),
 		unsubCh:   make(chan chan T, opts.BufferSize),
+		stats:     make(chan func(BrokerStats)),
 	}
 }
 
@@ -146,6 +153,11 @@ func (b *Broker[T]) startQueueWorkers(
 				subs.Add(msgCh)
 			case msgCh := <-b.unsubCh:
 				subs.Delete(msgCh)
+			case fn := <-b.stats:
+				fn(BrokerStats{
+					Subscriptions: subs.Len(),
+					BufferDepth:   dist.Len(),
+				})
 			case msg := <-b.publishCh:
 				if err := dist.Send(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
@@ -205,6 +217,25 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan 
 		_ = iter.Close()
 	}
 
+}
+
+func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
+	signal := make(chan BrokerStats)
+	var output BrokerStats
+	select {
+	case <-ctx.Done():
+		return output
+	case b.stats <- func(stats BrokerStats) {
+		defer close(signal)
+		signal <- stats
+
+	}:
+	}
+	select {
+	case <-ctx.Done():
+	case output = <-signal:
+	}
+	return output
 }
 
 func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T) {

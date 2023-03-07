@@ -329,16 +329,20 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 		t.Run(fix.Name, func(t *testing.T) {
 			fix := fix
 			t.Run("EndToEnd", func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
-				defer cancel()
-
 				opts := fix
 
 				t.Parallel()
+				ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
+				defer cancel()
+
 				broker := opts.Construtor(ctx, t)
 
 				ch1 := broker.Subscribe(ctx)
 				ch2 := broker.Subscribe(ctx)
+
+				if stat := broker.Stats(ctx); ctx.Err() != nil {
+					t.Error(stat)
+				}
 
 				seen1 := make(map[T]struct{}, len(elems))
 				seen2 := make(map[T]struct{}, len(elems))
@@ -405,6 +409,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 					return
 				case <-started2:
 				}
+
 				go func() {
 					defer wg.Done()
 					for idx := range elems {
@@ -478,6 +483,10 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 						}
 					}()
 
+					if stat := broker.Stats(ctx); stat.Subscriptions != 1 {
+						t.Error(stat)
+					}
+
 					for i := 0; i < 30; i++ {
 						wg.Add(1)
 						go func(id int) {
@@ -491,8 +500,12 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 							}
 						}(i)
 					}
-					fun.Wait(ctx, wg)
 
+					if stat := broker.Stats(ctx); stat.BufferDepth < 10 {
+						t.Error(stat)
+					}
+
+					fun.Wait(ctx, wg)
 					broker.Stop()
 					broker.Wait(ctx)
 					if int(count.Load()) != len(elems) {

@@ -19,6 +19,7 @@ func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
 		push: d.WaitPushBack,
 		pop:  d.WaitFront,
+		size: d.Len,
 	}
 }
 
