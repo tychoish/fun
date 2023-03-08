@@ -342,7 +342,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal(err)
 			}
 			if counter.Load() != 100 {
-				t.Error("all services did not run")
+				t.Error("all services did not run", counter.Load())
 			}
 		})
 		t.Run("PropogateErrors", func(t *testing.T) {

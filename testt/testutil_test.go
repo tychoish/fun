@@ -67,6 +67,7 @@ func TestTools(t *testing.T) {
 			mock := newMock()
 			start := time.Now()
 			ticker := Ticker(mock, 2*time.Millisecond)
+			runtime.Gosched()
 			<-ticker.C
 			dur := time.Since(start)
 			if dur < 2*time.Millisecond || dur > 4*time.Millisecond {
