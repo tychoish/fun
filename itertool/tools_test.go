@@ -704,7 +704,7 @@ func TestParallelObserve(t *testing.T) {
 				}
 				if i == 1 && matches != len(out) {
 					t.Error("should  all with 1 worker", matches, len(out))
-				} else if matches == len(out) {
+				} else if i > 1 && matches == len(out) {
 					// this test might be flaky on systems with smaller
 					// numbers of cores because it relies on worker
 					// threads executing out of order
