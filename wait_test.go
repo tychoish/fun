@@ -2,12 +2,15 @@ package fun
 
 import (
 	"context"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestWait(t *testing.T) {
@@ -222,4 +225,103 @@ func TestWait(t *testing.T) {
 			t.Error(time.Since(start))
 		}
 	})
+	t.Run("Singal", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		t.Run("PlainContext", func(t *testing.T) {
+			start := time.Now()
+			ran := &atomic.Bool{}
+			var wf WaitFunc = func(ctx context.Context) {
+				time.Sleep(5 * time.Millisecond)
+				ran.Store(true)
+			}
+
+			sig := wf.Signal(ctx)
+			runtime.Gosched()
+			<-sig
+			dur := time.Since(start)
+			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
+				t.Error(dur)
+			}
+			if !ran.Load() {
+				t.Error("did not observe test running")
+			}
+		})
+		t.Run("TimeoutContext", func(t *testing.T) {
+			start := time.Now()
+			ran := &atomic.Bool{}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+			defer cancel()
+
+			var wf WaitFunc = func(ctx context.Context) {
+				timer := testt.Timer(t, 20*time.Millisecond)
+				select {
+				case <-timer.C:
+					ran.Store(true)
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			sig := wf.Signal(ctx)
+			runtime.Gosched()
+			<-sig
+			dur := time.Since(start)
+			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
+				t.Error(dur)
+			}
+			if ran.Load() {
+				t.Error("should not observe test running")
+			}
+		})
+		t.Run("Timeout", func(t *testing.T) {
+			start := time.Now()
+			ran := &atomic.Bool{}
+			var wf WaitFunc = func(ctx context.Context) {
+				timer := testt.Timer(t, 10*time.Millisecond)
+				select {
+				case <-timer.C:
+					ran.Store(true)
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			sig := wf.WithTimeoutSignal(5 * time.Millisecond)
+			runtime.Gosched()
+			<-sig
+			dur := time.Since(start)
+			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
+				t.Error(dur)
+			}
+
+			if ran.Load() {
+				t.Error("should not have observed test running")
+			}
+
+		})
+		t.Run("Block", func(t *testing.T) {
+			start := time.Now()
+			ran := &atomic.Bool{}
+			var wf WaitFunc = func(ctx context.Context) {
+				time.Sleep(5 * time.Millisecond)
+				ran.Store(true)
+			}
+
+			sig := wf.BlockSignal()
+			runtime.Gosched()
+			<-sig
+			dur := time.Since(start)
+			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
+				t.Error(dur)
+			}
+			if !ran.Load() {
+				t.Error("did not observe test running")
+			}
+
+		})
+
+	})
+
 }

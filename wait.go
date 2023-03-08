@@ -12,15 +12,51 @@ import (
 // operation returns or the context is canceled.
 type WaitFunc func(context.Context)
 
-// Block executes the wait function with a context that will never
+// Block executes the WaitFunc with a context that will never
 // expire. Use with extreme caution.
 func (wf WaitFunc) Block() { wf(internal.BackgroundContext) }
 
-// WithTimeout runs the wait function with an explicit timeout.
+// WithTimeout runs the WaitFunc with an explicit timeout.
 func (wf WaitFunc) WithTimeout(timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(internal.BackgroundContext, timeout)
 	defer cancel()
 	wf(ctx)
+}
+
+// Signal runs the WaitFunc in a goroutine and returns a signal
+// channel that is canceled when the function completes. Useful for
+// bridging the gap between interfaces and integration that use
+// channels and functions.
+//
+// Callers are responsble for handling the (potential) panic in the WaitFunc.
+func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
+	out := make(chan struct{})
+	go func() { defer close(out); wf(ctx) }()
+	return out
+}
+
+// WithTimeoutSignal executes the WaitFunc as in WithTimeout, but
+// returns a singal channel that is closed when the task completes.
+//
+// Callers are responsble for handling the (potential) panic in the WaitFunc.
+func (wf WaitFunc) WithTimeoutSignal(timeout time.Duration) <-chan struct{} {
+	ctx, cancel := context.WithTimeout(internal.BackgroundContext, timeout)
+	sig := make(chan struct{})
+	go func() { defer close(sig); defer cancel(); wf(ctx) }()
+	return sig
+}
+
+// BlockSignal runs the WaitFunc in a background goroutine and
+// returns a signal channel that is closed when the operation completes.
+// As in Block() the WaitFunc is passed a background context that is
+// never canceled.
+//
+// Callers are responsble for handling the (potential) panic in the WaitFunc.
+func (wf WaitFunc) BlockSignal() <-chan struct{} {
+	ctx, cancel := context.WithCancel(internal.BackgroundContext)
+	sig := make(chan struct{})
+	go func() { defer close(sig); defer cancel(); wf(ctx) }()
+	return sig
 }
 
 // WaitBlocking is a convenience function to use simple blocking
@@ -38,7 +74,7 @@ func WaitBlockingObserve[T any](observe func(T), wait func() T) WaitFunc {
 	return func(context.Context) { observe(wait()) }
 }
 
-// WaitForGroup converts a WaitGroup into a fun.WaitFunc.
+// WaitForGroup converts a sync.WaitGroup into a fun.WaitFunc.
 //
 // This operation will leak a go routine if the WaitGroup
 // never returns and the context is canceled. To avoid a leaked
