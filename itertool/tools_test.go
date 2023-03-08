@@ -668,12 +668,18 @@ func TestParallelObserve(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		for i := 0; i <= 8; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
-				elems := makeIntSlice(200)
+				elems := makeIntSlice(100)
 				seen := set.Synchronize(set.MakeNewOrdered[int]())
 				err := ParallelObserve(ctx,
 					Slice(elems),
 					func(in int) {
 						seen.Add(in)
+						if i%10 == 0 {
+							// yield to make sure
+							// other threads can
+							// run sometimes
+							runtime.Gosched()
+						}
 					},
 					Options{NumWorkers: i},
 				)
@@ -696,9 +702,12 @@ func TestParallelObserve(t *testing.T) {
 						matches++
 					}
 				}
-				if i < 2 && matches != len(out) {
+				if i == 1 && matches != len(out) {
 					t.Error("should  all with 1 worker", matches, len(out))
-				} else if i >= 2 && matches == len(out) {
+				} else if matches == len(out) {
+					// this test might be flaky on systems with smaller
+					// numbers of cores because it relies on worker
+					// threads executing out of order
 					t.Error("should not all match", matches, len(out))
 				}
 			})
