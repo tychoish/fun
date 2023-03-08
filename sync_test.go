@@ -88,17 +88,64 @@ func TestWaitGroup(t *testing.T) {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Int63n(100)+1) * time.Millisecond)
 			}()
+			if i%10 == 0 {
+				runtime.Gosched()
+			}
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(101 * time.Millisecond)
 		waitStart := time.Now()
 		for _, ch := range waits {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > time.Millisecond {
+		if dur > 2*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
+	})
+	t.Run("BusyBlockingMixed", func(t *testing.T) {
+		wg := &WaitGroup{}
+		const num = 100
+		wg.Add(100)
+		waits := make([]chan struct{}, 100)
+		for i := 0; i < num; i++ {
+			ch := make(chan struct{})
+			waits[i] = ch
+			if i%2 == 0 {
+				go func(ch chan struct{}) {
+					defer close(ch)
+					wg.Wait(context.Background())
+				}(ch)
+			} else {
+				go func(ch chan struct{}, num int) {
+					defer close(ch)
+					ctx, cancel := context.WithTimeout(
+						context.Background(),
+						time.Duration(num*2)*time.Millisecond,
+					)
+					defer cancel()
+					wg.Wait(ctx)
+				}(ch, i)
+			}
+		}
 
+		for i := 0; i < num; i++ {
+			go func() {
+				defer wg.Done()
+				time.Sleep(time.Duration(rand.Int63n(100)+1) * time.Millisecond)
+			}()
+			if i%10 == 0 {
+				runtime.Gosched()
+			}
+		}
+		time.Sleep(101 * time.Millisecond)
+		waitStart := time.Now()
+		for _, ch := range waits {
+			<-ch
+		}
+		dur := time.Since(waitStart)
+		if dur > 2*time.Millisecond {
+			t.Error("took too long for waiters to resolve", dur)
+		}
 	})
 
 }

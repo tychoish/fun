@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -370,6 +371,7 @@ func TestService(t *testing.T) {
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
+			runtime.Gosched()
 			time.Sleep(10 * time.Millisecond)
 			s.Close()
 			<-sig
