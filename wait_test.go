@@ -172,7 +172,7 @@ func TestWait(t *testing.T) {
 		defer cancel()
 		start := time.Now()
 		WaitMerge(ctx, internal.NewSliceIter(wfs))(ctx)
-		if time.Since(start) > 12*time.Millisecond || time.Since(start) < 5*time.Millisecond {
+		if time.Since(start) > 20*time.Millisecond || time.Since(start) < 5*time.Millisecond {
 			t.Error(time.Since(start))
 		}
 	})

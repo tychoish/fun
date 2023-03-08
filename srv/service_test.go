@@ -357,14 +357,17 @@ func TestService(t *testing.T) {
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
+				//nolint:bodyclose
 				resp, err := http.DefaultClient.Do(
 					fun.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
 				)
+				t.Log(erc.Merge(fun.Safe(resp.Body.Close)))
+
 				if err != nil {
 					t.Error(err)
 				}
-				if err := resp.Body.Close(); err != nil {
-					t.Log(err)
+				if resp.StatusCode != http.StatusOK {
+					t.Error(resp.StatusCode)
 				}
 			}()
 

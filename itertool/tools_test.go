@@ -668,7 +668,7 @@ func TestParallelObserve(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		for i := 0; i <= 8; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
-				elems := makeIntSlice(100)
+				elems := makeIntSlice(200)
 				seen := set.Synchronize(set.MakeNewOrdered[int]())
 				err := ParallelObserve(ctx,
 					Slice(elems),
