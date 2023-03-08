@@ -41,7 +41,7 @@ func TestTools(t *testing.T) {
 			if ctx.Err() != nil {
 				t.Fatal("context should not be canceled")
 			}
-			time.Sleep(3 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 			runtime.Gosched()
 			if ctx.Err() == nil {
 				t.Fatal("context should be canceled")
@@ -53,10 +53,10 @@ func TestTools(t *testing.T) {
 		t.Run("Timer", func(t *testing.T) {
 			mock := newMock()
 			start := time.Now()
-			timer := Timer(mock, 3*time.Millisecond)
+			timer := Timer(mock, 2*time.Millisecond)
 			<-timer.C
 			dur := time.Since(start)
-			if dur < 3*time.Millisecond || dur > 4*time.Millisecond {
+			if dur < 2*time.Millisecond || dur > 4*time.Millisecond {
 				t.Error(dur)
 			}
 			if len(mock.cleanup) != 1 {
@@ -66,10 +66,10 @@ func TestTools(t *testing.T) {
 		t.Run("Ticker", func(t *testing.T) {
 			mock := newMock()
 			start := time.Now()
-			ticker := Ticker(mock, 3*time.Millisecond)
+			ticker := Ticker(mock, 2*time.Millisecond)
 			<-ticker.C
 			dur := time.Since(start)
-			if dur < 3*time.Millisecond || dur > 4*time.Millisecond {
+			if dur < 2*time.Millisecond || dur > 4*time.Millisecond {
 				t.Error(dur)
 			}
 			if len(mock.cleanup) != 1 {

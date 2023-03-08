@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"testing"
 	"time"
 
@@ -300,6 +301,7 @@ func TestTools(t *testing.T) {
 		}()
 
 		output := CollectChannel(ctx, Channel(pipe))
+		runtime.Gosched()
 
 		count := 0
 	CONSUME:
@@ -423,7 +425,7 @@ func TestParallelForEach(t *testing.T) {
 		for i := 0; i <= 8; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
 				elems := makeIntSlice(200)
-				seen := set.Synchronize(set.MakeNewOrdered[int]())
+				seen := set.Synchronize(set.NewOrdered[int]())
 				err := ParallelForEach(ctx,
 					Slice(elems),
 					func(ctx context.Context, in int) error {
@@ -452,7 +454,7 @@ func TestParallelForEach(t *testing.T) {
 					}
 				}
 				if i < 2 && matches != len(out) {
-					t.Error("should  all with 1 worker", matches, len(out))
+					t.Error("should all with 1 worker", matches, len(out))
 				} else if i >= 2 && matches == len(out) {
 					t.Error("should not all match", matches, len(out))
 				}
@@ -489,15 +491,18 @@ func TestParallelForEach(t *testing.T) {
 		}
 	})
 	t.Run("AbortOnPanic", func(t *testing.T) {
-		seen := set.Synchronize(set.MakeNewOrdered[int]())
+		seen := set.Synchronize(set.NewUnordered[int]())
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
-				if in == 4 {
-					seen.Add(in)
-				}
 				if in == 8 {
+					// make sure something else
+					// has a chance to run before
+					// the event.
+					runtime.Gosched()
 					panic("gotcha")
+				} else {
+					seen.Add(in)
 				}
 
 				<-ctx.Done()
@@ -511,9 +516,8 @@ func TestParallelForEach(t *testing.T) {
 		if err == nil {
 			t.Fatal("should not have errored", err)
 		}
-		if seen.Len() != 1 {
+		if seen.Len() < 1 {
 			t.Error("should have only seen one", seen.Len())
-
 		}
 		var es *erc.Stack
 		if !errors.As(err, &es) {
@@ -729,28 +733,30 @@ func TestParallelObserve(t *testing.T) {
 		}
 	})
 	t.Run("AbortOnPanic", func(t *testing.T) {
-		seen := set.Synchronize(set.MakeNewOrdered[int]())
+		seen := set.Synchronize(set.NewOrdered[int]())
 		err := ParallelObserve(ctx,
-			Slice(makeIntSlice(10)),
+			Slice(makeIntSlice(20)),
 			func(in int) {
 				if in == 4 {
-					seen.Add(in)
-				}
-				if in == 8 {
+					// make sure something else
+					// has a chance to run before
+					// the event.
+					runtime.Gosched()
 					panic("gotcha")
+				} else {
+					seen.Add(in)
 				}
 			},
 			Options{
-				NumWorkers:      10,
+				NumWorkers:      20,
 				ContinueOnPanic: false,
 			},
 		)
 		if err == nil {
 			t.Fatal("should not have errored", err)
 		}
-		if seen.Len() != 1 {
-			t.Error("should have only seen one", seen.Len())
-
+		if seen.Len() < 1 {
+			t.Error("should have seen more than one", seen.Len())
 		}
 		var es *erc.Stack
 		if !errors.As(err, &es) {

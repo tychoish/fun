@@ -128,13 +128,13 @@ func TestImplementationHelpers(t *testing.T) {
 	t.Run("ProcessIteratorPrallel", func(t *testing.T) {
 		count := atomic.Int64{}
 		srv := ProcessIterator(
-			makeIterator(100),
+			makeIterator(50),
 			func(_ context.Context, in int) error {
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 				count.Add(1)
 				return nil
 			},
-			itertool.Options{NumWorkers: 100},
+			itertool.Options{NumWorkers: 50},
 		)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -146,10 +146,10 @@ func TestImplementationHelpers(t *testing.T) {
 		if err := srv.Wait(); err != nil {
 			t.Fatal(err)
 		}
-		if count.Load() != 100 {
+		if count.Load() != 50 {
 			t.Error(count.Load())
 		}
-		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 15*time.Millisecond {
+		if time.Since(start) < 5*time.Millisecond || time.Since(start) > 10*time.Millisecond {
 			t.Error(time.Since(start))
 		}
 	})

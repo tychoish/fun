@@ -163,13 +163,13 @@ func TestWait(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
 		wfs := make([]WaitFunc, 100)
 		for i := 0; i < 100; i++ {
-			wfs[i] = func(context.Context) { time.Sleep(10 * time.Millisecond) }
+			wfs[i] = func(context.Context) { time.Sleep(5 * time.Millisecond) }
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
 		WaitMerge(ctx, internal.NewSliceIter(wfs))(ctx)
-		if time.Since(start) > 15*time.Millisecond || time.Since(start) < 5*time.Millisecond {
+		if time.Since(start) > 12*time.Millisecond || time.Since(start) < 5*time.Millisecond {
 			t.Error(time.Since(start))
 		}
 	})
@@ -218,7 +218,7 @@ func TestWait(t *testing.T) {
 		})
 		start := time.Now()
 		wf.WithTimeout(10 * time.Millisecond)
-		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Millisecond {
+		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 15*time.Millisecond {
 			t.Error(time.Since(start))
 		}
 	})

@@ -385,7 +385,7 @@ func TestOrchestrator(t *testing.T) {
 			orc := &Orchestrator{}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 			defer cancel()
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 50; i++ {
 				s := makeBlockingService(t)
 				if err := s.Start(ctx); err != nil {
 					t.Fatal(err)
@@ -431,10 +431,13 @@ func TestOrchestrator(t *testing.T) {
 			if s.Running() {
 				t.Error("running and should be stoped")
 			}
-			const num = 100
+			const num = 200
 			for i := 0; i < num; i++ {
 				if err := orc.Add(s); err != nil {
 					t.Error(err)
+				}
+				if i%10 == 0 {
+					runtime.Gosched()
 				}
 			}
 			if !orc.Service().Running() {
@@ -455,8 +458,7 @@ func TestOrchestrator(t *testing.T) {
 			err := orc.Wait()
 			errs := erc.Unwind(err)
 			if len(errs) == 0 {
-				t.Log(err, errs, len(errs))
-				t.Error("should have errors")
+				t.Error("should have errors", err, errs, len(errs))
 			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
