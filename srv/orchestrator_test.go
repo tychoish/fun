@@ -492,14 +492,12 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("LogRunningServices", func(t *testing.T) {
 			t.Parallel()
 			orc := &Orchestrator{}
-			// wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
-				// wg.Add(1)
 				if err := orc.Add(makeBlockingService(t)); err != nil {
 					t.Error(err)
 				}
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			defer cancel()
 			startAt := time.Now()
 			if err := orc.Start(ctx); err != nil {
@@ -509,7 +507,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error(err)
 			}
 			// the fixture ensures that all sub-services run
-			if dur := time.Since(startAt); dur > 105*time.Millisecond {
+			if dur := time.Since(startAt); dur > 60*time.Millisecond {
 				t.Error(dur)
 			}
 		})

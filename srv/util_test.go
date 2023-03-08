@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/testt"
 )
 
 func makeBlockingService(t *testing.T) *Service {
@@ -25,7 +27,7 @@ func makeBlockingService(t *testing.T) *Service {
 			return nil
 		},
 		Run: func(ctx context.Context) error {
-			timer := time.NewTimer(time.Hour)
+			timer := testt.Timer(t, time.Hour)
 			select {
 			case <-timer.C:
 				t.Error("this shouldn't happen")
