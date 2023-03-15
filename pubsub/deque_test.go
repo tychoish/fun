@@ -5,11 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/testt"
 )
 
 type waitPushCase struct {
@@ -828,5 +832,90 @@ func TestDeque(t *testing.T) {
 		if !iter.Next(ctx) {
 			t.Error("should have reported item", time.Since(sa), iter.Value())
 		}
+	})
+}
+
+func TestDequeIntegration(t *testing.T) {
+	t.Parallel()
+	t.Run("Integers", func(t *testing.T) {
+		const num = 100
+
+		t.Parallel()
+
+		queue := fun.Must(NewDeque[int64](DequeOptions{Unlimited: true}))
+		ctx := testt.Context(t)
+		counter := &atomic.Int64{}
+		input := &atomic.Int64{}
+
+		wg := &fun.WaitGroup{}
+
+		for i := 0; i < num; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				check.NotError(t, queue.PushBack(1))
+				input.Add(1)
+			}()
+		}
+
+		go func(iter fun.Iterator[int64]) {
+			for iter.Next(ctx) {
+				counter.Add(1)
+			}
+		}(queue.IteratorBlocking())
+
+		tctx := testt.ContextWithTimeout(t, 3*time.Second)
+		wg.Wait(tctx)
+
+		time.Sleep(time.Second)
+		assert.NotError(t, queue.Close())
+
+		tctx = testt.ContextWithTimeout(t, 3*time.Second)
+		wg.Wait(tctx)
+		assert.NotError(t, tctx.Err())
+
+		check.Equal(t, counter.Load(), input.Load())
+		testt.Logf(t, "counter=%d, input=%d", counter.Load(), input.Load())
+	})
+	t.Run("ProducerConsumer", func(t *testing.T) {
+		t.Parallel()
+		ctx := testt.ContextWithTimeout(t, time.Second)
+		queue := fun.Must(NewDeque[func()](DequeOptions{Unlimited: true}))
+		sent := &atomic.Int64{}
+		recv := &atomic.Int64{}
+
+		wg := &fun.WaitGroup{}
+		const (
+			factor = 5
+			worker = 20
+			num    = factor * worker
+		)
+		wwg := &fun.WaitGroup{}
+		for i := 0; i < factor; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < num; i++ {
+					assert.NotError(t, queue.PushBack(func() { sent.Add(1) }))
+					time.Sleep(time.Millisecond)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}()
+			for i := 0; i < worker; i++ {
+				wwg.Add(1)
+				go func(iter fun.Iterator[func()]) {
+					defer wwg.Done()
+
+					for iter.Next(ctx) {
+						iter.Value()()
+						recv.Add(1)
+					}
+				}(queue.IteratorBlocking())
+			}
+		}
+
+		wg.Wait(ctx)
+		assert.NotError(t, ctx.Err())
+		assert.Equal(t, sent.Load(), recv.Load())
 	})
 }
