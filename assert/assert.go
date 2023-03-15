@@ -85,6 +85,16 @@ func ErrorIs(t testing.TB, err, target error) {
 	}
 }
 
+// NotErrorIs is an assertion form of !errors.Is, and fails the test if
+// the error (or its wrapped values) are  equal to the target
+// error.
+func NotErrorIs(t testing.TB, err, target error) {
+	t.Helper()
+	if errors.Is(err, target) {
+		t.Fatalf("error <%v>, is <%v>", err, target)
+	}
+}
+
 // Panic asserts that the function raises a panic.
 func Panic(t testing.TB, fn func()) {
 	t.Helper()
