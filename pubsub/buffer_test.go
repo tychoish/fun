@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -33,7 +34,9 @@ func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
 func TestDistributor(t *testing.T) {
 	// TODO: add specific unit tests, most of the distributor code
 	// is tested via the broker.
+	t.Parallel()
 	t.Run("EdgeCases", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Channel", func(t *testing.T) {
 			t.Run("CloseSafety", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -161,8 +164,9 @@ func TestDistributor(t *testing.T) {
 
 	t.Run("Table", func(t *testing.T) {
 		const iterSize = 100
-
+		t.Parallel()
 		t.Run("Integer", func(t *testing.T) {
+			t.Parallel()
 			t.Run("Buffered", func(t *testing.T) {
 				RunDistributorTests(t, iterSize, func() fun.Iterator[int] {
 					return itertool.Slice(randomIntSlice(iterSize))
@@ -304,7 +308,7 @@ type DistCase[T comparable] struct {
 func MakeCases[T comparable](size int) []DistCase[T] {
 	return []DistCase[T]{
 		{
-			Name: "SingleSeen",
+			Name: "Seen",
 			Test: func(t *testing.T, d Distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 				seen := set.Synchronize(set.MakeUnordered[T](size))
@@ -320,6 +324,31 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 					}
 				}()
 				<-signal
+				assert.Equal(t, size, seen.Len())
+				assert.Zero(t, d.Len())
+			},
+		},
+		{
+			Name: "PoolSeen",
+			Test: func(t *testing.T, d Distributor[T]) {
+				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+				seen := set.Synchronize(set.MakeUnordered[T](size))
+				wg := &sync.WaitGroup{}
+				for i := 0; i < 8; i++ {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						for {
+							pop, err := d.Receive(ctx)
+							if err != nil {
+								break
+							}
+							seen.Add(pop)
+						}
+					}()
+
+				}
+				wg.Wait()
 				assert.Equal(t, size, seen.Len())
 				assert.Zero(t, d.Len())
 			},
@@ -345,10 +374,36 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 				assert.Zero(t, d.Len())
 			},
 		},
+		{
+			Name: "PoolCount",
+			Test: func(t *testing.T, d Distributor[T]) {
+				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+				count := &atomic.Int64{}
+				wg := &sync.WaitGroup{}
+				for i := 0; i < 8; i++ {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						for {
+							_, err := d.Receive(ctx)
+							if err != nil {
+								break
+							}
+							count.Add(1)
+						}
+					}()
+
+				}
+				wg.Wait()
+				assert.Equal(t, size, int(count.Load()))
+				assert.Zero(t, d.Len())
+			},
+		},
 	}
 }
 
 func RunDistributorTests[T comparable](t *testing.T, size int, producer func() fun.Iterator[T]) {
+	t.Parallel()
 	for _, gent := range MakeGenerators[T](size) {
 		t.Run(gent.Name, func(t *testing.T) {
 			for _, tt := range MakeCases[T](size) {
