@@ -316,19 +316,21 @@ func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
 }
 
 func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, error) {
-	if err := dq.root.getNextOrPrevious(direction).wait(ctx, direction); err != nil {
-		return *new(T), err
+	for {
+		if err := dq.root.getNextOrPrevious(direction).wait(ctx, direction); err != nil {
+			return *new(T), err
+		}
+
+		next := dq.root.getNextOrPrevious(direction)
+		if next.isRoot() {
+			return *new(T), errors.New("end of iteration")
+		}
+
+		it, ok := dq.pop(next)
+		if ok {
+			return it, nil
+		}
 	}
-
-	next := dq.root.getNextOrPrevious(direction)
-	if next.isRoot() {
-		return *new(T), errors.New("end of iteration")
-	}
-
-	it, ok := dq.pop(next)
-
-	fun.Invariant(ok, "deque can not be empty")
-	return it, nil
 }
 
 type dqIterator[T any] struct {

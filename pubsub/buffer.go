@@ -40,11 +40,11 @@ func ignorePopContext[T any](in func(T) error) func(context.Context, T) error {
 	return func(_ context.Context, obj T) error { return in(obj) }
 }
 
-// DistributorLIFO produces a Deque-based Distributor that, when the
+// distributorLIFO produces a Deque-based Distributor that, when the
 // user attempts to Push onto a full Deque, it will remove the first
 // element in the list, while all Pop operations are also to the front
 // of the Deque.
-func DistributorLIFO[T any](d *Deque[T]) Distributor[T] {
+func distributorLIFO[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
 		push: ignorePopContext(d.ForcePushFront),
 		pop:  d.WaitFront,
@@ -52,10 +52,10 @@ func DistributorLIFO[T any](d *Deque[T]) Distributor[T] {
 	}
 }
 
-// DistributorDeque produces a Distributor that always accepts new
+// distributorDeque produces a Distributor that always accepts new
 // Push operations by removing the oldest element in the queue, with
 // Pop operations returning the oldest elements first (FIFO).
-func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
+func distributorDeque[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
 		push: ignorePopContext(d.ForcePushBack),
 		pop:  d.WaitFront,
