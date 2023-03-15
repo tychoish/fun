@@ -263,6 +263,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 		f := f
 		t.Parallel()
 		t.Run("AddRemove", func(t *testing.T) {
+			t.Parallel()
 			fix := f()
 			for _, e := range fix.elems {
 				if err := fix.add(e); err != nil {
@@ -291,6 +292,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 			}
 		})
 		t.Run("Iterate", func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithTimeout(ctx, time.Second)
 			defer cancel()
 
@@ -347,6 +349,7 @@ func TestDeque(t *testing.T) {
 		}
 	})
 	t.Run("Config", func(t *testing.T) {
+		t.Parallel()
 		t.Run("InvalidQueueOptions", func(t *testing.T) {
 			conf := DequeOptions{
 				QueueOptions: &QueueOptions{HardLimit: 4, SoftQuota: 5},
@@ -467,6 +470,7 @@ func TestDeque(t *testing.T) {
 		}
 	})
 	t.Run("WaitPush", func(t *testing.T) {
+		t.Parallel()
 		t.Run("ContextCanceled", func(t *testing.T) {
 			for _, tt := range makeWaitPushCases() {
 				t.Run(tt.Name, func(t *testing.T) {
@@ -509,6 +513,7 @@ func TestDeque(t *testing.T) {
 			}
 		})
 		t.Run("RealWait", func(t *testing.T) {
+			t.Parallel()
 			for _, tt := range makeWaitPushCases() {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)

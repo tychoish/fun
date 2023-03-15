@@ -132,6 +132,7 @@ func TestQueueClose(t *testing.T) {
 }
 
 func TestQueueWait(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -201,6 +202,8 @@ func TestQueueWait(t *testing.T) {
 }
 
 func TestQueueIterator(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

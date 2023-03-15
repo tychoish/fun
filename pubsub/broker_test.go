@@ -328,6 +328,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 	for _, fix := range GenerateFixtures(elems) {
 		t.Run(fix.Name, func(t *testing.T) {
 			fix := fix
+			t.Parallel()
 			t.Run("EndToEnd", func(t *testing.T) {
 				opts := fix
 
