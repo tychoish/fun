@@ -74,20 +74,6 @@ func TestContext(t *testing.T) {
 			ctx = SetOrchestrator(ctx, orc)
 			assert.True(t, HasOrchestrator(ctx))
 		})
-		t.Run("DoubleSetNoop", func(t *testing.T) {
-			orc := &Orchestrator{}
-
-			ctx := context.Background()
-
-			ctx = SetOrchestrator(ctx, orc)
-			assert.True(t, HasOrchestrator(ctx))
-			_, err := fun.Safe(func() context.Context { return SetOrchestrator(ctx, nil) })
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, fun.ErrInvariantViolation)
-
-			rtorc := GetOrchestrator(ctx)
-			assert.Equal(t, rtorc, orc)
-		})
 	})
 	t.Run("BaseContext", func(t *testing.T) {
 		t.Run("Root", func(t *testing.T) {
@@ -316,5 +302,18 @@ func TestShutdownManager(t *testing.T) {
 				t.Error("should have been called")
 			}
 		})
+	})
+	t.Run("ContextsAreAStack", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		bctx := SetShutdownSignal(ctx)
+		ctx = WithOrchestrator(bctx)
+		ctx = SetShutdownSignal(ctx)
+
+		assert.NotError(t, ctx.Err())
+		GetShutdownSignal(ctx)()
+		assert.Error(t, ctx.Err())
+
+		assert.NotError(t, bctx.Err())
 	})
 }

@@ -49,8 +49,6 @@ type (
 // If an Orchestrator is already set on the context, this operation
 // panics with an invariant violation.
 func WithOrchestrator(ctx context.Context) context.Context {
-	fun.Invariant(!HasOrchestrator(ctx), "cannot attach more than one orchestrator")
-
 	orca := &Orchestrator{}
 	ctx = SetOrchestrator(ctx, orca)
 
@@ -62,8 +60,6 @@ func WithOrchestrator(ctx context.Context) context.Context {
 // SetOrchestrator attaches an orchestrator to a context, if one is
 // already set this is a panic with an invariant violation.
 func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
-	fun.Invariant(!HasOrchestrator(ctx), "cannot attach more than one orchestrator")
-
 	return context.WithValue(ctx, orchestratorCtxKey{}, or)
 }
 
@@ -92,8 +88,6 @@ func HasOrchestrator(ctx context.Context) bool {
 // If a shutdown function is already set on this context, this
 // operation is a noop.
 func SetShutdownSignal(ctx context.Context) context.Context {
-	fun.Invariant(!HasShutdownSignal(ctx), "cannot attach more than one shutdown")
-
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
 	return context.WithValue(ctx, shutdownTriggerCtxKey{}, cancel)
@@ -131,10 +125,7 @@ func HasShutdownSignal(ctx context.Context) bool {
 // If a base context is already set on this context, this operation
 // panics with an invariant violation.
 func SetBaseContext(ctx context.Context) context.Context {
-	fun.Invariant(!HasBaseContext(ctx), "cannot set more than one base context.")
-
 	bctx := ctx
-
 	return context.WithValue(ctx, baseContextCxtKey{}, bctx)
 }
 
@@ -171,8 +162,6 @@ func HasBaseContext(ctx context.Context) bool {
 // attach these services to the cotnext before creating and adding a
 // shutdown manager to this context.
 func WithShutdownManager(ctx context.Context) context.Context {
-	fun.Invariant(!HasShutdownManager(ctx), "cannot add more than one shutdown queue")
-
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
