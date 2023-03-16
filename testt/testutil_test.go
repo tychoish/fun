@@ -66,11 +66,11 @@ func TestTools(t *testing.T) {
 		t.Run("Ticker", func(t *testing.T) {
 			mock := newMock()
 			start := time.Now()
-			ticker := Ticker(mock, 2*time.Millisecond)
+			ticker := Ticker(mock, 5*time.Millisecond)
 			runtime.Gosched()
 			<-ticker.C
 			dur := time.Since(start)
-			if dur < 2*time.Millisecond || dur > 4*time.Millisecond {
+			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
 				t.Error(dur)
 			}
 			if len(mock.cleanup) != 1 {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -861,6 +862,9 @@ func TestDequeIntegration(t *testing.T) {
 				check.NotError(t, queue.PushBack(1))
 				input.Add(1)
 			}()
+			if i&5 == 0 {
+				runtime.Gosched()
+			}
 		}
 
 		go func(iter fun.Iterator[int64]) {

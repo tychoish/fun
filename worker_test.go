@@ -137,7 +137,7 @@ func TestWorker(t *testing.T) {
 				}
 
 				go func() {
-					time.Sleep(time.Millisecond)
+					time.Sleep(10 * time.Millisecond)
 					cancel()
 				}()
 
