@@ -97,6 +97,12 @@ func (q *Queue[T]) Add(item T) error {
 	return q.doAdd(item)
 }
 
+func (q *Queue[T]) Len() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.tracker.len()
+}
+
 func (q *Queue[T]) doAdd(item T) error {
 	if q.closed {
 		return ErrQueueClosed
@@ -330,7 +336,7 @@ func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 	iter.queue.mu.Lock()
 	defer iter.queue.mu.Unlock()
 
-	if iter.closed || ctx.Err() != nil {
+	if ctx.Err() != nil {
 		return false
 	}
 
@@ -345,6 +351,9 @@ func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 	}
 
 	if iter.item.link == nil {
+		if iter.closed {
+			return false
+		}
 		if err := iter.queue.unsafeWaitForNew(ctx); err != nil {
 			if errors.Is(err, ErrQueueClosed) {
 				iter.closed = true

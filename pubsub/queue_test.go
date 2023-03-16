@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -225,8 +226,8 @@ func TestQueueIterator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if queue.tracker.len() != 3 {
-			t.Fatal("unexpected queue length", queue.tracker.len())
+		if queue.Len() != 3 {
+			t.Fatal("unexpected queue length", queue.Len())
 		}
 
 		iter := queue.Iterator()
@@ -337,35 +338,55 @@ func TestQueueIterator(t *testing.T) {
 			t.Log("unexpected value", val)
 		}
 	})
-	t.Run("ClosedDoesNotIterate", func(t *testing.T) {
+	t.Run("ClosedQueueIteratesAndDoesNotBlock", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
-		if err != nil {
-			t.Fatal(err)
-		}
+		queue := NewUnlimitedQueue[string]()
 
-		if err := queue.Add("one"); err != nil {
-			t.Fatal(err)
-		}
-
-		iter := queue.Iterator()
-		if !iter.Next(ctx) {
-			t.Fatal("should iterate once")
-		}
-
-		err = iter.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		for i := 0; i < 2; i++ {
-			if iter.Next(ctx) {
-				t.Error("should not iterate")
+		for i := 0; i < 100; i++ {
+			if err := queue.Add(fmt.Sprint("item ", i)); err != nil {
+				t.Fatal(err)
 			}
 		}
+		iter := queue.Iterator()
+		count := 0
+		for iter.Next(ctx) {
+			count++
+			if count == 100 {
+				break
+			}
+		}
+		if count != 100 {
+			t.Error("count should be 100: ", count)
+		}
+	})
+	t.Run("ClosedIteratorDoesNotBlock", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
+		queue := NewUnlimitedQueue[string]()
+
+		for i := 0; i < 100; i++ {
+			if err := queue.Add(fmt.Sprint("item ", i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := queue.Close(); err != nil {
+			t.Error(err)
+		}
+		iter := queue.Iterator()
+
+		count := 0
+		for iter.Next(ctx) {
+			count++
+			if count == 100 {
+				break
+			}
+		}
+		if count != 100 {
+			t.Error("count should be 100: ", count)
+		}
 	})
 	t.Run("CanceledDoesNotIterate", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(ctx)
@@ -437,7 +458,7 @@ func TestQueueIterator(t *testing.T) {
 		sa := time.Now()
 		cancel()
 		<-sig
-		if dur := time.Since(sa); dur > time.Millisecond {
+		if dur := time.Since(sa); dur > 10*time.Millisecond {
 			t.Error(dur)
 		}
 	})

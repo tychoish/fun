@@ -266,7 +266,6 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 					for input.Next(ctx) {
 						err := out.Send(ctx, input.Value())
 						if err != nil {
-							fmt.Println(err)
 							break
 						}
 					}
@@ -287,7 +286,6 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 					for input.Next(ctx) {
 						err := out.Send(ctx, input.Value())
 						if err != nil {
-							fmt.Println(err)
 							break
 						}
 					}
