@@ -928,6 +928,9 @@ func TestDequeIntegration(t *testing.T) {
 
 		wg.Wait(ctx)
 		assert.NotError(t, ctx.Err())
+		assert.NotError(t, queue.Close())
+		wwg.Wait(ctx)
+		assert.NotError(t, ctx.Err())
 		assert.Equal(t, sent.Load(), recv.Load())
 	})
 }
