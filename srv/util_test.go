@@ -32,7 +32,6 @@ func makeBlockingService(t *testing.T) *Service {
 			case <-timer.C:
 				t.Error("this shouldn't happen")
 			case <-ctx.Done():
-				t.Log("why did this happen")
 				return nil
 			}
 			return errors.New("shouldn't get here")

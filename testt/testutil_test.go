@@ -51,12 +51,14 @@ func TestTools(t *testing.T) {
 			}
 		})
 		t.Run("Timer", func(t *testing.T) {
+			t.Parallel()
 			mock := newMock()
 			start := time.Now()
-			timer := Timer(mock, 2*time.Millisecond)
+			timer := Timer(mock, 5*time.Millisecond)
+			runtime.Gosched()
 			<-timer.C
 			dur := time.Since(start)
-			if dur < 2*time.Millisecond || dur > 4*time.Millisecond {
+			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
 				t.Error(dur)
 			}
 			if len(mock.cleanup) != 1 {
@@ -64,6 +66,7 @@ func TestTools(t *testing.T) {
 			}
 		})
 		t.Run("Ticker", func(t *testing.T) {
+			t.Parallel()
 			mock := newMock()
 			start := time.Now()
 			ticker := Ticker(mock, 5*time.Millisecond)

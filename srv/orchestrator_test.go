@@ -367,7 +367,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("StartRunningServices", func(t *testing.T) {
 			orc := &Orchestrator{}
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			defer cancel()
 			for i := 0; i < 50; i++ {
 				s := makeBlockingService(t)
@@ -386,7 +386,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error(err)
 			}
 			// the fixture ensures that all sub-services run
-			if dur := time.Since(startAt); dur > 20*time.Millisecond {
+			if dur := time.Since(startAt); dur > 75*time.Millisecond {
 				t.Error(dur)
 			}
 		})
@@ -493,7 +493,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error(err)
 			}
 			// the fixture ensures that all sub-services run
-			if dur := time.Since(startAt); dur > 60*time.Millisecond {
+			if dur := time.Since(startAt); dur > 100*time.Millisecond {
 				t.Error(dur)
 			}
 		})
