@@ -402,6 +402,35 @@ func TestWorkerPool(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	})
+	t.Run("MultiplePools", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		wpCt := &atomic.Int64{}
+		ctx = SetShutdownSignal(ctx)
+		ctx = WithWorkerPool(ctx, "merlin", itertool.Options{NumWorkers: 50})
+		obCt := &atomic.Int64{}
+		expected := errors.New("kip")
+		ctx = WithObserverWorkerPool(ctx, "kip", func(err error) {
+			check.ErrorIs(t, err, expected)
+			obCt.Add(1)
+		}, itertool.Options{NumWorkers: 50})
+		for i := 0; i < 100; i++ {
+			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error { wpCt.Add(1); return nil })
+			assert.NotError(t, err)
+			err = AddToWorkerPool(ctx, "kip", func(context.Context) error { return expected })
+			assert.NotError(t, err)
+		}
+		time.Sleep(250 * time.Millisecond)
+		svc := GetOrchestrator(ctx).Service()
+		svc.Close()
+		check.NotError(t, svc.Wait())
+		if obCt.Load() != 100 {
+			t.Error(obCt.Load())
+		}
 
+		if wpCt.Load() != 100 {
+			t.Error(wpCt.Load())
+		}
 	})
 }

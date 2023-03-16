@@ -244,25 +244,61 @@ func HasShutdownManager(ctx context.Context) bool {
 //
 // The default queue created by WithWorkerPool has a flexible capped
 // size that's roughly twice the number of active workers and a hard
-// limit of 4x the number of active workers. You can use SetWorkerPool
-// to create an unbounded queue or a queue with different capacity
-// limits.
+// limit of 4 times the number of active workers. You can use
+// SetWorkerPool to create an unbounded queue or a queue with
+// different capacity limits.
+//
+// Be aware that with this pool, errors returned from worker functions
+// remain in memory until they are returned when the service exits. In
+// many cases keeping these errors is reasonable; however, for very
+// long lived processes with a high error volume, this may not be
+// workable. In these cases: avoid returning errors, collect
+// and process them within your worker functions, or use an observer
+// worker pool.
 //
 // Use AddToWorkerPool with the specified key to dispatch work to this
 // worker pool.
 func WithWorkerPool(ctx context.Context, key string, opts itertool.Options) context.Context {
+	return SetWorkerPool(ctx, key, getQueueForOpts(opts), opts)
+}
+
+// WithObserverWorkerPool setups a long running WorkerPool service,
+// starts it, and attaches it to the returned context. The lifecycle
+// of the WorkerPool service is managed by the orchestrator attached
+// to this context: if not orchestrator is attached to the context, a
+// new one is created and added to the context.
+//
+// In order to permit multiple parallel worker pools at a time
+// attached to one context, specify an ID.
+//
+// The number of go routines servicing the work queue is determined by
+// the options.NumWorkers: the minimum value is 1. Values less than
+// one become one.
+//
+// The default queue created by WithWorkerPool has a flexible capped
+// size that's roughly twice the number of active workers and a hard
+// limit of 4 times the number of active workers. You can use
+// SetObserverWorkerPool to create an unbounded queue or a queue with
+// different capacity limits.
+//
+// All errors encountered during the execution of worker functions,
+// including panics, are passed to the observer function and are not
+// retained.
+func WithObserverWorkerPool(ctx context.Context, key string, observer func(error), opts itertool.Options) context.Context {
+	return SetObserverWorkerPool(ctx, key, getQueueForOpts(opts), observer, opts)
+}
+
+func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.WorkerFunc] {
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
 	}
 
-	queue := fun.Must(pubsub.NewQueue[fun.WorkerFunc](
+	return fun.Must(pubsub.NewQueue[fun.WorkerFunc](
 		pubsub.QueueOptions{
 			SoftQuota:   2 * opts.NumWorkers,
 			HardLimit:   4 * opts.NumWorkers,
 			BurstCredit: float64(opts.NumWorkers),
 		}))
-
-	return SetWorkerPool(ctx, key, queue, opts)
 }
 
 // SetWorkerPool constructs a WorkerPool based on the *pubsub.Queue
@@ -281,14 +317,47 @@ func WithWorkerPool(ctx context.Context, key string, opts itertool.Options) cont
 // Use AddToWorkerPool with the specified key to dispatch work to this
 // worker pool.
 func SetWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) context.Context {
+	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
+		fun.InvariantMust(orca.Add(WorkerPool(queue, opts)))
+	})
+}
+
+// SetObserverWorkerPool constructs a WorkerPool based on the
+// *pubsub.Queue provided. The lifecycle of the WorkerPool service is
+// managed by the orchestrator attached to this context: if not
+// orchestrator is attached to the context, a new one is created and
+// added to the context.
+//
+// Errors produced by the workers, including captured panics where
+// appropriate, are passed to the observer function and are not
+// retained.
+//
+// The number of go routines servicing the work queue is determined by
+// the options.NumWorkers: the minimum value is 1. Values less than
+// one become one.
+//
+// In order to permit multiple parallel worker pools at a time
+// attached to one context, specify an ID.
+//
+// Use AddToWorkerPool with the specified key to dispatch work to this
+// worker pool.
+func SetObserverWorkerPool(
+	ctx context.Context,
+	key string,
+	queue *pubsub.Queue[fun.WorkerFunc],
+	observer func(error),
+	opts itertool.Options,
+) context.Context {
+	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
+		fun.InvariantMust(orca.Add(ObserverWorkerPool(queue, observer, opts)))
+	})
+}
+
+func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.WorkerFunc], attach func(*Orchestrator)) context.Context {
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
-
-	orca := GetOrchestrator(ctx)
-
-	fun.InvariantMust(orca.Add(WorkerPool(queue, opts)))
-
+	attach(GetOrchestrator(ctx))
 	return context.WithValue(ctx, workerPoolNameCtxKey(key), queue)
 }
 
@@ -297,12 +366,11 @@ func SetWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.Work
 // returned. If the queue has been closed or the queue is full errors
 // from the pubsub package are propagated to the caller.
 //
-// Be aware that errors returned from worker functions remain in
-// memory until they are returned when the service exits. In many
-// cases keeping these errors is reasonable; however, for very long lived
-// processes with a high error volume, this may not be workable. In
-// these cases, either avoid returning errors, or collect and process
-// them within your worker functions.
+// AddToWorkerPool will propagate worker functions to both
+// conventional and obsesrver pools. Conventional pools will retain
+// any error produced a worker function until the service exits, while
+// observer pools pass errors to the observer function and then
+// release them.
 func AddToWorkerPool(ctx context.Context, key string, fn fun.WorkerFunc) error {
 	queue, ok := ctx.Value(workerPoolNameCtxKey(key)).(*pubsub.Queue[fun.WorkerFunc])
 	if !ok {
