@@ -85,6 +85,7 @@ func TestTools(t *testing.T) {
 			}
 			mock.shouldFail = true
 			Log(mock, "hello world")
+			mock.cleanup[0]()
 			if len(mock.logs) != 1 {
 				t.Fatal("should have logged", len(mock.logs))
 			}
@@ -97,6 +98,7 @@ func TestTools(t *testing.T) {
 			}
 			mock.shouldFail = true
 			Logf(mock, "hello world: %d", 42)
+			mock.cleanup[0]()
 			if len(mock.logs) != 1 {
 				t.Fatal("should have logged", len(mock.logs))
 			}
