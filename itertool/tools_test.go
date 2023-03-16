@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"sort"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/set"
@@ -796,5 +800,237 @@ func TestParallelObserve(t *testing.T) {
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
+	})
+	t.Run("WorkerPool", func(t *testing.T) {
+		t.Run("ProcessSerial", func(t *testing.T) {
+			t.Run("Count", func(t *testing.T) {
+				count := 0
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { count++; return nil }
+				}
+
+				if err := ProcessWork(ctx, Slice(workers)); err != nil {
+					t.Fatal(err)
+				}
+
+				assert.Equal(t, count, 100)
+			})
+			t.Run("Panic", func(t *testing.T) {
+				expected := errors.New("hello")
+				workers := make([]fun.WorkerFunc, 100)
+				count := 0
+				for i := range workers {
+					workers[i] = func(context.Context) error { count++; panic(expected) }
+				}
+
+				err := ProcessWork(ctx, Slice(workers))
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				errs := erc.Unwind(err)
+				if len(errs) != 1 {
+					t.Error("unexpected number of errors", len(errs))
+				}
+				if !errors.Is(err, expected) {
+					t.Error(err)
+				}
+				if count != 1 {
+					t.Error("should only run once")
+				}
+			})
+			t.Run("Order", func(t *testing.T) {
+				const num = 100
+				out := make([]int, num)
+				workers := make([]fun.WorkerFunc, num)
+				for i := range workers {
+					cp := i
+					workers[i] = func(context.Context) error { out[cp] = cp; return nil }
+				}
+
+				if err := ProcessWork(ctx, Slice(workers)); err != nil {
+					t.Fatal(err)
+				}
+
+				assert.True(t, sort.IntsAreSorted(out))
+				assert.Equal(t, num-1, out[len(out)-1])
+			})
+			t.Run("ErrorCollection", func(t *testing.T) {
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { return errors.New("womp") }
+				}
+
+				err := ProcessWork(ctx, Slice(workers))
+				if err == nil {
+					t.Fatal("expected errors")
+				}
+				errs := erc.Unwind(err)
+				if len(errs) != 1 {
+					t.Log(errs)
+					t.Error("unexpected number of errors", len(errs))
+				}
+			})
+		})
+		t.Run("Parallel", func(t *testing.T) {
+			t.Run("Count", func(t *testing.T) {
+				count := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { count.Add(1); return nil }
+				}
+
+				if err := WorkerPool(ctx, Slice(workers), Options{NumWorkers: 4}); err != nil {
+					t.Fatal(err)
+				}
+
+				assert.Equal(t, count.Load(), 100)
+			})
+			t.Run("ErrorCollection", func(t *testing.T) {
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { return errors.New("womp") }
+				}
+
+				err := WorkerPool(ctx, Slice(workers), Options{NumWorkers: 4, ContinueOnError: true})
+				if err == nil {
+					t.Fatal("expected errors")
+				}
+				errs := erc.Unwind(err)
+				if len(errs) != 100 {
+					t.Log(errs)
+					t.Error("unexpected number of errors", len(errs))
+				}
+			})
+			t.Run("Panic", func(t *testing.T) {
+				expected := errors.New("womp")
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { panic(expected) }
+				}
+
+				err := WorkerPool(ctx, Slice(workers), Options{NumWorkers: 4, ContinueOnPanic: true})
+				if err == nil {
+					t.Fatal("expected errors")
+				}
+				errs := erc.Unwind(err)
+				if len(errs) != 100 {
+					t.Log(errs)
+					t.Error("unexpected number of errors", len(errs))
+				}
+				assert.ErrorIs(t, err, expected)
+			})
+		})
+		t.Run("ObserverSerial", func(t *testing.T) {
+			t.Run("Count", func(t *testing.T) {
+				count := &atomic.Int64{}
+				called := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { called.Add(1); return nil }
+				}
+
+				ObserveWorker(ctx, Slice(workers), func(err error) { count.Add(1); check.NotError(t, err) })
+
+				// observe only is called if there's
+				// an error or a panic, so not at all here
+				assert.Equal(t, count.Load(), 0)
+				assert.Equal(t, called.Load(), 100)
+			})
+			t.Run("Panic", func(t *testing.T) {
+				count := &atomic.Int64{}
+				called := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				expected := errors.New("womp")
+				for i := range workers {
+					workers[i] = func(context.Context) error { called.Add(1); panic(expected) }
+				}
+
+				ObserveWorker(ctx, Slice(workers), func(err error) { count.Add(1); check.ErrorIs(t, err, expected) })
+
+				// observe must abort on panics
+				assert.Equal(t, count.Load(), 1)
+				assert.Equal(t, called.Load(), 1)
+			})
+			t.Run("ErrorCollection", func(t *testing.T) {
+				count := &atomic.Int64{}
+				called := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				expected := errors.New("womp")
+				for i := range workers {
+					workers[i] = func(context.Context) error { called.Add(1); return expected }
+				}
+
+				ObserveWorker(ctx, Slice(workers), func(err error) { count.Add(1); check.ErrorIs(t, err, expected) })
+
+				// observe is necessarily continue on error
+				check.Equal(t, count.Load(), 100)
+				check.Equal(t, called.Load(), 100)
+			})
+		})
+		t.Run("ObserveParallel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			t.Run("Count", func(t *testing.T) {
+				count := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				for i := range workers {
+					workers[i] = func(context.Context) error { count.Add(1); return nil }
+				}
+
+				ObserveWorkerPool(ctx, Slice(workers), func(err error) {
+					check.NotError(t, err)
+					// this should never be called
+					check.True(t, false)
+				}, Options{NumWorkers: 4})
+
+				assert.Equal(t, count.Load(), 100)
+			})
+			t.Run("Panic", func(t *testing.T) {
+				count := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				expected := errors.New("womp")
+				for i := range workers {
+					workers[i] = func(context.Context) error { count.Add(1); panic(expected) }
+				}
+
+				observations := &atomic.Int64{}
+				ObserveWorkerPool(ctx, Slice(workers), func(err error) {
+					check.Error(t, err)
+					observations.Add(1)
+					check.ErrorIs(t, err, expected)
+					errs := erc.Unwind(err)
+					check.Equal(t, len(errs), 100)
+				}, Options{
+					NumWorkers:      4,
+					ContinueOnPanic: true,
+				})
+
+				check.Equal(t, count.Load(), 100)
+				check.Equal(t, observations.Load(), 1)
+			})
+			t.Run("ErrorCollection", func(t *testing.T) {
+				count := &atomic.Int64{}
+				workers := make([]fun.WorkerFunc, 100)
+				expected := errors.New("womp")
+				for i := range workers {
+					workers[i] = func(context.Context) error { count.Add(1); return expected }
+				}
+
+				observations := &atomic.Int64{}
+				ObserveWorkerPool(ctx, Slice(workers), func(err error) {
+					check.Error(t, err)
+					observations.Add(1)
+					check.ErrorIs(t, err, expected)
+				}, Options{
+					NumWorkers:      4,
+					ContinueOnError: true,
+				})
+
+				assert.Equal(t, count.Load(), 100)
+				assert.Equal(t, observations.Load(), 100)
+			})
+		})
 	})
 }

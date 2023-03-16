@@ -40,6 +40,9 @@ func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error)
 
 // ForEach passes each item in the iterator through the specified
 // handler function, return an error if the handler function errors.
+//
+// ForEach aborts on the first error and converts any panic into an
+// error which is propagated with other errors.
 func ForEach[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
@@ -279,9 +282,59 @@ func ParallelObserve[T any](
 	return ParallelForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil }, opts)
 }
 
-// Options describes the runtime options to the Map, Generate,
-// ParallelForEach, or ParallelObserve operations. The zero value of
-// this struct provides a usable strict operation.
+// WorkerPool process the worker functions in the provided
+// iterator. Unlike fun.WorkerPool, this implementation checks has
+// options for handling errors and aborting on error.
+//
+// The pool follows the semantics configured by the Options, with
+// regards to error handling, panic handling, and parallelism. Errors
+// are collected and propagated WorkerPool output.
+func WorkerPool(
+	ctx context.Context,
+	iter fun.Iterator[fun.WorkerFunc],
+	opts Options,
+) error {
+	return ParallelForEach(
+		ctx,
+		iter,
+		func(ctx context.Context, wf fun.WorkerFunc) error {
+			return wf.Run(ctx)
+		},
+		opts,
+	)
+}
+
+// ProcessWork provides a serial implementation of WorkerPool with
+// similar semantics. These operations will abort on the first worker
+// function to error.
+func ProcessWork(ctx context.Context, iter fun.Iterator[fun.WorkerFunc]) error {
+	return ForEach(ctx, iter, func(ctx context.Context, wf fun.WorkerFunc) error { return wf.Run(ctx) })
+}
+
+// ObserveWorker executes the worker functions from the iterator, and
+// passes all errors through the observe function. If a worker panics,
+// ObserveWorker will abort, convert the panic into an error, and pass
+// that panic through the observe function.
+func ObserveWorker(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob func(error)) {
+	if err := Observe(ctx, iter, func(wf fun.WorkerFunc) { wf.Observe(ctx, ob) }); err != nil {
+		ob(err)
+	}
+}
+
+// ObserveWorkerPool executes the worker functions from the iterator
+// in a worker pool that operates according to the Options
+// configuration: including pool size, and error and panic handling.
+// If a worker panics, ObserveWorkerPool will convert the panic(s)
+// into an error, and pass that panic through the observe function.
+func ObserveWorkerPool(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob func(error), opts Options) {
+	if err := ParallelObserve(ctx, iter, func(wf fun.WorkerFunc) { wf.Observe(ctx, ob) }, opts); err != nil {
+		ob(err)
+	}
+}
+
+// Options describes the runtime options to several operations
+// operations. The zero value of this struct provides a usable strict
+// operation.
 type Options struct {
 	// ContinueOnPanic forces the entire IteratorMap operation to
 	// halt when a single map function panics. All panics are
