@@ -152,6 +152,22 @@ func ProcessIterator[T any](
 	}
 }
 
+// WorkerPool wraps a pubsub.Queue of functions that represent units
+// of work in an worker pool. The pool follows the semantics
+// configured by the itertool.Options, with regards to error handling,
+// panic handling, and parallelism. Errors are collected and
+// propogated to the service's wait function.
+func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) *Service {
+	return &Service{
+		Run: func(ctx context.Context) error {
+			return itertool.WorkerPool(ctx,
+				pubsub.DistributorIterator(pubsub.DistributorQueue(workQueue)),
+				opts)
+		},
+		Shutdown: workQueue.Close,
+	}
+}
+
 // Broker creates a Service implementation that wraps a
 // pubsub.Broker[T] implementation for integration into service
 // orchestration frameworks.

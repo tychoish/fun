@@ -386,11 +386,11 @@ func TestService(t *testing.T) {
 	t.Run("ErrorHandler", func(t *testing.T) {
 		var oberr error
 		s := &Service{
-			Run:          func(context.Context) error { return errors.New("run") },
-			Shutdown:     func() error { return errors.New("shutdown") },
-			Cleanup:      func() error { panic("cleanup") },
-			ErrorHandler: *fun.NewAtomic(func(err error) { oberr = err }),
+			Run:      func(context.Context) error { return errors.New("run") },
+			Shutdown: func() error { return errors.New("shutdown") },
+			Cleanup:  func() error { panic("cleanup") },
 		}
+		s.ErrorHandler.Set(func(err error) { oberr = err })
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

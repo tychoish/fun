@@ -10,7 +10,10 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -316,5 +319,89 @@ func TestShutdownManager(t *testing.T) {
 		assert.Error(t, ctx.Err())
 
 		assert.NotError(t, bctx.Err())
+	})
+}
+
+func TestWorkerPool(t *testing.T) {
+	t.Parallel()
+	t.Run("Example", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = WithWorkerPool(ctx, "kip", itertool.Options{NumWorkers: 4})
+		assert.True(t, HasOrchestrator(ctx))
+		called := &atomic.Bool{}
+		sig := make(chan struct{})
+		err := AddToWorkerPool(ctx, "kip", func(context.Context) error {
+			defer close(sig)
+			called.Store(true)
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-sig
+		assert.True(t, called.Load())
+		t.Run("MultipleDistinguishablePools", func(t *testing.T) {
+			err = AddToWorkerPool(ctx, "merlin", func(context.Context) error { return nil })
+			assert.Error(t, err)
+		})
+	})
+	t.Run("NegativeWorkersWork", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = WithWorkerPool(ctx, "kip", itertool.Options{NumWorkers: -4})
+		assert.True(t, HasOrchestrator(ctx))
+		called := &atomic.Bool{}
+		sig := make(chan struct{})
+		err := AddToWorkerPool(ctx, "kip", func(context.Context) error {
+			defer close(sig)
+			called.Store(true)
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-sig
+		assert.True(t, called.Load())
+	})
+	t.Run("UnsetAddToWorkerErrors", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		err := AddToWorkerPool(ctx, "kip", func(context.Context) error {
+			return errors.New("should not be called")
+		})
+		if err == nil {
+			t.Fatal(err)
+		}
+		check.Substring(t, err.Error(), "kip")
+	})
+	t.Run("ClosedQueueError", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		queue := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+		ctx = WithWorkerPool(ctx, "merlin", itertool.Options{})
+		ctx = SetWorkerPool(ctx, "kip", queue, itertool.Options{})
+
+		if err := queue.Close(); err != nil {
+			t.Error(err)
+		}
+
+		err := AddToWorkerPool(ctx, "kip", func(context.Context) error {
+			return errors.New("shouldn't run")
+		})
+		if err == nil {
+			t.Fatal("should have an error")
+		}
+		check.ErrorIs(t, err, pubsub.ErrQueueClosed)
+
+		t.Run("MultiplePools", func(t *testing.T) {
+			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error {
+				return errors.New("shouldn't run")
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+
 	})
 }
