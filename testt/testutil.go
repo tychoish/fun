@@ -47,6 +47,7 @@ func Ticker(t testing.TB, dur time.Duration) *time.Ticker {
 func Log(t testing.TB, args ...any) {
 	t.Helper()
 	t.Cleanup(func() {
+		t.Helper()
 		if t.Failed() {
 			t.Log(args...)
 		}
@@ -57,6 +58,7 @@ func Log(t testing.TB, args ...any) {
 func Logf(t testing.TB, format string, args ...any) {
 	t.Helper()
 	t.Cleanup(func() {
+		t.Helper()
 		if t.Failed() {
 			t.Logf(format, args...)
 		}

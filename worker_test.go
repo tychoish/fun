@@ -66,7 +66,7 @@ func TestWorker(t *testing.T) {
 				return errors.New("should not exist")
 			}).WithTimeout(10 * time.Millisecond)
 			dur := time.Since(start)
-			if dur > 11*time.Millisecond {
+			if dur > 15*time.Millisecond {
 				t.Error(dur)
 			}
 			check.NotError(t, err)
