@@ -12,8 +12,17 @@ import (
 // operation returns or the context is canceled.
 type WaitFunc func(context.Context)
 
-// Block executes the WaitFunc with a context that will never
-// expire. Use with extreme caution.
+// Run is equivalent to calling the wait function directly, except the
+// context passed to the function is always canceled when the wait
+// function returns.
+func (wf WaitFunc) Run(ctx context.Context) {
+	wctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	wf(wctx)
+}
+
+// Block runs the WaitFunc with a context that will never be canceled.
 func (wf WaitFunc) Block() { wf(internal.BackgroundContext) }
 
 // WithTimeout runs the WaitFunc with an explicit timeout.
@@ -31,7 +40,7 @@ func (wf WaitFunc) WithTimeout(timeout time.Duration) {
 // Callers are responsble for handling the (potential) panic in the WaitFunc.
 func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})
-	go func() { defer close(out); wf(ctx) }()
+	go func() { defer close(out); wf.Run(ctx) }()
 	return out
 }
 
@@ -144,10 +153,7 @@ func WaitContext(ctx context.Context) WaitFunc { return WaitChannel(ctx.Done()) 
 func WaitAdd(ctx context.Context, wg *WaitGroup, fn WaitFunc) {
 	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
-		fn(ctx)
-	}()
+	go func() { defer wg.Done(); fn.Run(ctx) }()
 }
 
 // WaitMerge starts a goroutine that blocks on each WaitFunc provided

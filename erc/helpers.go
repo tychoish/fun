@@ -97,7 +97,7 @@ func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
 // CheckWait returns a fun.WaitFunc for a function that returns an
 // error, with the error consumed by the collector.
-func CheckWait(ec *Collector, fn func(context.Context) error) fun.WaitFunc {
+func CheckWait(ec *Collector, fn fun.WorkerFunc) fun.WaitFunc {
 	return func(ctx context.Context) { ec.Add(fn(ctx)) }
 }
 
