@@ -83,6 +83,7 @@ func ParallelForEach[T any](
 	fn func(context.Context, T) error,
 	opts Options,
 ) (err error) {
+	iter = Synchronize(iter)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -316,7 +317,14 @@ func ProcessWork(ctx context.Context, iter fun.Iterator[fun.WorkerFunc]) error {
 // ObserveWorker will abort, convert the panic into an error, and pass
 // that panic through the observe function.
 func ObserveWorker(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob func(error)) {
-	if err := Observe(ctx, iter, func(wf fun.WorkerFunc) { wf.Observe(ctx, ob) }); err != nil {
+	// use ForEach rather than Observe to thread the context
+	// through to the workers less indirectly.
+	if err := ForEach(ctx, iter,
+		func(ctx context.Context, wf fun.WorkerFunc) error {
+			wf.Observe(ctx, ob)
+			return nil
+		},
+	); err != nil {
 		ob(err)
 	}
 }
@@ -327,7 +335,14 @@ func ObserveWorker(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob fu
 // If a worker panics, ObserveWorkerPool will convert the panic(s)
 // into an error, and pass that panic through the observe function.
 func ObserveWorkerPool(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob func(error), opts Options) {
-	if err := ParallelObserve(ctx, iter, func(wf fun.WorkerFunc) { wf.Observe(ctx, ob) }, opts); err != nil {
+	// use ForEach rather than Observe to thread the context
+	// through to the workers less indirectly.
+	if err := ParallelForEach(ctx, iter,
+		func(ctx context.Context, wf fun.WorkerFunc) error {
+			wf.Observe(ctx, ob)
+			return nil
+		}, opts,
+	); err != nil {
 		ob(err)
 	}
 }
