@@ -233,14 +233,13 @@ func TestError(t *testing.T) {
 				t.Error("iterator was incomplete", len(errs))
 			}
 		})
-		t.Run("When", func(t *testing.T) {
+		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, "no error")
 			if ec.stack != nil {
 				t.Error("should not error")
 			}
 			assert.NotError(t, ec.Resolve())
-
 			When(ec, true, errval)
 			check.NotZero(t, ec.stack) // nil is zero
 			if err := ec.Resolve(); err == nil {
@@ -249,7 +248,41 @@ func TestError(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		t.Run("When", func(t *testing.T) {
+		t.Run("WhenBasicError", func(t *testing.T) {
+			ec := &Collector{}
+			When(ec, false, "no error")
+			if ec.stack != nil {
+				t.Error("should not error")
+			}
+			assert.NotError(t, ec.Resolve())
+			ex := errors.New(errval)
+			When(ec, true, ex)
+			check.NotZero(t, ec.stack) // nil is zero
+			if err := ec.Resolve(); err == nil {
+				t.Fatal(err)
+			} else if err.Error() != errval {
+				t.Fatal(err)
+			}
+			assert.ErrorIs(t, ec.Resolve(), ex)
+		})
+		t.Run("WhenBasicWeirdType", func(t *testing.T) {
+			ec := &Collector{}
+			When(ec, false, 54)
+			if ec.stack != nil {
+				t.Error("should not error")
+			}
+			assert.NotError(t, ec.Resolve())
+			When(ec, true, 50000)
+			check.NotZero(t, ec.stack) // nil is zero
+			err := ec.Resolve()
+			if err == nil {
+				t.Fatal(err)
+			}
+			check.Substring(t, err.Error(), "50000")
+			check.Substring(t, err.Error(), "int")
+		})
+
+		t.Run("WhenWrapping", func(t *testing.T) {
 			serr := errors.New(errval)
 			ec := &Collector{}
 			Whenf(ec, false, "no error %w", serr)

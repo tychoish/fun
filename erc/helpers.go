@@ -23,12 +23,18 @@ func ContextExpired(err error) bool {
 // When is a helper function, typcially useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
-func When(ec *Collector, cond bool, val string) {
+func When(ec *Collector, cond bool, val any) {
 	if !cond {
 		return
 	}
-
-	ec.Add(errors.New(val))
+	switch e := val.(type) {
+	case error:
+		ec.Add(e)
+	case string:
+		ec.Add(errors.New(e))
+	default:
+		ec.Add(fmt.Errorf("error=%T: %v", val, e))
+	}
 }
 
 // Whenf conditionally creates and adds an error to the collector, as
