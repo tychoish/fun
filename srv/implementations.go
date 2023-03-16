@@ -23,7 +23,7 @@ import (
 // Use Group(itertool.Slice([]*Service)) to produce a group from a
 // slice of *Services,
 func Group(services fun.Iterator[*Service]) *Service {
-	waiters := fun.Must(pubsub.NewDeque[func() error](pubsub.DequeOptions{Unlimited: true}))
+	waiters := pubsub.NewUnlimitedQueue[func() error]()
 	wg := &fun.WaitGroup{}
 	ec := &erc.Collector{}
 
@@ -34,11 +34,12 @@ func Group(services fun.Iterator[*Service]) *Service {
 				go func(s *Service) {
 					defer erc.Recover(ec)
 					defer wg.Done()
-					defer func() { fun.Invariant(waiters.PushBack(s.Wait) == nil) }()
+					defer func() { fun.Invariant(waiters.Add(s.Wait) == nil) }()
 					ec.Add(s.Start(ctx))
 				}(services.Value())
 			}
 			wg.Wait(ctx)
+			ec.Add(waiters.Close())
 			return nil
 		},
 		Cleanup: func() error {
