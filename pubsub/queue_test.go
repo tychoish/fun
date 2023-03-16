@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestQueueNew(t *testing.T) {
@@ -205,11 +206,10 @@ func TestQueueWait(t *testing.T) {
 func TestQueueIterator(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("EndToEnd", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
@@ -289,7 +289,7 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("EndToEndStartEmpty", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
@@ -339,7 +339,7 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("ClosedQueueIteratesAndDoesNotBlock", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		queue := NewUnlimitedQueue[string]()
@@ -362,9 +362,7 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("ClosedIteratorDoesNotBlock", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
+		ctx := testt.Context(t)
 		queue := NewUnlimitedQueue[string]()
 
 		for i := 0; i < 100; i++ {
@@ -389,9 +387,8 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("CanceledDoesNotIterate", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancel(testt.Context(t))
 		defer cancel()
-
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
 		if err != nil {
 			t.Fatal(err)
@@ -418,9 +415,7 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("ClosedQueueDoesNotIterate", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
+		ctx := testt.Context(t)
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
 		if err != nil {
 			t.Fatal(err)
@@ -446,7 +441,10 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("WaitRespectsQueue", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		queue := NewUnlimitedQueue[int]()
 		sig := make(chan struct{})
 		go func() {
@@ -463,8 +461,7 @@ func TestQueueIterator(t *testing.T) {
 		}
 	})
 	t.Run("IteratorRetrySpecialCase", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		ctx := testt.Context(t)
 		queue := NewUnlimitedQueue[int]()
 		iter := queue.Iterator()
 		toctx, toccancel := context.WithTimeout(ctx, time.Millisecond)
@@ -483,7 +480,11 @@ func TestQueueIterator(t *testing.T) {
 	})
 
 	t.Run("WaitAdd", func(t *testing.T) {
+		t.Parallel()
 		t.Run("ContextCanceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
@@ -501,6 +502,9 @@ func TestQueueIterator(t *testing.T) {
 			}
 		})
 		t.Run("Closed", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
@@ -518,6 +522,10 @@ func TestQueueIterator(t *testing.T) {
 			}
 		})
 		t.Run("RealWait", func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)

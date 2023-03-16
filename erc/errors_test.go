@@ -460,7 +460,7 @@ func TestError(t *testing.T) {
 		t.Parallel()
 		startAt := time.Now()
 		defer func() { t.Log(time.Since(startAt)) }()
-		fixtureTimeout, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		fixtureTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		wg := &fun.WaitGroup{}
 		catcher := &Collector{}
@@ -485,7 +485,7 @@ func TestError(t *testing.T) {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
-				ticker := time.NewTicker(2 * time.Millisecond)
+				ticker := time.NewTicker(5 * time.Millisecond)
 				defer ticker.Stop()
 
 				var count int
@@ -508,7 +508,7 @@ func TestError(t *testing.T) {
 				}
 			}(i)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		wg.Wait(ctx)
 	})

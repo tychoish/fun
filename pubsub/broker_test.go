@@ -333,7 +333,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 				opts := fix
 
 				t.Parallel()
-				ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
+				ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 				defer cancel()
 
 				broker := opts.Construtor(ctx, t)
@@ -417,7 +417,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 						broker.Publish(ctx, elems[idx])
 						runtime.Gosched()
 					}
-					timer := time.NewTimer(500 * time.Millisecond)
+					timer := time.NewTimer(250 * time.Millisecond)
 					defer timer.Stop()
 					ticker := time.NewTicker(20 * time.Millisecond)
 					defer ticker.Stop()
@@ -464,7 +464,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 					opts := fix
 
 					t.Parallel()
-					ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+					ctx, cancel := context.WithTimeout(pctx, 2*time.Second)
 					defer cancel()
 
 					broker := opts.Construtor(pctx, t)
@@ -489,7 +489,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T,
 						t.Error(stat)
 					}
 
-					for i := 0; i < 30; i++ {
+					for i := 0; i < 20; i++ {
 						wg.Add(1)
 						go func(id int) {
 							defer wg.Done()

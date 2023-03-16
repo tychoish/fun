@@ -27,6 +27,7 @@ func TestOrchestrator(t *testing.T) {
 		}
 	})
 	t.Run("Add", func(t *testing.T) {
+		t.Parallel()
 		t.Run("BeforeStart", func(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
@@ -67,6 +68,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 	})
 	t.Run("Service", func(t *testing.T) {
+		t.Parallel()
 		t.Run("MultipleCalls", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -220,7 +222,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should still be running")
 			}
 
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 
 			osrv.Close()
 			err := osrv.Wait()
@@ -265,6 +267,8 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("LogRunningServices", func(t *testing.T) {
+			t.Parallel()
+
 			orc := &Orchestrator{}
 			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
@@ -290,6 +294,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 	})
 	t.Run("ServicePassthrough", func(t *testing.T) {
+		t.Parallel()
 		t.Run("RunEndToEnd", func(t *testing.T) {
 			t.Parallel()
 			counter := &atomic.Int64{}
@@ -386,6 +391,7 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("FinishedServicesError", func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 

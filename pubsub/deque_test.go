@@ -879,7 +879,7 @@ func TestDequeIntegration(t *testing.T) {
 		tctx := testt.ContextWithTimeout(t, 3*time.Second)
 		wg.Wait(tctx)
 
-		time.Sleep(2 * time.Second)
+		// time.Sleep(1 * time.Second)
 		assert.NotError(t, queue.Close())
 
 		tctx = testt.ContextWithTimeout(t, 3*time.Second)
