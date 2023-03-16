@@ -1,5 +1,7 @@
 package fun
 
+import "github.com/tychoish/fun/internal"
+
 // Is a generic version of `errors.Is` that takes advantage of the
 // Unwrap function, and is useful for checking if an object of an
 // interface type is or wraps an implementation of the type
@@ -27,11 +29,11 @@ func Unwrap[T any](in T) T {
 }
 
 // Zero returns the zero-value for the type T of the input argument.
-func Zero[T any](in T) T { return ZeroOf[T]() }
+func Zero[T any](T) T { return ZeroOf[T]() }
 
 // ZeroOf returns the zero-value for the type T specified as an
 // argument.
-func ZeroOf[T any]() T { return *new(T) }
+func ZeroOf[T any]() T { return internal.ZeroOf[T]() }
 
 // IsZero returns true if the input value compares "true" to the zero
 // value for the type of the argument. If the type implements an

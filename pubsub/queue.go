@@ -167,7 +167,7 @@ func (q *Queue[T]) Remove() (T, bool) {
 	defer q.mu.Unlock()
 
 	if q.tracker.len() == 0 {
-		return *new(T), false
+		return fun.ZeroOf[T](), false
 	}
 	return q.popFront(), true
 }
@@ -181,7 +181,7 @@ func (q *Queue[T]) Wait(ctx context.Context) (T, error) {
 	defer q.mu.Unlock()
 
 	if err := q.unsafeWaitWhileEmpty(ctx); err != nil {
-		return *new(T), err
+		return fun.ZeroOf[T](), err
 	}
 
 	return q.popFront(), nil

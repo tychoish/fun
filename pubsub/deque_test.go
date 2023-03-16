@@ -312,7 +312,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 
 			for iter.Next(ctx) {
 				seen++
-				if iter.Value() == *new(T) {
+				if fun.IsZero(iter.Value()) {
 					t.Fatal("problem at", seen)
 				}
 			}

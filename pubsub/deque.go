@@ -294,7 +294,7 @@ func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
 // be ergonomic.
 func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
 	if dq.closed || it.isRoot() {
-		return *new(T), false
+		return fun.ZeroOf[T](), false
 	}
 
 	if it.prev.isRoot() {
@@ -318,12 +318,12 @@ func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
 func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, error) {
 	for {
 		if err := dq.root.getNextOrPrevious(direction).wait(ctx, direction); err != nil {
-			return *new(T), err
+			return fun.ZeroOf[T](), err
 		}
 
 		next := dq.root.getNextOrPrevious(direction)
 		if next.isRoot() {
-			return *new(T), errors.New("end of iteration")
+			return fun.ZeroOf[T](), errors.New("end of iteration")
 		}
 
 		it, ok := dq.pop(next)

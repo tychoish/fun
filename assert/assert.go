@@ -128,7 +128,7 @@ func PanicValue[T comparable](t testing.TB, fn func(), value T) {
 		}
 		pval, ok := r.(T)
 		if !ok {
-			t.Fatalf("panic [%v], not of expected type %T", r, *new(T))
+			t.Fatalf("panic [%v], not of expected type %T", r, zeroOf[T]())
 		}
 		Equal(t, pval, value)
 	}()

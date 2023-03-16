@@ -114,7 +114,7 @@ func Range[T any](ctx context.Context, iter fun.Iterator[T]) RangeFunction[T] {
 			return true
 		}
 
-		*out = *new(T)
+		*out = fun.ZeroOf[T]()
 		return false
 	}
 }

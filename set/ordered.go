@@ -128,7 +128,7 @@ func (s *orderedSetImpl[T]) Delete(it T) {
 		return
 	}
 	s.elems[val.idx].deleted = true
-	s.elems[val.idx].item = *new(T) // zero to release memory
+	s.elems[val.idx].item = fun.ZeroOf[T]() // zero to release memory
 	delete(s.set, val.item)
 	s.deletedCount++
 

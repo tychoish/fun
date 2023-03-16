@@ -128,7 +128,7 @@ type distIter[T any] struct {
 
 func (d *distIter[T]) Close() error {
 	if !d.closed.Swap(true) {
-		d.value = *new(T)
+		d.value = fun.ZeroOf[T]()
 	}
 	return nil
 }

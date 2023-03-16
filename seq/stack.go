@@ -216,7 +216,7 @@ func (s *Stack[T]) UnmarshalJSON(in []byte) error {
 	if err := json.Unmarshal(in, &rv); err != nil {
 		return err
 	}
-	zero := *new(T)
+	zero := fun.ZeroOf[T]()
 	ns := &Stack[T]{}
 	head := ns.Head()
 	for idx := range rv {
@@ -239,7 +239,7 @@ func (s *Stack[T]) lazyInit() {
 	}
 
 	if s.head == nil {
-		val := *new(T)
+		val := fun.ZeroOf[T]()
 		s.itemConstructor = func(val T) *Item[T] { return &Item[T]{value: val, ok: true} }
 		s.length = 0
 		s.head = s.itemConstructor(val)

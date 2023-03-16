@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+
+	"github.com/tychoish/fun"
 )
 
 // this is a some what experimental pool for element objects.
@@ -40,13 +42,12 @@ func getElementPool[T any](val T) *sync.Pool {
 		return pool
 	}
 
-	zero := *new(T)
 	pool = &sync.Pool{
 		New: func() any {
 			e := &Element[T]{}
 			runtime.SetFinalizer(e, func(elem *Element[T]) {
 				elem.ok = false
-				elem.item = zero
+				elem.item = fun.ZeroOf[T]()
 				go pool.Put(elem)
 			})
 			return e
@@ -80,13 +81,12 @@ func getItemPool[T any](val T) *sync.Pool {
 		return pool
 	}
 
-	zero := *new(T)
 	pool = &sync.Pool{
 		New: func() any {
 			i := &Item[T]{}
 			runtime.SetFinalizer(i, func(item *Item[T]) {
 				item.ok = false
-				item.value = zero
+				item.value = fun.ZeroOf[T]()
 				go pool.Put(item)
 			})
 			return i

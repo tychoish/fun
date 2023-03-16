@@ -41,7 +41,7 @@ type errIter[T any] struct{ err error }
 
 func (e errIter[T]) Close() error              { return e.err }
 func (_ errIter[T]) Next(context.Context) bool { return false }
-func (_ errIter[T]) Value() T                  { return *new(T) }
+func (_ errIter[T]) Value() T                  { return fun.ZeroOf[T]() }
 
 // UnmarshalJSON reads a JSON input and produces an iterator of the
 // items. The implementation reads all items from the slice before

@@ -80,16 +80,20 @@ func (iter *MapIterImpl[T]) Close() error {
 	return iter.Error
 }
 
+// ZeroOf returns the zero-value for the type T specified as an
+// argument.
+func ZeroOf[T any]() T { return *new(T) }
+
 func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
 	select {
 	case <-ctx.Done():
-		return *new(T), ctx.Err()
+		return ZeroOf[T](), ctx.Err()
 	case obj, ok := <-ch:
 		if !ok {
-			return *new(T), io.EOF
+			return ZeroOf[T](), io.EOF
 		}
 		if err := ctx.Err(); err != nil {
-			return *new(T), err
+			return ZeroOf[T](), err
 		}
 
 		return obj, nil
