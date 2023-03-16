@@ -867,11 +867,14 @@ func TestDequeIntegration(t *testing.T) {
 			}
 		}
 
+		wg.Add(1)
 		go func(iter fun.Iterator[int64]) {
+			defer wg.Done()
 			for iter.Next(ctx) {
 				counter.Add(1)
+
 			}
-		}(queue.IteratorBlocking())
+		}(queue.Iterator())
 
 		tctx := testt.ContextWithTimeout(t, 3*time.Second)
 		wg.Wait(tctx)
