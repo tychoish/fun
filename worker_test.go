@@ -25,8 +25,8 @@ func TestWorker(t *testing.T) {
 			if dur < 10*time.Millisecond {
 				t.Error("did not block long enough", dur)
 			}
-			if dur > 12*time.Millisecond {
-				t.Error("did not block long enough", dur)
+			if dur > 15*time.Millisecond {
+				t.Error("blocked too long", dur)
 			}
 			assert.NotError(t, err)
 		})

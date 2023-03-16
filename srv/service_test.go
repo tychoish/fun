@@ -366,6 +366,11 @@ func TestService(t *testing.T) {
 				if err != nil {
 					t.Error(err)
 				}
+				if resp == nil {
+					t.Error("response body should not be nil")
+					return
+				}
+
 				if resp.StatusCode != http.StatusOK {
 					t.Error(resp.StatusCode)
 				}
