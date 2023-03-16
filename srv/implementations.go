@@ -169,6 +169,35 @@ func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) 
 	}
 }
 
+// ObserverWorkerPool has similar semantics and use to the WorkerPool,
+// but rather than aggregating errors, all errors are passed to the
+// observer function, which is responsible for ignoring or processing
+// the errors. The worker pool will respect continue/abort on error or
+// panics as expected.
+//
+// Observer pools may be more operable if your workers generate many
+// errors, and/or your process is long lived.
+//
+// The service itself may have execution or shutdown related errors,
+// particularly if there is an invariant violation or panic during
+// service execution which will be propagated to the return value of
+// the service's Wait method; but all errors that occur during the
+// execution of the workload will be observed (including panics) as well.
+func ObserverWorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], observer func(error), opts itertool.Options) *Service {
+	s := &Service{
+		Run: func(ctx context.Context) error {
+			itertool.ObserveWorkerPool(ctx,
+				pubsub.DistributorIterator(pubsub.DistributorQueue(workQueue)),
+				observer,
+				opts)
+			return nil
+		},
+		Shutdown: workQueue.Close,
+	}
+	s.ErrorHandler.Set(observer)
+	return s
+}
+
 // Broker creates a Service implementation that wraps a
 // pubsub.Broker[T] implementation for integration into service
 // orchestration frameworks.
