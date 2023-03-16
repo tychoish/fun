@@ -2,6 +2,7 @@ package srv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -24,24 +25,20 @@ type Orchestrator struct {
 	Name string
 	// mutex protects the struct. while the deque is threadsafe,
 	// we want to be able to avoid adding new threads during shutdown
-	mtx  sync.Mutex
-	pipe *pubsub.Deque[*Service]
-	srv  *Service
+	mtx   sync.Mutex
+	input *pubsub.Queue[*Service]
+	srv   *Service
 }
 
 // String implements fmt.Stringer and returns the type name and
 func (or *Orchestrator) String() string { return fmt.Sprintf("Orchestrator<%s>", or.Name) }
 
 func (or *Orchestrator) setup() {
-	if or.srv != nil {
-		if !or.srv.Running() && or.srv.isFinished.Load() {
-			or.srv = nil
-			or.pipe = nil
-		}
+	if or.input == nil {
+		or.input = pubsub.NewUnlimitedQueue[*Service]()
 	}
-
-	if or.pipe == nil {
-		or.pipe = fun.Must(pubsub.NewDeque[*Service](pubsub.DequeOptions{Unlimited: true}))
+	if or.Name == "" {
+		or.Name = "orchestrator"
 	}
 }
 
@@ -65,7 +62,7 @@ func (or *Orchestrator) Add(s *Service) error {
 		return nil
 	}
 
-	return or.pipe.PushBack(s)
+	return or.input.Add(s)
 }
 
 // Start is a convenience function that run's the service's start
@@ -101,19 +98,31 @@ func (or *Orchestrator) Service() *Service {
 
 	or.setup()
 
+	pipe := pubsub.NewUnlimitedQueue[*Service]()
 	or.srv = &Service{
 		Name: or.Name,
 		Run: func(ctx context.Context) error {
 			ec := &erc.Collector{}
-
-			// this means that we'll just block when we've
-			// gotten to the end until something new is
-			// pushed or the context is canceled.
-			iter := or.pipe.IteratorBlocking()
+			defer func() { ec.Add(pipe.Close()) }()
 
 			wg := &fun.WaitGroup{}
-			for iter.Next(ctx) {
-				s := iter.Value()
+
+			for {
+				s, ok := or.input.Remove()
+				if !ok {
+					var err error
+
+					s, err = or.input.Wait(ctx)
+					if err != nil {
+						// we only want to collect non-context
+						// cancelation and non queue-closed errors
+						erc.When(ec, (!errors.Is(err, pubsub.ErrQueueClosed) && !erc.ContextExpired(err)), err)
+						break
+					}
+				}
+
+				fun.InvariantMust(pipe.Add(s), "adding to shutdown queue")
+
 				if s.Running() {
 					continue
 				}
@@ -122,9 +131,9 @@ func (or *Orchestrator) Service() *Service {
 					defer wg.Done()
 					defer erc.Recover(ec)
 
-					// note: we could easily
-					// choose to ignore this
-					// error.
+					// note: we could easily choose to ignore this error.
+					// the cases where start fails are generally ok, and we
+					// are already going to track this service's shutdown.
 					if err := ss.Start(ctx); err != nil {
 						ec.Add(fmt.Errorf("problem starting %s: %w", ss.String(), err))
 					}
@@ -132,7 +141,6 @@ func (or *Orchestrator) Service() *Service {
 			}
 
 			wg.Wait(ctx)
-			ec.Add(iter.Close())
 			return ec.Resolve()
 		},
 		Cleanup: func() error {
@@ -142,7 +150,7 @@ func (or *Orchestrator) Service() *Service {
 			defer or.mtx.Unlock()
 
 			defer erc.Recover(ec)
-			defer func() { ec.Add(or.pipe.Close()) }()
+			defer func() { ec.Add(or.input.Close()) }()
 
 			// this has to be a background context,
 			// because any context that we would have at
@@ -153,9 +161,8 @@ func (or *Orchestrator) Service() *Service {
 			ctx, cancel := context.WithCancel(internal.BackgroundContext)
 			defer cancel()
 
-			iter := or.pipe.Iterator()
+			iter := pipe.Iterator()
 			wg := &fun.WaitGroup{}
-
 			for iter.Next(ctx) {
 				s := iter.Value()
 				if s != nil {

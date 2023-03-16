@@ -51,15 +51,17 @@ type (
 func WithOrchestrator(ctx context.Context) context.Context {
 	orca := &Orchestrator{}
 	ctx = SetOrchestrator(ctx, orca)
-
-	fun.InvariantMust(orca.Service().Start(ctx), "orchestrator service must start")
-
 	return ctx
 }
 
 // SetOrchestrator attaches an orchestrator to a context, if one is
 // already set this is a panic with an invariant violation.
 func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
+	svc := or.Service()
+	if !svc.Running() {
+		fun.InvariantMust(svc.Start(ctx), "orchestrator must start")
+	}
+
 	return context.WithValue(ctx, orchestratorCtxKey{}, or)
 }
 
@@ -151,35 +153,63 @@ func HasBaseContext(ctx context.Context) bool {
 	return ok
 }
 
-// WithShutdownManager constructs and attaches a wait service, which
-// waits until all submitted wait functions have returned.
+// WithShutdownManager constructs and attaches a wait service, to the
+// context it returns. If this context does not already have a base
+// context (SetBaseContxt), // shutdown signal (SetShutdownSignal) or
+// an orchestrator (WithOrchestrator), they are created before
+// starting the shutdown service. If they are already set on this
+// context, then they are *not* created.
 //
-// If a shutdown manager is already set on this context, this
-// operation is a noop.
+// Add wait functions to the service with AddToShutdownManager.
 //
-// If a shutdown trigger (e.g. SetShutdown/GetShutdown) is not set on
-// the provided context or an orchestrator, WithShutdownManager will
-// attach these services to the cotnext before creating and adding a
-// shutdown manager to this context.
+// The process orchestrator will then have a shutdown service which
+// will block until the shutdown signal is called,
+// (e.g. `srv.GetShutdownSignal(ctx)()`). At that time, using the base
+// context (from GetBaseContext), all enqueued shutdown wait functions
+// will run in parallel, and the Orchestrator will block until all
+// wait functions have run.
+//
+// Callers should take care that they don't cancel the base context or
+// an ancestor of this context *before* they want shutdown to
+// abort. The wait service, which begins executing when orchestrators
+// context is canceled, and will block until the base context is
+// canceled. Because context's values are effectively a stack, you can
+// use handles to earlier shutdown signals to implement safe shutdown
+// procedures.
 func WithShutdownManager(ctx context.Context) context.Context {
+	if !HasBaseContext(ctx) {
+		ctx = SetBaseContext(ctx)
+	}
+
+	if !HasShutdownSignal(ctx) {
+		ctx = SetShutdownSignal(ctx)
+	}
+
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
 
-	queue := pubsub.DistributorChannel(make(chan fun.WaitFunc))
-
 	orca := GetOrchestrator(ctx)
-	s := Wait(pubsub.DistributorIterator(queue))
 
-	fun.InvariantMust(s.Start(ctx), "wait service must start")
-	fun.InvariantMust(orca.Add(s), "problem adding wait service to orchestrator")
+	fun.Invariant(orca.Service().Running(), "the orchestrator should be running")
+	queue := pubsub.NewUnlimitedQueue[fun.WaitFunc]()
+
+	fun.InvariantMust(orca.Add(&Service{
+		Run: func(rctx context.Context) error {
+			<-rctx.Done()
+			bctx := GetBaseContext(ctx)
+			fun.InvariantMust(queue.Close(), "close shutdown manager")
+			fun.WaitMerge(bctx, queue.Iterator())(bctx)
+			return nil
+		},
+	}))
 
 	return context.WithValue(ctx, shutdownWaitQueueCtxKey{}, queue)
 }
 
-func getShutdownManager(ctx context.Context) pubsub.Distributor[fun.WaitFunc] {
-	q, ok := ctx.Value(shutdownWaitQueueCtxKey{}).(pubsub.Distributor[fun.WaitFunc])
-	fun.Invariant(ok, "shutdown queue was not correctly attached")
+func getShutdownManager(ctx context.Context) *pubsub.Queue[fun.WaitFunc] {
+	q, ok := ctx.Value(shutdownWaitQueueCtxKey{}).(*pubsub.Queue[fun.WaitFunc])
+	fun.Invariant(ok, "shutdown queue was not correctly attached", q, ok)
 	return q
 }
 
@@ -187,11 +217,11 @@ func getShutdownManager(ctx context.Context) pubsub.Distributor[fun.WaitFunc] {
 // shutdown manager is not set on the context, this raises a panic
 // with an InvariantViolation.
 func AddToShutdownManager(ctx context.Context, fn fun.WaitFunc) {
-	fun.InvariantMust(getShutdownManager(ctx).Send(ctx, fn), "problem adding wait function to shutdown queue")
+	fun.InvariantMust(getShutdownManager(ctx).Add(fn), "problem adding wait function to shutdown queue")
 }
 
 // HasShutdownManager returns true if a shutdown queue has started.
 func HasShutdownManager(ctx context.Context) bool {
-	_, ok := ctx.Value(shutdownWaitQueueCtxKey{}).(pubsub.Distributor[fun.WaitFunc])
+	_, ok := ctx.Value(shutdownWaitQueueCtxKey{}).(*pubsub.Queue[fun.WaitFunc])
 	return ok
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -46,7 +47,7 @@ func TestOrchestrator(t *testing.T) {
 			if orc.srv != nil {
 				t.Error("service is created lazily, later")
 			}
-			if orc.pipe == nil {
+			if orc.input == nil {
 				t.Error("pipe should be created")
 			}
 		})
@@ -57,11 +58,11 @@ func TestOrchestrator(t *testing.T) {
 					t.Error(err)
 				}
 			}
-			if orc.pipe == nil {
+			if orc.input == nil {
 				t.Error("pipe should be created")
 			}
-			if orc.pipe.Len() != 0 {
-				t.Error(orc.pipe.Len())
+			if orc.input.Len() != 0 {
+				t.Error(orc.input.Len())
 			}
 		})
 	})
@@ -130,24 +131,6 @@ func TestOrchestrator(t *testing.T) {
 			if counter.Load() != 100 {
 				t.Error("all services did not run")
 			}
-			t.Run("Reset", func(t *testing.T) {
-				if orc.pipe.Len() != 100 {
-					t.Error(orc.pipe.Len())
-				}
-				if err := orc.Add(nil); err != nil {
-					t.Error(err)
-				}
-				if orc.pipe.Len() != 0 {
-					t.Error(orc.pipe.Len())
-				}
-				ns := orc.Service()
-				if ns == nil {
-					t.Error("should be a valid service")
-				}
-				if ns == s {
-					t.Error("should be a different service")
-				}
-			})
 		})
 		t.Run("PropogateErrors", func(t *testing.T) {
 			orc := &Orchestrator{}
@@ -248,11 +231,8 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("should not be running")
 			}
 			errs := erc.Unwind(err)
-			if orc.pipe.Len() != num {
-				t.Error(orc.pipe.Len(), num)
-			}
-			if len(errs) == 0 {
-				t.Error("should have errors")
+			if len(errs) != 25 {
+				t.Error("should have 25 errors")
 			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
@@ -381,7 +361,6 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("StartRunningServices", func(t *testing.T) {
-			t.Parallel()
 			orc := &Orchestrator{}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 			defer cancel()
@@ -407,7 +386,6 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("FinishedServicesError", func(t *testing.T) {
-			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -424,7 +402,7 @@ func TestOrchestrator(t *testing.T) {
 			}
 			s.Close()
 			_ = s.Wait()
-			if orc.pipe == nil {
+			if orc.input == nil {
 				t.Fatal("should not be empty")
 			}
 			runtime.Gosched()
@@ -440,25 +418,27 @@ func TestOrchestrator(t *testing.T) {
 					runtime.Gosched()
 				}
 			}
-			if !orc.Service().Running() {
+
+			ors := orc.Service()
+			if !ors.Running() {
 				t.Error("should still be running")
 			}
 
-			if orc.pipe.Len() != num {
-				t.Error("should have services", orc.pipe.Len())
-			}
+			ors.Close()
 
-			orc.Service().Close()
+			if err := orc.Wait(); err != nil {
+				check.ErrorIs(t, err, ErrServiceReturned)
+			}
 
 			time.Sleep(500 * time.Millisecond)
 
-			if orc.Service().Running() {
+			if ors.Running() {
 				t.Error("should not be running")
 			}
-			err := orc.Wait()
+			err := ors.Wait()
 			errs := erc.Unwind(err)
 			if len(errs) == 0 {
-				t.Error("should have errors", err, errs, len(errs))
+				t.Error("should have errors", num, len(errs), err, errs)
 			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {

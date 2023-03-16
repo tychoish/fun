@@ -106,6 +106,7 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	s.doStart.Do(func() {
+		defer s.isRunning.Store(true)
 		defer s.isStarted.Store(true)
 		ec := &s.ec
 		ehSignal := make(chan struct{})
@@ -125,8 +126,6 @@ func (s *Service) Start(ctx context.Context) error {
 
 		ctx, s.cancel = context.WithCancel(ctx)
 
-		// set running to true here so that close is always safe
-		s.isRunning.Store(true)
 		shutdownSignal := make(chan struct{})
 		if s.Shutdown != nil {
 			// capture it just to be safe.
@@ -198,9 +197,14 @@ func (s *Service) Wait() error {
 }
 
 func (s *Service) waitFor(ctx context.Context) error {
-	if !s.isStarted.Load() {
-		return ErrServiceNotStarted
+	if s.isFinished.Load() {
+		return s.ec.Resolve()
 	}
+
+	if !s.isStarted.Load() {
+		return fmt.Errorf("%s: %w", s.String(), ErrServiceNotStarted)
+	}
+
 	s.wg.Wait(ctx)
 	return s.ec.Resolve()
 

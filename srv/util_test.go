@@ -27,11 +27,12 @@ func makeBlockingService(t *testing.T) *Service {
 			return nil
 		},
 		Run: func(ctx context.Context) error {
-			timer := testt.Timer(t, time.Hour)
+			timer := testt.Timer(t, 24*time.Hour)
 			select {
 			case <-timer.C:
 				t.Error("this shouldn't happen")
 			case <-ctx.Done():
+				t.Log("why did this happen")
 				return nil
 			}
 			return errors.New("shouldn't get here")
