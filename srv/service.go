@@ -120,7 +120,9 @@ func (s *Service) Start(ctx context.Context) error {
 			eh := s.ErrorHandler.Get()
 			if eh != nil {
 				defer erc.Recover(ec)
-				eh(ec.Resolve())
+				if err := ec.Resolve(); err != nil {
+					eh(err)
+				}
 			}
 		}()
 
