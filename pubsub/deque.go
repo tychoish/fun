@@ -309,8 +309,11 @@ func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
 
 	it.prev.next = it.next
 	it.next.prev = it.prev
-	it.next = nil
-	it.prev = nil
+
+	// don't reset poointers in the item in case we're using this
+	// item in an iterator
+	// it.next = nil
+	// it.prev = nil
 
 	return it.item, true
 }
@@ -321,12 +324,7 @@ func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, erro
 			return fun.ZeroOf[T](), err
 		}
 
-		next := dq.root.getNextOrPrevious(direction)
-		if next.isRoot() {
-			return fun.ZeroOf[T](), errors.New("end of iteration")
-		}
-
-		it, ok := dq.pop(next)
+		it, ok := dq.pop(dq.root.getNextOrPrevious(direction))
 		if ok {
 			return it, nil
 		}
@@ -334,14 +332,14 @@ func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, erro
 }
 
 type dqIterator[T any] struct {
+	mtx sync.Mutex
+
 	// these fields must be protected by the *list's* mutex
 	list      *Deque[T]
 	item      *element[T]
 	direction dqDirection
 	blocking  bool
 
-	// mtx protects only the following fields
-	mtx    sync.Mutex
 	closed bool
 	err    error
 	cache  T

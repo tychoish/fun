@@ -302,7 +302,6 @@ func (opts *QueueOptions) Validate() error {
 		opts.BurstCredit = float64(opts.SoftQuota)
 	}
 	return nil
-
 }
 
 type entry[T any] struct {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/itertool"
 )
 
@@ -208,6 +209,8 @@ func TestSort(t *testing.T) {
 			copyVals := fun.Must(itertool.CollectSlice(ctx, ListValues(lcopy.Iterator())))
 			t.Log("merge", listVals)
 			t.Log("quick", copyVals)
+			assert.Equal(t, len(listVals), len(copyVals))
+			assert.True(t, len(listVals) == 10)
 			for i := 0; i < 10; i++ {
 				if listVals[i] != copyVals[i] {
 					t.Error("sort missmatch", i, listVals[i], copyVals[i])

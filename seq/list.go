@@ -31,11 +31,12 @@ type List[T any] struct {
 // list. You can use the methods on this objects to iterate through
 // the list, and the Ok() method for validating zero-valued items.
 type Element[T any] struct {
-	ok   bool
-	next *Element[T]
-	prev *Element[T]
-	list *List[T]
-	item T
+	ok      bool
+	deleted bool
+	next    *Element[T]
+	prev    *Element[T]
+	list    *List[T]
+	item    T
 }
 
 // NewElement produces an unattached Element that you can use with
@@ -70,7 +71,7 @@ func (e *Element[T]) Previous() *Element[T] { return e.prev }
 // elements hold a pointer to their list, this is an O(1) operation.
 //
 // Returns false when the element is nil.
-func (e *Element[T]) In(l *List[T]) bool { return e.list != nil && e.list == l }
+func (e *Element[T]) In(l *List[T]) bool { return !e.deleted && e.list != nil && e.list == l }
 
 // Set allows you to change set the value of an item in place. Returns
 // true if the operation is successful. The operation fails if the Element is the
@@ -153,6 +154,10 @@ func (l *List[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
+func (e *Element[T]) appendable(new *Element[T]) bool {
+	return new != nil && new.ok && e.list != nil // && new.list == nil && new.list != e.list //&& new.next == nil && new.prev == nil
+}
+
 // Append adds the element 'new' after the element 'e', inserting it
 // in the next position in the list. Will return 'e' if 'new' is not
 // valid for insertion into this list (e.g. it belongs to another
@@ -214,10 +219,6 @@ func (e *Element[T]) removable() bool {
 	return e.list != nil && e.list.root != e && e.list.length > 0
 }
 
-func (e *Element[T]) appendable(new *Element[T]) bool {
-	return new != nil && e.list != nil && new.list != e.list && new.list == nil && new.ok && new.next == nil && new.prev == nil
-}
-
 func (e *Element[T]) uncheckedAppend(new *Element[T]) {
 	e.list.length++
 	new.list = e.list
@@ -225,15 +226,20 @@ func (e *Element[T]) uncheckedAppend(new *Element[T]) {
 	new.next = e.next
 	new.prev.next = new
 	new.next.prev = new
+	new.deleted = false
 }
 
 func (e *Element[T]) uncheckedRemove() {
 	e.list.length--
 	e.prev.next = e.next
 	e.next.prev = e.prev
-	e.list = nil
-	e.next = nil
-	e.prev = nil
+	e.deleted = true
+	// avoid removing references so iteration and deletes can
+	// interleve (ish)
+	//
+	// e.list = nil
+	// e.next = nil
+	// e.prev = nil
 }
 
 // Len returns the length of the list. As the Append/Remove operations
@@ -364,7 +370,6 @@ func (l *List[T]) lazySetup() {
 	}
 
 	if l.root == nil {
-
 		val := fun.ZeroOf[T]()
 		l.elementCreator = func(val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 		l.root = l.elementCreator(val)
@@ -377,7 +382,7 @@ func (l *List[T]) lazySetup() {
 
 func (l *List[T]) pop(it *Element[T]) *Element[T] {
 	if !it.removable() || it.list != l {
-		return nil
+		return &Element[T]{}
 	}
 
 	it.uncheckedRemove()
