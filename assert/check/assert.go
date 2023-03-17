@@ -96,6 +96,7 @@ func NotErrorIs(t testing.TB, err, target error) {
 func Panic(t testing.TB, fn func()) {
 	t.Helper()
 	defer func() {
+		t.Helper()
 		if r := recover(); r == nil {
 			t.Error("expected a panic but got none")
 		}
@@ -107,6 +108,7 @@ func Panic(t testing.TB, fn func()) {
 func NotPanic(t testing.TB, fn func()) {
 	t.Helper()
 	defer func() {
+		t.Helper()
 		if r := recover(); r != nil {
 			t.Error("panic: ", r)
 		}
@@ -119,6 +121,7 @@ func NotPanic(t testing.TB, fn func()) {
 func PanicValue[T comparable](t testing.TB, fn func(), value T) {
 	t.Helper()
 	defer func() {
+		t.Helper()
 		r := recover()
 		if r == nil {
 			t.Error("expected a panic but got none")
@@ -186,6 +189,7 @@ func Failing[T testing.TB](t T, test func(T)) {
 	t.Helper()
 	sig := make(chan bool)
 	go func() {
+		t.Helper()
 		defer close(sig)
 
 		var tt testing.TB
