@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,9 +15,6 @@ import (
 )
 
 func TestWorker(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
 			start := time.Now()
@@ -31,6 +29,7 @@ func TestWorker(t *testing.T) {
 			assert.NotError(t, err)
 		})
 		t.Run("Observe", func(t *testing.T) {
+			ctx := testt.Context(t)
 			t.Run("WithoutError", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
@@ -73,6 +72,7 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("PoolIntegration", func(t *testing.T) {
+		ctx := testt.Context(t)
 		t.Run("Unbounded", func(t *testing.T) {
 			const num = 100
 			called := &atomic.Int64{}
@@ -148,29 +148,34 @@ func TestWorker(t *testing.T) {
 				check.Equal(t, counter.Load(), 100)
 			})
 			t.Run("ParallelObserve", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
+				ctx, cancel := context.WithCancel(testt.Context(t))
+				timer := testt.Timer(t, time.Hour)
 				const num = 100
 				workers := make([]WorkerFunc, num)
 				counter := &atomic.Int64{}
 				for i := range workers {
-					workers[i] = func(context.Context) error { time.Sleep(100 * time.Millisecond); counter.Add(1); return nil }
+					workers[i] = func(context.Context) error {
+						select {
+						case <-timer.C:
+							t.Error("timer should never fire")
+						case <-ctx.Done():
+							counter.Add(1)
+						}
+						return nil
+					}
 				}
-				go func() {
-					time.Sleep(time.Millisecond)
-					cancel()
-				}()
 
 				wait := ObserveWorkerPool(ctx, 5, internal.NewSliceIter(workers), func(error) {})
 
-				wait(internal.BackgroundContext)
+				runtime.Gosched()
+
+				time.Sleep(100 * time.Millisecond)
+				cancel()
+
+				wait(testt.ContextWithTimeout(t, time.Second))
 
 				check.Equal(t, counter.Load(), 5)
 			})
-
 		})
-
 	})
-
 }

@@ -284,9 +284,6 @@ func TestShutdownManager(t *testing.T) {
 		count := &atomic.Int64{}
 		for i := 0; i < num; i++ {
 			AddToShutdownManager(ctx, func(ctx context.Context) {
-				// dottle := (time.Duration(rand.Int63n(count.Load())) + 1) * time.Millisecond
-				// time.Sleep(dottle)
-				t.Log("wat")
 				count.Add(1)
 			})
 		}
@@ -404,6 +401,7 @@ func TestWorkerPool(t *testing.T) {
 		})
 	})
 	t.Run("MultiplePools", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		wpCt := &atomic.Int64{}

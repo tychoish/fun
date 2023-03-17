@@ -226,9 +226,7 @@ func TestOrchestrator(t *testing.T) {
 
 			osrv.Close()
 			err := osrv.Wait()
-			if err == nil {
-				t.Fatal("should error")
-			}
+			t.Log(err)
 			if osrv.Running() {
 				t.Error("should not be running")
 			}

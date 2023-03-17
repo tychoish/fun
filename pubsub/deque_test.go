@@ -876,13 +876,10 @@ func TestDequeIntegration(t *testing.T) {
 			}
 		}(queue.Iterator())
 
-		tctx := testt.ContextWithTimeout(t, 3*time.Second)
-		wg.Wait(tctx)
-
-		// time.Sleep(1 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 		assert.NotError(t, queue.Close())
 
-		tctx = testt.ContextWithTimeout(t, 3*time.Second)
+		tctx := testt.ContextWithTimeout(t, 3*time.Second)
 		wg.Wait(tctx)
 		assert.NotError(t, tctx.Err())
 
@@ -898,8 +895,8 @@ func TestDequeIntegration(t *testing.T) {
 
 		wg := &fun.WaitGroup{}
 		const (
-			factor = 5
-			worker = 20
+			factor = 2
+			worker = 32
 			num    = factor * worker
 		)
 		wwg := &fun.WaitGroup{}

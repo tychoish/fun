@@ -354,10 +354,15 @@ func TestService(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
+
+			if err := s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(100 * time.Millisecond)
+
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
-
 				//nolint:bodyclose
 				resp, err := http.DefaultClient.Do(
 					fun.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
@@ -376,26 +381,22 @@ func TestService(t *testing.T) {
 				}
 			}()
 
-			if err := s.Start(ctx); err != nil {
-				t.Fatal(err)
-			}
 			runtime.Gosched()
-			time.Sleep(10 * time.Millisecond)
-			s.Close()
 			<-sig
-			if err := s.Wait(); err == nil {
-				t.Fatal("expected no error")
+			s.Close()
+			if err := s.Wait(); err != nil {
+				t.Fatal("expected no error", err)
 			}
 		})
 	})
 	t.Run("ErrorHandler", func(t *testing.T) {
-		var oberr error
+		oberr := &fun.Atomic[error]{}
 		s := &Service{
 			Run:      func(context.Context) error { return errors.New("run") },
 			Shutdown: func() error { return errors.New("shutdown") },
 			Cleanup:  func() error { panic("cleanup") },
 		}
-		s.ErrorHandler.Set(func(err error) { oberr = err })
+		s.ErrorHandler.Set(func(err error) { oberr.Set(err) })
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -405,7 +406,7 @@ func TestService(t *testing.T) {
 		errs := erc.Unwind(err)
 		assert.Error(t, err)
 		check.True(t, len(errs) == 3)
-		assert.Error(t, oberr)
-		assert.Equal(t, err.Error(), oberr.Error())
+		assert.Error(t, oberr.Get())
+		assert.Equal(t, err.Error(), oberr.Get().Error())
 	})
 }

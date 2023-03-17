@@ -115,8 +115,9 @@ func TestDistributor(t *testing.T) {
 					}
 				}()
 				<-sig
-				if time.Since(start) < 10*time.Millisecond {
-					t.Error(time.Since(start))
+				dur := time.Since(start)
+				if dur < 10*time.Millisecond {
+					t.Error(dur)
 				}
 			})
 		})

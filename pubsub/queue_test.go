@@ -449,6 +449,9 @@ func TestQueueIterator(t *testing.T) {
 		sig := make(chan struct{})
 		go func() {
 			defer close(sig)
+			queue.mu.Lock()
+			defer queue.mu.Unlock()
+
 			if err := queue.unsafeWaitForNew(ctx); !errors.Is(err, context.Canceled) {
 				t.Error(err)
 			}

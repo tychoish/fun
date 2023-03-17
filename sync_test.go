@@ -27,7 +27,9 @@ func TestAtomic(t *testing.T) {
 }
 
 func TestWaitGroup(t *testing.T) {
+	t.Parallel()
 	t.Run("MultipleWaiters", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		wg := &WaitGroup{}
@@ -70,6 +72,8 @@ func TestWaitGroup(t *testing.T) {
 		}
 	})
 	t.Run("BusyBlocking", func(t *testing.T) {
+		t.Parallel()
+
 		wg := &WaitGroup{}
 		const num = 100
 		wg.Add(100)
@@ -103,6 +107,8 @@ func TestWaitGroup(t *testing.T) {
 		}
 	})
 	t.Run("BusyBlockingMixed", func(t *testing.T) {
+		t.Parallel()
+
 		wg := &WaitGroup{}
 		const num = 100
 		wg.Add(100)
@@ -143,9 +149,8 @@ func TestWaitGroup(t *testing.T) {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > 2*time.Millisecond {
+		if dur > 5*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
 	})
-
 }

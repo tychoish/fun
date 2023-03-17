@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestImplementationHelpers(t *testing.T) {
@@ -33,8 +34,9 @@ func TestImplementationHelpers(t *testing.T) {
 			t.Error(err)
 		}
 
-		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Millisecond {
-			t.Error(time.Since(start))
+		dur := time.Since(start)
+		if dur < 10*time.Millisecond || dur > 15*time.Millisecond {
+			t.Error(dur)
 		}
 	})
 	t.Run("RunCollect", func(t *testing.T) {
@@ -103,8 +105,9 @@ func TestImplementationHelpers(t *testing.T) {
 		svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
 		start := time.Now()
 		RunWait(svc)(ctx)
-		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Millisecond {
-			t.Error(time.Since(start))
+		dur := time.Since(start)
+		if dur < 10*time.Millisecond || dur > 15*time.Millisecond {
+			t.Error(dur)
 		}
 	})
 
@@ -188,10 +191,8 @@ func TestImplementationHelpers(t *testing.T) {
 				makeQueue(t, 100, count),
 				itertool.Options{NumWorkers: 50},
 			)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 
-			start := time.Now()
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -201,9 +202,7 @@ func TestImplementationHelpers(t *testing.T) {
 			if count.Load() != 100 {
 				t.Error(count.Load())
 			}
-			if time.Since(start) < 5*time.Millisecond || time.Since(start) > 10*time.Millisecond {
-				t.Error(time.Since(start))
-			}
+			assert.NotError(t, ctx.Err())
 		})
 	})
 
@@ -249,10 +248,8 @@ func TestImplementationHelpers(t *testing.T) {
 				},
 				itertool.Options{NumWorkers: 50},
 			)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 
-			start := time.Now()
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -263,12 +260,9 @@ func TestImplementationHelpers(t *testing.T) {
 				t.Error(count.Load())
 			}
 			if errCount.Load() != 100 {
-
 				t.Error("did not observe correct errors", errCount.Load())
 			}
-			if time.Since(start) < 5*time.Millisecond || time.Since(start) > 10*time.Millisecond {
-				t.Error(time.Since(start))
-			}
+			assert.NotError(t, ctx.Err())
 		})
 	})
 

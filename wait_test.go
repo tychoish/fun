@@ -14,6 +14,7 @@ import (
 )
 
 func TestWait(t *testing.T) {
+	t.Parallel()
 	t.Run("WaitGroupEndToEnd", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		wg := &WaitGroup{}
@@ -28,10 +29,11 @@ func TestWait(t *testing.T) {
 			t.Fatal("should have returned instantly", "canceled cotnext")
 		}
 
+		start = time.Now()
 		ctxTwo, cancelTwo := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancelTwo()
-		start = time.Now()
 		wg.Wait(ctxTwo)
+
 		if time.Since(start) < 100*time.Millisecond {
 			t.Fatal("should have returned after a wait", "timeout", time.Since(start))
 		}
@@ -39,18 +41,18 @@ func TestWait(t *testing.T) {
 		check.Equal(t, wg.Num(), 0)
 		check.True(t, wg.IsDone())
 
+		start = time.Now()
 		ctxThree, cancelThree := context.WithTimeout(context.Background(), time.Second)
 		defer cancelThree()
-		start = time.Now()
 		wg.Wait(ctxThree)
 		if time.Since(start) > time.Millisecond {
 			t.Fatal("should have returned instantly", "no pending work")
 		}
 
 		wg = &WaitGroup{}
+		start = time.Now()
 		ctxFour, cancelFour := context.WithTimeout(context.Background(), time.Second)
 		defer cancelFour()
-		start = time.Now()
 		wg.Add(1)
 		go func() { time.Sleep(10 * time.Millisecond); wg.Done() }()
 		wg.Wait(ctxFour)
@@ -66,31 +68,32 @@ func TestWait(t *testing.T) {
 		cancel()
 		start := time.Now()
 		WaitForGroup(wg)(ctx)
-		if time.Since(start) > time.Millisecond {
-			t.Fatal("should have returned instantly", "canceled cotnext")
+		dur := time.Since(start)
+		if dur > time.Millisecond {
+			t.Fatal("should have returned instantly", "canceled cotnext", dur)
 		}
 
+		start = time.Now()
 		ctxTwo, cancelTwo := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancelTwo()
-		start = time.Now()
 		WaitForGroup(wg)(ctxTwo)
 		if time.Since(start) < 100*time.Millisecond {
 			t.Fatal("should have returned after a wait", "timeout", time.Since(start))
 		}
 		wg.Done()
 
+		start = time.Now()
 		ctxThree, cancelThree := context.WithTimeout(context.Background(), time.Second)
 		defer cancelThree()
-		start = time.Now()
 		WaitForGroup(wg)(ctxThree)
 		if time.Since(start) > time.Millisecond {
 			t.Fatal("should have returned instantly", "no pending work")
 		}
 
 		wg = &sync.WaitGroup{}
+		start = time.Now()
 		ctxFour, cancelFour := context.WithTimeout(context.Background(), time.Second)
 		defer cancelFour()
-		start = time.Now()
 		wg.Add(1)
 		go func() { time.Sleep(10 * time.Millisecond); wg.Done() }()
 		WaitForGroup(wg)(ctxFour)
