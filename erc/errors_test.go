@@ -233,6 +233,11 @@ func TestError(t *testing.T) {
 				t.Error("iterator was incomplete", len(errs))
 			}
 		})
+		t.Run("NilIterator", func(t *testing.T) {
+			es := &Collector{}
+			errs := collectIter(ctx, t, es.Iterator())
+			assert.Zero(t, len(errs))
+		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, "no error")

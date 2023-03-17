@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -58,6 +59,18 @@ func TestCollections(t *testing.T) {
 			err := Merge(nil, nil)
 			assert.NotError(t, err)
 		})
+	})
+	t.Run("Wrap", func(t *testing.T) {
+		check.NotError(t, Wrap(nil, "hello"))
+		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
+		expected := errors.New("hello")
+		err := Wrap(expected, "hello")
+		assert.Equal(t, err.Error(), "hello: hello")
+		assert.ErrorIs(t, err, expected)
+
+		err = Wrapf(expected, "hello %s", "world")
+		assert.Equal(t, err.Error(), "hello world: hello")
+		assert.ErrorIs(t, err, expected)
 	})
 	t.Run("Collapse", func(t *testing.T) {
 		t.Run("From", func(t *testing.T) {

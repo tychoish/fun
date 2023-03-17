@@ -20,6 +20,33 @@ func ContextExpired(err error) bool {
 	return false
 }
 
+// Wrap produces a wrapped error if the err is non-nil, wrapping the
+// error with the provided annotation. When the error is nil, Wrap
+// returns nil.
+//
+// This, roughly mirrors the usage "github/pkg/errors.Wrap" but
+// taking advantage of newer standard library error wrapping.
+func Wrap(err error, annotation string) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", annotation, err)
+}
+
+// Wrapf produces a wrapped error, if the error is non-nil, with a
+// formated wrap annotation. When the error is nil, Wrapf does not
+// build an error and returns nil.
+//
+// This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
+// taking advantage of newer standard library error wrapping.
+func Wrapf(err error, tmpl string, args ...any) error {
+	if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("%s: %w", fmt.Sprintf(tmpl, args...), err)
+}
+
 // When is a helper function, typcially useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
@@ -114,8 +141,7 @@ func Unwind(err error) []error {
 	out := []error{}
 	switch e := err.(type) {
 	case *Stack:
-		iter := e.Iterator()
-		fun.Observe(internal.BackgroundContext, iter, func(err error) {
+		fun.Observe(internal.BackgroundContext, e.Iterator(), func(err error) {
 			out = append(out, err)
 		})
 	default:
