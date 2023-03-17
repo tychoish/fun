@@ -32,6 +32,14 @@ func (wf WaitFunc) WithTimeout(timeout time.Duration) {
 	wf(ctx)
 }
 
+// Add starts a goroutine that waits for the WaitFunc to return,
+// incrementing and decrementing the sync.WaitGroup as
+// appropriate. This WaitFunc blocks on WaitAdd's context.
+func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
+	wg.Add(1)
+	go func() { defer wg.Done(); wf.Run(ctx) }()
+}
+
 // Signal runs the WaitFunc in a goroutine and returns a signal
 // channel that is canceled when the function completes. Useful for
 // bridging the gap between interfaces and integration that use
@@ -66,6 +74,21 @@ func (wf WaitFunc) BlockSignal() <-chan struct{} {
 	sig := make(chan struct{})
 	go func() { defer close(sig); defer cancel(); wf(ctx) }()
 	return sig
+}
+
+// CheckWorker converts a wait function into a WorkerFunc, running the
+// wait function inside of a Check() function, which catches panics
+// and turns them into the worker function's errors.
+func (wf WaitFunc) CheckWorker() WorkerFunc {
+	return func(ctx context.Context) error {
+		return Check(func() { wf.Run(ctx) })
+	}
+}
+
+// Worker converts a wait function into a WorkerFunc. These workers
+// will never error.
+func (wf WaitFunc) Worker() WorkerFunc {
+	return func(ctx context.Context) error { wf.Run(ctx); return nil }
 }
 
 // WaitBlocking is a convenience function to use simple blocking
@@ -147,15 +170,6 @@ func WaitChannel[T any](ch <-chan T) WaitFunc { return WaitObserve(func(T) {}, c
 // context to be cacneled with a timeout, for instance.
 func WaitContext(ctx context.Context) WaitFunc { return WaitChannel(ctx.Done()) }
 
-// WaitAdd starts a goroutine that waits for the WaitFunc to return,
-// incrementing and decrementing the sync.WaitGroup as
-// appropriate. This WaitFunc blocks on WaitAdd's context.
-func WaitAdd(ctx context.Context, wg *WaitGroup, fn WaitFunc) {
-	wg.Add(1)
-
-	go func() { defer wg.Done(); fn.Run(ctx) }()
-}
-
 // WaitMerge starts a goroutine that blocks on each WaitFunc provided
 // and returns a WaitFunc that waits for all of these goroutines to
 // return. The constituent WaitFunc are passed WaitMerge's context,
@@ -173,7 +187,7 @@ func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		Observe(ctx, iter, func(fn WaitFunc) { WaitAdd(ctx, wg, fn) })
+		Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
 	}()
 
 	return wg.Wait

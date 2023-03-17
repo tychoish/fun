@@ -23,6 +23,31 @@ func (wf WorkerFunc) Observe(ctx context.Context, ob func(error)) {
 	}
 }
 
+// Signal runs the worker function in a background goroutine and
+// returns the error in an error channel, that returns when the
+// worker function returns. If Singal is called with a canceled
+// context the worker is still executed (with that context.)
+func (wf WorkerFunc) Singal(ctx context.Context) <-chan error {
+	out := make(chan error)
+	go func() { defer close(out); out <- wf.Run(ctx) }()
+
+	return out
+}
+
+// MustWait converts a Worker function into a wait function; however,
+// if the worker produces an error MustWait converts the error into a
+// panic.
+func (wf WorkerFunc) MustWait() WaitFunc {
+	return func(ctx context.Context) { InvariantMust(wf.Run(ctx)) }
+}
+
+// ObserveWait converts a worker function into a wait function,
+// passing any error to the observer function. Only non-nil errors are
+// observed.
+func (wf WorkerFunc) ObserveWait(ob func(error)) WaitFunc {
+	return func(ctx context.Context) { wf.Observe(ctx, ob) }
+}
+
 // WithTimeout executes the worker function with the provided timeout
 // using a new context.
 func (wf WorkerFunc) WithTimeout(timeout time.Duration) error {
@@ -37,7 +62,6 @@ func (wf WorkerFunc) Run(ctx context.Context) error {
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	return wf(wctx)
-
 }
 
 // ObserveWorkerFuncs runs each worker function present in the

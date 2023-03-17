@@ -2,12 +2,14 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
@@ -227,6 +229,25 @@ func TestWait(t *testing.T) {
 		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 15*time.Millisecond {
 			t.Error(time.Since(start))
 		}
+	})
+	t.Run("WorkerConverter", func(t *testing.T) {
+		called := &atomic.Bool{}
+		err := WaitFunc(func(context.Context) { called.Store(true) }).Worker()(testt.Context(t))
+		assert.NotError(t, err)
+		assert.True(t, called.Load())
+		assert.Panic(t, func() {
+			var err error //nolint:gosimple
+			err = WaitFunc(func(context.Context) { panic("hi") }).Worker()(testt.Context(t))
+			check.NotError(t, err)
+		})
+	})
+	t.Run("CheckWorker", func(t *testing.T) {
+		assert.NotPanic(t, func() {
+			expected := errors.New("hi")
+			err := WaitFunc(func(context.Context) { panic(expected) }).CheckWorker()(testt.Context(t))
+			check.Error(t, err)
+			check.ErrorIs(t, err, expected)
+		})
 	})
 	t.Run("Singal", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

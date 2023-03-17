@@ -51,6 +51,50 @@ func TestWorker(t *testing.T) {
 				assert.True(t, called.Load())
 				assert.True(t, observed.Load())
 			})
+			t.Run("AsWait", func(t *testing.T) {
+				called := &atomic.Bool{}
+				observed := &atomic.Bool{}
+				expected := errors.New("hello")
+				wf := WorkerFunc(func(ctx context.Context) error {
+					called.Store(true)
+					return expected
+				}).ObserveWait(func(err error) {
+					observed.Store(true)
+					check.ErrorIs(t, err, expected)
+				})
+
+				// not called yet
+				assert.True(t, !called.Load())
+				assert.True(t, !observed.Load())
+
+				wf(ctx)
+
+				// now called
+				assert.True(t, called.Load())
+				assert.True(t, observed.Load())
+			})
+			t.Run("Must", func(t *testing.T) {
+				expected := errors.New("merlin")
+				err := Check(func() {
+					var wf WaitFunc //nolint:gosimple
+					wf = WorkerFunc(func(context.Context) error {
+						panic(expected)
+					}).MustWait()
+					t.Log(wf)
+				})
+				// declaration shouldn't call
+				assert.NotError(t, err)
+
+				err = Check(func() {
+					var wf WaitFunc //nolint:gosimple
+					wf = WorkerFunc(func(context.Context) error {
+						panic(expected)
+					}).MustWait()
+					wf(testt.Context(t))
+				})
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, expected)
+			})
 		})
 		t.Run("Timeout", func(t *testing.T) {
 			timer := testt.Timer(t, time.Hour)
@@ -69,6 +113,15 @@ func TestWorker(t *testing.T) {
 				t.Error(dur)
 			}
 			check.NotError(t, err)
+		})
+		t.Run("Signal", func(t *testing.T) {
+			ctx := testt.Context(t)
+			expected := errors.New("hello")
+			wf := WorkerFunc(func(ctx context.Context) error { return expected })
+			out := wf.Singal(ctx)
+			err := <-out
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
 		})
 	})
 	t.Run("PoolIntegration", func(t *testing.T) {
