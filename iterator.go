@@ -34,6 +34,9 @@ type Iterator[T any] interface {
 //
 // Use itertool.Observe and itertool.ParallelObserve for more advanced
 // execution patterns.
+//
+// Use with itertool.Slice, itertool.Channel, or itertool.Variadic to
+// process data in other forms.
 func Observe[T any](ctx context.Context, iter Iterator[T], observe func(T)) {
 	for iter.Next(ctx) {
 		observe(iter.Value())
