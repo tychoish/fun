@@ -350,6 +350,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 				wg.Wait()
 				assert.Equal(t, size, seen.Len())
 				assert.Zero(t, d.Len())
+				assert.NotError(t, ctx.Err())
 			},
 		},
 		{

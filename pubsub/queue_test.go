@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -458,6 +459,7 @@ func TestQueueIterator(t *testing.T) {
 		}()
 		sa := time.Now()
 		cancel()
+		runtime.Gosched()
 		<-sig
 		if dur := time.Since(sa); dur > 10*time.Millisecond {
 			t.Error(dur)
