@@ -21,12 +21,20 @@ func Is[T any](in any) bool {
 // for any type that implements an `Unwrap() T` method. useful in
 // combination with Is.
 func Unwrap[T any](in T) T {
-	u, ok := any(in).(interface{ Unwrap() T })
+	u, ok := doUnwrap(in)
 	if !ok {
 		return ZeroOf[T]()
 	}
 	return u.Unwrap()
 }
+
+type wrapped[T any] interface{ Unwrap() T }
+
+func doUnwrap[T any](in T) (wrapped[T], bool) { u, ok := any(in).(wrapped[T]); return u, ok }
+
+// IsWrapped returns true if the input value wraps another value of
+// the same type.
+func IsWrapped[T any](in T) bool { _, ok := doUnwrap(in); return ok }
 
 // Zero returns the zero-value for the type T of the input argument.
 func Zero[T any](T) T { return ZeroOf[T]() }

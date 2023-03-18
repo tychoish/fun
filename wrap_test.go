@@ -21,6 +21,14 @@ func TestWrap(t *testing.T) {
 			t.Fatal("should be nil")
 		}
 	})
+	t.Run("IsWrapFalse", func(t *testing.T) {
+		l := &wrapTestType{value: 42}
+		assert.True(t, !IsWrapped(l))
+	})
+	t.Run("IsWrap", func(t *testing.T) {
+		err := fmt.Errorf("hello: %w", errors.New("world"))
+		assert.True(t, IsWrapped(err))
+	})
 	t.Run("Is", func(t *testing.T) {
 		if Is[*testing.T](5) {
 			t.Error("Is should return false when types do not match ")
@@ -37,6 +45,7 @@ func TestWrap(t *testing.T) {
 			t.Fatal("unexpected unrwapping")
 		}
 	})
+
 }
 func TestZeroHelpers(t *testing.T) {
 	t.Run("Zero", func(t *testing.T) {
