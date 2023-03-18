@@ -1,7 +1,6 @@
 package fun
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -80,9 +79,9 @@ func Must[T any](arg T, err error) T {
 	return arg
 }
 
-// Check, like safe and SafeCtx runs a function without arguments that
-// does not produce an error, and, if the function panics, converts it
-// into an error.
+// Check, like Safe, runs a function without arguments that does not
+// produce an error, and, if the function panics, converts it into an
+// error.
 func Check(fn func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -113,12 +112,4 @@ func buildRecoverError(r any) error {
 	default:
 		return fmt.Errorf("panic: %v", in)
 	}
-}
-
-// SafeCtx provides a variant of the Safe function that takes a
-// context.
-func SafeCtx[T any](ctx context.Context, fn func(context.Context) T) (out T, err error) {
-	return Safe(func() T {
-		return fn(ctx)
-	})
 }

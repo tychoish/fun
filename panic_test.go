@@ -1,7 +1,6 @@
 package fun
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,9 +12,6 @@ import (
 )
 
 func TestPanics(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("MustNoPanic", func(t *testing.T) {
 		ok := Must(func() (bool, error) {
 			return true, nil
@@ -33,32 +29,6 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
 		ok, err := Safe(func() bool {
-			return Must(func() (bool, error) {
-				return true, nil
-			}())
-		})
-		if err != nil {
-			t.Error("error should be non-nil")
-		}
-		if !ok {
-			t.Error("should be zero value of T")
-		}
-	})
-	t.Run("SafeCtxWithPanic", func(t *testing.T) {
-		ok, err := SafeCtx(ctx, func(_ context.Context) bool {
-			return Must(func() (bool, error) {
-				return true, errors.New("error")
-			}())
-		})
-		if err == nil {
-			t.Error("error should be non-nil")
-		}
-		if ok {
-			t.Error("should be zero value of T")
-		}
-	})
-	t.Run("SafeCtxNoPanic", func(t *testing.T) {
-		ok, err := SafeCtx(ctx, func(_ context.Context) bool {
 			return Must(func() (bool, error) {
 				return true, nil
 			}())
