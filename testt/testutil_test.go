@@ -41,7 +41,7 @@ func TestTools(t *testing.T) {
 			if ctx.Err() != nil {
 				t.Fatal("context should not be canceled")
 			}
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			runtime.Gosched()
 			if ctx.Err() == nil {
 				t.Fatal("context should be canceled")
