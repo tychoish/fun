@@ -34,7 +34,7 @@ func (wf WaitFunc) WithTimeout(timeout time.Duration) {
 
 // Add starts a goroutine that waits for the WaitFunc to return,
 // incrementing and decrementing the sync.WaitGroup as
-// appropriate. This WaitFunc blocks on WaitAdd's context.
+// appropriate. The execution of the wait fun blocks on Add's context.
 func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 	wg.Add(1)
 	go func() { defer wg.Done(); wf.Run(ctx) }()
@@ -45,7 +45,8 @@ func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 // bridging the gap between interfaces and integration that use
 // channels and functions.
 //
-// Callers are responsble for handling the (potential) panic in the WaitFunc.
+// Callers are responsble for handling the (potential) panic in the
+// WaitFunc.
 func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})
 	go func() { defer close(out); wf.Run(ctx) }()
@@ -55,7 +56,8 @@ func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
 // WithTimeoutSignal executes the WaitFunc as in WithTimeout, but
 // returns a singal channel that is closed when the task completes.
 //
-// Callers are responsble for handling the (potential) panic in the WaitFunc.
+// Callers are responsble for handling the (potential) panic in the
+// WaitFunc.
 func (wf WaitFunc) WithTimeoutSignal(timeout time.Duration) <-chan struct{} {
 	ctx, cancel := context.WithTimeout(internal.BackgroundContext, timeout)
 	sig := make(chan struct{})
