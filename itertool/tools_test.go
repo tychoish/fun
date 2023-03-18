@@ -751,7 +751,7 @@ func TestParallelObserve(t *testing.T) {
 	t.Run("AbortOnPanic", func(t *testing.T) {
 		seen := set.Synchronize(set.NewOrdered[int]())
 		err := ParallelObserve(ctx,
-			Slice(makeIntSlice(20)),
+			Slice(makeIntSlice(50)),
 			func(in int) {
 				if in == 4 {
 					// make sure something else

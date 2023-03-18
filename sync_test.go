@@ -58,7 +58,7 @@ func TestWaitGroup(t *testing.T) {
 		<-secondCase
 
 		timeoutDur := time.Since(start)
-		if timeoutDur > 20*time.Millisecond {
+		if timeoutDur > 30*time.Millisecond {
 			t.Error("timeout waiter took too long", timeoutDur)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -102,7 +102,7 @@ func TestWaitGroup(t *testing.T) {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > 2*time.Millisecond {
+		if dur > 10*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
 	})

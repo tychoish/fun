@@ -607,7 +607,7 @@ func TestDeque(t *testing.T) {
 	t.Run("WaitingBack", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
-		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+		dq, err := NewDeque[int](DequeOptions{Capacity: 2})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -618,7 +618,7 @@ func TestDeque(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		time.Sleep(time.Millisecond)
+		runtime.Gosched()
 		out, err := dq.WaitBack(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -854,6 +854,7 @@ func TestDequeIntegration(t *testing.T) {
 		input := &atomic.Int64{}
 
 		wg := &fun.WaitGroup{}
+		signal := fun.WaitFunc(wg.Wait).Signal(ctx)
 
 		for i := 0; i < num; i++ {
 			wg.Add(1)
@@ -866,24 +867,47 @@ func TestDequeIntegration(t *testing.T) {
 				runtime.Gosched()
 			}
 		}
-
 		wg.Add(1)
 		go func(iter fun.Iterator[int64]) {
 			defer wg.Done()
+			runtime.Gosched()
 			for iter.Next(ctx) {
 				counter.Add(1)
-
+				runtime.Gosched()
 			}
 		}(queue.Iterator())
 
-		time.Sleep(250 * time.Millisecond)
-		assert.NotError(t, queue.Close())
+		ticker := testt.Ticker(t, 2*time.Millisecond)
+		timeout := testt.Timer(t, 1000*time.Millisecond)
 
-		tctx := testt.ContextWithTimeout(t, 3*time.Second)
-		wg.Wait(tctx)
-		assert.NotError(t, tctx.Err())
+	WAIT:
+		for {
+			select {
+			case <-signal:
+				t.Log("wait group returned", input.Load(), counter.Load())
+				break WAIT
+			case <-ticker.C:
+				cur := input.Load()
+				assert.True(t, cur <= num)
+				seen := counter.Load()
+				assert.True(t, seen <= num)
+				if cur == num && seen == num {
+					assert.NotError(t, queue.Close())
+					break WAIT
+				}
+			case <-timeout.C:
+				if wg.Num() == 0 {
+					t.Log("hit timeout, but workers returned")
+					break WAIT
+				}
+				t.Error("should complete input before timeout", wg.Num())
+			}
+		}
 
-		check.Equal(t, counter.Load(), input.Load())
+		wg.Wait(ctx)
+
+		check.Equal(t, 100, input.Load())
+		check.Equal(t, 100, counter.Load())
 		testt.Logf(t, "counter=%d, input=%d", counter.Load(), input.Load())
 	})
 	t.Run("ProducerConsumer", func(t *testing.T) {
