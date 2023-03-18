@@ -28,6 +28,23 @@ func Unwrap[T any](in T) T {
 	return u.Unwrap()
 }
 
+// Unwind uses the Unwrap operation to build a list of the "wrapped"
+// objects.
+func Unwind[T any](in T) []T {
+	out := []T{}
+
+	out = append(out, in)
+	for {
+		u, ok := doUnwrap(in)
+		if !ok {
+			break
+		}
+		in = u.Unwrap()
+		out = append(out, in)
+	}
+	return out
+}
+
 type wrapped[T any] interface{ Unwrap() T }
 
 func doUnwrap[T any](in T) (wrapped[T], bool) { u, ok := any(in).(wrapped[T]); return u, ok }

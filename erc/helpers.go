@@ -138,20 +138,15 @@ func Unwind(err error) []error {
 		return nil
 	}
 
-	out := []error{}
+	var out []error
 	switch e := err.(type) {
 	case *Stack:
-		fun.Observe(internal.BackgroundContext, e.Iterator(), func(err error) {
-			out = append(out, err)
-		})
+		fun.Observe(internal.BackgroundContext, e.Iterator(),
+			func(err error) {
+				out = append(out, err)
+			})
 	default:
-		out = append(out, err)
-		for e := errors.Unwrap(err); e != nil; e = errors.Unwrap(e) {
-			// the first error might not be unwrappable
-			if e != nil {
-				out = append(out, e)
-			}
-		}
+		out = fun.Unwind(err)
 	}
 
 	return out

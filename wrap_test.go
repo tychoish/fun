@@ -45,8 +45,15 @@ func TestWrap(t *testing.T) {
 			t.Fatal("unexpected unrwapping")
 		}
 	})
-
+	t.Run("UnwindErrors", func(t *testing.T) {
+		err := errors.New("root")
+		wrapped := fmt.Errorf("wrap: %w", err)
+		errs := Unwind(wrapped)
+		assert.True(t, len(errs) == 2)
+		assert.Equal(t, errs[1].Error(), err.Error())
+	})
 }
+
 func TestZeroHelpers(t *testing.T) {
 	t.Run("Zero", func(t *testing.T) {
 		assert.Zero(t, Zero(100))
