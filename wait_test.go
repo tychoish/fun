@@ -177,8 +177,9 @@ func TestWait(t *testing.T) {
 		defer cancel()
 		start := time.Now()
 		WaitMerge(ctx, internal.NewSliceIter(wfs))(ctx)
-		if time.Since(start) > 20*time.Millisecond || time.Since(start) < 5*time.Millisecond {
-			t.Error(time.Since(start))
+		dur := time.Since(start)
+		if dur > 10*time.Millisecond || dur < 5*time.Millisecond {
+			t.Error(dur)
 		}
 	})
 	t.Run("Blocking", func(t *testing.T) {

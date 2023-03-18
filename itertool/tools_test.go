@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"runtime"
 	"sort"
 	"sync/atomic"
@@ -426,17 +427,19 @@ func TestParallelForEach(t *testing.T) {
 	defer cancel()
 
 	t.Run("Basic", func(t *testing.T) {
-		for i := 0; i <= 8; i++ {
+		for i := int64(0); i <= 8; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
 				elems := makeIntSlice(200)
 				seen := set.Synchronize(set.NewOrdered[int]())
 				err := ParallelForEach(ctx,
 					Slice(elems),
 					func(ctx context.Context, in int) error {
+						jitter := time.Duration(rand.Int63n(1 + i*int64(time.Millisecond)))
+						time.Sleep(time.Millisecond + jitter)
 						seen.Add(in)
 						return nil
 					},
-					Options{NumWorkers: i},
+					Options{NumWorkers: int(i)},
 				)
 				if err != nil {
 					t.Fatal(err)

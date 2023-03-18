@@ -44,6 +44,9 @@ func TestTimestamp(t *testing.T) {
 		})
 		t.Run("Wrapped", func(t *testing.T) {
 			now := time.Now()
+
+			time.Sleep(time.Millisecond)
+
 			terr := fmt.Errorf("outer: %w", Time(err))
 			ts := GetTime(terr)
 
