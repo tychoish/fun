@@ -95,9 +95,9 @@ func TestDistributor(t *testing.T) {
 				}
 			})
 			t.Run("Cancelation", func(t *testing.T) {
+				start := time.Now()
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 				defer cancel()
-				start := time.Now()
 
 				ch := make(chan string, 1)
 				ch <- "merlin"
