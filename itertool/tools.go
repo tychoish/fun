@@ -176,6 +176,13 @@ func Checker[IN any, OUT any](fn func(context.Context, IN) (OUT, bool)) Processi
 	}
 }
 
+// Transformer for simple transformations of iterators.
+func Transformer[IN any, OUT any](fn func(IN) OUT) ProcessingFunction[IN, OUT] {
+	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
+		return fn(input), true, nil
+	}
+}
+
 // Collector makes adds all errors to the error collector (instructing
 // the iterator to skip these results,) but does not return an error
 // to the outer processing operation. This would be the same as using
@@ -257,6 +264,7 @@ func Transform[T any, O any](
 			}
 		}
 	}()
+
 	return out
 }
 

@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
@@ -318,6 +320,20 @@ func RunIteratorIntegerAlgoTests(
 										}
 									}
 								})
+							})
+							t.Run("Transformer", func(t *testing.T) {
+								ctx, cancel := context.WithCancel(context.Background())
+								defer cancel()
+
+								iter := Synchronize(baseBuilder(elems))
+								count := &atomic.Int64{}
+								out := Transform(ctx, iter, Transformer(
+									func(in int) string { count.Add(1); return strconv.Itoa(in) }))
+								strs, err := CollectSlice(ctx, out)
+								check.NotError(t, err)
+								check.Equal(t, int(count.Load()), len(elems))
+								t.Log(count.Load(), len(elems), strs)
+								assert.Equal(t, len(strs), len(elems))
 							})
 							t.Run("ForEach", func(t *testing.T) {
 								t.Run("ErrorAborts", func(t *testing.T) {

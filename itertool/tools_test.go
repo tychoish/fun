@@ -87,6 +87,7 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 				if err = cue.Close(); err != nil {
 					t.Fatal(err)
 				}
+
 				return cue.Iterator()
 			},
 		},
