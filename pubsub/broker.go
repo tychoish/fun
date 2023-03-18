@@ -30,6 +30,8 @@ type Broker[T any] struct {
 	close context.CancelFunc
 }
 
+// BrokerStats is a data struct used to report on the internal state
+// of the broker.
 type BrokerStats struct {
 	Subscriptions int
 	BufferDepth   int
@@ -219,6 +221,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan 
 
 }
 
+// Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	signal := make(chan BrokerStats)
 	var output BrokerStats
@@ -228,9 +231,9 @@ func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	case b.stats <- func(stats BrokerStats) {
 		defer close(signal)
 		signal <- stats
-
 	}:
 	}
+
 	select {
 	case <-ctx.Done():
 	case output = <-signal:
