@@ -283,53 +283,57 @@ func TestRangeSplit(t *testing.T) {
 
 func TestTools(t *testing.T) {
 	t.Parallel()
-	t.Run("CancelCollectChannel", func(t *testing.T) {
-		bctx, bcancel := context.WithCancel(context.Background())
-		defer bcancel()
+	for i := 0; i < 10; i++ {
+		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
+			t.Run("CancelCollectChannel", func(t *testing.T) {
+				bctx, bcancel := context.WithCancel(context.Background())
+				defer bcancel()
 
-		ctx, cancel := context.WithCancel(bctx)
-		defer cancel()
+				ctx, cancel := context.WithCancel(bctx)
+				defer cancel()
 
-		pipe := make(chan string, 1)
-		sig := make(chan struct{})
+				pipe := make(chan string, 1)
+				sig := make(chan struct{})
 
-		go func() {
-			defer close(sig)
-			for {
-				select {
-				case <-bctx.Done():
-					return
-				case pipe <- t.Name():
-					continue
+				go func() {
+					defer close(sig)
+					for {
+						select {
+						case <-bctx.Done():
+							return
+						case pipe <- t.Name():
+							continue
+						}
+					}
+				}()
+
+				output := CollectChannel(ctx, Channel(pipe))
+				runtime.Gosched()
+
+				count := 0
+			CONSUME:
+				for {
+					select {
+					case _, ok := <-output:
+						if ok {
+							count++
+							cancel()
+						}
+						if !ok {
+							break CONSUME
+						}
+					case <-sig:
+						break CONSUME
+					case <-time.After(10 * time.Millisecond):
+						break CONSUME
+					}
 				}
-			}
-		}()
-
-		output := CollectChannel(ctx, Channel(pipe))
-		runtime.Gosched()
-
-		count := 0
-	CONSUME:
-		for {
-			select {
-			case _, ok := <-output:
-				if ok {
-					count++
-					cancel()
+				if count != 1 {
+					t.Error(count)
 				}
-				if !ok {
-					break CONSUME
-				}
-			case <-sig:
-				break CONSUME
-			case <-time.After(10 * time.Millisecond):
-				break CONSUME
-			}
-		}
-		if count != 1 {
-			t.Error(count)
-		}
-	})
+			})
+		})
+	}
 	t.Run("MapWorkerSendingBlocking", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
