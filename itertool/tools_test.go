@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"runtime"
 	"sort"
@@ -346,7 +345,7 @@ func TestTools(t *testing.T) {
 			catcher,
 			wg,
 			Options{},
-			Mapper(func(ctx context.Context, in string) (int, error) { return 53, nil }),
+			func(ctx context.Context, in string) (int, error) { return 53, nil },
 			func() {},
 			pipe,
 			output,
@@ -389,35 +388,6 @@ func TestTools(t *testing.T) {
 
 		if iter.Next(ctx) {
 			t.Error("no iteration", iter.Value())
-		}
-	})
-	t.Run("MapSkipSomeValues", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		strs := makeIntSlice(100)
-		output := Map(ctx,
-			Slice(strs),
-			func(ctx context.Context, in int) (int, bool, error) {
-				if in%2 == 0 {
-					return math.MaxInt, false, nil
-				}
-				return in, true, nil
-			},
-			Options{NumWorkers: 5},
-		)
-		vals, err := CollectSlice(ctx, output)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(vals) != 50 {
-			t.Error("unexpected values", len(vals), vals)
-		}
-		for idx, v := range vals {
-			if v == math.MaxInt {
-				t.Error(idx)
-			}
 		}
 	})
 }
@@ -611,58 +581,6 @@ func TestParallelForEach(t *testing.T) {
 		// ran one task before aborting
 		if len(errs) > 2 {
 			t.Error(len(errs))
-		}
-	})
-	t.Run("MapCheckedFunction", func(t *testing.T) {
-		out := Map(
-			ctx,
-			Slice(makeIntSlice(100)),
-			Checker(func(ctx context.Context, num int) (int, bool) {
-				if num%2 == 0 {
-					return math.MaxInt, false
-				}
-
-				return num, true
-			}),
-			Options{},
-		)
-
-		vals, err := CollectSlice(ctx, out)
-		if err != nil {
-			t.Fatal(err)
-
-		}
-		if len(vals) != 50 {
-			t.Fatal(len(vals), vals)
-		}
-	})
-	t.Run("CollectErrors", func(t *testing.T) {
-		ec := &erc.Collector{}
-		pf := Collector(ec, func(ctx context.Context, in string) (int, error) {
-			if in == "hi" {
-				return 400, errors.New(in)
-			}
-			return 42, nil
-		})
-		_, ok, err := pf(ctx, "hello")
-		if err != nil || !ok || ec.HasErrors() {
-			t.Error("should not error", ok, err, ec.Resolve())
-		}
-		out, ok, err := pf(ctx, "hi")
-		if err != nil {
-			t.Error("collect errors shouldn't transmit errors", err)
-		}
-		if ok {
-			t.Error("should out be ok, for error values")
-		}
-		if !ec.HasErrors() {
-			t.Error("should collect errors")
-		}
-		if err := ec.Resolve(); err == nil {
-			t.Error("should have resolve error")
-		}
-		if out != 0 {
-			t.Error("wrapper should not propgate value in error case")
 		}
 	})
 }

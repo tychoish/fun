@@ -9,64 +9,6 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// CollectChannel converts and iterator to a channel. The iterator is
-// not closed.
-func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
-	out := make(chan T)
-	go func() {
-		defer close(out)
-		for iter.Next(ctx) {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- iter.Value():
-				continue
-			}
-		}
-	}()
-	return out
-}
-
-// CollectSlice converts an iterator to the slice of it's values, and
-// closes the iterator at the when the iterator has been exhausted..
-//
-// In the case of an error in the underlying iterator the output slice
-// will have the values encountered before the error.
-func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error) {
-	out := []T{}
-	fun.Observe(ctx, iter, func(in T) { out = append(out, in) })
-	return out, iter.Close()
-}
-
-// ForEach passes each item in the iterator through the specified
-// handler function, return an error if the handler function errors.
-//
-// ForEach aborts on the first error and converts any panic into an
-// error which is propagated with other errors.
-func ForEach[T any](
-	ctx context.Context,
-	iter fun.Iterator[T],
-	fn func(context.Context, T) error,
-) (err error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	catcher := &erc.Collector{}
-
-	defer func() { err = catcher.Resolve() }()
-	defer erc.Recover(catcher)
-	defer erc.Check(catcher, iter.Close)
-
-	for iter.Next(ctx) {
-		if ferr := fn(ctx, iter.Value()); ferr != nil {
-			catcher.Add(ferr)
-			break
-		}
-	}
-
-	return
-}
-
 // ParallelForEach processes the iterator in parallel, and is
 // essentially an iterator-driven worker pool. The input iterator is
 // split dynamically into iterators for every worker (determined by
@@ -146,148 +88,10 @@ func forEachWorker[T any](
 	}
 }
 
-// ProcessingFunction represents the underlying type used by serveral
-// processing tools. Use the ProcessingFunction constructors to
-// be able to write business logic more ergonomically.
-//
-// While the generic for ProcessingFunction allows for IN and OUT to
-// be different types, they may be of the same type for Filtering
-// operations.
-type ProcessingFunction[IN any, OUT any] func(ctx context.Context, input IN) (output OUT, include bool, err error)
-
-// Mapper wraps a simple function to provide a
-// ProcessingFunction that will include the output of all mapped
-// functions, but propagates errors (which usually abort processing)
-// to the larger operation.
-func Mapper[IN any, OUT any](fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
-	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
-		out, err := fn(ctx, input)
-		return out, true, err
-	}
-}
-
-// Checker wraps a function, and *never* propogates an error
-// to the calling operation but will include or exclude output based
-// on the second boolean output.
-func Checker[IN any, OUT any](fn func(context.Context, IN) (OUT, bool)) ProcessingFunction[IN, OUT] {
-	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
-		out, ok := fn(ctx, input)
-		return out, ok, nil
-	}
-}
-
-// Transformer for simple transformations of iterators.
-func Transformer[IN any, OUT any](fn func(IN) OUT) ProcessingFunction[IN, OUT] {
-	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
-		return fn(input), true, nil
-	}
-}
-
-// Collector makes adds all errors to the error collector (instructing
-// the iterator to skip these results,) but does not return an error
-// to the outer processing operation. This would be the same as using
-// "ContinueOnError" with the Map() operation.
-func Collector[IN any, OUT any](ec *erc.Collector, fn func(context.Context, IN) (OUT, error)) ProcessingFunction[IN, OUT] {
-	return func(ctx context.Context, input IN) (output OUT, include bool, err error) {
-		out, err := fn(ctx, input)
-		if err != nil {
-			ec.Add(err)
-			return *new(OUT), false, nil
-		}
-		return out, true, nil
-	}
-}
-
-// Filter passes all objects in an iterator through the
-// specified filter function. If the filter function errors, the
-// operation aborts and the error is reported by the returned
-// iterator's Close method. If the include boolean is true the result
-// of the function is included in the output iterator, otherwise the
-// operation is skipped.
-//
-// Filter is equivalent to Transform with the same input and output
-// types. Filter operations are processed in a different thread, but
-// are not cached or buffered: to process all options, you must
-// consume the output iterator.
-//
-// The output iterator is produced iteratively as the returned
-// iterator is consumed.
-func Filter[T any](
-	ctx context.Context,
-	iter fun.Iterator[T],
-	fn ProcessingFunction[T, T],
-) fun.Iterator[T] {
-	return Transform(ctx, iter, fn)
-}
-
-// Transform processes the input iterator of type T into an output
-// iterator of type O. This is the same as a Filter, but with
-// different input and output types.
-//
-// While the transformations themselves are processed in a different
-// go routine, the operations are not buffered or cached and the
-// output iterator must be consumed to process all of the results. For
-// concurrent processing, use the Map() operation.
-func Transform[T any, O any](
-	ctx context.Context,
-	iter fun.Iterator[T],
-	fn ProcessingFunction[T, O],
-) fun.Iterator[O] {
-	out := new(internal.MapIterImpl[O])
-	pipe := make(chan O)
-	out.Pipe = pipe
-
-	var iterCtx context.Context
-	iterCtx, out.Closer = context.WithCancel(ctx)
-
-	out.WG.Add(1)
-	go func() {
-		catcher := &erc.Collector{}
-		defer out.WG.Done()
-		defer func() { out.Error = catcher.Resolve() }()
-		defer erc.Recover(catcher)
-		defer erc.Check(catcher, iter.Close)
-		defer close(pipe)
-
-		for iter.Next(iterCtx) {
-			o, include, err := fn(iterCtx, iter.Value())
-			if err != nil {
-				catcher.Add(err)
-				break
-			}
-			if !include {
-				continue
-			}
-			select {
-			case <-iterCtx.Done():
-			case pipe <- o:
-			}
-		}
-	}()
-
-	return out
-}
-
-// Observe is a special case of ForEach to support observer pattern
-// functions. Observe functions should be short running as they do not
-// take a context, and could block unexpectedly.
-//
-// Unlike fun.Observe, itertool.Observe collects errors from the
-// iterator's Close method and recovers from panics in the
-// observer function, propagating them in the returned error.
-func Observe[T any](ctx context.Context, iter fun.Iterator[T], obfn func(T)) error {
-	return ForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil })
-}
-
 // ParallelObserve is a special case of ParallelObserve to support observer pattern
 // functions. Observe functions should be short running as they do not
 // take a context, and could block unexpectedly.
-func ParallelObserve[T any](
-	ctx context.Context,
-	iter fun.Iterator[T],
-	obfn func(T),
-	opts Options,
-) error {
+func ParallelObserve[T any](ctx context.Context, iter fun.Iterator[T], obfn func(T), opts Options) error {
 	return ParallelForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil }, opts)
 }
 
@@ -298,43 +102,11 @@ func ParallelObserve[T any](
 // The pool follows the semantics configured by the Options, with
 // regards to error handling, panic handling, and parallelism. Errors
 // are collected and propagated WorkerPool output.
-func WorkerPool(
-	ctx context.Context,
-	iter fun.Iterator[fun.WorkerFunc],
-	opts Options,
-) error {
-	return ParallelForEach(
-		ctx,
-		iter,
-		func(ctx context.Context, wf fun.WorkerFunc) error {
-			return wf.Run(ctx)
-		},
+func WorkerPool(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], opts Options) error {
+	return ParallelForEach(ctx, iter,
+		func(ctx context.Context, wf fun.WorkerFunc) error { return wf.Run(ctx) },
 		opts,
 	)
-}
-
-// ProcessWork provides a serial implementation of WorkerPool with
-// similar semantics. These operations will abort on the first worker
-// function to error.
-func ProcessWork(ctx context.Context, iter fun.Iterator[fun.WorkerFunc]) error {
-	return ForEach(ctx, iter, func(ctx context.Context, wf fun.WorkerFunc) error { return wf.Run(ctx) })
-}
-
-// ObserveWorker executes the worker functions from the iterator, and
-// passes all errors through the observe function. If a worker panics,
-// ObserveWorker will abort, convert the panic into an error, and pass
-// that panic through the observe function.
-func ObserveWorker(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob func(error)) {
-	// use ForEach rather than Observe to thread the context
-	// through to the workers less indirectly.
-	if err := ForEach(ctx, iter,
-		func(ctx context.Context, wf fun.WorkerFunc) error {
-			wf.Observe(ctx, ob)
-			return nil
-		},
-	); err != nil {
-		ob(err)
-	}
 }
 
 // ObserveWorkerPool executes the worker functions from the iterator
@@ -404,7 +176,7 @@ type Options struct {
 func Map[T any, O any](
 	ctx context.Context,
 	iter fun.Iterator[T],
-	mapper ProcessingFunction[T, O],
+	mapper func(context.Context, T) (O, error),
 	opts Options,
 ) fun.Iterator[O] {
 	out := new(internal.MapIterImpl[O])
@@ -469,7 +241,7 @@ func mapWorker[T any, O any](
 	catcher *erc.Collector,
 	wg *fun.WaitGroup,
 	opts Options,
-	mapper ProcessingFunction[T, O],
+	mapper func(context.Context, T) (O, error),
 	abort func(),
 	fromInput <-chan T,
 	toOutput chan<- O,
@@ -492,10 +264,7 @@ func mapWorker[T any, O any](
 			if !ok {
 				return
 			}
-			o, include, err := mapper(ctx, value)
-			if !include {
-				continue
-			}
+			o, err := mapper(ctx, value)
 			if err != nil {
 				if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
 					// when the option is true, include all errors.
@@ -515,33 +284,6 @@ func mapWorker[T any, O any](
 			}
 		}
 	}
-}
-
-// Reduce processes an input iterator with a reduce function and
-// outputs the final value. The initial value may be a zero or nil
-// value.
-func Reduce[T any, O any](
-	ctx context.Context,
-	iter fun.Iterator[T],
-	reducer func(context.Context, T, O) (O, error),
-	initalValue O,
-) (value O, err error) {
-	value = initalValue
-	catcher := &erc.Collector{}
-
-	defer func() { err = catcher.Resolve() }()
-	defer erc.Recover(catcher)
-	defer erc.Check(catcher, iter.Close)
-
-	for iter.Next(ctx) {
-		value, err = reducer(ctx, iter.Value(), value)
-		if err != nil {
-			catcher.Add(err)
-			return
-		}
-	}
-
-	return
 }
 
 // ErrAbortGenerator is a sentinel error returned by generators to
@@ -615,20 +357,19 @@ func generator[T any](
 	for {
 		value, err := fn(ctx)
 		if err != nil {
-			if errors.Is(err, ErrAbortGenerator) {
+			expired := erc.ContextExpired(err)
+			if errors.Is(err, ErrAbortGenerator) || (expired && !opts.IncludeContextExpirationErrors) {
 				abort()
 				return
 			}
-			if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
-				// when the option is true, include all errors.
-				// when false, only include not cancellation errors.
-				catcher.Add(err)
+
+			catcher.Add(err)
+
+			if !opts.ContinueOnError || expired {
+				abort()
+				return
 			}
-			if opts.ContinueOnError {
-				continue
-			}
-			abort()
-			return
+			continue
 		}
 
 		select {
