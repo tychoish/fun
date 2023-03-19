@@ -5,6 +5,9 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/tychoish/fun"
@@ -222,3 +225,149 @@ func RunWaitCollect(ec *erc.Collector, s *Service) fun.WaitFunc { return RunWait
 // RunWait produces a fun.WaitFunc that runs the service, ignoring any
 // error from the Service.
 func RunWait(s *Service) fun.WaitFunc { return RunWaitObserve(func(error) {}, s) }
+
+// Cmd wraps a exec.Command execution that **has not started** into a
+// service. If the command fails, the service returns.
+//
+// When the service is closed or the context is canceled, if the
+// command has not returned, the process is sent SIGTERM. If, after
+// the shutdownTimeout duration, the service has not returned, the
+// process is sent SIGKILL. In all cases, the service will not return
+// until the underlying command has returned, potentially blocking
+// until the command returns.
+func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
+	fun.Invariant(c != nil, "exec.Cmd must be non-nil")
+
+	started := make(chan struct{})
+	wg := &fun.WaitGroup{}
+
+	return &Service{
+		Run: func(ctx context.Context) error {
+			wg.Add(1)
+			defer wg.Done()
+
+			if err := c.Start(); err != nil {
+				close(started)
+				return err
+			}
+			close(started)
+
+			return c.Wait()
+		},
+		Shutdown: func() error {
+			<-started
+			ctx, cancel := context.WithTimeout(internal.BackgroundContext, shutdownTimeout)
+			defer cancel()
+
+			if wg.IsDone() || sendSignal(c, syscall.SIGTERM) {
+				// any of the cases that could cause
+				// us to fail to signal mean the
+				// process is dead.
+				return nil
+			}
+
+			<-ctx.Done()
+
+			if wg.IsDone() {
+				return nil
+			}
+			sendSignal(c, syscall.SIGKILL)
+
+			return nil
+		},
+		Cleanup: func() error {
+			fun.WaitFunc(wg.Wait).Block()
+			return nil
+		},
+	}
+}
+
+func sendSignal(c *exec.Cmd, sig os.Signal) bool { err := c.Process.Signal(sig); return err != nil }
+
+// Daemon produces a service that wraps another service, restarting
+// the base service in the case of errors or early termination. The
+// interval governs how long. If the base service's run function
+// returns an error that is either context.Canceled or
+// context.DeadlineExceeded, the context passed to the daemon service
+// is canceled, or the new services' Close() method is called, then
+// the service will return. In all other cases the service will
+// restart.
+//
+// All errors encountered, *except* errors that occur after the
+// context has been canceled *or* that are rooted in context
+// cancellation errors are collected and aggregated to the Daemon
+// services Wait() response.
+//
+// The input services Run/Shutdown/Cleanup/ErrorHandler are captured
+// when the Daemon service is created, and modifications to the base
+// service are not reflected in the daemon service. The base Service's
+// Run function is passed a context that is always canceled after that
+// instance of the Run invocation returns to give each invocation of
+// the daemon a chance to release its specific resources.
+//
+// The minInterval value ensures that services don't crash in a
+// tight loop: if the time between starting the input service and the
+// next loop is less than the minInterval value, then the Daemon
+// service will wait until at least that interval has passed from the
+// last time the service started.
+func Daemon(s *Service, minInterval time.Duration) *Service {
+	baseRun := s.Run
+	baseShutdown := s.Shutdown
+	baseCleanup := s.Cleanup
+	shouldShutdown := make(chan struct{})
+
+	out := &Service{
+		Shutdown: func() error {
+			defer close(shouldShutdown)
+			if baseShutdown != nil {
+				return baseShutdown()
+			}
+			return nil
+		},
+		Cleanup: func() error {
+			if baseCleanup != nil {
+				return baseCleanup()
+			}
+			return nil
+		},
+		Run: func(ctx context.Context) (re error) {
+			ec := &erc.Collector{}
+			defer func() { re = ec.Resolve() }()
+			timer := time.NewTimer(0)
+			defer timer.Stop()
+			for {
+				start := time.Now()
+				err := func() error {
+					tctx, tcancel := context.WithCancel(ctx)
+					defer tcancel()
+					return baseRun(tctx)
+				}()
+				if erc.ContextExpired(err) || ctx.Err() != nil {
+					return nil
+				}
+				ec.Add(err)
+
+				timer.Reset(maxOfDur(0, minInterval-time.Since(start)))
+
+				select {
+				case <-shouldShutdown:
+					return
+				case <-ctx.Done():
+					return
+				case <-timer.C:
+					continue
+				}
+			}
+		},
+	}
+	out.ErrorHandler.Set(s.ErrorHandler.Get())
+
+	return out
+}
+
+func maxOfDur(a, b time.Duration) time.Duration {
+	if a >= b {
+		return a
+	}
+	return b
+}
