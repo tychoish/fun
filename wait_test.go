@@ -158,8 +158,12 @@ func TestWait(t *testing.T) {
 	})
 	t.Run("Block", func(t *testing.T) {
 		wf := WaitFunc(func(ctx context.Context) {
-			if ctx != context.Background() {
-				t.Error("context not expected")
+			if ctx == context.Background() {
+				// block runs through wait, so that
+				//  any threads spawned in the
+				//  WaitFunc are cleaned up when the
+				//  main wait function returns.
+				t.Error("background context not expected")
 			}
 			time.Sleep(10 * time.Millisecond)
 		})

@@ -23,7 +23,7 @@ func (wf WaitFunc) Run(ctx context.Context) {
 }
 
 // Block runs the WaitFunc with a context that will never be canceled.
-func (wf WaitFunc) Block() { wf(internal.BackgroundContext) }
+func (wf WaitFunc) Block() { wf.Run(internal.BackgroundContext) }
 
 // WithTimeout runs the WaitFunc with an explicit timeout.
 func (wf WaitFunc) WithTimeout(timeout time.Duration) {
