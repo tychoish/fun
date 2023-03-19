@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // True causes a test to fail if the condition is false.
@@ -179,6 +180,30 @@ func NotSubstring(t testing.TB, str, substr string) {
 	t.Helper()
 	if strings.Contains(str, substr) {
 		t.Errorf("expected %q to contain substring %q", str, substr)
+	}
+}
+
+// MaxRuntime runs an operation and asserts that the operations
+// runtime was less than the provided duration.
+func MaxRuntime(t testing.TB, dur time.Duration, op func()) {
+	t.Helper()
+	start := time.Now()
+	op()
+	ranFor := time.Since(start)
+	if ranFor > dur {
+		t.Errorf("operation ran for %s, greater than expected %s", ranFor, dur)
+	}
+}
+
+// MinRuntime runs an operation and asserts that the operations
+// runtime was greater than the provided duration.
+func MinRuntime(t testing.TB, dur time.Duration, op func()) {
+	t.Helper()
+	start := time.Now()
+	op()
+	ranFor := time.Since(start)
+	if dur > ranFor {
+		t.Errorf("operation ran for %s, less than expected %s", ranFor, dur)
 	}
 }
 

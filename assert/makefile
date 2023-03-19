@@ -1,3 +1,6 @@
+.PHONY:all
+all:check/assert.go check/assert_test.go
+
 check:
 	mkdir -p check
 
@@ -14,5 +17,3 @@ check/%.go:%.go check
 reset:
 	rm -rf check
 
-.PHONY:all
-all:check/assert.go check/assert_test.go
