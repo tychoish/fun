@@ -13,7 +13,7 @@ type WorkerFunc func(context.Context) error
 
 // Block executes the worker function with a context that will never
 // expire and returns the error. Use with caution
-func (wf WorkerFunc) Block() error { return wf(internal.BackgroundContext) }
+func (wf WorkerFunc) Block() error { return wf.Run(internal.BackgroundContext) }
 
 // Observe runs the worker function passing the error output to the
 // observer function. Only non-nil errors are observed.
