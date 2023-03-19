@@ -176,7 +176,55 @@ func TestWorker(t *testing.T) {
 
 			check.Equal(t, counter.Load(), 1)
 		})
+		t.Run("ObserverPoolErrorCheck", func(t *testing.T) {
+			t.Parallel()
+			called := &atomic.Bool{}
+			mock := &mockErrIter[int]{err: errors.New("kip")}
+			wf := ObservePool(testt.Context(t), 1,
+				Iterator[int](mock),
+				func(in int) { called.Store(true) },
+			)
 
+			if called.Load() {
+				t.Error("should not observe any")
+			}
+
+			err := wf(ctx)
+			if mock.nextCalls.Load() != 1 {
+				t.Error("pool should execute when worker function is called")
+			}
+
+			if err == nil {
+				t.Error("should have errored")
+			}
+			t.Log(err)
+			if err.Error() != "kip" {
+				t.Error("unexpected error", err)
+			}
+		})
+		t.Run("ObserverPoolNoError", func(t *testing.T) {
+			t.Parallel()
+			called := &atomic.Bool{}
+			mock := &mockNoErrIter[int]{}
+			wf := ObservePool(testt.Context(t), 1,
+				Iterator[int](mock),
+				func(in int) { called.Store(true) },
+			)
+
+			if called.Load() {
+				t.Error("should not observe any")
+			}
+
+			err := wf(ctx)
+
+			if mock.nextCalls.Load() != 1 {
+				t.Error("pool should execute when worker function is called")
+			}
+
+			if err != nil {
+				t.Errorf("should not have errored, %T", err)
+			}
+		})
 		t.Run("ContextCacelation", func(t *testing.T) {
 			t.Run("Unbounded", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -232,3 +280,18 @@ func TestWorker(t *testing.T) {
 		})
 	})
 }
+
+type mockErrIter[T any] struct {
+	nextCalls atomic.Int64
+	err       error
+}
+
+func (e *mockErrIter[T]) Close() error              { return e.err }
+func (e *mockErrIter[T]) Next(context.Context) bool { e.nextCalls.Add(1); return false }
+func (e *mockErrIter[T]) Value() T                  { return ZeroOf[T]() }
+
+type mockNoErrIter[T any] struct{ nextCalls atomic.Int64 }
+
+func (e *mockNoErrIter[T]) Close() error              { return nil }
+func (e *mockNoErrIter[T]) Next(context.Context) bool { e.nextCalls.Add(1); return false }
+func (e *mockNoErrIter[T]) Value() T                  { return ZeroOf[T]() }

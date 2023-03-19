@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -182,6 +183,31 @@ func TestWait(t *testing.T) {
 			t.Error(dur)
 		}
 	})
+	t.Run("ObserveWait", func(t *testing.T) {
+		ops := make([]int, 100)
+		for i := 0; i < len(ops); i++ {
+			ops[i] = rand.Int()
+		}
+		seen := make(map[int]struct{})
+		counter := 0
+		wf := ObserveWait[int](internal.NewSliceIter(ops), func(in int) {
+			seen[in] = struct{}{}
+			counter++
+		})
+		if len(seen) != 0 || counter != 0 {
+			t.Error("should be lazy execution", counter, seen)
+		}
+
+		wf(testt.Context(t))
+
+		if len(seen) != 100 {
+			t.Error(len(seen), seen)
+		}
+		if counter != 100 {
+			t.Error(counter)
+		}
+	})
+
 	t.Run("Blocking", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			start := time.Now()

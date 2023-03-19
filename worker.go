@@ -76,17 +76,7 @@ func (wf WorkerFunc) Run(ctx context.Context) error {
 // Use itertool.Channel, itertool.Slice, and itertool.Variadic to
 // produce iterators from standard types for use with this function.
 func ObserveWorkerFuncs(ctx context.Context, iter Iterator[WorkerFunc], ob func(error)) WaitFunc {
-	wg := &WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for iter.Next(ctx) {
-			wg.Add(1)
-			go func(wf WorkerFunc) { defer wg.Done(); wf.Observe(ctx, ob) }(iter.Value())
-		}
-	}()
-
-	return wg.Wait
+	return ObserveAll(ctx, iter, func(fn WorkerFunc) { ob(fn(ctx)) })
 }
 
 // ObserveWorkerPool creates a worker pool of the specified size and
@@ -105,8 +95,23 @@ func ObserveWorkerFuncs(ctx context.Context, iter Iterator[WorkerFunc], ob func(
 // Use itertool.Channel, itertool.Slice, and itertool.Variadic to
 // produce iterators from standard types for use with this function.
 func ObserveWorkerPool(ctx context.Context, size int, iter Iterator[WorkerFunc], ob func(error)) WaitFunc {
+	wf := ObservePool(ctx, size, iter, func(fn WorkerFunc) { ob(fn(ctx)) })
+	return func(ctx context.Context) { ob(wf(ctx)) }
+}
+
+// ObservePool processes the items in the worker pool, passing them
+// all the observer function. The iterator is read serially and then
+// the items are processed in parallel in the specified (size) number
+// of goroutines. Panics in observer functions are not handled. Use
+// itertool.ObserveParallel for similar (and safer!) and more
+// configurable functionality.
+//
+// Errors are encountered closing the iterator
+func ObservePool[T any](ctx context.Context, size int, iter Iterator[T], observe func(T)) WorkerFunc {
+	var err error
+
 	wg := &WaitGroup{}
-	pipe := make(chan WorkerFunc)
+	pipe := make(chan T)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -115,11 +120,11 @@ func ObserveWorkerPool(ctx context.Context, size int, iter Iterator[WorkerFunc],
 			select {
 			case pipe <- iter.Value():
 			case <-ctx.Done():
-				ob(iter.Close())
+				err = iter.Close()
 				return
 			}
 		}
-		ob(iter.Close())
+		err = iter.Close()
 	}()
 	if size <= 0 {
 		size = 1
@@ -133,10 +138,16 @@ func ObserveWorkerPool(ctx context.Context, size int, iter Iterator[WorkerFunc],
 				if err != nil {
 					return
 				}
-				op.Observe(ctx, ob)
+				observe(op)
 			}
 		}()
 	}
 
-	return wg.Wait
+	return func(ctx context.Context) error {
+		wg.Wait(ctx)
+
+		// if the waitgroup returns we know that nothing could
+		// be mutating the error
+		return err
+	}
 }

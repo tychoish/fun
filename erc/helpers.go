@@ -241,7 +241,7 @@ func Consume(ctx context.Context, iter fun.Iterator[error]) error {
 // function that blocks until the iterator is exhausted. ConsumeAll
 // does not begin processing the iterator until the wait function is called.
 func ConsumeAll(ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
-	return func(ctx context.Context) { fun.Observe(ctx, iter, ec.Add) }
+	return fun.ObserveWait(iter, ec.Add)
 }
 
 // ConsumeProcess adds all errors in the iterator to the

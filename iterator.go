@@ -42,3 +42,35 @@ func Observe[T any](ctx context.Context, iter Iterator[T], observe func(T)) {
 		observe(iter.Value())
 	}
 }
+
+// ObserveWait has the same semantics as Observe, except that the
+// operation is wrapped in a WaitFunc, and executed when the WaitFunc
+// is called.
+func ObserveWait[T any](iter Iterator[T], observe func(T)) WaitFunc {
+	return func(ctx context.Context) { Observe(ctx, iter, observe) }
+}
+
+// ObserverAll process all items in an iterator using the provided
+// observer function. This operation begins as soon as ObserveAll is
+// called and proceeds in parallel with an unbounded number of
+// goroutines. Panics in the observer function are not handled. Use
+// ObservePool for bounded parallelsim, or  the itertool
+// Observer operations (Observe, ParallelObserve) for more control
+// over the execution.
+func ObserveAll[T any](ctx context.Context, iter Iterator[T], observe func(T)) WaitFunc {
+	wg := &WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		Observe(ctx, iter, func(in T) {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				observe(in)
+			}()
+		})
+	}()
+
+	return wg.Wait
+}
