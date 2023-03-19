@@ -30,8 +30,11 @@ var (
 //
 // There are no special construction requirements for Services and
 // implementations must define Run methods, with the other options
-// optional. The service can only be run once; however, callers
-// should avoid mutating the service after calling Start.
+// optional. The service can only be run once. There is no particular
+// concurency control provided on Services, except via the atomic
+// setter on the ErrorHandler. While callers should not modify the
+// other attributes of the service, after Start() returns the
+// Run/Cleanup/Shutdown functions are not referenced.
 type Service struct {
 	// Name is a human-readable name for the service, and is used
 	// in the String() method, and to annotate errors.
@@ -66,8 +69,9 @@ type Service struct {
 	// output. This is always the result of an
 	// erc.Collector.Resolve() method, and so contains the
 	// aggregated errors and panics collected during the service's
-	// execution (e.g. Run, Shutdown, Cleanup). Caller's may use
-	// this during
+	// execution (e.g. Run, Shutdown, Cleanup), and should be
+	// identical to the output of Wait(). Caller's set this value
+	// during the execution of the service.
 	ErrorHandler fun.Atomic[func(error)]
 
 	isRunning  atomic.Bool
