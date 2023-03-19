@@ -28,5 +28,4 @@ jobs:
       - name: Run Go Tests
         if: env.GIT_DIFF
         run: |
-          export GOMAXPROCS=$(($(nproc) + 2))
           go test -race -timeout=2m ./...
