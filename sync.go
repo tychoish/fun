@@ -31,6 +31,11 @@ func (a *Atomic[T]) Get() T { return ZeroWhenNil[T](a.Value.Load()) }
 // that lives for the entire time that Wait is running. Multiple
 // copies of Wait can be safely called at once, and the WaitGroup is
 // reusable more than once.
+//
+// This implementation is about 50% slower than sync.WaitGroup after
+// informal testing. It provides a little extra flexiblity and
+// introspection, with similar semantics, that may be worth the
+// additional performance hit.
 type WaitGroup struct {
 	mu      sync.Mutex
 	cond    *sync.Cond
@@ -83,11 +88,12 @@ func (wg *WaitGroup) IsDone() bool {
 func (wg *WaitGroup) Wait(ctx context.Context) {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()
-	wg.init()
 
 	if wg.counter == 0 || ctx.Err() != nil {
 		return
 	}
+
+	wg.init()
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
