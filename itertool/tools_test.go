@@ -450,6 +450,7 @@ func TestParallelForEach(t *testing.T) {
 			Slice(makeIntSlice(200)),
 			func(ctx context.Context, in int) error {
 				seen.Add(in)
+				runtime.Gosched()
 				if in >= 100 {
 					panic("error")
 				}
@@ -468,7 +469,8 @@ func TestParallelForEach(t *testing.T) {
 			t.Fatal(err)
 		}
 		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
-		if len(errs) != 100 {
+		if len(errs) != 200 {
+			// panics and expected
 			t.Error(len(errs))
 		}
 	})
@@ -506,7 +508,8 @@ func TestParallelForEach(t *testing.T) {
 			t.Fatal(err)
 		}
 		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
-		if len(errs) != 1 {
+		if len(errs) != 2 {
+			// panic + expected
 			t.Error(len(errs))
 		}
 	})
@@ -650,6 +653,7 @@ func TestParallelObserve(t *testing.T) {
 			Slice(makeIntSlice(200)),
 			func(in int) {
 				seen.Add(in)
+				runtime.Gosched()
 				if in >= 100 {
 					panic("error")
 				}
@@ -667,7 +671,7 @@ func TestParallelObserve(t *testing.T) {
 			t.Fatal(err)
 		}
 		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
-		if len(errs) != 100 {
+		if len(errs) != 200 {
 			t.Error(len(errs))
 		}
 	})
@@ -702,7 +706,8 @@ func TestParallelObserve(t *testing.T) {
 			t.Fatal(err)
 		}
 		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
-		if len(errs) != 1 {
+		if len(errs) != 2 {
+			// panic sentinel
 			t.Error(len(errs))
 		}
 	})
@@ -755,7 +760,7 @@ func TestParallelObserve(t *testing.T) {
 					t.Fatal("expected error")
 				}
 				errs := erc.Unwind(err)
-				if len(errs) != 1 {
+				if len(errs) != 2 {
 					t.Error("unexpected number of errors", len(errs))
 				}
 				if !errors.Is(err, expected) {
@@ -840,8 +845,7 @@ func TestParallelObserve(t *testing.T) {
 					t.Fatal("expected errors")
 				}
 				errs := erc.Unwind(err)
-				if len(errs) != 100 {
-					t.Log(errs)
+				if len(errs) != 200 {
 					t.Error("unexpected number of errors", len(errs))
 				}
 				assert.ErrorIs(t, err, expected)
@@ -918,7 +922,11 @@ func TestParallelObserve(t *testing.T) {
 				workers := make([]fun.WorkerFunc, 100)
 				expected := errors.New("womp")
 				for i := range workers {
-					workers[i] = func(context.Context) error { count.Add(1); panic(expected) }
+					workers[i] = func(context.Context) error {
+						count.Add(1)
+						runtime.Gosched()
+						panic(expected)
+					}
 				}
 
 				observations := &atomic.Int64{}
@@ -927,7 +935,7 @@ func TestParallelObserve(t *testing.T) {
 					observations.Add(1)
 					check.ErrorIs(t, err, expected)
 					errs := erc.Unwind(err)
-					check.Equal(t, len(errs), 100)
+					check.Equal(t, len(errs), 200)
 				}, Options{
 					NumWorkers:      4,
 					ContinueOnPanic: true,

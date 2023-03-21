@@ -39,4 +39,8 @@ func TestMerge(t *testing.T) {
 	if !strings.Contains(err.Error(), "200") {
 		t.Error(err)
 	}
+	ue := errors.Unwrap(err)
+	if ue != e2 {
+		t.Error(ue)
+	}
 }

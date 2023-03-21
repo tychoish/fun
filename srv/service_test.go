@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -144,9 +143,7 @@ func TestService(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			if !strings.HasPrefix(err.Error(), "panic: whoops") {
-				t.Error(err)
-			}
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 		})
 		t.Run("NilRun", func(t *testing.T) {
 			s := &Service{}
@@ -160,9 +157,7 @@ func TestService(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			if !strings.HasPrefix(err.Error(), "panic:") {
-				t.Error(err)
-			}
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 		})
 		t.Run("Run", func(t *testing.T) {
 			s := &Service{
@@ -179,9 +174,7 @@ func TestService(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			if !strings.HasPrefix(err.Error(), "panic: whoops") {
-				t.Error(err)
-			}
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 		})
 	})
 	t.Run("Group", func(t *testing.T) {
@@ -237,10 +230,7 @@ func TestService(t *testing.T) {
 				t.Fatal("expected error")
 			}
 
-			if err.Error() != "panic: whoops" {
-				t.Fatal(err)
-			}
-
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 		})
 		t.Run("ErrorPropogates", func(t *testing.T) {
 			s := &Service{
@@ -405,7 +395,7 @@ func TestService(t *testing.T) {
 		err := s.Wait()
 		errs := erc.Unwind(err)
 		assert.Error(t, err)
-		check.True(t, len(errs) == 3)
+		check.Equal(t, len(errs), 4) // ++ panic
 		assert.Error(t, oberr.Get())
 		assert.Equal(t, err.Error(), oberr.Get().Error())
 	})

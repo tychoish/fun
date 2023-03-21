@@ -162,12 +162,11 @@ func RunIteratorImplementationTests[T comparable](
 									if err == nil {
 										t.Fatal("expectged error")
 									}
-									if err.Error() != "panic: whoop" {
-										t.Fatal(err)
-									}
+									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
 									if len(out) != 0 {
 										t.Fatal("unexpected output", out)
 									}
+									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 								})
 								t.Run("ForEach", func(t *testing.T) {
 									err := ForEach(
@@ -181,9 +180,8 @@ func RunIteratorImplementationTests[T comparable](
 									if err == nil {
 										t.Fatal("expectged error")
 									}
-									if err.Error() != "panic: whoop" {
-										t.Fatal(err)
-									}
+									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
+									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 								})
 								t.Run("Observe", func(t *testing.T) {
 									err := Observe(
@@ -197,9 +195,7 @@ func RunIteratorImplementationTests[T comparable](
 									if err == nil {
 										t.Fatal("expectged error")
 									}
-									if err.Error() != "panic: whoop" {
-										t.Fatal(err)
-									}
+									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
 								})
 								t.Run("Map", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
@@ -214,9 +210,7 @@ func RunIteratorImplementationTests[T comparable](
 									if err == nil {
 										t.Fatal("expected error")
 									}
-									if err.Error() != "panic: whoop" {
-										t.Fatal(err)
-									}
+									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
 									if len(out) != 0 {
 										t.Fatal("unexpected output", out)
 									}
@@ -238,7 +232,10 @@ func RunIteratorImplementationTests[T comparable](
 									if err == nil {
 										t.Fatal("expected error")
 									}
-									if !strings.Contains(err.Error(), "panic: whoop") {
+
+									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+
+									if !strings.Contains(err.Error(), "whoop") {
 										t.Fatalf("panic error isn't propogated %q", err.Error())
 									}
 									if len(out) != 0 {
@@ -362,9 +359,7 @@ func RunIteratorIntegerAlgoTests(
 									if err == nil {
 										t.Fatal("expected error")
 									}
-									if err.Error() != "panic: whoop" {
-										t.Fatal(err)
-									}
+									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
 									if len(out) != len(elems)-1 {
 										t.Fatal("unexpected output", len(out), "->", out)
 									}
@@ -638,9 +633,10 @@ func RunIteratorStringAlgoTests(
 									if out.Next(ctx) {
 										t.Fatal("should not iterate when panic")
 									}
-									if err := out.Close(); err.Error() != "panic: foo" {
-										t.Fatalf("unexpected panic %q", err.Error())
-									}
+
+									err := out.Close()
+									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+									assert.Substring(t, err.Error(), "foo")
 								})
 								t.Run("ContinueOnPanic", func(t *testing.T) {
 									count := 0
@@ -668,9 +664,8 @@ func RunIteratorStringAlgoTests(
 									if err == nil {
 										t.Fatal("should have errored")
 									}
-									if err.Error() != "panic: foo" {
-										t.Fatalf("unexpected panic %q", err.Error())
-									}
+									assert.Substring(t, err.Error(), "foo")
+									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 								})
 								t.Run("ArbitraryErrorAborts", func(t *testing.T) {
 

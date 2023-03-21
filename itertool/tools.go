@@ -32,8 +32,8 @@ func ParallelForEach[T any](
 	catcher := &erc.Collector{}
 	wg := &fun.WaitGroup{}
 	defer func() { err = catcher.Resolve() }()
-	defer erc.Recover(catcher)
 	defer erc.Check(catcher, iter.Close)
+	defer erc.Recover(catcher)
 
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1

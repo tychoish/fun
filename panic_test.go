@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -52,7 +53,7 @@ func TestPanics(t *testing.T) {
 			if err == nil {
 				t.Fatal(err)
 			}
-			if err.Error() != "panic: function runs" {
+			if err.Error() != "panic: function runs: recovered panic" {
 				t.Error(err)
 			}
 		})
@@ -63,15 +64,9 @@ func TestPanics(t *testing.T) {
 				Invariant(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
-			t.Log(err)
-
 			assert.ErrorIs(t, err, ErrInvariantViolation)
-
+			assert.ErrorIs(t, err, ErrRecoveredPanic)
 			assert.True(t, IsInvariantViolation(err))
-
-			if !strings.HasPrefix(err.Error(), "panic:") {
-				t.Error(err)
-			}
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
@@ -97,12 +92,11 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
 			err := Check(func() { Invariant(1 == 2) })
-			if errors.Unwrap(err) != ErrInvariantViolation {
-				t.Error(err)
+			if !errors.Is(err, ErrInvariantViolation) {
+				t.Fatal(err)
 			}
-			// this is the check function
-			if !strings.HasPrefix(err.Error(), "panic:") {
-				t.Error(err)
+			if !errors.Is(err, ErrRecoveredPanic) {
+				t.Fatal(err)
 			}
 		})
 		t.Run("CheckError", func(t *testing.T) {
@@ -205,9 +199,7 @@ func TestPanics(t *testing.T) {
 			if !errors.Is(err, root) {
 				t.Error(err)
 			}
-			if !strings.Contains(err.Error(), "panic:") {
-				t.Error(err)
-			}
+			assert.ErrorIs(t, err, ErrRecoveredPanic)
 			if !strings.Contains(err.Error(), "annotate") {
 				t.Error(err)
 			}
@@ -219,6 +211,102 @@ func TestPanics(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+		})
+	})
+	t.Run("Ignore", func(t *testing.T) {
+		t.Run("SwallowError", func(t *testing.T) {
+			called := &atomic.Bool{}
+			Ignore(func(in string) error {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				return errors.New("exists")
+			}, "hello world")
+			assert.True(t, called.Load())
+		})
+		t.Run("IndifferentError", func(t *testing.T) {
+			called := &atomic.Bool{}
+			Ignore(func(in string) error {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				return nil
+			}, "hello world")
+			assert.True(t, called.Load())
+		})
+		t.Run("Panic", func(t *testing.T) {
+			called := &atomic.Bool{}
+			Ignore(func(in string) error {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				panic("hello")
+			}, "hello world")
+			assert.True(t, called.Load())
+		})
+
+	})
+	t.Run("IgnoreMust", func(t *testing.T) {
+		t.Run("SwallowError", func(t *testing.T) {
+			called := &atomic.Bool{}
+			output := IgnoreMust(func(in string) (int, error) {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				return 100, errors.New("exists")
+			}, "hello world")
+			assert.True(t, called.Load())
+			assert.Equal(t, 100, output)
+		})
+		t.Run("IndifferentError", func(t *testing.T) {
+			called := &atomic.Bool{}
+			output := IgnoreMust(func(in string) (int, error) {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				return 100, nil
+			}, "hello world")
+			assert.True(t, called.Load())
+			assert.Equal(t, 100, output)
+		})
+		t.Run("IndifferentValue", func(t *testing.T) {
+			called := &atomic.Bool{}
+			output := IgnoreMust(func(in string) (*int, error) {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				return nil, errors.New("hello")
+			}, "hello world")
+			assert.True(t, called.Load())
+			assert.Zero(t, output)
+		})
+		t.Run("Panic", func(t *testing.T) {
+			called := &atomic.Bool{}
+			output := IgnoreMust(func(in string) (int, error) {
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				panic("hello")
+			}, "hello world")
+			assert.True(t, called.Load())
+			assert.Zero(t, output)
+		})
+		t.Run("PanicDefault", func(t *testing.T) {
+			called := &atomic.Bool{}
+			output := IgnoreMust(func(in string) (val int, _ error) {
+				defer func() { val = 100 }()
+				called.Store(true)
+				check.Equal(t, "hello world", in)
+				panic("hello")
+			}, "hello world")
+			assert.True(t, called.Load())
+			// defers that don't recover aren't run
+			assert.Zero(t, output)
+		})
+		t.Run("DefersRun", func(t *testing.T) {
+			called := &atomic.Bool{}
+			output := IgnoreMust(func(in string) (val int, _ error) {
+				defer func() { val = 100 }()
+				defer func() { called.Store(true) }()
+				defer func() { _ = recover() }()
+				check.Equal(t, "hello world", in)
+				panic("hello")
+			}, "hello world")
+			assert.True(t, called.Load())
+			assert.Equal(t, 100, output)
 		})
 	})
 }

@@ -63,7 +63,7 @@ func (e *Stack) Error() string {
 	}
 
 	if e.next != nil && e.next.err != nil {
-		return strings.Join([]string{e.next.Error(), e.err.Error()}, "; ")
+		return strings.Join([]string{e.next.Error(), e.err.Error()}, ": ")
 	}
 
 	return e.err.Error()

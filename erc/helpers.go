@@ -86,10 +86,12 @@ func Recover(ec *Collector) {
 	if r := recover(); r != nil {
 		switch err := r.(type) {
 		case error:
-			ec.Add(fmt.Errorf("panic: %w", err))
+			ec.Add(err)
 		default:
-			ec.Add(fmt.Errorf("panic: %v", err))
+			ec.Add(fmt.Errorf("%v", err))
 		}
+
+		ec.Add(fun.ErrRecoveredPanic)
 	}
 }
 
@@ -100,10 +102,12 @@ func RecoverHook(ec *Collector, hook func()) {
 	if r := recover(); r != nil {
 		switch err := r.(type) {
 		case error:
-			ec.Add(fmt.Errorf("panic: %w", err))
+			ec.Add(err)
 		default:
-			ec.Add(fmt.Errorf("panic: %v", err))
+			ec.Add(fmt.Errorf("%v", err))
 		}
+
+		ec.Add(fun.ErrRecoveredPanic)
 
 		if hook != nil {
 			hook()

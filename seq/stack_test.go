@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
@@ -31,9 +32,8 @@ func TestStack(t *testing.T) {
 		if !errors.Is(err, seq.ErrUninitialized) {
 			t.Error(err)
 		}
-		if expected := fmt.Sprint("panic: ", seq.ErrUninitialized.Error()); expected != err.Error() {
-			t.Fatal(expected, "->", err)
-		}
+		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+		assert.ErrorIs(t, err, seq.ErrUninitialized)
 	})
 	t.Run("Constructor", func(t *testing.T) {
 		stack := &seq.Stack[int]{}

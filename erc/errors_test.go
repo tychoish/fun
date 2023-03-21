@@ -150,7 +150,7 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "panic: boop" {
+			if e := es.stack.Error(); e != "boop: recovered panic" {
 				t.Error(e)
 			}
 		})
@@ -168,9 +168,9 @@ func TestError(t *testing.T) {
 			if errr := es.Resolve(); errr == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "panic: kip" {
-				t.Error(e)
-			}
+
+			check.ErrorIs(t, es.Resolve(), fun.ErrRecoveredPanic)
+
 			if !errors.Is(es.Resolve(), err) {
 				t.Error(es.Resolve(), "error not propogated")
 			}
@@ -188,7 +188,7 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "panic: boop" {
+			if e := es.stack.Error(); e != "boop: recovered panic" {
 				t.Error(e)
 			}
 			if counter != 1 {
@@ -209,9 +209,9 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "panic: kip" {
-				t.Error(e)
-			}
+
+			check.ErrorIs(t, es.Resolve(), fun.ErrRecoveredPanic)
+
 			if counter != 1 {
 				t.Error("callback not called")
 			}
@@ -339,9 +339,11 @@ func TestError(t *testing.T) {
 			if !ec.HasErrors() {
 				t.Fatal("empty collector")
 			}
-			if ec.Resolve().Error() != "panic: foo" {
+			if ec.Resolve().Error() != "foo: recovered panic" {
 				t.Fatal(ec.Resolve())
 			}
+
+			assert.ErrorIs(t, ec.Resolve(), fun.ErrRecoveredPanic)
 
 			if out != "" {
 				t.Fatal("output:", out)
@@ -455,7 +457,7 @@ func TestError(t *testing.T) {
 			es = es.append(errors.New("three"))
 
 			output := es.Error()
-			const expected = "one; two; three"
+			const expected = "one: two: three"
 			if output != expected {
 				t.Error(output, "!=", expected)
 			}

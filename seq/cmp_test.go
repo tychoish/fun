@@ -3,7 +3,6 @@ package seq
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"math/rand"
 	"sort"
@@ -234,9 +233,9 @@ func TestSort(t *testing.T) {
 			if !errors.Is(err, ErrUninitialized) {
 				t.Error(err)
 			}
-			if expected := fmt.Sprint("panic: ", ErrUninitialized.Error()); expected != err.Error() {
-				t.Fatal(expected, "->", err)
-			}
+
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ErrUninitialized)
 		})
 		t.Run("Iterator", func(t *testing.T) {
 			heap := &Heap[int]{LT: LessThanNative[int]}

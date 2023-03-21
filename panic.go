@@ -7,9 +7,14 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// ErrInvariantViolation is the root error of the error object that is
-// the content of all panics produced by the Invariant helper.
-var ErrInvariantViolation = errors.New("invariant violation")
+var (
+	// ErrInvariantViolation is the root error of the error object that is
+	// the content of all panics produced by the Invariant helper.
+	ErrInvariantViolation = errors.New("invariant violation")
+	// ErrRecoveredPanic is at the root of any error returned by a
+	// function in the fun package that recovers from a panic.
+	ErrRecoveredPanic = errors.New("recovered panic")
+)
 
 // Invariant panics if the condition is false Invariant panics,
 // passing an error that is rooted by ErrInvariantViolation.
@@ -79,6 +84,34 @@ func Must[T any](arg T, err error) T {
 	return arg
 }
 
+// Ignore runs a function that takes an arbitrary argument and ignores
+// the error and swallows any panic. This is a risky move: usually
+// functions panic for a reason, but for certain invariants this may
+// be useful.
+//
+// Be aware, that while Ignore will recover from any panics, defers
+// within the ignored function will not run unless there is a call to
+// recover *before* the defer.
+func Ignore[T any](fn func(T) error, arg T) {
+	defer func() { _ = recover() }()
+	_ = fn(arg)
+}
+
+// IgnoreMust runs a function that takes an arbitrary argument and
+// ignores the error and swallows any panic, returning the output of
+// the function, likely a Zero value, in the case of an error.  This
+// is a risky move: usually functions panic for a reason, but for
+// certain invariants this may be useful.
+//
+// Be aware, that while Ignore will recover from any panics, defers
+// within the ignored function will not run unless there is a call to
+// recover *before* the defer.
+func IgnoreMust[T any, O any](fn func(T) (O, error), arg T) O {
+	defer func() { _ = recover() }()
+	val, _ := fn(arg)
+	return val
+}
+
 // Check, like Safe, runs a function without arguments that does not
 // produce an error, and, if the function panics, converts it into an
 // error.
@@ -108,8 +141,14 @@ func Safe[T any](fn func() T) (out T, err error) {
 func buildRecoverError(r any) error {
 	switch in := r.(type) {
 	case error:
-		return fmt.Errorf("panic: %w", in)
+		return &internal.MergedError{
+			Current: in,
+			Wrapped: ErrRecoveredPanic,
+		}
 	default:
-		return fmt.Errorf("panic: %v", in)
+		return &internal.MergedError{
+			Current: fmt.Errorf("panic: %v", in),
+			Wrapped: ErrRecoveredPanic,
+		}
 	}
 }

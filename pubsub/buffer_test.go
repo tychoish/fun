@@ -82,7 +82,8 @@ func TestDistributor(t *testing.T) {
 				}
 
 				errs = erc.Unwind(err)
-				if len(errs) != 1 {
+				if len(errs) != 2 {
+					// panic+expected
 					t.Error(len(errs))
 				}
 				err = buf.Send(ctx, "kip")
@@ -90,7 +91,8 @@ func TestDistributor(t *testing.T) {
 					t.Error("expected error")
 				}
 				errs = erc.Unwind(err)
-				if len(errs) != 1 {
+				if len(errs) != 2 {
+					// panic and the other
 					t.Error(len(errs))
 				}
 			})

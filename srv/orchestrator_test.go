@@ -259,7 +259,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal("should error")
 			}
 			errs := erc.Unwind(err)
-			if len(errs) != 100 {
+			if len(errs) != 200 {
 				t.Log(errs)
 				t.Error(len(errs))
 			}
@@ -468,7 +468,8 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal("should error")
 			}
 			errs := erc.Unwind(err)
-			if len(errs) != 100 {
+			if len(errs) != 200 {
+				// panics + expected errors
 				t.Log(errs)
 				t.Error(len(errs))
 			}
