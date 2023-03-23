@@ -7,20 +7,25 @@ import (
 )
 
 // Atomic is a very simple atomic Get/Set operation, providing a
-// generic type-safe implementation wrapping
-// sync/atomic.Value.
-type Atomic[T any] struct{ atomic.Value }
+// generic type-safe implementation wrapping sync/atomic.Value.
+type Atomic[T any] struct{ val atomic.Value }
 
 // NewAtomic creates a new Atomic Get/Set value with the initial value
 // already set.
 func NewAtomic[T any](initial T) *Atomic[T] { a := &Atomic[T]{}; a.Set(initial); return a }
 
 // Set atomically sets the value of the Atomic.
-func (a *Atomic[T]) Set(in T) { a.Value.Store(in) }
+func (a *Atomic[T]) Set(in T) { a.val.Store(in) }
 
 // Get resolves the atomic value, returning the zero value of the type
 // T if the value is unset.
-func (a *Atomic[T]) Get() T { return ZeroWhenNil[T](a.Value.Load()) }
+func (a *Atomic[T]) Get() T { return ZeroWhenNil[T](a.val.Load()) }
+
+// Swap does an in place exchange of the contents of a value
+// exchanging the new value for the old. Unlike sync.Atomic.Swap() if
+// new is nil, fun.Atomic.Swap() does NOT panic, and instead
+// constructs the zero value of type T.
+func (a *Atomic[T]) Swap(new T) (old T) { return a.val.Swap(ZeroWhenNil[T](new)).(T) }
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.WaitFunc). The

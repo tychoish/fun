@@ -69,8 +69,12 @@ func IsZero[T comparable](in T) bool {
 	switch val := any(in).(type) {
 	case interface{ IsZero() bool }:
 		return val.IsZero()
+	case *Atomic[T]:
+		return val == nil || IsZero(val.Get())
+	case nil:
+		return true
 	default:
-		return val == Zero(in)
+		return in == Zero(in)
 	}
 }
 
