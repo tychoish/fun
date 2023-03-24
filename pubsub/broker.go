@@ -109,7 +109,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, distributorDeque(deque), opts)
+	return MakeDistributorBroker(ctx, DistributorDeque(deque), opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to

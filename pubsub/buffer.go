@@ -52,10 +52,10 @@ func distributorLIFO[T any](d *Deque[T]) Distributor[T] {
 	}
 }
 
-// distributorDeque produces a Distributor that always accepts new
+// DistributorDeque produces a Distributor that always accepts new
 // Push operations by removing the oldest element in the queue, with
 // Pop operations returning the oldest elements first (FIFO).
-func distributorDeque[T any](d *Deque[T]) Distributor[T] {
+func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
 	return &distributorImpl[T]{
 		push: ignorePopContext(d.ForcePushBack),
 		pop:  d.WaitFront,
