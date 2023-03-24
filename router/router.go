@@ -38,17 +38,21 @@ type Interceptor func(context.Context, *Response) error
 type Handler func(context.Context, Message) (Response, error)
 
 type Router struct {
-	incoming *adt.SyncMap[RegistryKey, adt.Sequence[Middleware]]
+	incoming *adt.SyncMap[RegistryKey, *pubsub.Deque[Middleware]]
+	outgoing *adt.SyncMap[RegistryKey, *pubsub.Deque[Interceptor]]
 	handlers *adt.SyncMap[RegistryKey, Handler]
-	outgoing *adt.SyncMap[RegistryKey, adt.Sequence[Interceptor]]
 	broker   *pubsub.Broker[Response]
 }
 
-func (r *Router) RegisterMiddleware(key RegistryKey, it Middleware)   { r.incoming.Get(key).Add(it) }
-func (r *Router) RegisterInterceptor(key RegistryKey, it Interceptor) { r.outgoing.Get(key).Add(it) }
-func (r *Router) RegisterHandler(key RegistryKey, hfn Handler)        { r.handlers.Store(key, hfn) }
-func (r *Router) Stream(ctx context.Context) <-chan Response          { return r.broker.Subscribe(ctx) }
-func (r *Router) Broadcast(ctx context.Context, m Message) error      { return nil }
+func (r *Router) AddMiddleware(key RegistryKey, it Middleware) error {
+	return r.incoming.Get(key).PushBack(it)
+}
+func (r *Router) AddInterceptor(key RegistryKey, it Interceptor) error {
+	return r.outgoing.Get(key).PushBack(it)
+}
+func (r *Router) RegisterHandler(key RegistryKey, hfn Handler)   { r.handlers.Store(key, hfn) }
+func (r *Router) Stream(ctx context.Context) <-chan Response     { return r.broker.Subscribe(ctx) }
+func (r *Router) Broadcast(ctx context.Context, m Message) error { return nil }
 
 func (r *Router) Exec(ctx context.Context, m Message) (*Response, bool) {
 	sub := r.broker.Subscribe(ctx)

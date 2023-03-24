@@ -28,13 +28,22 @@ func MakeSyncMap[K comparable, V any](in map[K]V) *SyncMap[K, V] {
 	return mp
 }
 
-func (mp *SyncMap[K, V]) CompareAndDelete(key, old K) bool { return mp.mp.CompareAndDelete(key, old) }
-func (mp *SyncMap[K, V]) Delete(key K)                     { mp.mp.Delete(key) }
-func (mp *SyncMap[K, V]) Load(key K) (V, bool)             { v, ok := mp.mp.Load(key); return v.(V), ok }
-func (mp *SyncMap[K, V]) Store(k K, v V)                   { mp.mp.Store(k, v) }
-func (mp *SyncMap[K, V]) Swap(k K, v V) (any, bool)        { p, ok := mp.mp.Swap(k, v); return p.(V), ok }
-func (mp *SyncMap[K, V]) Set(it MapItem[K, V])             { mp.Store(it.Key, it.Value) }
-func (mp *SyncMap[K, V]) Append(its ...MapItem[K, V])      { mp.Extend(its) }
+func (mp *SyncMap[K, V]) Delete(key K)                { mp.mp.Delete(key) }
+func (mp *SyncMap[K, V]) Load(key K) (V, bool)        { v, ok := mp.mp.Load(key); return v.(V), ok }
+func (mp *SyncMap[K, V]) Store(k K, v V)              { mp.mp.Store(k, v) }
+func (mp *SyncMap[K, V]) Swap(k K, v V) (any, bool)   { p, ok := mp.mp.Swap(k, v); return p.(V), ok }
+func (mp *SyncMap[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
+func (mp *SyncMap[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
+
+func (mp *SyncMap[K, V]) LoadAndDelete(k K) (V, bool) {
+	v, ok := mp.mp.LoadAndDelete(k)
+	return v.(V), ok
+}
+
+func (mp *SyncMap[K, V]) LoadOrStore(key K, val V) (V, bool) {
+	v, ok := mp.mp.LoadOrStore(key, val)
+	return v.(V), ok
+}
 
 func (mp *SyncMap[K, V]) Get(key K) V {
 	new := mp.MakeDefault.Get()
@@ -62,21 +71,7 @@ func (mp *SyncMap[K, V]) Extend(its []MapItem[K, V]) {
 }
 
 func (mp *SyncMap[K, V]) StoreFrom(ctx context.Context, iter fun.Iterator[MapItem[K, V]]) {
-	fun.Observe(ctx, iter, func(it MapItem[K, V]) { mp.Store(it.Key, it.Value) })
-}
-
-func (mp *SyncMap[K, V]) CompareAndSwap(key K, old, new V) bool {
-	return mp.mp.CompareAndSwap(key, old, new)
-}
-
-func (mp *SyncMap[K, V]) LoadAndDelete(k K) (V, bool) {
-	v, ok := mp.mp.LoadAndDelete(k)
-	return v.(V), ok
-}
-
-func (mp *SyncMap[K, V]) LoadOrStore(key K, val V) (V, bool) {
-	v, ok := mp.mp.LoadOrStore(key, val)
-	return v.(V), ok
+	fun.Observe(ctx, iter, mp.Set)
 }
 
 func (mp *SyncMap[K, V]) Range(f func(K, V) bool) {
