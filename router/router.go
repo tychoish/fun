@@ -1,61 +1,113 @@
-package pubsub
+package router
 
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/srv"
 )
 
-type Message struct {
-	Payload          any
-	ResponseExpected bool
-
-	Version int
-	Schema  string
-	ID      string
+type Config struct {
+	Name    string
+	Workers int
 }
 
-type Response struct {
-	Payload any
-	Error   error
-	Version int
-	Schema  string
-	ID      string
+type Dispatcher struct {
+	// ErrorObserver defaults to a noop, but is called whenever a
+	// middlware or handler returns an error, and makes it
+	// possible to inject behavior to handle or collect errors.
+	ErrorObserver fun.Atomic[func(error)]
+
+	middleware  *adt.SyncMap[Protocol, *pubsub.Deque[Middleware]]
+	interceptor *adt.SyncMap[Protocol, *pubsub.Deque[Interceptor]]
+	handlers    *adt.SyncMap[Protocol, Handler]
+	broker      *pubsub.Broker[Response]
+	pipe        *pubsub.Deque[Message]
+	conf        Config
+	services    srv.Orchestrator
 }
 
-type RegistryKey struct {
-	Version int
-	Schema  string
+func NewDispatcher(ctx context.Context, conf Config) (*Dispatcher, error) {
+	broker := pubsub.NewBroker[Response](ctx, pubsub.BrokerOptions{WorkerPoolSize: conf.Workers, ParallelDispatch: true})
+	pipe, err := pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers})
+	if err != nil {
+		return nil, err
+	}
+
+	r := &Dispatcher{
+		middleware: &adt.SyncMap[Protocol, *pubsub.Deque[Middleware]]{},
+		handlers:   &adt.SyncMap[Protocol, Handler]{},
+		broker:     broker,
+		pipe:       pipe,
+		conf:       conf,
+	}
+	r.ErrorObserver.Set(func(error) {})
+	r.handlers.DefaultConstructor.Constructor.Set(func() Handler {
+		return func(_ context.Context, m Message) (Response, error) {
+			return Response{ID: m.ID, Error: ErrNoHandler}, ErrNoHandler
+		}
+	})
+
+	r.middleware.DefaultConstructor.Constructor.Set(func() *pubsub.Deque[Middleware] {
+		return fun.Must(pubsub.NewDeque[Middleware](pubsub.DequeOptions{Unlimited: true}))
+	})
+
+	r.interceptor.DefaultConstructor.Constructor.Set(func() *pubsub.Deque[Interceptor] {
+		return fun.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
+	})
+
+	if err := r.registerServices(ctx); err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
-type Middleware func(context.Context, *Message) error
-type Interceptor func(context.Context, *Response) error
-type Handler func(context.Context, Message) (Response, error)
+func (r *Dispatcher) Service() *srv.Service { return r.services.Service() }
 
-type Router struct {
-	incoming *adt.SyncMap[RegistryKey, *pubsub.Deque[Middleware]]
-	outgoing *adt.SyncMap[RegistryKey, *pubsub.Deque[Interceptor]]
-	handlers *adt.SyncMap[RegistryKey, Handler]
-	broker   *pubsub.Broker[Response]
+func (r *Dispatcher) AddMiddleware(key Protocol, it Middleware) error {
+	return r.middleware.Get(key).PushBack(it)
 }
 
-func (r *Router) AddMiddleware(key RegistryKey, it Middleware) error {
-	return r.incoming.Get(key).PushBack(it)
+func (r *Dispatcher) AddInterceptor(key Protocol, it Interceptor) error {
+	return r.interceptor.Get(key).PushBack(it)
 }
-func (r *Router) AddInterceptor(key RegistryKey, it Interceptor) error {
-	return r.outgoing.Get(key).PushBack(it)
-}
-func (r *Router) RegisterHandler(key RegistryKey, hfn Handler)   { r.handlers.Store(key, hfn) }
-func (r *Router) Stream(ctx context.Context) <-chan Response     { return r.broker.Subscribe(ctx) }
-func (r *Router) Broadcast(ctx context.Context, m Message) error { return nil }
 
-func (r *Router) Exec(ctx context.Context, m Message) (*Response, bool) {
+func populateID(id string) string {
+	if id != "" {
+		return id
+	}
+	return GenerateID()
+}
+
+func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler)  { r.handlers.Store(key, hfn) }
+func (r *Dispatcher) Stream(ctx context.Context) <-chan Response { return r.broker.Subscribe(ctx) }
+
+func (r *Dispatcher) Broadcast(ctx context.Context, m Message) error {
+	if m.Protocol.IsZero() {
+		return ErrNoProtocol
+	}
+
+	m.ID = populateID(m.ID)
+	return r.pipe.WaitPushBack(ctx, m)
+}
+
+func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, bool) {
+	m.ID = populateID(m.ID)
+
 	sub := r.broker.Subscribe(ctx)
+	defer r.broker.Unsubscribe(ctx, sub)
+
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
 	out := make(chan Response)
 
 	// start a goroutine to listen for responses before sending
@@ -82,78 +134,147 @@ func (r *Router) Exec(ctx context.Context, m Message) (*Response, bool) {
 		}
 	}(m.ID)
 
-	_ = r.Broadcast(ctx, m)
-
-	select {
-	case <-ctx.Done():
+	if err := r.Broadcast(ctx, m); err != nil {
 		return nil, false
-	case r := <-out:
-		return &r, true
 	}
+
+	val, err := fun.ReadOne(ctx, out)
+	if err != nil {
+		return nil, false
+	}
+	return &val, true
 }
 
-var ErrNoHandler = errors.New("no handler defined")
+func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response) (err error) {
+	defer func() { err = erc.Merge(erc.RecoverError(), err) }()
 
-func (r *Router) dispatchIncomming(ctx context.Context, incoming <-chan Message) {
-	outQueue := pubsub.NewUnlimitedQueue[Response]()
-	handleQueue := fun.Must(pubsub.NewDeque[Message](pubsub.DequeOptions{Unlimited: true}))
-
-	// TODO run these worker pools in the background
-	// TODO properly size worker pools
-	_ = itertool.WorkerPool(ctx,
-		itertool.Transform(ctx, outQueue.Iterator(), func(rr Response) fun.WorkerFunc {
-			return func(ctx context.Context) error {
-				if icetp, ok := r.outgoing.Load(RegistryKey{Version: rr.Version, Schema: rr.Schema}); ok {
-					iter := icetp.Iterator()
-					for iter.Next(ctx) {
-						if err := iter.Value()(ctx, &rr); err != nil {
-							rr.Error = erc.Merge(rr.Error, err)
-							break
-						}
-					}
-					if err := iter.Close(); err != nil {
-						rr.Error = erc.Merge(rr.Error, err)
-					}
-				}
-
-				r.broker.Publish(ctx, rr)
-				return ctx.Err()
+	if icept, ok := r.interceptor.Load(key); ok {
+		iter := icept.Iterator()
+		for iter.Next(ctx) {
+			if err = iter.Value()(ctx, rr); err != nil {
+				return err
 			}
-		}),
-		itertool.Options{NumWorkers: 8},
-	)
-	_ = itertool.WorkerPool(ctx,
-		itertool.Transform(ctx, handleQueue.IteratorBlocking(), func(req Message) fun.WorkerFunc {
-			return func(ctx context.Context) error {
-				if mw, ok := r.incoming.Load(RegistryKey{Version: req.Version, Schema: req.Schema}); ok {
-					fun.Observe(ctx, mw.Iterator(), func(m Middleware) { m(ctx, &req) })
-				}
-				var resp Response
-				var err error
-				if h, ok := r.handlers.Load(RegistryKey{Version: req.Version, Schema: req.Schema}); ok {
-					resp, err = h(ctx, req)
-				} else {
-					err = ErrNoHandler
-				}
-
-				// if err is nil, Wrapf returns nil
-				resp.Error = erc.Wrapf(err, "name=%q version=%d", req.Version, req.Version)
-
-				return outQueue.Add(resp)
-			}
-		}),
-		itertool.Options{NumWorkers: 8},
-	)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case msg := <-incoming:
-			if err := handleQueue.WaitPushBack(ctx, msg); err != nil {
-				return
-			}
-			continue
+		}
+		if err = iter.Close(); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+func (r *Dispatcher) doMiddleware(ctx context.Context, key Protocol, req *Message) (err error) {
+	defer func() { err = erc.Merge(erc.RecoverError(), err) }()
+
+	if mw, ok := r.middleware.Load(key); ok {
+		iter := mw.Iterator()
+		for iter.Next(ctx) {
+			if err := iter.Value()(ctx, req); err != nil {
+				return err
+			}
+		}
+		if err := iter.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Dispatcher) doHandler(ctx context.Context, key Protocol, req Message) (resp Response) {
+	defer func() { resp.Error = erc.Merge(erc.RecoverError(), resp.Error) }()
+
+	h, ok := r.handlers.Load(key)
+	if !ok {
+		resp.Error = ErrNoHandler
+		return
+	}
+
+	var err error
+	resp, err = h(ctx, req)
+	if resp.Error != nil && !errors.Is(resp.Error, err) {
+		resp.Error = erc.Merge(err, resp.Error)
+	}
+
+	return
+}
+
+func (r *Dispatcher) registerServices(ctx context.Context) error {
+	ec := &erc.Collector{}
+
+	r.services.Name = fmt.Sprintf("Router<%s>", r.conf.Name)
+	ec.Add(r.services.Add(srv.Broker(r.broker)))
+	ec.Add(r.services.Add(&srv.Service{
+		Run:     func(ctx context.Context) error { <-ctx.Done(); return nil },
+		Cleanup: r.pipe.Close,
+	}))
+
+	// TODO config object to control the size of the worker pools
+	// and the buffering of the pipes between things
+	outQueue := pubsub.NewUnlimitedQueue[Response]()
+
+	// process outgoing message filters
+	ec.Add(r.services.Add(&srv.Service{
+		Shutdown: outQueue.Close,
+		Run: func(ctx context.Context) error {
+			return itertool.WorkerPool(ctx,
+				itertool.Transform(ctx, outQueue.Iterator(), func(rr Response) fun.WorkerFunc {
+					return func(ctx context.Context) error {
+						if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
+							rr.Error = err
+							r.broker.Publish(ctx, rr)
+							return ctx.Err()
+						}
+						if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
+							rr.Error = erc.Merge(err, rr.Error)
+						}
+
+						r.broker.Publish(ctx, rr)
+						return ctx.Err()
+					}
+				}),
+				itertool.Options{NumWorkers: r.conf.Workers},
+			)
+		},
+	}))
+
+	// process middleware and actual handler
+	ec.Add(r.services.Add(&srv.Service{
+		Shutdown: r.pipe.Close,
+		Run: func(ctx context.Context) error {
+			return itertool.WorkerPool(ctx,
+				itertool.Transform(ctx, r.pipe.IteratorBlocking(), func(req Message) fun.WorkerFunc {
+					return func(ctx context.Context) error {
+						var resp Response
+						var err error
+
+						id := req.ID
+						protocol := req.Protocol
+
+						if err = r.doMiddleware(ctx, Protocol{}, &req); err != nil {
+							resp.Error = err
+						} else if err = r.doMiddleware(ctx, protocol, &req); err != nil {
+							resp.Error = err
+						} else {
+							resp = r.doHandler(ctx, protocol, req)
+						}
+
+						resp.ID = id
+
+						if resp.Protocol.IsZero() {
+							resp.Protocol = protocol
+						}
+
+						if err != nil {
+							resp.Error = &Error{Err: err, ID: id, Protocol: protocol}
+							r.ErrorObserver.Get()(resp.Error)
+						}
+
+						return outQueue.Add(resp)
+					}
+				}),
+				itertool.Options{NumWorkers: r.conf.Workers},
+			)
+		},
+	}))
+
+	return ec.Resolve()
 }
