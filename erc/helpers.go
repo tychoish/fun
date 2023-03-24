@@ -95,6 +95,18 @@ func Recover(ec *Collector) {
 	}
 }
 
+func RecoverError() error {
+	if r := recover(); r != nil {
+		switch re := r.(type) {
+		case error:
+			return Merge(re, fun.ErrRecoveredPanic)
+		default:
+			return fmt.Errorf("%v: %w", re, fun.ErrRecoveredPanic)
+		}
+	}
+	return nil
+}
+
 // RecoverHook runs adds the output of recover() to the error
 // collector, and runs the specified hook if. If there was no panic,
 // this function is a noop. Run RecoverHook in defer statements.

@@ -18,14 +18,8 @@ type MapItem[K comparable, V any] struct {
 // type with key/value types enforced by generics. Additional
 // helpers (Append, Extend, Populate) support
 type SyncMap[K comparable, V any] struct {
-	MakeDefault Pool[V]
-	mp          sync.Map
-}
-
-func MakeSyncMap[K comparable, V any](in map[K]V) *SyncMap[K, V] {
-	mp := &SyncMap[K, V]{}
-	mp.Populate(in)
-	return mp
+	DefaultConstructor Pool[V]
+	mp                 sync.Map
 }
 
 func (mp *SyncMap[K, V]) Delete(key K)                { mp.mp.Delete(key) }
@@ -35,23 +29,23 @@ func (mp *SyncMap[K, V]) Swap(k K, v V) (any, bool)   { p, ok := mp.mp.Swap(k, v
 func (mp *SyncMap[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
 func (mp *SyncMap[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
 
-func (mp *SyncMap[K, V]) LoadAndDelete(k K) (V, bool) {
-	v, ok := mp.mp.LoadAndDelete(k)
-	return v.(V), ok
-}
-
-func (mp *SyncMap[K, V]) LoadOrStore(key K, val V) (V, bool) {
-	v, ok := mp.mp.LoadOrStore(key, val)
-	return v.(V), ok
+// Ensure is a noop if the key exists in the map or inserts the
+// default value produced by the DefaultConstructor pool.
+func (mp *SyncMap[K, V]) Ensure(key K) {
+	new := mp.DefaultConstructor.Get()
+	_, loaded := mp.mp.LoadOrStore(key, new)
+	if !loaded {
+		mp.DefaultConstructor.Put(new)
+	}
 }
 
 func (mp *SyncMap[K, V]) Get(key K) V {
-	new := mp.MakeDefault.Get()
-	out, loaded := mp.LoadOrStore(key, new)
+	new := mp.DefaultConstructor.Get()
+	out, loaded := mp.mp.LoadOrStore(key, new)
 	if !loaded {
-		mp.MakeDefault.Put(new)
+		mp.DefaultConstructor.Put(new)
 	}
-	return out
+	return out.(V)
 }
 
 func (mp *SyncMap[K, V]) Join(in *SyncMap[K, V]) {
@@ -71,8 +65,27 @@ func (mp *SyncMap[K, V]) Extend(its []MapItem[K, V]) {
 }
 
 func (mp *SyncMap[K, V]) StoreFrom(ctx context.Context, iter fun.Iterator[MapItem[K, V]]) {
-	fun.Observe(ctx, iter, mp.Set)
+	fun.Observe(ctx, iter, func(it MapItem[K, V]) { mp.Store(it.Key, it.Value) })
 }
+
+// TODO: could expose these lower level operations, of which I think
+// compare-and-swap is the only really meaningfully useful one.
+//
+// func (mp *SyncMap[K, V]) CompareAndSwap(key K, old, new V) bool {
+// 	return mp.mp.CompareAndSwap(key, old, new)
+// }
+//
+// func (mp *SyncMap[K, V]) CompareAndDelete(key, old K) bool { return mp.mp.CompareAndDelete(key, old) }
+//
+// func (mp *SyncMap[K, V]) LoadAndDelete(k K) (V, bool) {
+// 	v, ok := mp.mp.LoadAndDelete(k)
+// 	return v.(V), ok
+// }
+//
+// func (mp *SyncMap[K, V]) LoadOrStore(key K, val V) (V, bool) {
+// 	v, ok := mp.mp.LoadOrStore(key, val)
+// 	return v.(V), ok
+// }
 
 func (mp *SyncMap[K, V]) Range(f func(K, V) bool) {
 	mp.mp.Range(func(ak, av any) bool { return f(ak.(K), av.(V)) })
