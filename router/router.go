@@ -3,7 +3,6 @@ package router
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -35,7 +34,7 @@ type Dispatcher struct {
 
 func NewDispatcher(ctx context.Context, conf Config) (*Dispatcher, error) {
 	broker := pubsub.NewBroker[Response](ctx, pubsub.BrokerOptions{WorkerPoolSize: conf.Workers, ParallelDispatch: true})
-	pipe, err := pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers})
+	pipe, err := pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.getPipeCapacity()})
 	if err != nil {
 		return nil, err
 	}
@@ -199,10 +198,10 @@ func (r *Dispatcher) doHandler(ctx context.Context, key Protocol, req Message) (
 
 func (r *Dispatcher) registerServices(ctx context.Context) error {
 	ec := &erc.Collector{}
+	orca := srv.GetOrchestrator(ctx)
 
-	r.services.Name = fmt.Sprintf("Router<%s>", r.conf.Name)
-	ec.Add(r.services.Add(srv.Broker(r.broker)))
-	ec.Add(r.services.Add(&srv.Service{
+	ec.Add(orca.Add(srv.Broker(r.broker)))
+	ec.Add(orca.Add(&srv.Service{
 		Run:     func(ctx context.Context) error { <-ctx.Done(); return nil },
 		Cleanup: r.pipe.Close,
 	}))
@@ -237,11 +236,14 @@ func (r *Dispatcher) registerServices(ctx context.Context) error {
 	}))
 
 	// process middleware and actual handler
-	ec.Add(r.services.Add(&srv.Service{
+	ec.Add(orca.Add(&srv.Service{
 		Shutdown: r.pipe.Close,
 		Run: func(ctx context.Context) error {
 			return itertool.WorkerPool(ctx,
+				// convert an iterator of messages to an iterator of workers:
 				itertool.Transform(ctx, r.pipe.IteratorBlocking(), func(req Message) fun.WorkerFunc {
+					// each worker processes the message through its middlewares
+					// (in the pool) and then passes the message off to the dispatcher/outgoing pool
 					return func(ctx context.Context) error {
 						var resp Response
 						var err error

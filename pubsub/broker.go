@@ -139,10 +139,7 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 }
 
-func (b *Broker[T]) startQueueWorkers(
-	ctx context.Context,
-	dist Distributor[T],
-) {
+func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) {
 	subs := set.Synchronize(set.NewOrdered[chan T]())
 	b.wg.Add(1)
 	go func() {

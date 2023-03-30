@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/seq"
 )
 
 // Orchestrator manages groups of services and makes it possible to
@@ -98,15 +99,13 @@ func (or *Orchestrator) Service() *Service {
 
 	or.setup()
 
-	pipe := pubsub.NewUnlimitedQueue[*Service]()
+	pipe := &seq.List[*Service]{}
 	or.srv = &Service{
 		Name: or.Name,
 		Run: func(ctx context.Context) error {
 			ec := &erc.Collector{}
-			defer func() { ec.Add(pipe.Close()) }()
-
-			wg := &fun.WaitGroup{}
-
+			wg := fun.WaitGroup{}
+			var count int
 			for {
 				s, ok := or.input.Remove()
 				if !ok {
@@ -121,11 +120,21 @@ func (or *Orchestrator) Service() *Service {
 					}
 				}
 
-				fun.InvariantMust(pipe.Add(s), "adding to shutdown queue")
-
 				if s.Running() {
 					continue
 				}
+
+				count++
+				if count%100 == 0 && pipe.Len() > 100 && ctx.Err() != nil {
+					for e := pipe.Front(); e.Ok(); e = e.Next() {
+						if e.Value().Running() {
+							continue
+						}
+						e.Drop()
+					}
+				}
+
+				pipe.PushBack(s)
 				wg.Add(1)
 				go func(ss *Service) {
 					defer wg.Done()
@@ -163,14 +172,16 @@ func (or *Orchestrator) Service() *Service {
 
 			iter := pipe.Iterator()
 			wg := &fun.WaitGroup{}
+			s := seq.ListValues(pipe.IteratorPop())
+
 			for iter.Next(ctx) {
-				s := iter.Value()
-				if s != nil {
+				svc := s.Value()
+				if s != nil && svc.Running() {
 					wg.Add(1)
 					go func() {
 						defer erc.Recover(ec)
 						defer wg.Done()
-						ec.Add(s.Wait())
+						ec.Add(svc.Wait())
 					}()
 				}
 			}

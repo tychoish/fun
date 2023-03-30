@@ -185,8 +185,8 @@ func (e *Element[T]) Remove() bool {
 	return true
 }
 
-// Drop wraps remove, and additional, if the remove was successful,
-// drops the value, and sets the Ok value to false.
+// Drop wraps remove, and additionally, if the remove was successful,
+// drops the value and sets the Ok value to false.
 func (e *Element[T]) Drop() {
 	if !e.Remove() {
 		return

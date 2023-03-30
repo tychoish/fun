@@ -24,9 +24,10 @@ type Pool[T any] struct {
 	Constructor fun.Atomic[func() T]
 	hook        *fun.Atomic[func(T) T]
 	pool        *sync.Pool
+	once        sync.Once
 }
 
-func (p *Pool[T]) init() {
+func (p *Pool[T]) setupPool() {
 	if p.pool == nil {
 		p.pool = &sync.Pool{
 			New: func() any {
@@ -37,7 +38,6 @@ func (p *Pool[T]) init() {
 	if p.hook == nil {
 		p.hook = fun.NewAtomic(func(in T) T { return in })
 	}
-}
 
 // SetCleanupHook sets a function to be called on every object
 // renetering the pool. By default, the cleanup function is a noop.
