@@ -64,5 +64,4 @@ func BenchmarkPool(b *testing.B) {
 			}
 		}
 	})
-
 }

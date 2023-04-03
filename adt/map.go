@@ -23,12 +23,22 @@ type Map[K comparable, V any] struct {
 }
 
 func (mp *Map[K, V]) Delete(key K)                { mp.mp.Delete(key) }
-func (mp *Map[K, V]) Load(key K) (V, bool)        { v, ok := mp.mp.Load(key); return v.(V), ok }
 func (mp *Map[K, V]) Store(k K, v V)              { mp.mp.Store(k, v) }
 func (mp *Map[K, V]) Swap(k K, v V) (any, bool)   { p, ok := mp.mp.Swap(k, v); return p.(V), ok }
 func (mp *Map[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
 func (mp *Map[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
 func (mp *Map[K, V]) Ensure(key K)                { mp.EnsureDefault(key, mp.DefaultConstructor.Make) }
+func (mp *Map[K, V]) Contains(key K) bool         { _, ok := mp.mp.Load(key); return ok }
+
+func (mp *Map[K, V]) Load(key K) (V, bool) {
+	v, ok := mp.mp.Load(key)
+	if v == nil {
+		return fun.ZeroOf[V](), false
+
+	}
+	return v.(V), ok
+}
+
 func (mp *Map[K, V]) Get(key K) V {
 	new := mp.DefaultConstructor.Get()
 	out, loaded := mp.mp.LoadOrStore(key, new)

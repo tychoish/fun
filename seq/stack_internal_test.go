@@ -38,7 +38,7 @@ func TestStackInternal(t *testing.T) {
 
 		time.Sleep(time.Millisecond)
 
-		e := pool.Get().(*Item[string])
+		e := pool.Get()
 		// ensure that the finalizer resets the value,
 		// conversely. we have to keep an eye on the coverage
 		// here.

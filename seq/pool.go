@@ -3,9 +3,9 @@ package seq
 import (
 	"fmt"
 	"runtime"
-	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 )
 
 // this is a some what experimental pool for element objects.
@@ -15,35 +15,25 @@ import (
 // list/stack don't use them for Push operations. (the
 // NewElement/NewItem) methods do, just to prevent bitrot.
 
-var elemPoolsMtx *sync.Mutex
-var elemPools map[any]*sync.Pool
-
-var itemPoolsMtx *sync.Mutex
-var itemPools map[any]*sync.Pool
+var elemPools *adt.Map[string, any]
+var itemPools *adt.Map[string, any]
 
 func init() {
-	itemPoolsMtx = &sync.Mutex{}
-	itemPools = map[any]*sync.Pool{}
-
-	elemPoolsMtx = &sync.Mutex{}
-	elemPools = map[any]*sync.Pool{}
+	itemPools = &adt.Map[string, any]{}
+	elemPools = &adt.Map[string, any]{}
 }
 
-func getElementPool[T any](val T) *sync.Pool {
-	// beause types aren't comparble/values you can't use them as
-	// keys in maps, this is just a trick to get a string that's usable.
+func getElementPool[T any](val T) *adt.Pool[*Element[T]] {
 	key := fmt.Sprintf("%T", val)
-
-	elemPoolsMtx.Lock()
-	defer elemPoolsMtx.Unlock()
-
-	pool, ok := elemPools[key]
-	if ok {
-		return pool
+	if out, ok := elemPools.Load(key); ok {
+		return out.(*adt.Pool[*Element[T]])
 	}
 
-	pool = &sync.Pool{
-		New: func() any {
+	// beause types aren't comparble/values you can't use them as
+	// keys in maps, this is just a trick to get a string that's usable.
+	return elemPools.EnsureDefault(key, func() any {
+		pool := &adt.Pool[*Element[T]]{}
+		pool.Constructor.Set(func() *Element[T] {
 			e := &Element[T]{}
 			runtime.SetFinalizer(e, func(elem *Element[T]) {
 				elem.ok = false
@@ -51,38 +41,30 @@ func getElementPool[T any](val T) *sync.Pool {
 				go pool.Put(elem)
 			})
 			return e
-		},
-	}
+		})
 
-	elemPools[key] = pool
-	return pool
+		return pool
+	}).(*adt.Pool[*Element[T]])
 }
 
 func makeElement[T any](val T) *Element[T] { return getElement(getElementPool(val), val) }
 
-func getElement[T any](pool *sync.Pool, val T) *Element[T] {
-	elem := pool.Get().(*Element[T])
+func getElement[T any](pool *adt.Pool[*Element[T]], val T) *Element[T] {
+	elem := pool.Get()
 	elem.item = val
 	elem.ok = true
 	return elem
 }
 
-func getItemPool[T any](val T) *sync.Pool {
+func getItemPool[T any](val T) *adt.Pool[*Item[T]] {
 	key := fmt.Sprintf("%T", val)
-
-	var pool *sync.Pool
-	var ok bool
-
-	itemPoolsMtx.Lock()
-	defer itemPoolsMtx.Unlock()
-
-	pool, ok = itemPools[key]
-	if ok {
-		return pool
+	if out, ok := itemPools.Load(key); ok {
+		return out.(*adt.Pool[*Item[T]])
 	}
 
-	pool = &sync.Pool{
-		New: func() any {
+	return itemPools.EnsureDefault(key, func() any {
+		pool := &adt.Pool[*Item[T]]{}
+		pool.Constructor.Set(func() *Item[T] {
 			i := &Item[T]{}
 			runtime.SetFinalizer(i, func(item *Item[T]) {
 				item.ok = false
@@ -90,16 +72,15 @@ func getItemPool[T any](val T) *sync.Pool {
 				go pool.Put(item)
 			})
 			return i
-		},
-	}
-	itemPools[key] = pool
-	return pool
+		})
+		return pool
+	}).(*adt.Pool[*Item[T]])
 }
 
 func makeItem[T any](val T) *Item[T] { return getItem(getItemPool(val), val) }
 
-func getItem[T any](pool *sync.Pool, val T) *Item[T] {
-	item := pool.Get().(*Item[T])
+func getItem[T any](pool *adt.Pool[*Item[T]], val T) *Item[T] {
+	item := pool.Get()
 	item.value = val
 	item.ok = true
 
