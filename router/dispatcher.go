@@ -38,9 +38,9 @@ type Dispatcher struct {
 	ErrorObserver fun.Atomic[func(error)]
 
 	services    srv.Orchestrator
-	middleware  adt.SyncMap[Protocol, *pubsub.Deque[Middleware]]
-	interceptor adt.SyncMap[Protocol, *pubsub.Deque[Interceptor]]
-	handlers    adt.SyncMap[Protocol, Handler]
+	middleware  adt.Map[Protocol, *pubsub.Deque[Middleware]]
+	interceptor adt.Map[Protocol, *pubsub.Deque[Interceptor]]
+	handlers    adt.Map[Protocol, Handler]
 
 	isRunning atomic.Bool
 	// the broker and pipe are constructed when the service is
