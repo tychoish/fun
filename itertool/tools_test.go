@@ -601,18 +601,22 @@ func TestParallelObserve(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		for i := 1; i <= 8; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
-				elems := makeIntSlice(200)
+				elems := makeIntSlice(400)
 				seen := set.Synchronize(set.MakeNewOrdered[int]())
 				err := ParallelObserve(ctx,
 					Slice(elems),
 					func(in int) {
 						seen.Add(in)
-						if i%2 == 0 {
+						if i%4 == 0 {
 							// yield to make sure
 							// other threads can
 							// run sometimes
 							runtime.Gosched()
 						}
+						if i%8 == 0 {
+							time.Sleep(time.Microsecond)
+						}
+
 					},
 					Options{NumWorkers: i},
 				)
