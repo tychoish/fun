@@ -58,10 +58,10 @@ func TestAssertion(t *testing.T) {
 		assert.Failing(t, func(t *testing.T) { assert.Substring(t, "merlin the cat", "woof") })
 		assert.Failing(t, func(t *testing.T) { assert.NotSubstring(t, "the cat", "cat") })
 		assert.Failing(t, func(t *testing.T) {
-			assert.MaxRuntime(t, time.Microsecond, func() { time.Sleep(time.Millisecond) })
+			assert.MaxRuntime(t, time.Microsecond, func() { time.Sleep(10 * time.Millisecond) })
 		})
 		assert.Failing(t, func(t *testing.T) {
-			assert.MinRuntime(t, time.Millisecond, func() { time.Sleep(time.Microsecond) })
+			assert.MinRuntime(t, 10*time.Millisecond, func() { time.Sleep(time.Microsecond) })
 		})
 	})
 }

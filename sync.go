@@ -33,17 +33,6 @@ func (a *Atomic[T]) Swap(new T) (old T) {
 	return v.(T)
 }
 
-// IsAtomicZero checks an atomic value for a comparable type to see if
-// it's zero. The IsZero() function can't correctly check both that
-// the Atomic is zero and that it holds a zero value, and because
-// atomics need not be comparable this can't be a method on Atomic.
-func IsAtomicZero[T comparable, A *Atomic[T]](in *Atomic[T]) bool {
-	if in == nil {
-		return true
-	}
-	return IsZero(in.Get())
-}
-
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.WaitFunc). The
 // implementation is exceptionally simple. The only constraint is that

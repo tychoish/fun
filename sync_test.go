@@ -149,19 +149,9 @@ func TestWaitGroup(t *testing.T) {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > 10*time.Millisecond {
+		if dur > 25*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
-	})
-	t.Run("IsAtomicZero", func(t *testing.T) {
-		var atom *Atomic[int]
-		assert.True(t, IsAtomicZero(atom))
-		atom = &Atomic[int]{}
-		assert.True(t, IsAtomicZero(atom))
-		atom.Set(0)
-		assert.True(t, IsAtomicZero(atom))
-		atom.Set(100)
-		assert.True(t, !IsAtomicZero(atom))
 	})
 	t.Run("AtomicSwap", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

@@ -1,6 +1,7 @@
 package adt
 
 import (
+	"reflect"
 	"runtime"
 	"sync"
 
@@ -30,11 +31,7 @@ type Pool[T any] struct {
 func (p *Pool[T]) init() {
 	p.once.Do(func() {
 		p.hook = fun.NewAtomic(func(in T) T { return in })
-		p.pool = &sync.Pool{
-			New: func() any {
-				return p.Constructor.Get()()
-			},
-		}
+		p.pool = &sync.Pool{New: func() any { return p.Constructor.Get()() }}
 	})
 }
 
@@ -42,10 +39,9 @@ func (p *Pool[T]) init() {
 // renetering the pool. By default, the cleanup function is a noop.
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
-	if in == nil {
-		return
+	if in != nil {
+		p.hook.Set(in)
 	}
-	p.hook.Set(in)
 }
 
 // Get returns an object from the pool or constructs a default object
@@ -64,4 +60,14 @@ func (p *Pool[T]) Put(in T) { p.init(); p.pool.Put(p.hook.Get()(in)) }
 // Finalizer hooks are not automatically cleared by the Put()
 // operation, so objects retrieved with Make should not be passed
 // manually to Put().
-func (p *Pool[T]) Make() T { p.init(); o := p.pool.Get().(T); runtime.SetFinalizer(o, p.Put); return o }
+func (p *Pool[T]) Make() T {
+	p.init()
+	o := p.pool.Get().(T)
+	if reflect.ValueOf(o).Kind() == reflect.Pointer {
+		runtime.SetFinalizer(o, p.Put)
+	} else {
+		runtime.SetFinalizer(&o, func(in *T) { p.Put(*in) })
+	}
+
+	return o
+}
