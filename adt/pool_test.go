@@ -39,14 +39,14 @@ func TestPool(t *testing.T) {
 		p := &Pool[*poolTestType]{}
 		p.Constructor.Set(func() *poolTestType { return &poolTestType{} })
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 1000; i++ {
 			pgt := p.Get()
 			pgt.value = 100
 			p.Put(pgt)
 		}
 
 		seen := false
-		for i := 0; i < 10000; i++ {
+		for i := 0; i < 100000; i++ {
 			ppg := p.Make()
 			if ppg.value == 100 {
 				seen = true
