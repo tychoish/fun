@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/seq"
 )
 
 // Orchestrator manages groups of services and makes it possible to
@@ -99,13 +96,12 @@ func (or *Orchestrator) Service() *Service {
 
 	or.setup()
 
-	pipe := &seq.List[*Service]{}
 	or.srv = &Service{
 		Name: or.Name,
 		Run: func(ctx context.Context) error {
 			ec := &erc.Collector{}
-			wg := fun.WaitGroup{}
-			var count int
+			wg := &sync.WaitGroup{}
+
 			for {
 				s, ok := or.input.Remove()
 				if !ok {
@@ -121,72 +117,29 @@ func (or *Orchestrator) Service() *Service {
 				}
 
 				if s.Running() {
+					wg.Add(1)
+					go func(ss *Service) {
+						defer wg.Done()
+						ec.Add(ss.waitFor(ctx))
+					}(s)
 					continue
 				}
 
-				count++
-				if count%100 == 0 && pipe.Len() > 100 && ctx.Err() != nil {
-					for e := pipe.Front(); e.Ok(); e = e.Next() {
-						if e.Value().Running() {
-							continue
-						}
-						e.Drop()
-					}
+				if s.isFinished.Load() {
+					ec.Add(s.Wait())
+					continue
 				}
 
-				pipe.PushBack(s)
 				wg.Add(1)
 				go func(ss *Service) {
 					defer wg.Done()
-					defer erc.Recover(ec)
 
-					// note: we could easily choose to ignore this error.
-					// the cases where start fails are generally ok, and we
-					// are already going to track this service's shutdown.
-					if err := ss.Start(ctx); err != nil {
-						ec.Add(fmt.Errorf("problem starting %s: %w", ss.String(), err))
-					}
+					ec.Add(erc.Wrapf(ss.Start(ctx), "problem starting %s", ss.String()))
+					ec.Add(ss.waitFor(ctx))
 				}(s)
 			}
 
-			wg.Wait(ctx)
-			return ec.Resolve()
-		},
-		Cleanup: func() error {
-			ec := &erc.Collector{}
-
-			or.mtx.Lock()
-			defer or.mtx.Unlock()
-
-			defer erc.Recover(ec)
-			defer func() { ec.Add(or.input.Close()) }()
-
-			// this has to be a background context,
-			// because any context that we would have at
-			// this point would not be live. However, we
-			// know that the non-blocking iterator won't
-			// cause a hang and we want to get through all
-			// services' waiters.
-			ctx, cancel := context.WithCancel(internal.BackgroundContext)
-			defer cancel()
-
-			iter := pipe.Iterator()
-			wg := &fun.WaitGroup{}
-			s := seq.ListValues(pipe.IteratorPop())
-
-			for iter.Next(ctx) {
-				svc := s.Value()
-				if s != nil && svc.Running() {
-					wg.Add(1)
-					go func() {
-						defer erc.Recover(ec)
-						defer wg.Done()
-						ec.Add(svc.Wait())
-					}()
-				}
-			}
-			ec.Add(iter.Close())
-			wg.Wait(ctx)
+			wg.Wait()
 			return ec.Resolve()
 		},
 	}

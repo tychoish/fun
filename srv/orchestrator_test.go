@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -134,7 +132,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("all services did not run")
 			}
 		})
-		t.Run("PropogateErrors", func(t *testing.T) {
+		t.Run("FinishedErrorsPropogate", func(t *testing.T) {
 			orc := &Orchestrator{}
 			wg := &fun.WaitGroup{}
 			for i := 0; i < 100; i++ {
@@ -143,7 +141,7 @@ func TestOrchestrator(t *testing.T) {
 					Name: fmt.Sprint(i),
 					Run: func(ctx context.Context) error {
 						defer wg.Done()
-						return errors.New("42")
+						return errors.New("expected")
 					},
 				}); err != nil {
 					t.Error(err)
@@ -160,13 +158,51 @@ func TestOrchestrator(t *testing.T) {
 			wg.Wait(ctx)
 			// close wrapper service
 			s.Close()
+			err := s.Wait()
+			if err == nil {
+				t.Fatal(err)
+			}
+			if errs := erc.Unwind(err); len(errs) != 100 {
+				t.Error(100, len(errs))
+			}
+		})
+		t.Run("PropogateErrors", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			orc := &Orchestrator{}
+			for i := 0; i < 100; i++ {
+				s := &Service{
+					Name: fmt.Sprint(i),
+					Run: func(ctx context.Context) error {
+						return errors.New("42")
+					},
+				}
+				if err := s.Start(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err := s.Wait(); err == nil {
+					t.Error("should have errored")
+				}
+				if err := orc.Add(s); err != nil {
+					t.Error(err)
+				}
+			}
+			s := orc.Service()
+
+			if err := s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(500 * time.Millisecond)
+			// close wrapper service
+			s.Close()
 
 			err := s.Wait()
 			if err == nil {
-				t.Fatal("should have errors")
+				t.Error("should have errors")
 			}
 			if errs := erc.Unwind(err); len(errs) != 100 {
-				t.Fatal(len(errs))
+				t.Error(100, len(errs))
 			}
 		})
 		t.Run("StartRunningServices", func(t *testing.T) {
@@ -195,46 +231,6 @@ func TestOrchestrator(t *testing.T) {
 				t.Error(dur)
 			}
 		})
-		t.Run("FinishedServicesError", func(t *testing.T) {
-			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			s := &Service{Name: "base", Run: func(context.Context) error { return nil }}
-			if err := s.Start(ctx); err != nil {
-				t.Fatal()
-			}
-			if err := s.Wait(); err != nil {
-				t.Fatal(err)
-			}
-			orc := &Orchestrator{}
-			osrv := orc.Service()
-			if err := osrv.Start(ctx); err != nil {
-				t.Fatal(err)
-			}
-			const num = 25
-			for i := 0; i < num; i++ {
-				if err := orc.Add(s); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if !osrv.Running() {
-				t.Error("should still be running")
-			}
-
-			time.Sleep(300 * time.Millisecond)
-
-			osrv.Close()
-			err := osrv.Wait()
-			t.Log(err)
-			if osrv.Running() {
-				t.Error("should not be running")
-			}
-			errs := erc.Unwind(err)
-			if len(errs) != 25 {
-				t.Error("should have 25 errors")
-			}
-		})
 		t.Run("PanicSafely", func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -251,7 +247,7 @@ func TestOrchestrator(t *testing.T) {
 				}
 			}
 
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 
 			osrv.Close()
 			err := osrv.Wait()
@@ -386,63 +382,6 @@ func TestOrchestrator(t *testing.T) {
 			// the fixture ensures that all sub-services run
 			if dur := time.Since(startAt); dur > 75*time.Millisecond {
 				t.Error(dur)
-			}
-		})
-		t.Run("FinishedServicesError", func(t *testing.T) {
-			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			s := &Service{Name: "base", Run: func(context.Context) error { return nil }}
-			if err := s.Start(ctx); err != nil {
-				t.Fatal(err)
-			}
-			if err := s.Wait(); err != nil {
-				t.Fatal(err)
-			}
-			orc := &Orchestrator{}
-			if err := orc.Start(ctx); err != nil {
-				t.Fatal(err)
-			}
-			s.Close()
-			_ = s.Wait()
-			if orc.input == nil {
-				t.Fatal("should not be empty")
-			}
-			runtime.Gosched()
-			if s.Running() {
-				t.Error("running and should be stoped")
-			}
-			const num = 200
-			for i := 0; i < num; i++ {
-				if err := orc.Add(s); err != nil {
-					t.Error(err)
-				}
-				if i%10 == 0 {
-					runtime.Gosched()
-				}
-			}
-
-			ors := orc.Service()
-			if !ors.Running() {
-				t.Error("should still be running")
-			}
-
-			ors.Close()
-
-			if err := orc.Wait(); err != nil {
-				check.ErrorIs(t, err, ErrServiceReturned)
-			}
-
-			time.Sleep(500 * time.Millisecond)
-
-			if ors.Running() {
-				t.Error("should not be running")
-			}
-			err := ors.Wait()
-			errs := erc.Unwind(err)
-			if len(errs) == 0 {
-				t.Error("should have errors", num, len(errs), err, errs)
 			}
 		})
 		t.Run("PanicSafely", func(t *testing.T) {

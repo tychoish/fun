@@ -15,18 +15,21 @@ func makeBlockingService(t *testing.T) *Service {
 	fired := &atomic.Bool{}
 
 	t.Cleanup(func() {
+		t.Helper()
 		if !fired.Load() {
-			t.Error("should run shutdown")
+			t.Error("should run cleanup")
 		}
 	})
 
 	return &Service{
 		Name: t.Name(),
-		Cleanup: func() error {
+		Shutdown: func() error {
+			t.Helper()
 			fired.Store(true)
 			return nil
 		},
 		Run: func(ctx context.Context) error {
+			t.Helper()
 			timer := testt.Timer(t, 24*time.Hour)
 			select {
 			case <-timer.C:

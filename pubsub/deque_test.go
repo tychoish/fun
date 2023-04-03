@@ -867,6 +867,8 @@ func TestDequeIntegration(t *testing.T) {
 				runtime.Gosched()
 			}
 		}
+		time.Sleep(100 * time.Millisecond)
+		runtime.Gosched()
 		wg.Add(1)
 		go func(iter fun.Iterator[int64]) {
 			defer wg.Done()
@@ -877,14 +879,14 @@ func TestDequeIntegration(t *testing.T) {
 			}
 		}(queue.Iterator())
 
-		ticker := testt.Ticker(t, 2*time.Millisecond)
+		ticker := testt.Ticker(t, 50*time.Millisecond)
 		timeout := testt.Timer(t, 1000*time.Millisecond)
 
 	WAIT:
 		for {
 			select {
 			case <-signal:
-				t.Log("wait group returned", input.Load(), counter.Load())
+				t.Log("wait group returned", input.Load(), counter.Load(), wg.Num())
 				break WAIT
 			case <-ticker.C:
 				cur := input.Load()
@@ -896,6 +898,7 @@ func TestDequeIntegration(t *testing.T) {
 					break WAIT
 				}
 			case <-timeout.C:
+				assert.NotError(t, queue.Close())
 				if wg.Num() == 0 {
 					t.Log("hit timeout, but workers returned")
 					break WAIT

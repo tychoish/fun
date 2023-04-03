@@ -3,8 +3,11 @@ package internal
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/assert"
 )
 
 func makeClosedSlice[T any](in []T) <-chan T {
@@ -207,4 +210,57 @@ func TestIterators(t *testing.T) {
 
 		}
 	})
+	t.Run("SendOne", func(t *testing.T) {
+		t.Run("BlockingHelper", func(t *testing.T) {
+			if Blocking(true) != SendModeBlocking {
+				t.Error("blocking true is not blocking")
+			}
+			if Blocking(false) != SendModeNonBlocking {
+				t.Error("blocking false is blocking")
+			}
+		})
+		t.Run("Send", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan int, 2)
+			err := SendOne(ctx, Blocking(true), ch, 1)
+			assert.NotError(t, err)
+			assert.Equal(t, <-ch, 1)
+
+			err = SendOne(ctx, Blocking(false), ch, 3)
+			assert.NotError(t, err)
+			assert.Equal(t, <-ch, 3)
+		})
+		t.Run("NonBlocking", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan int)
+
+			err := SendOne(ctx, Blocking(false), ch, 3)
+			assert.NotError(t, err)
+			close(ch)
+			out, ok := <-ch
+			assert.True(t, !ok)
+			assert.Zero(t, out)
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			ch := make(chan int)
+
+			err := SendOne(ctx, Blocking(true), ch, 1)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+			err = SendOne(ctx, Blocking(false), ch, 1)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+			err = SendOne(ctx, SendMode(42), ch, 1)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, io.EOF)
+		})
+
+	})
+
 }

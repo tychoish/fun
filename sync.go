@@ -25,7 +25,24 @@ func (a *Atomic[T]) Get() T { return ZeroWhenNil[T](a.val.Load()) }
 // exchanging the new value for the old. Unlike sync.Atomic.Swap() if
 // new is nil, fun.Atomic.Swap() does NOT panic, and instead
 // constructs the zero value of type T.
-func (a *Atomic[T]) Swap(new T) (old T) { return a.val.Swap(ZeroWhenNil[T](new)).(T) }
+func (a *Atomic[T]) Swap(new T) (old T) {
+	v := a.val.Swap(ZeroWhenNil[T](new))
+	if v == nil {
+		return old
+	}
+	return v.(T)
+}
+
+// IsAtomicZero checks an atomic value for a comparable type to see if
+// it's zero. The IsZero() function can't correctly check both that
+// the Atomic is zero and that it holds a zero value, and because
+// atomics need not be comparable this can't be a method on Atomic.
+func IsAtomicZero[T comparable, A *Atomic[T]](in *Atomic[T]) bool {
+	if in == nil {
+		return true
+	}
+	return IsZero(in.Get())
+}
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.WaitFunc). The

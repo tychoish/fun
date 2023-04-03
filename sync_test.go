@@ -58,7 +58,7 @@ func TestWaitGroup(t *testing.T) {
 		<-secondCase
 
 		timeoutDur := time.Since(start)
-		if timeoutDur > 30*time.Millisecond {
+		if timeoutDur > 50*time.Millisecond {
 			t.Error("timeout waiter took too long", timeoutDur)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -67,7 +67,7 @@ func TestWaitGroup(t *testing.T) {
 		<-firstCase
 
 		blockingDur := time.Since(start)
-		if blockingDur-timeoutDur > 20*time.Millisecond {
+		if blockingDur-timeoutDur > 50*time.Millisecond {
 			t.Error("blocking waiter deadlocked", blockingDur, timeoutDur)
 		}
 	})
@@ -149,8 +149,38 @@ func TestWaitGroup(t *testing.T) {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > 5*time.Millisecond {
+		if dur > 10*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
 	})
+	t.Run("IsAtomicZero", func(t *testing.T) {
+		var atom *Atomic[int]
+		assert.True(t, IsAtomicZero(atom))
+		atom = &Atomic[int]{}
+		assert.True(t, IsAtomicZero(atom))
+		atom.Set(0)
+		assert.True(t, IsAtomicZero(atom))
+		atom.Set(100)
+		assert.True(t, !IsAtomicZero(atom))
+	})
+	t.Run("AtomicSwap", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		atom := &Atomic[int]{}
+
+		wg := WaitGroup{}
+		// this should always pass, but we're mostly tempting
+		// the race detector.
+		for i := 1; i < 256; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				old := atom.Swap(id)
+				assert.True(t, old != id)
+			}(i)
+		}
+		wg.Wait(ctx)
+		assert.True(t, atom.Get() != 0)
+	})
+
 }

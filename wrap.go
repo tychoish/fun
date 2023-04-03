@@ -1,6 +1,8 @@
 package fun
 
-import "github.com/tychoish/fun/internal"
+import (
+	"github.com/tychoish/fun/internal"
+)
 
 // Is a generic version of `errors.Is` that takes advantage of the
 // Unwrap function, and is useful for checking if an object of an
@@ -69,10 +71,6 @@ func IsZero[T comparable](in T) bool {
 	switch val := any(in).(type) {
 	case interface{ IsZero() bool }:
 		return val.IsZero()
-	case *Atomic[T]:
-		return val == nil || IsZero(val.Get())
-	case nil:
-		return true
 	default:
 		return in == Zero(in)
 	}
