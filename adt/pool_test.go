@@ -45,6 +45,8 @@ func TestPool(t *testing.T) {
 
 		seen := false
 
+		seen := false
+
 		for i := 0; i < 1000; i++ {
 			pgt := p.Get()
 			if pgt.value == 100 {
