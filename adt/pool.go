@@ -22,22 +22,21 @@ import (
 // the Constructor before calling Get() or Make() on the pool.
 type Pool[T any] struct {
 	Constructor fun.Atomic[func() T]
+	once        sync.Once
 	hook        *fun.Atomic[func(T) T]
 	pool        *sync.Pool
-	once        sync.Once
 }
 
-func (p *Pool[T]) setupPool() {
-	if p.pool == nil {
+func (p *Pool[T]) init() {
+	p.once.Do(func() {
+		p.hook = fun.NewAtomic(func(in T) T { return in })
 		p.pool = &sync.Pool{
 			New: func() any {
 				return p.Constructor.Get()()
 			},
 		}
-	}
-	if p.hook == nil {
-		p.hook = fun.NewAtomic(func(in T) T { return in })
-	}
+	})
+}
 
 // SetCleanupHook sets a function to be called on every object
 // renetering the pool. By default, the cleanup function is a noop.

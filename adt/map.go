@@ -28,7 +28,7 @@ func (mp *SyncMap[K, V]) Store(k K, v V)              { mp.mp.Store(k, v) }
 func (mp *SyncMap[K, V]) Swap(k K, v V) (any, bool)   { p, ok := mp.mp.Swap(k, v); return p.(V), ok }
 func (mp *SyncMap[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
 func (mp *SyncMap[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
-func (mp *SyncMap[K, V]) Ensure(key K)                { _, _ = mp.LoadOrStore(key, mp.MakeDefault.Make()) }
+func (mp *SyncMap[K, V]) Ensure(key K)                { _, _ = mp.mp.LoadOrStore(key, mp.DefaultConstructor.Make()) }
 func (mp *SyncMap[K, V]) Get(key K) V {
 	new := mp.DefaultConstructor.Get()
 	out, loaded := mp.mp.LoadOrStore(key, new)
