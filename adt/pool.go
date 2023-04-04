@@ -22,16 +22,17 @@ import (
 // Pool can be used with default construction; however, you should set
 // the Constructor before calling Get() or Make() on the pool.
 type Pool[T any] struct {
-	Constructor fun.Atomic[func() T]
 	once        sync.Once
-	hook        *fun.Atomic[func(T) T]
+	hook        *Atomic[func(T) T]
+	constructor *Atomic[func() T]
 	pool        *sync.Pool
 }
 
 func (p *Pool[T]) init() {
 	p.once.Do(func() {
-		p.hook = fun.NewAtomic(func(in T) T { return in })
-		p.pool = &sync.Pool{New: func() any { return p.Constructor.Get()() }}
+		p.hook = NewAtomic(func(in T) T { return in })
+		p.constructor = NewAtomic(func() T { return fun.ZeroOf[T]() })
+		p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
 	})
 }
 
@@ -41,6 +42,13 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
 	if in != nil {
 		p.hook.Set(in)
+	}
+}
+
+func (p *Pool[T]) SetConstructor(in func() T) {
+	p.init()
+	if in != nil {
+		p.constructor.Set(in)
 	}
 }
 

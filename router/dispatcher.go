@@ -35,7 +35,7 @@ type Dispatcher struct {
 	//
 	// Callers can modify the value at any time, and the
 	// NewDispatcher constructor creates a noop observer.
-	ErrorObserver fun.Atomic[func(error)]
+	ErrorObserver adt.Atomic[func(error)]
 
 	services    srv.Orchestrator
 	middleware  adt.Map[Protocol, *pubsub.Deque[Middleware]]
@@ -78,17 +78,17 @@ func NewDispatcher(conf Config) (*Dispatcher, error) {
 	}
 	r.services.Name = conf.Name
 	r.ErrorObserver.Set(func(error) {})
-	r.handlers.DefaultConstructor.Constructor.Set(func() Handler {
+	r.handlers.Default.SetConstructor(func() Handler {
 		return func(_ context.Context, m Message) (Response, error) {
 			return Response{ID: m.ID, Error: ErrNoHandler}, ErrNoHandler
 		}
 	})
 
-	r.middleware.DefaultConstructor.Constructor.Set(func() *pubsub.Deque[Middleware] {
+	r.middleware.Default.SetConstructor(func() *pubsub.Deque[Middleware] {
 		return fun.Must(pubsub.NewDeque[Middleware](pubsub.DequeOptions{Unlimited: true}))
 	})
 
-	r.interceptor.DefaultConstructor.Constructor.Set(func() *pubsub.Deque[Interceptor] {
+	r.interceptor.Default.SetConstructor(func() *pubsub.Deque[Interceptor] {
 		return fun.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
 	})
 

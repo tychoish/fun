@@ -2,6 +2,7 @@ package adt
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -14,36 +15,42 @@ type MapItem[K comparable, V any] struct {
 	Value V
 }
 
-// Map provides a wrapper around the standard library's sync.Map
-// type with key/value types enforced by generics. Additional
-// helpers (Append, Extend, Populate) support
+// Map provides a wrapper around the standard library's sync.Map type
+// with key/value types enforced by generics. Additional helpers
+// (Append, Extend, Populate) support adding multiple items to the
+// map, while Iterator and StoreFrom provide compatibility with
+// iterators.
 type Map[K comparable, V any] struct {
-	DefaultConstructor Pool[V]
-	mp                 sync.Map
+	// Default handles construction and pools objects in
+	// the map for the Ensure and Get operations which must
+	// construct zero-value items. No configuration or
+	// construction is necessary; however, callers can modify the
+	// default value constructed as needed.
+	Default Pool[V]
+	mp      sync.Map
 }
 
 func (mp *Map[K, V]) Delete(key K)                { mp.mp.Delete(key) }
 func (mp *Map[K, V]) Store(k K, v V)              { mp.mp.Store(k, v) }
-func (mp *Map[K, V]) Swap(k K, v V) (any, bool)   { p, ok := mp.mp.Swap(k, v); return p.(V), ok }
 func (mp *Map[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
 func (mp *Map[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
-func (mp *Map[K, V]) Ensure(key K)                { mp.EnsureDefault(key, mp.DefaultConstructor.Make) }
+func (mp *Map[K, V]) Ensure(key K)                { mp.EnsureDefault(key, mp.Default.Make) }
 func (mp *Map[K, V]) Contains(key K) bool         { _, ok := mp.mp.Load(key); return ok }
+func (mp *Map[K, V]) Load(key K) (V, bool)        { return mp.safeCast(mp.mp.Load(key)) }
+func (mp *Map[K, V]) Swap(k K, v V) (V, bool)     { return mp.safeCast(mp.mp.Swap(k, v)) }
 
-func (mp *Map[K, V]) Load(key K) (V, bool) {
-	v, ok := mp.mp.Load(key)
+func (mp *Map[K, V]) safeCast(v any, ok bool) (V, bool) {
 	if v == nil {
 		return fun.ZeroOf[V](), false
-
 	}
 	return v.(V), ok
 }
 
 func (mp *Map[K, V]) Get(key K) V {
-	new := mp.DefaultConstructor.Get()
+	new := mp.Default.Get()
 	out, loaded := mp.mp.LoadOrStore(key, new)
 	if !loaded {
-		mp.DefaultConstructor.Put(new)
+		mp.Default.Put(new)
 	}
 	return out.(V)
 }
@@ -54,13 +61,30 @@ func (mp *Map[K, V]) EnsureDefault(key K, constr func() V) V {
 }
 
 func (mp *Map[K, V]) Join(in *Map[K, V]) {
-	mp.Range(func(k K, v V) bool { mp.Store(k, v); return true })
+	in.Range(func(k K, v V) bool { mp.Store(k, v); return true })
 }
 
 func (mp *Map[K, V]) Populate(in map[K]V) {
 	for k := range in {
 		mp.Store(k, in[k])
 	}
+}
+
+func (mp *Map[K, V]) Export() map[K]V {
+	out := map[K]V{}
+	mp.Range(func(k K, v V) bool { out[k] = v; return true })
+	return out
+}
+
+func (mp *Map[K, V]) MarshalJSON() ([]byte, error) { return json.Marshal(mp.Export()) }
+
+func (mp *Map[K, V]) UnmashsalJSON(in []byte) error {
+	out := map[K]V{}
+	if err := json.Unmarshal(in, &out); err != nil {
+		return err
+	}
+	mp.Populate(out)
+	return nil
 }
 
 func (mp *Map[K, V]) Extend(its []MapItem[K, V]) {

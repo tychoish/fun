@@ -124,7 +124,7 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("EnsureSemantics", func(t *testing.T) {
 		mp := &Map[int, int]{}
-		mp.DefaultConstructor.Constructor.Set(func() int { return 42 })
+		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 100; i++ {
 			mp.Set(MapItem[int, int]{Key: i, Value: rand.Int() + 43})
 		}
@@ -150,7 +150,7 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("Iterator", func(t *testing.T) {
 		mp := &Map[int, int]{}
-		mp.DefaultConstructor.Constructor.Set(func() int { return 42 })
+		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 200; i++ {
 			mp.Ensure(i)
 		}
@@ -172,5 +172,156 @@ func TestMap(t *testing.T) {
 		assert.NotError(t, iter.Close())
 		assert.Equal(t, count, 100)
 	})
+	t.Run("Contains", func(t *testing.T) {
+		mp := &Map[string, int]{}
+		mp.Store("foo", 100)
+		mp.Store("bar", 42)
+		assert.Equal(t, 2, mp.Len())
+		assert.True(t, mp.Contains("foo"))
+		assert.True(t, mp.Contains("bar"))
+		assert.True(t, !mp.Contains("baz"))
+		assert.Equal(t, 2, mp.Len())
+	})
+	t.Run("Get", func(t *testing.T) {
+		mp := &Map[string, int]{}
+		assert.Zero(t, mp.Len())
+		val := mp.Get("foo")
+		assert.Zero(t, val)
+		assert.Equal(t, 1, mp.Len())
+		mp.Default.SetConstructor(func() int { return 42 })
+		_ = mp.Default.Get()
+		_ = mp.Default.Get()
+		_ = mp.Default.Get()
+		val = mp.Get("bar")
+		assert.Equal(t, 42, val)
+		val = mp.Get("foo")
+		assert.Zero(t, val)
+	})
+	t.Run("Join", func(t *testing.T) {
+		t.Run("Disjoint", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			mp.Store("bar", 100)
+			mp2 := &Map[string, int]{}
+			mp2.Store("foofoo", 100)
+			mp2.Store("barfoo", 100)
+			assert.Equal(t, 2, mp.Len())
+			assert.Equal(t, 2, mp2.Len())
 
+			// the op:
+			mp.Join(mp2)
+
+			assert.Equal(t, 2, mp2.Len())
+			assert.Equal(t, 4, mp.Len())
+		})
+		t.Run("Overlapping", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			mp.Store("bar", 100)
+			mp2 := &Map[string, int]{}
+			mp2.Store("foo", 500)
+			mp2.Store("baz", 100)
+			assert.Equal(t, 2, mp.Len())
+			assert.Equal(t, 2, mp2.Len())
+
+			// the op:
+			mp.Join(mp2)
+
+			assert.Equal(t, 2, mp2.Len())
+			assert.Equal(t, 3, mp.Len())
+			assert.Equal(t, mp.Get("foo"), 500)
+		})
+	})
+	t.Run("StoreFrom", func(t *testing.T) {
+		t.Run("Disjoint", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			mp.Store("bar", 100)
+			mp2 := &Map[string, int]{}
+			mp2.Store("foofoo", 100)
+			mp2.Store("barfoo", 100)
+			assert.Equal(t, 2, mp.Len())
+			assert.Equal(t, 2, mp2.Len())
+
+			// the op:
+			mp.StoreFrom(testt.Context(t), mp2.Iterator())
+
+			assert.Equal(t, 2, mp2.Len())
+			assert.Equal(t, 4, mp.Len())
+		})
+		t.Run("Overlapping", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			mp.Store("bar", 100)
+			mp2 := &Map[string, int]{}
+			mp2.Store("foo", 500)
+			mp2.Store("baz", 100)
+			assert.Equal(t, 2, mp.Len())
+			assert.Equal(t, 2, mp2.Len())
+
+			// the op:
+			mp.StoreFrom(testt.Context(t), mp2.Iterator())
+
+			assert.Equal(t, 2, mp2.Len())
+			assert.Equal(t, 3, mp.Len())
+			assert.Equal(t, mp.Get("foo"), 500)
+		})
+	})
+	t.Run("Populate", func(t *testing.T) {
+		t.Run("Disjoint", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			mp.Store("bar", 100)
+			mp2 := map[string]int{
+				"foofoo": 100,
+				"barfoo": 100,
+			}
+			assert.Equal(t, 2, mp.Len())
+			assert.Equal(t, 2, len(mp2))
+			mp.Populate(mp2)
+			assert.Equal(t, 4, mp.Len())
+			assert.Equal(t, 2, len(mp2))
+		})
+		t.Run("Overlapping", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			mp.Store("bar", 100)
+			mp2 := map[string]int{
+				"foo": 500,
+				"baz": 100,
+			}
+			assert.Equal(t, 2, mp.Len())
+			assert.Equal(t, 2, len(mp2))
+			mp.Populate(mp2)
+			assert.Equal(t, 2, len(mp2))
+			assert.Equal(t, 3, mp.Len())
+			assert.Equal(t, mp.Get("foo"), 500)
+		})
+	})
+	t.Run("Swap", func(t *testing.T) {
+		t.Run("Exists", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+
+			out, ok := mp.Swap("foo", 200)
+			assert.True(t, ok)
+			assert.Equal(t, 100, out)
+
+			out, ok = mp.Load("foo")
+			assert.True(t, ok)
+			assert.Equal(t, 200, out)
+		})
+		t.Run("Unknown", func(t *testing.T) {
+			mp := &Map[string, int]{}
+
+			out, ok := mp.Swap("foo", 200)
+			assert.True(t, !ok)
+			assert.Equal(t, 0, out)
+
+			out, ok = mp.Load("foo")
+			assert.True(t, ok)
+			assert.Equal(t, 200, out)
+		})
+
+	})
 }

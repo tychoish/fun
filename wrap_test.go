@@ -69,19 +69,6 @@ func TestZeroHelpers(t *testing.T) {
 		assert.True(t, IsZero(""))
 		assert.True(t, IsZero(time.Time{}))
 	})
-	t.Run("AtomicTypes", func(t *testing.T) {
-		assert.True(t, IsZero[*Atomic[int]](nil))
-		var f *Atomic[int]
-		assert.True(t, IsZero(f))
-		f = &Atomic[int]{}
-		// ideally this should be
-		// true, but...
-		assert.True(t, !IsZero(f))
-		// clearly true
-		assert.True(t, IsZero(f.Get()))
-		f = (*Atomic[int])(NewAtomic(100))
-		assert.True(t, !IsZero(f))
-	})
 	t.Run("OrNil", func(t *testing.T) {
 		assert.Zero(t, ZeroWhenNil[int](any(0)))
 		assert.True(t, ZeroWhenNil[bool](any(true)))

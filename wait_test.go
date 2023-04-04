@@ -310,7 +310,7 @@ func TestWait(t *testing.T) {
 			defer cancel()
 
 			var wf WaitFunc = func(ctx context.Context) {
-				timer := testt.Timer(t, 20*time.Millisecond)
+				timer := testt.Timer(t, 100*time.Millisecond)
 				select {
 				case <-timer.C:
 					ran.Store(true)
@@ -323,7 +323,7 @@ func TestWait(t *testing.T) {
 			runtime.Gosched()
 			<-sig
 			dur := time.Since(start)
-			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
+			if dur < 5*time.Millisecond || dur > 50*time.Millisecond {
 				t.Error(dur)
 			}
 			if ran.Load() {

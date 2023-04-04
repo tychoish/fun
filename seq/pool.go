@@ -33,7 +33,7 @@ func getElementPool[T any](val T) *adt.Pool[*Element[T]] {
 	// keys in maps, this is just a trick to get a string that's usable.
 	return elemPools.EnsureDefault(key, func() any {
 		pool := &adt.Pool[*Element[T]]{}
-		pool.Constructor.Set(func() *Element[T] {
+		pool.SetConstructor(func() *Element[T] {
 			e := &Element[T]{}
 			runtime.SetFinalizer(e, func(elem *Element[T]) {
 				elem.ok = false
@@ -64,7 +64,7 @@ func getItemPool[T any](val T) *adt.Pool[*Item[T]] {
 
 	return itemPools.EnsureDefault(key, func() any {
 		pool := &adt.Pool[*Item[T]]{}
-		pool.Constructor.Set(func() *Item[T] {
+		pool.SetConstructor(func() *Item[T] {
 			i := &Item[T]{}
 			runtime.SetFinalizer(i, func(item *Item[T]) {
 				item.ok = false

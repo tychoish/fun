@@ -6,25 +6,7 @@ import (
 	"runtime"
 	"testing"
 	"time"
-
-	"github.com/tychoish/fun/assert"
 )
-
-func TestAtomic(t *testing.T) {
-	t.Run("Default", func(t *testing.T) {
-		at := NewAtomic(1000)
-		assert.Equal(t, at.Get(), 1000)
-	})
-	t.Run("Zero", func(t *testing.T) {
-		at := &Atomic[int]{}
-		assert.Equal(t, at.Get(), 0)
-	})
-	t.Run("RoundTrip", func(t *testing.T) {
-		at := &Atomic[int]{}
-		at.Set(42)
-		assert.Equal(t, at.Get(), 42)
-	})
-}
 
 func TestWaitGroup(t *testing.T) {
 	t.Parallel()
@@ -152,25 +134,6 @@ func TestWaitGroup(t *testing.T) {
 		if dur > 25*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
-	})
-	t.Run("AtomicSwap", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		atom := &Atomic[int]{}
-
-		wg := WaitGroup{}
-		// this should always pass, but we're mostly tempting
-		// the race detector.
-		for i := 1; i < 256; i++ {
-			wg.Add(1)
-			go func(id int) {
-				defer wg.Done()
-				old := atom.Swap(id)
-				assert.True(t, old != id)
-			}(i)
-		}
-		wg.Wait(ctx)
-		assert.True(t, atom.Get() != 0)
 	})
 
 }
