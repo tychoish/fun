@@ -1,3 +1,6 @@
+// Package adt provides "atomic data types" as strongly-typed generic
+// helpers for simple atomic operations (including sync.Map,
+// sync.Pool, and a typed value).
 package adt
 
 import (
