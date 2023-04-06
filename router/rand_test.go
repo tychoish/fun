@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -36,9 +37,21 @@ func TestMessageIDs(t *testing.T) {
 			check.Zero(t, count)
 			check.Zero(t, rs)
 		})
-
+		t.Run("Incorrect", func(t *testing.T) {
+			for _, str := range []string{
+				"a-a-a-a",
+				"1-a-a-a",
+			} {
+				id := MessageID(str)
+				ts, host, count, rs, err := id.Parse()
+				check.Error(t, err)
+				check.Zero(t, ts)
+				check.Zero(t, host)
+				check.Zero(t, count)
+				check.Zero(t, rs)
+			}
+		})
 	})
-
 	t.Run("StableLength", func(t *testing.T) {
 		defer resetCounter()
 
@@ -56,4 +69,28 @@ func TestMessageIDs(t *testing.T) {
 		}
 		assert.Equal(t, seen.Len(), iters)
 	})
+	t.Run("PopulateHelper", func(t *testing.T) {
+		t.Run("NonZero", func(t *testing.T) {
+			for _, str := range []string{"foo", "kip", "merlin", "cat"} {
+				assert.Equal(t, str, populateID(str))
+			}
+		})
+		t.Run("Set", func(t *testing.T) {
+			id := MessageID(populateID(""))
+			ts, host, count, rs, err := id.Parse()
+			check.NotError(t, err)
+			check.NotZero(t, ts)
+			check.NotZero(t, host)
+			check.NotZero(t, count)
+			check.NotZero(t, rs)
+		})
+	})
+}
+func TestRandomInterval(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		t.Run(fmt.Sprint("Case", i), func(t *testing.T) {
+
+		})
+
+	}
 }

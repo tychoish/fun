@@ -15,6 +15,8 @@ import (
 
 var counter = &atomic.Int64{}
 
+func resetCounter() { counter.Store(0) }
+
 const charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const numChars = len(charSet)
 const idLenght = 32
@@ -30,8 +32,6 @@ func init() {
 	hostsum := hasher.Sum([]byte{})
 	hostID = fmt.Sprintf("%x", hostsum[:4])
 }
-
-func resetCounter() { counter.Store(0) }
 
 // MessageID produces a (mostly) unique identifier for messages.  The
 // ID is composed of a unix timestamp, an atomic counter (per-process
@@ -65,6 +65,7 @@ func MakeID(ts time.Time, count int64) MessageID {
 	for i := 0; i < 16 && builder.Len() < idLenght; i++ {
 		builder.WriteByte(charSet[rand.Intn(numChars)])
 	}
+
 	return MessageID(builder.String())
 }
 
@@ -82,7 +83,6 @@ func (id MessageID) Parse() (time.Time, string, int64, string, error) {
 	count, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {
 		return time.Time{}, "", 0, "", err
-
 	}
 
 	return time.Unix(ts, 0), parts[1], count, parts[3], nil

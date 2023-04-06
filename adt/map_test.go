@@ -2,6 +2,7 @@ package adt
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -324,4 +325,42 @@ func TestMap(t *testing.T) {
 		})
 
 	})
+	t.Run("Append", func(t *testing.T) {
+		mp := &Map[string, int]{}
+		assert.Equal(t, 0, mp.Len())
+		mp.Append(NewMapItem("foo", 400))
+		assert.Equal(t, 1, mp.Len())
+		mp.Append(NewMapItem("foo", 42), NewMapItem("bar", 3))
+		assert.Equal(t, 2, mp.Len())
+		assert.Equal(t, 42, mp.Get("foo"))
+		mp.Append(NewMapItem("foofoo", 42), NewMapItem("baz", 3))
+		assert.Equal(t, 4, mp.Len())
+	})
+	t.Run("Export", func(t *testing.T) {
+		mp := &Map[string, int]{}
+		mp.Store("foo", 100)
+		xp := mp.Export()
+		assert.Equal(t, len(xp), 1)
+		assert.Equal(t, xp["foo"], 100)
+	})
+	t.Run("JSON", func(t *testing.T) {
+		t.Run("HappyPath", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Store("foo", 100)
+			js, err := json.Marshal(mp)
+			assert.NotError(t, err)
+			assert.Equal(t, string(js), `{"foo":100}`)
+			nmp := &Map[string, int]{}
+			err = json.Unmarshal(js, nmp)
+			assert.NotError(t, err)
+			assert.Equal(t, nmp.Len(), 1)
+			assert.Equal(t, nmp.Get("foo"), 100)
+		})
+		t.Run("Impossible", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			err := json.Unmarshal([]byte(`{"foo": []}`), mp)
+			assert.Error(t, err)
+		})
+	})
+
 }

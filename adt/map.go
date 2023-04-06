@@ -10,6 +10,8 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+func NewMapItem[K comparable, V any](k K, v V) MapItem[K, V] { return MapItem[K, V]{Key: k, Value: v} }
+
 type MapItem[K comparable, V any] struct {
 	Key   K
 	Value V
@@ -78,7 +80,7 @@ func (mp *Map[K, V]) Export() map[K]V {
 
 func (mp *Map[K, V]) MarshalJSON() ([]byte, error) { return json.Marshal(mp.Export()) }
 
-func (mp *Map[K, V]) UnmashsalJSON(in []byte) error {
+func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
 	out := map[K]V{}
 	if err := json.Unmarshal(in, &out); err != nil {
 		return err

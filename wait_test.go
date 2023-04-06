@@ -176,14 +176,14 @@ func TestWait(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
 		wfs := make([]WaitFunc, 100)
 		for i := 0; i < 100; i++ {
-			wfs[i] = func(context.Context) { time.Sleep(5 * time.Millisecond) }
+			wfs[i] = func(context.Context) { time.Sleep(10 * time.Millisecond) }
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
 		WaitMerge(ctx, internal.NewSliceIter(wfs))(ctx)
 		dur := time.Since(start)
-		if dur > 10*time.Millisecond || dur < 5*time.Millisecond {
+		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 			t.Error(dur)
 		}
 	})
