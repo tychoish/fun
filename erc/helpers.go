@@ -126,6 +126,14 @@ func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
+// CheckWhen executes a simple function and if it returns an error, adds
+// it to the collector, primarily for use in defer statements.
+func CheckWhen(ec *Collector, cond bool, fn func() error) {
+	if cond {
+		ec.Add(fn())
+	}
+}
+
 // CheckWait returns a fun.WaitFunc for a function that returns an
 // error, with the error consumed by the collector.
 func CheckWait(ec *Collector, fn fun.WorkerFunc) fun.WaitFunc {
@@ -263,4 +271,22 @@ func ConsumeProcess(ctx context.Context, ec *Collector, iter fun.Iterator[error]
 	}()
 
 	return fun.WaitChannel(sig)
+}
+
+// Collect produces a function that will collect the error from a
+// function and add it to the collector returning the result. Use
+// this, like fun.Must to delay handling an error while also avoiding
+// declaring an extra error variable, without dropping the error
+// entirely.
+//
+// For example:
+//
+//	func actor(conf Configuration) (int, error) { return 42, nil}
+//
+//	func main() {
+//	    ec := &erc.Collector{}
+//	    size := erc.Collect[int](ec)(actor(Configuration{}))
+//	}
+func Collect[T any](ec *Collector) func(T, error) T {
+	return func(out T, err error) T { ec.Add(err); return out }
 }
