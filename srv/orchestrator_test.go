@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestOrchestrator(t *testing.T) {
@@ -399,7 +401,7 @@ func TestOrchestrator(t *testing.T) {
 				}
 			}
 
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			orc.Service().Close()
 			err := orc.Wait()
@@ -407,11 +409,8 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal("should error")
 			}
 			errs := erc.Unwind(err)
-			if len(errs) != 200 {
-				// panics + expected errors
-				t.Log(errs)
-				t.Error(len(errs))
-			}
+			check.Equal(t, len(errs), 200)
+			testt.Log(t, errs)
 		})
 		t.Run("LogRunningServices", func(t *testing.T) {
 			t.Parallel()
