@@ -18,6 +18,8 @@ Packages:
   linked lists.)
 - [srv](https://pkg.go.dev/github.com/tychoish/fun/seq) (service
   orchestration and management framework.)
+- [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly
+  atomic data types and operations.)
 
 For more information, see the documentation, but of general interest:
 
@@ -35,7 +37,9 @@ For more information, see the documentation, but of general interest:
   block until new items added.
 - In `seq`, general purpose linked list implementations, with a
   healthy feature set and flexible interface.
-- In `srv`, a service orchestration toolkit.
+- In `srv`, a service orchestration toolkit and lifecycle tools.
+- In `adt`, a collection of Atomic/Pool/Map operations that use
+  generics to provide strongly typed interfaces for common operations.
 
 Contributions welcome, the general goals of the project:
 

@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -98,14 +96,11 @@ func (or *Orchestrator) Service() *Service {
 
 	or.setup()
 
-	pipe := pubsub.NewUnlimitedQueue[*Service]()
 	or.srv = &Service{
 		Name: or.Name,
 		Run: func(ctx context.Context) error {
 			ec := &erc.Collector{}
-			defer func() { ec.Add(pipe.Close()) }()
-
-			wg := &fun.WaitGroup{}
+			wg := &sync.WaitGroup{}
 
 			for {
 				s, ok := or.input.Remove()
@@ -121,61 +116,30 @@ func (or *Orchestrator) Service() *Service {
 					}
 				}
 
-				fun.InvariantMust(pipe.Add(s), "adding to shutdown queue")
-
 				if s.Running() {
+					wg.Add(1)
+					go func(ss *Service) {
+						defer wg.Done()
+						ec.Add(ss.waitFor(ctx))
+					}(s)
 					continue
 				}
+
+				if s.isFinished.Load() {
+					ec.Add(s.Wait())
+					continue
+				}
+
 				wg.Add(1)
 				go func(ss *Service) {
 					defer wg.Done()
-					defer erc.Recover(ec)
 
-					// note: we could easily choose to ignore this error.
-					// the cases where start fails are generally ok, and we
-					// are already going to track this service's shutdown.
-					if err := ss.Start(ctx); err != nil {
-						ec.Add(fmt.Errorf("problem starting %s: %w", ss.String(), err))
-					}
+					ec.Add(erc.Wrapf(ss.Start(ctx), "problem starting %s", ss.String()))
+					ec.Add(ss.waitFor(ctx))
 				}(s)
 			}
 
-			wg.Wait(ctx)
-			return ec.Resolve()
-		},
-		Cleanup: func() error {
-			ec := &erc.Collector{}
-
-			or.mtx.Lock()
-			defer or.mtx.Unlock()
-
-			defer erc.Recover(ec)
-			defer func() { ec.Add(or.input.Close()) }()
-
-			// this has to be a background context,
-			// because any context that we would have at
-			// this point would not be live. However, we
-			// know that the non-blocking iterator won't
-			// cause a hang and we want to get through all
-			// services' waiters.
-			ctx, cancel := context.WithCancel(internal.BackgroundContext)
-			defer cancel()
-
-			iter := pipe.Iterator()
-			wg := &fun.WaitGroup{}
-			for iter.Next(ctx) {
-				s := iter.Value()
-				if s != nil {
-					wg.Add(1)
-					go func() {
-						defer erc.Recover(ec)
-						defer wg.Done()
-						ec.Add(s.Wait())
-					}()
-				}
-			}
-			ec.Add(iter.Close())
-			wg.Wait(ctx)
+			wg.Wait()
 			return ec.Resolve()
 		},
 	}

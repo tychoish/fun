@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/internal"
 )
@@ -72,7 +73,7 @@ type Service struct {
 	// execution (e.g. Run, Shutdown, Cleanup), and should be
 	// identical to the output of Wait(). Caller's set this value
 	// during the execution of the service.
-	ErrorHandler fun.Atomic[func(error)]
+	ErrorHandler adt.Atomic[func(error)]
 
 	isRunning  atomic.Bool
 	isFinished atomic.Bool

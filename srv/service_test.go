@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
@@ -380,7 +381,7 @@ func TestService(t *testing.T) {
 		})
 	})
 	t.Run("ErrorHandler", func(t *testing.T) {
-		oberr := &fun.Atomic[error]{}
+		oberr := &adt.Atomic[error]{}
 		s := &Service{
 			Run:      func(context.Context) error { return errors.New("run") },
 			Shutdown: func() error { return errors.New("shutdown") },
