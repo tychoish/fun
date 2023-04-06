@@ -39,7 +39,6 @@ func (mp *Map[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
 func (mp *Map[K, V]) Ensure(key K)                { mp.EnsureDefault(key, mp.Default.Make) }
 func (mp *Map[K, V]) Contains(key K) bool         { _, ok := mp.mp.Load(key); return ok }
 func (mp *Map[K, V]) Load(key K) (V, bool)        { return mp.safeCast(mp.mp.Load(key)) }
-func (mp *Map[K, V]) Swap(k K, v V) (V, bool)     { return mp.safeCast(mp.mp.Swap(k, v)) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (V, bool) {
 	if v == nil {
