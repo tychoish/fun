@@ -1,6 +1,8 @@
 package fun
 
-import "github.com/tychoish/fun/internal"
+import (
+	"github.com/tychoish/fun/internal"
+)
 
 // Is a generic version of `errors.Is` that takes advantage of the
 // Unwrap function, and is useful for checking if an object of an
@@ -70,7 +72,7 @@ func IsZero[T comparable](in T) bool {
 	case interface{ IsZero() bool }:
 		return val.IsZero()
 	default:
-		return val == Zero(in)
+		return in == Zero(in)
 	}
 }
 
