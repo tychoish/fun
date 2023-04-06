@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/internal"
 )
 
 // Distributor provides a layer of indirection above queue-like
@@ -85,21 +86,15 @@ func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
 func DistributorChannel[T any](ch chan T) Distributor[T] {
-	ec := &erc.Collector{}
 	return &distributorImpl[T]{
 		push: func(ctx context.Context, in T) (err error) {
 			// this only happens if we've already paniced
 			// so we shouldn't get too many errors.
-			if ec.HasErrors() {
-				return ec.Resolve()
-			}
+			ec := &erc.Collector{}
+			defer func() { err = ec.Resolve() }()
 			defer erc.Recover(ec)
-			select {
-			case <-ctx.Done():
-				ec.Add(ctx.Err())
-			case ch <- in:
-			}
-			return ec.Resolve()
+			ec.Add(internal.SendOne(ctx, internal.SendModeBlocking, ch, in))
+			return
 		},
 		pop: func(ctx context.Context) (T, error) {
 			val, err := fun.ReadOne(ctx, ch)

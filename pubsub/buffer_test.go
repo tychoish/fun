@@ -73,9 +73,8 @@ func TestDistributor(t *testing.T) {
 
 				// add another so that the rest of the test works
 				err = buf.Send(ctx, "merlin")
-				if err != nil {
-					t.Error(err)
-				}
+				check.ErrorIs(t, err, fun.ErrRecoveredPanic)
+
 				err = buf.Send(ctx, "kip")
 				if err == nil {
 					t.Error("expected error")
@@ -85,6 +84,7 @@ func TestDistributor(t *testing.T) {
 				if len(errs) != 2 {
 					// panic+expected
 					t.Error(len(errs))
+					t.Log(errs)
 				}
 				err = buf.Send(ctx, "kip")
 				if err == nil {
