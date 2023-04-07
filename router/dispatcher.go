@@ -154,7 +154,15 @@ func (r *Dispatcher) AddInterceptor(key Protocol, it Interceptor) error {
 	return r.interceptor.Get(key).PushBack(it)
 }
 
-func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) { r.handlers.Store(key, hfn) }
+func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) bool {
+	return !key.IsZero() && r.handlers.EnsureStore(key, hfn) // short circut
+}
+
+func (r *Dispatcher) OverrideHandler(key Protocol, hfn Handler) {
+	if !key.IsZero() {
+		r.handlers.Store(key, hfn)
+	}
+}
 
 func (r *Dispatcher) Stream(ctx context.Context) <-chan Response {
 	return r.watch(ctx, false, Protocol{})
