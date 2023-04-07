@@ -91,6 +91,5 @@ func TestRandomInterval(t *testing.T) {
 		t.Run(fmt.Sprint("Case", i), func(t *testing.T) {
 
 		})
-
 	}
 }
