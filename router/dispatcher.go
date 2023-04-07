@@ -2,9 +2,6 @@ package router
 
 import (
 	"context"
-	"errors"
-	"sync/atomic"
-	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
@@ -14,6 +11,7 @@ import (
 	"github.com/tychoish/fun/srv"
 )
 
+// Config describes the behavior of the Dispatcher.
 type Config struct {
 	Name    string
 	Buffer  int
@@ -37,17 +35,19 @@ type Dispatcher struct {
 	// NewDispatcher constructor creates a noop observer.
 	ErrorObserver adt.Atomic[func(error)]
 
-	services    srv.Orchestrator
 	middleware  adt.Map[Protocol, *pubsub.Deque[Middleware]]
 	interceptor adt.Map[Protocol, *pubsub.Deque[Interceptor]]
 	handlers    adt.Map[Protocol, Handler]
 
-	isRunning atomic.Bool
+	isRunning    chan struct{}
+	orchestrator srv.Orchestrator
+
 	// the broker and pipe are constructed when the service is
 	// initialized.
-	broker *pubsub.Broker[Response]
-	pipe   *pubsub.Deque[Message]
-	conf   Config
+	broker   *pubsub.Broker[Response]
+	pipe     *pubsub.Deque[Message]
+	outgoing *pubsub.Queue[Response]
+	conf     Config
 }
 
 // NewDispatcher builds a new dispatching service. The configuration
@@ -62,21 +62,17 @@ type Dispatcher struct {
 // the Service() method to access a service that manages the work of
 // the dispatcher. Once the service has started and the Running()
 // method returns true you can use the service.
-func NewDispatcher(conf Config) (*Dispatcher, error) {
+func NewDispatcher(conf Config) *Dispatcher {
 	if conf.Workers < 1 {
-		return nil, errors.New("must specify one or more workers")
-	}
-
-	pipe, err := pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers})
-	if err != nil {
-		return nil, err
+		conf.Workers = 1
 	}
 
 	r := &Dispatcher{
-		pipe: pipe,
-		conf: conf,
+		conf:      conf,
+		isRunning: make(chan struct{}),
 	}
-	r.services.Name = conf.Name
+
+	r.orchestrator.Name = conf.Name
 	r.ErrorObserver.Set(func(error) {})
 	r.handlers.Default.SetConstructor(func() Handler {
 		return func(_ context.Context, m Message) (Response, error) {
@@ -92,11 +88,36 @@ func NewDispatcher(conf Config) (*Dispatcher, error) {
 		return fun.Must(pubsub.NewDeque[Interceptor](pubsub.DequeOptions{Unlimited: true}))
 	})
 
-	if err := r.registerServices(); err != nil {
-		return nil, err
+	// impossible for this to error, because the capacity is
+	// always greater than 1, and this will always vialidate
+	r.pipe = fun.Must(pubsub.NewDeque[Message](pubsub.DequeOptions{Capacity: conf.Workers}))
+
+	if r.conf.Buffer <= 0 {
+		r.outgoing = pubsub.NewUnlimitedQueue[Response]()
+	} else {
+		r.outgoing = fun.Must(pubsub.NewQueue[Response](pubsub.QueueOptions{
+			SoftQuota:   r.conf.Buffer,
+			HardLimit:   r.conf.Buffer + r.conf.Workers,
+			BurstCredit: float64(r.conf.Workers + 1),
+		}))
 	}
 
-	return r, nil
+	// there's no real way to make adding these services error:
+	// registerServices() is only called in the constructor, the
+	// orchestrator is configured such that the only way for Add
+	// to error is if the incoming Service buffer is full (it's
+	// unlimited), or if something closes the buffer (nothing
+	// does,) and even if orchestrators were closable (or closed
+	// when their services shutdown; which might be a reasonable
+	// change,) because this is called exactly once when the
+	// Dispatcher is created, nothing can error
+
+	fun.InvariantMust(r.registerBrokerService())
+	fun.InvariantMust(r.registerPipeShutdownService())
+	fun.InvariantMust(r.registerProcessResponseService())
+	fun.InvariantMust(r.registerMiddlwareService())
+
+	return r
 }
 
 // Service returns access to a srv.Service object that is responsible
@@ -107,29 +128,19 @@ func NewDispatcher(conf Config) (*Dispatcher, error) {
 //
 // Once initialized you must start the service *and* the Running()
 // method must return true before you can use the service.
-func (r *Dispatcher) Service() *srv.Service { return r.services.Service() }
-func (r *Dispatcher) Running() bool         { return r.Service().Running() && r.isRunning.Load() }
+func (r *Dispatcher) Service() *srv.Service { return r.orchestrator.Service() }
 
 // Ready produces a fun.WaitFunc that blocks until the dispatcher's
 // service is ready and running (or the context passed to the wait
 // function is canceled.)
 func (r *Dispatcher) Ready() fun.WaitFunc {
 	return func(ctx context.Context) {
-		if r.isRunning.Load() {
-			return
-		}
-
-		timer := time.NewTimer(randomInterval(5))
-		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-timer.C:
-				if r.isRunning.Load() {
-					return
-				}
-				timer.Reset(randomInterval(5))
+			case <-r.isRunning:
+				return
 			}
 		}
 	}
@@ -179,6 +190,8 @@ func (r *Dispatcher) watch(ctx context.Context, shouldFilter bool, key Protocol)
 	return out
 }
 
+// Broadcast sends a message without waiting for a response. Responses
+// will be sent to subscribers.
 func (r *Dispatcher) Broadcast(ctx context.Context, m Message) error {
 	if m.Protocol.IsZero() {
 		return ErrNoProtocol
@@ -188,9 +201,15 @@ func (r *Dispatcher) Broadcast(ctx context.Context, m Message) error {
 	return r.pipe.WaitPushBack(ctx, m)
 }
 
-func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, bool) {
+// Exec passes a Message to the dispatcher which processes the message
+// and returns a response. The error reflects errors processing the
+// message (e.g. an invalid message, canceled context, or the
+// dispatcher shutting down.) The response contains its own error that
+// may be non-nil if the dispatcher or any of the handlers encountered
+// an error when processing the message.
+func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, error) {
 	if m.Protocol.IsZero() {
-		return nil, false
+		return nil, ErrNoProtocol
 	}
 
 	m.ID = populateID(m.ID)
@@ -229,14 +248,14 @@ func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, bool) {
 	}(m.ID)
 
 	if err := r.pipe.WaitPushBack(ctx, m); err != nil {
-		return nil, false
+		return nil, err
 	}
 
 	val, err := fun.ReadOne(ctx, out)
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
-	return &val, true
+	return &val, nil
 }
 
 func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response) (err error) {
@@ -293,57 +312,43 @@ func (r *Dispatcher) doHandler(ctx context.Context, key Protocol, req Message) (
 	return
 }
 
-func (r *Dispatcher) registerServices() error {
-	ec := &erc.Collector{}
-
-	// we need to be able to signal from the broker service, which
-	// starts first that the broker is initialized in the
-	// dispatcher struct, this channel does that.
-	brokerSetup := make(chan struct{})
-
-	ec.Add(r.services.Add(&srv.Service{
+func (r *Dispatcher) registerBrokerService() error {
+	return r.orchestrator.Add(&srv.Service{
 		Run: func(ctx context.Context) error {
 			r.broker = pubsub.NewBroker[Response](ctx, pubsub.BrokerOptions{WorkerPoolSize: r.conf.Workers, ParallelDispatch: true})
-			r.isRunning.Store(true)
-			close(brokerSetup)
+			close(r.isRunning)
 			r.broker.Wait(ctx)
 			return nil
 		},
 		Shutdown: func() error { r.broker.Stop(); return nil },
-	}))
+	})
+}
 
-	ec.Add(r.services.Add(&srv.Service{
+func (r *Dispatcher) registerPipeShutdownService() error {
+	return r.orchestrator.Add(&srv.Service{
 		Run:     func(ctx context.Context) error { <-ctx.Done(); return nil },
 		Cleanup: r.pipe.Close,
-	}))
+	})
+}
 
-	var outQueue *pubsub.Queue[Response]
-	if r.conf.Buffer <= 0 {
-		outQueue = pubsub.NewUnlimitedQueue[Response]()
-	} else {
-		outQueue = erc.Collect[*pubsub.Queue[Response]](ec)(pubsub.NewQueue[Response](pubsub.QueueOptions{
-			SoftQuota:   r.conf.Buffer,
-			HardLimit:   r.conf.Buffer + r.conf.Workers,
-			BurstCredit: float64(r.conf.Workers + 1),
-		}))
-	}
-
+func (r *Dispatcher) registerProcessResponseService() error {
 	// process outgoing message filters
-	ec.Add(r.services.Add(&srv.Service{
-		Shutdown: outQueue.Close,
+	return r.orchestrator.Add(&srv.Service{
+		Shutdown: r.outgoing.Close,
 		Run: func(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return nil
-			case <-brokerSetup:
+			case <-r.isRunning:
 				return itertool.WorkerPool(ctx,
-					itertool.Transform(ctx, outQueue.Iterator(), func(rr Response) fun.WorkerFunc {
+					itertool.Transform(ctx, r.outgoing.Iterator(), func(rr Response) fun.WorkerFunc {
 						return func(ctx context.Context) error {
 							if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
 								rr.Error = err
 								r.broker.Publish(ctx, rr)
 								return ctx.Err()
 							}
+
 							if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
 								rr.Error = erc.Merge(err, rr.Error)
 							}
@@ -356,10 +361,11 @@ func (r *Dispatcher) registerServices() error {
 				)
 			}
 		},
-	}))
+	})
+}
 
-	// process middleware and actual handler
-	ec.Add(r.services.Add(&srv.Service{
+func (r *Dispatcher) registerMiddlwareService() error {
+	return r.orchestrator.Add(&srv.Service{
 		Shutdown: r.pipe.Close,
 		Run: func(ctx context.Context) error {
 			return itertool.WorkerPool(ctx,
@@ -392,13 +398,11 @@ func (r *Dispatcher) registerServices() error {
 							resp.Error = &Error{Err: err, ID: id, Protocol: protocol}
 							r.ErrorObserver.Get()(resp.Error)
 						}
-						return outQueue.Add(resp)
+						return r.outgoing.Add(resp)
 					}
 				}),
 				itertool.Options{NumWorkers: r.conf.Workers},
 			)
 		},
-	}))
-
-	return ec.Resolve()
+	})
 }
