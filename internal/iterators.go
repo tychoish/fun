@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"io"
 	"sync"
 )
 
@@ -44,6 +43,7 @@ type ChannelIterImpl[T any] struct {
 	Error  error
 	Ctx    context.Context
 	Closer context.CancelFunc
+	WG     sync.WaitGroup
 }
 
 func (iter *ChannelIterImpl[T]) Value() T { return iter.value }
@@ -51,7 +51,7 @@ func (iter *ChannelIterImpl[T]) Close() error {
 	if iter.Closer != nil {
 		iter.Closer()
 	}
-
+	iter.WG.Wait()
 	return iter.Error
 }
 func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
@@ -65,74 +65,4 @@ func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 	}
 	iter.value = v
 	return true
-}
-
-type MapIterImpl[T any] struct {
-	ChannelIterImpl[T]
-	WG sync.WaitGroup
-}
-
-func (iter *MapIterImpl[T]) Close() error {
-	if iter.Closer != nil {
-		iter.Closer()
-	}
-	iter.WG.Wait()
-	return iter.Error
-}
-
-// ZeroOf returns the zero-value for the type T specified as an
-// argument.
-func ZeroOf[T any]() T { return *new(T) }
-
-func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
-	select {
-	case <-ctx.Done():
-		return ZeroOf[T](), ctx.Err()
-	case obj, ok := <-ch:
-		if !ok {
-			return ZeroOf[T](), io.EOF
-		}
-		if err := ctx.Err(); err != nil {
-			return ZeroOf[T](), err
-		}
-
-		return obj, nil
-	}
-}
-
-type SendMode int
-
-const (
-	SendModeBlocking SendMode = iota
-	SendModeNonBlocking
-)
-
-func Blocking(in bool) SendMode {
-	if in {
-		return SendModeBlocking
-	}
-	return SendModeNonBlocking
-}
-
-func SendOne[T any](ctx context.Context, mode SendMode, ch chan<- T, it T) error {
-	switch mode {
-	case SendModeBlocking:
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case ch <- it:
-			return nil
-		}
-	case SendModeNonBlocking:
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case ch <- it:
-			return nil
-		default:
-			return nil
-		}
-	default:
-		return io.EOF
-	}
 }

@@ -119,11 +119,9 @@ func TestIterators(t *testing.T) {
 			defer cancel()
 
 			var closerCalled bool
-			iter := &MapIterImpl[int]{
-				ChannelIterImpl: ChannelIterImpl[int]{
-					Pipe:   makeClosedSlice([]int{1, 2, 3, 4}),
-					Closer: func() { closerCalled = true },
-				},
+			iter := &ChannelIterImpl[int]{
+				Pipe:   makeClosedSlice([]int{1, 2, 3, 4}),
+				Closer: func() { closerCalled = true },
 			}
 			seen := 0
 			for iter.Next(ctx) {
@@ -149,10 +147,8 @@ func TestIterators(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			iter := &MapIterImpl[int]{
-				ChannelIterImpl: ChannelIterImpl[int]{
-					Pipe: makeClosedSlice([]int{1, 2, 3, 4}),
-				},
+			iter := &ChannelIterImpl[int]{
+				Pipe: makeClosedSlice([]int{1, 2, 3, 4}),
 			}
 			seen := 0
 			for iter.Next(ctx) {

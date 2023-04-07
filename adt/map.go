@@ -111,7 +111,7 @@ func (mp *Map[K, V]) Range(f func(K, V) bool) {
 }
 
 func (mp *Map[K, V]) Iterator() fun.Iterator[MapItem[K, V]] {
-	iter := &internal.MapIterImpl[MapItem[K, V]]{}
+	iter := &internal.ChannelIterImpl[MapItem[K, V]]{}
 	pipe := make(chan MapItem[K, V])
 	iter.Pipe = pipe
 	ctx, cancel := context.WithCancel(internal.BackgroundContext)

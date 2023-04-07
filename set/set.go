@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -56,25 +57,21 @@ func (s mapSetImpl[T]) Check(item T) bool { return checkInMap(item, s) }
 func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	pipe := make(chan T)
 
-	iter := &internal.MapIterImpl[T]{
-		ChannelIterImpl: internal.ChannelIterImpl[T]{Pipe: pipe},
-	}
+	iter := &internal.ChannelIterImpl[T]{Pipe: pipe}
+
 	iter.Ctx, iter.Closer = context.WithCancel(internal.BackgroundContext)
 	iter.WG.Add(1)
 
-	go func() {
+	go func(ctx context.Context) {
 		defer iter.WG.Done()
 		defer close(pipe)
 
 		for item := range s {
-			select {
-			case <-iter.Ctx.Done():
+			if err := internal.SendOne(ctx, internal.Blocking(true), pipe, item); err != nil {
 				return
-			case pipe <- item:
-				continue
 			}
 		}
-	}()
+	}(iter.Ctx)
 
 	return iter
 }
@@ -128,37 +125,9 @@ func (s syncSetImpl[T]) Delete(in T) {
 	s.set.Delete(in)
 }
 
-type syncIterImpl[T any] struct {
-	// this is duplicated from itertool to avoid an import cycle
-	mtx  sync.Locker
-	iter fun.Iterator[T]
-}
-
 func (s syncSetImpl[T]) Iterator() fun.Iterator[T] {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	return syncIterImpl[T]{mtx: s.mtx, iter: s.set.Iterator()}
-}
-
-func (iter syncIterImpl[T]) Unwrap() fun.Iterator[T] { return iter.iter }
-func (iter syncIterImpl[T]) Next(ctx context.Context) bool {
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-
-	return iter.iter.Next(ctx)
-}
-
-func (iter syncIterImpl[T]) Close() error {
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-
-	return iter.iter.Close()
-}
-
-func (iter syncIterImpl[T]) Value() T {
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-
-	return iter.iter.Value()
+	return adt.NewIterator(s.mtx, s.set.Iterator())
 }

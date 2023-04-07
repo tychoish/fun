@@ -60,7 +60,7 @@ func Filter[T any](ctx context.Context, iter fun.Iterator[T], fn func(T) T) fun.
 // output iterator must be consumed to process all of the results. For
 // concurrent processing, use the Map() operation.
 func Transform[T any, O any](ctx context.Context, iter fun.Iterator[T], fn func(T) O) fun.Iterator[O] {
-	out := new(internal.MapIterImpl[O])
+	out := new(internal.ChannelIterImpl[O])
 	pipe := make(chan O)
 	out.Pipe = pipe
 

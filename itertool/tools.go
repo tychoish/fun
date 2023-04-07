@@ -179,7 +179,7 @@ func Map[T any, O any](
 	mapper func(context.Context, T) (O, error),
 	opts Options,
 ) fun.Iterator[O] {
-	out := new(internal.MapIterImpl[O])
+	out := new(internal.ChannelIterImpl[O])
 	safeOut := Synchronize[O](out)
 	toOutput := make(chan O)
 	catcher := &erc.Collector{}
@@ -304,7 +304,7 @@ func Generate[T any](
 		opts.OutputBufferSize = 0
 	}
 
-	out := new(internal.MapIterImpl[T])
+	out := new(internal.ChannelIterImpl[T])
 	pipe := make(chan T, opts.OutputBufferSize)
 	catcher := &erc.Collector{}
 	out.Pipe = pipe
@@ -372,11 +372,8 @@ func generator[T any](
 			continue
 		}
 
-		select {
-		case <-ctx.Done():
+		if err := internal.SendOne(ctx, internal.Blocking(true), out, value); err != nil {
 			return
-		case out <- value:
-			continue
 		}
 	}
 }
