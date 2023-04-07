@@ -267,7 +267,8 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 // are no longer listening to this channel.
 //
 // Subscription channels are *not* closed and should never be closed
-// by the caller.
+// by the caller. Closing a subscription channel will cause an
+// unhandled panic.
 func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 	if ctx.Err() != nil {
 		return nil
