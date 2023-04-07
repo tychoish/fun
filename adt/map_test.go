@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -335,6 +336,16 @@ func TestMap(t *testing.T) {
 			err := json.Unmarshal([]byte(`{"foo": []}`), mp)
 			assert.Error(t, err)
 		})
+	})
+
+	t.Run("Ensure", func(t *testing.T) {
+		mp := &Map[string, int]{}
+		ok := mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 100})
+		check.True(t, ok)
+		ok = mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 100})
+		check.True(t, !ok)
+		ok = mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 10})
+		check.True(t, !ok)
 	})
 
 }

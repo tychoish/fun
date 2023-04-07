@@ -32,13 +32,15 @@ type Map[K comparable, V any] struct {
 	mp      sync.Map
 }
 
-func (mp *Map[K, V]) Delete(key K)                { mp.mp.Delete(key) }
-func (mp *Map[K, V]) Store(k K, v V)              { mp.mp.Store(k, v) }
-func (mp *Map[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
-func (mp *Map[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
-func (mp *Map[K, V]) Ensure(key K)                { mp.EnsureDefault(key, mp.Default.Make) }
-func (mp *Map[K, V]) Contains(key K) bool         { _, ok := mp.mp.Load(key); return ok }
-func (mp *Map[K, V]) Load(key K) (V, bool)        { return mp.safeCast(mp.mp.Load(key)) }
+func (mp *Map[K, V]) Delete(key K)                   { mp.mp.Delete(key) }
+func (mp *Map[K, V]) Store(k K, v V)                 { mp.mp.Store(k, v) }
+func (mp *Map[K, V]) Set(it MapItem[K, V])           { mp.Store(it.Key, it.Value) }
+func (mp *Map[K, V]) Append(its ...MapItem[K, V])    { mp.Extend(its) }
+func (mp *Map[K, V]) Ensure(key K)                   { mp.EnsureDefault(key, mp.Default.Make) }
+func (mp *Map[K, V]) Contains(key K) bool            { _, ok := mp.mp.Load(key); return ok }
+func (mp *Map[K, V]) Load(key K) (V, bool)           { return mp.safeCast(mp.mp.Load(key)) }
+func (mp *Map[K, V]) EnsureStore(k K, v V) bool      { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
+func (mp *Map[K, V]) EnsureSet(i MapItem[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (V, bool) {
 	if v == nil {
