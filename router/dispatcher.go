@@ -134,16 +134,7 @@ func (r *Dispatcher) Service() *srv.Service { return r.orchestrator.Service() }
 // service is ready and running (or the context passed to the wait
 // function is canceled.)
 func (r *Dispatcher) Ready() fun.WaitFunc {
-	return func(ctx context.Context) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-r.isRunning:
-				return
-			}
-		}
-	}
+	return func(ctx context.Context) { _, _ = fun.ReadOne(ctx, r.isRunning) }
 }
 
 func (r *Dispatcher) AddMiddleware(key Protocol, it Middleware) error {
@@ -159,21 +150,17 @@ func (r *Dispatcher) RegisterHandler(key Protocol, hfn Handler) bool {
 }
 
 func (r *Dispatcher) OverrideHandler(key Protocol, hfn Handler) {
-	if !key.IsZero() {
-		r.handlers.Store(key, hfn)
-	}
+	fun.WhenCall(!key.IsZero(), func() { r.handlers.Store(key, hfn) })
 }
 
+// Stream returns a channel that processes
 func (r *Dispatcher) Stream(ctx context.Context) <-chan Response {
-	return r.watch(ctx, false, Protocol{})
+	return r.Subscribe(ctx, Protocol{})
 }
 
+// Subscribe streams responses from the
 func (r *Dispatcher) Subscribe(ctx context.Context, p Protocol) <-chan Response {
-	return r.watch(ctx, true, p)
-}
-
-func (r *Dispatcher) watch(ctx context.Context, shouldFilter bool, key Protocol) <-chan Response {
-	out := make(chan Response)
+	out := make(chan Response, r.conf.Buffer)
 	go func() {
 		defer close(out)
 		sub := r.broker.Subscribe(ctx)
@@ -184,7 +171,7 @@ func (r *Dispatcher) watch(ctx context.Context, shouldFilter bool, key Protocol)
 			case <-ctx.Done():
 				return
 			case r := <-sub:
-				if shouldFilter && r.Protocol != key {
+				if !p.IsZero() && r.Protocol != p {
 					continue
 				}
 				select {
@@ -266,6 +253,15 @@ func (r *Dispatcher) Exec(ctx context.Context, m Message) (*Response, error) {
 	return &val, nil
 }
 
+// these functions [do<>] handle the processing/management of the
+// request pipeline, and server to simplify the service
+// implementations. They are all panic safe (because they are
+// executing incject/caller code.) doInterceptor and doMiddleware are
+// called twice per request: once for the protocol-specific code, and
+// once for general all-dispatcher handling. The protocol specific
+// code is called before the first middleware and after the last
+// interceptor.
+
 func (r *Dispatcher) doIntercept(ctx context.Context, key Protocol, rr *Response) (err error) {
 	ec := &erc.Collector{}
 	defer func() { err = ec.Resolve() }()
@@ -319,6 +315,11 @@ func (r *Dispatcher) doHandler(ctx context.Context, key Protocol, req Message) (
 	}
 	return
 }
+
+// These functions [register<>Service()] just add services to the
+// orchestrator in the constructor (but do not start them,) all are
+// called exactly once in the constructor. Their errors are
+// (impossible, and handled as invariants.)
 
 func (r *Dispatcher) registerBrokerService() error {
 	return r.orchestrator.Add(&srv.Service{
@@ -388,9 +389,9 @@ func (r *Dispatcher) registerMiddlwareService() error {
 						id := req.ID
 						protocol := req.Protocol
 
-						if err = r.doMiddleware(ctx, Protocol{}, &req); err != nil {
+						if err = r.doMiddleware(ctx, protocol, &req); err != nil {
 							resp.Error = err
-						} else if err = r.doMiddleware(ctx, protocol, &req); err != nil {
+						} else if err = r.doMiddleware(ctx, Protocol{}, &req); err != nil {
 							resp.Error = err
 						} else {
 							resp = r.doHandler(ctx, protocol, req)
