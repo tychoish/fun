@@ -11,12 +11,15 @@ import (
 )
 
 func makeTestDispatcher(t *testing.T) *Dispatcher {
-	d := NewDispatcher(Config{Name: t.Name(), Workers: runtime.NumCPU(), Buffer: runtime.NumCPU() * runtime.NumCPU()})
+	baseNum := runtime.NumCPU()
+
+	d := NewDispatcher(Config{Name: t.Name(), Workers: baseNum, Buffer: baseNum * baseNum})
 	ctx := testt.ContextWithTimeout(t, time.Second)
 	srv := d.Service()
 	assert.NotError(t, srv.Start(ctx))
 	d.Ready()(ctx)
 	t.Cleanup(func() { srv.Close() })
+
 	return d
 }
 
