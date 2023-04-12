@@ -70,7 +70,9 @@ type readOneable[T any] interface {
 // the iterator.
 //
 // IterateOne does not provide atomic exclusion if multiple calls to
-// the iterator or IterateOne happen concurrently.
+// the iterator or IterateOne happen concurrently; however, the
+// adt.NewIterator wrapper provides a special case which *does* allow
+// for concurrent use.
 func IterateOne[T any](ctx context.Context, iter Iterator[T]) (T, error) {
 	if si, ok := iter.(readOneable[T]); ok {
 		return si.ReadOne(ctx)
