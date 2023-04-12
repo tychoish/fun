@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -93,7 +92,6 @@ func (iter *GeneratorIterator[T]) Close() error {
 
 func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {
 	if ctx.Err() != nil || iter.closed.Load() {
-		fmt.Println("one", iter.closed.Load(), ctx.Err())
 		return false
 	}
 

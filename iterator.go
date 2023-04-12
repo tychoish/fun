@@ -60,6 +60,10 @@ func ObserveWorker[T any](iter Iterator[T], fn Observer[T]) WorkerFunc {
 	return func(ctx context.Context) error { return Observe(ctx, iter, fn) }
 }
 
+type readOneable[T any] interface {
+	ReadOne(ctx context.Context) (T, error)
+}
+
 // IterateOne, like ReadOne reads one value from the iterator, and
 // returns it. The error values are either a context cancelation error
 // if the context is canceled, or io.EOF if there are no elements in
@@ -68,6 +72,10 @@ func ObserveWorker[T any](iter Iterator[T], fn Observer[T]) WorkerFunc {
 // IterateOne does not provide atomic exclusion if multiple calls to
 // the iterator or IterateOne happen concurrently.
 func IterateOne[T any](ctx context.Context, iter Iterator[T]) (T, error) {
+	if si, ok := iter.(readOneable[T]); ok {
+		return si.ReadOne(ctx)
+	}
+
 	if err := ctx.Err(); err != nil {
 		return ZeroOf[T](), err
 	}

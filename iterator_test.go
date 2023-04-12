@@ -48,10 +48,27 @@ func TestIteratorTools(t *testing.T) {
 			assert.ErrorIs(t, err, context.Canceled)
 			assert.Zero(t, it)
 		})
-		t.Run("", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
 			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{}))
 			assert.Zero(t, it)
 			assert.ErrorIs(t, err, io.EOF)
+		})
+		t.Run("ReadOneable", func(t *testing.T) {
+			input := &TestReadoneableImpl{
+				Iterator: internal.NewSliceIter([]string{
+					fmt.Sprint(10),
+					fmt.Sprint(10),
+					fmt.Sprint(20),
+					fmt.Sprint(2),
+				}),
+			}
+			val, err := IterateOne[string](ctx, input)
+			assert.NotError(t, err)
+			assert.Equal(t, "sparta", val)
+
+			val, err = IterateOne[string](ctx, input)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.Zero(t, val)
 		})
 	})
 	t.Run("Transform", func(t *testing.T) {
@@ -144,4 +161,17 @@ func TestIteratorTools(t *testing.T) {
 
 	})
 
+}
+
+type TestReadoneableImpl struct {
+	Iterator[string]
+	once bool
+}
+
+func (iter *TestReadoneableImpl) ReadOne(ctx context.Context) (string, error) {
+	if !iter.once {
+		iter.once = true
+		return "sparta", nil
+	}
+	return "", io.EOF
 }
