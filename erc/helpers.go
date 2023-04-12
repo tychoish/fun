@@ -153,10 +153,11 @@ func Unwind(err error) []error {
 	var out []error
 	switch e := err.(type) {
 	case *Stack:
-		fun.Observe(internal.BackgroundContext, e.Iterator(),
-			func(err error) {
-				out = append(out, err)
-			})
+		// the only way this can error is if the observer
+		// function panics, which it can't:
+		fun.InvariantMust(fun.Observe(internal.BackgroundContext,
+			e.Iterator(), func(err error) { out = append(out, err) },
+		))
 	default:
 		out = fun.Unwind(err)
 	}
@@ -170,18 +171,7 @@ func Unwind(err error) []error {
 //
 // If both errors are of the same root type and you investigate the
 // output error with errors.As, the first error's value will be used.
-func Merge(err1, err2 error) error {
-	switch {
-	case err1 == nil && err2 == nil:
-		return nil
-	case err1 == nil && err2 != nil:
-		return err2
-	case err1 != nil && err2 == nil:
-		return err1
-	default:
-		return &internal.MergedError{Current: err1, Wrapped: err2}
-	}
-}
+func Merge(err1, err2 error) error { return internal.MergeErrors(err1, err2) }
 
 // Collapse takes a slice of errors and converts it into an *erc.Stack
 // typed error.
@@ -253,7 +243,7 @@ func Consume(ctx context.Context, iter fun.Iterator[error]) error {
 // function that blocks until the iterator is exhausted. ConsumeAll
 // does not begin processing the iterator until the wait function is called.
 func ConsumeAll(ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
-	return fun.ObserveWait(iter, ec.Add)
+	return func(ctx context.Context) { fun.ObserveWorker(iter, ec.Add).Observe(ctx, ec.Add) }
 }
 
 // ConsumeProcess adds all errors in the iterator to the

@@ -17,9 +17,7 @@ import (
 func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T] {
 	pipe := make(chan T)
 
-	iter := &internal.MapIterImpl[T]{
-		ChannelIterImpl: internal.ChannelIterImpl[T]{Pipe: pipe},
-	}
+	iter := &internal.ChannelIterImpl[T]{Pipe: pipe}
 
 	wg := &iter.WG
 	ctx, iter.Closer = context.WithCancel(ctx)

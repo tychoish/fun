@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
 )
 
 // CollectChannel converts and iterator to a channel. The iterator is
@@ -13,11 +14,8 @@ func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 	go func() {
 		defer close(out)
 		for iter.Next(ctx) {
-			select {
-			case <-ctx.Done():
+			if err := internal.SendOne(ctx, internal.Blocking(true), out, iter.Value()); err != nil {
 				return
-			case out <- iter.Value():
-				continue
 			}
 		}
 	}()
@@ -31,6 +29,10 @@ func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 // will have the values encountered before the error.
 func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error) {
 	out := []T{}
-	fun.Observe(ctx, iter, func(in T) { out = append(out, in) })
-	return out, iter.Close()
+	return out, fun.Observe(ctx, iter, func(in T) { out = append(out, in) })
+	// if err := fun.Observe(ctx, iter, func(in T) { out = append(out, in) }); err != nil {
+	// 	return nil, err
+	// }
+
+	// return out, nil
 }

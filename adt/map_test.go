@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -334,6 +335,54 @@ func TestMap(t *testing.T) {
 			mp := &Map[string, int]{}
 			err := json.Unmarshal([]byte(`{"foo": []}`), mp)
 			assert.Error(t, err)
+		})
+	})
+
+	t.Run("Ensure", func(t *testing.T) {
+		mp := &Map[string, int]{}
+		ok := mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 100})
+		check.True(t, ok)
+		ok = mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 100})
+		check.True(t, !ok)
+		ok = mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 10})
+		check.True(t, !ok)
+	})
+	t.Run("Iterators", func(t *testing.T) {
+		t.Run("Keys", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Default.SetConstructor(func() int { return 38 })
+			for i := 0; i < 100; i++ {
+				mp.Ensure(fmt.Sprint(i))
+			}
+
+			ctx := testt.Context(t)
+			assert.Equal(t, mp.Len(), 100)
+			iter := mp.Keys()
+			count := 0
+			seen := map[string]struct{}{}
+			for iter.Next(ctx) {
+				count++
+				seen[iter.Value()] = struct{}{}
+			}
+			assert.Equal(t, count, 100)
+			assert.Equal(t, len(seen), 100)
+		})
+		t.Run("Values", func(t *testing.T) {
+			mp := &Map[string, int]{}
+			mp.Default.SetConstructor(func() int { return 38 })
+			for i := 0; i < 100; i++ {
+				mp.Ensure(fmt.Sprint(i))
+			}
+
+			ctx := testt.Context(t)
+			assert.Equal(t, mp.Len(), 100)
+			iter := mp.Values()
+			count := 0
+			for iter.Next(ctx) {
+				count++
+				assert.Equal(t, iter.Value(), 38)
+			}
+			assert.Equal(t, count, 100)
 		})
 	})
 

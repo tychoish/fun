@@ -73,9 +73,8 @@ func TestDistributor(t *testing.T) {
 
 				// add another so that the rest of the test works
 				err = buf.Send(ctx, "merlin")
-				if err != nil {
-					t.Error(err)
-				}
+				check.ErrorIs(t, err, fun.ErrRecoveredPanic)
+
 				err = buf.Send(ctx, "kip")
 				if err == nil {
 					t.Error("expected error")
@@ -85,6 +84,7 @@ func TestDistributor(t *testing.T) {
 				if len(errs) != 2 {
 					// panic+expected
 					t.Error(len(errs))
+					t.Log(errs)
 				}
 				err = buf.Send(ctx, "kip")
 				if err == nil {
@@ -145,7 +145,9 @@ func TestDistributor(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 				queue.Close()
 			}()
-			fun.Observe(ctx, iter, func(in string) { set.Add(in); seen++ })
+			if err := fun.Observe(ctx, iter, func(in string) { set.Add(in); seen++ }); err != nil {
+				t.Fatal(err)
+			}
 			if iter.Next(ctx) {
 				t.Error("iterator should be empty")
 			}

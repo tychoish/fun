@@ -213,6 +213,28 @@ func (s *Service) waitFor(ctx context.Context) error {
 	}
 
 	s.wg.Wait(ctx)
+
 	return s.ec.Resolve()
 
+}
+
+// Worker runs the service, starting it if needed and then waiting for
+// the service to return. If the service has already finished, the
+// WorkerFunc, like Wait(), will return the same aggreagated error
+// from the service when called multiple times on a completed service.
+//
+// Unlike Wait(), the WorkerFunc respects the context and will return
+// early if the context is canceled: returning a context cancelation
+// error.
+func (s *Service) Worker() fun.WorkerFunc {
+	return func(ctx context.Context) error {
+		_ = s.Start(ctx)
+		werr := s.waitFor(ctx)
+
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		return werr
+	}
 }

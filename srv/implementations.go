@@ -164,9 +164,12 @@ func ProcessIterator[T any](
 func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			return itertool.WorkerPool(ctx,
-				pubsub.DistributorIterator(pubsub.DistributorQueue(workQueue)),
-				opts)
+			return itertool.ParallelForEach(ctx, workQueue.Iterator(),
+				func(ctx context.Context, fn fun.WorkerFunc) error {
+					return fn.Run(ctx)
+				},
+				opts,
+			)
 		},
 		Shutdown: workQueue.Close,
 	}
@@ -186,14 +189,24 @@ func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) 
 // service execution which will be propagated to the return value of
 // the service's Wait method; but all errors that occur during the
 // execution of the workload will be observed (including panics) as well.
-func ObserverWorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], observer func(error), opts itertool.Options) *Service {
+func ObserverWorkerPool(
+	workQueue *pubsub.Queue[fun.WorkerFunc],
+	observer fun.Observer[error],
+	opts itertool.Options,
+) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {
-			itertool.ObserveWorkerPool(ctx,
-				pubsub.DistributorIterator(pubsub.DistributorQueue(workQueue)),
-				observer,
-				opts)
-			return nil
+			return itertool.ParallelForEach(
+				ctx,
+				workQueue.Iterator(),
+				func(ctx context.Context, fn fun.WorkerFunc) error {
+					if err := fn.Run(ctx); err != nil {
+						observer(err)
+					}
+					return nil
+				},
+				opts,
+			)
 		},
 		Shutdown: workQueue.Close,
 	}
@@ -210,21 +223,6 @@ func Broker[T any](broker *pubsub.Broker[T]) *Service {
 		Shutdown: func() error { broker.Stop(); return nil },
 	}
 }
-
-// RunWaitObserve returns a fun.WaitFunc that runs the service,
-// passing the error that the Service's Wait() method to the
-// observer.
-func RunWaitObserve(observe func(error), s *Service) fun.WaitFunc {
-	return func(ctx context.Context) { observe(s.Start(ctx)); observe(s.waitFor(ctx)) }
-}
-
-// RunWaitCollect produces a fun.WaitFunc that runs the service and
-// adds any errors produced to the provided collector.
-func RunWaitCollect(ec *erc.Collector, s *Service) fun.WaitFunc { return RunWaitObserve(ec.Add, s) }
-
-// RunWait produces a fun.WaitFunc that runs the service, ignoring any
-// error from the Service.
-func RunWait(s *Service) fun.WaitFunc { return RunWaitObserve(func(error) {}, s) }
 
 // Cmd wraps a exec.Command execution that **has not started** into a
 // service. If the command fails, the service returns.

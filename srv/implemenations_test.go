@@ -2,7 +2,6 @@ package srv
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -13,7 +12,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
@@ -39,78 +37,6 @@ func TestImplementationHelpers(t *testing.T) {
 			t.Error(dur)
 		}
 	})
-	t.Run("RunCollect", func(t *testing.T) {
-		t.Run("Happy", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ec := &erc.Collector{}
-			svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
-			RunWaitCollect(ec, svc)(ctx)
-			if err := ec.Resolve(); err != nil {
-				t.Error(err)
-			}
-		})
-		t.Run("AlreadyStarted", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ec := &erc.Collector{}
-			svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
-			if err := svc.Start(ctx); err != nil {
-				t.Error(err)
-			}
-
-			RunWaitCollect(ec, svc)(ctx)
-
-			if err := ec.Resolve(); !errors.Is(err, ErrServiceAlreadyStarted) {
-				t.Error(err)
-			}
-		})
-	})
-	t.Run("RunObserve", func(t *testing.T) {
-		t.Run("Happy", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ec := &erc.Collector{}
-			svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
-			RunWaitObserve(ec.Add, svc)(ctx)
-			if err := ec.Resolve(); err != nil {
-				t.Error(err)
-			}
-		})
-		t.Run("AlreadyStarted", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ec := &erc.Collector{}
-			svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
-			if err := svc.Start(ctx); err != nil {
-				t.Error(err)
-			}
-
-			RunWaitObserve(ec.Add, svc)(ctx)
-
-			if err := ec.Resolve(); !errors.Is(err, ErrServiceAlreadyStarted) {
-				t.Error(err)
-			}
-		})
-	})
-
-	t.Run("RunWait", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
-		start := time.Now()
-		RunWait(svc)(ctx)
-		dur := time.Since(start)
-		if dur < 10*time.Millisecond || dur > 15*time.Millisecond {
-			t.Error(dur)
-		}
-	})
-
 	t.Run("Process", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Large", func(t *testing.T) {

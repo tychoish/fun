@@ -73,9 +73,6 @@ func TestIterators(t *testing.T) {
 			if seen != 4 {
 				t.Error(seen)
 			}
-			if closerCalled {
-				t.Error("closer called early")
-			}
 			if iter.Close() != nil {
 				t.Error(iter.Close())
 			}
@@ -119,11 +116,9 @@ func TestIterators(t *testing.T) {
 			defer cancel()
 
 			var closerCalled bool
-			iter := &MapIterImpl[int]{
-				ChannelIterImpl: ChannelIterImpl[int]{
-					Pipe:   makeClosedSlice([]int{1, 2, 3, 4}),
-					Closer: func() { closerCalled = true },
-				},
+			iter := &ChannelIterImpl[int]{
+				Pipe:   makeClosedSlice([]int{1, 2, 3, 4}),
+				Closer: func() { closerCalled = true },
 			}
 			seen := 0
 			for iter.Next(ctx) {
@@ -134,9 +129,6 @@ func TestIterators(t *testing.T) {
 			}
 			if seen != 4 {
 				t.Error(seen)
-			}
-			if closerCalled {
-				t.Error("closer called early")
 			}
 			if iter.Close() != nil {
 				t.Error(iter.Close())
@@ -149,10 +141,8 @@ func TestIterators(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			iter := &MapIterImpl[int]{
-				ChannelIterImpl: ChannelIterImpl[int]{
-					Pipe: makeClosedSlice([]int{1, 2, 3, 4}),
-				},
+			iter := &ChannelIterImpl[int]{
+				Pipe: makeClosedSlice([]int{1, 2, 3, 4}),
 			}
 			seen := 0
 			for iter.Next(ctx) {
@@ -260,7 +250,88 @@ func TestIterators(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, io.EOF)
 		})
+	})
+	t.Run("Generator", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		t.Run("BasicOperation", func(t *testing.T) {
+			var closed bool
+			iter := &GeneratorIterator[int]{
+				Operation: func(context.Context) (int, error) {
+					return 1, nil
+				},
+				Closer: func() { closed = true },
+			}
+
+			if iter.Value() != 0 {
+				t.Error("should initialize to zero")
+			}
+			if !iter.Next(ctx) {
+				t.Error("should always iterate at least once")
+			}
+			if err := iter.Close(); err != nil {
+				t.Error(err)
+			}
+			if !closed {
+				t.Error("should have observed closed side effect")
+			}
+			if iter.Next(ctx) {
+				t.Error("should not iterate after close")
+			}
+		})
+		t.Run("RespectEOF", func(t *testing.T) {
+			count := 0
+			iter := &GeneratorIterator[int]{
+				Operation: func(context.Context) (int, error) {
+					count++
+					if count > 10 {
+						return 1000, io.EOF
+					}
+					return count, nil
+				},
+			}
+
+			seen := 0
+			for iter.Next(ctx) {
+				seen++
+				if iter.Value() > 10 {
+					t.Error("unexpected value", iter.Value())
+				}
+			}
+
+			if seen > count {
+				t.Error(seen, "vs", "count")
+			}
+		})
+		t.Run("PropogateErrors", func(t *testing.T) {
+			count := 0
+			expected := errors.New("kip")
+			iter := &GeneratorIterator[int]{
+				Operation: func(context.Context) (int, error) {
+					count++
+					if count > 10 {
+						return 1000, expected
+					}
+					return count, nil
+				},
+			}
+
+			seen := 0
+			for iter.Next(ctx) {
+				seen++
+				if iter.Value() > 10 {
+					t.Error("unexpected value", iter.Value())
+				}
+			}
+
+			if seen > count {
+				t.Error(seen, "vs", "count")
+			}
+			if err := iter.Close(); !errors.Is(err, expected) {
+				t.Error(err)
+
+			}
+		})
 
 	})
-
 }

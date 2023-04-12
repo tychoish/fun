@@ -68,7 +68,8 @@ func (wg *WaitGroup) IsDone() bool {
 	return wg.counter == 0
 }
 
-// Wait blocks until either the context is canceled or the
+// Wait blocks until either the context is canceled or all items have
+// completed.
 func (wg *WaitGroup) Wait(ctx context.Context) {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()

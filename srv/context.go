@@ -316,7 +316,12 @@ func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.WorkerFunc] {
 //
 // Use AddToWorkerPool with the specified key to dispatch work to this
 // worker pool.
-func SetWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) context.Context {
+func SetWorkerPool(
+	ctx context.Context,
+	key string,
+	queue *pubsub.Queue[fun.WorkerFunc],
+	opts itertool.Options,
+) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.InvariantMust(orca.Add(WorkerPool(queue, opts)))
 	})
@@ -345,7 +350,7 @@ func SetObserverWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fun.WorkerFunc],
-	observer func(error),
+	observer fun.Observer[error],
 	opts itertool.Options,
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {

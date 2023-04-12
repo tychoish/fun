@@ -9,6 +9,40 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+// Options describes the runtime options to several operations
+// operations. The zero value of this struct provides a usable strict
+// operation.
+type Options struct {
+	// ContinueOnPanic forces the entire IteratorMap operation to
+	// halt when a single map function panics. All panics are
+	// converted to errors and propagated to the output iterator's
+	// Close() method.
+	ContinueOnPanic bool
+	// ContinueOnError allows a map or generate function to return
+	// an error and allow the work of the broader operation to
+	// continue. Errors are aggregated propagated to the output
+	// iterator's Close() method.
+	ContinueOnError bool
+	// NumWorkers describes the number of parallel workers
+	// processing the incoming iterator items and running the map
+	// function. All values less than 1 are converted to 1. Any
+	// value greater than 1 will result in out-of-sequence results
+	// in the output iterator.
+	NumWorkers int
+	// OutputBufferSize controls how buffered the output pipe on the
+	// iterator should be. Typically this should be zero, but
+	// there are workloads for which a moderate buffer may be
+	// useful.
+	OutputBufferSize int
+	// IncludeContextExpirationErrors changes the default handling
+	// of context cancellation errors. By default all errors
+	// rooted in context cancellation are not propagated to the
+	// Close() method, however, when true, these errors are
+	// captured. All other error handling semantics
+	// (e.g. ContinueOnError) are applicable.
+	IncludeContextExpirationErrors bool
+}
+
 // ParallelForEach processes the iterator in parallel, and is
 // essentially an iterator-driven worker pool. The input iterator is
 // split dynamically into iterators for every worker (determined by
@@ -88,79 +122,6 @@ func forEachWorker[T any](
 	}
 }
 
-// ParallelObserve is a special case of ParallelObserve to support observer pattern
-// functions. Observe functions should be short running as they do not
-// take a context, and could block unexpectedly.
-func ParallelObserve[T any](ctx context.Context, iter fun.Iterator[T], obfn func(T), opts Options) error {
-	return ParallelForEach(ctx, iter, func(_ context.Context, in T) error { obfn(in); return nil }, opts)
-}
-
-// WorkerPool process the worker functions in the provided
-// iterator. Unlike fun.WorkerPool, this implementation checks has
-// options for handling errors and aborting on error.
-//
-// The pool follows the semantics configured by the Options, with
-// regards to error handling, panic handling, and parallelism. Errors
-// are collected and propagated WorkerPool output.
-func WorkerPool(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], opts Options) error {
-	return ParallelForEach(ctx, iter,
-		func(ctx context.Context, wf fun.WorkerFunc) error { return wf.Run(ctx) },
-		opts,
-	)
-}
-
-// ObserveWorkerPool executes the worker functions from the iterator
-// in a worker pool that operates according to the Options
-// configuration: including pool size, and error and panic handling.
-// If a worker panics, ObserveWorkerPool will convert the panic(s)
-// into an error, and pass that panic through the observe function.
-func ObserveWorkerPool(ctx context.Context, iter fun.Iterator[fun.WorkerFunc], ob func(error), opts Options) {
-	// use ForEach rather than Observe to thread the context
-	// through to the workers less indirectly.
-	if err := ParallelForEach(ctx, iter,
-		func(ctx context.Context, wf fun.WorkerFunc) error {
-			wf.Observe(ctx, ob)
-			return nil
-		}, opts,
-	); err != nil {
-		ob(err)
-	}
-}
-
-// Options describes the runtime options to several operations
-// operations. The zero value of this struct provides a usable strict
-// operation.
-type Options struct {
-	// ContinueOnPanic forces the entire IteratorMap operation to
-	// halt when a single map function panics. All panics are
-	// converted to errors and propagated to the output iterator's
-	// Close() method.
-	ContinueOnPanic bool
-	// ContinueOnError allows a map or generate function to return
-	// an error and allow the work of the broader operation to
-	// continue. Errors are aggregated propagated to the output
-	// iterator's Close() method.
-	ContinueOnError bool
-	// NumWorkers describes the number of parallel workers
-	// processing the incoming iterator items and running the map
-	// function. All values less than 1 are converted to 1. Any
-	// value greater than 1 will result in out-of-sequence results
-	// in the output iterator.
-	NumWorkers int
-	// OutputBufferSize controls how buffered the output pipe on the
-	// iterator should be. Typically this should be zero, but
-	// there are workloads for which a moderate buffer may be
-	// useful.
-	OutputBufferSize int
-	// IncludeContextExpirationErrors changes the default handling
-	// of context cancellation errors. By default all errors
-	// rooted in context cancellation are not propagated to the
-	// Close() method, however, when true, these errors are
-	// captured. All other error handling semantics
-	// (e.g. ContinueOnError) are applicable.
-	IncludeContextExpirationErrors bool
-}
-
 // Map provides an orthodox functional map implementation based around
 // fun.Iterator. Operates in asynchronous/streaming manner, so that
 // the output Iterator must be consumed. The zero values of Options
@@ -179,7 +140,7 @@ func Map[T any, O any](
 	mapper func(context.Context, T) (O, error),
 	opts Options,
 ) fun.Iterator[O] {
-	out := new(internal.MapIterImpl[O])
+	out := new(internal.ChannelIterImpl[O])
 	safeOut := Synchronize[O](out)
 	toOutput := make(chan O)
 	catcher := &erc.Collector{}
@@ -304,7 +265,7 @@ func Generate[T any](
 		opts.OutputBufferSize = 0
 	}
 
-	out := new(internal.MapIterImpl[T])
+	out := new(internal.ChannelIterImpl[T])
 	pipe := make(chan T, opts.OutputBufferSize)
 	catcher := &erc.Collector{}
 	out.Pipe = pipe
@@ -372,11 +333,8 @@ func generator[T any](
 			continue
 		}
 
-		select {
-		case <-ctx.Done():
+		if err := internal.SendOne(ctx, internal.Blocking(true), out, value); err != nil {
 			return
-		case out <- value:
-			continue
 		}
 	}
 }

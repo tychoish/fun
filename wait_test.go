@@ -194,7 +194,7 @@ func TestWait(t *testing.T) {
 		}
 		seen := make(map[int]struct{})
 		counter := 0
-		wf := ObserveWait[int](internal.NewSliceIter(ops), func(in int) {
+		wf := ObserveWorker[int](internal.NewSliceIter(ops), func(in int) {
 			seen[in] = struct{}{}
 			counter++
 		})
@@ -202,7 +202,9 @@ func TestWait(t *testing.T) {
 			t.Error("should be lazy execution", counter, seen)
 		}
 
-		wf(testt.Context(t))
+		if err := wf(testt.Context(t)); err != nil {
+			t.Error(err)
+		}
 
 		if len(seen) != 100 {
 			t.Error(len(seen), seen)

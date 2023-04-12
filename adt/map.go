@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -32,13 +31,15 @@ type Map[K comparable, V any] struct {
 	mp      sync.Map
 }
 
-func (mp *Map[K, V]) Delete(key K)                { mp.mp.Delete(key) }
-func (mp *Map[K, V]) Store(k K, v V)              { mp.mp.Store(k, v) }
-func (mp *Map[K, V]) Set(it MapItem[K, V])        { mp.Store(it.Key, it.Value) }
-func (mp *Map[K, V]) Append(its ...MapItem[K, V]) { mp.Extend(its) }
-func (mp *Map[K, V]) Ensure(key K)                { mp.EnsureDefault(key, mp.Default.Make) }
-func (mp *Map[K, V]) Contains(key K) bool         { _, ok := mp.mp.Load(key); return ok }
-func (mp *Map[K, V]) Load(key K) (V, bool)        { return mp.safeCast(mp.mp.Load(key)) }
+func (mp *Map[K, V]) Delete(key K)                   { mp.mp.Delete(key) }
+func (mp *Map[K, V]) Store(k K, v V)                 { mp.mp.Store(k, v) }
+func (mp *Map[K, V]) Set(it MapItem[K, V])           { mp.Store(it.Key, it.Value) }
+func (mp *Map[K, V]) Append(its ...MapItem[K, V])    { mp.Extend(its) }
+func (mp *Map[K, V]) Ensure(key K)                   { mp.EnsureDefault(key, mp.Default.Make) }
+func (mp *Map[K, V]) Contains(key K) bool            { _, ok := mp.mp.Load(key); return ok }
+func (mp *Map[K, V]) Load(key K) (V, bool)           { return mp.safeCast(mp.mp.Load(key)) }
+func (mp *Map[K, V]) EnsureStore(k K, v V) bool      { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
+func (mp *Map[K, V]) EnsureSet(i MapItem[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (V, bool) {
 	if v == nil {
@@ -95,8 +96,9 @@ func (mp *Map[K, V]) Extend(its []MapItem[K, V]) {
 }
 
 func (mp *Map[K, V]) StoreFrom(ctx context.Context, iter fun.Iterator[MapItem[K, V]]) {
-	fun.Observe(ctx, iter, func(it MapItem[K, V]) { mp.Store(it.Key, it.Value) })
+	fun.InvariantMust(fun.Observe(ctx, iter, func(it MapItem[K, V]) { mp.Store(it.Key, it.Value) }))
 }
+
 func (mp *Map[K, V]) Len() int {
 	count := 0
 	mp.Range(func(K, V) bool { count++; return true })
@@ -109,18 +111,15 @@ func (mp *Map[K, V]) Range(f func(K, V) bool) {
 }
 
 func (mp *Map[K, V]) Iterator() fun.Iterator[MapItem[K, V]] {
-	iter := &internal.MapIterImpl[MapItem[K, V]]{}
+	iter := &internal.ChannelIterImpl[MapItem[K, V]]{}
 	pipe := make(chan MapItem[K, V])
 	iter.Pipe = pipe
 	ctx, cancel := context.WithCancel(internal.BackgroundContext)
 	iter.Closer = cancel
-	ec := &erc.Collector{}
 	iter.WG.Add(1)
 	go func() {
 		defer iter.WG.Done()
 		defer close(pipe)
-		defer func() { iter.Error = ec.Resolve() }()
-		defer erc.Recover(ec)
 		mp.Range(func(key K, value V) bool {
 			select {
 			case <-ctx.Done():
@@ -131,4 +130,12 @@ func (mp *Map[K, V]) Iterator() fun.Iterator[MapItem[K, V]] {
 		})
 	}()
 	return iter
+}
+
+func (mp *Map[K, V]) Keys() fun.Iterator[K] {
+	return fun.Transform(mp.Iterator(), func(in MapItem[K, V]) (K, error) { return in.Key, nil })
+}
+
+func (mp *Map[K, V]) Values() fun.Iterator[V] {
+	return fun.Transform(mp.Iterator(), func(in MapItem[K, V]) (V, error) { return in.Value, nil })
 }

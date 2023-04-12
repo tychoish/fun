@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -34,7 +33,8 @@ func Has[T comparable](t testing.TB, iter fun.Iterator[T], item T) {
 func NotHas[T comparable](t testing.TB, iter fun.Iterator[T], item T) {
 	t.Helper()
 
-	fun.Observe(testt.Context(t), iter, func(val T) { assert.NotEqual(t, item, val) })
+	assert.NotError(t, fun.Observe(testt.Context(t), iter, func(val T) { assert.NotEqual(t, item, val) }))
+
 }
 
 func CheckSeenMap[T comparable](t *testing.T, elems []T, seen map[T]struct{}) {
@@ -150,53 +150,6 @@ func RunIteratorImplementationTests[T comparable](
 								}
 							})
 							t.Run("PanicSafety", func(t *testing.T) {
-								t.Run("Filter", func(t *testing.T) {
-									outIter := Filter(
-										ctx,
-										filter.Filter(baseBuilder(elems)),
-										func(input T) T {
-											panic("whoop")
-										},
-									)
-									out, err := CollectSlice(ctx, outIter)
-									if err == nil {
-										t.Fatal("expectged error")
-									}
-									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
-									if len(out) != 0 {
-										t.Fatal("unexpected output", out)
-									}
-									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-								})
-								t.Run("ForEach", func(t *testing.T) {
-									err := ForEach(
-										ctx,
-										filter.Filter(baseBuilder(elems)),
-										func(input T) error {
-											panic("whoop")
-										},
-									)
-
-									if err == nil {
-										t.Fatal("expectged error")
-									}
-									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
-									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-								})
-								t.Run("Observe", func(t *testing.T) {
-									err := Observe(
-										ctx,
-										filter.Filter(baseBuilder(elems)),
-										func(input T) {
-											panic("whoop")
-										},
-									)
-
-									if err == nil {
-										t.Fatal("expectged error")
-									}
-									check.ErrorIs(t, err, fun.ErrRecoveredPanic)
-								})
 								t.Run("Map", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
 										Map(ctx,
@@ -268,55 +221,11 @@ func RunIteratorIntegerAlgoTests(
 
 					for _, filter := range filters {
 						t.Run(filter.Name, func(t *testing.T) {
-							t.Run("Transformer", func(t *testing.T) {
-								ctx, cancel := context.WithCancel(context.Background())
-								defer cancel()
-
-								iter := Synchronize(baseBuilder(elems))
-								count := &atomic.Int64{}
-								out := Transform(ctx, iter,
-									func(in int) string { count.Add(1); return strconv.Itoa(in) })
-								strs, err := CollectSlice(ctx, out)
-								check.NotError(t, err)
-								check.Equal(t, int(count.Load()), len(elems))
-								t.Log(count.Load(), len(elems), strs)
-								assert.Equal(t, len(strs), len(elems))
-							})
-							t.Run("ForEach", func(t *testing.T) {
-								t.Run("ErrorAborts", func(t *testing.T) {
-									var count int
-									seen := set.NewUnordered[int]()
-									err := ForEach(
-										ctx,
-										filter.Filter(baseBuilder(elems)),
-										func(in int) error {
-											count++
-											seen.Add(in)
-											if count >= len(elems)/2 {
-												return errors.New("whoop")
-											}
-
-											return nil
-										})
-
-									if err == nil {
-										t.Fatal("expected error")
-									}
-									if err.Error() != "whoop" {
-										t.Error(err)
-									}
-									if count != len(elems)/2 {
-										t.Error("count should have been 60, but was", count)
-									}
-									if count != seen.Len() {
-										t.Error("impossible", count, seen.Len())
-									}
-								})
-							})
 							t.Run("Map", func(t *testing.T) {
 								t.Run("ErrorDoesNotAbort", func(t *testing.T) {
 									out, err := CollectSlice(ctx,
-										Map(ctx,
+										Map(
+											ctx,
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input int) (int, error) {
 												if input == elems[2] {
@@ -333,7 +242,7 @@ func RunIteratorIntegerAlgoTests(
 										t.Fatal("expected error")
 									}
 									if err.Error() != "whoop" {
-										t.Fatal(err)
+										t.Error(err)
 									}
 									if len(out) != len(elems)-1 {
 										t.Fatal("unexpected output", len(out), "->", out)
@@ -367,7 +276,8 @@ func RunIteratorIntegerAlgoTests(
 								t.Run("ErrorAborts", func(t *testing.T) {
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
-										Map(ctx,
+										Map(
+											ctx,
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input int) (int, error) {
 												if input >= elems[2] {
@@ -448,39 +358,6 @@ func RunIteratorStringAlgoTests(
 					for _, filter := range filters {
 						t.Run(filter.Name, func(t *testing.T) {
 							builder := func() fun.Iterator[string] { return filter.Filter(baseBuilder(elems)) }
-							t.Run("ForEach", func(t *testing.T) {
-								var count int
-								seen := make(map[string]struct{}, len(elems))
-								err := ForEach(
-									ctx,
-									builder(),
-									func(str string) error {
-										count++
-										seen[str] = struct{}{}
-										return nil
-									})
-								if err != nil {
-									t.Fatal(err)
-								}
-
-								CheckSeenMap(t, elems, seen)
-							})
-							t.Run("Observe", func(t *testing.T) {
-								var count int
-								seen := make(map[string]struct{}, len(elems))
-								err := Observe(
-									ctx,
-									builder(),
-									func(str string) {
-										count++
-										seen[str] = struct{}{}
-									})
-								if err != nil {
-									t.Fatal(err)
-								}
-
-								CheckSeenMap(t, elems, seen)
-							})
 							t.Run("Channel", func(t *testing.T) {
 								seen := make(map[string]struct{}, len(elems))
 								iter := builder()
@@ -718,7 +595,7 @@ func RunIteratorStringAlgoTests(
 										t.Fatal("should have errored")
 									}
 									if err.Error() != "beep" {
-										t.Fatalf("unexpected panic %q", err.Error())
+										t.Fatalf("unexpected error %q", err.Error())
 									}
 								})
 							})
