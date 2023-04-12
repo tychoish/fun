@@ -7,7 +7,7 @@ import (
 
 // ZeroOf returns the zero-value for the type T specified as an
 // argument.
-func ZeroOf[T any]() T { return *new(T) }
+func ZeroOf[T any]() T { var out T; return out }
 
 func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
 	select {
