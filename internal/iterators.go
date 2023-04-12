@@ -2,7 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"sync"
+	"sync/atomic"
 )
 
 // use internally for iterations we know are cannot block. USE WITH CAUTION
@@ -61,8 +65,50 @@ func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 	}
 	v, err := ReadOne(ctx, iter.Pipe)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			_ = iter.Close()
+		}
 		return false
 	}
 	iter.value = v
 	return true
+}
+
+type GeneratorIterator[T any] struct {
+	Operation func(context.Context) (T, error)
+	Closer    context.CancelFunc
+	Error     error
+	closed    atomic.Bool
+	value     T
+}
+
+func (iter *GeneratorIterator[T]) Value() T { return iter.value }
+func (iter *GeneratorIterator[T]) Close() error {
+	if iter.Closer != nil {
+		iter.Closer()
+	}
+	iter.closed.Store(true)
+	return iter.Error
+}
+
+func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {
+	if ctx.Err() != nil || iter.closed.Load() {
+		fmt.Println("one", iter.closed.Load(), ctx.Err())
+		return false
+	}
+
+	v, err := iter.Operation(ctx)
+	switch {
+	case err == nil:
+		iter.value = v
+		return true
+	case errors.Is(err, context.Canceled):
+	case errors.Is(err, context.DeadlineExceeded):
+	case errors.Is(err, io.EOF):
+		_ = iter.Close()
+	default:
+		iter.Error = err
+		_ = iter.Close()
+	}
+	return false
 }

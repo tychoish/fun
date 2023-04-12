@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/seq"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestService(t *testing.T) {
@@ -400,4 +401,29 @@ func TestService(t *testing.T) {
 		assert.Error(t, oberr.Get())
 		assert.Equal(t, err.Error(), oberr.Get().Error())
 	})
+	t.Run("Worker", func(t *testing.T) {
+		t.Run("Timeout", func(t *testing.T) {
+			s := makeBlockingService(t)
+			ctx := testt.ContextWithTimeout(t, 10*time.Millisecond)
+			var err error
+			assert.MaxRuntime(t, 20*time.Millisecond, func() {
+				err = s.Worker()(ctx)
+			})
+			assert.Error(t, err)
+			assert.True(t, erc.ContextExpired(err))
+			assert.True(t, s.isStarted.Load())
+		})
+		t.Run("ErrorPropogate", func(t *testing.T) {
+			expected := errors.New("run")
+			s := &Service{
+				Run:      func(context.Context) error { return expected },
+				Shutdown: func() error { return errors.New("shutdown") },
+			}
+
+			ctx := testt.Context(t)
+			err := s.Worker()(ctx)
+			assert.ErrorIs(t, err, expected)
+		})
+	})
+
 }

@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -116,12 +117,7 @@ func IgnoreMust[T any, O any](fn func(T) (O, error), arg T) O {
 // produce an error, and, if the function panics, converts it into an
 // error.
 func Check(fn func()) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = buildRecoverError(r)
-		}
-	}()
-
+	defer func() { err = buildRecoverError(recover()) }()
 	fn()
 	return
 }
@@ -129,16 +125,54 @@ func Check(fn func()) (err error) {
 // Safe runs a function with a panic handler that converts the panic
 // to an error.
 func Safe[T any](fn func() T) (out T, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = buildRecoverError(r)
-		}
-	}()
+	defer func() { err = buildRecoverError(recover()) }()
 	out = fn()
 	return
 }
 
+// Protect wraps a function with a panic handler, that will parse and
+// attach the content of the pantic to the error output (while
+// maintaining the functions orginial error.) All handled panics will
+// be annotated with fun.ErrRecoveredPanic.
+func Protect[I any, O any](fn func(I) (O, error)) func(I) (O, error) {
+	return func(in I) (out O, err error) {
+		defer func() { err = mergeWithRecover(err, recover()) }()
+		return fn(in)
+	}
+}
+
+// Observer describes a function that operates on a single object, but
+// returns no output, and is used primarly for side effects,
+// particularly around handling errors or collecting metrics. The
+// Observer implementation here makes it possible to provide
+// panic-safety for these kinds of functions or easily convert to
+// other related types.
+type Observer[T any] func(T)
+
+// Safe handles any panic encountered during the observer's execution
+// and converts it to an error.
+func (of Observer[T]) Safe(in T) (err error) {
+	defer func() { err = buildRecoverError(recover()) }()
+	of(in)
+	return
+}
+
+// Worker captures a variable and returns a worker function which
+// will, when executed, observe the input value. These worker
+// functions, use the Safe-mode of execution.
+func (of Observer[T]) Worker(in T) WorkerFunc {
+	return func(context.Context) (err error) { return of.Safe(in) }
+}
+
+// Wait captures a variable and converts an Observer into a wait
+// function that observes the value when the WaitFunc runs.
+func (of Observer[T]) Wait(in T) WaitFunc { return func(context.Context) { of(in) } }
+
 func buildRecoverError(r any) error {
+	if r == nil {
+		return nil
+	}
+
 	switch in := r.(type) {
 	case error:
 		return &internal.MergedError{
@@ -151,4 +185,8 @@ func buildRecoverError(r any) error {
 			Wrapped: ErrRecoveredPanic,
 		}
 	}
+}
+
+func mergeWithRecover(err error, r any) error {
+	return internal.MergeErrors(err, buildRecoverError(r))
 }

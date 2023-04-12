@@ -145,7 +145,9 @@ func TestDistributor(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 				queue.Close()
 			}()
-			fun.Observe(ctx, iter, func(in string) { set.Add(in); seen++ })
+			if err := fun.Observe(ctx, iter, func(in string) { set.Add(in); seen++ }); err != nil {
+				t.Fatal(err)
+			}
 			if iter.Next(ctx) {
 				t.Error("iterator should be empty")
 			}

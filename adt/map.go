@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -97,8 +96,9 @@ func (mp *Map[K, V]) Extend(its []MapItem[K, V]) {
 }
 
 func (mp *Map[K, V]) StoreFrom(ctx context.Context, iter fun.Iterator[MapItem[K, V]]) {
-	fun.Observe(ctx, iter, func(it MapItem[K, V]) { mp.Store(it.Key, it.Value) })
+	fun.InvariantMust(fun.Observe(ctx, iter, func(it MapItem[K, V]) { mp.Store(it.Key, it.Value) }))
 }
+
 func (mp *Map[K, V]) Len() int {
 	count := 0
 	mp.Range(func(K, V) bool { count++; return true })
@@ -116,13 +116,10 @@ func (mp *Map[K, V]) Iterator() fun.Iterator[MapItem[K, V]] {
 	iter.Pipe = pipe
 	ctx, cancel := context.WithCancel(internal.BackgroundContext)
 	iter.Closer = cancel
-	ec := &erc.Collector{}
 	iter.WG.Add(1)
 	go func() {
 		defer iter.WG.Done()
 		defer close(pipe)
-		defer func() { iter.Error = ec.Resolve() }()
-		defer erc.Recover(ec)
 		mp.Range(func(key K, value V) bool {
 			select {
 			case <-ctx.Done():
@@ -133,4 +130,12 @@ func (mp *Map[K, V]) Iterator() fun.Iterator[MapItem[K, V]] {
 		})
 	}()
 	return iter
+}
+
+func (mp *Map[K, V]) Keys() fun.Iterator[K] {
+	return fun.Transform(mp.Iterator(), func(in MapItem[K, V]) (K, error) { return in.Key, nil })
+}
+
+func (mp *Map[K, V]) Values() fun.Iterator[V] {
+	return fun.Transform(mp.Iterator(), func(in MapItem[K, V]) (V, error) { return in.Value, nil })
 }

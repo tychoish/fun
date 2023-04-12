@@ -189,7 +189,8 @@ func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
+		_ = Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
+
 	}()
 
 	return wg.Wait

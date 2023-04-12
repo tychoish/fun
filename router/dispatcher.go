@@ -349,23 +349,22 @@ func (r *Dispatcher) registerProcessResponseService() error {
 			case <-ctx.Done():
 				return nil
 			case <-r.isRunning:
-				return itertool.WorkerPool(ctx,
-					itertool.Transform(ctx, r.outgoing.Iterator(), func(rr Response) fun.WorkerFunc {
-						return func(ctx context.Context) error {
-							if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
-								rr.Error = err
-								r.broker.Publish(ctx, rr)
-								return ctx.Err()
-							}
-
-							if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
-								rr.Error = erc.Merge(err, rr.Error)
-							}
-
+				return itertool.ParallelForEach(ctx, r.outgoing.Iterator(),
+					func(ctx context.Context, rr Response) error {
+						if err := r.doIntercept(ctx, Protocol{}, &rr); err != nil {
+							rr.Error = err
 							r.broker.Publish(ctx, rr)
 							return ctx.Err()
 						}
-					}),
+
+						if err := r.doIntercept(ctx, rr.Protocol, &rr); err != nil {
+							rr.Error = erc.Merge(err, rr.Error)
+						}
+
+						r.broker.Publish(ctx, rr)
+						return ctx.Err()
+
+					},
 					itertool.Options{NumWorkers: r.conf.Workers},
 				)
 			}
@@ -377,41 +376,35 @@ func (r *Dispatcher) registerMiddlwareService() error {
 	return r.orchestrator.Add(&srv.Service{
 		Shutdown: r.pipe.Close,
 		Run: func(ctx context.Context) error {
-			return itertool.WorkerPool(ctx,
-				// convert an iterator of messages to an iterator of workers:
-				itertool.Transform(ctx, r.pipe.IteratorBlocking(), func(req Message) fun.WorkerFunc {
-					// each worker processes the message through its middlewares
-					// (in the pool) and then passes the message off to the dispatcher/outgoing pool
-					return func(ctx context.Context) error {
-						var resp Response
-						var err error
+			return itertool.ParallelForEach(ctx, r.pipe.IteratorBlocking(),
+				func(ctx context.Context, req Message) error {
+					var resp Response
+					var err error
 
-						id := req.ID
-						protocol := req.Protocol
+					id := req.ID
+					protocol := req.Protocol
 
-						if err = r.doMiddleware(ctx, protocol, &req); err != nil {
-							resp.Error = err
-						} else if err = r.doMiddleware(ctx, Protocol{}, &req); err != nil {
-							resp.Error = err
-						} else {
-							resp = r.doHandler(ctx, protocol, req)
-						}
-
-						resp.ID = id
-
-						if resp.Protocol.IsZero() {
-							resp.Protocol = protocol
-						}
-
-						if err != nil {
-							resp.Error = &Error{Err: err, ID: id, Protocol: protocol}
-							r.ErrorObserver.Get()(resp.Error)
-						}
-						return r.outgoing.Add(resp)
+					if err = r.doMiddleware(ctx, protocol, &req); err != nil {
+						resp.Error = err
+					} else if err = r.doMiddleware(ctx, Protocol{}, &req); err != nil {
+						resp.Error = err
+					} else {
+						resp = r.doHandler(ctx, protocol, req)
 					}
-				}),
-				itertool.Options{NumWorkers: r.conf.Workers},
-			)
+
+					resp.ID = id
+
+					if resp.Protocol.IsZero() {
+						resp.Protocol = protocol
+					}
+
+					if err != nil {
+						resp.Error = &Error{Err: err, ID: id, Protocol: protocol}
+						r.ErrorObserver.Get()(resp.Error)
+					}
+					return r.outgoing.Add(resp)
+				},
+				itertool.Options{NumWorkers: r.conf.Workers})
 		},
 	})
 }

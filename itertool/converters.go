@@ -29,6 +29,10 @@ func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 // will have the values encountered before the error.
 func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error) {
 	out := []T{}
-	fun.Observe(ctx, iter, func(in T) { out = append(out, in) })
-	return out, iter.Close()
+	return out, fun.Observe(ctx, iter, func(in T) { out = append(out, in) })
+	// if err := fun.Observe(ctx, iter, func(in T) { out = append(out, in) }); err != nil {
+	// 	return nil, err
+	// }
+
+	// return out, nil
 }

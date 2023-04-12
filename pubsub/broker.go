@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/adt"
 )
 
 // stole this from
@@ -140,7 +140,7 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 }
 
 func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) {
-	subs := set.Synchronize(set.NewOrdered[chan T]())
+	subs := &adt.Map[chan T, struct{}]{}
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
@@ -149,7 +149,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 			case <-ctx.Done():
 				return
 			case msgCh := <-b.subCh:
-				subs.Add(msgCh)
+				subs.Ensure(msgCh)
 			case msgCh := <-b.unsubCh:
 				subs.Delete(msgCh)
 			case fn := <-b.stats:
@@ -190,7 +190,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 				if err != nil {
 					return
 				}
-				b.dispatchMessage(ctx, subs.Iterator(), msg)
+				b.dispatchMessage(ctx, subs.Keys(), msg)
 			}
 		}()
 	}
@@ -284,13 +284,15 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 
 // Unsubscribe removes a channel from the broker.
 func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
-	if ctx.Err() != nil {
-		return
-	}
-
 	select {
-	case <-ctx.Done():
 	case b.unsubCh <- msgCh:
+		// try to unsubscribe if the channel isn't full (it
+		// really shouldn't be.)
+	default:
+		select {
+		case b.unsubCh <- msgCh:
+		case <-ctx.Done():
+		}
 	}
 }
 

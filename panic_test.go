@@ -1,8 +1,10 @@
 package fun
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -10,6 +12,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestPanics(t *testing.T) {
@@ -307,6 +310,45 @@ func TestPanics(t *testing.T) {
 			}, "hello world")
 			assert.True(t, called.Load())
 			assert.Equal(t, 100, output)
+		})
+	})
+	t.Run("Protect", func(t *testing.T) {
+		assert.NotPanic(t, func() {
+			value, err := Protect(func(int) (out string, err error) {
+				panic(context.Canceled)
+			})(1)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.ErrorIs(t, err, ErrRecoveredPanic)
+			assert.Zero(t, value)
+		})
+	})
+	t.Run("Observer", func(t *testing.T) {
+		ctx := testt.Context(t)
+		var of Observer[string]
+		t.Run("Worker", func(t *testing.T) {
+			var called bool
+			of = func(string) {
+				called = true
+				panic(io.EOF)
+			}
+
+			assert.NotPanic(t, func() {
+				err := of.Worker("hi")(ctx)
+				assert.ErrorIs(t, err, io.EOF)
+				assert.ErrorIs(t, err, ErrRecoveredPanic)
+			})
+			assert.True(t, called)
+		})
+		t.Run("Wait", func(t *testing.T) {
+			var called bool
+			of = func(string) {
+				called = true
+				panic("hi")
+			}
+
+			assert.Panic(t, func() { of.Wait("hi")(ctx) })
+			assert.True(t, called)
 		})
 	})
 }
