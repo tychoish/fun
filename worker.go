@@ -47,11 +47,7 @@ func (wf WorkerFunc) Observe(ctx context.Context, ob Observer[error]) {
 // convert panics to errors.
 func (wf WorkerFunc) Singal(ctx context.Context) <-chan error {
 	out := make(chan error)
-	go func() {
-		defer close(out)
-		out <- wf.Safe(ctx)
-	}()
-
+	go func() { defer close(out); Blocking(out).Ignore(ctx, wf.Safe(ctx)) }()
 	return out
 }
 

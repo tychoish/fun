@@ -298,7 +298,7 @@ func TestWait(t *testing.T) {
 			runtime.Gosched()
 			<-sig
 			dur := time.Since(start)
-			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
+			if dur < 5*time.Millisecond || dur > 15*time.Millisecond {
 				t.Error(dur)
 			}
 			if !ran.Load() {

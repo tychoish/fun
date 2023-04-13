@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"sync"
@@ -73,25 +74,21 @@ func TestDistributor(t *testing.T) {
 
 				// add another so that the rest of the test works
 				err = buf.Send(ctx, "merlin")
-				check.ErrorIs(t, err, fun.ErrRecoveredPanic)
+				check.ErrorIs(t, err, io.EOF)
 
 				err = buf.Send(ctx, "kip")
-				if err == nil {
-					t.Error("expected error")
-				}
+				check.ErrorIs(t, err, io.EOF)
 
 				errs = erc.Unwind(err)
-				if len(errs) != 2 {
+				if len(errs) != 1 {
 					// panic+expected
 					t.Error(len(errs))
-					t.Log(errs)
 				}
 				err = buf.Send(ctx, "kip")
-				if err == nil {
-					t.Error("expected error")
-				}
+				check.ErrorIs(t, err, io.EOF)
+
 				errs = erc.Unwind(err)
-				if len(errs) != 2 {
+				if len(errs) != 1 {
 					// panic and the other
 					t.Error(len(errs))
 				}

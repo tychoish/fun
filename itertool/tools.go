@@ -333,7 +333,7 @@ func generator[T any](
 			continue
 		}
 
-		if err := internal.SendOne(ctx, internal.Blocking(true), out, value); err != nil {
+		if !fun.Blocking(out).Check(ctx, value) {
 			return
 		}
 	}

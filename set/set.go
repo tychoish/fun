@@ -78,7 +78,7 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 		defer close(pipe)
 
 		for item := range s {
-			if err := internal.SendOne(ctx, internal.Blocking(true), pipe, item); err != nil {
+			if !fun.Blocking(pipe).Check(ctx, item) {
 				return
 			}
 		}
