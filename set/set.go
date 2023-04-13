@@ -48,6 +48,17 @@ func BuildUnordered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set
 	return set
 }
 
+// BuildOrderedFromPairs produces an unordered set from a sequence of pairs.
+func BuildOrderedFromPairs[K, V comparable](pairs fun.Pairs[K, V]) Set[fun.Pair[K, V]] {
+	return BuildOrdered(internal.BackgroundContext, fun.Iterator[fun.Pair[K, V]](internal.NewSliceIter(pairs)))
+}
+
+// BuildUnorderedFromPairs produces an order-preserving set based on a
+// sequence of Pairs.
+func BuildUnorderedFromPairs[K, V comparable](pairs fun.Pairs[K, V]) Set[fun.Pair[K, V]] {
+	return BuildUnordered(internal.BackgroundContext, fun.Iterator[fun.Pair[K, V]](internal.NewSliceIter(pairs)))
+}
+
 type mapSetImpl[T comparable] map[T]struct{}
 
 func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }

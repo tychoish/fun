@@ -45,6 +45,8 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	}
 }
 
+// SetConstructor overrides the default constructor (which makes an
+// object with a Zero value by default) for Get/Make operations.
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
 	if in != nil {

@@ -194,24 +194,24 @@ func TestSet(t *testing.T) {
 		})
 	}
 	t.Run("Pairs/Basic", func(t *testing.T) {
-		pairs := Pairs[string, int]{
-			{"foo", 42},
-			{"bar", 31},
+		pairs := fun.Pairs[string, int]{
+			{Key: "foo", Value: 42},
+			{Key: "bar", Value: 31},
 		}
 
-		set := pairs.Set()
+		set := BuildUnorderedFromPairs(pairs)
 		if set.Len() != 2 {
 			t.Fatal("set conversion didn't work")
 		}
 
-		pmap := pairs.Map()
+		pmap := fun.Pairs[string, int](pairs).Map()
 		if v, ok := pmap["foo"]; !ok && v != 42 {
 			t.Error("value should exist, and have expected value", ok, v)
 		}
 
-		extraPair := Pair[string, int]{"foo", 89}
+		extraPair := fun.Pair[string, int]{Key: "foo", Value: 89}
 		pairs = append(pairs, extraPair)
-		set = pairs.OrderedSet()
+		set = BuildOrderedFromPairs(pairs)
 		if set.Len() != 3 {
 			t.Fatal("now three items in set")
 		}
@@ -245,19 +245,19 @@ func TestSet(t *testing.T) {
 			t.Errorf("saw=%d not 3", seen)
 		}
 
-		set = pairs.Set()
+		set = BuildUnorderedFromPairs(pairs)
 		if set.Len() != 3 {
 			t.Fatal("now three items in set")
 		}
 
-		pmap = pairs.Map()
+		pmap = fun.Pairs[string, int](pairs).Map()
 		if len(pmap) != 2 {
 			t.Fatal("deduplication of keys", pmap)
 		}
 		set.Delete(extraPair)
 
-		pairsFromMap := MakePairs(map[string]int{"foo": 42, "bar": 31})
-		set2 := pairsFromMap.Set()
+		pairsFromMap := fun.MakePairs(map[string]int{"foo": 42, "bar": 31})
+		set2 := BuildUnorderedFromPairs(pairsFromMap)
 		if !Equal(ctx, set, set2) {
 			t.Log(pairsFromMap)
 			t.Log(set)
@@ -265,20 +265,22 @@ func TestSet(t *testing.T) {
 			t.Error("pairs should be equal")
 		}
 
-		pairs = pairs.Append(Pair[string, int]{"kip", 14})
-		newItem := pairs[len(pairs)-1]
+		fp := fun.Pairs[string, int](pairs)
+
+		fp = fp.Append(fun.Pair[string, int]{Key: "kip", Value: 14})
+		newItem := fp[len(fp)-1]
 		if newItem.Key != "kip" {
 			t.Error("wrong key value", newItem.Key)
 		}
 
-		pairs.Add("merlin", 14)
-		newItem = pairs[len(pairs)-1]
+		fp.Add("merlin", 14)
+		newItem = fp[len(fp)-1]
 		if newItem.Key != "merlin" {
 			t.Error("wrong key value", newItem.Key)
 		}
 	})
 	t.Run("Pairs/DuplicateKey", func(t *testing.T) {
-		pairs := Pairs[string, string]{}
+		pairs := fun.Pairs[string, string]{}
 		pairs.Add("aaa", "bbb")
 		pairs.Add("aaa", "bbb")
 		pairs.Add("aaa", "ccc")
@@ -289,15 +291,19 @@ func TestSet(t *testing.T) {
 
 		for _, tt := range []struct {
 			Name    string
-			MakeSet func() Set[Pair[string, string]]
+			MakeSet func() Set[fun.Pair[string, string]]
 		}{
 			{
-				Name:    "Map",
-				MakeSet: pairs.Set,
+				Name: "Map",
+				MakeSet: func() Set[fun.Pair[string, string]] {
+					return BuildUnorderedFromPairs(pairs)
+				},
 			},
 			{
-				Name:    "Ordered",
-				MakeSet: pairs.OrderedSet,
+				Name: "Ordered",
+				MakeSet: func() Set[fun.Pair[string, string]] {
+					return BuildOrderedFromPairs(pairs)
+				},
 			},
 		} {
 			t.Run(tt.Name, func(t *testing.T) {
