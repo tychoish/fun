@@ -39,7 +39,7 @@ func TestIterator(t *testing.T) {
 		if uiter == iter {
 			t.Error("unwrap should not be the same")
 		}
-		if _, ok := uiter.(*internal.ChannelIterImpl[MapItem[string, int]]); !ok {
+		if _, ok := uiter.(*internal.ChannelIterImpl[fun.Pair[string, int]]); !ok {
 			t.Errorf("%T", uiter)
 		}
 

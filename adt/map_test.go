@@ -16,6 +16,47 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
+// When implementing the Map[K,V] type, I wrote a number of
+// convenience functions for adding and modifying the map. As I was
+// reviewing and documenting the code, these function, which are
+// ergonomic are a bit confusing, and may hide that they're not
+// strictly speaking atomic (e.g. the underlying map can be modified
+// during the execution which may lead to unexpected semantics, but
+// will never trigger the race detector.)
+//
+// If these operations were complicated or gnarly, I might have left
+// them with sizeable disclaimers, but they're largely one-liners that
+// would be simple to write for most users.
+//
+// Given that I'd already written tests, and they're not absurd, I
+// thought it would be easier to leave them here in the tests with
+// this note in case my (or someone elses!) thinking evolves.
+
+// Join adds the keys of the input map to the current map. This uses a
+// Range function from the input map, and may have inconsistent
+// results if the input map is mutated during the operation. Keys and
+// values from the input map will replace keys and values from the
+// output map.
+func (mp *Map[K, V]) Join(in *Map[K, V]) {
+	in.Range(func(k K, v V) bool { mp.Store(k, v); return true })
+}
+
+// StoreFrom extends an the content from a map, with the content of an
+// iterator of Pairs.
+func (mp *Map[K, V]) StoreFrom(ctx context.Context, iter fun.Iterator[fun.Pair[K, V]]) {
+	fun.InvariantMust(fun.Observe(ctx, iter, func(it fun.Pair[K, V]) { mp.Store(it.Key, it.Value) }))
+}
+
+// Append adds a sequence of pairs to the map.
+func (mp *Map[K, V]) Append(its ...fun.Pair[K, V]) { mp.Extend(its) }
+
+// Extend adds a slice of pairs to the map.
+func (mp *Map[K, V]) Extend(its []fun.Pair[K, V]) {
+	for _, it := range its {
+		mp.Store(it.Key, it.Value)
+	}
+}
+
 func TestMap(t *testing.T) {
 	t.Parallel()
 	t.Run("StoreItems", func(t *testing.T) {
@@ -128,7 +169,7 @@ func TestMap(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 100; i++ {
-			mp.Set(MapItem[int, int]{Key: i, Value: rand.Int() + 43})
+			mp.Set(fun.Pair[int, int]{Key: i, Value: rand.Int() + 43})
 		}
 
 		for i := 0; i < 200; i++ {
@@ -269,54 +310,16 @@ func TestMap(t *testing.T) {
 			assert.Equal(t, mp.Get("foo"), 500)
 		})
 	})
-	t.Run("Populate", func(t *testing.T) {
-		t.Run("Disjoint", func(t *testing.T) {
-			mp := &Map[string, int]{}
-			mp.Store("foo", 100)
-			mp.Store("bar", 100)
-			mp2 := map[string]int{
-				"foofoo": 100,
-				"barfoo": 100,
-			}
-			assert.Equal(t, 2, mp.Len())
-			assert.Equal(t, 2, len(mp2))
-			mp.Populate(mp2)
-			assert.Equal(t, 4, mp.Len())
-			assert.Equal(t, 2, len(mp2))
-		})
-		t.Run("Overlapping", func(t *testing.T) {
-			mp := &Map[string, int]{}
-			mp.Store("foo", 100)
-			mp.Store("bar", 100)
-			mp2 := map[string]int{
-				"foo": 500,
-				"baz": 100,
-			}
-			assert.Equal(t, 2, mp.Len())
-			assert.Equal(t, 2, len(mp2))
-			mp.Populate(mp2)
-			assert.Equal(t, 2, len(mp2))
-			assert.Equal(t, 3, mp.Len())
-			assert.Equal(t, mp.Get("foo"), 500)
-		})
-	})
 	t.Run("Append", func(t *testing.T) {
 		mp := &Map[string, int]{}
 		assert.Equal(t, 0, mp.Len())
-		mp.Append(NewMapItem("foo", 400))
+		mp.Append(fun.MakePair("foo", 400))
 		assert.Equal(t, 1, mp.Len())
-		mp.Append(NewMapItem("foo", 42), NewMapItem("bar", 3))
+		mp.Append(fun.MakePair("foo", 42), fun.MakePair("bar", 3))
 		assert.Equal(t, 2, mp.Len())
 		assert.Equal(t, 42, mp.Get("foo"))
-		mp.Append(NewMapItem("foofoo", 42), NewMapItem("baz", 3))
+		mp.Append(fun.MakePair("foofoo", 42), fun.MakePair("baz", 3))
 		assert.Equal(t, 4, mp.Len())
-	})
-	t.Run("Export", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		mp.Store("foo", 100)
-		xp := mp.Export()
-		assert.Equal(t, len(xp), 1)
-		assert.Equal(t, xp["foo"], 100)
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("HappyPath", func(t *testing.T) {
@@ -340,11 +343,11 @@ func TestMap(t *testing.T) {
 
 	t.Run("Ensure", func(t *testing.T) {
 		mp := &Map[string, int]{}
-		ok := mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 100})
+		ok := mp.EnsureSet(fun.Pair[string, int]{Key: "hi", Value: 100})
 		check.True(t, ok)
-		ok = mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 100})
+		ok = mp.EnsureSet(fun.Pair[string, int]{Key: "hi", Value: 100})
 		check.True(t, !ok)
-		ok = mp.EnsureSet(MapItem[string, int]{Key: "hi", Value: 10})
+		ok = mp.EnsureSet(fun.Pair[string, int]{Key: "hi", Value: 10})
 		check.True(t, !ok)
 	})
 	t.Run("Iterators", func(t *testing.T) {

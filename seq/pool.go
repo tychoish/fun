@@ -24,13 +24,13 @@ func init() {
 }
 
 func getElementPool[T any](val T) *adt.Pool[*Element[T]] {
+	// beause types aren't comparble/values you can't use them as
+	// keys in maps, this is just a trick to get a string that's usable.
 	key := fmt.Sprintf("%T", val)
 	if out, ok := elemPools.Load(key); ok {
 		return out.(*adt.Pool[*Element[T]])
 	}
 
-	// beause types aren't comparble/values you can't use them as
-	// keys in maps, this is just a trick to get a string that's usable.
 	return elemPools.EnsureDefault(key, func() any {
 		pool := &adt.Pool[*Element[T]]{}
 		pool.SetConstructor(func() *Element[T] {
