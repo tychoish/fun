@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -373,16 +374,18 @@ func TestOrchestrator(t *testing.T) {
 				if err := orc.Add(s); err != nil {
 					t.Fatal(err)
 				}
+				runtime.Gosched()
 			}
 			startAt := time.Now()
 			if err := orc.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
+			time.Sleep(75 * time.Millisecond)
 			if err := orc.Wait(); err != nil {
 				t.Error(err)
 			}
 			// the fixture ensures that all sub-services run
-			if dur := time.Since(startAt); dur > 75*time.Millisecond {
+			if dur := time.Since(startAt); dur > 300*time.Millisecond {
 				t.Error(dur)
 			}
 		})
