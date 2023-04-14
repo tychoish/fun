@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 )
 
 // Distributor provides a layer of indirection above queue-like
@@ -93,7 +92,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 			ec := &erc.Collector{}
 			defer func() { err = ec.Resolve() }()
 			defer erc.Recover(ec)
-			ec.Add(internal.SendOne(ctx, internal.SendModeBlocking, ch, in))
+			ec.Add(fun.Blocking(ch).Send(ctx, in))
 			return
 		},
 		pop: func(ctx context.Context) (T, error) {
