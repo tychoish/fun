@@ -8,12 +8,12 @@ you *could* write one-offs for but shouldn't.
 
 Packages:
 
-- [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error collecting)
-- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool) (iterator tools)
+- [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error collecting.)
+- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool) (iterator tools.)
 - [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message broker
-  and queues)
+  and queues.)
 - [set](https://pkg.go.dev/github.com/tychoish/fun/set) (generic
-  ordered and unordered sets)
+  ordered and unordered sets.)
 - [seq](https://pkg.go.dev/github.com/tychoish/fun/seq) (generic
   linked lists.)
 - [srv](https://pkg.go.dev/github.com/tychoish/fun/seq) (service
