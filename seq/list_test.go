@@ -10,6 +10,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
@@ -238,6 +239,18 @@ func TestList(t *testing.T) {
 		})
 	})
 	t.Run("Iterators", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
+			list := &seq.List[int]{}
+			ct := 0
+			assert.NotPanic(t, func() {
+				iter := list.Iterator()
+				for iter.Next(ctx) {
+					ct++
+				}
+				check.NotError(t, iter.Close())
+			})
+			assert.Zero(t, ct)
+		})
 		t.Run("Forward", func(t *testing.T) {
 			list := &seq.List[int]{}
 			for i := 1; i <= 100; i++ {

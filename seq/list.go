@@ -439,11 +439,11 @@ func (iter *elemIter[T]) getNext(next direction) *Element[T] {
 func (iter *elemIter[T]) Close() error       { iter.closed = true; return nil }
 func (iter *elemIter[T]) Value() *Element[T] { return iter.elem }
 func (iter *elemIter[T]) Next(ctx context.Context) bool {
-	if iter.list == nil {
+	if iter.list == nil && iter.elem != nil {
 		iter.list = iter.elem.list
 	}
 
-	if iter.closed || ctx.Err() != nil {
+	if iter.closed || (iter.list == nil && iter.elem == nil) || ctx.Err() != nil {
 		return false
 	}
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
@@ -272,6 +273,18 @@ func TestStack(t *testing.T) {
 		})
 	})
 	t.Run("Iterators", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
+			list := &seq.Stack[int]{}
+			ct := 0
+			assert.NotPanic(t, func() {
+				iter := list.Iterator()
+				for iter.Next(ctx) {
+					ct++
+				}
+				check.NotError(t, iter.Close())
+			})
+			assert.Zero(t, ct)
+		})
 		t.Run("Content", func(t *testing.T) {
 			stack := GenerateStack(t, 100)
 			items := fun.Must(itertool.CollectSlice(ctx, seq.StackValues(stack.Iterator())))

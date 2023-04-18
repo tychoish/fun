@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/set"
+	"github.com/tychoish/fun/testt"
 )
 
 func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureIteratorConstuctors[T] {
@@ -586,4 +588,18 @@ func TestParallelForEach(t *testing.T) {
 			t.Error(len(errs))
 		}
 	})
+}
+
+func TestEmptyIteration(t *testing.T) {
+	ctx := testt.Context(t)
+
+	ch := make(chan int)
+	close(ch)
+
+	t.Run("EmptyObserve", func(t *testing.T) {
+		assert.NotError(t, fun.Observe(ctx, Slice([]int{}), func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, fun.Observe(ctx, Variadic[int](), func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, fun.Observe(ctx, Channel(ch), func(in int) { t.Fatal("should not be called") }))
+	})
+
 }

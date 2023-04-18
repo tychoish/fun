@@ -91,7 +91,7 @@ func (iter *GeneratorIterator[T]) Close() error {
 }
 
 func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {
-	if ctx.Err() != nil || iter.closed.Load() {
+	if ctx.Err() != nil || iter.Operation == nil || iter.closed.Load() {
 		return false
 	}
 
