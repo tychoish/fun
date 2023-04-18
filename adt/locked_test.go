@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 )
 
@@ -17,6 +18,12 @@ func TestLocked(t *testing.T) {
 		seed[idx] = num
 	}
 	val.Set(seed)
+	second := val.Get()
+
+	assert.Equal(t, len(seed), len(second))
+	for idx := range seed {
+		assert.Equal(t, seed[idx], second[idx])
+	}
 
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 30; i++ {

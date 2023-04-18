@@ -23,5 +23,8 @@ func (s *Synchronized[T]) With(in func(obj T)) { defer s.withLock()(); in(s.obj)
 // caution.
 func (s *Synchronized[T]) Set(in T) { defer s.withLock()(); s.obj = in }
 
+// Get returns the underlying protected object. Use with caution.
+func (s *Synchronized[T]) Get() T { defer s.withLock()(); return s.obj }
+
 // withLock provides a terse
 func (s *Synchronized[T]) withLock() func() { s.mtx.Lock(); return s.mtx.Unlock }
