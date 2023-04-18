@@ -50,8 +50,12 @@ func (mp *Map[K, V]) Contains(key K) bool { _, ok := mp.mp.Load(key); return ok 
 // the key was present in the map.
 func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key)) }
 
-// Ensure store takes a value
-func (mp *Map[K, V]) EnsureStore(k K, v V) bool       { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
+// Ensure store takes a value and returns true if the value was stored
+// in the map.
+func (mp *Map[K, V]) EnsureStore(k K, v V) bool { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
+
+// EnsureSet has the same semantics as EnsureStore, but takes a fun.Pair
+// object.
 func (mp *Map[K, V]) EnsureSet(i fun.Pair[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (V, bool) {
