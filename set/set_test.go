@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/itertool"
 )
 
@@ -33,6 +35,19 @@ func TestSet(t *testing.T) {
 		"Ordered/Linked":           func() Set[string] { return MakeNewOrdered[string]() },
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Run("EmptyIteraton", func(t *testing.T) {
+				set := builder()
+				ct := 0
+				assert.NotPanic(t, func() {
+					iter := set.Iterator()
+					for iter.Next(ctx) {
+						ct++
+					}
+					check.NotError(t, iter.Close())
+				})
+				assert.Zero(t, ct)
+			})
+
 			t.Run("Initialization", func(t *testing.T) {
 				set := builder()
 				if set.Len() != 0 {

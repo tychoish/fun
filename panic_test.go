@@ -323,6 +323,16 @@ func TestPanics(t *testing.T) {
 			assert.Zero(t, value)
 		})
 	})
+	t.Run("MustBeOk", func(t *testing.T) {
+		assert.NotPanic(t, func() {
+			foo := MustBeOk(func() (string, bool) { return "foo", true }())
+			assert.Equal(t, "foo", foo)
+		})
+		assert.Panic(t, func() {
+			foo := MustBeOk(func() (string, bool) { return "foo", false }())
+			assert.Equal(t, "foo", foo)
+		})
+	})
 	t.Run("Observer", func(t *testing.T) {
 		ctx := testt.Context(t)
 		var of Observer[string]

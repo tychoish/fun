@@ -85,6 +85,13 @@ func Must[T any](arg T, err error) T {
 	return arg
 }
 
+// MustBeOk raises an invariant violation if the ok value is false,
+// and returns the first value if the second value is ok. Useful as
+// in:
+//
+//	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
+func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); return out }
+
 // Ignore runs a function that takes an arbitrary argument and ignores
 // the error and swallows any panic. This is a risky move: usually
 // functions panic for a reason, but for certain invariants this may

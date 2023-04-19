@@ -605,6 +605,7 @@ func TestDeque(t *testing.T) {
 		})
 	})
 	t.Run("WaitingBack", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 		dq, err := NewDeque[int](DequeOptions{Capacity: 2})
@@ -631,6 +632,7 @@ func TestDeque(t *testing.T) {
 		}
 	})
 	t.Run("WaitingFront", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
@@ -726,6 +728,7 @@ func TestDeque(t *testing.T) {
 	})
 
 	t.Run("Closed", func(t *testing.T) {
+		t.Parallel()
 		dq, err := NewDeque[int](DequeOptions{Capacity: 40})
 		if err != nil {
 			t.Fatal(err)
@@ -820,6 +823,7 @@ func TestDeque(t *testing.T) {
 		})
 	})
 	t.Run("IteratorBlockingOnEmpty", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		queue := fun.Must(NewDeque[int](DequeOptions{Unlimited: true}))
@@ -839,6 +843,10 @@ func TestDeque(t *testing.T) {
 			t.Error("should have reported item", time.Since(sa), iter.Value())
 		}
 	})
+	t.Run("EmptyIteration", func(t *testing.T) {
+
+	})
+
 }
 
 func TestDequeIntegration(t *testing.T) {

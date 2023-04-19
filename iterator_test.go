@@ -34,6 +34,9 @@ func TestIteratorTools(t *testing.T) {
 			t.Error(err)
 		}
 	})
+	t.Run("EmptyObserve", func(t *testing.T) {
+		assert.NotError(t, Observe[int](ctx, internal.NewSliceIter([]int{}), func(in int) { t.Fatal("should not be called") }))
+	})
 	t.Run("IterateOne", func(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
 			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
