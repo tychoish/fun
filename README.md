@@ -16,7 +16,7 @@ Packages:
   ordered and unordered sets.)
 - [seq](https://pkg.go.dev/github.com/tychoish/fun/seq) (generic
   linked lists.)
-- [srv](https://pkg.go.dev/github.com/tychoish/fun/seq) (service
+- [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
   orchestration and management framework.)
 - [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly
   atomic data types and operations.)
