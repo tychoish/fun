@@ -51,7 +51,7 @@ type peer[T any] struct {
 	sequence          int64
 	lastObservedReset time.Time
 
-	info *ConnectionInfo
+	info adt.Synchronized[*ConnectionInfo]
 
 	// cap this.
 	historic *seq.List[ConnectionInfo]
@@ -64,6 +64,7 @@ type ConnectionInfo struct {
 	MessagesSent     int
 	MessagesRecieved int
 	Reconnect        bool
+	DialedAt         time.Time
 	LastActive       time.Time
 	Created          time.Time
 	Latency          time.Duration
@@ -189,6 +190,7 @@ func (r *Router[T]) reactor(ctx context.Context) {
 		opts := iter.Value()
 		conn, err := dialer(ctx, opts)
 		if err != nil {
+
 			// TODO:
 			//  - retry
 			//  - backoff
@@ -201,6 +203,14 @@ func (r *Router[T]) reactor(ctx context.Context) {
 			id:      id,
 			conn:    conn,
 		}
+		connectedAt := time.Now()
+		p.info.Set(&ConnectionInfo{
+			ID:        id,
+			Connected: true,
+			Created:   connectedAt,
+			DialedAt:  connectedAt,
+		})
+
 		// when ensure store returns true, we allready had a
 		// peer here
 		if !r.store.EnsureStore(id, p) {
@@ -221,7 +231,12 @@ func (r *Router[T]) reactor(ctx context.Context) {
 
 		// RECIEVE MESSAGES
 		go func() {
-			defer func() { r.ErrorObserver.Get()(conn.Close()) }()
+			defer func() {
+				p.info.With(func(info *ConnectionInfo) {
+					info.Connected = false
+					r.ErrorObserver.Get()(conn.Close())
+				})
+			}()
 			for {
 				ep, err := conn.Recieve(ctx)
 
@@ -232,10 +247,13 @@ func (r *Router[T]) reactor(ctx context.Context) {
 					r.ErrorObserver.Get()(err)
 					continue
 				}
-				ep.RecievedAt = time.Now()
-				p.info.MessagesRecieved++
-				p.info.LastActive = time.Now()
-				p.info.Connected = true
+				now := time.Now()
+				p.info.With(func(info *ConnectionInfo) {
+					ep.RecievedAt = now
+					info.LastActive = now
+					info.MessagesRecieved++
+					info.Connected = true
+				})
 
 				if ep.Target != r.self || ep.Target != TargetNetwork {
 					// make an error here but drop it
@@ -253,8 +271,12 @@ func (r *Router[T]) reactor(ctx context.Context) {
 
 		// SEND MESSAGES
 		go func() {
-			defer func() { p.info.Connected = false }()
-			defer func() { r.ErrorObserver.Get()(conn.Close()) }()
+			defer func() {
+				p.info.With(func(info *ConnectionInfo) {
+					r.ErrorObserver.Get()(conn.Close())
+					info.Connected = false
+				})
+			}()
 
 			iter := r.outgoing.Iterator()
 			defer func() { r.ErrorObserver.Get()(iter.Close()) }()
@@ -269,8 +291,11 @@ func (r *Router[T]) reactor(ctx context.Context) {
 					r.ErrorObserver.Get()(err)
 					return
 				}
-				p.info.LastActive = time.Now()
-				p.info.Connected = true
+				p.info.With(func(info *ConnectionInfo) {
+					info.LastActive = time.Now()
+					info.MessagesSent++
+					info.Connected = true
+				})
 			}
 		}()
 
@@ -281,16 +306,14 @@ func (r *Router[T]) reactor(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case <-cycle.C:
-					old := p.info
-					p.info = new(ConnectionInfo)
-					p.historic.PushBack(*old)
-					for p.historic.Len() > 360 {
-						_ = p.historic.PopFront()
-					}
+					p.info.With(func(info *ConnectionInfo) {
+						p.historic.PushBack(*info)
+						for p.historic.Len() > 360 {
+							_ = p.historic.PopFront()
+						}
+					})
 				}
-
 			}
-
 		}()
 	}
 }
