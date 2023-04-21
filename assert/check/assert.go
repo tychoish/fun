@@ -166,6 +166,36 @@ func NotContains[T comparable](t testing.TB, slice []T, item T) {
 	}
 }
 
+// EqualItems compares the values in two slices and creates an error
+// if all items are not equal.
+func EqualItems[T comparable](t testing.TB, one, two []T) {
+	t.Helper()
+	if len(one) != len(two) {
+		t.Errorf("slices are of different lengths [%d vs %d]", len(one), len(two))
+	}
+
+	for idx := range one {
+		if one[idx] != two[idx] {
+			t.Errorf("items at index %d [%v vs %v] are not equal", idx, one[idx], two[idx])
+			break
+		}
+	}
+}
+
+// EqualItems compares the values in two slices and creates a failure
+// if all items are not equal
+func NotEqualItems[T comparable](t testing.TB, one, two []T) {
+	t.Helper()
+
+	for idx := range one {
+		if one[idx] == two[idx] {
+			continue
+		}
+		return
+	}
+	t.Error("slices do not have identical items")
+}
+
 // Substring asserts that the substring is present in the string.
 func Substring(t testing.TB, str, substr string) {
 	t.Helper()
