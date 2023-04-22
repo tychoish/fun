@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -205,5 +207,37 @@ func TestDaemon(t *testing.T) {
 		})
 		assert.True(t, baseRunCounter.Load() >= 1)
 	})
+}
 
+func TestCleanup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+
+	signal := make(chan struct{})
+	count := &atomic.Int64{}
+	s := Cleanup(pipe, 10*time.Second)
+
+	assert.NotError(t, s.Start(ctx))
+
+	go func() {
+		defer close(signal)
+		check.Equal(t, 0, count.Load())
+		check.NotError(t, s.Wait())
+		check.Equal(t, 100, count.Load())
+	}()
+
+	for i := 0; i < 100; i++ {
+		check.NotError(t, pipe.Add(func(context.Context) error {
+			count.Add(1)
+			return nil
+		}))
+	}
+	time.Sleep(time.Millisecond)
+	check.True(t, s.Running())
+	check.Equal(t, 0, count.Load())
+	check.NotError(t, s.Shutdown())
+	<-signal
+	check.Equal(t, 100, count.Load())
 }
