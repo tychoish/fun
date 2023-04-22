@@ -14,14 +14,7 @@ func makeBlockingService(t *testing.T) *Service {
 	t.Helper()
 	fired := &atomic.Bool{}
 
-	t.Cleanup(func() {
-		t.Helper()
-		if !fired.Load() {
-			t.Error("should run cleanup")
-		}
-	})
-
-	return &Service{
+	s := &Service{
 		Name: t.Name(),
 		Shutdown: func() error {
 			t.Helper()
@@ -40,6 +33,16 @@ func makeBlockingService(t *testing.T) *Service {
 			return errors.New("shouldn't get here")
 		},
 	}
+
+	t.Cleanup(func() {
+		t.Helper()
+		_ = s.Wait()
+		if !fired.Load() {
+			t.Error("should run cleanup")
+		}
+	})
+
+	return s
 }
 
 func testCheckOrderingEffects(t *testing.T, s *Service) {

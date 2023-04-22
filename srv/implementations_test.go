@@ -93,11 +93,11 @@ func TestDaemon(t *testing.T) {
 		baseRunCounter := &atomic.Int64{}
 		baseService := &Service{
 			Run: func(context.Context) error {
-				baseRunCounter.Add(1)
-				time.Sleep(10 * time.Millisecond)
 				if baseRunCounter.Load() > 10 {
 					return context.Canceled
 				}
+				baseRunCounter.Add(1)
+				time.Sleep(10 * time.Millisecond)
 				return nil
 			},
 		}
@@ -107,6 +107,7 @@ func TestDaemon(t *testing.T) {
 			check.NotError(t, ds.Start(ctx))
 			check.NotError(t, ds.Wait())
 		})
+		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, baseRunCounter.Load(), 11)
 	})
 	t.Run("WithCleanupShutdown", func(t *testing.T) {

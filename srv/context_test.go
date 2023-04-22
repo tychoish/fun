@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestContext(t *testing.T) {
@@ -213,103 +212,16 @@ func TestContext(t *testing.T) {
 			var _ context.CancelFunc = shutdown
 		}
 	})
-}
-
-func TestShutdownManager(t *testing.T) {
-	t.Run("Initializer", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		assert.True(t, !HasOrchestrator(ctx))
-		assert.True(t, !HasShutdownSignal(ctx))
-		assert.True(t, !HasBaseContext(ctx))
-		assert.True(t, !HasShutdownManager(ctx))
-
-		// setup shutdown manager
-		ctx = WithShutdownManager(ctx)
-
-		// we have to set some
-		assert.True(t, HasShutdownSignal(ctx))
-		assert.True(t, HasShutdownManager(ctx))
-		assert.True(t, HasOrchestrator(ctx))
-		assert.True(t, HasBaseContext(ctx))
-	})
-	t.Run("WithShutdownManager", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ctx = WithShutdownManager(ctx)
-		assert.True(t, HasShutdownManager(ctx))
-
-		called := &atomic.Bool{}
-		AddToShutdownManager(ctx, func(ctx context.Context) {
-			called.Store(true)
-		})
-
-		orca := GetOrchestrator(ctx)
-		s := orca.Service()
-		time.Sleep(100 * time.Millisecond)
-		assert.True(t, s.Running())
-		GetShutdownSignal(ctx)()
-		time.Sleep(200 * time.Millisecond)
-		assert.True(t, s.isStarted.Load())
-		assert.NotError(t, s.Wait())
-
-		assert.True(t, called.Load())
-	})
-	t.Run("AddToQueue", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ctx = WithShutdownManager(ctx)
-
-		called := &atomic.Bool{}
-		AddToShutdownManager(ctx, func(ctx context.Context) {
-			called.Store(true)
-		})
-
-		time.Sleep(10 * time.Millisecond)
-		GetShutdownSignal(ctx)()
-		time.Sleep(10 * time.Millisecond)
-
-		if err := GetOrchestrator(ctx).Wait(); err != nil {
-			t.Error(err)
-		}
-
-		if !called.Load() {
-			t.Error("should have been called")
-		}
-	})
-	t.Run("Integration", func(t *testing.T) {
-		t.Parallel()
-		ctx := WithShutdownManager(testt.Context(t))
-		const num = 1
-		count := &atomic.Int64{}
-		for i := 0; i < num; i++ {
-			AddToShutdownManager(ctx, func(ctx context.Context) {
-				count.Add(1)
-			})
-		}
-
-		orca := GetOrchestrator(ctx)
-		s := orca.Service()
-		s.Name = "hi"
-
-		assert.True(t, s.Running())
-		assert.True(t, s.isStarted.Load())
-		GetShutdownSignal(ctx)()
-		assert.Error(t, ctx.Err())
-		// err := s.Wait()
-		// check.NotError(t, err)
-		defer (func() { t.Log("end count", count.Load()) })()
-		time.Sleep(200 * time.Millisecond)
-		assert.True(t, !s.Running())
-		assert.Equal(t, count.Load(), num)
-	})
-
 	t.Run("ContextsAreAStack", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = SetBaseContext(ctx)
 		bctx := SetShutdownSignal(ctx)
 		ctx = WithOrchestrator(bctx)
 		ctx = SetShutdownSignal(ctx)
+
+		check.True(t, HasShutdownSignal(ctx))
+		check.True(t, HasBaseContext(ctx))
 
 		assert.NotError(t, ctx.Err())
 		GetShutdownSignal(ctx)()
