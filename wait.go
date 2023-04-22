@@ -78,19 +78,24 @@ func (wf WaitFunc) BlockSignal() <-chan struct{} {
 	return sig
 }
 
-// CheckWorker converts a wait function into a WorkerFunc, running the
+// Check converts a wait function into a WorkerFunc, running the
 // wait function inside of a Check() function, which catches panics
-// and turns them into the worker function's errors.
-func (wf WaitFunc) CheckWorker() WorkerFunc {
+// and turns them into the worker function's errors. If the context
+// errors, the Check function's error also propogates a merged error
+// that includes the context's cancelation error
+func (wf WaitFunc) Check() WorkerFunc {
 	return func(ctx context.Context) error {
-		return Check(func() { wf.Run(ctx) })
+		return internal.MergeErrors(
+			Check(func() { wf.Run(ctx) }),
+			ctx.Err(),
+		)
 	}
 }
 
-// Worker converts a wait function into a WorkerFunc. These workers
-// will never error.
+// Worker converts a wait function into a WorkerFunc. If the context
+// is canceled, the worker function returns the context's error.
 func (wf WaitFunc) Worker() WorkerFunc {
-	return func(ctx context.Context) error { wf.Run(ctx); return nil }
+	return func(ctx context.Context) error { wf.Run(ctx); return ctx.Err() }
 }
 
 // WaitBlocking is a convenience function to use simple blocking
