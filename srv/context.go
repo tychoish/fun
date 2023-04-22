@@ -20,6 +20,7 @@ type (
 	orchestratorCtxKey      struct{}
 	shutdownTriggerCtxKey   struct{}
 	shutdownWaitQueueCtxKey struct{}
+	cleanupCtxKey           struct{}
 	workerPoolNameCtxKey    string
 )
 
@@ -83,6 +84,41 @@ func GetOrchestrator(ctx context.Context) *Orchestrator {
 func HasOrchestrator(ctx context.Context) bool {
 	_, ok := ctx.Value(orchestratorCtxKey{}).(*Orchestrator)
 	return ok
+}
+
+// HasCleanup returns true if a cleanup process is registered in the
+// context.
+func HasCleanup(ctx context.Context) bool {
+	_, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.WorkerFunc])
+	return ok
+}
+
+// WithCleanup adds a Cleanup service as created by the Cleanup()
+// constructor, to an orchestrator attached to the context (or creates
+// the orchestrator if needed,)
+func WithCleanup(ctx context.Context) context.Context {
+	if !HasOrchestrator(ctx) {
+		ctx = WithOrchestrator(ctx)
+	}
+	pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+
+	fun.InvariantMust(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
+
+	return context.WithValue(ctx, cleanupCtxKey{}, pipe)
+}
+
+func getCleanup(ctx context.Context) *pubsub.Queue[fun.WorkerFunc] {
+	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.WorkerFunc])
+	fun.Invariant(ok, "cleanup service not configured")
+	return val
+}
+
+// AddCleanup appends a cleanup function to the cleanup service
+// pending in the context. Raises an invariant failure if the cleanup
+// service was not previously configured, or if you attempt to add a
+// new cleanup function while shutdown is running.
+func AddCleanup(ctx context.Context, cleanup fun.WorkerFunc) {
+	fun.InvariantMust(getCleanup(ctx).Add(cleanup))
 }
 
 // SetShutdownSignal attaches a context.CancelFunc for the current context

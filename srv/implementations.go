@@ -198,7 +198,10 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 			ec := &erc.Collector{}
 
 			ec.Add(itertool.ParallelForEach(ctx, seq.ListValues(cache.IteratorPop()),
-				func(ctx context.Context, wf fun.WorkerFunc) error { ec.Add(wf.Safe(ctx)); return nil },
+				func(ctx context.Context, wf fun.WorkerFunc) error {
+					ec.Add(wf.Safe(ctx))
+					return nil
+				},
 				opts))
 
 			return ec.Resolve()

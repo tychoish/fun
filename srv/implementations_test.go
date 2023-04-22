@@ -210,34 +210,72 @@ func TestDaemon(t *testing.T) {
 }
 
 func TestCleanup(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Run("Basic", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+		pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
 
-	signal := make(chan struct{})
-	count := &atomic.Int64{}
-	s := Cleanup(pipe, 10*time.Second)
+		signal := make(chan struct{})
+		count := &atomic.Int64{}
+		s := Cleanup(pipe, 10*time.Second)
 
-	assert.NotError(t, s.Start(ctx))
+		assert.NotError(t, s.Start(ctx))
 
-	go func() {
-		defer close(signal)
+		go func() {
+			defer close(signal)
+			check.Equal(t, 0, count.Load())
+			check.NotError(t, s.Wait())
+			check.Equal(t, 100, count.Load())
+		}()
+
+		for i := 0; i < 100; i++ {
+			check.NotError(t, pipe.Add(func(context.Context) error {
+				count.Add(1)
+				return nil
+			}))
+		}
+		time.Sleep(time.Millisecond)
+		check.True(t, s.Running())
 		check.Equal(t, 0, count.Load())
-		check.NotError(t, s.Wait())
+		check.NotError(t, s.Shutdown())
+		<-signal
 		check.Equal(t, 100, count.Load())
-	}()
+	})
+	t.Run("Context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	for i := 0; i < 100; i++ {
-		check.NotError(t, pipe.Add(func(context.Context) error {
-			count.Add(1)
-			return nil
-		}))
-	}
-	time.Sleep(time.Millisecond)
-	check.True(t, s.Running())
-	check.Equal(t, 0, count.Load())
-	check.NotError(t, s.Shutdown())
-	<-signal
-	check.Equal(t, 100, count.Load())
+		ctx = WithCleanup(ctx)
+		count := &atomic.Int64{}
+
+		signal := make(chan struct{})
+		go func() {
+			defer close(signal)
+			check.Equal(t, 0, count.Load())
+			check.True(t, GetOrchestrator(ctx).Service().Running())
+			check.NotError(t, GetOrchestrator(ctx).Wait())
+			check.Equal(t, 100, count.Load())
+		}()
+
+		called := 0
+		for i := 0; i < 100; i++ {
+			check.NotPanic(t, func() {
+				called++
+				AddCleanup(ctx, func(context.Context) error {
+					count.Add(1)
+					return nil
+				})
+			})
+		}
+		check.True(t, HasCleanup(ctx))
+		check.Equal(t, 100, called)
+		time.Sleep(time.Millisecond)
+		check.Equal(t, 0, count.Load())
+
+		GetOrchestrator(ctx).Service().Close()
+		<-signal
+
+		check.Equal(t, 100, count.Load())
+	})
 }
