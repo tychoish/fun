@@ -14,7 +14,7 @@ import (
 type AtomicValue[T any] interface {
 	Get() T
 	Set(T)
-	Sawp(T) T
+	Swap(T) T
 }
 
 // Atomic is a very simple atomic Get/Set operation, providing a
