@@ -16,11 +16,11 @@ import (
 )
 
 type (
-	baseContextCxtKey       struct{}
-	orchestratorCtxKey      struct{}
-	shutdownTriggerCtxKey   struct{}
-	shutdownWaitQueueCtxKey struct{}
-	workerPoolNameCtxKey    string
+	baseContextCxtKey     struct{}
+	orchestratorCtxKey    struct{}
+	shutdownTriggerCtxKey struct{}
+	cleanupCtxKey         struct{}
+	workerPoolNameCtxKey  string
 )
 
 // WithOrchestrator creates a new *Orchestrator, starts the associated
@@ -83,6 +83,41 @@ func GetOrchestrator(ctx context.Context) *Orchestrator {
 func HasOrchestrator(ctx context.Context) bool {
 	_, ok := ctx.Value(orchestratorCtxKey{}).(*Orchestrator)
 	return ok
+}
+
+// HasCleanup returns true if a cleanup process is registered in the
+// context.
+func HasCleanup(ctx context.Context) bool {
+	_, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.WorkerFunc])
+	return ok
+}
+
+// WithCleanup adds a Cleanup service as created by the Cleanup()
+// constructor, to an orchestrator attached to the context (or creates
+// the orchestrator if needed,)
+func WithCleanup(ctx context.Context) context.Context {
+	if !HasOrchestrator(ctx) {
+		ctx = WithOrchestrator(ctx)
+	}
+	pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+
+	fun.InvariantMust(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
+
+	return context.WithValue(ctx, cleanupCtxKey{}, pipe)
+}
+
+func getCleanup(ctx context.Context) *pubsub.Queue[fun.WorkerFunc] {
+	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.WorkerFunc])
+	fun.Invariant(ok, "cleanup service not configured")
+	return val
+}
+
+// AddCleanup appends a cleanup function to the cleanup service
+// pending in the context. Raises an invariant failure if the cleanup
+// service was not previously configured, or if you attempt to add a
+// new cleanup function while shutdown is running.
+func AddCleanup(ctx context.Context, cleanup fun.WorkerFunc) {
+	fun.InvariantMust(getCleanup(ctx).Add(cleanup))
 }
 
 // SetShutdownSignal attaches a context.CancelFunc for the current context
@@ -153,79 +188,6 @@ func GetBaseContext(ctx context.Context) context.Context {
 // false otherwise.
 func HasBaseContext(ctx context.Context) bool {
 	_, ok := ctx.Value(baseContextCxtKey{}).(context.Context)
-	return ok
-}
-
-// WithShutdownManager constructs and attaches a wait service, to the
-// context it returns. If this context does not already have a base
-// context (SetBaseContxt), // shutdown signal (SetShutdownSignal) or
-// an orchestrator (WithOrchestrator), they are created before
-// starting the shutdown service. If they are already set on this
-// context, then they are *not* created.
-//
-// Add wait functions to the service with AddToShutdownManager.
-//
-// The process orchestrator will then have a shutdown service which
-// will block until the shutdown signal is called,
-// (e.g. `srv.GetShutdownSignal(ctx)()`). At that time, using the base
-// context (from GetBaseContext), all enqueued shutdown wait functions
-// will run in parallel, and the Orchestrator will block until all
-// wait functions have run.
-//
-// Callers should take care that they don't cancel the base context or
-// an ancestor of this context *before* they want shutdown to
-// abort. The wait service, which begins executing when orchestrators
-// context is canceled, and will block until the base context is
-// canceled. Because context's values are effectively a stack, you can
-// use handles to earlier shutdown signals to implement safe shutdown
-// procedures.
-func WithShutdownManager(ctx context.Context) context.Context {
-	if !HasBaseContext(ctx) {
-		ctx = SetBaseContext(ctx)
-	}
-
-	if !HasShutdownSignal(ctx) {
-		ctx = SetShutdownSignal(ctx)
-	}
-
-	if !HasOrchestrator(ctx) {
-		ctx = WithOrchestrator(ctx)
-	}
-
-	orca := GetOrchestrator(ctx)
-
-	fun.Invariant(orca.Service().Running(), "the orchestrator should be running")
-	queue := pubsub.NewUnlimitedQueue[fun.WaitFunc]()
-
-	fun.InvariantMust(orca.Add(&Service{
-		Run: func(rctx context.Context) error {
-			<-rctx.Done()
-			bctx := GetBaseContext(ctx)
-			fun.InvariantMust(queue.Close(), "close shutdown manager")
-			fun.WaitMerge(bctx, queue.Iterator())(bctx)
-			return nil
-		},
-	}))
-
-	return context.WithValue(ctx, shutdownWaitQueueCtxKey{}, queue)
-}
-
-func getShutdownManager(ctx context.Context) *pubsub.Queue[fun.WaitFunc] {
-	q, ok := ctx.Value(shutdownWaitQueueCtxKey{}).(*pubsub.Queue[fun.WaitFunc])
-	fun.Invariant(ok, "shutdown queue was not correctly attached", q, ok)
-	return q
-}
-
-// AddToShutdownManager adds a wait function to the shutdown queue. If a
-// shutdown manager is not set on the context, this raises a panic
-// with an InvariantViolation.
-func AddToShutdownManager(ctx context.Context, fn fun.WaitFunc) {
-	fun.InvariantMust(getShutdownManager(ctx).Add(fn), "problem adding wait function to shutdown queue")
-}
-
-// HasShutdownManager returns true if a shutdown queue has started.
-func HasShutdownManager(ctx context.Context) bool {
-	_, ok := ctx.Value(shutdownWaitQueueCtxKey{}).(*pubsub.Queue[fun.WaitFunc])
 	return ok
 }
 

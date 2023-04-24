@@ -19,6 +19,8 @@ func (wf WorkerFunc) Run(ctx context.Context) error {
 	return wf(wctx)
 }
 
+// Safe runs the worker function and converts the worker function to a
+// panic to an error.
 func (wf WorkerFunc) Safe(ctx context.Context) (err error) {
 	defer func() { err = mergeWithRecover(err, recover()) }()
 	return wf.Run(ctx)

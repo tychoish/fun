@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/seq"
 )
 
 // Group makes it possible to have a collection of services, provided
@@ -153,6 +155,57 @@ func ProcessIterator[T any](
 			return itertool.ParallelForEach(ctx, iter, mapper, opts)
 		},
 		Shutdown: iter.Close,
+	}
+}
+
+// Cleanup provides a service which services the provided queue of
+// worker functions and runs the shutdown functions during service
+// shutdown (e.g. either after Close() is called or when the context
+// is canceled.) The timeout, when non-zero, is passed to the clean up
+// operation. Cleanup functions are dispatched in parallel.
+func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service {
+	// assume some reasonable defaults.
+	opts := itertool.Options{
+		ContinueOnPanic: true,
+		ContinueOnError: true,
+		NumWorkers:      runtime.NumCPU(),
+	}
+
+	// copy the values out of the pipe so that we don't end up
+	// deadlocking or missing jobs. on shutdown.
+	cache := &seq.List[fun.WorkerFunc]{}
+
+	return &Service{
+		Run: func(ctx context.Context) error {
+			iter := pipe.Iterator()
+			for {
+				item, err := fun.IterateOne(ctx, iter)
+				if err != nil {
+					return nil
+				}
+				cache.PushBack(item)
+			}
+		},
+		Shutdown: func() error { return pipe.Close() },
+		Cleanup: func() error {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+			}
+
+			ec := &erc.Collector{}
+
+			ec.Add(itertool.ParallelForEach(ctx, seq.ListValues(cache.IteratorPop()),
+				func(ctx context.Context, wf fun.WorkerFunc) error {
+					ec.Add(wf.Safe(ctx))
+					return nil
+				},
+				opts))
+
+			return ec.Resolve()
+		},
 	}
 }
 

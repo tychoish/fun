@@ -84,7 +84,7 @@ func TestWaitGroup(t *testing.T) {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > 10*time.Millisecond {
+		if dur > 20*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
 	})

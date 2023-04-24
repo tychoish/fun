@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -91,11 +93,11 @@ func TestDaemon(t *testing.T) {
 		baseRunCounter := &atomic.Int64{}
 		baseService := &Service{
 			Run: func(context.Context) error {
-				baseRunCounter.Add(1)
-				time.Sleep(10 * time.Millisecond)
 				if baseRunCounter.Load() > 10 {
 					return context.Canceled
 				}
+				baseRunCounter.Add(1)
+				time.Sleep(10 * time.Millisecond)
 				return nil
 			},
 		}
@@ -105,6 +107,7 @@ func TestDaemon(t *testing.T) {
 			check.NotError(t, ds.Start(ctx))
 			check.NotError(t, ds.Wait())
 		})
+		time.Sleep(10 * time.Millisecond)
 		assert.Equal(t, baseRunCounter.Load(), 11)
 	})
 	t.Run("WithCleanupShutdown", func(t *testing.T) {
@@ -205,5 +208,75 @@ func TestDaemon(t *testing.T) {
 		})
 		assert.True(t, baseRunCounter.Load() >= 1)
 	})
+}
 
+func TestCleanup(t *testing.T) {
+	t.Run("Basic", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+
+		signal := make(chan struct{})
+		count := &atomic.Int64{}
+		s := Cleanup(pipe, 10*time.Second)
+
+		assert.NotError(t, s.Start(ctx))
+
+		go func() {
+			defer close(signal)
+			check.Equal(t, 0, count.Load())
+			check.NotError(t, s.Wait())
+			check.Equal(t, 100, count.Load())
+		}()
+
+		for i := 0; i < 100; i++ {
+			check.NotError(t, pipe.Add(func(context.Context) error {
+				count.Add(1)
+				return nil
+			}))
+		}
+		time.Sleep(time.Millisecond)
+		check.True(t, s.Running())
+		check.Equal(t, 0, count.Load())
+		check.NotError(t, s.Shutdown())
+		<-signal
+		check.Equal(t, 100, count.Load())
+	})
+	t.Run("Context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx = WithCleanup(ctx)
+		count := &atomic.Int64{}
+
+		signal := make(chan struct{})
+		go func() {
+			defer close(signal)
+			check.Equal(t, 0, count.Load())
+			check.True(t, GetOrchestrator(ctx).Service().Running())
+			check.NotError(t, GetOrchestrator(ctx).Wait())
+			check.Equal(t, 100, count.Load())
+		}()
+
+		called := 0
+		for i := 0; i < 100; i++ {
+			check.NotPanic(t, func() {
+				called++
+				AddCleanup(ctx, func(context.Context) error {
+					count.Add(1)
+					return nil
+				})
+			})
+		}
+		check.True(t, HasCleanup(ctx))
+		check.Equal(t, 100, called)
+		time.Sleep(time.Millisecond)
+		check.Equal(t, 0, count.Load())
+
+		GetOrchestrator(ctx).Service().Close()
+		<-signal
+
+		check.Equal(t, 100, count.Load())
+	})
 }

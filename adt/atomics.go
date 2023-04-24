@@ -9,6 +9,14 @@ import (
 	"github.com/tychoish/fun"
 )
 
+// AtomicValue describes the public interface of the Atomic type. Use
+// this definition to compose atomic types into other interfaces.
+type AtomicValue[T any] interface {
+	Get() T
+	Set(T)
+	Swap(T) T
+}
+
 // Atomic is a very simple atomic Get/Set operation, providing a
 // generic type-safe implementation wrapping sync/atomic.Value.
 type Atomic[T any] struct{ val atomic.Value }
@@ -46,7 +54,7 @@ func CompareAndSwap[T comparable](a *Atomic[T], old, new T) bool {
 // it's zero. The fun.IsZero() function can't correctly check both that
 // the Atomic is zero and that it holds a zero value, and because
 // atomics need not be comparable this can't be a method on Atomic.
-func IsAtomicZero[T comparable](in *Atomic[T]) bool {
+func IsAtomicZero[T comparable](in AtomicValue[T]) bool {
 	if in == nil {
 		return true
 	}
@@ -55,7 +63,7 @@ func IsAtomicZero[T comparable](in *Atomic[T]) bool {
 
 // SafeSet sets the atomic to the given value only if the value is not
 // the Zero value for that type.
-func SafeSet[T comparable](atom *Atomic[T], value T) {
+func SafeSet[T comparable](atom AtomicValue[T], value T) {
 	if !fun.IsZero(value) && atom != nil {
 		atom.Set(value)
 	}

@@ -213,7 +213,6 @@ func (s *Service) waitFor(ctx context.Context) error {
 	}
 
 	s.wg.Wait(ctx)
-
 	return s.ec.Resolve()
 
 }
