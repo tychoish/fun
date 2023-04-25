@@ -63,10 +63,10 @@ func TestLocked(t *testing.T) {
 		})
 		t.Run("Compare", func(t *testing.T) {
 			item := &Synchronized[int]{}
-			assert.True(t, CompareAndSwapItem(item, 0, 100))
+			assert.True(t, CompareAndSwap[int](item, 0, 100))
 			assert.Equal(t, item.Get(), 100)
-			assert.True(t, !CompareAndSwapItem(item, 0, 42))
-			assert.True(t, CompareAndSwapItem(item, 100, 42))
+			assert.True(t, !CompareAndSwap[int](item, 0, 42))
+			assert.True(t, CompareAndSwap[int](item, 100, 42))
 			assert.Equal(t, item.Get(), 42)
 		})
 	})

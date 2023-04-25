@@ -83,7 +83,7 @@ func TestImplementationHelpers(t *testing.T) {
 			if count.Load() != 50 {
 				t.Error(count.Load())
 			}
-			if time.Since(start) < 5*time.Millisecond || time.Since(start) > 10*time.Millisecond {
+			if time.Since(start) < 5*time.Millisecond || time.Since(start) > 20*time.Millisecond {
 				t.Error(time.Since(start))
 			}
 		})

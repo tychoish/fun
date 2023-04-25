@@ -43,15 +43,3 @@ func (s *Synchronized[T]) Swap(new T) (old T) {
 	old = item
 	return
 }
-
-// CompareAndSwapItem swaps the value of comparable Synchronized types
-// when the existing value is equal to the old and returns true, and
-// has no impact otherwise (returning false.)
-func CompareAndSwapItem[T comparable](s *Synchronized[T], old, new T) bool {
-	defer s.withLock()()
-	if s.obj == old {
-		s.obj = new
-		return true
-	}
-	return false
-}

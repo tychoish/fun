@@ -97,10 +97,44 @@ func TestAtomics(t *testing.T) {
 		assert.True(t, !fun.IsZero(f))
 	})
 	t.Run("CompareAndSwap", func(t *testing.T) {
-		atom := &Atomic[int]{}
-		atom.Set(54)
-		swapped := CompareAndSwap(atom, 54, 100)
-		assert.True(t, swapped)
-		assert.Equal(t, 100, atom.Get())
+		t.Run("Atomic", func(t *testing.T) {
+			atom := &Atomic[int]{}
+			atom.Set(54)
+			swapped := CompareAndSwap[int](atom, 54, 100)
+			assert.True(t, swapped)
+			assert.Equal(t, 100, atom.Get())
+		})
+		t.Run("Interface", func(t *testing.T) {
+			atom := &swappable{}
+			atom.Set(54)
+			swapped := CompareAndSwap[int](atom, 54, 100)
+			assert.True(t, swapped)
+			assert.Equal(t, 100, atom.Get())
+		})
+		t.Run("Impossible", func(t *testing.T) {
+			atom := &Unsafe[int]{}
+			atom.Set(54)
+			assert.Panic(t, func() {
+				_ = CompareAndSwap[int](atom, 54, 100)
+			})
+		})
+
 	})
+}
+
+type swappable struct{ Atomic[int] }
+
+func (s *swappable) CompareAndSwap(a, b int) bool { return CompareAndSwap[int](&s.Atomic, a, b) }
+
+type Unsafe[T any] struct{ val T }
+
+func NewUnsafe[T any](initial T) *Unsafe[T] { a := &Unsafe[T]{}; a.Set(initial); return a }
+
+func (a *Unsafe[T]) Set(in T) { a.val = in }
+func (a *Unsafe[T]) Get() T   { return a.val }
+
+func (a *Unsafe[T]) Swap(new T) T {
+	out := a.val
+	a.val = new
+	return out
 }

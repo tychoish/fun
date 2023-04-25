@@ -4,6 +4,7 @@
 package adt
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
@@ -45,9 +46,26 @@ func (a *Atomic[T]) Swap(new T) (old T) {
 }
 
 // CompareAndSwap exposes the CompareAndSwap option for atomics that
-// store values of comparable types.
-func CompareAndSwap[T comparable](a *Atomic[T], old, new T) bool {
-	return a.val.CompareAndSwap(old, new)
+// store values of comparable types. Only supports the Atomic and
+// Synchronized types as well as any type that implements a
+// CompareAndSwap method for old/new values of T. Panics for all other
+// types.
+func CompareAndSwap[T comparable](a AtomicValue[T], old, new T) bool {
+	switch atom := a.(type) {
+	case *Atomic[T]:
+		return atom.val.CompareAndSwap(old, new)
+	case *Synchronized[T]:
+		defer atom.withLock()()
+		if atom.obj == old {
+			atom.obj = new
+			return true
+		}
+		return false
+	case interface{ CompareAndSwap(a, b T) bool }:
+		return atom.CompareAndSwap(old, new)
+	default:
+		panic(fmt.Errorf("compare and swap operation not supported: %w", fun.ErrInvariantViolation))
+	}
 }
 
 // IsAtomicZero checks an atomic value for a comparable type to see if
