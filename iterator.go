@@ -44,13 +44,17 @@ func Observe[T any](ctx context.Context, iter Iterator[T], fn Observer[T]) (err 
 	defer func() { err = internal.MergeErrors(err, iter.Close()) }()
 	defer func() { err = mergeWithRecover(err, recover()) }()
 
-	for iter.Next(ctx) {
-		err = fn.Safe(iter.Value())
+	for {
+		var item T
+		item, err = IterateOne(ctx, iter)
 		if err != nil {
+			return nil // channel closed or complete.
+		}
+
+		if err = fn.Safe(item); err != nil {
 			return err
 		}
 	}
-	return nil
 }
 
 // ObserveWorker has the same semantics as Observe, except that the

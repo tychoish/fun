@@ -92,8 +92,11 @@ type syncSetImpl[T comparable] struct {
 	set Set[T]
 }
 
-// Synchronize wraps an existing set instance with a
-// mutex. The underlying implementation provides an Unwrap method.
+// Synchronize wraps an existing set instance with a mutex. The
+// underlying implementation provides an Unwrap method. Additionally
+// the iterator implementation uses the adt package's synchronized
+// iterator, which is handled specially by the `fun.IterateOne`
+// function and a number of tools which use it.
 func Synchronize[T comparable](s Set[T]) Set[T] {
 	return syncSetImpl[T]{
 		set: s,

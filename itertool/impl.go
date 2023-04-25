@@ -106,13 +106,12 @@ func Range[T any](ctx context.Context, iter fun.Iterator[T]) RangeFunction[T] {
 		mtx.Lock()
 		defer mtx.Unlock()
 
-		if iter.Next(ctx) {
-			val := iter.Value()
-			*out = val
-			return true
+		val, err := fun.IterateOne(ctx, iter)
+		if err != nil {
+			*out = fun.ZeroOf[T]()
+			return false
 		}
-
-		*out = fun.ZeroOf[T]()
-		return false
+		*out = val
+		return true
 	}
 }

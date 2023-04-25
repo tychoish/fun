@@ -30,7 +30,6 @@ func TestAtomics(t *testing.T) {
 		assert.True(t, IsAtomicZero[int](atom))
 		atom.Set(100)
 		assert.True(t, !IsAtomicZero[int](atom))
-
 		atom = nil
 		assert.True(t, IsAtomicZero[int](atom))
 	})

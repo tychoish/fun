@@ -16,19 +16,25 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 	buf := &bytes.Buffer{}
 	_, _ = buf.Write([]byte("["))
 	first := true
-	for iter.Next(ctx) {
+	for {
+		val, err := fun.IterateOne(ctx, iter)
+		if err != nil {
+			break
+		}
+
 		if first {
 			first = false
 		} else {
 			_, _ = buf.Write([]byte(","))
 		}
 
-		it, err := json.Marshal(iter.Value())
+		it, err := json.Marshal(val)
 		if err != nil {
 			return nil, err
 		}
 		_, _ = buf.Write(it)
 	}
+
 	if err := iter.Close(); err != nil {
 		return nil, err
 	}

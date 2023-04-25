@@ -12,8 +12,13 @@ import (
 // You may call Populate in a go routine. The error returned is the
 // result the iterator's close method.
 func Populate[T any](ctx context.Context, iter fun.Iterator[T], broker *Broker[T]) error {
-	for iter.Next(ctx) {
-		broker.Publish(ctx, iter.Value())
+	for {
+		val, err := fun.IterateOne(ctx, iter)
+		if err != nil {
+			break
+		}
+		broker.Publish(ctx, val)
 	}
+
 	return iter.Close()
 }

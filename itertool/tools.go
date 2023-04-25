@@ -167,11 +167,16 @@ func Map[T any, O any](
 		defer close(fromInput)
 		defer erc.Recover(catcher)
 
-		for iter.Next(abortCtx) {
+		for {
+			val, err := fun.IterateOne(abortCtx, iter)
+			if err != nil {
+				return
+			}
+
 			select {
 			case <-abortCtx.Done():
 				return
-			case fromInput <- iter.Value():
+			case fromInput <- val:
 				continue
 			}
 		}

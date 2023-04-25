@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -119,25 +120,29 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // worker will have returned. Use a blocking pubsub iterator to
 // dispatch wait functions throughout the lifecycle of your program.
 func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
-	wg := &fun.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
 		Run: func(ctx context.Context) error {
-			for iter.Next(ctx) {
-				wg.Add(1)
+			for {
+				value, err := fun.IterateOne(ctx, iter)
+				if err != nil {
+					break
+				}
 
+				wg.Add(1)
 				go func(fn fun.WaitFunc) {
 					defer erc.Recover(ec)
 					defer wg.Done()
 					fn(ctx)
-				}(iter.Value())
-
+				}(value)
 			}
+
 			ec.Add(iter.Close())
-			wg.Wait(ctx)
+			wg.Wait()
 			return nil
 		},
-		Cleanup:  func() error { wg.Wait(internal.BackgroundContext); return ec.Resolve() },
+		Cleanup:  func() error { wg.Wait(); return ec.Resolve() },
 		Shutdown: iter.Close,
 	}
 }

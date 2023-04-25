@@ -18,8 +18,8 @@ type syncIterImpl[T any] struct {
 // (e.g. advance with Next() and access with Value()) are not isolated
 // with regards to eachother so multiple goroutines can have logical
 // races if both are iterating concurrently. As a special case the
-// fun.IterateOne function provides a special case that allows for
-// safe, concurrent iteration.
+// fun.IterateOne function allows for safe, concurrent iteration of
+// these iterators.
 func NewIterator[T any](mtx *sync.Mutex, iter fun.Iterator[T]) fun.Iterator[T] {
 	return syncIterImpl[T]{mtx: mtx, iter: iter}
 }

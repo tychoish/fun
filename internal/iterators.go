@@ -85,6 +85,7 @@ func (iter *GeneratorIterator[T]) Value() T { return iter.value }
 func (iter *GeneratorIterator[T]) Close() error {
 	if iter.Closer != nil {
 		iter.Closer()
+		iter.Closer = nil
 	}
 	iter.closed.Store(true)
 	return iter.Error
