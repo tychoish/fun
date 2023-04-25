@@ -10,7 +10,9 @@ type Pair[K comparable, V any] struct {
 }
 
 // MakePair constructs a pair object. This is identical to using the
-// literal constructor but may be more ergonomic.
+// literal constructor but may be more ergonomic as the compiler seems
+// to be better at inferring types in function calls over literal
+// constructors.
 func MakePair[K comparable, V any](k K, v V) Pair[K, V] { return Pair[K, V]{Key: k, Value: v} }
 
 // Pairs implements a collection of key-value pairs.
