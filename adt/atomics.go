@@ -55,16 +55,34 @@ func CompareAndSwap[T comparable](a *Atomic[T], old, new T) bool {
 // the Atomic is zero and that it holds a zero value, and because
 // atomics need not be comparable this can't be a method on Atomic.
 func IsAtomicZero[T comparable](in AtomicValue[T]) bool {
+	return isAtomicValueNil(in) || fun.IsZero(in.Get())
+}
+
+func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
 	if in == nil {
 		return true
 	}
-	return fun.IsZero(in.Get())
+	switch v := in.(type) {
+	case *Atomic[T]:
+		if v == nil {
+			return true
+		}
+	case *Synchronized[T]:
+		if v == nil {
+			return true
+		}
+	case interface{ IsZero() bool }:
+		if v.IsZero() {
+			return true
+		}
+	}
+	return false
 }
 
 // SafeSet sets the atomic to the given value only if the value is not
 // the Zero value for that type.
 func SafeSet[T comparable](atom AtomicValue[T], value T) {
-	if !fun.IsZero(value) && atom != nil {
+	if !fun.IsZero(value) && !isAtomicValueNil(atom) {
 		atom.Set(value)
 	}
 }

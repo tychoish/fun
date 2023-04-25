@@ -8,22 +8,47 @@ import (
 	"github.com/tychoish/fun/assert"
 )
 
+type zeroed struct{ Atomic[int] }
+
+func (*zeroed) IsZero() bool { return true }
+
 func TestAtomics(t *testing.T) {
+	t.Run("NilIsZero", func(t *testing.T) {
+		assert.True(t, IsAtomicZero[int](nil))
+	})
+	t.Run("IsZeroInterface", func(t *testing.T) {
+		atom := &zeroed{}
+		assert.True(t, IsAtomicZero[int](atom))
+	})
+
 	t.Run("IsAtomicZero", func(t *testing.T) {
 		var atom *Atomic[int]
-		assert.True(t, IsAtomicZero(atom))
+		assert.True(t, IsAtomicZero[int](atom))
 		atom = &Atomic[int]{}
-		assert.True(t, IsAtomicZero(atom))
+		assert.True(t, IsAtomicZero[int](atom))
 		atom.Set(0)
-		assert.True(t, IsAtomicZero(atom))
+		assert.True(t, IsAtomicZero[int](atom))
 		atom.Set(100)
-		assert.True(t, !IsAtomicZero(atom))
+		assert.True(t, !IsAtomicZero[int](atom))
+
+		atom = nil
+		assert.True(t, IsAtomicZero[int](atom))
+	})
+	t.Run("IsSynchronizedZero", func(t *testing.T) {
+		var atom *Synchronized[int]
+		assert.True(t, IsAtomicZero[int](atom))
+		atom = &Synchronized[int]{}
+		assert.True(t, IsAtomicZero[int](atom))
+		atom.Set(0)
+		assert.True(t, IsAtomicZero[int](atom))
+		atom.Set(100)
+		assert.True(t, !IsAtomicZero[int](atom))
 	})
 	t.Run("SafeSet", func(t *testing.T) {
 		atom := &Atomic[int]{}
-		SafeSet(atom, -1)
+		SafeSet[int](atom, -1)
 		assert.Equal(t, atom.Get(), -1)
-		SafeSet(atom, 0) // noop
+		SafeSet[int](atom, 0) // noop
 		assert.Equal(t, atom.Get(), -1)
 	})
 
