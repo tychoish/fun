@@ -5,6 +5,7 @@ package adt
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
@@ -17,6 +18,42 @@ type AtomicValue[T any] interface {
 	Set(T)
 	Swap(T) T
 }
+
+// Mnemonize, like adt.Once, provides a way to lazily resolve and
+// cache a value. Mnemonize takes an input function that returns a
+// type and returns a function of the same signature. When the
+// function is called the first time it caches the value and.
+//
+// While the function produced by Mnemonize is safe to use
+// concurrently, there is no provision for protecting mutable types
+// returned by the function and concurrent modification of mutable
+// returned values is a race.
+func Mnemonize[T any](in func() T) func() T {
+	once := &sync.Once{}
+	var value T
+
+	return func() T {
+		once.Do(func() { value = in() })
+		return value
+	}
+}
+
+// Once provides a mnemonic form of sync.Once, caching and returning a
+// value after the Do() function is called.
+type Once[T any] struct {
+	act sync.Once
+	val T
+}
+
+// Do runs the function provided and returns its value. All subsequent
+// calls to Do return the value of the first function passed to do. If
+// multiple callers use Do at the same time, like sync.Once.Do none
+// will return until return until the first operation completes.
+//
+// Functions passed to Do should return values that are safe for
+// concurrent access: while the Do operation is synchronized, the
+// return value from Do is responsible for its own synchronization.
+func (o *Once[T]) Do(constr func() T) T { o.act.Do(func() { o.val = constr() }); return o.val }
 
 // Atomic is a very simple atomic Get/Set operation, providing a
 // generic type-safe implementation wrapping sync/atomic.Value.
@@ -47,7 +84,7 @@ func (a *Atomic[T]) Swap(new T) (old T) {
 
 // CompareAndSwap exposes the CompareAndSwap option for atomics that
 // store values of comparable types. Only supports the Atomic and
-// Synchronized types as well as any type that implements a
+// Synchronized types, as well as any type that implement a
 // CompareAndSwap method for old/new values of T. Panics for all other
 // types.
 func CompareAndSwap[T comparable](a AtomicValue[T], old, new T) bool {
