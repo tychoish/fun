@@ -70,6 +70,21 @@ func (wg *WaitGroup) IsDone() bool {
 
 // Wait blocks until either the context is canceled or all items have
 // completed.
+//
+// Wait is pasable or usable as a fun.WaitFunc.
+//
+// In many cases, callers should not rely on the Wait operation
+// returning after the context expires: If Done() calls are used in
+// situations that respect a context cancellation, aborting the Wait
+// on a context cancellation, particularly when Wait gets a context
+// that has the same lifecycle as the operations its waiting on, the
+// result is that worker routines will leak. Nevertheless, in some
+// situations, when workers may take a long time to respond to a
+// context cancellation, being able to set a second deadline on
+// Waiting may be useful.
+//
+// Consider using `fun.WaitFunc(wg.Wait).Block()` if you want blocking
+// semantics with the other features of this WaitGroup implementation.
 func (wg *WaitGroup) Wait(ctx context.Context) {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()
