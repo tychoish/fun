@@ -120,6 +120,14 @@ func AddCleanup(ctx context.Context, cleanup fun.WorkerFunc) {
 	fun.InvariantMust(getCleanup(ctx).Add(cleanup))
 }
 
+// AddCleanupError adds an error to the cleanup handler which is
+// returned when that service shuts down. Useful to propagating errors
+// encountered during runtime that don't warrent a panic to process
+// shutdown.
+func AddCleanupError(ctx context.Context, err error) {
+	AddCleanup(ctx, func(context.Context) error { return err })
+}
+
 // SetShutdownSignal attaches a context.CancelFunc for the current context
 // to that context, which can be accesed with the GetShutdown function
 // to make it possible to trigger a safe and clean shutdown in

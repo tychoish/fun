@@ -135,6 +135,7 @@ func TestDaemon(t *testing.T) {
 		assert.True(t, baseCleanupCalled.Load())
 		assert.True(t, baseShutdownCalled.Load())
 	})
+
 	t.Run("CloseTriggers", func(t *testing.T) {
 		ctx := testt.Context(t)
 		baseRunCounter := &atomic.Int64{}
@@ -279,4 +280,21 @@ func TestCleanup(t *testing.T) {
 
 		check.Equal(t, 100, count.Load())
 	})
+	t.Run("ContextCleanupError", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = WithCleanup(ctx)
+		err := errors.New("kip")
+
+		AddCleanupError(ctx, err)
+
+		orch := GetOrchestrator(ctx)
+		srv := orch.Service()
+		time.Sleep(10 * time.Millisecond)
+		srv.Close()
+		out := srv.Wait()
+		assert.True(t, out != nil)
+		assert.ErrorIs(t, out, err)
+	})
+
 }
