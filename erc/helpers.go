@@ -140,6 +140,29 @@ func CheckWait(ec *Collector, fn fun.WorkerFunc) fun.WaitFunc {
 	return func(ctx context.Context) { ec.Add(fn(ctx)) }
 }
 
+// WithCollector runs the provided function in the returned
+// WorkerFunc, and provides a managed erc.Collector.
+func WithCollector(in func(context.Context, *Collector) error) fun.WorkerFunc {
+	return func(ctx context.Context) (err error) {
+		ec := &Collector{}
+		defer func() { err = ec.Resolve() }()
+		ec.Add(in(ctx, ec))
+		return
+	}
+}
+
+// WithSafeCollector, like WithCollector, runs the provided function
+// in the returned WorkerFunc, and provides a managed
+// erc.Collector. In addition to the semantics of WithCollector,
+// WithSafeCollector also runs erc.Recover() in a defer statement for
+// additional pantic safety.
+func WithSafeCollector(in func(context.Context, *Collector) error) fun.WorkerFunc {
+	return WithCollector(func(ctx context.Context, ec *Collector) error {
+		defer Recover(ec)
+		return in(ctx, ec)
+	})
+}
+
 // Unwind converts an error into a slice of errors in two cases:
 // First, if an error is an *erc.Stack, Unwind will return a slice
 // with all constituent errors. Second, if the error is wrapped,

@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/testt"
 )
 
 type errorTest struct {
@@ -360,7 +362,84 @@ func TestCollections(t *testing.T) {
 		assert.Error(t, ec.Resolve())
 		assert.Equal(t, ec.Resolve().Error(), "kip")
 	})
+	t.Run("WithHelpers", func(t *testing.T) {
+		t.Run("Safe", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
+			err := WithSafeCollector(func(_ context.Context, ec *Collector) error {
+				panic(io.EOF)
+			})(ctx)
+			assert.Error(t, err)
+
+			errs := Unwind(err)
+			testt.Log(t, errs)
+
+			assert.Equal(t, 2, len(errs))
+			assert.ErrorIs(t, err, io.EOF)
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+		})
+		t.Run("SafeExtra", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := WithSafeCollector(func(_ context.Context, ec *Collector) error {
+				ec.Add(fun.ErrSkippedBlockingSend)
+				panic(io.EOF)
+			})(ctx)
+			assert.Error(t, err)
+
+			errs := Unwind(err)
+			testt.Log(t, errs)
+
+			assert.Equal(t, 3, len(errs))
+			assert.ErrorIs(t, err, io.EOF)
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, fun.ErrSkippedBlockingSend)
+		})
+		t.Run("Empty", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := WithCollector(func(_ context.Context, ec *Collector) error {
+				return nil
+			})(ctx)
+			assert.NotError(t, err)
+		})
+		t.Run("NotCollected", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := WithCollector(func(_ context.Context, ec *Collector) error {
+				return io.EOF
+			})(ctx)
+			assert.Error(t, err)
+
+			errs := Unwind(err)
+			testt.Log(t, errs)
+
+			assert.Equal(t, 1, len(errs))
+			assert.ErrorIs(t, err, io.EOF)
+		})
+		t.Run("NotCollected", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := WithCollector(func(_ context.Context, ec *Collector) error {
+				ec.Add(fun.ErrSkippedBlockingSend)
+				return io.EOF
+			})(ctx)
+			assert.Error(t, err)
+
+			errs := Unwind(err)
+			testt.Log(t, errs)
+
+			assert.Equal(t, 2, len(errs))
+			assert.ErrorIs(t, err, io.EOF)
+			assert.ErrorIs(t, err, fun.ErrSkippedBlockingSend)
+		})
+
+	})
 }
 
 func getPopulatedErrChan(size int) chan error {
