@@ -603,3 +603,15 @@ func TestEmptyIteration(t *testing.T) {
 	})
 
 }
+
+func TestContains(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("Exists", func(t *testing.T) {
+		assert.True(t, Contains(ctx, 1, Slice([]int{12, 3, 44, 1})))
+	})
+	t.Run("NotExists", func(t *testing.T) {
+		assert.True(t, !Contains(ctx, 1, Slice([]int{12, 3, 44})))
+	})
+}

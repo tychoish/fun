@@ -110,5 +110,13 @@ func TestSend(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, io.EOF)
 	})
+}
 
+func TestContains(t *testing.T) {
+	t.Run("Exists", func(t *testing.T) {
+		assert.True(t, Contains(1, []int{12, 3, 44, 1}))
+	})
+	t.Run("NotExists", func(t *testing.T) {
+		assert.True(t, !Contains(1, []int{12, 3, 44}))
+	})
 }

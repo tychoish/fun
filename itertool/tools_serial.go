@@ -2,6 +2,8 @@ package itertool
 
 import (
 	"context"
+	"errors"
+	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -23,13 +25,34 @@ func Reduce[T any, O any](
 	defer erc.Check(catcher, iter.Close)
 	defer erc.Recover(catcher)
 
-	for iter.Next(ctx) {
-		value, err = reducer(iter.Value(), value)
+	for {
+		var item T
+		item, err = fun.IterateOne(ctx, iter)
+		if err != nil {
+			erc.When(catcher, !errors.Is(err, io.EOF), err)
+			return
+		}
+
+		value, err = reducer(item, value)
 		if err != nil {
 			catcher.Add(err)
 			return
 		}
 	}
+}
 
-	return
+// Contains processes an iterator of compareable type returning true
+// after the first element that equals item, and false otherwise.
+func Contains[T comparable](ctx context.Context, item T, iter fun.Iterator[T]) bool {
+	for {
+		v, err := fun.IterateOne(ctx, iter)
+		if err != nil {
+			break
+		}
+		if v == item {
+			return true
+		}
+	}
+
+	return false
 }

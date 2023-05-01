@@ -34,6 +34,17 @@ func WhenDo[T any](cond bool, op func() T) T {
 	return op()
 }
 
+// Contain returns true if an element of the slice is equal to the
+// item.
+func Contains[T comparable](item T, slice []T) bool {
+	for _, i := range slice {
+		if i == item {
+			return true
+		}
+	}
+	return false
+}
+
 // Send provides a functional and descriptive interface for sending
 // into channels. The only meaningful use of Send objects is via the
 // Blocking() and NonBlocking() constructors. Invocations resemble:
