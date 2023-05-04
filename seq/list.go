@@ -26,6 +26,13 @@ type List[T any] struct {
 	elementCreator func(val T) *Element[T]
 }
 
+// Append adds a variadic sequence of items to the end of the list.
+func (l *List[T]) Append(items ...T) {
+	for idx := range items {
+		l.PushBack(items[idx])
+	}
+}
+
 // Element is the underlying component of a list, provided by
 // iterators, the Pop operations, and the Front/Back accesses in the
 // list. You can use the methods on this objects to iterate through

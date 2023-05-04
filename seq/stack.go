@@ -17,6 +17,13 @@ type Stack[T any] struct {
 	itemConstructor func(val T) *Item[T]
 }
 
+// Append adds a variadic sequence of items to the list.
+func (s *Stack[T]) Append(items ...T) {
+	for idx := range items {
+		s.Push(items[idx])
+	}
+}
+
 // Item is a common wrapper for the elements in a stack.
 type Item[T any] struct {
 	next  *Item[T]

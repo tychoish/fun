@@ -351,9 +351,7 @@ func TestStack(t *testing.T) {
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("RoundTrip", func(t *testing.T) {
 			stack := &seq.Stack[int]{}
-			stack.Push(400)
-			stack.Push(300)
-			stack.Push(42)
+			stack.Append(400, 300, 42)
 			out, err := stack.MarshalJSON()
 			if err != nil {
 				t.Fatal(err)
@@ -372,9 +370,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			stack := &seq.Stack[int]{}
-			stack.Push(400)
-			stack.Push(300)
-			stack.Push(42)
+			stack.Append(400, 300, 42)
 
 			out, err := stack.MarshalJSON()
 			if err != nil {

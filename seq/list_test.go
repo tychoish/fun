@@ -718,9 +718,7 @@ func TestList(t *testing.T) {
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			list := &seq.List[int]{}
-			list.PushBack(400)
-			list.PushBack(300)
-			list.PushBack(42)
+			list.Append(400, 300, 42)
 
 			out, err := list.MarshalJSON()
 			if err != nil {
