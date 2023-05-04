@@ -35,6 +35,8 @@ func TestAssertion(t *testing.T) {
 		assert.NotContains(t, []int{1, 2, 3}, 43)
 		assert.Substring(t, "merlin the cat", strVal)
 		assert.NotSubstring(t, "the cat", strVal)
+		assert.Type[int](t, 1)
+		assert.NotType[string](t, 2)
 		assert.MaxRuntime(t, time.Millisecond, func() { time.Sleep(time.Microsecond) })
 		assert.MinRuntime(t, time.Microsecond, func() { time.Sleep(time.Millisecond) })
 	})
@@ -63,6 +65,8 @@ func TestAssertion(t *testing.T) {
 		assert.Failing(t, func(t *testing.T) { assert.NotContains(t, []int{1, 2, 3}, 1) })
 		assert.Failing(t, func(t *testing.T) { assert.Substring(t, "merlin the cat", "woof") })
 		assert.Failing(t, func(t *testing.T) { assert.NotSubstring(t, "the cat", "cat") })
+		assert.Failing(t, func(t *testing.T) { assert.Type[int](t, "hello") })
+		assert.Failing(t, func(t *testing.T) { assert.NotType[int](t, 1) })
 		assert.Failing(t, func(t *testing.T) {
 			assert.MaxRuntime(t, time.Nanosecond, func() { time.Sleep(time.Millisecond) })
 		})

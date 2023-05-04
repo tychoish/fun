@@ -76,6 +76,26 @@ func NotError(t testing.TB, err error) {
 	}
 }
 
+// Type fails the test if the type of the object doesn't match the
+// specifier type provided.
+func Type[T any](t testing.TB, obj any) {
+	_, ok := obj.(T)
+	if !ok {
+		var tn T
+		t.Fatalf("%s is not of type %T", obj, tn)
+	}
+}
+
+// NotType fails the test when the type of the specifier matches the
+// type of the object.
+func NotType[T any](t testing.TB, obj any) {
+	_, ok := obj.(T)
+	if ok {
+		var tn T
+		t.Fatalf("%s is not of type %T", obj, tn)
+	}
+}
+
 // ErrorIs is an assertion form of errors.Is, and fails the test if
 // the error (or its wrapped values) are not equal to the target
 // error.
