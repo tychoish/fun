@@ -65,7 +65,7 @@ func TestCollections(t *testing.T) {
 	t.Run("Wrap", func(t *testing.T) {
 		check.NotError(t, Wrap(nil, "hello"))
 		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
-		expected := errors.New("hello")
+		const expected ConstErr = "hello"
 		err := Wrap(expected, "hello")
 		assert.Equal(t, err.Error(), "hello: hello")
 		assert.ErrorIs(t, err, expected)
@@ -90,7 +90,7 @@ func TestCollections(t *testing.T) {
 			})
 			t.Run("One", func(t *testing.T) {
 				ec := &Collector{}
-				e := errors.New("fourty-two")
+				const e ConstErr = "fourty-two"
 				CollapseFrom(ec, []error{e})
 				err := ec.Resolve()
 				if !errors.Is(err, e) {
@@ -99,8 +99,8 @@ func TestCollections(t *testing.T) {
 			})
 			t.Run("Many", func(t *testing.T) {
 				ec := &Collector{}
-				e0 := errors.New("fourty-two")
-				e1 := errors.New("fourty-three")
+				const e0 ConstErr = "fourty-two"
+				const e1 ConstErr = "fourty-three"
 				CollapseFrom(ec, []error{e0, e1})
 				err := ec.Resolve()
 				if !errors.Is(err, e1) {
@@ -131,7 +131,7 @@ func TestCollections(t *testing.T) {
 				})
 				t.Run("One", func(t *testing.T) {
 					ec := &Collector{}
-					e := errors.New("fourty-two")
+					const e ConstErr = "fourty-two"
 					CollapseInto(ec, e)
 					err := ec.Resolve()
 					if !errors.Is(err, e) {
@@ -140,8 +140,8 @@ func TestCollections(t *testing.T) {
 				})
 				t.Run("Many", func(t *testing.T) {
 					ec := &Collector{}
-					e0 := errors.New("fourty-two")
-					e1 := errors.New("fourty-three")
+					const e0 ConstErr = "fourty-two"
+					const e1 ConstErr = "fourty-three"
 					CollapseInto(ec, e0, e1)
 					err := ec.Resolve()
 					if !errors.Is(err, e1) {
@@ -164,15 +164,15 @@ func TestCollections(t *testing.T) {
 				}
 			})
 			t.Run("One", func(t *testing.T) {
-				e := errors.New("fourty-two")
+				const e ConstErr = "fourty-two"
 				err := Collapse(e)
 				if !errors.Is(err, e) {
 					t.Error(err, e)
 				}
 			})
 			t.Run("Many", func(t *testing.T) {
-				e0 := errors.New("fourty-two")
-				e1 := errors.New("fourty-three")
+				const e0 ConstErr = "fourty-two"
+				const e1 ConstErr = "fourty-three"
 				err := Collapse(e0, e1)
 				if !errors.Is(err, e1) {
 					t.Error(err, e1)

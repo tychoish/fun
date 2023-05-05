@@ -9,6 +9,13 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+// ConstErr is a type alias for building/declaring sentinel errors
+// as constants.
+type ConstErr string
+
+// Error implements the error interface for ConstError.
+func (e ConstErr) Error() string { return string(e) }
+
 // ContextExpired checks an error to see if it, or any of it's parent
 // contexts signal that a context has expired. This covers both
 // canceled contexts and ones which have exceeded their deadlines.
