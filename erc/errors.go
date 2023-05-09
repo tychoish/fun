@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 )
 
 // Stack represents the error type returned by an ErrorCollector
@@ -109,7 +110,7 @@ func (e *esIterImpl) Next(ctx context.Context) bool {
 // goroutine, or with a synchronized approach. You may create multiple
 // Iterators on the same stack without issue.
 func (e *Stack) Iterator() fun.Iterator[error] {
-	return &esIterImpl{current: &Stack{next: e}}
+	return adt.NewIterator[error](&sync.Mutex{}, &esIterImpl{current: &Stack{next: e}})
 }
 
 // Collector is a simplified version of the error collector in
@@ -139,14 +140,12 @@ func (ec *Collector) Add(err error) {
 // Iterator produces an iterator for all errors present in the
 // collector. The iterator proceeds from the current error to the
 // oldest error, and will not observe new errors added to the
-// collector. While the iterator isn't safe for current access from
-// multiple go routines, the sequence of errors stored are not
-// modified after creation.
+// collector.
 func (ec *Collector) Iterator() fun.Iterator[error] {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 
-	return ec.stack.Iterator()
+	return adt.NewIterator[error](&ec.mu, &esIterImpl{current: &Stack{next: ec.stack}})
 }
 
 // Resolve returns an error of type *erc.Stack, or nil if there have
