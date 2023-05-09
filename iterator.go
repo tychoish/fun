@@ -71,12 +71,14 @@ type readOneable[T any] interface {
 // IterateOne, like ReadOne reads one value from the iterator, and
 // returns it. The error values are either a context cancelation error
 // if the context is canceled, or io.EOF if there are no elements in
-// the iterator.
+// the iterator. The semantics of fun.IterateOne and fun.ReadOne are
+// the same.
 //
 // IterateOne does not provide atomic exclusion if multiple calls to
 // the iterator or IterateOne happen concurrently; however, the
-// adt.NewIterator wrapper provides a special case which *does* allow
-// for concurrent use.
+// adt.NewIterator wrapper, and most of the iterator implementations
+// provided by the fun package, provide a special case which *does*
+// allow for safe and atomic concurrent use with fun.IterateOne.
 func IterateOne[T any](ctx context.Context, iter Iterator[T]) (T, error) {
 	if si, ok := iter.(readOneable[T]); ok {
 		return si.ReadOne(ctx)
@@ -85,16 +87,18 @@ func IterateOne[T any](ctx context.Context, iter Iterator[T]) (T, error) {
 	if err := ctx.Err(); err != nil {
 		return ZeroOf[T](), err
 	}
+
 	if iter.Next(ctx) {
 		return iter.Value(), nil
 	}
+
 	return ZeroOf[T](), io.EOF
 }
 
 // IterateOneBlocking has the same semantics as IterateOne except it
 // uses a blocking context, and if the iterator is blocking and there
 // are no more items, IterateOneBlocking will never return. Use with
-// caution, and in situations where you understand the iterators
+// caution, and in situations where you understand the iterator's
 // implementation.
 func IterateOneBlocking[T any](iter Iterator[T]) (T, error) {
 	return IterateOne(internal.BackgroundContext, iter)

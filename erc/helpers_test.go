@@ -384,7 +384,7 @@ func TestCollections(t *testing.T) {
 			defer cancel()
 
 			err := WithSafeCollector(func(_ context.Context, ec *Collector) error {
-				ec.Add(fun.ErrSkippedBlockingSend)
+				ec.Add(fun.ErrSkippedNonBlockingSend)
 				panic(io.EOF)
 			})(ctx)
 			assert.Error(t, err)
@@ -395,7 +395,7 @@ func TestCollections(t *testing.T) {
 			assert.Equal(t, 3, len(errs))
 			assert.ErrorIs(t, err, io.EOF)
 			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-			assert.ErrorIs(t, err, fun.ErrSkippedBlockingSend)
+			assert.ErrorIs(t, err, fun.ErrSkippedNonBlockingSend)
 		})
 		t.Run("Empty", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -426,7 +426,7 @@ func TestCollections(t *testing.T) {
 			defer cancel()
 
 			err := WithCollector(func(_ context.Context, ec *Collector) error {
-				ec.Add(fun.ErrSkippedBlockingSend)
+				ec.Add(fun.ErrSkippedNonBlockingSend)
 				return io.EOF
 			})(ctx)
 			assert.Error(t, err)
@@ -436,7 +436,7 @@ func TestCollections(t *testing.T) {
 
 			assert.Equal(t, 2, len(errs))
 			assert.ErrorIs(t, err, io.EOF)
-			assert.ErrorIs(t, err, fun.ErrSkippedBlockingSend)
+			assert.ErrorIs(t, err, fun.ErrSkippedNonBlockingSend)
 		})
 
 	})

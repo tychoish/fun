@@ -52,6 +52,7 @@ func Contains[T comparable](item T, slice []T) bool {
 //	ch := make(chan int)
 //	err := fun.Blocking(ch).Send(ctx, 42)
 //	// handle error, which is always a context cancellation error
+//	// or io.EOF.
 //
 // There are three kinds of sends: Check, which returns a boolean if
 // the send was successful; Send(), which returns the error useful if
@@ -72,17 +73,22 @@ const (
 	non_blocking blockingMode = 2
 )
 
-// ErrSkippedBlockingSend is returned when sending into a channel, in
+// ErrSkippedNonBlockingSend is returned when sending into a channel, in
 // a non-blocking context, when the channel was blocking and the send
 // was therefore skipped.
-var ErrSkippedBlockingSend = errors.New("skipped blocking send")
+var ErrSkippedNonBlockingSend = errors.New("skipped non-blocking send")
 
 // Blocking produces a blocking Send instance. All Send/Check/Ignore
 // operations will block until the context is canceled, the channel is
 // canceled, or the send succeeds.
 func Blocking[T any](ch chan<- T) Send[T] { return Send[T]{mode: blocking, ch: ch} }
 
-// NonBlocking produces a send instance that performs a non-blocking send.
+// NonBlocking produces a send instance that performs a non-blocking
+// send.
+//
+// The Send() method, for non-blocking sends, will return
+// ErrSkipedNonBlockingsend if the channel was full and the object was
+// not sent.
 func NonBlocking[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_blocking, ch: ch} }
 
 // Check performs a send and returns true when the send was successful.
@@ -115,7 +121,7 @@ func (sm Send[T]) Send(ctx context.Context, it T) (err error) {
 		case sm.ch <- it:
 			return nil
 		default:
-			return ErrSkippedBlockingSend
+			return ErrSkippedNonBlockingSend
 		}
 	default:
 		// it should be impossible to provoke an EOF error

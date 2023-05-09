@@ -59,7 +59,7 @@ func TestSend(t *testing.T) {
 			ch := make(chan int)
 
 			err := NonBlocking(ch).Send(ctx, 3)
-			assert.ErrorIs(t, err, ErrSkippedBlockingSend)
+			assert.ErrorIs(t, err, ErrSkippedNonBlockingSend)
 			close(ch)
 			out, ok := <-ch
 			assert.True(t, !ok)
