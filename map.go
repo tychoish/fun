@@ -25,7 +25,7 @@ func (m Map[K, V]) Add(k K, v V) { m[k] = v }
 // AddPair adds a Pair object to the map.
 func (m Map[K, V]) AddPair(p Pair[K, V]) { m.Add(p.Key, p.Value) }
 
-// Append adds a variadic sequence of Pair objects to the map.
+// Append adds a sequence of Pair objects to the map.
 func (m Map[K, V]) Append(pairs ...Pair[K, V]) { m.Extend(pairs) }
 
 // Len returns the length. It is equivalent to len(Map), but is
