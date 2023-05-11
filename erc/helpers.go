@@ -133,6 +133,12 @@ func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
+// Checkf executes a simple function and if it returns an error, adds
+// it to the collector, primarily for use in defer statements.
+func Checkf(ec *Collector, fn func() error, tmpl string, args ...any) {
+	ec.Add(Wrapf(fn(), tmpl, args...))
+}
+
 // CheckWhen executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
 func CheckWhen(ec *Collector, cond bool, fn func() error) {
@@ -172,9 +178,9 @@ func WithSafeCollector(in func(context.Context, *Collector) error) fun.WorkerFun
 
 // Unwind converts an error into a slice of errors in two cases:
 // First, if an error is an *erc.Stack, Unwind will return a slice
-// with all constituent errors. Second, if the error is wrapped,
-// Unwind will unwrap the error object adding every intermediate
-// error.
+// with all constituent errors. Second, if the error is wrapped or
+// merged, Unwind will unwrap the error object adding every
+// intermediate error.
 func Unwind(err error) []error {
 	if err == nil {
 		return nil

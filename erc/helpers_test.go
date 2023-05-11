@@ -337,6 +337,7 @@ func TestCollections(t *testing.T) {
 
 		})
 	})
+
 	t.Run("CheckWhen", func(t *testing.T) {
 		t.Run("NotCalled", func(t *testing.T) {
 			ec := &Collector{}
@@ -353,6 +354,21 @@ func TestCollections(t *testing.T) {
 			assert.True(t, called)
 		})
 	})
+
+	t.Run("Checkf", func(t *testing.T) {
+		ec := &Collector{}
+		count := 0
+		Checkf(ec, func() error { count++; return nil }, "foo %s", "bar")
+		check.Equal(t, count, 1)
+		assert.NotError(t, ec.Resolve())
+		expected := errors.New("kip")
+		Checkf(ec, func() error { count++; return expected }, "foo %s", "bar")
+		assert.Error(t, ec.Resolve())
+		assert.ErrorIs(t, ec.Resolve(), expected)
+		check.Equal(t, count, 2)
+		assert.Equal(t, "foo bar: kip", ec.Resolve().Error())
+	})
+
 	t.Run("Collect", func(t *testing.T) {
 		ec := &Collector{}
 		collect := Collect[int](ec)
