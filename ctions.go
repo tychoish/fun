@@ -87,7 +87,7 @@ func Blocking[T any](ch chan<- T) Send[T] { return Send[T]{mode: blocking, ch: c
 // send.
 //
 // The Send() method, for non-blocking sends, will return
-// ErrSkipedNonBlockingsend if the channel was full and the object was
+// ErrSkipedNonBlockingSend if the channel was full and the object was
 // not sent.
 func NonBlocking[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_blocking, ch: ch} }
 
