@@ -42,19 +42,6 @@ func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T]
 	return iter
 }
 
-// Slice produces an iterator for an arbitrary slice.
-func Slice[T any](in []T) fun.Iterator[T] { return internal.NewSliceIter(in) }
-
-// Channel produces an iterator for a specified channel. The
-// iterator does not start any background threads.
-func Channel[T any](pipe <-chan T) fun.Iterator[T] {
-	return &internal.ChannelIterImpl[T]{Pipe: pipe}
-}
-
-// Variadic is a wrapper around Slice() for more ergonomic use at some
-// call sites.
-func Variadic[T any](in ...T) fun.Iterator[T] { return Slice(in) }
-
 // Split produces an arbitrary number of iterators which divide the
 // input. The division is lazy and depends on the rate of consumption
 // of output iterators, but every item from the input iterator is sent
