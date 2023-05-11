@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -59,6 +61,16 @@ func (lls *orderedLLSet[T]) Delete(it T) {
 
 	e.Remove()
 	delete(lls.set, it)
+}
+
+func (lls *orderedLLSet[T]) MarshalJSON() ([]byte, error) {
+	return itertool.MarshalJSON(internal.BackgroundContext, lls.Iterator())
+}
+
+func (lls *orderedLLSet[T]) UnmarshalJSON(in []byte) error {
+	iter := itertool.UnmarshalJSON[T](in)
+	PopulateSet[T](internal.BackgroundContext, lls, iter)
+	return iter.Close()
 }
 
 type orderedSetItem[T comparable] struct {
@@ -134,9 +146,20 @@ func (s *orderedSetImpl[T]) Delete(it T) {
 
 	s.lazyDelete()
 }
+
 func (s *orderedSetImpl[T]) Iterator() fun.Iterator[T] {
 	s.lazyDelete()
 	return &orderedSetIterImpl[T]{set: s, lastIdx: -1}
+}
+
+func (s *orderedSetImpl[T]) MarshalJSON() ([]byte, error) {
+	return itertool.MarshalJSON(internal.BackgroundContext, s.Iterator())
+}
+
+func (s *orderedSetImpl[T]) UnmarshalJSON(in []byte) error {
+	iter := itertool.UnmarshalJSON[T](in)
+	PopulateSet[T](internal.BackgroundContext, s, iter)
+	return iter.Close()
 }
 
 type orderedSetIterImpl[T comparable] struct {

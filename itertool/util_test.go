@@ -12,9 +12,10 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
+
+type none struct{}
 
 func Has[T comparable](t testing.TB, iter fun.Iterator[T], item T) {
 	t.Helper()
@@ -626,13 +627,13 @@ func RunIteratorStringAlgoTests(
 							t.Run("ReduceError", func(t *testing.T) {
 								iter := builder()
 
-								seen := set.MakeUnordered[string](2)
+								seen := map[string]none{}
 
 								total, err := Reduce(ctx, iter,
 									func(in string, val int) (int, error) {
-										seen.Add(in)
+										seen[in] = none{}
 										val++
-										if seen.Len() == 2 {
+										if len(seen) == 2 {
 											return val, errors.New("boop")
 										}
 										return val, nil
@@ -647,7 +648,7 @@ func RunIteratorStringAlgoTests(
 								if e := err.Error(); e != "boop" {
 									t.Error("unexpected error:", e)
 								}
-								if l := seen.Len(); l != 2 {
+								if l := len(seen); l != 2 {
 									t.Error("seen", l, seen)
 								}
 								if total != 2 {

@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -40,28 +41,6 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 				}
 				close(vals)
 				return Channel(vals)
-			},
-		},
-		{
-			Name: "SetIterator",
-			Constructor: func(elems []T) fun.Iterator[T] {
-				set := set.MakeUnordered[T](len(elems))
-				for idx := range elems {
-					set.Add(elems[idx])
-				}
-
-				return set.Iterator()
-			},
-		},
-		{
-			Name: "OrderedSetIterator",
-			Constructor: func(elems []T) fun.Iterator[T] {
-				set := set.MakeOrdered[T](len(elems))
-				for idx := range elems {
-					set.Add(elems[idx])
-				}
-
-				return set.Iterator()
 			},
 		},
 		{
@@ -201,15 +180,15 @@ func TestRangeSplit(t *testing.T) {
 
 			rf := Range(ctx, input)
 
-			set := set.MakeOrdered[string](10)
+			set := map[string]none{}
 
 			var st string
 			for rf(ctx, &st) {
-				set.Add(st)
+				set[st] = none{}
 			}
 
-			if set.Len() != 10 {
-				t.Error("did not sufficently iteratre", set.Len())
+			if len(set) != 10 {
+				t.Error("did not sufficently iteratre", len(set))
 			}
 		})
 		t.Run("Parallel", func(t *testing.T) {
@@ -217,7 +196,7 @@ func TestRangeSplit(t *testing.T) {
 
 			rf := Range(ctx, input)
 
-			set := set.Synchronize(set.MakeOrdered[string](100))
+			set := &adt.Map[string, none]{}
 
 			wg := &fun.WaitGroup{}
 			for i := 0; i < 10; i++ {
@@ -228,7 +207,7 @@ func TestRangeSplit(t *testing.T) {
 
 					var st string
 					for rf(ctx, &st) {
-						set.Add(st)
+						set.Ensure(st)
 					}
 				}()
 			}
@@ -254,19 +233,22 @@ func TestRangeSplit(t *testing.T) {
 			t.Fatal("didn't make enough split")
 		}
 
-		set := set.Synchronize(set.MakeOrdered[string](100))
+		set := &adt.Map[string, none]{}
 
 		wg := &fun.WaitGroup{}
 		for _, iter := range splits {
 			wg.Add(1)
 
 			go func(it fun.Iterator[string]) {
+
 				defer wg.Done()
 
 				for it.Next(ctx) {
-					set.Add(it.Value())
+					set.Ensure(it.Value())
 				}
+
 			}(iter)
+
 		}
 
 		wg.Wait(ctx)
@@ -400,16 +382,20 @@ func TestParallelForEach(t *testing.T) {
 	defer cancel()
 
 	t.Run("Basic", func(t *testing.T) {
-		for i := int64(0); i <= 8; i++ {
+		for i := int64(-1); i <= 12; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
 				elems := makeIntSlice(200)
-				seen := set.Synchronize(set.NewOrdered[int]())
+
+				seen := &adt.Map[int, none]{}
+
 				err := ParallelForEach(ctx,
 					Slice(elems),
 					func(ctx context.Context, in int) error {
-						jitter := time.Duration(rand.Int63n(1 + i*int64(time.Millisecond)))
+						abs := int64(math.Abs(float64(i)))
+
+						jitter := time.Duration(rand.Int63n(1 + abs*int64(time.Millisecond)))
 						time.Sleep(time.Millisecond + jitter)
-						seen.Add(in)
+						seen.Ensure(in)
 						return nil
 					},
 					Options{NumWorkers: int(i)},
@@ -417,13 +403,15 @@ func TestParallelForEach(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out, err := CollectSlice(ctx, seen.Iterator())
+				out, err := CollectSlice(ctx, seen.Keys())
 				if err != nil {
 					t.Fatal(err)
 				}
+
+				testt.Log(t, "output", out)
+				testt.Log(t, "input", elems)
+
 				if len(out) != len(elems) {
-					t.Log("output", out)
-					t.Log("input", elems)
 					t.Error("unequal length slices")
 				}
 
@@ -433,9 +421,7 @@ func TestParallelForEach(t *testing.T) {
 						matches++
 					}
 				}
-				if i < 2 && matches != len(out) {
-					t.Error("should all with 1 worker", matches, len(out))
-				} else if i >= 2 && matches == len(out) {
+				if i >= 2 && matches == len(out) {
 					t.Error("should not all match", matches, len(out))
 				}
 			})
@@ -443,11 +429,12 @@ func TestParallelForEach(t *testing.T) {
 	})
 
 	t.Run("ContinueOnPanic", func(t *testing.T) {
-		seen := set.Synchronize(set.MakeNewOrdered[int]())
+		seen := &adt.Map[int, none]{}
+
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(200)),
 			func(ctx context.Context, in int) error {
-				seen.Add(in)
+				seen.Ensure(in)
 				runtime.Gosched()
 				if in >= 100 {
 					panic("error")
@@ -462,18 +449,23 @@ func TestParallelForEach(t *testing.T) {
 		if err == nil {
 			t.Fatal("should not have errored", err)
 		}
+
 		var es *erc.Stack
+
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
+
 		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+
 		if len(errs) != 200 {
 			// panics and expected
 			t.Error(len(errs))
 		}
 	})
 	t.Run("AbortOnPanic", func(t *testing.T) {
-		seen := set.Synchronize(set.NewUnordered[int]())
+		seen := &adt.Map[int, none]{}
+
 		err := ParallelForEach(ctx,
 			Slice(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
@@ -484,7 +476,7 @@ func TestParallelForEach(t *testing.T) {
 					runtime.Gosched()
 					panic("gotcha")
 				} else {
-					seen.Add(in)
+					seen.Ensure(in)
 				}
 
 				<-ctx.Done()

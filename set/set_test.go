@@ -2,13 +2,16 @@ package set
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/itertool"
+	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/testt"
 )
 
 func generateIter(ctx context.Context, size int) fun.Iterator[string] {
@@ -17,7 +20,7 @@ func generateIter(ctx context.Context, size int) fun.Iterator[string] {
 		out[i] = fmt.Sprintf("iter=%d", i)
 
 	}
-	return itertool.Slice(out)
+	return internal.NewSliceIter(out)
 }
 
 func TestSet(t *testing.T) {
@@ -53,6 +56,40 @@ func TestSet(t *testing.T) {
 				if set.Len() != 0 {
 					t.Fatal("initalized non-empty set")
 				}
+			})
+			t.Run("JSON", func(t *testing.T) {
+				set := builder()
+				set.Add("hello")
+				set.Add("merlin")
+				set.Add("hello")
+				set.Add("kip")
+				check.Equal(t, set.Len(), 3) // hello is a dupe
+
+				data, err := json.Marshal(set)
+				check.NotError(t, err)
+				iter := set.Iterator()
+				count := 0
+				rjson := string(data)
+				for iter.Next(ctx) {
+					count++
+					item := iter.Value()
+					switch {
+					case strings.Contains(rjson, "hello"):
+						continue
+					case strings.Contains(rjson, "merlin"):
+						continue
+					case strings.Contains(rjson, "kip"):
+						continue
+					default:
+						t.Errorf("unexpeced item %q<%d>", item, count)
+					}
+				}
+				check.Equal(t, count, set.Len())
+				testt.Log(t, rjson)
+				nset := builder()
+				assert.NotError(t, nset.(json.Unmarshaler).UnmarshalJSON(data))
+				check.True(t, Equal(ctx, set, nset))
+
 			})
 			t.Run("Recall", func(t *testing.T) {
 				set := builder()
@@ -426,6 +463,15 @@ func TestSet(t *testing.T) {
 			}
 		})
 	})
+	t.Run("JSONCheck", func(t *testing.T) {
+		// want to make sure this works normally, without the
+		// extra cast, as above.
+		set := MakeNewOrdered[int]()
+		err := json.Unmarshal([]byte("[1,2,3]"), &set)
+		check.NotError(t, err)
+		check.Equal(t, 3, set.Len())
+	})
+
 }
 
 func BenchmarkSet(b *testing.B) {

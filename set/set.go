@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/itertool"
 )
 
 // Set describes a basic set interface, and fun provdies a
@@ -37,7 +38,7 @@ func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T](0) }
 
 // PopulateSet adds all elements in the iterator to the provided Set.
 func PopulateSet[T comparable](ctx context.Context, set Set[T], iter fun.Iterator[T]) {
-	_ = fun.Observe(ctx, iter, set.Add)
+	fun.InvariantMust(fun.Observe(ctx, iter, set.Add))
 }
 
 // BuildUnordered produces a new unordered set from the elements in
@@ -85,6 +86,16 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	}(iter.Ctx)
 
 	return iter
+}
+
+func (s mapSetImpl[T]) MarshalJSON() ([]byte, error) {
+	return itertool.MarshalJSON(internal.BackgroundContext, s.Iterator())
+}
+
+func (s mapSetImpl[T]) UnmarshalJSON(in []byte) error {
+	iter := itertool.UnmarshalJSON[T](in)
+	PopulateSet[T](internal.BackgroundContext, s, iter)
+	return iter.Close()
 }
 
 type syncSetImpl[T comparable] struct {
@@ -144,4 +155,14 @@ func (s syncSetImpl[T]) Iterator() fun.Iterator[T] {
 	defer s.mtx.Unlock()
 
 	return adt.NewIterator(s.mtx, s.set.Iterator())
+}
+
+func (s syncSetImpl[T]) MarshalJSON() ([]byte, error) {
+	return itertool.MarshalJSON(internal.BackgroundContext, s.Iterator())
+}
+
+func (s syncSetImpl[T]) UnmarshalJSON(in []byte) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	return fun.Observe(internal.BackgroundContext, itertool.UnmarshalJSON[T](in), s.set.Add)
 }
