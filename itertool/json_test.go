@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/tychoish/fun/assert/check"
 )
 
 func TestJSON(t *testing.T) {
@@ -51,10 +53,12 @@ func TestJSON(t *testing.T) {
 		}
 	})
 	t.Run("ErrorIter", func(t *testing.T) {
-		out, err := MarshalJSON[int](ctx, &errIter[int]{err: context.Canceled})
+		iter := &errIter[int]{err: context.Canceled}
+		out, err := MarshalJSON[int](ctx, iter)
 		if err == nil {
 			t.Fatal(string(out))
 		}
+		check.Zero(t, iter.Value())
 	})
 	t.Run("UnmarshalNil", func(t *testing.T) {
 		iter := UnmarshalJSON[string](nil)

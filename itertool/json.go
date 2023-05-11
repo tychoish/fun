@@ -4,9 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 
 	"github.com/tychoish/fun"
 )
+
+type errIter[T any] struct{ err error }
+
+func (e errIter[T]) Close() error              { return e.err }
+func (_ errIter[T]) Next(context.Context) bool { return false }
+func (_ errIter[T]) Value() T                  { return fun.ZeroOf[T]() }
 
 // MarshalJSON is useful for implementing json.Marshaler methods
 // from iterator-supporting types. Wrapping the standard library's
@@ -21,7 +28,6 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 		if err != nil {
 			break
 		}
-
 		if first {
 			first = false
 		} else {
@@ -43,27 +49,26 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 	return buf.Bytes(), nil
 }
 
-type errIter[T any] struct{ err error }
-
-func (e errIter[T]) Close() error              { return e.err }
-func (_ errIter[T]) Next(context.Context) bool { return false }
-func (_ errIter[T]) Value() T                  { return fun.ZeroOf[T]() }
-
 // UnmarshalJSON reads a JSON input and produces an iterator of the
 // items. The implementation reads all items from the slice before
-// returning.
+// returning. Any errors encountered are propgated to the Close method
+// of the iterator.
 func UnmarshalJSON[T any](in []byte) fun.Iterator[T] {
 	rv := []json.RawMessage{}
 
 	if err := json.Unmarshal(in, &rv); err != nil {
 		return errIter[T]{err: err}
 	}
-	out := make([]T, len(rv))
-	for idx := range out {
-		if err := json.Unmarshal(rv[idx], &out[idx]); err != nil {
-			return errIter[T]{err: err}
+	var idx int
+	return fun.Generator(func(ctx context.Context) (out T, err error) {
+		if idx >= len(rv) {
+			return out, io.EOF
 		}
-	}
-
-	return Slice(out)
+		err = json.Unmarshal(rv[idx], &out)
+		if err != nil {
+			return
+		}
+		idx++
+		return
+	})
 }
