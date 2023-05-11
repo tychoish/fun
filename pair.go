@@ -1,6 +1,11 @@
 package fun
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/tychoish/fun/internal"
+)
 
 // Pair represents a key-value pair. Used by the adt synchronized map
 // implementation and the set package to handle ordered key-value pairs.
@@ -17,6 +22,37 @@ func MakePair[K comparable, V any](k K, v V) Pair[K, V] { return Pair[K, V]{Key:
 
 // Pairs implements a collection of key-value pairs.
 type Pairs[K comparable, V any] []Pair[K, V]
+
+// MakePairs converts a map type into a slice of Pair types
+// that can be usable in a set.
+func MakePairs[K comparable, V any](in map[K]V) Pairs[K, V] {
+	out := make([]Pair[K, V], 0, len(in))
+	for k, v := range in {
+		out = append(out, MakePair(k, v))
+	}
+	return out
+}
+
+// Iterator return an iterator over each key-value pairs.
+func (p Pairs[K, V]) Iterator() Iterator[Pair[K, V]] { return internal.NewSliceIter(p) }
+
+// Keys returns an iterator over only the keys in a sequence of
+// iterator items.
+func (p Pairs[K, V]) Keys() Iterator[K] { return PairKeys(p.Iterator()) }
+
+// Values returns an iterator over only the values in a sequence of
+// iterator pairs.
+func (p Pairs[K, V]) Values() Iterator[V] { return PairValues(p.Iterator()) }
+
+// PairKeys converts an iterator of Pairs to an iterator of its keys.
+func PairKeys[K comparable, V any](iter Iterator[Pair[K, V]]) Iterator[K] {
+	return Transform(iter, func(p Pair[K, V]) (K, error) { return p.Key, nil })
+}
+
+// PairValues converts an iterator of pairs to an iterator of its values.
+func PairValues[K comparable, V any](iter Iterator[Pair[K, V]]) Iterator[V] {
+	return Transform(iter, func(p Pair[K, V]) (V, error) { return p.Value, nil })
+}
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
 // converting it to a map and then encoding that map as JSON. The JSON
@@ -38,19 +74,12 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-// MakePairs converts a map type into a slice of Pair types
-// that can be usable in a set.
-func MakePairs[K comparable, V any](in map[K]V) Pairs[K, V] {
-	out := make([]Pair[K, V], 0, len(in))
-	for k, v := range in {
-		out = append(out, MakePair(k, v))
-	}
-	return out
-}
-
 // Add adds a new value to the underlying slice. This may add a
 // duplicate key.
 func (p *Pairs[K, V]) Add(k K, v V) { *p = p.Append(Pair[K, V]{Key: k, Value: v}) }
+
+// AddPair adds a single pair to the slice of pairs.
+func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) { *p = p.Append(pair) }
 
 // Append, mirroring the semantics of the built in append() function
 // adds one or more Pair items to a Pairs slice, and returns the new
@@ -58,6 +87,11 @@ func (p *Pairs[K, V]) Add(k K, v V) { *p = p.Append(Pair[K, V]{Key: k, Value: v}
 //
 //	p = p.Append(pair, pare, pear)
 func (p Pairs[K, V]) Append(new ...Pair[K, V]) Pairs[K, V] { return append(p, new...) }
+
+// Consume adds items from an iterator of pairs to the current Pairs slice.
+func (p *Pairs[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
+	InvariantMust(Observe(ctx, iter, func(item Pair[K, V]) { p.AddPair(item) }))
+}
 
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
