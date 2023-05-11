@@ -95,7 +95,7 @@ func TestIterators(t *testing.T) {
 				}
 			})
 			t.Run("During", func(t *testing.T) {
-				iter := &ChannelIterImpl[int]{Pipe: make(chan int)}
+				iter := NewChannelIterator(make(chan int))
 				seen := 0
 				sig := make(chan struct{})
 				go func() { defer close(sig); time.Sleep(5 * time.Millisecond); cancel() }()
@@ -139,9 +139,8 @@ func TestIterators(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			iter := &ChannelIterImpl[int]{
-				Pipe: makeClosedSlice([]int{1, 2, 3, 4}),
-			}
+			iter := NewChannelIterator(makeClosedSlice([]int{1, 2, 3, 4}))
+
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -203,12 +202,10 @@ func TestIterators(t *testing.T) {
 		defer cancel()
 		t.Run("BasicOperation", func(t *testing.T) {
 			var closed bool
-			iter := &GeneratorIterator[int]{
-				Operation: func(context.Context) (int, error) {
-					return 1, nil
-				},
-				Closer: func() { closed = true },
-			}
+			iter := NewGeneratorIterator(func(context.Context) (int, error) {
+				return 1, nil
+			})
+			iter.Closer = func() { closed = true }
 
 			if iter.Value() != 0 {
 				t.Error("should initialize to zero")
@@ -228,15 +225,13 @@ func TestIterators(t *testing.T) {
 		})
 		t.Run("RespectEOF", func(t *testing.T) {
 			count := 0
-			iter := &GeneratorIterator[int]{
-				Operation: func(context.Context) (int, error) {
-					count++
-					if count > 10 {
-						return 1000, io.EOF
-					}
-					return count, nil
-				},
-			}
+			iter := NewGeneratorIterator(func(context.Context) (int, error) {
+				count++
+				if count > 10 {
+					return 1000, io.EOF
+				}
+				return count, nil
+			})
 
 			seen := 0
 			for iter.Next(ctx) {

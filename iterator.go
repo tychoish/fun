@@ -17,7 +17,7 @@ import (
 //
 // The itertool package provides a number of tools and paradigms for
 // creating and processing Iterator objects, including Generators, Map
-// and Reduce, Filter as well as Split and Merge to combine or divide
+// and Reduce as well as Split and Merge to combine or divide
 // iterators.
 //
 // In general, Iterators cannot be safe for access from multiple
@@ -35,11 +35,8 @@ type Iterator[T any] interface {
 // exhausted. Take care to ensure that the Observe function does not
 // block.
 //
-// Use itertool.Observe and itertool.ParallelObserve for more advanced
-// execution patterns.
-//
-// Use with itertool.Slice, itertool.Channel, or itertool.Variadic to
-// process data in other forms.
+// The error returned captures any panics encountered as an error, as
+// well as the output of the Close() operation.
 func Observe[T any](ctx context.Context, iter Iterator[T], fn Observer[T]) (err error) {
 	defer func() { err = internal.MergeErrors(err, iter.Close()) }()
 	defer func() { err = mergeWithRecover(err, recover()) }()
@@ -112,7 +109,7 @@ func IterateOneBlocking[T any](iter Iterator[T]) (T, error) {
 // propagated to the close method, as long as it is not a context
 // cancellation error or an io.EOF error.
 func Generator[T any](op func(context.Context) (T, error)) Iterator[T] {
-	return &internal.GeneratorIterator[T]{Operation: op}
+	return internal.NewGeneratorIterator(op)
 }
 
 // Transform processes the input iterator of type I into an output
@@ -127,6 +124,37 @@ func Transform[I, O any](iter Iterator[I], op func(in I) (O, error)) Iterator[O]
 		}
 
 		return op(item)
-
 	})
+}
+
+// Filter passes every item in the input iterator and, if the check
+// function returns true propogates it to the output iterator.
+// There is no buffering, and check functions should return
+// quickly. For more advanced use, consider using itertool.Map()
+func Filter[T any](iter Iterator[T], check func(T) bool) Iterator[T] {
+	return Generator(func(ctx context.Context) (T, error) {
+		for {
+			item, err := IterateOne(ctx, iter)
+			if err != nil {
+				return ZeroOf[T](), err
+			}
+
+			if check(item) {
+				return item, nil
+			}
+		}
+	})
+}
+
+// Count returns the number of items observed by the iterator. Callers
+// should still manually call Close on the iterator.
+func Count[T any](ctx context.Context, iter Iterator[T]) int {
+	count := 0
+	for {
+		if _, err := IterateOne(ctx, iter); err != nil {
+			break
+		}
+		count++
+	}
+	return count
 }

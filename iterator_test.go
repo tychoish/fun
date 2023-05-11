@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -200,6 +201,33 @@ func TestIteratorTools(t *testing.T) {
 			}
 		})
 
+	})
+	t.Run("Filter", func(t *testing.T) {
+		evens := Filter(testIntIter(t, 100), func(in int) bool { return in%2 == 0 })
+		assert.Equal(t, Count(ctx, evens), 50)
+		for evens.Next(ctx) {
+			assert.True(t, evens.Value()%2 == 0)
+		}
+		assert.NotError(t, evens.Close())
+	})
+}
+
+func testIntIter(t *testing.T, size int) Iterator[int] {
+	t.Helper()
+
+	var count int
+
+	t.Cleanup(func() {
+		t.Helper()
+		check.Equal(t, count, size)
+	})
+
+	return Generator(func(context.Context) (int, error) {
+		if count >= size {
+			return 0, io.EOF
+		}
+		count++
+		return count - 1, nil
 	})
 
 }

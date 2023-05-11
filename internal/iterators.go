@@ -49,7 +49,12 @@ type ChannelIterImpl[T any] struct {
 	WG     sync.WaitGroup
 }
 
+func NewChannelIterator[T any](pipe <-chan T) *ChannelIterImpl[T] {
+	return &ChannelIterImpl[T]{Pipe: pipe}
+}
+
 func (iter *ChannelIterImpl[T]) Value() T { return iter.value }
+
 func (iter *ChannelIterImpl[T]) Close() error {
 	if iter.Closer != nil {
 		iter.Closer()
@@ -57,6 +62,7 @@ func (iter *ChannelIterImpl[T]) Close() error {
 	iter.WG.Wait()
 	return iter.Error
 }
+
 func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
 	// check first because select statement ordering is non-deterministic
 	if ctx.Err() != nil {
@@ -79,6 +85,10 @@ type GeneratorIterator[T any] struct {
 	Error     error
 	closed    atomic.Bool
 	value     T
+}
+
+func NewGeneratorIterator[T any](op func(ctx context.Context) (T, error)) *GeneratorIterator[T] {
+	return &GeneratorIterator[T]{Operation: op}
 }
 
 func (iter *GeneratorIterator[T]) Value() T { return iter.value }
