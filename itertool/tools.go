@@ -41,6 +41,23 @@ type Options struct {
 	// captured. All other error handling semantics
 	// (e.g. ContinueOnError) are applicable.
 	IncludeContextExpirationErrors bool
+	// SkipErrorCheck, when specified, should return true if the
+	// error should be skipped and false otherwise.
+	SkipErrorCheck func(error) bool
+}
+
+func (opts Options) shouldCollectError(err error) bool {
+	return err != nil &&
+		(opts.SkipErrorCheck == nil || !opts.SkipErrorCheck(err)) &&
+		(opts.IncludeContextExpirationErrors || !erc.ContextExpired(err))
+}
+
+func (opts Options) wrapErrorCheck(newCheck func(error) bool) func(error) bool {
+	oldCheck := opts.SkipErrorCheck
+	return func(err error) bool {
+		return (oldCheck == nil || oldCheck(err)) &&
+			(newCheck == nil || newCheck(err))
+	}
 }
 
 // ParallelForEach processes the iterator in parallel, and is
@@ -108,14 +125,12 @@ func forEachWorker[T any](
 	})
 	for iter.Next(ctx) {
 		if err := fn(ctx, iter.Value()); err != nil {
-			if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
-				// when the option is true, include all errors.
-				// when false, only include not cancellation errors.
-				catcher.Add(err)
-			}
+			erc.When(catcher, opts.shouldCollectError(err), err)
+
 			if opts.ContinueOnError {
 				continue
 			}
+
 			abort()
 			return
 		}
@@ -232,14 +247,12 @@ func mapWorker[T any, O any](
 			}
 			o, err := mapper(ctx, value)
 			if err != nil {
-				if opts.IncludeContextExpirationErrors || !erc.ContextExpired(err) {
-					// when the option is true, include all errors.
-					// when false, only include not cancellation errors.
-					catcher.Add(err)
-				}
+				erc.When(catcher, opts.shouldCollectError(err), err)
+
 				if opts.ContinueOnError {
 					continue
 				}
+
 				abort()
 				return
 			}
@@ -310,6 +323,8 @@ func generator[T any](
 	abort func(),
 	out chan<- T,
 ) {
+	shouldCollectError := opts.wrapErrorCheck(func(err error) bool { return !errors.Is(err, ErrAbortGenerator) })
+
 	defer wg.Done()
 	defer erc.RecoverHook(catcher, func() {
 		if !opts.ContinueOnPanic {
@@ -323,18 +338,13 @@ func generator[T any](
 	for {
 		value, err := fn(ctx)
 		if err != nil {
-			expired := erc.ContextExpired(err)
-			if errors.Is(err, ErrAbortGenerator) || (expired && !opts.IncludeContextExpirationErrors) {
+			erc.When(catcher, shouldCollectError(err), err)
+
+			if errors.Is(err, ErrAbortGenerator) || erc.ContextExpired(err) || !opts.ContinueOnError {
 				abort()
 				return
 			}
 
-			catcher.Add(err)
-
-			if !opts.ContinueOnError || expired {
-				abort()
-				return
-			}
 			continue
 		}
 
