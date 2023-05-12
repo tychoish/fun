@@ -269,10 +269,7 @@ func TestWait(t *testing.T) {
 		assert.NotError(t, err)
 		assert.True(t, called.Load())
 		assert.Panic(t, func() {
-			var err error //nolint:gosimple
-
-			err = WaitFunc(func(context.Context) { panic("hi") }).Worker()(testt.Context(t))
-			check.NotError(t, err)
+			WaitFunc(func(context.Context) { panic("hi") }).Run(testt.Context(t))
 		})
 	})
 	t.Run("WorkerCancel", func(t *testing.T) {
@@ -280,7 +277,7 @@ func TestWait(t *testing.T) {
 		cancel()
 
 		called := &atomic.Bool{}
-		err := WaitFunc(func(context.Context) { called.Store(true) }).Worker()(ctx)
+		err := WaitFunc(func(context.Context) { called.Store(true) }).Check()(ctx)
 		assert.Error(t, err)
 		assert.True(t, called.Load())
 		assert.ErrorIs(t, err, context.Canceled)
@@ -296,6 +293,12 @@ func TestWait(t *testing.T) {
 			check.ErrorIs(t, err, expected)
 			check.ErrorIs(t, err, context.Canceled)
 		})
+	})
+	t.Run("Safe", func(t *testing.T) {
+		expected := errors.New("safer")
+		err := WaitFunc(func(context.Context) { panic(expected) }).Safe().Run(testt.Context(t))
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, expected)
 	})
 	t.Run("Singal", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

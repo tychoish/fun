@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,14 +27,52 @@ func TestWorker(t *testing.T) {
 			}
 			assert.NotError(t, err)
 		})
+		t.Run("Background", func(t *testing.T) {
+			called := &atomic.Int64{}
+			expected := errors.New("foo")
+			WorkerFunc(func(ctx context.Context) error { called.Add(1); panic(expected) }).
+				Background(testt.Context(t), func(err error) {
+					check.Error(t, err)
+					check.ErrorIs(t, err, expected)
+					called.Add(1)
+				})
+			for {
+				if called.Load() == 2 {
+					return
+				}
+				time.Sleep(4 * time.Millisecond)
+			}
+		})
+		t.Run("Add", func(t *testing.T) {
+			ctx := testt.Context(t)
+			wg := &WaitGroup{}
+			count := &atomic.Int64{}
+			func() {
+				runtime.LockOSThread()
+				defer runtime.UnlockOSThread()
+
+				WorkerFunc(func(ctx context.Context) error {
+					assert.Equal(t, wg.Num(), 1)
+					count.Add(1)
+					return nil
+				}).Add(ctx, wg, func(err error) {
+					assert.Equal(t, wg.Num(), 1)
+					count.Add(1)
+					assert.NotError(t, err)
+				})
+			}()
+			wg.Wait(ctx)
+			assert.Equal(t, wg.Num(), 0)
+			assert.Equal(t, count.Load(), 2)
+		})
 		t.Run("Observe", func(t *testing.T) {
 			ctx := testt.Context(t)
-			t.Run("WithoutError", func(t *testing.T) {
+			t.Run("ObserveNilErrors", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
 				WorkerFunc(func(ctx context.Context) error { called.Store(true); return nil }).Observe(ctx, func(error) { observed.Store(true) })
 				assert.True(t, called.Load())
-				assert.True(t, !observed.Load())
+				assert.True(t, observed.Load())
 			})
 			t.Run("WithError", func(t *testing.T) {
 				called := &atomic.Bool{}

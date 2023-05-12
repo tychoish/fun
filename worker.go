@@ -30,13 +30,11 @@ func (wf WorkerFunc) Safe(ctx context.Context) (err error) {
 // expire and returns the error. Use with caution
 func (wf WorkerFunc) Block() error { return wf.Run(internal.BackgroundContext) }
 
-// Observe runs the worker function, and observes the error. Panics
-// are converted to errors for both the worker function but not the
-// observer function.
+// Observe runs the worker function, and observes the error (or nil
+// response). Panics are converted to errors for both the worker
+// function but not the observer function.
 func (wf WorkerFunc) Observe(ctx context.Context, ob Observer[error]) {
-	if err := wf.Safe(ctx); err != nil {
-		ob(err)
-	}
+	ob(wf.Safe(ctx))
 }
 
 // Signal runs the worker function in a background goroutine and
@@ -53,11 +51,13 @@ func (wf WorkerFunc) Singal(ctx context.Context) <-chan error {
 	return out
 }
 
-// MustWait converts a Worker function into a wait function; however,
-// if the worker produces an error MustWait converts the error into a
-// panic.
-func (wf WorkerFunc) MustWait() WaitFunc {
-	return func(ctx context.Context) { InvariantMust(wf.Run(ctx)) }
+// Background runs the worker function in a go routine and passes the
+// output to the provided observer function.
+func (wf WorkerFunc) Background(ctx context.Context, ob Observer[error]) { go wf.ObserveWait(ob)(ctx) }
+
+// Add runs the worker function in a go routine
+func (wf WorkerFunc) Add(ctx context.Context, wg *WaitGroup, ob Observer[error]) {
+	wf.ObserveWait(ob).Add(ctx, wg)
 }
 
 // ObserveWait converts a worker function into a wait function,
@@ -65,6 +65,13 @@ func (wf WorkerFunc) MustWait() WaitFunc {
 // observed.
 func (wf WorkerFunc) ObserveWait(ob Observer[error]) WaitFunc {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
+}
+
+// MustWait converts a Worker function into a wait function; however,
+// if the worker produces an error MustWait converts the error into a
+// panic.
+func (wf WorkerFunc) MustWait() WaitFunc {
+	return func(ctx context.Context) { InvariantMust(wf.Run(ctx)) }
 }
 
 // WithTimeout executes the worker function with the provided timeout

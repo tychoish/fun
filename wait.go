@@ -40,6 +40,15 @@ func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 	go func() { defer wg.Done(); wf.Run(ctx) }()
 }
 
+// Safe produces a worker function that catches. This is the same as
+// WaitFunc.Check() except check will also propgate the context error,
+// which this WorkerFunc will not.
+func (wf WaitFunc) Safe() WorkerFunc {
+	return func(ctx context.Context) error {
+		return Check(func() { wf.Run(ctx) })
+	}
+}
+
 // Signal runs the WaitFunc in a goroutine and returns a signal
 // channel that is canceled when the function completes. Useful for
 // bridging the gap between interfaces and integration that use
@@ -93,9 +102,13 @@ func (wf WaitFunc) Check() WorkerFunc {
 }
 
 // Worker converts a wait function into a WorkerFunc. If the context
-// is canceled, the worker function returns the context's error.
+// is canceled, the worker function returns the context's error. The
+// worker function also captures the wait functions panic and converts
+// it to an error.
 func (wf WaitFunc) Worker() WorkerFunc {
-	return func(ctx context.Context) error { wf.Run(ctx); return ctx.Err() }
+	return func(ctx context.Context) (err error) {
+		return Check(func() { wf.Run(ctx) })
+	}
 }
 
 // WaitBlocking is a convenience function to use simple blocking
@@ -132,7 +145,7 @@ func WaitForGroup(wg *sync.WaitGroup) WaitFunc {
 //
 // WaitObserve consumes and observes, at most, one item from the
 // channel. Callers must call the WaitFunc.
-func WaitObserve[T any](observe func(T), ch <-chan T) WaitFunc {
+func WaitObserve[T any](observe Observer[T], ch <-chan T) WaitFunc {
 	return func(ctx context.Context) {
 		val, err := ReadOne(ctx, ch)
 		if err != nil {
@@ -146,7 +159,7 @@ func WaitObserve[T any](observe func(T), ch <-chan T) WaitFunc {
 // function, waiting for the input channel to be closed or the
 // WaitFunc's context to be canceled. WaitObserveAll does not begin
 // processing the channel until the WaitFunc is called.
-func WaitObserveAll[T any](observe func(T), ch <-chan T) WaitFunc {
+func WaitObserveAll[T any](observe Observer[T], ch <-chan T) WaitFunc {
 	return WaitObserveAllCtx(func(_ context.Context, in T) { observe(in) }, ch)
 }
 
