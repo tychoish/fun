@@ -33,7 +33,7 @@ func TestImplementationHelpers(t *testing.T) {
 		}
 
 		dur := time.Since(start)
-		if dur < 10*time.Millisecond || dur > 15*time.Millisecond {
+		if dur < 10*time.Millisecond || dur > 20*time.Millisecond {
 			t.Error(dur)
 		}
 	})

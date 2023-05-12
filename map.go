@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"sync"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -39,11 +40,33 @@ func (m Map[K, V]) Extend(pairs Pairs[K, V]) {
 	}
 }
 
-// Merge adds all the keys from the input map the map.
-func (m Map[K, V]) Merge(in Map[K, V]) {
+// ConsumeMap adds all the keys from the input map the map.
+func (m Map[K, V]) ConsumeMap(in Map[K, V]) {
 	for k, v := range in {
 		m[k] = v
 	}
+}
+
+// ConsumeSlice adds a slice of values to the map, using the provided
+// function to generate the key for the value. Existing values in the
+// map are overridden.
+func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
+	for idx := range in {
+		value := in[idx]
+		m[keyf(value)] = value
+	}
+}
+
+// Consume adds items to the map from an iterator of Pair
+// objects. Existing values for K are always overwritten.
+func (m Map[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
+	InvariantMust(Observe(ctx, iter, func(in Pair[K, V]) { m.AddPair(in) }))
+}
+
+// ConsumeValues adds items to the map, using the function to generate
+// the keys for the values.
+func (m Map[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf func(V) K) {
+	InvariantMust(Observe(ctx, iter, func(in V) { m[keyf(in)] = in }))
 }
 
 // Iterator converts a map into an iterator of fun.Pair objects. The
@@ -60,13 +83,22 @@ func (m Map[K, V]) Merge(in Map[K, V]) {
 // times a collection of data must be coppied.
 func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 	iter := &internal.GeneratorIterator[Pair[K, V]]{}
+	synciter := &internal.SyncIterImpl[Pair[K, V]]{
+		Iter: iter,
+		Mtx:  &sync.Mutex{},
+	}
 
 	once := internal.MnemonizeContext(func(ctx context.Context) <-chan Pair[K, V] {
-		ctx, cancel := context.WithCancel(ctx)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
 
 		// setting this means that iter.Close() will
 		// release this thread
-		iter.Closer = cancel
+		func() {
+			synciter.Mtx.Lock()
+			defer synciter.Mtx.Unlock()
+			iter.Closer = cancel
+		}()
 
 		// now we make the pipe
 		out := make(chan Pair[K, V])
@@ -83,7 +115,13 @@ func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 		// worker.Safe makes this panic safe.and
 		// ensures the context is fully canceled no
 		// matter what
-		go func() { defer cancel(); iter.Error = worker.Safe(ctx) }()
+		go func() {
+			defer cancel()
+			synciter.Mtx.Lock()
+			defer synciter.Mtx.Unlock()
+
+			iter.Error = worker.Safe(ctx)
+		}()
 
 		return out
 	})

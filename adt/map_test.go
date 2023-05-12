@@ -388,5 +388,4 @@ func TestMap(t *testing.T) {
 			assert.Equal(t, count, 100)
 		})
 	})
-
 }

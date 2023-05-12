@@ -93,6 +93,26 @@ func (p *Pairs[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
 	InvariantMust(Observe(ctx, iter, func(item Pair[K, V]) { p.AddPair(item) }))
 }
 
+// ConsumeMap adds all of the items in a map to the Pairs object.
+func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
+	p.Consume(internal.BackgroundContext, Mapify(in).Iterator())
+}
+
+// ConsumeValues adds all of the values in the input iterator,
+// generating the keys using the function provided.
+func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf func(V) K) {
+	InvariantMust(Observe(ctx, iter, func(item V) { p.Add(keyf(item), item) }))
+}
+
+// ConsumeSlice adds all the values in the input slice to the Pairs
+// object, creating the keys using the function provide.
+func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
+	for idx := range in {
+		value := in[idx]
+		p.Add(keyf(value), value)
+	}
+}
+
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.

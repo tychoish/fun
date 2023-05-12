@@ -2,10 +2,12 @@ package fun
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -39,19 +41,51 @@ func TestPairs(t *testing.T) {
 		check.Equal(t, idx, 128)
 	})
 	t.Run("Consume", func(t *testing.T) {
-		ctx := testt.Context(t)
-		ps := Pairs[int, int]{}
-		sp := Pairs[int, int]{}
-		for i := 0; i < 128; i++ {
-			ps.Add(i, i)
-			sp.Add(i, i)
-		}
-		assert.Equal(t, len(ps), 128)
-		ps.Consume(ctx, sp.Iterator())
-		assert.Equal(t, len(ps), 256)
-		assert.Equal(t, len(ps.Map()), 128)
-	})
+		t.Run("Prime", func(t *testing.T) {
+			ctx := testt.Context(t)
+			ps := Pairs[int, int]{}
+			sp := Pairs[int, int]{}
+			for i := 0; i < 128; i++ {
+				ps.Add(i, i)
+				sp.Add(i, i)
+			}
+			assert.Equal(t, len(ps), 128)
+			ps.Consume(ctx, sp.Iterator())
+			assert.Equal(t, len(ps), 256)
+			assert.Equal(t, len(ps.Map()), 128)
+		})
+		t.Run("Slice", func(t *testing.T) {
+			p := Pairs[string, int]{}
+			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			for idx := range p {
+				check.Equal(t, p[idx].Key, fmt.Sprint(idx+1))
+				check.Equal(t, p[idx].Value, idx+1)
+			}
+		})
+		t.Run("Values", func(t *testing.T) {
+			p := Pairs[string, int]{}
+			p.ConsumeValues(
+				testt.Context(t),
+				internal.NewSliceIter([]int{1, 2, 3}),
+				func(in int) string { return fmt.Sprint(in) },
+			)
+			assert.Equal(t, len(p), 3)
+			for idx := range p {
+				check.Equal(t, p[idx].Key, fmt.Sprint(idx+1))
+				check.Equal(t, p[idx].Value, idx+1)
+			}
+		})
+		t.Run("Map", func(t *testing.T) {
+			p := Pairs[string, int]{}
+			p.ConsumeMap(map[string]int{
+				"1": 1,
+				"2": 2,
+				"3": 3,
+			})
+			assert.Equal(t, len(p), 3)
+		})
 
+	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Encode", func(t *testing.T) {
 			ps := MakePairs(map[string]string{"in": "out"})

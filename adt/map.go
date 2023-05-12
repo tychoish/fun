@@ -3,7 +3,6 @@ package adt
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -12,9 +11,8 @@ import (
 
 // Map provides a wrapper around the standard library's sync.Map type
 // with key/value types enforced by generics. Additional helpers
-// (Append, Extend, Populate) support adding multiple items to the
-// map, while Iterator and StoreFrom provide compatibility with
-// iterators.
+// support adding multiple items to the map, while Iterator and
+// StoreFrom provide compatibility with iterators.
 type Map[K comparable, V any] struct {
 	// Default handles construction and pools objects in
 	// the map for the Ensure and Get operations which must
@@ -188,7 +186,8 @@ func makeMapIterator[K comparable, V any, O any](
 ) fun.Iterator[O] {
 	once := &Once[<-chan O]{}
 	iter := &internal.GeneratorIterator[O]{}
-	ob := func(err error) { iter.Error = err }
+	mtx := &sync.Mutex{}
+	ob := func(err error) { mtx.Lock(); defer mtx.Unlock(); iter.Error = err }
 
 	iter.Operation = func(ctx context.Context) (O, error) {
 		pipe := once.Do(func() <-chan O {
@@ -204,7 +203,7 @@ func makeMapIterator[K comparable, V any, O any](
 						return true
 					}
 				})
-				return io.EOF
+				return nil
 			}).Background(ctx, ob)
 
 			return out
@@ -213,5 +212,5 @@ func makeMapIterator[K comparable, V any, O any](
 		return fun.ReadOne(ctx, pipe)
 	}
 
-	return NewIterator(&sync.Mutex{}, fun.Iterator[O](iter))
+	return NewIterator(mtx, fun.Iterator[O](iter))
 }

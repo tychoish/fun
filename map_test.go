@@ -7,14 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/internal"
 )
 
 func makeMap(size int) Map[string, int] {
 	out := Mapify(make(map[string]int, size))
 	for i := 0; len(out) < size; i++ {
 
-		out[fmt.Sprint(rand.Intn((1+i)*1000))] = i
+		out[fmt.Sprint(rand.Intn((1+i)*100000))] = i
 	}
 	return Mapify(out)
 }
@@ -57,10 +59,10 @@ func TestMap(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
 		mp := makeMap(100)
 
-		mp.Merge(mp)
+		mp.ConsumeMap(mp)
 		check.Equal(t, mp.Len(), 100)
 
-		mp.Merge(makeMap(100))
+		mp.ConsumeMap(makeMap(100))
 		check.Equal(t, mp.Len(), 200)
 
 	})
@@ -72,6 +74,42 @@ func TestMap(t *testing.T) {
 		go cancel()
 
 		check.True(t, Count(ctx, mp.Iterator()) < num)
+	})
+	t.Run("Consume", func(t *testing.T) {
+		t.Run("Slice", func(t *testing.T) {
+			mp := Map[string, int]{}
+			mp.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			check.Equal(t, mp["1"], 1)
+			check.Equal(t, mp["2"], 2)
+			check.Equal(t, mp["3"], 3)
+		})
+		t.Run("Prine", func(t *testing.T) {
+			orig := Map[string, int]{
+				"1": 1,
+				"2": 2,
+				"3": 3,
+			}
+			mp := Map[string, int]{}
+			iter := orig.Iterator()
+			assert.Equal(t, len(orig), 3)
+			assert.Equal(t, len(mp), 0)
+			mp.Consume(ctx, iter)
+			check.Equal(t, mp["1"], 1)
+			check.Equal(t, mp["2"], 2)
+			check.Equal(t, mp["3"], 3)
+
+		})
+		t.Run("Values", func(t *testing.T) {
+			mp := Map[string, int]{}
+			mp.ConsumeValues(ctx,
+				internal.NewSliceIter([]int{1, 2, 3}),
+				func(in int) string { return fmt.Sprint(in) },
+			)
+			check.Equal(t, mp["1"], 1)
+			check.Equal(t, mp["2"], 2)
+			check.Equal(t, mp["3"], 3)
+
+		})
 	})
 
 }
