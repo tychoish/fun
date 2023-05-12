@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -39,10 +38,6 @@ func TestIterator(t *testing.T) {
 		if uiter == iter {
 			t.Error("unwrap should not be the same")
 		}
-		if _, ok := uiter.(*internal.ChannelIterImpl[fun.Pair[string, int]]); !ok {
-			t.Errorf("%T", uiter)
-		}
-
 		if seen != 4 {
 			t.Error(seen)
 		}

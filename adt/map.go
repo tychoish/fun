@@ -3,6 +3,7 @@ package adt
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -104,7 +105,8 @@ func (mp *Map[K, V]) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON takes a json sequence and adds the values to the
-// map. This does not remove or reset the values in the map, and
+// map. This does not remove or reset the values in the map, and other
+// operations may interleave during this operation.
 func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
 	out := map[K]V{}
 	if err := json.Unmarshal(in, &out); err != nil {
@@ -184,23 +186,32 @@ func makeMapIterator[K comparable, V any, O any](
 	mp *Map[K, V],
 	rf func(K, V) O,
 ) fun.Iterator[O] {
-	iter := &internal.ChannelIterImpl[O]{}
-	pipe := make(chan O)
-	iter.Pipe = pipe
-	ctx, cancel := context.WithCancel(internal.BackgroundContext)
-	iter.Closer = cancel
-	iter.WG.Add(1)
-	go func() {
-		defer iter.WG.Done()
-		defer close(pipe)
-		mp.Range(func(key K, value V) bool {
-			select {
-			case <-ctx.Done():
-				return false
-			case pipe <- rf(key, value):
-				return true
-			}
+	once := &Once[<-chan O]{}
+	iter := &internal.GeneratorIterator[O]{}
+	ob := func(err error) { iter.Error = err }
+
+	iter.Operation = func(ctx context.Context) (O, error) {
+		pipe := once.Do(func() <-chan O {
+			ctx, iter.Closer = context.WithCancel(ctx)
+			out := make(chan O)
+			fun.WorkerFunc(func(ctx context.Context) error {
+				defer close(out)
+				mp.Range(func(key K, value V) bool {
+					select {
+					case <-ctx.Done():
+						return false
+					case out <- rf(key, value):
+						return true
+					}
+				})
+				return io.EOF
+			}).Background(ctx, ob)
+
+			return out
 		})
-	}()
-	return iter
+
+		return fun.ReadOne(ctx, pipe)
+	}
+
+	return NewIterator(&sync.Mutex{}, fun.Iterator[O](iter))
 }
