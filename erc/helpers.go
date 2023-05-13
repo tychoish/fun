@@ -122,13 +122,6 @@ func RecoverHook(ec *Collector, hook func()) {
 	}
 }
 
-// CheckCtx executes a simple function that takes a context and if it
-// returns an error, adds it to the collector, primarily for use in
-// defer statements.
-func CheckCtx(ctx context.Context, ec *Collector, fn func(context.Context) error) {
-	CheckWait(ec, fn)(ctx)
-}
-
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }

@@ -124,20 +124,6 @@ func TestError(t *testing.T) {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
-		t.Run("CheckCtx", func(t *testing.T) {
-			catcher := &Collector{}
-			serr := errors.New(errval)
-			CheckCtx(ctx, catcher, func(_ context.Context) error { return serr })
-			catcherHasErrors(t, 1, catcher)
-			err := catcher.Resolve()
-			if !errors.Is(err, serr) {
-				t.Error("errors is behaves unexpectedly")
-			}
-
-			if err.Error() != serr.Error() {
-				t.Error("unexpected error from resolved catcher", err)
-			}
-		})
 		t.Run("PanicRecovery", func(t *testing.T) {
 			es := &Collector{}
 			sig := make(chan struct{})
