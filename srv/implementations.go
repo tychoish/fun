@@ -222,7 +222,9 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx, workQueue.Iterator(),
+			dist := pubsub.DistributorQueue(workQueue)
+
+			return itertool.ParallelForEach(ctx, pubsub.DistributorIterator(dist),
 				func(ctx context.Context, fn fun.WorkerFunc) error {
 					return fn.Run(ctx)
 				},
@@ -256,7 +258,7 @@ func ObserverWorkerPool(
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(
 				ctx,
-				workQueue.Iterator(),
+				pubsub.DistributorIterator(pubsub.DistributorQueue(workQueue)),
 				func(ctx context.Context, fn fun.WorkerFunc) error {
 					if err := fn.Run(ctx); err != nil {
 						observer(err)
