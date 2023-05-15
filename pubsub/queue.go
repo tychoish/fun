@@ -75,6 +75,18 @@ func NewUnlimitedQueue[T any]() *Queue[T] {
 	return makeQueue[T](&queueNoLimitTrackerImpl{})
 }
 
+func NewLimitedQueue[T any](size int) *Queue[T] {
+	if size <= 0 {
+		size = 1
+	}
+
+	return fun.Must(NewQueue[T](QueueOptions{
+		SoftQuota:   2 * size,
+		HardLimit:   4 * size,
+		BurstCredit: float64(size),
+	}))
+}
+
 func makeQueue[T any](tracker queueLimitTracker) *Queue[T] {
 	sentinel := new(entry[T])
 	q := &Queue[T]{

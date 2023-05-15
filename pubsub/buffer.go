@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -111,7 +113,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 // iterator's close method does *not* close the distributor's
 // underlying structure.
 func DistributorIterator[T any](dist Distributor[T]) fun.Iterator[T] {
-	return &distIter[T]{dist: dist}
+	return adt.NewIterator[T](&sync.Mutex{}, &distIter[T]{dist: dist})
 }
 
 type distIter[T any] struct {
