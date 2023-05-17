@@ -116,6 +116,13 @@ func TestOperations(t *testing.T) {
 		check.True(t, ok)
 		check.Equal(t, 100, value)
 	})
+	t.Run("CheckErr", func(t *testing.T) {
+		ok := CheckErr(errors.New("foo"))
+		check.True(t, !ok)
+
+		ok = CheckErr(nil)
+		check.True(t, ok)
+	})
 	t.Run("Force", func(t *testing.T) {
 		value := Force(100, errors.New("foo"))
 		check.Equal(t, 100, value)

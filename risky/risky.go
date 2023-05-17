@@ -13,9 +13,14 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Check takes two values and returns a second "ok" value if the error
-// is non-nil. This is not too risky.
+// Check takes two values and returns the first value and a second
+// "ok" value. The second value is true if the error is nil (isOK) and
+// false otherwise. This is not too risky.
 func Check[T any](out T, err error) (T, bool) { return out, err == nil }
+
+// CheckErr converts an error into an "ok" value. Returns true if the
+// error is nil and false otherwise. This is not too risky.
+func CheckErr(err error) bool { return err == nil }
 
 // Force swallows an error, and returns the output, as a non-panic'ing
 // form of fun.Invariant.
