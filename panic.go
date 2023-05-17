@@ -92,34 +92,6 @@ func Must[T any](arg T, err error) T {
 //	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); return out }
 
-// Ignore runs a function that takes an arbitrary argument and ignores
-// the error and swallows any panic. This is a risky move: usually
-// functions panic for a reason, but for certain invariants this may
-// be useful.
-//
-// Be aware, that while Ignore will recover from any panics, defers
-// within the ignored function will not run unless there is a call to
-// recover *before* the defer.
-func Ignore[T any](fn func(T) error, arg T) {
-	defer func() { _ = recover() }()
-	_ = fn(arg)
-}
-
-// IgnoreMust runs a function that takes an arbitrary argument and
-// ignores the error and swallows any panic, returning the output of
-// the function, likely a Zero value, in the case of an error.  This
-// is a risky move: usually functions panic for a reason, but for
-// certain invariants this may be useful.
-//
-// Be aware, that while Ignore will recover from any panics, defers
-// within the ignored function will not run unless there is a call to
-// recover *before* the defer.
-func IgnoreMust[T any, O any](fn func(T) (O, error), arg T) O {
-	defer func() { _ = recover() }()
-	val, _ := fn(arg)
-	return val
-}
-
 // Check, like Safe, runs a function without arguments that does not
 // produce an error, and, if the function panics, converts it into an
 // error.
