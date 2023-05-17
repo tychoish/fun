@@ -85,6 +85,7 @@ type GeneratorIterator[T any] struct {
 	Error     error
 	closed    atomic.Bool
 	value     T
+	opErr     error
 }
 
 func NewGeneratorIterator[T any](op func(ctx context.Context) (T, error)) *GeneratorIterator[T] {
@@ -93,12 +94,13 @@ func NewGeneratorIterator[T any](op func(ctx context.Context) (T, error)) *Gener
 
 func (iter *GeneratorIterator[T]) Value() T { return iter.value }
 func (iter *GeneratorIterator[T]) Close() error {
-	if iter.Closer != nil {
-		iter.Closer()
-		iter.Closer = nil
+	if iter.closed.CompareAndSwap(false, true) {
+		if closer := iter.Closer; closer != nil {
+			closer()
+		}
 	}
-	iter.closed.Store(true)
-	return iter.Error
+
+	return MergeErrors(iter.Error, iter.opErr)
 }
 
 func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {
@@ -114,10 +116,8 @@ func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {
 	case errors.Is(err, context.Canceled):
 	case errors.Is(err, context.DeadlineExceeded):
 	case errors.Is(err, io.EOF):
-		_ = iter.Close()
 	default:
-		iter.Error = err
-		_ = iter.Close()
+		iter.opErr = err
 	}
 	return false
 }

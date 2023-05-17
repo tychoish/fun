@@ -2,7 +2,6 @@ package fun
 
 import (
 	"context"
-	"sync"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -18,7 +17,7 @@ func Mapify[K comparable, V any](in map[K]V) Map[K, V] { return in }
 
 // Pairs exports a map a Pairs object, which is an alias for a slice of
 // Pair objects.
-func (m Map[K, V]) Pairs() Pairs[K, V] { return MakePairs(m) }
+func (m Map[K, V]) Pairs() Pairs[K, V] { p := MakePairs[K, V](); p.ConsumeMap(m); return p }
 
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }
@@ -83,52 +82,36 @@ func (m Map[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf fun
 // times a collection of data must be coppied.
 func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 	iter := &internal.GeneratorIterator[Pair[K, V]]{}
-	synciter := &internal.SyncIterImpl[Pair[K, V]]{
-		Iter: iter,
-		Mtx:  &sync.Mutex{},
-	}
 
 	once := internal.MnemonizeContext(func(ctx context.Context) <-chan Pair[K, V] {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
-
-		// setting this means that iter.Close() will
-		// release this thread
-		func() {
-			synciter.Mtx.Lock()
-			defer synciter.Mtx.Unlock()
-			iter.Closer = cancel
-		}()
 
 		// now we make the pipe
 		out := make(chan Pair[K, V])
+
 		worker := WorkerFunc(func(ctx context.Context) error {
 			defer close(out)
 			for k, v := range m {
-				if !Blocking(out).Check(ctx, MakePair(k, v)) {
+				if !Blocking(out).Send().Check(ctx, MakePair(k, v)) {
 					break
 				}
 			}
 			return nil // worker
 		})
 
-		// worker.Safe makes this panic safe.and
-		// ensures the context is fully canceled no
-		// matter what
-		go func() {
-			defer cancel()
-			synciter.Mtx.Lock()
-			defer synciter.Mtx.Unlock()
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
 
-			iter.Error = worker.Safe(ctx)
-		}()
+		sig := worker.Signal(ctx) // starts background thread
+		iter.Closer = func() {
+			cancel()
+			iter.Error = <-sig
+		}
 
 		return out
 	})
 
 	iter.Operation = func(ctx context.Context) (Pair[K, V], error) {
-		pipe := once(ctx)
-		return ReadOne(ctx, pipe)
+		return ReadOne(ctx, once(ctx))
 	}
 
 	return iter
