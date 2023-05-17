@@ -266,6 +266,64 @@ func TestIterators(t *testing.T) {
 
 		}
 	})
+
+	t.Run("NonBlockingReadOne", func(t *testing.T) {
+		t.Parallel()
+		t.Run("BlockingCompatibility", func(t *testing.T) {
+			ch := make(chan string, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			ch <- "merlin"
+			defer cancel()
+			out, err := NonBlockingReadOne(ctx, ch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out != "merlin" {
+				t.Fatal(out)
+			}
+
+			ch <- "merlin"
+			cancel()
+			seenCondition := false
+			for i := 0; i < 10; i++ {
+				t.Log(i)
+				_, err = NonBlockingReadOne(ctx, ch)
+				if errors.Is(err, context.Canceled) {
+					seenCondition = true
+				}
+				t.Log(err)
+
+				select {
+				case ch <- "merlin":
+				default:
+				}
+			}
+			if !seenCondition {
+				t.Error("should have observed a context canceled")
+
+			}
+		})
+		t.Run("NonBlocking", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan string)
+			out, err := NonBlockingReadOne(ctx, ch)
+			assert.Zero(t, out)
+			assert.NotError(t, err)
+		})
+		t.Run("Closed", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan string)
+			close(ch)
+			out, err := NonBlockingReadOne(ctx, ch)
+			assert.Zero(t, out)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, io.EOF)
+		})
+	})
 	t.Run("Generator", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
