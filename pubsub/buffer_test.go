@@ -25,7 +25,7 @@ import (
 // should have similar semantics as a channel, but callers may
 // (carefully) interact with the Deque structure while it's in use.
 func DistributorBuffer[T any](d *Deque[T]) Distributor[T] {
-	return &distributorImpl[T]{
+	return Distributor[T]{
 		push: d.WaitPushBack,
 		pop:  d.WaitFront,
 		size: d.Len,
@@ -129,7 +129,7 @@ func TestDistributor(t *testing.T) {
 			_ = queue.Add("strong")
 			_ = queue.Add("strung")
 
-			dist := DistributorQueue(queue)
+			dist := queue.Distributor()
 
 			set := set.MakeNewOrdered[string]()
 			seen := 0
@@ -137,7 +137,7 @@ func TestDistributor(t *testing.T) {
 				t.Fatal(queue.tracker.len())
 			}
 
-			iter := DistributorIterator(dist)
+			iter := dist.Iterator()
 			go func() {
 				time.Sleep(10 * time.Millisecond)
 				queue.Close()
@@ -282,7 +282,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 			Generator: func(t *testing.T, input fun.Iterator[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
-				out := DistributorQueue[T](queue)
+				out := queue.Distributor()
 				go func() {
 					defer queue.Close()
 					for input.Next(ctx) {

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 )
 
 // stolen shamelessly from https://github.com/tendermint/tendermint/tree/master/internal/libs/queue
@@ -73,18 +74,6 @@ func NewQueue[T any](opts QueueOptions) (*Queue[T], error) {
 // NewUnlimitedQueue produces an unbounded queue.
 func NewUnlimitedQueue[T any]() *Queue[T] {
 	return makeQueue[T](&queueNoLimitTrackerImpl{})
-}
-
-func NewLimitedQueue[T any](size int) *Queue[T] {
-	if size <= 0 {
-		size = 1
-	}
-
-	return fun.Must(NewQueue[T](QueueOptions{
-		SoftQuota:   2 * size,
-		HardLimit:   4 * size,
-		BurstCredit: float64(size),
-	}))
 }
 
 func makeQueue[T any](tracker queueLimitTracker) *Queue[T] {
@@ -335,18 +324,28 @@ type queueIterImpl[T any] struct {
 // operations, without additional locking. The iterator does not
 // modify the contents of the queue, and will only terminate when the
 // queue has been closed via the Close() method.
-func (q *Queue[T]) Iterator() fun.Iterator[T] {
-	iter := &queueIterImpl[T]{
-		queue: q,
+//
+// To create a "consuming" iterator, a Distributor.
+func (q *Queue[T]) Iterator() fun.Iterator[T] { return adt.NewIterator(&q.mu, newQueueIter(q)) }
+func (q *Queue[T]) Distributor() Distributor[T] {
+	return Distributor[T]{
+		push: ignorePopContext(q.Add),
+		pop: func(ctx context.Context) (T, error) {
+			msg, ok := q.Remove()
+			if ok {
+				return msg, nil
+			}
+			return q.Wait(ctx)
+		},
+		size: q.tracker.len,
 	}
-
-	return iter
 }
 
-func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
-	iter.queue.mu.Lock()
-	defer iter.queue.mu.Unlock()
+func newQueueIter[T any](q *Queue[T]) fun.Iterator[T] { return &queueIterImpl[T]{queue: q} }
+func (iter *queueIterImpl[T]) Close() error           { iter.closed = true; return nil }
+func (iter *queueIterImpl[T]) Value() T               { return iter.item.item }
 
+func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 	if ctx.Err() != nil {
 		return false
 	}
@@ -376,18 +375,4 @@ func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
 
 	iter.item = iter.item.link
 	return true
-}
-
-func (iter *queueIterImpl[T]) Close() error {
-	iter.queue.mu.Lock()
-	defer iter.queue.mu.Unlock()
-	iter.closed = true
-	return nil
-}
-
-func (iter *queueIterImpl[T]) Value() T {
-	iter.queue.mu.Lock()
-	defer iter.queue.mu.Unlock()
-
-	return iter.item.item
 }

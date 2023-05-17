@@ -95,7 +95,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+			cue := NewUnlimitedDeque[T]()
 
 			return fixture[T]{
 				name:     "DequePushBackPopFrontForward",
@@ -108,7 +108,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+			cue := NewUnlimitedDeque[T]()
 
 			return fixture[T]{
 				name:     "DequePushFrontPopBackForward",
@@ -121,7 +121,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+			cue := NewUnlimitedDeque[T]()
 
 			return fixture[T]{
 				name:     "DequePushBackPopFrontReverse",
@@ -134,7 +134,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+			cue := NewUnlimitedDeque[T]()
 
 			return fixture[T]{
 				name:     "DequePushFrontPopBackReverse",
@@ -147,7 +147,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+			cue := NewUnlimitedDeque[T]()
 
 			return fixture[T]{
 				name:     "DequePushBackPopFrontForward",
@@ -826,7 +826,7 @@ func TestDeque(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		queue := fun.Must(NewDeque[int](DequeOptions{Unlimited: true}))
+		queue := NewUnlimitedDeque[int]()
 
 		iter := queue.IteratorBlocking()
 		toctx, toccancel := context.WithTimeout(ctx, time.Millisecond)

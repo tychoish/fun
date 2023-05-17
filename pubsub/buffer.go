@@ -13,92 +13,47 @@ import (
 )
 
 // Distributor provides a layer of indirection above queue-like
-// implementations (e.g. Queue, Deque and channels) for buffering and
+// implementations (e.g. Queue, Deque, and channels) for buffering and
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
-//
-// Implementations should provide Send/Recieve operations that are
-// blocking and wait for the underlying structure to be "closed", the
-// context to be canceled, or have capacity (Send), or new objects
-// (Recieve). These operations *should* mutate the underlying data
-// structure or service.
-type Distributor[T any] interface {
-	Send(context.Context, T) error
-	Receive(context.Context) (T, error)
-	Len() int
-}
-
-type distributorImpl[T any] struct {
+type Distributor[T any] struct {
 	push func(context.Context, T) error
 	pop  func(context.Context) (T, error)
 	size func() int
 }
 
-func (d *distributorImpl[T]) Len() int                               { return d.size() }
-func (d *distributorImpl[T]) Send(ctx context.Context, in T) error   { return d.push(ctx, in) }
-func (d *distributorImpl[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
+func (d Distributor[T]) Len() int                               { return d.size() }
+func (d Distributor[T]) Send(ctx context.Context, in T) error   { return d.push(ctx, in) }
+func (d Distributor[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
+
+// Iterator allows iterator-like access to a
+// distributor. These iterators are blocking and destructive. The
+// iterator's close method does *not* close the distributor's
+// underlying structure.
+func (d Distributor[T]) Iterator() fun.Iterator[T] {
+	return adt.NewIterator[T](&sync.Mutex{}, &distIter[T]{dist: d})
+}
 
 func ignorePopContext[T any](in func(T) error) func(context.Context, T) error {
 	return func(_ context.Context, obj T) error { return in(obj) }
-}
-
-// distributorLIFO produces a Deque-based Distributor that, when the
-// user attempts to Push onto a full Deque, it will remove the first
-// element in the list, while all Pop operations are also to the front
-// of the Deque.
-func distributorLIFO[T any](d *Deque[T]) Distributor[T] {
-	return &distributorImpl[T]{
-		push: ignorePopContext(d.ForcePushFront),
-		pop:  d.WaitFront,
-		size: d.Len,
-	}
-}
-
-// DistributorDeque produces a Distributor that always accepts new
-// Push operations by removing the oldest element in the queue, with
-// Pop operations returning the oldest elements first (FIFO).
-func DistributorDeque[T any](d *Deque[T]) Distributor[T] {
-	return &distributorImpl[T]{
-		push: ignorePopContext(d.ForcePushBack),
-		pop:  d.WaitFront,
-		size: d.Len,
-	}
-}
-
-// DistributorQueue uses a Queue implementation for FIFO distribution
-// of items. If the queue is at capacity, push operations will return
-// ErrQueueFull errors, effectively allowing the user of the
-// distributor to drop new messages before they enter the queue..
-func DistributorQueue[T any](q *Queue[T]) Distributor[T] {
-	return &distributorImpl[T]{
-		push: ignorePopContext(q.Add),
-		pop: func(ctx context.Context) (T, error) {
-			msg, ok := q.Remove()
-			if ok {
-				return msg, nil
-			}
-			return q.Wait(ctx)
-		},
-		size: q.tracker.len,
-	}
 }
 
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
 func DistributorChannel[T any](ch chan T) Distributor[T] {
-	return &distributorImpl[T]{
+	return Distributor[T]{
 		push: func(ctx context.Context, in T) (err error) {
 			// this only happens if we've already paniced
 			// so we shouldn't get too many errors.
 			ec := &erc.Collector{}
 			defer func() { err = ec.Resolve() }()
 			defer erc.Recover(ec)
-			ec.Add(fun.Blocking(ch).Send(ctx, in))
+			ec.Add(fun.Blocking(ch).Send().Write(ctx, in))
 			return
 		},
 		pop: func(ctx context.Context) (T, error) {
-			val, err := fun.ReadOne(ctx, ch)
+			val, err := fun.Blocking(ch).Recieve().Read(ctx)
 			if err != nil && errors.Is(err, io.EOF) {
 				return val, ErrQueueClosed
 			}
@@ -106,14 +61,6 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 		},
 		size: func() int { return len(ch) },
 	}
-}
-
-// DistributorIterator allows iterator-like access to a
-// distributor. These iterators are blocking and destructive. The
-// iterator's close method does *not* close the distributor's
-// underlying structure.
-func DistributorIterator[T any](dist Distributor[T]) fun.Iterator[T] {
-	return adt.NewIterator[T](&sync.Mutex{}, &distIter[T]{dist: dist})
 }
 
 type distIter[T any] struct {

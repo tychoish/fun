@@ -92,6 +92,11 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 	return q, nil
 }
 
+// NewUnlimitedDeque constructs an unbounded Deque.
+func NewUnlimitedDeque[T any]() *Deque[T] {
+	return fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+}
+
 func makeDeque[T any]() *Deque[T] {
 	q := &Deque[T]{}
 	q.updates = sync.NewCond(&q.mtx)
@@ -260,6 +265,29 @@ func (dq *Deque[T]) IteratorBlocking() fun.Iterator[T] {
 func (dq *Deque[T]) IteratorBlockingReverse() fun.Iterator[T] {
 	defer dq.withLock()()
 	return &dqIterator[T]{list: dq, blocking: true, item: dq.root, direction: dqPrev}
+}
+
+// Distributor produces a consuming Distributor implementation that
+// always accepts new Push operations by removing the oldest element
+// in the queue, with Pop operations returning the oldest elements
+// first (FIFO).
+func (dq *Deque[T]) Distributor() Distributor[T] {
+	return Distributor[T]{
+		push: ignorePopContext(dq.ForcePushBack),
+		pop:  dq.WaitFront,
+		size: dq.Len,
+	}
+}
+
+// DistributorLIFO produces a Distributor that, when a caller attempts
+// to Push onto a full Deque, it will remove the first element in the
+// list, while all Pop operations are also from the front of the Deque.
+func (dq *Deque[T]) DistributorLIFO() Distributor[T] {
+	return Distributor[T]{
+		push: ignorePopContext(dq.ForcePushFront),
+		pop:  dq.WaitFront,
+		size: dq.Len,
+	}
 }
 
 func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
