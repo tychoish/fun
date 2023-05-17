@@ -182,7 +182,8 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 
 	return &Service{
 		Run: func(ctx context.Context) error {
-			iter := pipe.Iterator()
+			iter := pipe.Distributor().Iterator()
+
 			for {
 				item, err := fun.IterateOne(ctx, iter)
 				if err != nil {
@@ -222,9 +223,8 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			dist := pubsub.DistributorQueue(workQueue)
-
-			return itertool.ParallelForEach(ctx, pubsub.DistributorIterator(dist),
+			return itertool.ParallelForEach(ctx,
+				workQueue.Distributor().Iterator(),
 				func(ctx context.Context, fn fun.WorkerFunc) error {
 					return fn.Run(ctx)
 				},
@@ -256,13 +256,10 @@ func ObserverWorkerPool(
 ) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(
-				ctx,
-				pubsub.DistributorIterator(pubsub.DistributorQueue(workQueue)),
+			return itertool.ParallelForEach(ctx,
+				workQueue.Distributor().Iterator(),
 				func(ctx context.Context, fn fun.WorkerFunc) error {
-					if err := fn.Run(ctx); err != nil {
-						observer(err)
-					}
+					observer(fn.Run(ctx))
 					return nil
 				},
 				opts,
