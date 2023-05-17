@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/internal"
 )
 
 // Stack represents the error type returned by an ErrorCollector
@@ -48,6 +49,8 @@ func (e *Stack) append(err error) *Stack {
 		}
 
 		return e
+	case *internal.MergedError:
+		return e.append(werr.Wrapped).append(werr.Current)
 	default:
 		return &Stack{
 			next: e,

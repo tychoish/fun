@@ -136,9 +136,9 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "boop: recovered panic" {
-				t.Error(e)
-			}
+			err := es.stack
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.Substring(t, err.Error(), "boop")
 		})
 
 		t.Run("PanicRecoveryWithError", func(t *testing.T) {
@@ -325,11 +325,10 @@ func TestError(t *testing.T) {
 			if !ec.HasErrors() {
 				t.Fatal("empty collector")
 			}
-			if ec.Resolve().Error() != "foo: recovered panic" {
-				t.Fatal(ec.Resolve())
-			}
-
-			assert.ErrorIs(t, ec.Resolve(), fun.ErrRecoveredPanic)
+			err := ec.Resolve()
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.Substring(t, err.Error(), "foo")
 
 			if out != "" {
 				t.Fatal("output:", out)

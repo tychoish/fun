@@ -337,7 +337,13 @@ func TestCollections(t *testing.T) {
 
 		})
 	})
-
+	t.Run("CheckWait", func(t *testing.T) {
+		ec := &Collector{}
+		wait := CheckWait(ec, func(ctx context.Context) error { return errors.New("hello") })
+		assert.True(t, !ec.HasErrors())
+		wait(testt.Context(t))
+		assert.True(t, ec.HasErrors())
+	})
 	t.Run("CheckWhen", func(t *testing.T) {
 		t.Run("NotCalled", func(t *testing.T) {
 			ec := &Collector{}
@@ -367,6 +373,16 @@ func TestCollections(t *testing.T) {
 		assert.ErrorIs(t, ec.Resolve(), expected)
 		check.Equal(t, count, 2)
 		assert.Equal(t, "foo bar: kip", ec.Resolve().Error())
+	})
+	t.Run("Recovery", func(t *testing.T) {
+		ob := func(err error) {
+			check.Error(t, err)
+			check.ErrorIs(t, err, fun.ErrRecoveredPanic)
+		}
+		assert.NotPanic(t, func() {
+			defer Recovery(ob)
+			panic("hi")
+		})
 	})
 
 	t.Run("Collect", func(t *testing.T) {

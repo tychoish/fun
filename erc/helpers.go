@@ -89,17 +89,22 @@ func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() 
 // Recover calls the builtin recover() function and converts it to an
 // error that is populated in the collector. Run RecoverHook in defer
 // statements.
-func Recover(ec *Collector) {
-	if r := recover(); r != nil {
+func Recover(ec *Collector) { ec.Add(parsePanic(recover())) }
+
+// Recovery catches a panic, turns it into an error and passes it to
+// the provided observer function.
+func Recovery(ob fun.Observer[error]) { ob(parsePanic(recover())) }
+
+func parsePanic(r any) error {
+	if r != nil {
 		switch err := r.(type) {
 		case error:
-			ec.Add(err)
+			return Merge(err, fun.ErrRecoveredPanic)
 		default:
-			ec.Add(fmt.Errorf("%v", err))
+			return Merge(fmt.Errorf("%v", err), fun.ErrRecoveredPanic)
 		}
-
-		ec.Add(fun.ErrRecoveredPanic)
 	}
+	return nil
 }
 
 // RecoverHook runs adds the output of recover() to the error
