@@ -1,8 +1,6 @@
 package fun
 
 import (
-	"context"
-	"io"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -28,90 +26,6 @@ func TestWhen(t *testing.T) {
 	})
 }
 
-func TestSend(t *testing.T) {
-	t.Run("Send", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ch := make(chan int, 2)
-		err := Blocking(ch).Send(ctx, 1)
-		assert.NotError(t, err)
-		assert.Equal(t, <-ch, 1)
-
-		err = NonBlocking(ch).Send(ctx, 3)
-		assert.NotError(t, err)
-		assert.Equal(t, <-ch, 3)
-	})
-	t.Run("ClosedSend", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ch := make(chan int)
-		close(ch)
-		err := Blocking(ch).Send(ctx, 43)
-		assert.ErrorIs(t, err, io.EOF)
-	})
-	t.Run("NonBlocking", func(t *testing.T) {
-		t.Run("Send", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ch := make(chan int)
-
-			err := NonBlocking(ch).Send(ctx, 3)
-			assert.ErrorIs(t, err, ErrSkippedNonBlockingSend)
-			close(ch)
-			out, ok := <-ch
-			assert.True(t, !ok)
-			assert.Zero(t, out)
-		})
-		t.Run("Check", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ch := make(chan int, 1)
-
-			sent := NonBlocking(ch).Check(ctx, 3)
-			assert.True(t, sent)
-			out, ok := <-ch
-			assert.True(t, ok)
-			assert.Equal(t, 3, out)
-		})
-		t.Run("Check", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ch := make(chan int, 1)
-
-			NonBlocking(ch).Ignore(ctx, 3)
-			out, ok := <-ch
-			assert.True(t, ok)
-			assert.Equal(t, 3, out)
-		})
-	})
-	t.Run("Canceled", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		ch := make(chan int)
-
-		err := Blocking(ch).Send(ctx, 1)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
-		err = NonBlocking(ch).Send(ctx, 1)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
-
-		assert.True(t, !NonBlocking(ch).Check(ctx, 1))
-
-		err = (Send[int]{ch: ch}).Send(ctx, 1)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, io.EOF)
-		err = (Send[int]{mode: 42, ch: ch}).Send(ctx, 1)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, io.EOF)
-	})
-}
-
 func TestContains(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
 		assert.True(t, Contains(1, []int{12, 3, 44, 1}))
@@ -119,4 +33,17 @@ func TestContains(t *testing.T) {
 	t.Run("NotExists", func(t *testing.T) {
 		assert.True(t, !Contains(1, []int{12, 3, 44}))
 	})
+}
+
+func TestApply(t *testing.T) {
+	primes := []int{1, 3, 5, 7, 9, 11, 17, 19}
+	magnitutde := Apply(func(in int) int { return in * 10 }, primes)
+	assert.Equal(t, len(primes), len(magnitutde))
+	assert.Equal(t, len(primes), 8)
+
+	for idx := range primes {
+		assert.Zero(t, magnitutde[idx]%primes[idx])
+		assert.NotEqual(t, magnitutde[idx], primes[idx])
+		assert.Equal(t, magnitutde[idx]/10, primes[idx])
+	}
 }
