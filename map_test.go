@@ -75,6 +75,34 @@ func TestMap(t *testing.T) {
 
 		check.True(t, Count(ctx, mp.Iterator()) < num)
 	})
+	t.Run("SetDefaultAndCheck", func(t *testing.T) {
+		mp := Map[string, bool]{}
+		assert.True(t, !mp.Check("hi"))
+		assert.True(t, !mp.Check("kip"))
+		assert.True(t, !mp.Check("merlin"))
+		mp.SetDefault("hi")
+		mp.SetDefault("kip")
+		mp.SetDefault("merlin")
+		assert.True(t, mp.Check("hi"))
+		assert.True(t, mp.Check("kip"))
+		assert.True(t, mp.Check("merlin"))
+	})
+	t.Run("GetAndLoad", func(t *testing.T) {
+		mp := Map[string, bool]{}
+		assert.True(t, !mp.Get("foo"))
+		assert.Equal(t, mp.Len(), 0)
+		v, ok := mp.Load("foo")
+		assert.True(t, !v)
+		assert.True(t, !ok)
+
+		mp.SetDefault("foo")
+		assert.True(t, !mp.Get("foo"))
+
+		v, ok = mp.Load("foo")
+		assert.True(t, !v)
+		assert.True(t, ok)
+	})
+
 	t.Run("Consume", func(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			mp := Map[string, int]{}

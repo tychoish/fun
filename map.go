@@ -9,11 +9,35 @@ import (
 // Map is just a generic type wrapper around a map, mostly for the
 // purpose of being able to interact with Pair[K,V] objects and
 // Iterators.
+//
+// All normal map operations are still accessible, these methods
+// exist to provide accessible function objects for use in contexts
+// where that may be useful and to improve the readability of some
+// call sites, where default map access may be awkward.
 type Map[K comparable, V any] map[K]V
 
 // Mapify provides a constructor that will produce a fun.Map without
 // specifying types.
 func Mapify[K comparable, V any](in map[K]V) Map[K, V] { return in }
+
+// Check returns true if the value K is in the map.
+func (m Map[K, V]) Check(key K) bool { _, ok := m[key]; return ok }
+
+// Get returns the value from the map, and is the same thing as:
+//
+//	foo := mp[key]
+//
+// If the key is not present in the map, as with a normal map, this is
+// the zero value for V.
+func (m Map[K, V]) Get(key K) V { return m[key] }
+
+// Load returns the value in the map for the key, and an "ok" value
+// which is true if that item is present in the map.
+func (m Map[K, V]) Load(key K) (V, bool) { v, ok := m[key]; return v, ok }
+
+// SetDefault set's sets the provided key in the map to the zero value
+// for the value type.
+func (m Map[K, V]) SetDefault(key K) { m[key] = ZeroOf[V]() }
 
 // Pairs exports a map a Pairs object, which is an alias for a slice of
 // Pair objects.
@@ -84,14 +108,12 @@ func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 	iter := &internal.GeneratorIterator[Pair[K, V]]{}
 
 	once := internal.MnemonizeContext(func(ctx context.Context) <-chan Pair[K, V] {
-
-		// now we make the pipe
-		out := make(chan Pair[K, V])
+		pipe := make(chan Pair[K, V])
 
 		worker := WorkerFunc(func(ctx context.Context) error {
-			defer close(out)
+			defer close(pipe)
 			for k, v := range m {
-				if !Blocking(out).Send().Check(ctx, MakePair(k, v)) {
+				if !Blocking(pipe).Send().Check(ctx, MakePair(k, v)) {
 					break
 				}
 			}
@@ -107,7 +129,7 @@ func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 			iter.Error = <-sig
 		}
 
-		return out
+		return pipe
 	})
 
 	iter.Operation = func(ctx context.Context) (Pair[K, V], error) {

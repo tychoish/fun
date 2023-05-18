@@ -1,7 +1,9 @@
 package fun
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -13,7 +15,7 @@ import (
 
 func TestPairs(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
-		ps := MakePairs(map[string]string{"in": "out"})
+		ps := Mapify(map[string]string{"in": "out"}).Pairs()
 		ps.Add("in", "in")
 		ps.AddPair(MakePair("in", "in"))
 		mp := ps.Map()
@@ -40,6 +42,12 @@ func TestPairs(t *testing.T) {
 		}
 		check.Equal(t, idx, 128)
 	})
+	t.Run("Extend", func(t *testing.T) {
+		ps := Pairs[string, string]{}
+		ps.Extend(MakePairs(MakePair("one", "1"), MakePair("two", "2")))
+		assert.Equal(t, len(ps), 2)
+		assert.Equal(t, ps[0], MakePair("one", "1"))
+	})
 	t.Run("Consume", func(t *testing.T) {
 		t.Run("Prime", func(t *testing.T) {
 			ctx := testt.Context(t)
@@ -50,7 +58,7 @@ func TestPairs(t *testing.T) {
 				sp.Add(i, i)
 			}
 			assert.Equal(t, len(ps), 128)
-			ps.Consume(ctx, sp.Iterator())
+			assert.NotError(t, ps.Consume(ctx, sp.Iterator()))
 			assert.Equal(t, len(ps), 256)
 			assert.Equal(t, len(ps.Map()), 128)
 		})
@@ -64,11 +72,12 @@ func TestPairs(t *testing.T) {
 		})
 		t.Run("Values", func(t *testing.T) {
 			p := Pairs[string, int]{}
-			p.ConsumeValues(
+			err := p.ConsumeValues(
 				testt.Context(t),
 				internal.NewSliceIter([]int{1, 2, 3}),
 				func(in int) string { return fmt.Sprint(in) },
 			)
+			assert.NotError(t, err)
 			assert.Equal(t, len(p), 3)
 			for idx := range p {
 				check.Equal(t, p[idx].Key, fmt.Sprint(idx+1))
@@ -88,10 +97,16 @@ func TestPairs(t *testing.T) {
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Encode", func(t *testing.T) {
-			ps := MakePairs(map[string]string{"in": "out"})
+			ps := Mapify(map[string]string{"in": "out"}).Pairs()
 			out, err := json.Marshal(ps)
 			assert.NotError(t, err)
 			assert.Equal(t, string(out), `{"in":"out"}`)
+		})
+		t.Run("EncodeLong", func(t *testing.T) {
+			ps := MakePairs(MakePair("in", "out"), MakePair("out", "in"))
+			out, err := json.Marshal(ps)
+			assert.NotError(t, err)
+			assert.Equal(t, string(out), `{"in":"out","out":"in"}`)
 		})
 		t.Run("Decode", func(t *testing.T) {
 			ps := Pairs[string, string]{}
@@ -107,5 +122,20 @@ func TestPairs(t *testing.T) {
 			assert.Error(t, err)
 			assert.Equal(t, 0, len(ps))
 		})
+		t.Run("ImpossibleValue", func(t *testing.T) {
+			ps := Pairs[string, context.CancelFunc]{Pair[string, context.CancelFunc]{"hi", func() {}}}
+			_, err := ps.MarshalJSON()
+			assert.Error(t, err)
+		})
+		t.Run("ImpossibleKey", func(t *testing.T) {
+			ps := Pairs[badKey, string]{Pair[badKey, string]{"hi", "hi"}}
+			_, err := ps.MarshalJSON()
+			assert.Error(t, err)
+		})
+
 	})
 }
+
+type badKey string
+
+func (badKey) MarshalJSON() ([]byte, error) { return nil, errors.New("cannot marshal") }

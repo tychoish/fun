@@ -23,14 +23,19 @@ func MakePair[K comparable, V any](k K, v V) Pair[K, V] { return Pair[K, V]{Key:
 // Pairs implements a collection of key-value pairs.
 type Pairs[K comparable, V any] []Pair[K, V]
 
-// MakePairs converts a map type into a slice of Pair types
-// that can be usable in a set.
-func MakePairs[K comparable, V any](in map[K]V) Pairs[K, V] {
-	out := make([]Pair[K, V], 0, len(in))
-	for k, v := range in {
-		out = append(out, MakePair(k, v))
-	}
-	return out
+// MakePairs constructs a Pairs object from a sequence of Pairs. This
+// is identical to using the literal constructor but may be more
+// ergonomic as the compiler seems to be better at inferring types in
+// function calls over literal constructors.
+//
+// To build Pairs objects from other types, use the Consume methods.
+func MakePairs[K comparable, V any](in ...Pair[K, V]) Pairs[K, V] { return in }
+
+// Pair constructs an iterator of pairs, which it builds from a
+// sequence of values, generating the keys using the provided key
+// function.
+func BuildPairs[K comparable, V any](ctx context.Context, iter Iterator[V], keyf func(V) K) Iterator[Pair[K, V]] {
+	return Transform(iter, func(in V) (Pair[K, V], error) { return MakePair(keyf(in), in), nil })
 }
 
 // Iterator return an iterator over each key-value pairs.
@@ -58,7 +63,29 @@ func PairValues[K comparable, V any](iter Iterator[Pair[K, V]]) Iterator[V] {
 // converting it to a map and then encoding that map as JSON. The JSON
 // serialization does not necessarily preserve the order of the pairs
 // object.
-func (p Pairs[K, V]) MarshalJSON() ([]byte, error) { return json.Marshal(p.Map()) }
+func (p Pairs[K, V]) MarshalJSON() ([]byte, error) {
+	buf := &internal.IgnoreNewLinesBuffer{}
+	enc := json.NewEncoder(buf)
+	_, _ = buf.Write([]byte("{"))
+	first := true
+	for _, item := range p {
+		if first {
+			first = false
+		} else {
+			_, _ = buf.Write([]byte(","))
+		}
+		if err := enc.Encode(item.Key); err != nil {
+			return nil, err
+		}
+		_, _ = buf.Write([]byte(":"))
+		if err := enc.Encode(item.Value); err != nil {
+			return nil, err
+		}
+	}
+	_, _ = buf.Write([]byte("}"))
+
+	return buf.Bytes(), nil
+}
 
 // UnmarshalJSON provides consistent JSON decoding for Pairs
 // objects. It reads a JSON document into a map and converts it to
@@ -69,8 +96,8 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 	if err := json.Unmarshal(in, &t); err != nil {
 		return err
 	}
-	tt := MakePairs(t)
-	*p = p.Append(tt...)
+
+	p.ConsumeMap(t)
 	return nil
 }
 
@@ -88,20 +115,24 @@ func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) { *p = p.Append(pair) }
 //	p = p.Append(pair, pare, pear)
 func (p Pairs[K, V]) Append(new ...Pair[K, V]) Pairs[K, V] { return append(p, new...) }
 
-// Consume adds items from an iterator of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
-	InvariantMust(Observe(ctx, iter, func(item Pair[K, V]) { p.AddPair(item) }))
-}
+// Extend adds the items from a Pairs object (slice of Pair) without
+// modifying the donating object.
+func (p *Pairs[K, V]) Extend(toAdd Pairs[K, V]) { *p = append(*p, toAdd...) }
 
-// ConsumeMap adds all of the items in a map to the Pairs object.
-func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
-	p.Consume(internal.BackgroundContext, Mapify(in).Iterator())
+// Consume adds items from an iterator of pairs to the current Pairs slice.
+func (p *Pairs[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) error {
+	return Observe(ctx, iter, func(item Pair[K, V]) { p.AddPair(item) })
 }
 
 // ConsumeValues adds all of the values in the input iterator,
 // generating the keys using the function provided.
-func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf func(V) K) {
-	InvariantMust(Observe(ctx, iter, func(item V) { p.Add(keyf(item), item) }))
+func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf func(V) K) error {
+	return p.Consume(ctx, BuildPairs(ctx, iter, keyf))
+}
+
+// ConsumeMap adds all of the items in a map to the Pairs object.
+func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
+	InvariantMust(p.Consume(internal.BackgroundContext, Mapify(in).Iterator()))
 }
 
 // ConsumeSlice adds all the values in the input slice to the Pairs
