@@ -17,6 +17,17 @@ type Stack[T any] struct {
 	itemConstructor func(val T) *Item[T]
 }
 
+// NewListFromIterator builds a stack from the elements in the
+// iterator. In general, any error would be the result of the input
+// iterators's close method.
+func NewStackFromIterator[T any](ctx context.Context, iter fun.Iterator[T]) (*Stack[T], error) {
+	out := &Stack[T]{}
+	if err := fun.Observe(ctx, iter, func(in T) { out.Push(in) }); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Append adds a variadic sequence of items to the list.
 func (s *Stack[T]) Append(items ...T) {
 	for idx := range items {

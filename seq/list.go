@@ -26,6 +26,17 @@ type List[T any] struct {
 	elementCreator func(val T) *Element[T]
 }
 
+// NewListFromIterator builds a list from the elements in the
+// iterator. In general, any error would be the result of the input
+// iterators's close method.
+func NewListFromIterator[T any](ctx context.Context, iter fun.Iterator[T]) (*List[T], error) {
+	out := &List[T]{}
+	if err := fun.Observe(ctx, iter, func(in T) { out.PushBack(in) }); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Append adds a variadic sequence of items to the end of the list.
 func (l *List[T]) Append(items ...T) {
 	for idx := range items {

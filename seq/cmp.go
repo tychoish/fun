@@ -10,6 +10,7 @@
 package seq
 
 import (
+	"context"
 	"sort"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 
 // Orderable describes all native types which (currently) support the
 // < operator. To order custom types, use the OrderableUser interface.
+//
+// In the future an equivalent oderable type specification is likely
+// to enter the standard library, which will supercede this type.
 type Orderable interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | ~string
 }
@@ -39,6 +43,12 @@ func LessThanNative[T Orderable](a, b T) bool { return a < b }
 // interface.
 func LessThanCustom[T OrderableUser[T]](a, b T) bool { return a.LessThan(b) }
 
+// LessThanConverter provides a function to convert a non-orderable
+// type to an orderable type. Use this for
+func LessThanConverter[T any, S Orderable](converter func(T) S) LessThan[T] {
+	return func(a, b T) bool { return LessThanNative(converter(a), converter(b)) }
+}
+
 // LessThanTime compares time using the time.Time.Before() method.
 func LessThanTime(a, b time.Time) bool { return a.Before(b) }
 
@@ -52,6 +62,22 @@ func Reverse[T any](fn LessThan[T]) LessThan[T] { return func(a, b T) bool { ret
 type Heap[T any] struct {
 	LT   LessThan[T]
 	list *List[T]
+}
+
+// NewHeapFromIterator constructs and populates a heap using the input
+// iterator and corresponding comparison function. Will return the
+// input iterators Close() error if one exists, and otherwise will
+// return the populated heap.
+func NewHeapFromIterator[T any](ctx context.Context, cmp LessThan[T], iter fun.Iterator[T]) (*Heap[T], error) {
+	out := &Heap[T]{
+		LT: cmp,
+	}
+	out.lazySetup()
+
+	if err := fun.Observe(ctx, iter, func(in T) { out.Push(in) }); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (h *Heap[T]) lazySetup() {

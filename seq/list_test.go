@@ -15,6 +15,12 @@ import (
 	"github.com/tychoish/fun/seq"
 )
 
+type errIterator[T any] struct{}
+
+func (errIterator[T]) Next(context.Context) bool { return false }
+func (errIterator[T]) Close() error              { return errors.New("iteration") }
+func (errIterator[T]) Value() T                  { return fun.ZeroOf[T]() }
+
 type jsonMarshlerError struct{}
 
 func (jsonMarshlerError) MarshalJSON() ([]byte, error) { return nil, errors.New("always") }
@@ -35,6 +41,17 @@ func TestList(t *testing.T) {
 		if v := list.PopFront().Value(); v != 42 {
 			t.Fatal(v)
 		}
+	})
+	t.Run("NewFromIterator", func(t *testing.T) {
+		iter := itertool.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+		list, err := seq.NewListFromIterator(ctx, iter)
+		assert.NotError(t, err)
+		assert.Equal(t, list.Len(), 10)
+		assert.Equal(t, list.Back().Value(), 0)
+		assert.Equal(t, list.Front().Value(), 1)
+
+		_, err = seq.NewListFromIterator[int](ctx, errIterator[int]{})
+		assert.Error(t, err)
 	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := fun.Safe(func() bool {

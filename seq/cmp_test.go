@@ -14,6 +14,12 @@ import (
 	"github.com/tychoish/fun/itertool"
 )
 
+type errIterator[T any] struct{}
+
+func (errIterator[T]) Next(context.Context) bool { return false }
+func (errIterator[T]) Close() error              { return errors.New("iteration") }
+func (errIterator[T]) Value() T                  { return fun.ZeroOf[T]() }
+
 func GetPopulatedList(t testing.TB, size int) *List[int] {
 	t.Helper()
 	list := &List[int]{}
@@ -120,6 +126,16 @@ func TestSort(t *testing.T) {
 				t.Error("custom error")
 			}
 			if LessThanCustom(userOrderable{1000}, userOrderable{199}) {
+				t.Error("custom error")
+			}
+		})
+		t.Run("Function", func(t *testing.T) {
+			anyCmp := LessThanConverter(func(in any) int { return in.(int) })
+
+			if !anyCmp(any(1), any(900)) {
+				t.Error("custom error")
+			}
+			if anyCmp(any(1000), any(199)) {
 				t.Error("custom error")
 			}
 		})
@@ -236,6 +252,17 @@ func TestSort(t *testing.T) {
 
 			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 			assert.ErrorIs(t, err, ErrUninitialized)
+		})
+		t.Run("IteratorConstructor", func(t *testing.T) {
+			iter := itertool.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+			heap, err := NewHeapFromIterator(ctx, LessThanNative[int], iter)
+			assert.NotError(t, err)
+			assert.Equal(t, heap.Len(), 10)
+			assert.Equal(t, heap.list.Back().Value(), 9)
+			assert.Equal(t, heap.list.Front().Value(), 0)
+
+			_, err = NewHeapFromIterator[int](ctx, LessThanNative[int], errIterator[int]{})
+			assert.Error(t, err)
 		})
 		t.Run("Iterator", func(t *testing.T) {
 			heap := &Heap[int]{LT: LessThanNative[int]}

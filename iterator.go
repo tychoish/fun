@@ -36,7 +36,9 @@ type Iterator[T any] interface {
 // block.
 //
 // The error returned captures any panics encountered as an error, as
-// well as the output of the Close() operation.
+// well as the output of the Close() operation. Observe will not add a
+// context cancelation error to its error, though the observed
+// iterator may return one in its close method.
 func Observe[T any](ctx context.Context, iter Iterator[T], fn Observer[T]) (err error) {
 	defer func() { err = internal.MergeErrors(err, iter.Close()) }()
 	defer func() { err = mergeWithRecover(err, recover()) }()

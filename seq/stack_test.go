@@ -36,6 +36,16 @@ func TestStack(t *testing.T) {
 		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 		assert.ErrorIs(t, err, seq.ErrUninitialized)
 	})
+	t.Run("NewFromIterator", func(t *testing.T) {
+		iter := itertool.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+		stack, err := seq.NewStackFromIterator(ctx, iter)
+		assert.NotError(t, err)
+		assert.Equal(t, stack.Len(), 10)
+		assert.Equal(t, stack.Head().Value(), 0)
+
+		_, err = seq.NewStackFromIterator[int](ctx, errIterator[int]{})
+		assert.Error(t, err)
+	})
 	t.Run("Constructor", func(t *testing.T) {
 		stack := &seq.Stack[int]{}
 
