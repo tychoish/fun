@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/internal"
 )
 
 type wrapTestType struct {
@@ -28,6 +29,18 @@ func TestWrap(t *testing.T) {
 	t.Run("IsWrap", func(t *testing.T) {
 		err := fmt.Errorf("hello: %w", errors.New("world"))
 		assert.True(t, IsWrapped(err))
+	})
+	t.Run("Unwinder", func(t *testing.T) {
+		err := fmt.Errorf("hello: %w", errors.New("world"))
+		errs1 := Unwind(err)
+		errs2 := []error{}
+
+		assert.NotError(t, Observe(internal.BackgroundContext, UnwindIterator(err), func(in error) { errs2 = append(errs2, in) }))
+		assert.True(t, IsWrapped(err))
+		assert.Equal(t, len(errs1), len(errs2))
+		for idx := range errs1 {
+			assert.True(t, errs1[idx] == errs2[idx])
+		}
 	})
 	t.Run("Is", func(t *testing.T) {
 		if Is[*testing.T](5) {

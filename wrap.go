@@ -1,6 +1,9 @@
 package fun
 
 import (
+	"context"
+	"io"
+
 	"github.com/tychoish/fun/internal"
 )
 
@@ -47,13 +50,38 @@ func Unwind[T any](in T) []T {
 	return out
 }
 
+// UnwindIterator unwinds an object as in unwind but produces the
+// result as an Iterator. The iterative approach may be more ergonomic
+// in some situations, but also eliminates the need to create a copy
+// the unwound stack of objects to a slice.
+func UnwindIterator[T any](root T) Iterator[T] {
+	var next *T
+	next = &root
+	return Generator(func(context.Context) (T, error) {
+		if next == nil {
+			return internal.ZeroOf[T](), io.EOF
+		}
+		item := *next
+
+		wrapped, ok := doUnwrap(item)
+		if !ok {
+			next = nil
+		} else {
+			ni := wrapped.Unwrap()
+			next = &ni
+		}
+
+		return item, nil
+	})
+}
+
 type wrapped[T any] interface{ Unwrap() T }
 
 func doUnwrap[T any](in T) (wrapped[T], bool) { u, ok := any(in).(wrapped[T]); return u, ok }
 
-// IsWrapped returns true if the input value wraps another value of
-// the same type.
-func IsWrapped[T any](in T) bool { _, ok := doUnwrap(in); return ok }
+// IsWrapped returns true if the object is wrapped (e.g. implements an
+// Unwrap() method returning its own type). and false otherwise.
+func IsWrapped[T any](in T) bool { return Is[wrapped[T]](in) }
 
 // Zero returns the zero-value for the type T of the input argument.
 func Zero[T any](T) T { return ZeroOf[T]() }
