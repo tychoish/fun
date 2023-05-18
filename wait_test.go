@@ -300,7 +300,7 @@ func TestWait(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})
-	t.Run("Singal", func(t *testing.T) {
+	t.Run("Signal", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 

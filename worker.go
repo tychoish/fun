@@ -39,15 +39,15 @@ func (wf WorkerFunc) Observe(ctx context.Context, ob Observer[error]) {
 
 // Signal runs the worker function in a background goroutine and
 // returns the error in an error channel, that returns when the
-// worker function returns. If Singal is called with a canceled
+// worker function returns. If Signal is called with a canceled
 // context the worker is still executed (with that context.)
 //
 // A value, possibly nil, is always sent through the channel, though
 // the WorkerFunc runs in a different go routine, a panic handler will
 // convert panics to errors.
-func (wf WorkerFunc) Singal(ctx context.Context) <-chan error {
+func (wf WorkerFunc) Signal(ctx context.Context) <-chan error {
 	out := make(chan error)
-	go func() { defer close(out); Blocking(out).Ignore(ctx, wf.Safe(ctx)) }()
+	go func() { defer close(out); Blocking(out).Send().Ignore(ctx, wf.Safe(ctx)) }()
 	return out
 }
 

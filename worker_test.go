@@ -155,7 +155,7 @@ func TestWorker(t *testing.T) {
 			ctx := testt.Context(t)
 			expected := errors.New("hello")
 			wf := WorkerFunc(func(ctx context.Context) error { return expected })
-			out := wf.Singal(ctx)
+			out := wf.Signal(ctx)
 			err := <-out
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, expected)
