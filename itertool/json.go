@@ -1,12 +1,12 @@
 package itertool
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
 )
 
 type errIter[T any] struct{ err error }
@@ -17,10 +17,13 @@ func (_ errIter[T]) Value() T                  { return fun.ZeroOf[T]() }
 
 // MarshalJSON is useful for implementing json.Marshaler methods
 // from iterator-supporting types. Wrapping the standard library's
-// json.Marshal method, it produces a byte array of encoded JSON
-// documents.
+// json encoding tools.
+//
+// The contents of the iterator are marshaled as elements in an JSON
+// array.
 func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, error) {
-	buf := &bytes.Buffer{}
+	buf := &internal.IgnoreNewLinesBuffer{}
+	enc := json.NewEncoder(buf)
 	_, _ = buf.Write([]byte("["))
 	first := true
 	for {
@@ -34,11 +37,9 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 			_, _ = buf.Write([]byte(","))
 		}
 
-		it, err := json.Marshal(val)
-		if err != nil {
+		if err := enc.Encode(val); err != nil {
 			return nil, err
 		}
-		_, _ = buf.Write(it)
 	}
 
 	if err := iter.Close(); err != nil {
