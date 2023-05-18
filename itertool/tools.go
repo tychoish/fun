@@ -321,7 +321,7 @@ func generator[T any](
 	opts Options,
 	fn func(context.Context) (T, error),
 	abort func(),
-	out chan<- T,
+	out chan T,
 ) {
 	shouldCollectError := opts.wrapErrorCheck(func(err error) bool { return !errors.Is(err, ErrAbortGenerator) })
 
@@ -348,7 +348,7 @@ func generator[T any](
 			continue
 		}
 
-		if !fun.Blocking(out).Check(ctx, value) {
+		if !fun.Blocking(out).Send().Check(ctx, value) {
 			return
 		}
 	}

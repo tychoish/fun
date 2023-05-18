@@ -15,7 +15,7 @@ func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
 		defer close(out)
 		for {
 			item, err := fun.IterateOne(ctx, iter)
-			if err != nil || !fun.Blocking(out).Check(ctx, item) {
+			if err != nil || !fun.Blocking(out).Send().Check(ctx, item) {
 				return
 			}
 		}
