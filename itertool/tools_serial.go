@@ -56,3 +56,26 @@ func Contains[T comparable](ctx context.Context, item T, iter fun.Iterator[T]) b
 
 	return false
 }
+
+// Any, as a special case of Transform converts an iterator of any
+// type and converts it to an iterator of any (e.g. interface{})
+// values.
+func Any[T any](iter fun.Iterator[T]) fun.Iterator[any] {
+	return fun.Transform(iter, func(in T) (any, error) { return any(in), nil })
+}
+
+// Uniq iterates over an iterator of comparable items, and caches them
+// in a map, returning the first instance of each equivalent object,
+// and skipping subsequent items
+func Uniq[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
+	set := fun.Mapify(map[T]struct{}{})
+	return fun.Generator(func(ctx context.Context) (T, error) {
+		for iter.Next(ctx) {
+			if val := iter.Value(); !set.Check(val) {
+				set.SetDefault(val)
+				return val, nil
+			}
+		}
+		return fun.ZeroOf[T](), io.EOF
+	})
+}

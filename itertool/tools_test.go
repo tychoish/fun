@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
@@ -606,4 +607,26 @@ func TestContains(t *testing.T) {
 	t.Run("NotExists", func(t *testing.T) {
 		assert.True(t, !Contains(ctx, 1, Slice([]int{12, 3, 44})))
 	})
+}
+func TestUniq(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
+	assert.Equal(t, fun.Count(ctx, Slice(sl)), 8)
+
+	assert.Equal(t, fun.Count(ctx, Uniq(Slice(sl))), 6)
+}
+
+func TestAny(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
+	count := 0
+	fun.Observe(ctx, Any(Slice(sl)), func(in any) {
+		count++
+		check.True(t, fun.Is[int](in))
+	})
+	assert.Equal(t, count, 8)
 }
