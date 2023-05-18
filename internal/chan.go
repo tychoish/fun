@@ -2,8 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"io"
 )
+
+var ErrSkippedNonBlockingChannelOperation = errors.New("skipped non-blocking channel operation")
 
 // ZeroOf returns the zero-value for the type T specified as an
 // argument.
@@ -39,6 +42,6 @@ func NonBlockingReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
 
 		return obj, nil
 	default:
-		return ZeroOf[T](), nil
+		return ZeroOf[T](), ErrSkippedNonBlockingChannelOperation
 	}
 }

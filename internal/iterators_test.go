@@ -310,7 +310,8 @@ func TestIterators(t *testing.T) {
 			ch := make(chan string)
 			out, err := NonBlockingReadOne(ctx, ch)
 			assert.Zero(t, out)
-			assert.NotError(t, err)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
 		})
 		t.Run("Closed", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
