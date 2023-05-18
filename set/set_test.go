@@ -308,7 +308,8 @@ func TestSet(t *testing.T) {
 		}
 		set.Delete(extraPair)
 
-		pairsFromMap := fun.MakePairs(map[string]int{"foo": 42, "bar": 31})
+		pairsFromMap := fun.Pairs[string, int]{}
+		pairsFromMap.ConsumeMap(map[string]int{"foo": 42, "bar": 31})
 		set2 := BuildUnorderedFromPairs(pairsFromMap)
 		if !Equal(ctx, set, set2) {
 			t.Log(pairsFromMap)

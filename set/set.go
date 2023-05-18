@@ -79,7 +79,7 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 		defer close(pipe)
 
 		for item := range s {
-			if !fun.Blocking(pipe).Check(ctx, item) {
+			if !fun.Blocking(pipe).Send().Check(ctx, item) {
 				return
 			}
 		}
