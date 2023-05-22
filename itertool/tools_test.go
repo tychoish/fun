@@ -179,7 +179,7 @@ func TestRangeSplit(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			input := Slice(GenerateRandomStringSlice(10))
 
-			rf := Range(ctx, input)
+			rf := Range(input)
 
 			set := map[string]none{}
 
@@ -195,7 +195,7 @@ func TestRangeSplit(t *testing.T) {
 		t.Run("Parallel", func(t *testing.T) {
 			input := Slice(GenerateRandomStringSlice(100))
 
-			rf := Range(ctx, input)
+			rf := Range(input)
 
 			set := &adt.Map[string, none]{}
 
@@ -224,12 +224,12 @@ func TestRangeSplit(t *testing.T) {
 	t.Run("Split", func(t *testing.T) {
 		input := Slice(GenerateRandomStringSlice(100))
 
-		splits := Split(ctx, 0, input)
+		splits := Split(0, input)
 		if splits != nil {
 			t.Fatal("should be nil if empty")
 		}
 
-		splits = Split(ctx, 10, input)
+		splits = Split(10, input)
 		if len(splits) != 10 {
 			t.Fatal("didn't make enough split")
 		}
@@ -362,11 +362,7 @@ func TestTools(t *testing.T) {
 		defer cancel()
 
 		pipe := make(chan string)
-		iter := Merge(ctx, Channel(pipe), Channel(pipe), Channel(pipe))
-		pipe <- t.Name()
-
-		time.Sleep(10 * time.Millisecond)
-		cancel()
+		iter := Merge(Channel(pipe), Channel(pipe), Channel(pipe))
 
 		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -404,10 +400,7 @@ func TestParallelForEach(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out, err := CollectSlice(ctx, seen.Keys())
-				if err != nil {
-					t.Fatal(err)
-				}
+				out := fun.Must(CollectSlice(ctx, seen.Keys()))
 
 				testt.Log(t, "output", out)
 				testt.Log(t, "input", elems)

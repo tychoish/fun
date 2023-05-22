@@ -14,30 +14,44 @@ import (
 // Merge combines a set of related iterators into a single
 // iterator. Starts a thread to consume from each iterator and does
 // not otherwise guarantee the iterator's order.
-func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T] {
-	pipe := make(chan T)
+func Merge[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
+	iter := &internal.GeneratorIterator[T]{}
 
-	iter := &internal.ChannelIterImpl[T]{Pipe: pipe}
+	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
+		pipe := make(chan T)
+		wg := &fun.WaitGroup{}
+		wctx, cancel := context.WithCancel(ctx)
 
-	wg := &iter.WG
-	ctx, iter.Closer = context.WithCancel(ctx)
-	for _, it := range iters {
-		wg.Add(1)
-		go func(itr fun.Iterator[T]) {
-			defer wg.Done()
-			for itr.Next(ctx) {
-				select {
-				case <-ctx.Done():
-					return
-				case pipe <- itr.Value():
-					continue
+		for idx := range iters {
+			it := iters[idx]
+			fun.WorkerFunc(func(ctx context.Context) error {
+				for {
+					if wctx.Err() != nil {
+						return nil
+					}
+
+					value, err := fun.IterateOne(ctx, it)
+					if err != nil {
+						return nil
+					}
+					err = fun.Blocking(pipe).Send().Write(ctx, value)
+					if err != nil {
+						return nil
+					}
 				}
-			}
-		}(it)
-	}
+			}).Add(wctx, wg, func(err error) {})
+		}
 
-	// when all workers conclude, close the pipe.
-	go func() { wg.Wait(); close(pipe) }()
+		go func() { wg.Wait(wctx); close(pipe) }()
+
+		iter.Closer = func() { cancel() }
+
+		return pipe
+	})
+
+	iter.Operation = func(ctx context.Context) (T, error) {
+		return fun.ReadOne(ctx, pipe(ctx))
+	}
 
 	return iter
 }
@@ -49,19 +63,42 @@ func Merge[T any](ctx context.Context, iters ...fun.Iterator[T]) fun.Iterator[T]
 // from a different go routine.
 //
 // The input iterator is not closed after the output iterators are
-// exhausted. If the context passed to split is closed, Split will no
-// stop populating the output iterators.
-func Split[T any](ctx context.Context, numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
+// exhausted. There is one background go routine that reads items off
+// of the input iterator, which starts when the first output iterator
+// is advanced: be aware that canceling this context will effectively
+// cancel all iterators.
+func Split[T any](numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
 	if numSplits <= 0 {
 		return nil
 	}
 
-	pipe := CollectChannel(ctx, input)
+	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
+		pipe := make(chan T)
+		wg := &fun.WaitGroup{}
+		fun.WorkerFunc(func(ctx context.Context) error {
+			for {
+				value, err := fun.IterateOne(ctx, input)
+				if err != nil {
+					return nil
+				}
+				if !fun.Blocking(pipe).Send().Check(ctx, value) {
+					return nil
+				}
+			}
+		}).Add(ctx, wg, func(error) {})
+		go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()
+
+		return pipe
+	})
 
 	output := make([]fun.Iterator[T], numSplits)
 
 	for idx := range output {
-		output[idx] = Channel(pipe)
+		output[idx] = &internal.GeneratorIterator[T]{
+			Operation: func(ctx context.Context) (T, error) {
+				return fun.ReadOne(ctx, pipe(ctx))
+			},
+		}
 	}
 
 	return output
@@ -86,7 +123,7 @@ type RangeFunction[T any] func(context.Context, *T) bool
 // error state of the iterator, which you must synchronize on your
 // own. The safety of range assumes that you do not interact with the
 // iterator outside of the range function.
-func Range[T any](ctx context.Context, iter fun.Iterator[T]) RangeFunction[T] {
+func Range[T any](iter fun.Iterator[T]) RangeFunction[T] {
 	mtx := &sync.Mutex{}
 
 	return func(ctx context.Context, out *T) bool {

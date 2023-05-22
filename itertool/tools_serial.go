@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/internal"
 )
 
 // Reduce processes an input iterator with a reduce function and
@@ -78,4 +79,60 @@ func Uniq[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
 		}
 		return fun.ZeroOf[T](), io.EOF
 	})
+}
+
+// DropZeroValues processes an iterator removing all zero values,
+// providing a slightly more expressive alias for:
+//
+//	fun.Filter(iter, fun.IsZero[T])
+func DropZeroValues[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
+	return fun.Filter(iter, fun.IsZero[T])
+}
+
+// Chain, like merge
+func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
+	iter := &internal.GeneratorIterator[T]{}
+	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
+		pipe := make(chan T)
+		wg := &fun.WaitGroup{}
+		wctx, cancel := context.WithCancel(ctx)
+		fun.WorkerFunc(func(ctx context.Context) error {
+		CHAIN:
+			for _, iter := range iters {
+			CURRENT:
+				for {
+					if wctx.Err() != nil {
+						return wctx.Err()
+					}
+
+					value, err := fun.IterateOne(ctx, iter)
+					switch {
+					case errors.Is(err, io.EOF):
+						break CURRENT
+					case erc.ContextExpired(err):
+						break CHAIN
+					}
+
+					err = fun.Blocking(pipe).Send().Write(ctx, value)
+					if err != nil {
+						break CHAIN
+					}
+				}
+			}
+			return io.EOF
+		}).Add(ctx, wg, func(error) {})
+
+		iter.Closer = func() {
+			cancel()
+			fun.WaitFunc(wg.Wait).Block()
+		}
+
+		return pipe
+	})
+
+	iter.Operation = func(ctx context.Context) (T, error) {
+		return fun.ReadOne(ctx, pipe(ctx))
+	}
+
+	return iter
 }

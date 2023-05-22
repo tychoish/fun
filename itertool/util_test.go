@@ -119,7 +119,7 @@ func RunIteratorImplementationTests[T comparable](
 								CheckSeenMap(t, elems, seen)
 							})
 							t.Run("Merged", func(t *testing.T) {
-								iter := Merge(ctx, builder(), builder(), builder())
+								iter := Merge(builder(), builder(), builder())
 								seen := make(map[T]struct{}, len(elems))
 								var count int
 								for iter.Next(ctx) {
@@ -246,7 +246,7 @@ func RunIteratorIntegerAlgoTests(
 										t.Error(err)
 									}
 									if len(out) != len(elems)-1 {
-										t.Fatal("unexpected output", len(out), "->", out)
+										t.Fatal("unexpected output", len(out), "->", out, len(elems)-1)
 									}
 								})
 
@@ -409,7 +409,7 @@ func RunIteratorStringAlgoTests(
 							t.Run("ParallelMap", func(t *testing.T) {
 								out := Map(
 									ctx,
-									Merge(ctx, builder(), builder(), builder()),
+									Merge(builder(), builder(), builder()),
 									func(ctx context.Context, str string) (string, error) {
 										for _, c := range []string{"a", "e", "i", "o", "u"} {
 											str = strings.ReplaceAll(str, c, "")
@@ -444,7 +444,6 @@ func RunIteratorStringAlgoTests(
 									inputs := GenerateRandomStringSlice(512)
 									count := &atomic.Int32{}
 									out := Generate(
-										ctx,
 										func(ctx context.Context) (string, error) {
 											count.Add(1)
 											if int(count.Load()) > len(inputs) {
@@ -474,7 +473,6 @@ func RunIteratorStringAlgoTests(
 									inputs := GenerateRandomStringSlice(512)
 									count := &atomic.Int32{}
 									out := Generate(
-										ctx,
 										func(ctx context.Context) (string, error) {
 											count.Add(1)
 											if int(count.Load()) > len(inputs) {
@@ -502,7 +500,6 @@ func RunIteratorStringAlgoTests(
 								})
 								t.Run("PanicSafety", func(t *testing.T) {
 									out := Generate(
-										ctx,
 										func(ctx context.Context) (string, error) {
 											panic("foo")
 										},
@@ -519,7 +516,6 @@ func RunIteratorStringAlgoTests(
 								t.Run("ContinueOnPanic", func(t *testing.T) {
 									count := 0
 									out := Generate(
-										ctx,
 										func(ctx context.Context) (string, error) {
 											count++
 											if count == 3 {
@@ -537,6 +533,7 @@ func RunIteratorStringAlgoTests(
 									)
 									output, err := CollectSlice(ctx, out)
 									if l := len(output); l != 3 {
+										t.Log(err, output)
 										t.Error(l)
 									}
 									if err == nil {
@@ -546,10 +543,8 @@ func RunIteratorStringAlgoTests(
 									assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 								})
 								t.Run("ArbitraryErrorAborts", func(t *testing.T) {
-
 									count := 0
 									out := Generate(
-										ctx,
 										func(ctx context.Context) (string, error) {
 											count++
 											if count == 4 {
@@ -573,7 +568,6 @@ func RunIteratorStringAlgoTests(
 								t.Run("ContinueOnError", func(t *testing.T) {
 									count := 0
 									out := Generate(
-										ctx,
 										func(ctx context.Context) (string, error) {
 											count++
 											if count == 3 {

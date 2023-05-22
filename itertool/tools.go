@@ -90,7 +90,7 @@ func ParallelForEach[T any](
 		opts.NumWorkers = 1
 	}
 
-	splits := Split(ctx, opts.NumWorkers, iter)
+	splits := Split(opts.NumWorkers, iter)
 
 	for idx := range splits {
 		wg.Add(1)
@@ -270,12 +270,12 @@ func mapWorker[T any, O any](
 var ErrAbortGenerator = errors.New("abort generator signal")
 
 // Generate creates an iterator using a generator pattern which
-// produces items until the context is canceled or the generator
-// function returns ErrAbortGenerator. Parallel operation is also
-// available and Generate shares configuration and semantics with the
-// Map operation.
+// produces items until the generator function returns
+// ErrAbortGenerator, or the context (passed to the first call to
+// Next()) is canceled. Parallel operation, and continue on
+// error/continue-on-panic semantics are available and share
+// configuration with the Map and ParallelForEach operations.
 func Generate[T any](
-	ctx context.Context,
 	fn func(context.Context) (T, error),
 	opts Options,
 ) fun.Iterator[T] {
@@ -283,73 +283,84 @@ func Generate[T any](
 		opts.OutputBufferSize = 0
 	}
 
-	out := new(internal.ChannelIterImpl[T])
-	pipe := make(chan T, opts.OutputBufferSize)
-	catcher := &erc.Collector{}
-	out.Pipe = pipe
-
-	gctx, abort := context.WithCancel(ctx)
-	out.Closer = abort
-
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
 	}
 
-	wg := &fun.WaitGroup{}
-	for i := 0; i < opts.NumWorkers; i++ {
-		wg.Add(1)
-		go generator(gctx, catcher, wg, opts, fn, abort, pipe)
+	out := &internal.GeneratorIterator[T]{}
+
+	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
+		pipe := make(chan T, opts.OutputBufferSize)
+		catcher := &erc.Collector{}
+		gctx, abort := context.WithCancel(ctx)
+		wg := &fun.WaitGroup{}
+
+		for i := 0; i < opts.NumWorkers; i++ {
+			worker := generator(catcher, opts, fn, abort, pipe)
+			worker.Add(gctx, wg, catcher.Add)
+		}
+
+		go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()
+		out.Closer = func() {
+			abort()
+			out.Error = catcher.Resolve()
+		}
+
+		return pipe
+	})
+
+	out.Operation = func(ctx context.Context) (T, error) {
+		return fun.ReadOne(ctx, pipe(ctx))
 	}
-	out.WG.Add(1)
-	go func() {
-		defer out.WG.Done()
-		defer func() { out.Error = catcher.Resolve() }()
-		defer erc.Recover(catcher)
-		wg.Wait(ctx)
-		abort()
-		// can't wait against a context here because it's canceled
-		close(pipe)
-	}()
 
 	return Synchronize[T](out)
 }
 
 func generator[T any](
-	ctx context.Context,
 	catcher *erc.Collector,
-	wg *fun.WaitGroup,
 	opts Options,
 	fn func(context.Context) (T, error),
 	abort func(),
 	out chan T,
-) {
-	shouldCollectError := opts.wrapErrorCheck(func(err error) bool { return !errors.Is(err, ErrAbortGenerator) })
+) fun.WorkerFunc {
+	return func(ctx context.Context) error {
+		shouldCollectError := opts.wrapErrorCheck(func(err error) bool { return !errors.Is(err, ErrAbortGenerator) })
+		for {
+			value, err := func() (out T, err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = internal.ParsePanic(r, fun.ErrRecoveredPanic)
+					}
+				}()
+				return fn(ctx)
+			}()
 
-	defer wg.Done()
-	defer erc.RecoverHook(catcher, func() {
-		if !opts.ContinueOnPanic {
-			abort()
-			return
-		}
+			if err != nil {
+				if errors.Is(err, fun.ErrRecoveredPanic) {
+					catcher.Add(err)
 
-		wg.Add(1)
-		go generator(ctx, catcher, wg, opts, fn, abort, out)
-	})
-	for {
-		value, err := fn(ctx)
-		if err != nil {
-			erc.When(catcher, shouldCollectError(err), err)
+					if opts.ContinueOnPanic {
+						continue
+					}
 
-			if errors.Is(err, ErrAbortGenerator) || erc.ContextExpired(err) || !opts.ContinueOnError {
-				abort()
-				return
+					abort()
+					return nil
+				}
+
+				erc.When(catcher, shouldCollectError(err), err)
+
+				if errors.Is(err, ErrAbortGenerator) || erc.ContextExpired(err) || !opts.ContinueOnError {
+					abort()
+					return nil
+				}
+
+				continue
 			}
 
-			continue
-		}
-
-		if !fun.Blocking(out).Send().Check(ctx, value) {
-			return
+			if !fun.Blocking(out).Send().Check(ctx, value) {
+				return nil
+			}
 		}
 	}
+
 }
