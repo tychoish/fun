@@ -36,8 +36,8 @@ func MakeUnordered[T comparable](len int) Set[T] { return make(mapSetImpl[T], le
 // NewUnordered constructs a set object for the given type, without prealocation.
 func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T](0) }
 
-// PopulateSet adds all elements in the iterator to the provided Set.
-func PopulateSet[T comparable](ctx context.Context, set Set[T], iter fun.Iterator[T]) {
+// Populate adds all elements in the iterator to the provided Set.
+func Populate[T comparable](ctx context.Context, set Set[T], iter fun.Iterator[T]) {
 	fun.InvariantMust(fun.Observe(ctx, iter, set.Add))
 }
 
@@ -45,7 +45,7 @@ func PopulateSet[T comparable](ctx context.Context, set Set[T], iter fun.Iterato
 // the iterator.
 func BuildUnordered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set[T] {
 	set := NewUnordered[T]()
-	PopulateSet(ctx, set, iter)
+	Populate(ctx, set, iter)
 	return set
 }
 
@@ -65,7 +65,7 @@ type mapSetImpl[T comparable] map[T]struct{}
 func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }
 func (s mapSetImpl[T]) Len() int          { return len(s) }
 func (s mapSetImpl[T]) Delete(item T)     { delete(s, item) }
-func (s mapSetImpl[T]) Check(item T) bool { return checkInMap(item, s) }
+func (s mapSetImpl[T]) Check(item T) bool { _, ok := s[item]; return ok }
 func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	pipe := make(chan T)
 
@@ -94,7 +94,7 @@ func (s mapSetImpl[T]) MarshalJSON() ([]byte, error) {
 
 func (s mapSetImpl[T]) UnmarshalJSON(in []byte) error {
 	iter := itertool.UnmarshalJSON[T](in)
-	PopulateSet[T](internal.BackgroundContext, s, iter)
+	Populate[T](internal.BackgroundContext, s, iter)
 	return iter.Close()
 }
 

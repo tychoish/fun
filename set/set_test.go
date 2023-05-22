@@ -153,7 +153,7 @@ func TestSet(t *testing.T) {
 					}
 				},
 				"Populator": func(set Set[string]) {
-					PopulateSet(ctx, set, generateIter(ctx, 100))
+					Populate(ctx, set, generateIter(ctx, 100))
 				},
 			} {
 				t.Run(populatorName, func(t *testing.T) {

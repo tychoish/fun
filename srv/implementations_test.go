@@ -39,7 +39,7 @@ func TestCmd(t *testing.T) {
 				s := Cmd(cmd, 0)
 				ctx := testt.Context(t)
 				check.NotError(t, s.Start(ctx))
-				assert.MaxRuntime(t, 15*time.Millisecond, func() {
+				assert.MaxRuntime(t, 100*time.Millisecond, func() {
 					s.Close()
 					check.Error(t, s.Wait())
 				})

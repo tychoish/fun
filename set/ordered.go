@@ -10,8 +10,8 @@ import (
 )
 
 type orderedLLSet[T comparable] struct {
-	set   map[T]*seq.Element[T]
-	elems *seq.List[T]
+	set   fun.Map[T, *seq.Element[T]]
+	elems seq.List[T]
 }
 
 // MakeNewOrdered constructs a "new" ordered set implementation. This
@@ -24,24 +24,19 @@ type orderedLLSet[T comparable] struct {
 // This implementation does not permit iteration with concurrent
 // deletes, as is the case with the old ordered implementation.
 func MakeNewOrdered[T comparable]() Set[T] {
-	return &orderedLLSet[T]{
-		set:   map[T]*seq.Element[T]{},
-		elems: &seq.List[T]{},
-	}
+	return &orderedLLSet[T]{set: fun.Map[T, *seq.Element[T]]{}}
 }
 
 // BuildOrdered creates an ordered set (new implementation) from
 // the contents of the input iterator.
 func BuildOrdered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set[T] {
 	set := MakeNewOrdered[T]()
-	PopulateSet(ctx, set, iter)
+	Populate(ctx, set, iter)
 	return set
 }
 
-func checkInMap[K comparable, V any](key K, mp map[K]V) bool { _, ok := mp[key]; return ok }
-
 func (lls *orderedLLSet[T]) Add(it T) {
-	if checkInMap(it, lls.set) {
+	if lls.set.Check(it) {
 		return
 	}
 
@@ -52,9 +47,9 @@ func (lls *orderedLLSet[T]) Add(it T) {
 
 func (lls *orderedLLSet[T]) Iterator() fun.Iterator[T] { return seq.ListValues(lls.elems.Iterator()) }
 func (lls *orderedLLSet[T]) Len() int                  { return lls.elems.Len() }
-func (lls *orderedLLSet[T]) Check(it T) bool           { return checkInMap(it, lls.set) }
+func (lls *orderedLLSet[T]) Check(it T) bool           { return lls.set.Check(it) }
 func (lls *orderedLLSet[T]) Delete(it T) {
-	e, ok := lls.set[it]
+	e, ok := lls.set.Load(it)
 	if !ok {
 		return
 	}
@@ -69,7 +64,7 @@ func (lls *orderedLLSet[T]) MarshalJSON() ([]byte, error) {
 
 func (lls *orderedLLSet[T]) UnmarshalJSON(in []byte) error {
 	iter := itertool.UnmarshalJSON[T](in)
-	PopulateSet[T](internal.BackgroundContext, lls, iter)
+	Populate[T](internal.BackgroundContext, lls, iter)
 	return iter.Close()
 }
 
@@ -81,7 +76,7 @@ type orderedSetItem[T comparable] struct {
 
 type orderedSetImpl[T comparable] struct {
 	elems        []orderedSetItem[T]
-	set          map[T]orderedSetItem[T]
+	set          fun.Map[T, orderedSetItem[T]]
 	deletedCount int
 }
 
@@ -96,7 +91,7 @@ func NewOrdered[T comparable]() Set[T] {
 // reflect insertion order.
 func MakeOrdered[T comparable](size int) Set[T] {
 	return &orderedSetImpl[T]{
-		set:   make(map[T]orderedSetItem[T], size),
+		set:   fun.Mapify(make(map[T]orderedSetItem[T], size)),
 		elems: make([]orderedSetItem[T], 0, size),
 	}
 }
@@ -132,7 +127,7 @@ func (s *orderedSetImpl[T]) Add(in T) {
 	s.elems = append(s.elems, val)
 }
 
-func (s *orderedSetImpl[T]) Check(in T) bool { return checkInMap(in, s.set) }
+func (s *orderedSetImpl[T]) Check(in T) bool { return s.set.Check(in) }
 func (s *orderedSetImpl[T]) Len() int        { return len(s.set) }
 func (s *orderedSetImpl[T]) Delete(it T) {
 	val, ok := s.set[it]
@@ -158,7 +153,7 @@ func (s *orderedSetImpl[T]) MarshalJSON() ([]byte, error) {
 
 func (s *orderedSetImpl[T]) UnmarshalJSON(in []byte) error {
 	iter := itertool.UnmarshalJSON[T](in)
-	PopulateSet[T](internal.BackgroundContext, s, iter)
+	Populate[T](internal.BackgroundContext, s, iter)
 	return iter.Close()
 }
 
