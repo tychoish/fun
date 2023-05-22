@@ -39,77 +39,41 @@ func TestIteratorTools(t *testing.T) {
 		assert.NotError(t, Observe[int](ctx, internal.NewSliceIter([]int{}), func(in int) { t.Fatal("should not be called") }))
 	})
 	t.Run("IterateOne", func(t *testing.T) {
-		t.Run("NonBlocking", func(t *testing.T) {
-
-			t.Run("First", func(t *testing.T) {
-				it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
-				assert.NotError(t, err)
-				assert.Equal(t, 101, it)
-			})
-
-			t.Run("Canceled", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel()
-				it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
-				assert.ErrorIs(t, err, context.Canceled)
-				assert.Zero(t, it)
-			})
-			t.Run("Empty", func(t *testing.T) {
-				it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{}))
-				assert.Zero(t, it)
-				assert.ErrorIs(t, err, io.EOF)
-			})
-
-			t.Run("ReadOneable", func(t *testing.T) {
-				input := &TestReadoneableImpl{
-					Iterator: internal.NewSliceIter([]string{
-						fmt.Sprint(10),
-						fmt.Sprint(10),
-						fmt.Sprint(20),
-						fmt.Sprint(2),
-					}),
-				}
-				val, err := IterateOne[string](ctx, input)
-				assert.NotError(t, err)
-				assert.Equal(t, "sparta", val)
-
-				val, err = IterateOne[string](ctx, input)
-				assert.ErrorIs(t, err, io.EOF)
-				assert.Zero(t, val)
-			})
+		t.Run("First", func(t *testing.T) {
+			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
+			assert.NotError(t, err)
+			assert.Equal(t, 101, it)
 		})
-		t.Run("Blocking", func(t *testing.T) {
 
-			t.Run("First", func(t *testing.T) {
-				it, err := IterateOneBlocking[int](internal.NewSliceIter([]int{101, 2, 34, 56}))
-				assert.NotError(t, err)
-				assert.Equal(t, 101, it)
-			})
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.Zero(t, it)
+		})
+		t.Run("Empty", func(t *testing.T) {
+			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{}))
+			assert.Zero(t, it)
+			assert.ErrorIs(t, err, io.EOF)
+		})
 
-			t.Run("Empty", func(t *testing.T) {
-				it, err := IterateOneBlocking[int](internal.NewSliceIter([]int{}))
-				assert.Zero(t, it)
-				assert.ErrorIs(t, err, io.EOF)
-			})
+		t.Run("ReadOneable", func(t *testing.T) {
+			input := &TestReadoneableImpl{
+				Iterator: internal.NewSliceIter([]string{
+					fmt.Sprint(10),
+					fmt.Sprint(10),
+					fmt.Sprint(20),
+					fmt.Sprint(2),
+				}),
+			}
+			val, err := IterateOne[string](ctx, input)
+			assert.NotError(t, err)
+			assert.Equal(t, "sparta", val)
 
-			t.Run("ReadOneable", func(t *testing.T) {
-				input := &TestReadoneableImpl{
-					Iterator: internal.NewSliceIter([]string{
-						fmt.Sprint(10),
-						fmt.Sprint(10),
-						fmt.Sprint(20),
-						fmt.Sprint(2),
-					}),
-				}
-				val, err := IterateOneBlocking[string](input)
-				assert.NotError(t, err)
-				assert.Equal(t, "sparta", val)
-
-				val, err = IterateOneBlocking[string](input)
-				assert.ErrorIs(t, err, io.EOF)
-				assert.Zero(t, val)
-			})
-
+			val, err = IterateOne[string](ctx, input)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.Zero(t, val)
 		})
 
 	})

@@ -94,15 +94,6 @@ func IterateOne[T any](ctx context.Context, iter Iterator[T]) (T, error) {
 	return ZeroOf[T](), io.EOF
 }
 
-// IterateOneBlocking has the same semantics as IterateOne except it
-// uses a blocking context, and if the iterator is blocking and there
-// are no more items, IterateOneBlocking will never return. Use with
-// caution, and in situations where you understand the iterator's
-// implementation.
-func IterateOneBlocking[T any](iter Iterator[T]) (T, error) {
-	return IterateOne(internal.BackgroundContext, iter)
-}
-
 // Generator creates an iterator that produces new values, using the
 // generator function provided. This implementation does not create
 // any background go routines, and the iterator will produce values
