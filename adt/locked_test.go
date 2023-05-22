@@ -48,7 +48,7 @@ func TestLocked(t *testing.T) {
 			}(i)
 		}
 
-		wg.Done()
+		wg.Wait()
 	})
 	t.Run("Swaps", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
