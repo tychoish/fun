@@ -77,13 +77,7 @@ func IsInvariantViolation(r any) bool {
 
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.
-func Must[T any](arg T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-
-	return arg
-}
+func Must[T any](arg T, err error) T { InvariantMust(err); return arg }
 
 // MustBeOk raises an invariant violation if the ok value is false,
 // and returns the first value if the second value is ok. Useful as
