@@ -33,3 +33,15 @@ func (dwe *MergedError) Is(target error) bool {
 func (dwe *MergedError) As(target any) bool {
 	return errors.As(dwe.Current, target) || errors.As(dwe.Wrapped, target)
 }
+
+func ParsePanic(r any, baseErr error) error {
+	if r != nil {
+		switch err := r.(type) {
+		case error:
+			return MergeErrors(err, baseErr)
+		default:
+			return MergeErrors(fmt.Errorf("%v", err), baseErr)
+		}
+	}
+	return nil
+}
