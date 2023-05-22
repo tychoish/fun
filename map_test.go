@@ -71,7 +71,7 @@ func TestMap(t *testing.T) {
 		num := int(time.Microsecond)
 		mp := makeMap(num)
 
-		go cancel()
+		cancel()
 
 		check.True(t, Count(ctx, mp.Iterator()) < num)
 	})

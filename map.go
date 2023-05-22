@@ -88,6 +88,9 @@ func (m Map[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
 
 // ConsumeValues adds items to the map, using the function to generate
 // the keys for the values.
+//
+// This operation will panic (with an ErrInvariantValidation) if the
+// keyf panics.
 func (m Map[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf func(V) K) {
 	InvariantMust(Observe(ctx, iter, func(in V) { m[keyf(in)] = in }))
 }
