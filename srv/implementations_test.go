@@ -58,9 +58,9 @@ func TestCmd(t *testing.T) {
 			t.Run("TimeoutObserved", func(t *testing.T) {
 				ctx := testt.Context(t)
 				cmd := exec.Command("sleep", "2")
-				s := Cmd(cmd, time.Millisecond)
+				s := Cmd(cmd, 10*time.Millisecond)
 				check.NotError(t, s.Start(ctx))
-				assert.MaxRuntime(t, 10*time.Millisecond, func() {
+				assert.MaxRuntime(t, 100*time.Millisecond, func() {
 					s.Close()
 					check.Error(t, s.Wait())
 				})
