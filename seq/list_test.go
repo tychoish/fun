@@ -307,7 +307,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := seq.ListValues(list.IteratorPop())
+			iter := seq.ListValues(list.PopIterator())
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -361,7 +361,7 @@ func TestList(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		t.Run("ReversePop", func(t *testing.T) {
+		t.Run("PopReverse", func(t *testing.T) {
 			list := &seq.List[int]{}
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
@@ -371,7 +371,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := seq.ListValues(list.ReversePop())
+			iter := seq.ListValues(list.PopReverse())
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())

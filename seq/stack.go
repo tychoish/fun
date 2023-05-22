@@ -300,10 +300,10 @@ func (s *Stack[T]) Pop() *Item[T] {
 // during iteration.
 func (s *Stack[T]) Iterator() fun.Iterator[*Item[T]] { return newItemIter(s.head) }
 
-// IteratorPop returns a destructive iterator over the Items in a
-// stack. IteratorPop will not observe new items added to the
+// PopIterator returns a destructive iterator over the Items in a
+// stack. PopIterator will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) IteratorPop() fun.Iterator[*Item[T]] { return &itemIter[T]{pop: true, next: s.head} }
+func (s *Stack[T]) PopIterator() fun.Iterator[*Item[T]] { return &itemIter[T]{pop: true, next: s.head} }
 func newItemIter[T any](it *Item[T]) *itemIter[T]       { return &itemIter[T]{next: &Item[T]{next: it}} }
 
 // StackValues converts an iterator of stack Items to an iterator of

@@ -191,7 +191,7 @@ func TestService(t *testing.T) {
 				},
 			})
 		}
-		s := Group(seq.ListValues(list.IteratorPop()))
+		s := Group(seq.ListValues(list.PopIterator()))
 		if err := s.Start(context.Background()); err != nil {
 			t.Fatal(err)
 		}

@@ -203,7 +203,7 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 
 			ec := &erc.Collector{}
 
-			ec.Add(itertool.ParallelForEach(ctx, seq.ListValues(cache.IteratorPop()),
+			ec.Add(itertool.ParallelForEach(ctx, seq.ListValues(cache.PopIterator()),
 				func(ctx context.Context, wf fun.WorkerFunc) error {
 					ec.Add(wf.Safe(ctx))
 					return nil
@@ -219,7 +219,7 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 // of work in an worker pool. The pool follows the semantics
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
-// propogated to the service's wait function.
+// propogated to the service's ywait function.
 func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
