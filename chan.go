@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/tychoish/fun/internal"
-	"github.com/tychoish/fun/risky"
 )
 
 // ErrSkippedNonBlockingChannelOperation is returned when sending into
@@ -68,12 +67,12 @@ func (ro Receive[T]) Drop(ctx context.Context) bool { _, err := ro.Read(ctx); re
 // T. Because zero values can be sent through channels, Force does not
 // provide a way to distinguish between "channel-closed" and "received
 // a zero value".
-func (ro Receive[T]) Force(ctx context.Context) T { return risky.Force(ro.Read(ctx)) }
+func (ro Receive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(ctx); return }
 
 // Check performs the read operation and converts the error into an
 // "ok" value, returning true if receive was successful and false
 // otherwise.
-func (ro Receive[T]) Check(ctx context.Context) (T, bool) { return risky.Check(ro.Read(ctx)) }
+func (ro Receive[T]) Check(ctx context.Context) (T, bool) { o, e := ro.Read(ctx); return o, e == nil }
 
 // Read performs the read operation according to the
 // blocking/non-blocking semantics of the receive operation.
@@ -108,7 +107,7 @@ type Send[T any] struct {
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
-func (sm Send[T]) Check(ctx context.Context, it T) bool { return risky.CheckErr(sm.Write(ctx, it)) }
+func (sm Send[T]) Check(ctx context.Context, it T) bool { return sm.Write(ctx, it) == nil }
 
 // Ignore performs a send and omits the error.
 func (sm Send[T]) Ignore(ctx context.Context, it T) { _ = sm.Write(ctx, it) }
