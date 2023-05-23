@@ -57,10 +57,14 @@ type Receive[T any] struct {
 	ch   <-chan T
 }
 
+func BlockingReceive[T any](ch <-chan T) Receive[T]    { return Receive[T]{mode: blocking, ch: ch} }
+func NonBlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: non_blocking, ch: ch} }
+
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
 func (ro Receive[T]) Drop(ctx context.Context) bool { _, err := ro.Read(ctx); return err == nil }
+func (ro Receive[T]) Ignore(ctx context.Context)    { _, _ = ro.Check(ctx) }
 
 // Force ignores the error returning only the value from Read. This is
 // either the value sent through the channel, or the zero value for
@@ -104,6 +108,9 @@ type Send[T any] struct {
 	mode blockingMode
 	ch   chan<- T
 }
+
+func BlockingSend[T any](ch chan<- T) Send[T]    { return Send[T]{mode: blocking, ch: ch} }
+func NonBlockingSend[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_blocking, ch: ch} }
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
