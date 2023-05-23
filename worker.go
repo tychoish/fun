@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/tychoish/fun/internal"
@@ -10,6 +11,12 @@ import (
 // WorkerFunc represents a basic function used in worker pools and
 // other similar situations
 type WorkerFunc func(context.Context) error
+
+func WorkSignal(ch <-chan error) WorkerFunc {
+	return func(ctx context.Context) error {
+		return internal.MergeErrors(BlockingReceive(ch).Read(ctx))
+	}
+}
 
 // Run is equivalent to calling the worker function directly, except
 // the context passed to it is canceled when the worker function returns.
@@ -23,7 +30,7 @@ func (wf WorkerFunc) Run(ctx context.Context) error {
 // panic to an error.
 func (wf WorkerFunc) Safe(ctx context.Context) (err error) {
 	defer func() { err = mergeWithRecover(err, recover()) }()
-	return wf.Run(ctx)
+	return wf(ctx)
 }
 
 // Block executes the worker function with a context that will never
@@ -51,9 +58,25 @@ func (wf WorkerFunc) Signal(ctx context.Context) <-chan error {
 	return out
 }
 
-// Background runs the worker function in a go routine and passes the
-// output to the provided observer function.
-func (wf WorkerFunc) Background(ctx context.Context, ob Observer[error]) { go wf.ObserveWait(ob)(ctx) }
+// Background runs the worker function in a go routine and returns a
+// new WorkerFunc which will block for the context to expire or the
+// background worker to complete.
+func (wf WorkerFunc) Background(ctx context.Context) WorkerFunc {
+	return WorkSignal(wf.Signal(ctx))
+}
+
+func (wf WorkerFunc) BackgroundObserve(ctx context.Context, ob Observer[error]) {
+	go func() { ob(wf.Safe(ctx)) }()
+}
+
+func (wf WorkerFunc) Once() WorkerFunc {
+	once := &sync.Once{}
+	var err error
+	return func(ctx context.Context) error {
+		once.Do(func() { err = wf(ctx) })
+		return err
+	}
+}
 
 // Add runs the worker function in a go routine
 func (wf WorkerFunc) Add(ctx context.Context, wg *WaitGroup, ob Observer[error]) {
@@ -71,7 +94,7 @@ func (wf WorkerFunc) ObserveWait(ob Observer[error]) WaitFunc {
 // if the worker produces an error MustWait converts the error into a
 // panic.
 func (wf WorkerFunc) MustWait() WaitFunc {
-	return func(ctx context.Context) { InvariantMust(wf.Run(ctx)) }
+	return func(ctx context.Context) { InvariantMust(wf(ctx)) }
 }
 
 // WithTimeout executes the worker function with the provided timeout

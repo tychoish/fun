@@ -29,5 +29,5 @@ func IterateOne[T any](iter fun.Iterator[T]) (T, error) {
 func IgnoreObserver[T any](_ T) {}
 
 func BackgroundWorker(ctx context.Context, fn fun.WorkerFunc) {
-	fn.Background(ctx, IgnoreObserver[error])
+	fn.BackgroundObserve(ctx, IgnoreObserver[error])
 }

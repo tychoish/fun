@@ -12,6 +12,8 @@ import (
 // operation returns or the context is canceled.
 type WaitFunc func(context.Context)
 
+func WaitSingal(ch <-chan struct{}) WaitFunc { return BlockingReceive(ch).Ignore }
+
 // Run is equivalent to calling the wait function directly, except the
 // context passed to the function is always canceled when the wait
 // function returns.
@@ -20,6 +22,17 @@ func (wf WaitFunc) Run(ctx context.Context) {
 	defer cancel()
 
 	wf(wctx)
+}
+
+func (wf WaitFunc) Once() WaitFunc {
+	once := &sync.Once{}
+	return func(ctx context.Context) { once.Do(func() { wf(ctx) }) }
+}
+
+func (wf WaitFunc) Background(ctx context.Context) WaitFunc {
+	wg := &WaitGroup{}
+	wf.Add(ctx, wg)
+	return wg.Wait
 }
 
 // Block runs the WaitFunc with a context that will never be canceled.
@@ -37,7 +50,7 @@ func (wf WaitFunc) WithTimeout(timeout time.Duration) {
 // appropriate. The execution of the wait fun blocks on Add's context.
 func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 	wg.Add(1)
-	go func() { defer wg.Done(); wf.Run(ctx) }()
+	go func() { defer wg.Done(); wf(ctx) }()
 }
 
 // Safe produces a worker function that catches. This is the same as
@@ -45,7 +58,7 @@ func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 // which this WorkerFunc will not.
 func (wf WaitFunc) Safe() WorkerFunc {
 	return func(ctx context.Context) error {
-		return Check(func() { wf.Run(ctx) })
+		return Check(func() { wf(ctx) })
 	}
 }
 
@@ -58,7 +71,7 @@ func (wf WaitFunc) Safe() WorkerFunc {
 // WaitFunc.
 func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})
-	go func() { defer close(out); wf.Run(ctx) }()
+	go func() { defer close(out); wf(ctx) }()
 	return out
 }
 
@@ -95,7 +108,7 @@ func (wf WaitFunc) BlockSignal() <-chan struct{} {
 func (wf WaitFunc) Check() WorkerFunc {
 	return func(ctx context.Context) error {
 		return internal.MergeErrors(
-			Check(func() { wf.Run(ctx) }),
+			Check(func() { wf(ctx) }),
 			ctx.Err(),
 		)
 	}
@@ -107,7 +120,7 @@ func (wf WaitFunc) Check() WorkerFunc {
 // it to an error.
 func (wf WaitFunc) Worker() WorkerFunc {
 	return func(ctx context.Context) (err error) {
-		return Check(func() { wf.Run(ctx) })
+		return Check(func() { wf(ctx) })
 	}
 }
 

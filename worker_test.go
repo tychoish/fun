@@ -28,10 +28,12 @@ func TestWorker(t *testing.T) {
 			assert.NotError(t, err)
 		})
 		t.Run("Background", func(t *testing.T) {
+			ctx := testt.Context(t)
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
 			WorkerFunc(func(ctx context.Context) error { called.Add(1); panic(expected) }).
-				Background(testt.Context(t), func(err error) {
+				Background(ctx).
+				Observe(ctx, func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
 					called.Add(1)

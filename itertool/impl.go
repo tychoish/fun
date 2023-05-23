@@ -24,22 +24,13 @@ func Merge[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 
 		for idx := range iters {
 			it := iters[idx]
-			fun.WorkerFunc(func(ctx context.Context) error {
+			fun.WaitFunc(func(ctx context.Context) {
 				for {
-					if wctx.Err() != nil {
-						return nil
-					}
-
-					value, err := fun.IterateOne(ctx, it)
-					if err != nil {
-						return nil
-					}
-					err = fun.Blocking(pipe).Send().Write(ctx, value)
-					if err != nil {
-						return nil
+					if value, err := fun.IterateOne(wctx, it); err != nil || !fun.Blocking(pipe).Send().Check(wctx, value) {
+						return
 					}
 				}
-			}).Add(wctx, wg, func(err error) {})
+			}).Add(wctx, wg)
 		}
 
 		go func() { wg.Wait(wctx); close(pipe) }()
@@ -72,33 +63,27 @@ func Split[T any](numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
 		return nil
 	}
 
-	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
-		pipe := make(chan T)
-		wg := &fun.WaitGroup{}
-		fun.WorkerFunc(func(ctx context.Context) error {
+	pipe := make(chan T)
+	setup := fun.WaitFunc(func(ctx context.Context) {
+		go func() {
+			defer close(pipe)
 			for {
-				value, err := fun.IterateOne(ctx, input)
-				if err != nil {
-					return nil
-				}
-				if !fun.Blocking(pipe).Send().Check(ctx, value) {
-					return nil
+				if value, err := fun.IterateOne(ctx, input); err != nil || !fun.Blocking(pipe).Send().Check(ctx, value) {
+					return
 				}
 			}
-		}).Add(ctx, wg, func(error) {})
-		go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()
-
-		return pipe
-	})
+		}()
+		return
+	}).Once()
 
 	output := make([]fun.Iterator[T], numSplits)
 
 	for idx := range output {
-		output[idx] = &internal.GeneratorIterator[T]{
-			Operation: func(ctx context.Context) (T, error) {
-				return fun.ReadOne(ctx, pipe(ctx))
-			},
-		}
+		output[idx] = fun.Generator(func(ctx context.Context) (T, error) {
+			setup(ctx)
+			return fun.ReadOne(ctx, pipe)
+		})
+
 	}
 
 	return output
