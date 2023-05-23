@@ -6,6 +6,8 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+func ContextExpired(ctx context.Context) bool { return ctx.Err() != nil }
+
 // ReadOnce reads one item from the channel, and returns it. ReadOne
 // returns early if the context is canceled (ctx.Err()) or the channel
 // is closed (io.EOF).
