@@ -37,11 +37,10 @@ func Unwrap[T any](in T) T {
 // non-nil wrapped item
 func UnwrapedRoot[T any](in T) T {
 	for {
-		next, ok := doUnwrap(in)
-		if !ok || next == nil {
+		if !IsWrapped(in) {
 			return in
 		}
-		in = next
+		in = Unwrap(in)
 	}
 }
 
