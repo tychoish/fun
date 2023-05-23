@@ -23,7 +23,7 @@ func Check[T any](out T, err error) (T, bool) { return out, err == nil }
 func CheckErr(err error) bool { return err == nil }
 
 // Force swallows an error, and returns the output, as a non-panic'ing
-// form of fun.Invariant.
+// form of fun.Must.
 //
 //	size += risky.Force(buffer.Write([]byte("hello world")))
 func Force[T any](out T, _ error) T { return out }
