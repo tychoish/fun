@@ -19,7 +19,7 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
-func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureIteratorConstuctors[T] {
+func getConstructors[T comparable](t *testing.T) []FixtureIteratorConstuctors[T] {
 	return []FixtureIteratorConstuctors[T]{
 		{
 			Name: "SliceIterator",
@@ -74,9 +74,6 @@ func getConstructors[T comparable](t *testing.T, ctx context.Context) []FixtureI
 
 func TestIteratorImplementations(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	elems := []FixtureData[string]{
 		{
 			Name:     "Basic",
@@ -103,18 +100,17 @@ func TestIteratorImplementations(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(ctx, t, elems, getConstructors[string](t, ctx), filters)
+		RunIteratorImplementationTests(t, elems, getConstructors[string](t), filters)
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorStringAlgoTests(ctx, t, elems, getConstructors[string](t, ctx), filters)
+		RunIteratorStringAlgoTests(t, elems, getConstructors[string](t), filters)
 	})
 }
 
 func TestIteratorAlgoInts(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
 	elemGenerator := func() []int {
 		e := make([]int, 100)
 		for idx := range e {
@@ -149,11 +145,11 @@ func TestIteratorAlgoInts(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(ctx, t, elems, getConstructors[int](t, ctx), filters)
+		RunIteratorImplementationTests(t, elems, getConstructors[int](t), filters)
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorIntegerAlgoTests(ctx, t, elems, getConstructors[int](t, ctx), filters)
+		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int](t), filters)
 	})
 }
 
@@ -324,17 +320,14 @@ func TestTools(t *testing.T) {
 		catcher := &erc.Collector{}
 		wg := &fun.WaitGroup{}
 		pipe <- t.Name()
-		wg.Add(1)
-		go mapWorker(
-			ctx,
+
+		mapWorker(
 			catcher,
-			wg,
 			Options{},
 			func(ctx context.Context, in string) (int, error) { return 53, nil },
-			func() {},
 			pipe,
 			output,
-		)
+		).Add(ctx, wg, func(error) {})
 		time.Sleep(10 * time.Millisecond)
 		cancel()
 

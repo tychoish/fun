@@ -10,7 +10,11 @@ import (
 // CollectChannel converts and iterator to a channel. The iterator is
 // not closed.
 func CollectChannel[T any](ctx context.Context, iter fun.Iterator[T]) <-chan T {
-	out := make(chan T)
+	return collectChannel(ctx, 0, iter)
+}
+
+func collectChannel[T any](ctx context.Context, buf int, iter fun.Iterator[T]) chan T {
+	out := make(chan T, buf)
 	go func() {
 		defer close(out)
 		for {
