@@ -128,7 +128,7 @@ func RunIteratorImplementationTests[T comparable](
 									ctx := testt.Context(t)
 
 									out, err := CollectSlice(ctx,
-										Map(ctx,
+										Map(
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input T) (T, error) {
 												panic("whoop")
@@ -149,7 +149,7 @@ func RunIteratorImplementationTests[T comparable](
 									ctx := testt.Context(t)
 
 									out, err := CollectSlice(ctx,
-										Map(ctx,
+										Map(
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input T) (T, error) {
 												panic("whoop")
@@ -205,7 +205,6 @@ func RunIteratorIntegerAlgoTests(
 
 									out, err := CollectSlice(ctx,
 										Map(
-											ctx,
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input int) (int, error) {
 												if input == elems[2] {
@@ -234,7 +233,7 @@ func RunIteratorIntegerAlgoTests(
 									ctx := testt.Context(t)
 
 									out, err := CollectSlice(ctx,
-										Map(ctx,
+										Map(
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input int) (int, error) {
 												if input == elems[3] {
@@ -264,7 +263,6 @@ func RunIteratorIntegerAlgoTests(
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
 										Map(
-											ctx,
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input int) (int, error) {
 												if input >= elems[2] {
@@ -294,7 +292,7 @@ func RunIteratorIntegerAlgoTests(
 
 									expectedErr := errors.New("whoop")
 									out, err := CollectSlice(ctx,
-										Map(ctx,
+										Map(
 											filter.Filter(baseBuilder(elems)),
 											func(ctx context.Context, input int) (int, error) {
 												if input == len(elems)/2+1 {
@@ -381,7 +379,6 @@ func RunIteratorStringAlgoTests(
 
 								iter := builder()
 								out := Map(
-									ctx,
 									iter,
 									func(ctx context.Context, str string) (string, error) {
 										return str, nil
@@ -403,7 +400,6 @@ func RunIteratorStringAlgoTests(
 								ctx := testt.Context(t)
 
 								out := Map(
-									ctx,
 									Merge(builder(), builder(), builder()),
 									func(ctx context.Context, str string) (string, error) {
 										for _, c := range []string{"a", "e", "i", "o", "u"} {

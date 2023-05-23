@@ -23,7 +23,6 @@ import (
 // is an *erc.Stack object. Panics in the map function are converted
 // to errors and handled according to the ContinueOnPanic option.
 func Map[T any, O any](
-	_ context.Context,
 	iter fun.Iterator[T],
 	mapper func(context.Context, T) (O, error),
 	opts Options,
@@ -57,9 +56,8 @@ func Map[T any, O any](
 				})
 			}
 			go func() {
-				fun.WaitFunc(wg.Wait).Block()
+				out.Closer()
 				wcancel()
-				shutdown.Do(func() { close(output) })
 			}()
 		})
 
@@ -117,11 +115,7 @@ func mapWorker[T any, O any](
 				return errAbortAllMapWorkers
 			}
 
-			if erc.ContextExpired(err) {
-				erc.When(catcher, opts.IncludeContextExpirationErrors, err)
-			} else {
-				erc.When(catcher, opts.shouldCollectError(err), err)
-			}
+			erc.When(catcher, opts.shouldCollectError(err), err)
 
 			if opts.ContinueOnError {
 				continue ITEM
