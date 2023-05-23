@@ -6,6 +6,12 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+// Ptr returns a pointer for the object. Useful for creating values
+func Ptr[T any](in T) *T { return &in }
+
+// ContextExpired checks the context's Err method and returns true
+// when it is non-nil, and false otherwise. Provided for
+// expressiveness.
 func ContextExpired(ctx context.Context) bool { return ctx.Err() != nil }
 
 // ReadOnce reads one item from the channel, and returns it. ReadOne
