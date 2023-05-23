@@ -17,7 +17,14 @@ import (
 // fun.IterateOne function allows for safe, concurrent iteration of
 // these iterators.
 func NewIterator[T any](mtx *sync.Mutex, iter fun.Iterator[T]) fun.Iterator[T] {
-	return syncIterImpl[T]{internal.SyncIterImpl[T]{Mtx: mtx, Iter: iter}}
+	switch si := iter.(type) {
+	case internal.SyncIterImpl[T]:
+		return syncIterImpl[T]{SyncIterImpl: si}
+	case syncIterImpl[T]:
+		return si
+	default:
+		return syncIterImpl[T]{internal.SyncIterImpl[T]{Mtx: mtx, Iter: iter}}
+	}
 }
 
 type syncIterImpl[T any] struct {
