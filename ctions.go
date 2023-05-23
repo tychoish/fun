@@ -15,6 +15,13 @@ func ReadOne[T any](ctx context.Context, ch <-chan T) (T, error) {
 	return internal.ReadOne(ctx, ch)
 }
 
+func Default[T comparable](input T, defaultValue T) T {
+	if IsZero(input) {
+		return defaultValue
+	}
+	return input
+}
+
 // WhenCall runs a function when condition is true, and is a noop
 // otherwise.
 func WhenCall(cond bool, op func()) {

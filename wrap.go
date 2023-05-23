@@ -33,6 +33,18 @@ func Unwrap[T any](in T) T {
 	return u.Unwrap()
 }
 
+// UnwrapedRoot unwinds a wrapped object and returns the innermost
+// non-nil wrapped item
+func UnwrapedRoot[T any](in T) T {
+	for {
+		next, ok := doUnwrap(in)
+		if !ok || next == nil {
+			return in
+		}
+		in = next
+	}
+}
+
 // Unwind uses the Unwrap operation to build a list of the "wrapped"
 // objects.
 func Unwind[T any](in T) []T {
