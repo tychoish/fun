@@ -8,6 +8,15 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+func Process[T any](
+	ctx context.Context,
+	iter fun.Iterator[T],
+	fn fun.ProcessFunc[T],
+	opts Options,
+) error {
+	return ParallelForEach(ctx, iter, fn, opts)
+}
+
 // ParallelForEach processes the iterator in parallel, and is
 // essentially an iterator-driven worker pool. The input iterator is
 // split dynamically into iterators for every worker (determined by
@@ -21,7 +30,7 @@ import (
 func ParallelForEach[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
-	fn func(context.Context, T) error,
+	fn fun.ProcessFunc[T],
 	opts Options,
 ) (err error) {
 	iter = Synchronize(iter)
@@ -55,7 +64,7 @@ func forEachWorker[T any](
 	wg *fun.WaitGroup,
 	opts Options,
 	iter fun.Iterator[T],
-	fn func(context.Context, T) error,
+	fn fun.ProcessFunc[T],
 	abort func(),
 ) {
 	defer wg.Done()

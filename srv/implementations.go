@@ -152,7 +152,7 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessIterator[T any](
 	iter fun.Iterator[T],
-	mapper func(context.Context, T) error,
+	mapper fun.ProcessFunc[T],
 	opts itertool.Options,
 ) *Service {
 	return &Service{
