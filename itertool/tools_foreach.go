@@ -8,6 +8,8 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+// Process provides a (potentially) more sensible alternate name for
+// ParallelForEach, but otherwise is identical.
 func Process[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
@@ -15,6 +17,36 @@ func Process[T any](
 	opts Options,
 ) error {
 	return ParallelForEach(ctx, iter, fn, opts)
+}
+
+// compile-time assertions that both worker types support the "safe"
+// interface needed for the Worker() tool.
+var _ interface{ Safe(context.Context) error } = new(fun.WorkerFunc)
+var _ interface{ Safe(context.Context) error } = new(fun.WaitFunc)
+
+// Worker takes iterators of fun.WorkerFunc or fun.WaitFunc lambdas
+// and processes them in according to the configuration.
+//
+// All operations functions are processed using their respective
+// Safe() methods, which means that the functions themselves will
+// never panic, and the ContinueOnPanic option will not impact the
+// outcome of the operation (unless the iterator returns a nil
+// operation.)
+//
+// This operation is particularly powerful in combination with the
+// iterator for a pubsub.Distributor, interfaces which provide
+// synchronized, blocking, and destructive (e.g. so completed
+// workloads do not remain in memory) containers.
+//
+// Worker is implemented using ParallelForEach.
+func Worker[OP fun.WorkerFunc | fun.WaitFunc](
+	ctx context.Context,
+	iter fun.Iterator[OP],
+	opts Options,
+) error {
+	return Process(ctx, iter, func(ctx context.Context, op OP) error {
+		return any(op).(interface{ Safe(context.Context) error }).Safe(ctx)
+	}, opts)
 }
 
 // ParallelForEach processes the iterator in parallel, and is

@@ -53,13 +53,11 @@ func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 	go func() { defer wg.Done(); wf(ctx) }()
 }
 
-// Safe produces a worker function that catches. This is the same as
-// WaitFunc.Check() except check will also propgate the context error,
-// which this WorkerFunc will not.
-func (wf WaitFunc) Safe() WorkerFunc {
-	return func(ctx context.Context) error {
-		return Check(func() { wf(ctx) })
-	}
+// Safe is catches panics and returns them as errors using
+// fun.Check. This method is also a fun.WorkerFunc and can be used
+// thusly.
+func (wf WaitFunc) Safe(ctx context.Context) error {
+	return Check(func() { wf(ctx) })
 }
 
 // Signal runs the WaitFunc in a goroutine and returns a signal
