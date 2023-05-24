@@ -196,7 +196,7 @@ func Stream(ctx context.Context, errCh <-chan error) error {
 // fun.WorkerFunc and fun.WaitFunc objects as needed.
 func Consume(ctx context.Context, iter fun.Iterator[error]) error {
 	ec := &Collector{}
-	fun.Observe(ctx, iter, ec.Add)
+	ec.Add(fun.Observe(ctx, iter, ec.Add))
 	return ec.Resolve()
 }
 

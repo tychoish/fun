@@ -46,7 +46,7 @@ func (wf WaitFunc) Once() WaitFunc {
 
 func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})
-	go func() { defer close(out); wf.Safe(ctx) }()
+	go func() { defer close(out); wf(ctx) }()
 	return out
 }
 
