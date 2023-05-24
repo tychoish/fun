@@ -40,45 +40,6 @@ func (iter *SliceIterImpl[T]) Next(ctx context.Context) bool {
 	return true
 }
 
-type ChannelIterImpl[T any] struct {
-	Pipe   <-chan T
-	value  T
-	Error  error
-	Ctx    context.Context
-	Closer context.CancelFunc
-	WG     sync.WaitGroup
-}
-
-func NewChannelIterator[T any](pipe <-chan T) *ChannelIterImpl[T] {
-	return &ChannelIterImpl[T]{Pipe: pipe}
-}
-
-func (iter *ChannelIterImpl[T]) Value() T { return iter.value }
-
-func (iter *ChannelIterImpl[T]) Close() error {
-	if iter.Closer != nil {
-		iter.Closer()
-	}
-	iter.WG.Wait()
-	return iter.Error
-}
-
-func (iter *ChannelIterImpl[T]) Next(ctx context.Context) bool {
-	// check first because select statement ordering is non-deterministic
-	if ctx.Err() != nil {
-		return false
-	}
-	v, err := ReadOne(ctx, iter.Pipe)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			_ = iter.Close()
-		}
-		return false
-	}
-	iter.value = v
-	return true
-}
-
 type GeneratorIterator[T any] struct {
 	Operation func(context.Context) (T, error)
 	Closer    context.CancelFunc
