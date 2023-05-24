@@ -28,31 +28,24 @@ func Generate[T any](
 		opts.NumWorkers = 1
 	}
 
+	pipe := make(chan T, opts.OutputBufferSize)
+
+	catcher := &erc.Collector{}
+	wg := &fun.WaitGroup{}
+	go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()
+
 	out := &internal.GeneratorIterator[T]{}
 
-	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
-		pipe := make(chan T, opts.OutputBufferSize)
-		catcher := &erc.Collector{}
+	init := fun.WaitFunc(func(ctx context.Context) {
 		gctx, abort := context.WithCancel(ctx)
-		wg := &fun.WaitGroup{}
-
+		out.Closer = func() { abort(); out.Error = catcher.Resolve() }
 		for i := 0; i < opts.NumWorkers; i++ {
-			worker := generator(catcher, opts, fn, abort, pipe)
-			worker.Wait(catcher.Add).Add(gctx, wg)
+			generator(catcher, opts, fn, abort, pipe).Add(gctx, wg)
 		}
+		return
+	}).Once()
 
-		go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()
-		out.Closer = func() {
-			abort()
-			out.Error = catcher.Resolve()
-		}
-
-		return pipe
-	})
-
-	out.Operation = func(ctx context.Context) (T, error) {
-		return fun.ReadOne(ctx, pipe(ctx))
-	}
+	out.Operation = func(ctx context.Context) (T, error) { init(ctx); return fun.ReadOne(ctx, pipe) }
 
 	return Synchronize[T](out)
 }
@@ -63,8 +56,8 @@ func generator[T any](
 	fn func(context.Context) (T, error),
 	abort func(),
 	out chan T,
-) fun.WorkerFunc {
-	return func(ctx context.Context) error {
+) fun.WaitFunc {
+	return func(ctx context.Context) {
 		defer abort()
 
 		shouldCollectError := opts.wrapErrorCheck(func(err error) bool { return !errors.Is(err, io.EOF) })
@@ -85,20 +78,20 @@ func generator[T any](
 						continue
 					}
 
-					return nil
+					return
 				}
 
 				erc.When(catcher, shouldCollectError(err), err)
 
 				if errors.Is(err, io.EOF) || erc.ContextExpired(err) || !opts.ContinueOnError {
-					return nil
+					return
 				}
 
 				continue
 			}
 
 			if !fun.Blocking(out).Send().Check(ctx, value) {
-				return nil
+				return
 			}
 		}
 	}

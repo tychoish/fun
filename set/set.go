@@ -68,22 +68,21 @@ func (s mapSetImpl[T]) Delete(item T)     { delete(s, item) }
 func (s mapSetImpl[T]) Check(item T) bool { _, ok := s[item]; return ok }
 func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 	pipe := make(chan T)
+	iter := &internal.GeneratorIterator[T]{}
+	ctx, cancel := context.WithCancel(internal.BackgroundContext)
+	once := &sync.Once{}
+	iter.Closer = func() { once.Do(func() { cancel(); close(pipe) }) }
+	iter.Operation = fun.Blocking(pipe).Recieve().Read
 
-	iter := &internal.ChannelIterImpl[T]{Pipe: pipe}
-
-	iter.Ctx, iter.Closer = context.WithCancel(internal.BackgroundContext)
-	iter.WG.Add(1)
-
-	go func(ctx context.Context) {
-		defer iter.WG.Done()
-		defer close(pipe)
+	go func() {
+		defer iter.Closer()
 
 		for item := range s {
 			if !fun.Blocking(pipe).Send().Check(ctx, item) {
 				return
 			}
 		}
-	}(iter.Ctx)
+	}()
 
 	return iter
 }

@@ -20,11 +20,7 @@ func (e ConstErr) Error() string { return string(e) }
 // contexts signal that a context has expired. This covers both
 // canceled contexts and ones which have exceeded their deadlines.
 func ContextExpired(err error) bool {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return true
-	}
-
-	return false
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
@@ -133,35 +129,6 @@ func CheckWhen(ec *Collector, cond bool, fn func() error) {
 	}
 }
 
-// CheckWait returns a fun.WaitFunc for a function that returns an
-// error, with the error consumed by the collector.
-func CheckWait(ec *Collector, fn fun.WorkerFunc) fun.WaitFunc {
-	return func(ctx context.Context) { ec.Add(fn(ctx)) }
-}
-
-// WithCollector runs the provided function in the returned
-// WorkerFunc, and provides a managed erc.Collector.
-func WithCollector(in func(context.Context, *Collector) error) fun.WorkerFunc {
-	return func(ctx context.Context) (err error) {
-		ec := &Collector{}
-		defer func() { err = ec.Resolve() }()
-		ec.Add(in(ctx, ec))
-		return
-	}
-}
-
-// WithSafeCollector, like WithCollector, runs the provided function
-// in the returned WorkerFunc, and provides a managed
-// erc.Collector. In addition to the semantics of WithCollector,
-// WithSafeCollector also runs erc.Recover() in a defer statement for
-// additional pantic safety.
-func WithSafeCollector(in func(context.Context, *Collector) error) fun.WorkerFunc {
-	return WithCollector(func(ctx context.Context, ec *Collector) error {
-		defer Recover(ec)
-		return in(ctx, ec)
-	})
-}
-
 // Unwind converts an error into a slice of errors in two cases:
 // First, if an error is an *erc.Stack, Unwind will return a slice
 // with all constituent errors. Second, if the error is wrapped or
@@ -204,85 +171,33 @@ func Collapse(errs ...error) error {
 
 	ec := &Collector{}
 
-	CollapseFrom(ec, errs)
-
-	return ec.Resolve()
-}
-
-// CollapseInto is a helper that has the same semantics and calling
-// pattern as Collapse, but collapses those errors into the provided
-// Collector.
-func CollapseInto(ec *Collector, errs ...error) { CollapseFrom(ec, errs) }
-
-// CollapseFrom is a helper that adds a slice of errors to the
-// provided Collector.
-func CollapseFrom(ec *Collector, errs []error) {
 	for idx := range errs {
 		ec.Add(errs[idx])
 	}
+
+	return ec.Resolve()
 }
 
 // Stream collects all errors from an error channel, and returns the
 // aggregated error. Stream blocks until the context expires (but
 // does not add a context cancellation error) or the error channel is
 // closed.
+//
+// Because Stream() is a fun.ProcessFunc you can convert this into
+// fun.WorkerFunc and fun.WaitFunc objects as needed.
 func Stream(ctx context.Context, errCh <-chan error) error {
-	return Consume(ctx, &internal.ChannelIterImpl[error]{Pipe: errCh})
-}
-
-// StreamAll collects all errors from an error channel and adds them
-// to the provided collector. StreamAll returns a fun.WaitFunc that
-// blocks the error channel is closed or its context is canceled.
-func StreamAll(ec *Collector, errCh <-chan error) fun.WaitFunc {
-	return fun.WaitObserveAll(ec.Add, errCh)
-}
-
-// StreamOne returns a fun.WaitFunc that blocks until a single
-// error is set to the error channel and adds that to the
-// collector.
-func StreamOne(ec *Collector, errCh <-chan error) fun.WaitFunc {
-	return fun.WaitObserve(ec.Add, errCh)
-}
-
-// StreamProcess is a non-blocking helper that starts a background
-// goroutine to process the contents of an error channel. The function
-// returned will block until the channel is closed or the context is
-// canceled and can be used to wait for the background operation to be
-// complete.
-func StreamProcess(ctx context.Context, ec *Collector, errCh <-chan error) fun.WaitFunc {
-	return ConsumeProcess(ctx, ec, &internal.ChannelIterImpl[error]{Pipe: errCh})
+	return Consume(ctx, fun.Generator(fun.BlockingReceive(errCh).Read))
 }
 
 // Consume iterates through all errors in the fun.Iterator and
 // returning the aggregated (*erc.Stack) error for these errors.
+//
+// Because Consume() is a fun.ProcessFunc you can convert this into
+// fun.WorkerFunc and fun.WaitFunc objects as needed.
 func Consume(ctx context.Context, iter fun.Iterator[error]) error {
 	ec := &Collector{}
-	ConsumeAll(ec, iter)(ctx)
+	fun.Observe(ctx, iter, ec.Add)
 	return ec.Resolve()
-}
-
-// ConsumeAll adds all errors in the input iterator and returns a wait
-// function that blocks until the iterator is exhausted. ConsumeAll
-// does not begin processing the iterator until the wait function is called.
-func ConsumeAll(ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
-	return func(ctx context.Context) { fun.ObserveWorker(iter, ec.Add).Observe(ctx, ec.Add) }
-}
-
-// ConsumeProcess adds all errors in the iterator to the
-// provided collector and returns a wait function that blocks until
-// the iterator has been exhausted. This error processing work happens
-// in a different go routine, and the fun.WaitFunc blocks until this
-// goroutine has returned.
-func ConsumeProcess(ctx context.Context, ec *Collector, iter fun.Iterator[error]) fun.WaitFunc {
-	sig := make(chan struct{})
-
-	go func() {
-		defer close(sig)
-		defer Recover(ec)
-		ConsumeAll(ec, iter)(ctx)
-	}()
-
-	return fun.WaitChannel(sig)
 }
 
 // Collect produces a function that will collect the error from a

@@ -3,7 +3,6 @@ package fun
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -88,11 +87,3 @@ func (wf WorkerFunc) Wait(ob Observer[error]) WaitFunc {
 // panic.
 func (wf WorkerFunc) Must() WaitFunc   { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
 func (wf WorkerFunc) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }
-
-// WithTimeout executes the worker function with the provided timeout
-// using a new context.
-func (wf WorkerFunc) WithTimeout(timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(internal.BackgroundContext, timeout)
-	defer cancel()
-	return wf(ctx)
-}

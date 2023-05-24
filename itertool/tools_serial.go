@@ -91,48 +91,35 @@ func DropZeroValues[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
 
 // Chain, like merge
 func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
+	pipe := make(chan T)
+	wg := &fun.WaitGroup{}
 	iter := &internal.GeneratorIterator[T]{}
-	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
-		pipe := make(chan T)
-		wg := &fun.WaitGroup{}
+
+	init := fun.WaitFunc(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
-		fun.WorkerFunc(func(ctx context.Context) error {
-		CHAIN:
-			for _, iter := range iters {
-			CURRENT:
-				for {
-					if wctx.Err() != nil {
-						return wctx.Err()
-					}
+		iter.Closer = func() { cancel(); fun.WaitFunc(wg.Wait).Block() }
 
-					value, err := fun.IterateOne(ctx, iter)
-					switch {
-					case errors.Is(err, io.EOF):
-						break CURRENT
-					case erc.ContextExpired(err):
-						break CHAIN
-					}
+	CHAIN:
+		for _, iter := range iters {
+		CURRENT:
+			for {
+				value, err := fun.IterateOne(wctx, iter)
+				switch {
+				case errors.Is(err, io.EOF):
+					break CURRENT
+				case erc.ContextExpired(err):
+					break CHAIN
+				}
 
-					err = fun.Blocking(pipe).Send().Write(ctx, value)
-					if err != nil {
-						break CHAIN
-					}
+				err = fun.Blocking(pipe).Send().Write(wctx, value)
+				if err != nil {
+					break CHAIN
 				}
 			}
-			return io.EOF
-		}).Ignore().Add(ctx, wg)
-
-		iter.Closer = func() {
-			cancel()
-			fun.WaitFunc(wg.Wait).Block()
 		}
-
-		return pipe
 	})
 
-	iter.Operation = func(ctx context.Context) (T, error) {
-		return fun.ReadOne(ctx, pipe(ctx))
-	}
+	iter.Operation = func(ctx context.Context) (T, error) { init.Add(ctx, wg); return fun.ReadOne(ctx, pipe) }
 
 	return iter
 }

@@ -43,7 +43,7 @@ func Slice[T any](in []T) fun.Iterator[T] { return internal.NewSliceIter(in) }
 // Channel produces an iterator for a specified channel. The
 // iterator does not start any background threads.
 func Channel[T any](pipe <-chan T) fun.Iterator[T] {
-	return &internal.ChannelIterImpl[T]{Pipe: pipe}
+	return fun.Generator(fun.BlockingReceive(pipe).Read)
 }
 
 // Variadic is a wrapper around Slice() for more ergonomic use at some
