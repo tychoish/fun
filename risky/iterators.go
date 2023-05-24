@@ -1,8 +1,6 @@
 package risky
 
 import (
-	"context"
-
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
 )
@@ -36,8 +34,3 @@ func IterateOne[T any](iter fun.Iterator[T]) (T, error) {
 // IgnoreObserver is a fun.Observer[T] function that ignores its
 // input.
 func IgnoreObserver[T any](_ T) {}
-
-// BackgroundWorker starts a worker function, ignoring the error.
-func BackgroundWorker(ctx context.Context, fn fun.WorkerFunc) {
-	fn.BackgroundObserve(ctx, IgnoreObserver[error])
-}

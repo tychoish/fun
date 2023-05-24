@@ -38,7 +38,7 @@ func Generate[T any](
 
 		for i := 0; i < opts.NumWorkers; i++ {
 			worker := generator(catcher, opts, fn, abort, pipe)
-			worker.Add(gctx, wg, catcher.Add)
+			worker.Wait(catcher.Add).Add(gctx, wg)
 		}
 
 		go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()

@@ -12,7 +12,7 @@ import (
 // other similar situations
 type WorkerFunc func(context.Context) error
 
-func WorkSignal(ch <-chan error) WorkerFunc {
+func MakeFuture(ch <-chan error) WorkerFunc {
 	return func(ctx context.Context) error {
 		return internal.MergeErrors(BlockingReceive(ch).Read(ctx))
 	}
@@ -58,14 +58,12 @@ func (wf WorkerFunc) Signal(ctx context.Context) <-chan error {
 	return out
 }
 
-// Background runs the worker function in a go routine and returns a
+// Future runs the worker function in a go routine and returns a
 // new WorkerFunc which will block for the context to expire or the
 // background worker to complete.
-func (wf WorkerFunc) Background(ctx context.Context) WorkerFunc {
-	return WorkSignal(wf.Signal(ctx))
-}
+func (wf WorkerFunc) Future(ctx context.Context) WorkerFunc { return MakeFuture(wf.Signal(ctx)) }
 
-func (wf WorkerFunc) BackgroundObserve(ctx context.Context, ob Observer[error]) {
+func (wf WorkerFunc) Background(ctx context.Context, ob Observer[error]) {
 	go func() { ob(wf.Safe(ctx)) }()
 }
 
@@ -78,24 +76,18 @@ func (wf WorkerFunc) Once() WorkerFunc {
 	}
 }
 
-// Add runs the worker function in a go routine
-func (wf WorkerFunc) Add(ctx context.Context, wg *WaitGroup, ob Observer[error]) {
-	wf.ObserveWait(ob).Add(ctx, wg)
-}
-
-// ObserveWait converts a worker function into a wait function,
+// Wait converts a worker function into a wait function,
 // passing any error to the observer function. Only non-nil errors are
 // observed.
-func (wf WorkerFunc) ObserveWait(ob Observer[error]) WaitFunc {
+func (wf WorkerFunc) Wait(ob Observer[error]) WaitFunc {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
-// MustWait converts a Worker function into a wait function; however,
-// if the worker produces an error MustWait converts the error into a
+// Must converts a Worker function into a wait function; however,
+// if the worker produces an error Must converts the error into a
 // panic.
-func (wf WorkerFunc) MustWait() WaitFunc {
-	return func(ctx context.Context) { InvariantMust(wf(ctx)) }
-}
+func (wf WorkerFunc) Must() WaitFunc   { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
+func (wf WorkerFunc) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }
 
 // WithTimeout executes the worker function with the provided timeout
 // using a new context.

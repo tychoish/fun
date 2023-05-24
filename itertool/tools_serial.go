@@ -120,7 +120,7 @@ func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 				}
 			}
 			return io.EOF
-		}).Add(ctx, wg, func(error) {})
+		}).Ignore().Add(ctx, wg)
 
 		iter.Closer = func() {
 			cancel()

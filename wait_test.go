@@ -187,7 +187,7 @@ func TestWait(t *testing.T) {
 			t.Error(dur)
 		}
 	})
-	t.Run("ObserveWait", func(t *testing.T) {
+	t.Run("Wait", func(t *testing.T) {
 		ops := make([]int, 100)
 		for i := 0; i < len(ops); i++ {
 			ops[i] = rand.Int()
@@ -296,7 +296,8 @@ func TestWait(t *testing.T) {
 	})
 	t.Run("Safe", func(t *testing.T) {
 		expected := errors.New("safer")
-		err := WaitFunc(func(context.Context) { panic(expected) }).Safe().Run(testt.Context(t))
+		err := WaitFunc(func(context.Context) { panic(expected) }).
+			Safe(testt.Context(t))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})

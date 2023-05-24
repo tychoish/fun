@@ -204,7 +204,7 @@ func makeMapIterator[K comparable, V any, O any](
 					}
 				})
 				return nil
-			}).BackgroundObserve(ctx, ob)
+			}).Background(ctx, ob)
 
 			return out
 		})

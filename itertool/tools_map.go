@@ -49,11 +49,11 @@ func Map[T any, O any](
 			wctx, wcancel := context.WithCancel(ctx)
 			for i := 0; i < opts.NumWorkers; i++ {
 				worker := mapWorker(ec, opts, mapper, input, output)
-				worker.Add(wctx, wg, func(err error) {
+				worker.Wait(func(err error) {
 					if errors.Is(err, errAbortAllMapWorkers) {
 						wcancel()
 					}
-				})
+				}).Add(wctx, wg)
 			}
 			go func() {
 				out.Closer()

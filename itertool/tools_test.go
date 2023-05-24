@@ -327,7 +327,7 @@ func TestTools(t *testing.T) {
 			func(ctx context.Context, in string) (int, error) { return 53, nil },
 			pipe,
 			output,
-		).Add(ctx, wg, func(error) {})
+		).Ignore().Add(ctx, wg)
 		time.Sleep(10 * time.Millisecond)
 		cancel()
 

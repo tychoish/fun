@@ -32,7 +32,7 @@ func TestWorker(t *testing.T) {
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
 			WorkerFunc(func(ctx context.Context) error { called.Add(1); panic(expected) }).
-				Background(ctx).
+				Future(ctx).
 				Observe(ctx, func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
@@ -57,11 +57,11 @@ func TestWorker(t *testing.T) {
 					assert.Equal(t, wg.Num(), 1)
 					count.Add(1)
 					return nil
-				}).Add(ctx, wg, func(err error) {
+				}).Wait(func(err error) {
 					assert.Equal(t, wg.Num(), 1)
 					count.Add(1)
 					assert.NotError(t, err)
-				})
+				}).Add(ctx, wg)
 			}()
 			wg.Wait(ctx)
 			assert.Equal(t, wg.Num(), 0)
@@ -97,7 +97,7 @@ func TestWorker(t *testing.T) {
 				wf := WorkerFunc(func(ctx context.Context) error {
 					called.Store(true)
 					return expected
-				}).ObserveWait(func(err error) {
+				}).Wait(func(err error) {
 					observed.Store(true)
 					check.ErrorIs(t, err, expected)
 				})

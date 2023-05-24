@@ -56,9 +56,7 @@ func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) {
 // Safe is catches panics and returns them as errors using
 // fun.Check. This method is also a fun.WorkerFunc and can be used
 // thusly.
-func (wf WaitFunc) Safe(ctx context.Context) error {
-	return Check(func() { wf(ctx) })
-}
+func (wf WaitFunc) Safe(ctx context.Context) error { return Check(func() { wf(ctx) }) }
 
 // Signal runs the WaitFunc in a goroutine and returns a signal
 // channel that is canceled when the function completes. Useful for
