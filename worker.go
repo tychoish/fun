@@ -60,7 +60,11 @@ func (wf WorkerFunc) Signal(ctx context.Context) <-chan error {
 // Future runs the worker function in a go routine and returns a
 // new WorkerFunc which will block for the context to expire or the
 // background worker to complete.
-func (wf WorkerFunc) Future(ctx context.Context) WorkerFunc { return MakeFuture(wf.Signal(ctx)) }
+func (wf WorkerFunc) Future() WorkerFunc {
+	return func(ctx context.Context) error {
+		return MakeFuture(wf.Signal(ctx))(ctx)
+	}
+}
 
 func (wf WorkerFunc) Background(ctx context.Context, ob Observer[error]) {
 	go func() { ob(wf.Safe(ctx)) }()

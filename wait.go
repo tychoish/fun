@@ -44,6 +44,16 @@ func (wf WaitFunc) Once() WaitFunc {
 	return func(ctx context.Context) { once.Do(func() { wf(ctx) }) }
 }
 
+func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
+	out := make(chan struct{})
+	go func() { defer close(out); wf.Safe(ctx) }()
+	return out
+}
+
+func (wf WaitFunc) Future() WaitFunc {
+	return func(ctx context.Context) { WaitChannel(wf.Signal(ctx)) }
+}
+
 // Add starts a goroutine that waits for the WaitFunc to return,
 // incrementing and decrementing the sync.WaitGroup as
 // appropriate. The execution of the wait fun blocks on Add's context.
@@ -84,22 +94,20 @@ func WaitForGroup(wg *sync.WaitGroup) WaitFunc {
 	return WaitChannel(sig)
 }
 
-// WaitMerge starts a goroutine that blocks on each WaitFunc provided
-// and returns a WaitFunc that waits for all of these goroutines to
-// return. The constituent WaitFunc are passed WaitMerge's context,
-// while the returned WaitFunc respects its own context.
-//
-// Use itertool.Variadic, itertool.Slice, or itertool.Channel to
-// convert common container types/calling patterns to an iterator.
-func WaitMerge(ctx context.Context, iter Iterator[WaitFunc]) WaitFunc {
-	wg := &WaitGroup{}
+// WaitMerge returns a WaitFunc that, when run, processes the incoming
+// iterator of WaitFuncs, starts a go routine running each, and wait
+// function and then blocks until all operations have returned, or the
+// context passed to the output function has been canceled.
+func WaitMerge(iter Iterator[WaitFunc]) WaitFunc {
+	return func(ctx context.Context) {
+		wg := &WaitGroup{}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_ = Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
+		}()
 
-	}()
-
-	return wg.Wait
+		wg.Wait(ctx)
+	}
 }

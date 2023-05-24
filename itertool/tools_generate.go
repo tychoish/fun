@@ -28,24 +28,41 @@ func Generate[T any](
 		opts.NumWorkers = 1
 	}
 
-	pipe := make(chan T, opts.OutputBufferSize)
-
-	catcher := &erc.Collector{}
 	wg := &fun.WaitGroup{}
-	go func() { fun.WaitFunc(wg.Wait).Block(); close(pipe) }()
+	pipe := make(chan T, opts.OutputBufferSize)
+	catcher := &erc.Collector{}
 
-	out := &internal.GeneratorIterator[T]{}
+	out := &internal.GeneratorIterator[T]{
+		Error: catcher.Resolve,
+	}
 
 	init := fun.WaitFunc(func(ctx context.Context) {
-		gctx, abort := context.WithCancel(ctx)
-		out.Closer = func() { abort(); out.Error = catcher.Resolve() }
+		ctx, cancel := context.WithCancel(ctx)
+		out.Closer = cancel
+
 		for i := 0; i < opts.NumWorkers; i++ {
-			generator(catcher, opts, fn, abort, pipe).Add(gctx, wg)
+			generator(catcher, opts, fn, cancel, pipe).Add(ctx, wg)
 		}
-		return
+		go func() {
+			// waits for the contest to be canceled
+			// (because Close(), or called in a defer in
+			// generator()) AND all workers to exit. It's
+			// blocking(background context), but safe
+			// because logically once the context in this
+			// function expires, it must espire shortly
+			// there after.
+			//
+			// a blocking/deadlock in the generator
+			// function is possible, and there's not much
+			// to be done there.
+			fun.WaitMerge(Variadic(fun.WaitContext(ctx), wg.Wait)).Block()
+			// once everyone is done, we can safely close
+			// the pipe.
+			close(pipe)
+		}()
 	}).Once()
 
-	out.Operation = func(ctx context.Context) (T, error) { init(ctx); return fun.ReadOne(ctx, pipe) }
+	out.Operation = func(ctx context.Context) (T, error) { init(ctx); return fun.Blocking(pipe).Recieve().Read(ctx) }
 
 	return Synchronize[T](out)
 }

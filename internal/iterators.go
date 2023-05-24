@@ -43,7 +43,7 @@ func (iter *SliceIterImpl[T]) Next(ctx context.Context) bool {
 type GeneratorIterator[T any] struct {
 	Operation func(context.Context) (T, error)
 	Closer    context.CancelFunc
-	Error     error
+	Error     func() error
 	closed    atomic.Bool
 	value     T
 	opErr     error
@@ -60,8 +60,10 @@ func (iter *GeneratorIterator[T]) Close() error {
 			closer()
 		}
 	}
-
-	return MergeErrors(iter.Error, iter.opErr)
+	if iter.Error != nil {
+		return MergeErrors(iter.Error(), iter.opErr)
+	}
+	return iter.opErr
 }
 
 func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {

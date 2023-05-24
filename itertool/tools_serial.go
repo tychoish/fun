@@ -92,12 +92,11 @@ func DropZeroValues[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
 // Chain, like merge
 func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 	pipe := make(chan T)
-	wg := &fun.WaitGroup{}
 	iter := &internal.GeneratorIterator[T]{}
 
 	init := fun.WaitFunc(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
-		iter.Closer = func() { cancel(); fun.WaitFunc(wg.Wait).Block() }
+		iter.Closer = cancel
 
 	CHAIN:
 		for _, iter := range iters {
@@ -117,9 +116,12 @@ func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 				}
 			}
 		}
-	})
+	}).Future().Once()
 
-	iter.Operation = func(ctx context.Context) (T, error) { init.Add(ctx, wg); return fun.ReadOne(ctx, pipe) }
+	iter.Operation = func(ctx context.Context) (T, error) {
+		init(ctx)
+		return fun.Blocking(pipe).Recieve().Read(ctx)
+	}
 
 	return iter
 }

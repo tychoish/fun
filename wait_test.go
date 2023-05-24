@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/rand"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -104,36 +103,6 @@ func TestWait(t *testing.T) {
 			t.Fatal("should have returned after completion", "delayed completion", time.Since(start))
 		}
 	})
-	t.Run("WaitObserveAll", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ch := make(chan int, 2)
-		ch <- 42
-		ch <- 42
-		close(ch)
-		var sum int
-
-		WaitObserveAll(func(in int) { sum += in }, ch)(ctx)
-		if sum != 84 {
-			t.Error("unexpected total", sum)
-		}
-	})
-	t.Run("WaitObserveOne", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ch := make(chan int, 2)
-		ch <- 42
-		ch <- 42
-		close(ch)
-		var sum int
-
-		WaitObserve(func(in int) { sum += in }, ch)(ctx)
-		if sum != 42 {
-			t.Error("unexpected total", sum)
-		}
-	})
 	t.Run("WaitContext", func(t *testing.T) {
 		t.Run("BaseBlocking", func(t *testing.T) {
 			bctx := context.Background()
@@ -181,7 +150,7 @@ func TestWait(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
-		WaitMerge(ctx, internal.NewSliceIter(wfs))(ctx)
+		WaitMerge(internal.NewSliceIter(wfs))(ctx)
 		dur := time.Since(start)
 		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 			t.Error(dur)
@@ -213,56 +182,6 @@ func TestWait(t *testing.T) {
 			t.Error(counter)
 		}
 	})
-
-	t.Run("Blocking", func(t *testing.T) {
-		t.Run("Basic", func(t *testing.T) {
-			start := time.Now()
-			WaitBlocking(func() { time.Sleep(10 * time.Millisecond) }).Block()
-			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Second {
-				t.Error(time.Since(start))
-			}
-		})
-		t.Run("Context", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			start := time.Now()
-			WaitBlocking(func() { time.Sleep(10 * time.Millisecond) })(ctx)
-			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Second {
-				t.Error(time.Since(start))
-			}
-		})
-		t.Run("Observe", func(t *testing.T) {
-			var seen int
-			start := time.Now()
-			WaitBlockingObserve(
-				func(in int) { seen = in },
-				func() int { time.Sleep(10 * time.Millisecond); return 42 },
-			).Block()
-
-			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 11*time.Second {
-				t.Error(time.Since(start))
-			}
-			if seen != 42 {
-				t.Error(seen)
-			}
-		})
-	})
-	t.Run("Timeout", func(t *testing.T) {
-		wf := WaitFunc(func(ctx context.Context) {
-			timer := time.NewTimer(time.Second)
-			defer timer.Stop()
-			select {
-			case <-ctx.Done():
-			case <-timer.C:
-			}
-		})
-		start := time.Now()
-		wf.WithTimeout(10 * time.Millisecond)
-		if time.Since(start) < 10*time.Millisecond || time.Since(start) > 15*time.Millisecond {
-			t.Error(time.Since(start))
-		}
-	})
 	t.Run("WorkerConverter", func(t *testing.T) {
 		called := &atomic.Bool{}
 		err := WaitFunc(func(context.Context) { called.Store(true) }).Worker()(testt.Context(t))
@@ -277,7 +196,7 @@ func TestWait(t *testing.T) {
 		cancel()
 
 		called := &atomic.Bool{}
-		err := WaitFunc(func(context.Context) { called.Store(true) }).Check()(ctx)
+		err := WaitFunc(func(context.Context) { called.Store(true) }).Worker()(ctx)
 		assert.Error(t, err)
 		assert.True(t, called.Load())
 		assert.ErrorIs(t, err, context.Canceled)
@@ -288,7 +207,7 @@ func TestWait(t *testing.T) {
 			cancel()
 
 			expected := errors.New("hi")
-			err := WaitFunc(func(context.Context) { panic(expected) }).Check()(ctx)
+			err := WaitFunc(func(context.Context) { panic(expected) }).Worker()(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, expected)
 			check.ErrorIs(t, err, context.Canceled)
@@ -301,103 +220,4 @@ func TestWait(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})
-	t.Run("Signal", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		t.Run("PlainContext", func(t *testing.T) {
-			start := time.Now()
-			ran := &atomic.Bool{}
-			var wf WaitFunc = func(ctx context.Context) {
-				time.Sleep(5 * time.Millisecond)
-				ran.Store(true)
-			}
-
-			sig := wf.Signal(ctx)
-			runtime.Gosched()
-			<-sig
-			dur := time.Since(start)
-			if dur < 5*time.Millisecond || dur > 15*time.Millisecond {
-				t.Error(dur)
-			}
-			if !ran.Load() {
-				t.Error("did not observe test running")
-			}
-		})
-		t.Run("TimeoutContext", func(t *testing.T) {
-			start := time.Now()
-			ran := &atomic.Bool{}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
-			defer cancel()
-
-			var wf WaitFunc = func(ctx context.Context) {
-				timer := testt.Timer(t, 100*time.Millisecond)
-				select {
-				case <-timer.C:
-					ran.Store(true)
-				case <-ctx.Done():
-					return
-				}
-			}
-
-			sig := wf.Signal(ctx)
-			runtime.Gosched()
-			<-sig
-			dur := time.Since(start)
-			if dur < 5*time.Millisecond || dur > 50*time.Millisecond {
-				t.Error(dur)
-			}
-			if ran.Load() {
-				t.Error("should not observe test running")
-			}
-		})
-		t.Run("Timeout", func(t *testing.T) {
-			start := time.Now()
-			ran := &atomic.Bool{}
-			var wf WaitFunc = func(ctx context.Context) {
-				timer := testt.Timer(t, 10*time.Millisecond)
-				select {
-				case <-timer.C:
-					ran.Store(true)
-				case <-ctx.Done():
-					return
-				}
-			}
-
-			sig := wf.WithTimeoutSignal(5 * time.Millisecond)
-			runtime.Gosched()
-			<-sig
-			dur := time.Since(start)
-			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
-				t.Error(dur)
-			}
-
-			if ran.Load() {
-				t.Error("should not have observed test running")
-			}
-
-		})
-		t.Run("Block", func(t *testing.T) {
-			start := time.Now()
-			ran := &atomic.Bool{}
-			var wf WaitFunc = func(ctx context.Context) {
-				time.Sleep(5 * time.Millisecond)
-				ran.Store(true)
-			}
-
-			sig := wf.BlockSignal()
-			runtime.Gosched()
-			<-sig
-			dur := time.Since(start)
-			if dur < 5*time.Millisecond || dur > 10*time.Millisecond {
-				t.Error(dur)
-			}
-			if !ran.Load() {
-				t.Error("did not observe test running")
-			}
-
-		})
-
-	})
-
 }

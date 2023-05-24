@@ -4,14 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"testing"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
-	"github.com/tychoish/fun/testt"
 )
 
 type errorTest struct {
@@ -75,116 +72,32 @@ func TestCollections(t *testing.T) {
 		assert.ErrorIs(t, err, expected)
 	})
 	t.Run("Collapse", func(t *testing.T) {
-		t.Run("From", func(t *testing.T) {
-			t.Run("Empty", func(t *testing.T) {
-				ec := &Collector{}
-				CollapseFrom(ec, nil)
-				if err := ec.Resolve(); err != nil {
-					t.Error("should be nil", err)
-				}
-				ec = &Collector{}
-				CollapseFrom(ec, []error{})
-				if err := ec.Resolve(); err != nil {
-					t.Error("should be nil", err)
-				}
-			})
-			t.Run("One", func(t *testing.T) {
-				ec := &Collector{}
-				const e ConstErr = "fourty-two"
-				CollapseFrom(ec, []error{e})
-				err := ec.Resolve()
-				if !errors.Is(err, e) {
-					t.Error(err, e)
-				}
-			})
-			t.Run("Many", func(t *testing.T) {
-				ec := &Collector{}
-				const e0 ConstErr = "fourty-two"
-				const e1 ConstErr = "fourty-three"
-				CollapseFrom(ec, []error{e0, e1})
-				err := ec.Resolve()
-				if !errors.Is(err, e1) {
-					t.Error(err, e1)
-				}
-				if !errors.Is(err, e0) {
-					t.Error(err, e0)
-				}
-				errs := Unwind(err)
-				if len(errs) != 2 {
-					t.Error(errs)
-				}
-			})
+		t.Run("Empty", func(t *testing.T) {
+			if err := Collapse(); err != nil {
+				t.Error("should be nil", err)
+			}
 		})
-		t.Run("Into", func(t *testing.T) {
-			t.Run("From", func(t *testing.T) {
-				t.Run("Empty", func(t *testing.T) {
-					ec := &Collector{}
-					CollapseInto(ec, nil)
-					if err := ec.Resolve(); err != nil {
-						t.Error("should be nil", err)
-					}
-					ec = &Collector{}
-					CollapseInto(ec)
-					if err := ec.Resolve(); err != nil {
-						t.Error("should be nil", err)
-					}
-				})
-				t.Run("One", func(t *testing.T) {
-					ec := &Collector{}
-					const e ConstErr = "fourty-two"
-					CollapseInto(ec, e)
-					err := ec.Resolve()
-					if !errors.Is(err, e) {
-						t.Error(err, e)
-					}
-				})
-				t.Run("Many", func(t *testing.T) {
-					ec := &Collector{}
-					const e0 ConstErr = "fourty-two"
-					const e1 ConstErr = "fourty-three"
-					CollapseInto(ec, e0, e1)
-					err := ec.Resolve()
-					if !errors.Is(err, e1) {
-						t.Error(err, e1)
-					}
-					if !errors.Is(err, e0) {
-						t.Error(err, e0)
-					}
-					errs := Unwind(err)
-					if len(errs) != 2 {
-						t.Error(errs)
-					}
-				})
-			})
+		t.Run("One", func(t *testing.T) {
+			const e ConstErr = "fourty-two"
+			err := Collapse(e)
+			if !errors.Is(err, e) {
+				t.Error(err, e)
+			}
 		})
-		t.Run("Base", func(t *testing.T) {
-			t.Run("Empty", func(t *testing.T) {
-				if err := Collapse(); err != nil {
-					t.Error("should be nil", err)
-				}
-			})
-			t.Run("One", func(t *testing.T) {
-				const e ConstErr = "fourty-two"
-				err := Collapse(e)
-				if !errors.Is(err, e) {
-					t.Error(err, e)
-				}
-			})
-			t.Run("Many", func(t *testing.T) {
-				const e0 ConstErr = "fourty-two"
-				const e1 ConstErr = "fourty-three"
-				err := Collapse(e0, e1)
-				if !errors.Is(err, e1) {
-					t.Error(err, e1)
-				}
-				if !errors.Is(err, e0) {
-					t.Error(err, e0)
-				}
-				errs := Unwind(err)
-				if len(errs) != 2 {
-					t.Error(errs)
-				}
-			})
+		t.Run("Many", func(t *testing.T) {
+			const e0 ConstErr = "fourty-two"
+			const e1 ConstErr = "fourty-three"
+			err := Collapse(e0, e1)
+			if !errors.Is(err, e1) {
+				t.Error(err, e1)
+			}
+			if !errors.Is(err, e0) {
+				t.Error(err, e0)
+			}
+			errs := Unwind(err)
+			if len(errs) != 2 {
+				t.Error(errs)
+			}
 		})
 	})
 	t.Run("Stream", func(t *testing.T) {
@@ -228,121 +141,6 @@ func TestCollections(t *testing.T) {
 				}
 			})
 		})
-		t.Run("WaitOne", func(t *testing.T) {
-			ch := getPopulatedErrChan(1)
-			close(ch)
-			ec := &Collector{}
-			StreamOne(ec, ch)(ctx)
-			err := ec.Resolve()
-			if err == nil {
-				t.Logf("%T", err)
-				t.Error("nil expected", err)
-			}
-			errs := Unwind(err)
-			if len(errs) != 1 {
-				t.Error(errs)
-			}
-		})
-		t.Run("Into", func(t *testing.T) {
-			t.Run("Many", func(t *testing.T) {
-				ch := getPopulatedErrChan(10)
-				close(ch)
-				fun.Invariant(len(ch) == 10)
-				ec := &Collector{}
-				StreamAll(ec, ch)(ctx)
-				err := ec.Resolve()
-				if err == nil {
-					t.Logf("%T", err)
-					t.Error("nil expected", err)
-				}
-				errs := Unwind(err)
-				if len(errs) != 10 {
-					t.Error(errs)
-				}
-			})
-			t.Run("CanceledWithContent", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel()
-				ch := getPopulatedErrChan(10)
-				close(ch)
-				fun.Invariant(len(ch) == 10)
-				ec := &Collector{}
-				StreamAll(ec, ch)(ctx)
-				err := ec.Resolve()
-				if err != nil {
-					t.Error(err)
-				}
-				errs := Unwind(err)
-				if len(errs) != 0 {
-					t.Error("no errors expected with empty context")
-				}
-			})
-			t.Run("Canceled", func(t *testing.T) {
-				// the real test here is that it
-				// doesn't deadlock
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel()
-				ch := getPopulatedErrChan(0)
-				ec := &Collector{}
-				StreamAll(ec, ch)(ctx)
-				err := ec.Resolve()
-				if err != nil {
-					t.Error(err)
-				}
-				errs := Unwind(err)
-				if len(errs) != 0 {
-					t.Error("no errors expected with empty context")
-				}
-			})
-		})
-		t.Run("Process", func(t *testing.T) {
-			t.Run("Many", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				ch := getPopulatedErrChan(10)
-				close(ch)
-				fun.Invariant(len(ch) == 10)
-				fun.Invariant(ctx.Err() == nil, ctx.Err())
-				ec := &Collector{}
-				wait := StreamProcess(ctx, ec, ch)
-				wait(ctx)
-				err := ec.Resolve()
-				if err == nil {
-					t.Logf("%T", err)
-					t.Error("nil expected", err)
-				}
-				errs := Unwind(err)
-				if len(errs) != 10 {
-					t.Error(len(errs), errs, err)
-				}
-			})
-			t.Run("Canceled", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(ctx)
-				cancel()
-				ch := getPopulatedErrChan(10)
-				close(ch)
-				fun.Invariant(len(ch) == 10)
-				ec := &Collector{}
-				wait := StreamProcess(ctx, ec, ch)
-				wait(internal.BackgroundContext)
-				err := ec.Resolve()
-				if err != nil {
-					t.Error(err)
-				}
-				errs := Unwind(err)
-				if len(errs) != 0 {
-					t.Error("no errors expected with empty context")
-				}
-			})
-
-		})
-	})
-	t.Run("CheckWait", func(t *testing.T) {
-		ec := &Collector{}
-		wait := CheckWait(ec, func(ctx context.Context) error { return errors.New("hello") })
-		assert.True(t, !ec.HasErrors())
-		wait(testt.Context(t))
-		assert.True(t, ec.HasErrors())
 	})
 	t.Run("CheckWhen", func(t *testing.T) {
 		t.Run("NotCalled", func(t *testing.T) {
@@ -393,84 +191,6 @@ func TestCollections(t *testing.T) {
 		assert.Equal(t, out, 42)
 		assert.Error(t, ec.Resolve())
 		assert.Equal(t, ec.Resolve().Error(), "kip")
-	})
-	t.Run("WithHelpers", func(t *testing.T) {
-		t.Run("Safe", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := WithSafeCollector(func(_ context.Context, ec *Collector) error {
-				panic(io.EOF)
-			})(ctx)
-			assert.Error(t, err)
-
-			errs := Unwind(err)
-			testt.Log(t, errs)
-
-			assert.Equal(t, 2, len(errs))
-			assert.ErrorIs(t, err, io.EOF)
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-		})
-		t.Run("SafeExtra", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := WithSafeCollector(func(_ context.Context, ec *Collector) error {
-				ec.Add(fun.ErrSkippedNonBlockingChannelOperation)
-				panic(io.EOF)
-			})(ctx)
-			assert.Error(t, err)
-
-			errs := Unwind(err)
-			testt.Log(t, errs)
-
-			assert.Equal(t, 3, len(errs))
-			assert.ErrorIs(t, err, io.EOF)
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-			assert.ErrorIs(t, err, fun.ErrSkippedNonBlockingChannelOperation)
-		})
-		t.Run("Empty", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := WithCollector(func(_ context.Context, ec *Collector) error {
-				return nil
-			})(ctx)
-			assert.NotError(t, err)
-		})
-		t.Run("NotCollected", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := WithCollector(func(_ context.Context, ec *Collector) error {
-				return io.EOF
-			})(ctx)
-			assert.Error(t, err)
-
-			errs := Unwind(err)
-			testt.Log(t, errs)
-
-			assert.Equal(t, 1, len(errs))
-			assert.ErrorIs(t, err, io.EOF)
-		})
-		t.Run("NotCollected", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := WithCollector(func(_ context.Context, ec *Collector) error {
-				ec.Add(fun.ErrSkippedNonBlockingChannelOperation)
-				return io.EOF
-			})(ctx)
-			assert.Error(t, err)
-
-			errs := Unwind(err)
-			testt.Log(t, errs)
-
-			assert.Equal(t, 2, len(errs))
-			assert.ErrorIs(t, err, io.EOF)
-			assert.ErrorIs(t, err, fun.ErrSkippedNonBlockingChannelOperation)
-		})
-
 	})
 }
 

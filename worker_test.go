@@ -32,7 +32,7 @@ func TestWorker(t *testing.T) {
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
 			WorkerFunc(func(ctx context.Context) error { called.Add(1); panic(expected) }).
-				Future(ctx).
+				Future().
 				Observe(ctx, func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
@@ -118,7 +118,7 @@ func TestWorker(t *testing.T) {
 					var wf WaitFunc //nolint:gosimple
 					wf = WorkerFunc(func(context.Context) error {
 						panic(expected)
-					}).MustWait()
+					}).Must()
 					t.Log(wf)
 				})
 				// declaration shouldn't call
@@ -128,30 +128,12 @@ func TestWorker(t *testing.T) {
 					var wf WaitFunc //nolint:gosimple
 					wf = WorkerFunc(func(context.Context) error {
 						panic(expected)
-					}).MustWait()
+					}).Must()
 					wf(testt.Context(t))
 				})
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, expected)
 			})
-		})
-		t.Run("Timeout", func(t *testing.T) {
-			timer := testt.Timer(t, time.Hour)
-			start := time.Now()
-			err := WorkerFunc(func(ctx context.Context) error {
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-timer.C:
-					t.Fatal("timer must not fail")
-				}
-				return errors.New("should not exist")
-			}).WithTimeout(10 * time.Millisecond)
-			dur := time.Since(start)
-			if dur > 20*time.Millisecond {
-				t.Error(dur)
-			}
-			check.NotError(t, err)
 		})
 		t.Run("Signal", func(t *testing.T) {
 			ctx := testt.Context(t)

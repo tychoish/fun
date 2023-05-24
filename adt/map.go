@@ -184,33 +184,26 @@ func makeMapIterator[K comparable, V any, O any](
 	mp *Map[K, V],
 	rf func(K, V) O,
 ) fun.Iterator[O] {
-	once := &Once[<-chan O]{}
 	iter := &internal.GeneratorIterator[O]{}
-	mtx := &sync.Mutex{}
-	ob := func(err error) { mtx.Lock(); defer mtx.Unlock(); iter.Error = err }
+	pipe := make(chan O)
+	init := fun.WaitFunc(func(ctx context.Context) {
+		ctx, iter.Closer = context.WithCancel(ctx)
+
+		defer close(pipe)
+		mp.Range(func(key K, value V) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case pipe <- rf(key, value):
+				return true
+			}
+		})
+	}).Future().Once()
 
 	iter.Operation = func(ctx context.Context) (O, error) {
-		pipe := once.Do(func() <-chan O {
-			ctx, iter.Closer = context.WithCancel(ctx)
-			out := make(chan O)
-			fun.WorkerFunc(func(ctx context.Context) error {
-				defer close(out)
-				mp.Range(func(key K, value V) bool {
-					select {
-					case <-ctx.Done():
-						return false
-					case out <- rf(key, value):
-						return true
-					}
-				})
-				return nil
-			}).Background(ctx, ob)
-
-			return out
-		})
-
-		return fun.ReadOne(ctx, pipe)
+		init(ctx)
+		return fun.BlockingReceive(pipe).Read(ctx)
 	}
 
-	return NewIterator(mtx, fun.Iterator[O](iter))
+	return NewIterator(&sync.Mutex{}, fun.Iterator[O](iter))
 }

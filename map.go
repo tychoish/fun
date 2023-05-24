@@ -109,34 +109,24 @@ func (m Map[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf fun
 // times a collection of data must be coppied.
 func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 	iter := &internal.GeneratorIterator[Pair[K, V]]{}
+	pipe := make(chan Pair[K, V])
 
-	once := internal.MnemonizeContext(func(ctx context.Context) <-chan Pair[K, V] {
-		pipe := make(chan Pair[K, V])
+	init := WaitFunc(func(ctx context.Context) {
+		ctx, cancel := context.WithCancel(ctx)
+		iter.Closer = cancel
 
-		worker := WorkerFunc(func(ctx context.Context) error {
-			defer close(pipe)
-			for k, v := range m {
-				if !Blocking(pipe).Send().Check(ctx, MakePair(k, v)) {
-					break
-				}
+		defer close(pipe)
+
+		for k, v := range m {
+			if !Blocking(pipe).Send().Check(ctx, MakePair(k, v)) {
+				break
 			}
-			return nil // worker
-		})
-
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
-
-		sig := worker.Signal(ctx) // starts background thread
-		iter.Closer = func() {
-			cancel()
-			iter.Error = <-sig
 		}
-
-		return pipe
-	})
+	}).Future().Once()
 
 	iter.Operation = func(ctx context.Context) (Pair[K, V], error) {
-		return ReadOne(ctx, once(ctx))
+		init(ctx)
+		return Blocking(pipe).Recieve().Read(ctx)
 	}
 
 	return iter

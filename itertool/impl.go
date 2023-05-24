@@ -16,12 +16,15 @@ import (
 // not otherwise guarantee the iterator's order.
 func Merge[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 	iter := &internal.GeneratorIterator[T]{}
+	pipe := make(chan T)
+	wg := &fun.WaitGroup{}
 
-	pipe := internal.MnemonizeContext(func(ctx context.Context) <-chan T {
-		pipe := make(chan T)
-		wg := &fun.WaitGroup{}
+	init := fun.WaitFunc(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
+		iter.Closer = cancel
 
+		// start a go routine for every iterator, to read from
+		// the incoming iterator and push it to the pipe
 		for idx := range iters {
 			it := iters[idx]
 			fun.WaitFunc(func(ctx context.Context) {
@@ -33,15 +36,15 @@ func Merge[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 			}).Add(wctx, wg)
 		}
 
-		go func() { wg.Wait(wctx); close(pipe) }()
-
-		iter.Closer = func() { cancel() }
-
-		return pipe
-	})
+		go func() {
+			fun.WaitFunc(wg.Wait).Block()
+			close(pipe)
+		}()
+	}).Once()
 
 	iter.Operation = func(ctx context.Context) (T, error) {
-		return fun.ReadOne(ctx, pipe(ctx))
+		init(ctx)
+		return fun.Blocking(pipe).Recieve().Read(ctx)
 	}
 
 	return iter
@@ -65,23 +68,20 @@ func Split[T any](numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
 
 	pipe := make(chan T)
 	setup := fun.WaitFunc(func(ctx context.Context) {
-		go func() {
-			defer close(pipe)
-			for {
-				if value, err := fun.IterateOne(ctx, input); err != nil || !fun.Blocking(pipe).Send().Check(ctx, value) {
-					return
-				}
+		defer close(pipe)
+		for {
+			if value, err := fun.IterateOne(ctx, input); err != nil || !fun.Blocking(pipe).Send().Check(ctx, value) {
+				return
 			}
-		}()
-		return
-	}).Once()
+		}
+	}).Future().Once()
 
 	output := make([]fun.Iterator[T], numSplits)
 
 	for idx := range output {
 		output[idx] = fun.Generator(func(ctx context.Context) (T, error) {
 			setup(ctx)
-			return fun.ReadOne(ctx, pipe)
+			return fun.Blocking(pipe).Recieve().Read(ctx)
 		})
 
 	}
