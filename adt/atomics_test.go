@@ -181,6 +181,31 @@ func TestAtomics(t *testing.T) {
 	})
 }
 
+func TestMnemonize(t *testing.T) {
+	const value string = "val"
+	counter := 0
+	op := func() string { counter++; return value }
+
+	foo := Mnemonize(op)
+	if counter != 0 {
+		t.Error("should not call yet", counter)
+	}
+	if out := foo(); out != value {
+		t.Error("wrong value", out, value)
+	}
+	if counter != 1 {
+		t.Error("should call only once", counter)
+	}
+	for i := 0; i < 128; i++ {
+		if out := foo(); out != value {
+			t.Error("wrong value", out, value)
+		}
+		if counter != 1 {
+			t.Error("should call only once", counter)
+		}
+	}
+}
+
 type swappable struct{ Atomic[int] }
 
 func (s *swappable) CompareAndSwap(a, b int) bool { return CompareAndSwap[int](&s.Atomic, a, b) }
