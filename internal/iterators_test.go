@@ -91,7 +91,18 @@ func TestIterators(t *testing.T) {
 
 		}
 	})
+	t.Run("ReadOneEOF", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
 
+		ch := make(chan string, 1)
+		close(ch)
+
+		_, err := ReadOne(ctx, ch)
+		if !errors.Is(err, io.EOF) {
+			t.Fatal(err)
+		}
+	})
 	t.Run("NonBlockingReadOne", func(t *testing.T) {
 		t.Parallel()
 		t.Run("BlockingCompatibility", func(t *testing.T) {

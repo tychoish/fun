@@ -61,7 +61,7 @@ func Map[T any, O any](
 			}()
 		})
 
-		out, err := fun.Blocking(output).Recieve().Read(ctx)
+		out, err := fun.Blocking(output).Receive().Read(ctx)
 		if err == nil {
 			return out, nil
 		}
@@ -85,7 +85,7 @@ func mapWorker[T any, O any](
 	return func(ctx context.Context) error {
 	ITEM:
 		for {
-			value, ok := fun.Blocking(fromInput).Recieve().Check(ctx)
+			value, ok := fun.Blocking(fromInput).Receive().Check(ctx)
 			if !ok {
 				return nil
 			}

@@ -44,7 +44,7 @@ func Merge[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 
 	iter.Operation = func(ctx context.Context) (T, error) {
 		init(ctx)
-		return fun.Blocking(pipe).Recieve().Read(ctx)
+		return fun.Blocking(pipe).Receive().Read(ctx)
 	}
 
 	return iter
@@ -81,7 +81,7 @@ func Split[T any](numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
 	for idx := range output {
 		output[idx] = fun.Generator(func(ctx context.Context) (T, error) {
 			setup(ctx)
-			return fun.Blocking(pipe).Recieve().Read(ctx)
+			return fun.Blocking(pipe).Receive().Read(ctx)
 		})
 
 	}

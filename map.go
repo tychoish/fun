@@ -126,7 +126,7 @@ func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 
 	iter.Operation = func(ctx context.Context) (Pair[K, V], error) {
 		init(ctx)
-		return Blocking(pipe).Recieve().Read(ctx)
+		return Blocking(pipe).Receive().Read(ctx)
 	}
 
 	return iter

@@ -62,7 +62,7 @@ func Generate[T any](
 		}()
 	}).Once()
 
-	out.Operation = func(ctx context.Context) (T, error) { init(ctx); return fun.Blocking(pipe).Recieve().Read(ctx) }
+	out.Operation = func(ctx context.Context) (T, error) { init(ctx); return fun.Blocking(pipe).Receive().Read(ctx) }
 
 	return Synchronize[T](out)
 }

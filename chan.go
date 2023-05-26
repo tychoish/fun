@@ -46,7 +46,7 @@ func Blocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: blockin
 func NonBlocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: non_blocking, ch: ch} }
 
 func (op ChannelOp[T]) Send() Send[T]       { return Send[T]{mode: op.mode, ch: op.ch} }
-func (op ChannelOp[T]) Recieve() Receive[T] { return Receive[T]{mode: op.mode, ch: op.ch} }
+func (op ChannelOp[T]) Receive() Receive[T] { return Receive[T]{mode: op.mode, ch: op.ch} }
 
 // Receive, wraps a channel fore <-chan T operations. It is the type
 // returned by the Receive() method on ChannelOp. The primary method

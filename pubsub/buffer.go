@@ -53,7 +53,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 			return
 		},
 		pop: func(ctx context.Context) (T, error) {
-			val, err := fun.Blocking(ch).Recieve().Read(ctx)
+			val, err := fun.Blocking(ch).Receive().Read(ctx)
 			if err != nil && errors.Is(err, io.EOF) {
 				return val, ErrQueueClosed
 			}

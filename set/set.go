@@ -83,7 +83,7 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 
 	iter.Operation = func(ctx context.Context) (T, error) {
 		setup(ctx)
-		return fun.Blocking(pipe).Recieve().Read(ctx)
+		return fun.Blocking(pipe).Receive().Read(ctx)
 	}
 
 	return iter

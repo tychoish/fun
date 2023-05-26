@@ -120,7 +120,7 @@ func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 
 	iter.Operation = func(ctx context.Context) (T, error) {
 		init(ctx)
-		return fun.Blocking(pipe).Recieve().Read(ctx)
+		return fun.Blocking(pipe).Receive().Read(ctx)
 	}
 
 	return iter
