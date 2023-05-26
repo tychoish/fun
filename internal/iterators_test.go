@@ -237,6 +237,23 @@ func TestIterators(t *testing.T) {
 
 			}
 		})
+		t.Run("MergeErrors", func(t *testing.T) {
+			expected := errors.New("cat")
+			iter := &GeneratorIterator[string]{
+				Error: func() error { return expected },
+				opErr: ErrSkippedNonBlockingChannelOperation,
+			}
+			err := iter.Close()
+			if err == nil {
+				t.Fatal("got nil, expected err")
+			}
+			if !errors.Is(err, ErrSkippedNonBlockingChannelOperation) {
+				t.Error(err)
+			}
+			if !errors.Is(err, expected) {
+				t.Error(err)
+			}
+		})
 
 	})
 }
