@@ -88,7 +88,7 @@ func HasOrchestrator(ctx context.Context) bool {
 // HasCleanup returns true if a cleanup process is registered in the
 // context.
 func HasCleanup(ctx context.Context) bool {
-	_, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.WorkerFunc])
+	_, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.Worker])
 	return ok
 }
 
@@ -99,15 +99,15 @@ func WithCleanup(ctx context.Context) context.Context {
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
-	pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+	pipe := pubsub.NewUnlimitedQueue[fun.Worker]()
 
 	fun.InvariantMust(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
 
 	return context.WithValue(ctx, cleanupCtxKey{}, pipe)
 }
 
-func getCleanup(ctx context.Context) *pubsub.Queue[fun.WorkerFunc] {
-	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.WorkerFunc])
+func getCleanup(ctx context.Context) *pubsub.Queue[fun.Worker] {
+	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.Worker])
 	fun.Invariant(ok, "cleanup service not configured")
 	return val
 }
@@ -116,7 +116,7 @@ func getCleanup(ctx context.Context) *pubsub.Queue[fun.WorkerFunc] {
 // pending in the context. Raises an invariant failure if the cleanup
 // service was not previously configured, or if you attempt to add a
 // new cleanup function while shutdown is running.
-func AddCleanup(ctx context.Context, cleanup fun.WorkerFunc) {
+func AddCleanup(ctx context.Context, cleanup fun.Worker) {
 	fun.InvariantMust(getCleanup(ctx).Add(cleanup))
 }
 
@@ -258,12 +258,12 @@ func WithObserverWorkerPool(ctx context.Context, key string, observer func(error
 	return SetObserverWorkerPool(ctx, key, getQueueForOpts(opts), observer, opts)
 }
 
-func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.WorkerFunc] {
+func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.Worker] {
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
 	}
 
-	return fun.Must(pubsub.NewQueue[fun.WorkerFunc](
+	return fun.Must(pubsub.NewQueue[fun.Worker](
 		pubsub.QueueOptions{
 			SoftQuota:   2 * opts.NumWorkers,
 			HardLimit:   4 * opts.NumWorkers,
@@ -289,7 +289,7 @@ func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.WorkerFunc] {
 func SetWorkerPool(
 	ctx context.Context,
 	key string,
-	queue *pubsub.Queue[fun.WorkerFunc],
+	queue *pubsub.Queue[fun.Worker],
 	opts itertool.Options,
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
@@ -319,7 +319,7 @@ func SetWorkerPool(
 func SetObserverWorkerPool(
 	ctx context.Context,
 	key string,
-	queue *pubsub.Queue[fun.WorkerFunc],
+	queue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
 	opts itertool.Options,
 ) context.Context {
@@ -328,7 +328,7 @@ func SetObserverWorkerPool(
 	})
 }
 
-func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.WorkerFunc], attach func(*Orchestrator)) context.Context {
+func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.Worker], attach func(*Orchestrator)) context.Context {
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
@@ -346,8 +346,8 @@ func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.Wo
 // any error produced a worker function until the service exits, while
 // observer pools pass errors to the observer function and then
 // release them.
-func AddToWorkerPool(ctx context.Context, key string, fn fun.WorkerFunc) error {
-	queue, ok := ctx.Value(workerPoolNameCtxKey(key)).(*pubsub.Queue[fun.WorkerFunc])
+func AddToWorkerPool(ctx context.Context, key string, fn fun.Worker) error {
+	queue, ok := ctx.Value(workerPoolNameCtxKey(key)).(*pubsub.Queue[fun.Worker])
 	if !ok {
 		return fmt.Errorf("worker pool named %q is not registered [%T]", key, ctx.Value(workerPoolNameCtxKey(key)))
 	}

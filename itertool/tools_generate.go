@@ -17,7 +17,7 @@ import (
 // error/continue-on-panic semantics are available and share
 // configuration with the Map and ParallelForEach operations.
 func Generate[T any](
-	fn func(context.Context) (T, error),
+	fn fun.Producer[T],
 	opts Options,
 ) fun.Iterator[T] {
 	if opts.OutputBufferSize < 0 {
@@ -70,7 +70,7 @@ func Generate[T any](
 func generator[T any](
 	catcher *erc.Collector,
 	opts Options,
-	fn func(context.Context) (T, error),
+	fn fun.Producer[T],
 	abort func(),
 	out chan T,
 ) fun.WaitFunc {

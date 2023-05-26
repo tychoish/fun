@@ -224,9 +224,9 @@ func makeIterator(size int) fun.Iterator[int] {
 	return itertool.Slice(slice)
 }
 
-func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.WorkerFunc] {
+func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {
 	t.Helper()
-	queue := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+	queue := pubsub.NewUnlimitedQueue[fun.Worker]()
 
 	for i := 0; i < size; i++ {
 		assert.NotError(t, queue.Add(func(ctx context.Context) error {
@@ -239,9 +239,9 @@ func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Wo
 	return queue
 }
 
-func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.WorkerFunc] {
+func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {
 	t.Helper()
-	queue := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+	queue := pubsub.NewUnlimitedQueue[fun.Worker]()
 
 	for i := 0; i < size; i++ {
 		idx := i

@@ -287,7 +287,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("ClosedQueueError", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		queue := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+		queue := pubsub.NewUnlimitedQueue[fun.Worker]()
 		ctx = WithWorkerPool(ctx, "merlin", itertool.Options{})
 		ctx = SetWorkerPool(ctx, "kip", queue, itertool.Options{})
 

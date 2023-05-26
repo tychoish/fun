@@ -13,7 +13,7 @@ import (
 func Process[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
-	fn fun.ProcessFunc[T],
+	fn fun.Processor[T],
 	opts Options,
 ) error {
 	return ParallelForEach(ctx, iter, fn, opts)
@@ -21,10 +21,10 @@ func Process[T any](
 
 // compile-time assertions that both worker types support the "safe"
 // interface needed for the Worker() tool.
-var _ interface{ Safe(context.Context) error } = new(fun.WorkerFunc)
+var _ interface{ Safe(context.Context) error } = new(fun.Worker)
 var _ interface{ Safe(context.Context) error } = new(fun.WaitFunc)
 
-// Worker takes iterators of fun.WorkerFunc or fun.WaitFunc lambdas
+// Worker takes iterators of fun.Worker or fun.WaitFunc lambdas
 // and processes them in according to the configuration.
 //
 // All operations functions are processed using their respective
@@ -39,7 +39,7 @@ var _ interface{ Safe(context.Context) error } = new(fun.WaitFunc)
 // workloads do not remain in memory) containers.
 //
 // Worker is implemented using ParallelForEach.
-func Worker[OP fun.WorkerFunc | fun.WaitFunc](
+func Worker[OP fun.Worker | fun.WaitFunc](
 	ctx context.Context,
 	iter fun.Iterator[OP],
 	opts Options,
@@ -62,7 +62,7 @@ func Worker[OP fun.WorkerFunc | fun.WaitFunc](
 func ParallelForEach[T any](
 	ctx context.Context,
 	iter fun.Iterator[T],
-	fn fun.ProcessFunc[T],
+	fn fun.Processor[T],
 	opts Options,
 ) (err error) {
 	iter = Synchronize(iter)
@@ -96,7 +96,7 @@ func forEachWorker[T any](
 	wg *fun.WaitGroup,
 	opts Options,
 	iter fun.Iterator[T],
-	fn fun.ProcessFunc[T],
+	fn fun.Processor[T],
 	abort func(),
 ) {
 	defer wg.Done()

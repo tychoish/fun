@@ -7,19 +7,13 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// WorkerFunc represents a basic function used in worker pools and
+// Worker represents a basic function used in worker pools and
 // other similar situations
-type WorkerFunc func(context.Context) error
-
-func MakeFuture(ch <-chan error) WorkerFunc {
-	return func(ctx context.Context) error {
-		return internal.MergeErrors(BlockingReceive(ch).Read(ctx))
-	}
-}
+type Worker func(context.Context) error
 
 // Run is equivalent to calling the worker function directly, except
 // the context passed to it is canceled when the worker function returns.
-func (wf WorkerFunc) Run(ctx context.Context) error {
+func (wf Worker) Run(ctx context.Context) error {
 	wctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	return wf(wctx)
@@ -27,19 +21,19 @@ func (wf WorkerFunc) Run(ctx context.Context) error {
 
 // Safe runs the worker function and converts the worker function to a
 // panic to an error.
-func (wf WorkerFunc) Safe(ctx context.Context) (err error) {
+func (wf Worker) Safe(ctx context.Context) (err error) {
 	defer func() { err = mergeWithRecover(err, recover()) }()
 	return wf(ctx)
 }
 
 // Block executes the worker function with a context that will never
 // expire and returns the error. Use with caution
-func (wf WorkerFunc) Block() error { return wf.Run(internal.BackgroundContext) }
+func (wf Worker) Block() error { return wf.Run(internal.BackgroundContext) }
 
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are converted to errors for both the worker
 // function but not the observer function.
-func (wf WorkerFunc) Observe(ctx context.Context, ob Observer[error]) {
+func (wf Worker) Observe(ctx context.Context, ob Observer[error]) {
 	ob(wf.Safe(ctx))
 }
 
@@ -49,28 +43,28 @@ func (wf WorkerFunc) Observe(ctx context.Context, ob Observer[error]) {
 // context the worker is still executed (with that context.)
 //
 // A value, possibly nil, is always sent through the channel, though
-// the WorkerFunc runs in a different go routine, a panic handler will
+// the fun.Worker runs in a different go routine, a panic handler will
 // convert panics to errors.
-func (wf WorkerFunc) Signal(ctx context.Context) <-chan error {
+func (wf Worker) Signal(ctx context.Context) <-chan error {
 	out := make(chan error)
 	go func() { defer close(out); Blocking(out).Send().Ignore(ctx, wf.Safe(ctx)) }()
 	return out
 }
 
 // Future runs the worker function in a go routine and returns a
-// new WorkerFunc which will block for the context to expire or the
-// background worker to complete.
-func (wf WorkerFunc) Future() WorkerFunc {
-	return func(ctx context.Context) error {
-		return MakeFuture(wf.Signal(ctx))(ctx)
-	}
+// new fun.Worker which will block for the context to expire or the
+// background worker to complete, which returns the error from the
+// background request.
+func (wf Worker) Future(ctx context.Context) Worker {
+	out := wf.Signal(ctx)
+	return func(ctx context.Context) error { return internal.MergeErrors(MakeFuture(out)(ctx)) }
 }
 
-func (wf WorkerFunc) Background(ctx context.Context, ob Observer[error]) {
+func (wf Worker) Background(ctx context.Context, ob Observer[error]) {
 	go func() { ob(wf.Safe(ctx)) }()
 }
 
-func (wf WorkerFunc) Once() WorkerFunc {
+func (wf Worker) Once() Worker {
 	once := &sync.Once{}
 	var err error
 	return func(ctx context.Context) error {
@@ -82,12 +76,12 @@ func (wf WorkerFunc) Once() WorkerFunc {
 // Wait converts a worker function into a wait function,
 // passing any error to the observer function. Only non-nil errors are
 // observed.
-func (wf WorkerFunc) Wait(ob Observer[error]) WaitFunc {
+func (wf Worker) Wait(ob Observer[error]) WaitFunc {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
 // Must converts a Worker function into a wait function; however,
 // if the worker produces an error Must converts the error into a
 // panic.
-func (wf WorkerFunc) Must() WaitFunc   { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
-func (wf WorkerFunc) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }
+func (wf Worker) Must() WaitFunc   { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
+func (wf Worker) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }

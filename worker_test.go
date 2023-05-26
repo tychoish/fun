@@ -17,7 +17,7 @@ func TestWorker(t *testing.T) {
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
 			start := time.Now()
-			err := WorkerFunc(func(ctx context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Block()
+			err := Worker(func(ctx context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Block()
 			dur := time.Since(start)
 			if dur < 10*time.Millisecond {
 				t.Error("did not block long enough", dur)
@@ -31,8 +31,8 @@ func TestWorker(t *testing.T) {
 			ctx := testt.Context(t)
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
-			WorkerFunc(func(ctx context.Context) error { called.Add(1); panic(expected) }).
-				Future().
+			Worker(func(ctx context.Context) error { called.Add(1); panic(expected) }).
+				Future(ctx).
 				Observe(ctx, func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
@@ -53,7 +53,7 @@ func TestWorker(t *testing.T) {
 				runtime.LockOSThread()
 				defer runtime.UnlockOSThread()
 
-				WorkerFunc(func(ctx context.Context) error {
+				Worker(func(ctx context.Context) error {
 					assert.Equal(t, wg.Num(), 1)
 					count.Add(1)
 					return nil
@@ -72,7 +72,7 @@ func TestWorker(t *testing.T) {
 			t.Run("ObserveNilErrors", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
-				WorkerFunc(func(ctx context.Context) error { called.Store(true); return nil }).Observe(ctx, func(error) { observed.Store(true) })
+				Worker(func(ctx context.Context) error { called.Store(true); return nil }).Observe(ctx, func(error) { observed.Store(true) })
 				assert.True(t, called.Load())
 				assert.True(t, observed.Load())
 			})
@@ -80,7 +80,7 @@ func TestWorker(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
 				expected := errors.New("hello")
-				WorkerFunc(func(ctx context.Context) error {
+				Worker(func(ctx context.Context) error {
 					called.Store(true)
 					return expected
 				}).Observe(ctx, func(err error) {
@@ -94,7 +94,7 @@ func TestWorker(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
 				expected := errors.New("hello")
-				wf := WorkerFunc(func(ctx context.Context) error {
+				wf := Worker(func(ctx context.Context) error {
 					called.Store(true)
 					return expected
 				}).Wait(func(err error) {
@@ -116,7 +116,7 @@ func TestWorker(t *testing.T) {
 				expected := errors.New("merlin")
 				err := Check(func() {
 					var wf WaitFunc //nolint:gosimple
-					wf = WorkerFunc(func(context.Context) error {
+					wf = Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
 					t.Log(wf)
@@ -126,7 +126,7 @@ func TestWorker(t *testing.T) {
 
 				err = Check(func() {
 					var wf WaitFunc //nolint:gosimple
-					wf = WorkerFunc(func(context.Context) error {
+					wf = Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
 					wf(testt.Context(t))
@@ -138,7 +138,7 @@ func TestWorker(t *testing.T) {
 		t.Run("Signal", func(t *testing.T) {
 			ctx := testt.Context(t)
 			expected := errors.New("hello")
-			wf := WorkerFunc(func(ctx context.Context) error { return expected })
+			wf := Worker(func(ctx context.Context) error { return expected })
 			out := wf.Signal(ctx)
 			err := <-out
 			assert.Error(t, err)

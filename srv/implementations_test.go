@@ -216,7 +216,7 @@ func TestCleanup(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		pipe := pubsub.NewUnlimitedQueue[fun.WorkerFunc]()
+		pipe := pubsub.NewUnlimitedQueue[fun.Worker]()
 
 		signal := make(chan struct{})
 		count := &atomic.Int64{}

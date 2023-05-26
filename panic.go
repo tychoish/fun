@@ -133,7 +133,7 @@ func (of Observer[T]) Safe(in T) (err error) {
 // Worker captures a variable and returns a worker function which
 // will, when executed, observe the input value. These worker
 // functions, use the Safe-mode of execution.
-func (of Observer[T]) Worker(in T) WorkerFunc {
+func (of Observer[T]) Worker(in T) Worker {
 	return func(context.Context) (err error) { return of.Safe(in) }
 }
 

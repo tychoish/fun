@@ -152,7 +152,7 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessIterator[T any](
 	iter fun.Iterator[T],
-	mapper fun.ProcessFunc[T],
+	mapper fun.Processor[T],
 	opts itertool.Options,
 ) *Service {
 	return &Service{
@@ -168,7 +168,7 @@ func ProcessIterator[T any](
 // shutdown (e.g. either after Close() is called or when the context
 // is canceled.) The timeout, when non-zero, is passed to the clean up
 // operation. Cleanup functions are dispatched in parallel.
-func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service {
+func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 	// assume some reasonable defaults.
 	opts := itertool.Options{
 		ContinueOnPanic: true,
@@ -178,7 +178,7 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 
 	// copy the values out of the pipe so that we don't end up
 	// deadlocking or missing jobs. on shutdown.
-	cache := &seq.List[fun.WorkerFunc]{}
+	cache := &seq.List[fun.Worker]{}
 
 	return &Service{
 		Run: func(ctx context.Context) error {
@@ -204,7 +204,7 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 			ec := &erc.Collector{}
 
 			ec.Add(itertool.ParallelForEach(ctx, seq.ListValues(cache.PopIterator()),
-				func(ctx context.Context, wf fun.WorkerFunc) error {
+				func(ctx context.Context, wf fun.Worker) error {
 					ec.Add(wf.Safe(ctx))
 					return nil
 				},
@@ -220,12 +220,12 @@ func Cleanup(pipe *pubsub.Queue[fun.WorkerFunc], timeout time.Duration) *Service
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fun.Worker], opts itertool.Options) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
 				workQueue.Distributor().Iterator(),
-				func(ctx context.Context, fn fun.WorkerFunc) error {
+				func(ctx context.Context, fn fun.Worker) error {
 					return fn.Run(ctx)
 				},
 				opts,
@@ -250,7 +250,7 @@ func WorkerPool(workQueue *pubsub.Queue[fun.WorkerFunc], opts itertool.Options) 
 // the service's Wait method; but all errors that occur during the
 // execution of the workload will be observed (including panics) as well.
 func ObserverWorkerPool(
-	workQueue *pubsub.Queue[fun.WorkerFunc],
+	workQueue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
 	opts itertool.Options,
 ) *Service {
@@ -258,7 +258,7 @@ func ObserverWorkerPool(
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
 				workQueue.Distributor().Iterator(),
-				func(ctx context.Context, fn fun.WorkerFunc) error {
+				func(ctx context.Context, fn fun.Worker) error {
 					observer(fn.Run(ctx))
 					return nil
 				},

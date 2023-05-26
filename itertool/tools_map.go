@@ -81,7 +81,7 @@ func mapWorker[T any, O any](
 	mapper func(context.Context, T) (O, error),
 	fromInput chan T,
 	toOutput chan O,
-) fun.WorkerFunc {
+) fun.Worker {
 	return func(ctx context.Context) error {
 	ITEM:
 		for {

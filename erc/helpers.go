@@ -184,7 +184,7 @@ func Collapse(errs ...error) error {
 // closed.
 //
 // Because Stream() is a fun.ProcessFunc you can convert this into
-// fun.WorkerFunc and fun.WaitFunc objects as needed.
+// fun.Worker and fun.WaitFunc objects as needed.
 func Stream(ctx context.Context, errCh <-chan error) error {
 	return Consume(ctx, fun.Generator(fun.BlockingReceive(errCh).Read))
 }
@@ -193,7 +193,7 @@ func Stream(ctx context.Context, errCh <-chan error) error {
 // returning the aggregated (*erc.Stack) error for these errors.
 //
 // Because Consume() is a fun.ProcessFunc you can convert this into
-// fun.WorkerFunc and fun.WaitFunc objects as needed.
+// fun.Worker and fun.WaitFunc objects as needed.
 func Consume(ctx context.Context, iter fun.Iterator[error]) error {
 	ec := &Collector{}
 	ec.Add(fun.Observe(ctx, iter, ec.Add))

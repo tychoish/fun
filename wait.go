@@ -67,15 +67,15 @@ func (wf WaitFunc) Background(wg *WaitGroup) WaitFunc {
 func (wf WaitFunc) Block() { wf.Run(internal.BackgroundContext) }
 
 // Safe is catches panics and returns them as errors using
-// fun.Check. This method is also a fun.WorkerFunc and can be used
+// fun.Check. This method is also a fun.Worker and can be used
 // thusly.
 func (wf WaitFunc) Safe(ctx context.Context) error { return Check(func() { wf(ctx) }) }
 
-// Worker converts a wait function into a WorkerFunc. If the context
+// Worker converts a wait function into a fun.Worker. If the context
 // is canceled, the worker function returns the context's error. The
 // worker function also captures the wait functions panic and converts
 // it to an error.
-func (wf WaitFunc) Worker() WorkerFunc {
+func (wf WaitFunc) Worker() Worker {
 	return func(ctx context.Context) (err error) {
 		return internal.MergeErrors(wf.Safe(ctx), ctx.Err())
 	}
