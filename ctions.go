@@ -1,8 +1,16 @@
 package fun
 
-// Ptr returns a pointer for the object. Useful for creating values
+// Ptr returns a pointer for the object. Useful for setting the value
+// in structs where you cannot easily create a reference (e.g. the
+// output of functions, and for constant literals.). If you pass a
+// value that is a pointer (e.x. *string), then Ptr returns
+// **string. If the input object is a nil pointer, then Ptr returns a
+// non-nil pointer to a nil pointer.
 func Ptr[T any](in T) *T { return &in }
 
+// Default takes two values. if the first value is the zero value for
+// the type T, then Default returns the second (default)
+// value. Otherwise it returns the first input type.
 func Default[T comparable](input T, defaultValue T) T {
 	if IsZero(input) {
 		return defaultValue

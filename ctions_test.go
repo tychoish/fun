@@ -47,3 +47,26 @@ func TestApply(t *testing.T) {
 		assert.Equal(t, magnitutde[idx]/10, primes[idx])
 	}
 }
+
+func TestPtr(t *testing.T) {
+	out := Ptr(123)
+	assert.True(t, out != nil)
+	check.Equal(t, *out, 123)
+
+	// this is gross, but we have a pointer (non-nil) to an object
+	// that is a pointer, which is nil.
+
+	var dptr *string
+	st := Ptr(dptr)
+	assert.True(t, st != nil)
+	assert.True(t, *st == nil)
+	assert.Type[**string](t, st)
+}
+
+func TestDefault(t *testing.T) {
+	assert.Equal(t, Default(0, 42), 42)
+	assert.Equal(t, Default(77, 42), 77)
+
+	assert.Equal(t, Default("", "kip"), "kip")
+	assert.Equal(t, Default("merlin", "kip"), "merlin")
+}
