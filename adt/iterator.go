@@ -2,10 +2,10 @@ package adt
 
 import (
 	"context"
+	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
 )
 
 // NewIterator constructs an iterator that wraps the input iterator
@@ -17,21 +17,51 @@ import (
 // fun.IterateOne function allows for safe, concurrent iteration of
 // these iterators.
 func NewIterator[T any](mtx *sync.Mutex, iter fun.Iterator[T]) fun.Iterator[T] {
-	switch si := iter.(type) {
-	case internal.SyncIterImpl[T]:
-		return syncIterImpl[T]{SyncIterImpl: si}
-	case syncIterImpl[T]:
-		return si
-	default:
-		return syncIterImpl[T]{internal.SyncIterImpl[T]{Mtx: mtx, Iter: iter}}
+	return syncIterImpl[T]{
+		mtx:  mtx,
+		iter: iter,
 	}
 }
 
+func (iter syncIterImpl[T]) Unwrap() fun.Iterator[T] { return iter.iter }
+
 type syncIterImpl[T any] struct {
-	internal.SyncIterImpl[T]
+	mtx  *sync.Mutex
+	iter fun.Iterator[T]
 }
 
-func (iter syncIterImpl[T]) Unwrap() fun.Iterator[T] { return iter.Iter }
+func (iter syncIterImpl[T]) Next(ctx context.Context) bool {
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	return iter.iter.Next(ctx)
+}
+
+func (iter syncIterImpl[T]) Close() error {
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	return iter.iter.Close()
+}
+
+func (iter syncIterImpl[T]) Value() T {
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	return iter.iter.Value()
+}
+
 func (iter syncIterImpl[T]) ReadOne(ctx context.Context) (T, error) {
-	return iter.SyncIterImpl.ReadOne(ctx)
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return fun.ZeroOf[T](), err
+	}
+
+	if iter.iter.Next(ctx) {
+		return iter.iter.Value(), nil
+	}
+
+	return fun.ZeroOf[T](), io.EOF
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
 	"sync/atomic"
 )
 
@@ -83,49 +82,4 @@ func (iter *GeneratorIterator[T]) Next(ctx context.Context) bool {
 		iter.opErr = err
 	}
 	return false
-}
-
-type SyncIterImpl[T any] struct {
-	Mtx  *sync.Mutex
-	Iter interface {
-		Next(context.Context) bool
-		Value() T
-		Close() error
-	}
-}
-
-func (iter SyncIterImpl[T]) Next(ctx context.Context) bool {
-	iter.Mtx.Lock()
-	defer iter.Mtx.Unlock()
-
-	return iter.Iter.Next(ctx)
-}
-
-func (iter SyncIterImpl[T]) Close() error {
-	iter.Mtx.Lock()
-	defer iter.Mtx.Unlock()
-
-	return iter.Iter.Close()
-}
-
-func (iter SyncIterImpl[T]) Value() T {
-	iter.Mtx.Lock()
-	defer iter.Mtx.Unlock()
-
-	return iter.Iter.Value()
-}
-
-func (iter SyncIterImpl[T]) ReadOne(ctx context.Context) (T, error) {
-	iter.Mtx.Lock()
-	defer iter.Mtx.Unlock()
-
-	if err := ctx.Err(); err != nil {
-		return ZeroOf[T](), err
-	}
-
-	if iter.Iter.Next(ctx) {
-		return iter.Iter.Value(), nil
-	}
-
-	return ZeroOf[T](), io.EOF
 }

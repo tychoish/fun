@@ -1,6 +1,7 @@
 package adt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -74,5 +76,67 @@ func TestIterator(t *testing.T) {
 		wg.Wait()
 		assert.Equal(t, count.Load(), 1000)
 	})
+	t.Run("AlternateSyncIterator", func(t *testing.T) {
+		t.Run("Normal", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
+			counter := &atomic.Int64{}
+
+			iter := syncIterImpl[int]{
+				mtx: &sync.Mutex{},
+				iter: internal.NewGeneratorIterator(func(ctx context.Context) (int, error) {
+					if err := ctx.Err(); err != nil {
+						return 0, err
+					} else if val := counter.Add(1); val > 64 {
+						return 0, io.EOF
+					} else {
+						return int(val), nil
+					}
+				}),
+			}
+			for {
+				val, err := iter.ReadOne(ctx)
+				testt.Log(t, err, val)
+				if err != nil {
+					assert.Equal(t, val, 0)
+					break
+				} else {
+					assert.True(t, val >= 1 && val < 65)
+				}
+			}
+			assert.True(t, counter.Load() > 2)
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			counter := &atomic.Int64{}
+
+			iter := syncIterImpl[int]{
+				mtx: &sync.Mutex{},
+				iter: internal.NewGeneratorIterator(func(ctx context.Context) (int, error) {
+					if err := ctx.Err(); err != nil {
+						return 0, err
+					} else if val := counter.Add(1); val > 64 {
+						return 0, io.EOF
+					} else {
+						return int(val), nil
+					}
+				}),
+			}
+			for {
+				val, err := iter.ReadOne(ctx)
+				testt.Log(t, err, val)
+				if err != nil {
+					assert.Equal(t, val, 0)
+					break
+				} else {
+					assert.True(t, val >= 1 && val < 65)
+				}
+			}
+			assert.True(t, counter.Load() == 0)
+
+		})
+	})
 }

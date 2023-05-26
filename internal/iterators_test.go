@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/testt"
 )
 
 func makeClosedSlice[T any](in []T) <-chan T {
@@ -59,70 +56,6 @@ func TestIterators(t *testing.T) {
 			}
 		})
 	})
-	t.Run("AlternateSyncIterator", func(t *testing.T) {
-		t.Run("Normal", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			counter := &atomic.Int64{}
-
-			iter := SyncIterImpl[int]{
-				Mtx: &sync.Mutex{},
-				Iter: NewGeneratorIterator(func(ctx context.Context) (int, error) {
-					if err := ctx.Err(); err != nil {
-						return 0, err
-					} else if val := counter.Add(1); val > 64 {
-						return 0, io.EOF
-					} else {
-						return int(val), nil
-					}
-				}),
-			}
-			for {
-				val, err := iter.ReadOne(ctx)
-				testt.Log(t, err, val)
-				if err != nil {
-					assert.Equal(t, val, 0)
-					break
-				} else {
-					assert.True(t, val >= 1 && val < 65)
-				}
-			}
-			assert.True(t, counter.Load() > 2)
-		})
-		t.Run("Canceled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			counter := &atomic.Int64{}
-
-			iter := SyncIterImpl[int]{
-				Mtx: &sync.Mutex{},
-				Iter: NewGeneratorIterator(func(ctx context.Context) (int, error) {
-					if err := ctx.Err(); err != nil {
-						return 0, err
-					} else if val := counter.Add(1); val > 64 {
-						return 0, io.EOF
-					} else {
-						return int(val), nil
-					}
-				}),
-			}
-			for {
-				val, err := iter.ReadOne(ctx)
-				testt.Log(t, err, val)
-				if err != nil {
-					assert.Equal(t, val, 0)
-					break
-				} else {
-					assert.True(t, val >= 1 && val < 65)
-				}
-			}
-			assert.True(t, counter.Load() == 0)
-
-		})
-	})
-
 	t.Run("ReadOne", func(t *testing.T) {
 		t.Parallel()
 		ch := make(chan string, 1)
@@ -268,16 +201,13 @@ func TestIterators(t *testing.T) {
 		t.Run("PropogateErrors", func(t *testing.T) {
 			count := 0
 			expected := errors.New("kip")
-			iter := SyncIterImpl[int]{
-				Mtx: &sync.Mutex{},
-				Iter: &GeneratorIterator[int]{
-					Operation: func(context.Context) (int, error) {
-						count++
-						if count > 10 {
-							return 1000, expected
-						}
-						return count, nil
-					},
+			iter := &GeneratorIterator[int]{
+				Operation: func(context.Context) (int, error) {
+					count++
+					if count > 10 {
+						return 1000, expected
+					}
+					return count, nil
 				},
 			}
 			seen := 0
