@@ -253,6 +253,26 @@ func TestPanics(t *testing.T) {
 			})
 			assert.True(t, called)
 		})
+		t.Run("Processor", func(t *testing.T) {
+			var called bool
+			var seen string
+			of = func(in string) {
+				called = true
+				seen = in
+			}
+
+			err := of.Processor()(ctx, "hello")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !called {
+				t.Error("not called")
+			}
+			if seen != "hello" {
+				t.Errorf("unexpected value%q", seen)
+
+			}
+		})
 		t.Run("Wait", func(t *testing.T) {
 			var called bool
 			of = func(string) {

@@ -141,6 +141,12 @@ func (of Observer[T]) Worker(in T) Worker {
 // function that observes the value when the WaitFunc runs.
 func (of Observer[T]) Wait(in T) WaitFunc { return func(context.Context) { of(in) } }
 
+// Processor converts the observer to an observer function. The
+// Processor will always return nil, and the context is ignored.
+func (of Observer[T]) Processor() Processor[T] {
+	return func(_ context.Context, in T) error { of(in); return nil }
+}
+
 func buildRecoverError(r any) error {
 	if r == nil {
 		return nil
