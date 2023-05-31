@@ -22,7 +22,7 @@ func Observe[T any](iter fun.Iterator[T], fn fun.Observer[T]) {
 	fun.InvariantMust(fun.Observe(internal.BackgroundContext, iter, fn))
 }
 
-// IterateOneBlocking has the same semantics as IterateOne except it
+// IterateOne has the same semantics as IterateOne except it
 // uses a blocking context, and if the iterator is blocking and there
 // are no more items, IterateOneBlocking will never return. Use with
 // caution, and in situations where you understand the iterator's
