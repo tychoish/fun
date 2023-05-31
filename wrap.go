@@ -7,6 +7,11 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+// Wrapper produces a function that always returns the value
+// provided. Useful for bridging interface paradigms, and for storing
+// interface-typed objects in atomics.
+func Wrapper[T any](in T) func() T { return func() T { return in } }
+
 // Is a generic version of `errors.Is` that takes advantage of the
 // Unwrap function, and is useful for checking if an object of an
 // interface type is or wraps an implementation of the type

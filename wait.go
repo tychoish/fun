@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -28,6 +29,37 @@ func WaitChannel[T any](ch <-chan T) WaitFunc {
 // context. Use this WaitFunc and it's own context to wait for a
 // context to be cacneled with a timeout, for instance.
 func WaitContext(ctx context.Context) WaitFunc { return WaitChannel(ctx.Done()) }
+
+// WaitForGroup converts a sync.WaitGroup into a fun.WaitFunc.
+//
+// This operation will leak a go routine if the WaitGroup
+// never returns and the context is canceled. To avoid a leaked
+// goroutine, use the fun.WaitGroup type.
+func WaitForGroup(wg *sync.WaitGroup) WaitFunc {
+	sig := make(chan struct{})
+
+	go func() { defer close(sig); wg.Wait() }()
+
+	return WaitChannel(sig)
+}
+
+// WaitMerge returns a WaitFunc that, when run, processes the incoming
+// iterator of WaitFuncs, starts a go routine running each, and wait
+// function and then blocks until all operations have returned, or the
+// context passed to the output function has been canceled.
+func WaitMerge(iter Iterator[WaitFunc]) WaitFunc {
+	return func(ctx context.Context) {
+		wg := &WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
+		}()
+
+		wg.Wait(ctx)
+	}
+}
 
 // Run is equivalent to calling the wait function directly, except the
 // context passed to the function is always canceled when the wait
@@ -68,46 +100,41 @@ func (wf WaitFunc) Block() { wf.Run(internal.BackgroundContext) }
 
 // Safe is catches panics and returns them as errors using
 // fun.Check. This method is also a fun.Worker and can be used
-// thusly.
+// thusly: the SafeWorker() method provides a more ergonomic access to
+// this operation.
 func (wf WaitFunc) Safe(ctx context.Context) error { return Check(func() { wf(ctx) }) }
+func (wf WaitFunc) SafeWorker() Worker             { return wf.Safe }
 
 // Worker converts a wait function into a fun.Worker. If the context
-// is canceled, the worker function returns the context's error. The
-// worker function also captures the wait functions panic and converts
-// it to an error.
+// is canceled, the worker function returns the context's error.
 func (wf WaitFunc) Worker() Worker {
-	return func(ctx context.Context) (err error) {
-		return internal.MergeErrors(wf.Safe(ctx), ctx.Err())
-	}
+	return func(ctx context.Context) (err error) { wf(ctx); return ctx.Err() }
 }
 
-// WaitForGroup converts a sync.WaitGroup into a fun.WaitFunc.
-//
-// This operation will leak a go routine if the WaitGroup
-// never returns and the context is canceled. To avoid a leaked
-// goroutine, use the fun.WaitGroup type.
-func WaitForGroup(wg *sync.WaitGroup) WaitFunc {
-	sig := make(chan struct{})
+func (wf WaitFunc) After(ts time.Time) WaitFunc {
+	return func(ctx context.Context) { wf.Delay(time.Until(ts))(ctx) }
+}
+func (wf WaitFunc) Jitter(dur func() time.Duration) WaitFunc { return wf.Worker().Jitter(dur).Ignore() }
+func (wf WaitFunc) Delay(dur time.Duration) WaitFunc         { return wf.Worker().Delay(dur).Ignore() }
+func (wf WaitFunc) When(cond func() bool) WaitFunc           { return wf.Worker().When(cond).Ignore() }
+func (wf WaitFunc) If(cond bool) WaitFunc                    { return wf.Worker().If(cond).Ignore() }
 
-	go func() { defer close(sig); wg.Wait() }()
+func (wf WaitFunc) Limit(in int) WaitFunc {
+	resolver := limitExec[bool](in)
 
-	return WaitChannel(sig)
+	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
 }
 
-// WaitMerge returns a WaitFunc that, when run, processes the incoming
-// iterator of WaitFuncs, starts a go routine running each, and wait
-// function and then blocks until all operations have returned, or the
-// context passed to the output function has been canceled.
-func WaitMerge(iter Iterator[WaitFunc]) WaitFunc {
+func (wf WaitFunc) TTL(dur time.Duration) WaitFunc {
+	resolver := ttlExec[bool](dur)
+	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
+}
+
+func (wf WaitFunc) Lock() Worker {
+	mtx := &sync.Mutex{}
 	return func(ctx context.Context) {
-		wg := &WaitGroup{}
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_ = Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
-		}()
-
-		wg.Wait(ctx)
+		mtx.Lock()
+		defer mtx.Unlock()
+		wf(ctx)
 	}
 }

@@ -201,18 +201,6 @@ func TestWait(t *testing.T) {
 		assert.True(t, called.Load())
 		assert.ErrorIs(t, err, context.Canceled)
 	})
-	t.Run("Check", func(t *testing.T) {
-		assert.NotPanic(t, func() {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			expected := errors.New("hi")
-			err := WaitFunc(func(context.Context) { panic(expected) }).Worker()(ctx)
-			check.Error(t, err)
-			check.ErrorIs(t, err, expected)
-			check.ErrorIs(t, err, context.Canceled)
-		})
-	})
 	t.Run("Safe", func(t *testing.T) {
 		expected := errors.New("safer")
 		err := WaitFunc(func(context.Context) { panic(expected) }).

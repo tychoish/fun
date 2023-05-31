@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -85,3 +86,52 @@ func (wf Worker) Wait(ob Observer[error]) WaitFunc {
 // panic.
 func (wf Worker) Must() WaitFunc   { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
 func (wf Worker) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }
+
+func (wf Worker) If(cond bool) Worker { return wf.When(func() bool { return cond }) }
+func (wf Worker) When(cond func() bool) Worker {
+	return func(ctx context.Context) error {
+		if cond() {
+			return wf(ctx)
+		}
+		return nil
+	}
+
+}
+func (wf Worker) After(ts time.Time) Worker {
+	return func(ctx context.Context) error { return wf.Delay(time.Until(ts))(ctx) }
+}
+
+func (wf Worker) Jitter(dur func() time.Duration) Worker { return wf.Delay(internal.Max(0, dur())) }
+
+func (wf Worker) Delay(dur time.Duration) Worker {
+	return func(ctx context.Context) error {
+		timer := time.NewTimer(dur)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return wf(ctx)
+		}
+	}
+}
+
+func (wf Worker) Limit(in int) Worker {
+	resolver := limitExec[error](in)
+
+	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
+}
+
+func (wf Worker) TTL(dur time.Duration) Worker {
+	resolver := ttlExec[error](dur)
+	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
+}
+
+func (wf Worker) Lock() Worker {
+	mtx := &sync.Mutex{}
+	return func(ctx context.Context) error {
+		mtx.Lock()
+		defer mtx.Unlock()
+		return wf(ctx)
+	}
+}
