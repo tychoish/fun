@@ -56,13 +56,6 @@ func Observe[T any](ctx context.Context, iter Iterator[T], fn Observer[T]) (err 
 	}
 }
 
-// ObserveWorker has the same semantics as Observe, except that the
-// operation is wrapped in a WaitFunc, and executed when the WaitFunc
-// is called.
-func ObserveWorker[T any](iter Iterator[T], fn Observer[T]) Worker {
-	return func(ctx context.Context) error { return Observe(ctx, iter, fn) }
-}
-
 type readOneable[T any] interface {
 	ReadOne(ctx context.Context) (T, error)
 }

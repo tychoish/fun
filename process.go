@@ -3,8 +3,8 @@ package fun
 import (
 	"context"
 	"errors"
-	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/internal"
@@ -59,6 +59,10 @@ func (pf Processor[T]) Observer(ctx context.Context, oe Observer[error]) Observe
 
 func (pf Processor[T]) Worker(in T) Worker {
 	return func(ctx context.Context) error { return pf(ctx, in) }
+}
+
+func (pf Processor[T]) Future(ctx context.Context, in T) Worker {
+	return pf.Worker(in).Future(ctx)
 }
 
 func (pf Processor[T]) Once() Processor[T] {
@@ -124,14 +128,22 @@ func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
 
 func limitExec[T any](in int) func(func() T) T {
 	Invariant(in > 0, "limit must be greater than zero;", in)
-	var (
-		counter int
-		output  T
-	)
+	counter := &atomic.Int64{}
+	mtx := &sync.Mutex{}
+
+	var output T
 	return func(op func() T) T {
-		if counter < in {
+		if counter.CompareAndSwap(int64(in), int64(in)) {
+			return output
+		}
+
+		mtx.Lock()
+		defer mtx.Unlock()
+		num := counter.Load()
+
+		if num < int64(in) {
 			output = op()
-			counter++
+			counter.CompareAndSwap(num, internal.Min(int64(in), num+1))
 		}
 
 		return output
@@ -140,10 +152,8 @@ func limitExec[T any](in int) func(func() T) T {
 
 func ttlExec[T any](dur time.Duration) func(op func() T) T {
 	Invariant(dur < 0, "ttl must not be negative;", dur)
-	Invariant(dur == math.MaxInt64, "ttl must not be max-int64;", dur)
 
 	if dur == 0 {
-		// special case
 		return func(op func() T) T { return op() }
 	}
 
@@ -154,26 +164,15 @@ func ttlExec[T any](dur time.Duration) func(op func() T) T {
 	mtx := &sync.Mutex{}
 
 	return func(op func() T) (out T) {
-		err := func() error {
-			mtx.Lock()
-			defer mtx.Unlock()
-
-			since := time.Since(lastAt)
-			if lastAt.IsZero() || since <= dur {
-				lastAt = time.Now().Add(math.MaxInt64)
-				return nil
-			}
-			return ErrLimitExceeded
-		}()
-
-		if err != nil {
-			return output
-		}
-
-		output = op()
 		mtx.Lock()
 		defer mtx.Unlock()
-		lastAt = time.Now()
+
+		since := time.Since(lastAt)
+		if lastAt.IsZero() || since <= dur {
+			output = op()
+			lastAt = time.Now()
+		}
+
 		return output
 	}
 }

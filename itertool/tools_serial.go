@@ -116,7 +116,7 @@ func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 				}
 			}
 		}
-	}).Future().Once()
+	}).Start().Once()
 
 	iter.Operation = func(ctx context.Context) (T, error) {
 		init(ctx)

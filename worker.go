@@ -12,6 +12,13 @@ import (
 // other similar situations
 type Worker func(context.Context) error
 
+// ObserveWorker has the same semantics as Observe, except that the
+// operation is wrapped in a WaitFunc, and executed when the WaitFunc
+// is called.
+func ObserveWorker[T any](iter Iterator[T], fn Observer[T]) Worker {
+	return func(ctx context.Context) error { return Observe(ctx, iter, fn) }
+}
+
 // Run is equivalent to calling the worker function directly, except
 // the context passed to it is canceled when the worker function returns.
 func (wf Worker) Run(ctx context.Context) error {

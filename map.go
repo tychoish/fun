@@ -122,7 +122,7 @@ func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 				break
 			}
 		}
-	}).Future().Once()
+	}).Start().Once()
 
 	iter.Operation = func(ctx context.Context) (Pair[K, V], error) {
 		init(ctx)

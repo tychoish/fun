@@ -11,9 +11,7 @@ import (
 type Producer[T any] func(context.Context) (T, error)
 
 func MakeFuture[T any](ch <-chan T) Producer[T] {
-	return func(ctx context.Context) (T, error) {
-		return BlockingReceive(ch).Read(ctx)
-	}
+	return func(ctx context.Context) (T, error) { return BlockingReceive(ch).Read(ctx) }
 }
 
 func BlockingProducer[T any](fn func() (T, error)) Producer[T] {
@@ -44,10 +42,8 @@ func (pf Producer[T]) Safe(ctx context.Context) (_ T, err error) {
 }
 
 func (pf Producer[T]) Must(ctx context.Context) T { return Must(pf(ctx)) }
-
-func (pf Producer[T]) Force() T { return Must(pf.Block()) }
-
-func (pf Producer[T]) Block() (T, error) { return pf(internal.BackgroundContext) }
+func (pf Producer[T]) Force() T                   { return Must(pf.Block()) }
+func (pf Producer[T]) Block() (T, error)          { return pf(internal.BackgroundContext) }
 
 func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) WaitFunc {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
@@ -77,6 +73,7 @@ func (pf Producer[T]) Once() Producer[T] {
 	)
 
 	once := &sync.Once{}
+
 	return func(ctx context.Context) (T, error) {
 		once.Do(func() { out, err = pf(ctx) })
 		return out, err
@@ -86,6 +83,7 @@ func (pf Producer[T]) Once() Producer[T] {
 func (pf Producer[T]) Generator() Iterator[T]         { return Generator(pf) }
 func (pf Producer[T]) If(c bool) Producer[T]          { return pf.When(Wrapper(c)) }
 func (pf Producer[T]) After(ts time.Time) Producer[T] { return pf.Delay(time.Until(ts)) }
+
 func (pf Producer[T]) Jitter(jf func() time.Duration) Producer[T] {
 	return pf.Delay(internal.Max(0, jf()))
 }
@@ -127,7 +125,7 @@ type tuple[T, U any] struct {
 	Two U
 }
 
-func (pf Producer[T]) Limit(in int) Worker {
+func (pf Producer[T]) Limit(in int) Producer[T] {
 	resolver := limitExec[tuple[T, error]](in)
 
 	return func(ctx context.Context) (T, error) {
@@ -139,7 +137,7 @@ func (pf Producer[T]) Limit(in int) Worker {
 	}
 }
 
-func (pf Producer[T]) TTL(dur time.Duration) Worker {
+func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 	resolver := ttlExec[tuple[T, error]](dur)
 
 	return func(ctx context.Context) (T, error) {

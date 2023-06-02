@@ -198,7 +198,7 @@ func makeMapIterator[K comparable, V any, O any](
 				return true
 			}
 		})
-	}).Future().Once()
+	}).Start().Once()
 
 	iter.Operation = func(ctx context.Context) (O, error) {
 		init(ctx)

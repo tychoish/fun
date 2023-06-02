@@ -79,7 +79,7 @@ func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
 				return
 			}
 		}
-	}).Future().Once()
+	}).Start().Once()
 
 	iter.Operation = func(ctx context.Context) (T, error) {
 		setup(ctx)

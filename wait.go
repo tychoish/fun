@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/internal"
@@ -82,9 +83,12 @@ func (wf WaitFunc) Signal(ctx context.Context) <-chan struct{} {
 	return out
 }
 
-func (wf WaitFunc) Future() WaitFunc {
-	return func(ctx context.Context) { WaitChannel(wf.Signal(ctx)) }
+func (wf WaitFunc) Future(ctx context.Context) WaitFunc {
+	sig := wf.Signal(ctx)
+	return func(ctx context.Context) { WaitChannel(sig) }
 }
+
+func (wf WaitFunc) Start() WaitFunc { return func(ctx context.Context) { go wf(ctx) } }
 
 // Add starts a goroutine that waits for the WaitFunc to return,
 // incrementing and decrementing the sync.WaitGroup as
@@ -120,9 +124,25 @@ func (wf WaitFunc) When(cond func() bool) WaitFunc           { return wf.Worker(
 func (wf WaitFunc) If(cond bool) WaitFunc                    { return wf.Worker().If(cond).Ignore() }
 
 func (wf WaitFunc) Limit(in int) WaitFunc {
-	resolver := limitExec[bool](in)
+	Invariant(in > 0, "limit must be greater than zero;", in)
+	counter := &atomic.Int64{}
+	mtx := &sync.Mutex{}
 
-	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
+	return func(ctx context.Context) {
+		if counter.CompareAndSwap(int64(in), int64(in)) {
+			return
+		}
+
+		func() {
+			mtx.Lock()
+			defer mtx.Unlock()
+
+			num := counter.Load()
+
+			counter.CompareAndSwap(int64(in), internal.Min(int64(in), num+1))
+		}()
+		wf(ctx)
+	}
 }
 
 func (wf WaitFunc) TTL(dur time.Duration) WaitFunc {
@@ -130,7 +150,7 @@ func (wf WaitFunc) TTL(dur time.Duration) WaitFunc {
 	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
 }
 
-func (wf WaitFunc) Lock() Worker {
+func (wf WaitFunc) Lock() WaitFunc {
 	mtx := &sync.Mutex{}
 	return func(ctx context.Context) {
 		mtx.Lock()

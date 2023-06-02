@@ -74,7 +74,7 @@ func Split[T any](numSplits int, input fun.Iterator[T]) []fun.Iterator[T] {
 				return
 			}
 		}
-	}).Future().Once()
+	}).Start().Once()
 
 	output := make([]fun.Iterator[T], numSplits)
 
