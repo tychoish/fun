@@ -128,7 +128,7 @@ func (h *Heap[T]) Pop() (T, bool) { h.lazySetup(); e := h.list.PopFront(); retur
 // Iterator provides an fun.Iterator interface to the heap. The
 // iterator consumes items from the heap, and will return when the
 // heap is empty.
-func (h *Heap[T]) Iterator() fun.Iterator[T] { h.lazySetup(); return ListValues(h.list.PopIterator()) }
+func (h *Heap[T]) Iterator() fun.Iterator[T] { h.lazySetup(); return h.list.PopValues() }
 
 // IsSorted reports if the list is sorted from low to high, according
 // to the LessThan function.

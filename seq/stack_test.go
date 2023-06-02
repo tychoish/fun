@@ -297,7 +297,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Content", func(t *testing.T) {
 			stack := GenerateStack(t, 100)
-			items := fun.Must(itertool.CollectSlice(ctx, seq.StackValues(stack.Iterator())))
+			items := fun.Must(itertool.CollectSlice(ctx, stack.Values()))
 			if len(items) != stack.Len() {
 				t.Fatal("unexpected collection", len(items), stack.Len())
 			}
@@ -330,7 +330,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Destructive", func(t *testing.T) {
 			stack := GenerateStack(t, 50)
-			iter := stack.PopIterator()
+			iter := stack.PopValues()
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -338,7 +338,7 @@ func TestStack(t *testing.T) {
 			}
 			fun.Invariant(iter.Close() == nil)
 			if seen != 50 {
-				t.Fatal("did not see all values")
+				t.Fatal("did not see all values", seen)
 			}
 			if stack.Len() != 0 {
 				t.Fatal("stack should be empty", stack.Len())

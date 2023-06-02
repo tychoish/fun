@@ -45,7 +45,7 @@ func (lls *orderedLLSet[T]) Add(it T) {
 	lls.set[it] = lls.elems.Back()
 }
 
-func (lls *orderedLLSet[T]) Iterator() fun.Iterator[T] { return seq.ListValues(lls.elems.Iterator()) }
+func (lls *orderedLLSet[T]) Iterator() fun.Iterator[T] { return lls.elems.Values() }
 func (lls *orderedLLSet[T]) Len() int                  { return lls.elems.Len() }
 func (lls *orderedLLSet[T]) Check(it T) bool           { return lls.set.Check(it) }
 func (lls *orderedLLSet[T]) Delete(it T) {

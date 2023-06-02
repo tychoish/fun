@@ -299,18 +299,20 @@ func (s *Stack[T]) Pop() *Item[T] {
 // stack. Iterator will not observe new items added to the stack
 // during iteration.
 func (s *Stack[T]) Iterator() fun.Iterator[*Item[T]] { return newItemIter(s.head) }
+func (s *Stack[T]) Values() fun.Iterator[T]          { return stackValues(s.Iterator()) }
+func newItemIter[T any](it *Item[T]) *itemIter[T]    { return &itemIter[T]{next: &Item[T]{next: it}} }
 
 // PopIterator returns a destructive iterator over the Items in a
 // stack. PopIterator will not observe new items added to the
 // stack during iteration.
 func (s *Stack[T]) PopIterator() fun.Iterator[*Item[T]] { return &itemIter[T]{pop: true, next: s.head} }
-func newItemIter[T any](it *Item[T]) *itemIter[T]       { return &itemIter[T]{next: &Item[T]{next: it}} }
+func (s *Stack[T]) PopValues() fun.Iterator[T]          { return stackValues(s.PopIterator()) }
 
-// StackValues converts an iterator of stack Items to an iterator of
+// stackValues converts an iterator of stack Items to an iterator of
 // their values. The conversion does not have additional overhead
 // relative to the original iterator, and only overides the behavior
 // of the Value() method of the iterator.
-func StackValues[T any](in fun.Iterator[*Item[T]]) fun.Iterator[T] { return &valIter[T, *Item[T]]{in} }
+func stackValues[T any](in fun.Iterator[*Item[T]]) fun.Iterator[T] { return &valIter[T, *Item[T]]{in} }
 
 type itemIter[T any] struct {
 	next   *Item[T]

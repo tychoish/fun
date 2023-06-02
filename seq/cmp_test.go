@@ -207,11 +207,11 @@ func TestSort(t *testing.T) {
 			}
 			SortListMerge(list, LessThanNative[int])
 			if !stdCheckSortedIntsFromList(ctx, t, list) {
-				t.Log(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
+				t.Log(itertool.CollectSlice(ctx, list.Values()))
 				t.Fatal("sort should be verified, externally")
 			}
 			if !IsSorted(list, LessThanNative[int]) {
-				t.Log(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
+				t.Log(itertool.CollectSlice(ctx, list.Values()))
 				t.Fatal("should be sorted")
 			}
 		})
@@ -220,8 +220,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			SortListMerge(list, LessThanNative[int])
 			SortListQuick(lcopy, LessThanNative[int])
-			listVals := fun.Must(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
-			copyVals := fun.Must(itertool.CollectSlice(ctx, ListValues(lcopy.Iterator())))
+			listVals := fun.Must(itertool.CollectSlice(ctx, list.Values()))
+			copyVals := fun.Must(itertool.CollectSlice(ctx, lcopy.Values()))
 			t.Log("merge", listVals)
 			t.Log("quick", copyVals)
 			assert.Equal(t, len(listVals), len(copyVals))
@@ -334,7 +334,7 @@ func TestSort(t *testing.T) {
 }
 func getSliceForList(ctx context.Context, t *testing.T, list *List[int]) []int {
 	t.Helper()
-	return fun.Must(itertool.CollectSlice(ctx, ListValues(list.Iterator())))
+	return fun.Must(itertool.CollectSlice(ctx, list.Values()))
 }
 
 func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {

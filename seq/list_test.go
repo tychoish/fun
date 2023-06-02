@@ -141,7 +141,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), fun.Must(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator()))))
+			t.Log(seen, list.Len(), fun.Must(itertool.CollectSlice(ctx, list.Values())))
 			t.Error(seen, len(expected), expected)
 
 		}
@@ -278,7 +278,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := seq.ListValues(list.Iterator())
+			iter := list.Values()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -307,7 +307,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := seq.ListValues(list.PopIterator())
+			iter := list.PopValues()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -342,7 +342,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := seq.ListValues(list.Reverse())
+			iter := list.ReverseValues()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -371,7 +371,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := seq.ListValues(list.PopReverse())
+			iter := list.PopReverseValues()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -566,14 +566,14 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 			// ["hello", "world"]
 			if list.Front().Value() != "hello" && list.Front().Next().Value() != "world" {
-				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
 			}
 			if !list.Front().Swap(list.Back()) {
-				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
 			}
 
 			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
-				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
 			}
 		})
 		t.Run("Self", func(t *testing.T) {
@@ -582,7 +582,7 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 
 			if list.Front().Swap(list.Front()) {
-				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
 			}
 		})
 		t.Run("NilList", func(t *testing.T) {
@@ -590,7 +590,7 @@ func TestList(t *testing.T) {
 			list.PushFront("hello")
 
 			if list.Front().Swap(seq.NewElement("world")) {
-				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
 			}
 		})
 		t.Run("Root", func(t *testing.T) {
@@ -619,11 +619,11 @@ func TestList(t *testing.T) {
 			// [ 42, 84, 420, 840 ]
 
 			if !list.Back().Swap(list.Front().Next()) {
-				t.Fatal(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
 				t.Fatal("should have swapped")
 			}
 			// expected: [42, 840, 420, 84]
-			slice := fun.Must(itertool.CollectSlice(ctx, seq.ListValues(list.Iterator())))
+			slice := fun.Must(itertool.CollectSlice(ctx, list.Values()))
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
@@ -680,10 +680,10 @@ func TestList(t *testing.T) {
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := seq.GetPopulatedList(t, 100)
-			itemsOne := fun.Must(itertool.CollectSlice(ctx, seq.ListValues(lOne.Iterator())))
+			itemsOne := fun.Must(itertool.CollectSlice(ctx, lOne.Values()))
 
 			lTwo := seq.GetPopulatedList(t, 100)
-			itemsTwo := fun.Must(itertool.CollectSlice(ctx, seq.ListValues(lTwo.Iterator())))
+			itemsTwo := fun.Must(itertool.CollectSlice(ctx, lTwo.Values()))
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())
@@ -694,7 +694,7 @@ func TestList(t *testing.T) {
 
 			lOne.Extend(lTwo)
 			combined := append(itemsOne, itemsTwo...)
-			iter := seq.ListValues(lOne.Iterator())
+			iter := lOne.Values()
 			idx := 0
 			for iter.Next(ctx) {
 				if combined[idx] != iter.Value() {
