@@ -22,6 +22,19 @@ func TestWrap(t *testing.T) {
 			t.Fatal("should be nil")
 		}
 	})
+	t.Run("Wrapper", func(t *testing.T) {
+		assert.NotError(t, Wrapper[error](nil)())
+		assert.Error(t, Wrapper(errors.New("Hello"))())
+		assert.Equal(t, Wrapper(1)(), 1)
+		assert.Equal(t, Wrapper("hello")(), "hello")
+	})
+	t.Run("RootUnWrapp", func(t *testing.T) {
+		root := errors.New("hello")
+		err := fmt.Errorf("bar: %w", fmt.Errorf("foo: %w", root))
+		errs := Unwind(err)
+		assert.Equal(t, len(errs), 3)
+		assert.True(t, root == UnwrapedRoot(err))
+	})
 	t.Run("IsWrapFalse", func(t *testing.T) {
 		l := &wrapTestType{value: 42}
 		assert.True(t, !IsWrapped(l))
