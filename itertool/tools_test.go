@@ -368,8 +368,8 @@ func TestTools(t *testing.T) {
 
 func TestParallelForEach(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	ctx := testt.Context(t)
 
 	t.Run("Basic", func(t *testing.T) {
 		for i := int64(-1); i <= 12; i++ {
@@ -378,7 +378,7 @@ func TestParallelForEach(t *testing.T) {
 
 				seen := &adt.Map[int, none]{}
 
-				err := ParallelForEach(ctx,
+				err := Process(ctx,
 					Slice(elems),
 					func(ctx context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
@@ -418,7 +418,7 @@ func TestParallelForEach(t *testing.T) {
 	t.Run("ContinueOnPanic", func(t *testing.T) {
 		seen := &adt.Map[int, none]{}
 
-		err := ParallelForEach(ctx,
+		err := Process(ctx,
 			Slice(makeIntSlice(200)),
 			func(ctx context.Context, in int) error {
 				seen.Ensure(in)
@@ -453,7 +453,7 @@ func TestParallelForEach(t *testing.T) {
 	t.Run("AbortOnPanic", func(t *testing.T) {
 		seen := &adt.Map[int, none]{}
 
-		err := ParallelForEach(ctx,
+		err := Process(ctx,
 			Slice(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
 				if in == 8 {
@@ -494,7 +494,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := ParallelForEach(ctx,
+		err := Process(ctx,
 			Slice(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
 				if in == 8 {
@@ -516,7 +516,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := ParallelForEach(ctx,
+		err := Process(ctx,
 			Slice(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
@@ -543,7 +543,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := ParallelForEach(ctx,
+		err := Process(ctx,
 			Slice(makeIntSlice(100)),
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)

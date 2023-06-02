@@ -71,7 +71,14 @@ func TestMap(t *testing.T) {
 		num := int(time.Microsecond)
 		mp := makeMap(num)
 
+		check.True(t, Count(ctx, mp.Iterator()) == mp.Len())
+
+		iter := mp.Iterator()
+		check.True(t, iter.Next(ctx))
+
 		cancel()
+
+		check.True(t, !iter.Next(ctx))
 
 		check.True(t, Count(ctx, mp.Iterator()) < num)
 	})
@@ -102,7 +109,6 @@ func TestMap(t *testing.T) {
 		assert.True(t, !v)
 		assert.True(t, ok)
 	})
-
 	t.Run("Consume", func(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			mp := Map[string, int]{}
@@ -139,5 +145,4 @@ func TestMap(t *testing.T) {
 
 		})
 	})
-
 }
