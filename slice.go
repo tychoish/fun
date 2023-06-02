@@ -17,12 +17,3 @@ func (s Slice[T]) Extend(in []T) Slice[T]               { return append(s, in...
 func (s Slice[T]) Iterator() Iterator[T]                { return internal.NewSliceIter(s) }
 func (s Slice[T]) Len() int                             { return len(s) }
 func (s Slice[T]) Cap() int                             { return cap(s) }
-
-func IndexOf[T comparable](s Slice[T], item T) int {
-	for idx, it := range s {
-		if it == item {
-			return idx
-		}
-	}
-	return -1
-}

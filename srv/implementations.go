@@ -205,7 +205,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 
 			ec.Add(itertool.ParallelForEach(ctx, cache.PopValues(),
 				func(ctx context.Context, wf fun.Worker) error {
-					ec.Add(wf.Safe(ctx))
+					ec.Add(wf.Safe()(ctx))
 					return nil
 				},
 				opts))

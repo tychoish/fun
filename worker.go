@@ -27,11 +27,13 @@ func (wf Worker) Run(ctx context.Context) error {
 	return wf(wctx)
 }
 
-// Safe runs the worker function and converts the worker function to a
-// panic to an error.
-func (wf Worker) Safe(ctx context.Context) (err error) {
-	defer func() { err = mergeWithRecover(err, recover()) }()
-	return wf(ctx)
+// Safe produces a worker function that converts the worker function's
+// panics to errors.
+func (wf Worker) Safe() Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = mergeWithRecover(err, recover()) }()
+		return wf(ctx)
+	}
 }
 
 // Block executes the worker function with a context that will never
@@ -42,7 +44,7 @@ func (wf Worker) Block() error { return wf.Run(internal.BackgroundContext) }
 // response). Panics are converted to errors for both the worker
 // function but not the observer function.
 func (wf Worker) Observe(ctx context.Context, ob Observer[error]) {
-	ob(wf.Safe(ctx))
+	ob(wf.Safe()(ctx))
 }
 
 // Signal runs the worker function in a background goroutine and
@@ -55,7 +57,7 @@ func (wf Worker) Observe(ctx context.Context, ob Observer[error]) {
 // convert panics to errors.
 func (wf Worker) Signal(ctx context.Context) <-chan error {
 	out := make(chan error)
-	go func() { defer close(out); Blocking(out).Send().Ignore(ctx, wf.Safe(ctx)) }()
+	go func() { defer close(out); Blocking(out).Send().Ignore(ctx, wf.Safe()(ctx)) }()
 	return out
 }
 
@@ -69,7 +71,7 @@ func (wf Worker) Future(ctx context.Context) Worker {
 }
 
 func (wf Worker) Background(ctx context.Context, ob Observer[error]) {
-	go func() { ob(wf.Safe(ctx)) }()
+	go func() { ob(wf.Safe()(ctx)) }()
 }
 
 func (wf Worker) Once() Worker {
@@ -108,11 +110,20 @@ func (wf Worker) After(ts time.Time) Worker {
 	return func(ctx context.Context) error { return wf.Delay(time.Until(ts))(ctx) }
 }
 
-func (wf Worker) Jitter(dur func() time.Duration) Worker { return wf.Delay(internal.Max(0, dur())) }
+// Delay wraps a Worker in a function that will always wait for the
+// specified duration before running.
+//
+// If the value is negative, then there is always zero delay.
+func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(Wrapper(dur)) }
 
-func (wf Worker) Delay(dur time.Duration) Worker {
+// Jitter wraps a Worker that runs the jitter function (jf) once
+// before every execution of the resulting fucntion, and waits for the
+// resulting duration before running the Worker.
+//
+// If the function produces a negative duration, there is no delay.
+func (wf Worker) Jitter(jf func() time.Duration) Worker {
 	return func(ctx context.Context) error {
-		timer := time.NewTimer(dur)
+		timer := time.NewTimer(internal.Max(0, jf()))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
@@ -121,6 +132,7 @@ func (wf Worker) Delay(dur time.Duration) Worker {
 			return wf(ctx)
 		}
 	}
+
 }
 
 func (wf Worker) Limit(in int) Worker {

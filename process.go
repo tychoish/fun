@@ -20,6 +20,8 @@ import (
 // analogues.
 type Processor[T any] func(context.Context, T) error
 
+// BlockingProcessor converts a function with the Processor signature
+// (minus the context, and adds a noop context,) for easy conversion.
 func BlockingProcessor[T any](fn func(T) error) Processor[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
@@ -41,16 +43,38 @@ func (pf Processor[T]) Wait(in T, of Observer[error]) WaitFunc { return pf.Worke
 
 // Safe runs the producer, converted all panics into errors. Safe is
 // itself a processor.
-func (pf Processor[T]) Safe(ctx context.Context, in T) error { return pf.Worker(in).Safe(ctx) }
+func (pf Processor[T]) Safe() Processor[T] {
+	return func(ctx context.Context, in T) error { return pf.Worker(in).Safe()(ctx) }
+}
 
 // After produces a Processor that will execute after the provided
 // timestamp.
 func (pf Processor[T]) After(ts time.Time) Processor[T] { return pf.Delay(time.Until(ts)) }
 
-// Delay returns a process
+// Delay wraps a Processor in a function that will always wait for the
+// specified duration before running.
+//
+// If the value is negative, then there is always zero delay.
+func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(Wrapper(dur)) }
+
+// Jitter wraps a Processor that runs the jitter function (jf) once
+// before every execution of the resulting fucntion, and waits for the
+// resulting duration before running the processor.
+//
+// If the function produces a negative duration, there is no delay.
 func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
-	return pf.Delay(internal.Max(0, jf()))
+	return func(ctx context.Context, in T) error {
+		timer := time.NewTimer(internal.Max(0, jf()))
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return pf(ctx, in)
+		}
+	}
 }
+
 func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(Wrapper(c)) }
 
 func (pf Processor[T]) Observer(ctx context.Context, oe Observer[error]) Observer[T] {
@@ -80,19 +104,6 @@ func (pf Processor[T]) When(c func() bool) Processor[T] {
 			return pf(ctx, in)
 		}
 		return nil
-	}
-}
-
-func (pf Processor[T]) Delay(dur time.Duration) Processor[T] {
-	return func(ctx context.Context, in T) error {
-		timer := time.NewTimer(dur)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-			return pf(ctx, in)
-		}
 	}
 }
 

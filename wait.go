@@ -102,12 +102,11 @@ func (wf WaitFunc) Background(wg *WaitGroup) WaitFunc {
 // Block runs the WaitFunc with a context that will never be canceled.
 func (wf WaitFunc) Block() { wf.Run(internal.BackgroundContext) }
 
-// Safe is catches panics and returns them as errors using
-// fun.Check. This method is also a fun.Worker and can be used
-// thusly: the SafeWorker() method provides a more ergonomic access to
-// this operation.
-func (wf WaitFunc) Safe(ctx context.Context) error { return Check(func() { wf(ctx) }) }
-func (wf WaitFunc) SafeWorker() Worker             { return wf.Safe }
+// Safe converts the WaitFunc into a Worker function that catchers
+// panics and returns them as errors using fun.Check.
+func (wf WaitFunc) Safe() Worker {
+	return func(ctx context.Context) error { return Check(func() { wf(ctx) }) }
+}
 
 // Worker converts a wait function into a fun.Worker. If the context
 // is canceled, the worker function returns the context's error.
@@ -118,6 +117,12 @@ func (wf WaitFunc) Worker() Worker {
 func (wf WaitFunc) After(ts time.Time) WaitFunc {
 	return func(ctx context.Context) { wf.Delay(time.Until(ts))(ctx) }
 }
+
+// Jitter wraps a WaitFunc that runs the jitter function (jf) once
+// before every execution of the resulting fucntion, and waits for the
+// resulting duration before running the WaitFunc operation.
+//
+// If the function produces a negative duration, there is no delay.
 func (wf WaitFunc) Jitter(dur func() time.Duration) WaitFunc { return wf.Worker().Jitter(dur).Ignore() }
 func (wf WaitFunc) Delay(dur time.Duration) WaitFunc         { return wf.Worker().Delay(dur).Ignore() }
 func (wf WaitFunc) When(cond func() bool) WaitFunc           { return wf.Worker().When(cond).Ignore() }

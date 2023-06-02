@@ -204,7 +204,7 @@ func TestWait(t *testing.T) {
 	t.Run("Safe", func(t *testing.T) {
 		expected := errors.New("safer")
 		err := WaitFunc(func(context.Context) { panic(expected) }).
-			Safe(testt.Context(t))
+			Safe()(testt.Context(t))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})

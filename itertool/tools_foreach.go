@@ -21,8 +21,8 @@ func Process[T any](
 
 // compile-time assertions that both worker types support the "safe"
 // interface needed for the Worker() tool.
-var _ interface{ Safe(context.Context) error } = new(fun.Worker)
-var _ interface{ Safe(context.Context) error } = new(fun.WaitFunc)
+var _ interface{ Safe() fun.Worker } = new(fun.Worker)
+var _ interface{ Safe() fun.Worker } = new(fun.WaitFunc)
 
 // Worker takes iterators of fun.Worker or fun.WaitFunc lambdas
 // and processes them in according to the configuration.
@@ -45,7 +45,9 @@ func Worker[OP fun.Worker | fun.WaitFunc](
 	opts Options,
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
-		return any(op).(interface{ Safe(context.Context) error }).Safe(ctx)
+		return any(op).(interface {
+			Safe() fun.Worker
+		}).Safe()(ctx)
 	}, opts)
 }
 
