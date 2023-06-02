@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/tychoish/fun"
@@ -55,7 +56,14 @@ func TestIterator(t *testing.T) {
 			assert.ErrorIs(t, err, io.EOF)
 			assert.Zero(t, val)
 		})
-
 	})
-
+	t.Run("Slice", func(t *testing.T) {
+		out := make([]int, 100)
+		for idx := range out {
+			out[idx] = idx + rand.Intn(10*idx+1)
+		}
+		iter := internal.NewSliceIter(out)
+		cpy := Slice[int](iter)
+		assert.EqualItems(t, out, cpy)
+	})
 }

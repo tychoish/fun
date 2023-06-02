@@ -30,7 +30,3 @@ func Observe[T any](iter fun.Iterator[T], fn fun.Observer[T]) {
 func IterateOne[T any](iter fun.Iterator[T]) (T, error) {
 	return fun.IterateOne(internal.BackgroundContext, iter)
 }
-
-// IgnoreObserver is a fun.Observer[T] function that ignores its
-// input.
-func IgnoreObserver[T any](_ T) {}
