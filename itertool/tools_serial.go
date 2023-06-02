@@ -86,7 +86,7 @@ func Uniq[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
 //
 //	fun.Filter(iter, fun.IsZero[T])
 func DropZeroValues[T comparable](iter fun.Iterator[T]) fun.Iterator[T] {
-	return fun.Filter(iter, fun.IsZero[T])
+	return fun.Filter(iter, func(in T) bool { return !fun.IsZero(in) })
 }
 
 // Chain, like merge
@@ -97,24 +97,19 @@ func Chain[T any](iters ...fun.Iterator[T]) fun.Iterator[T] {
 	init := fun.WaitFunc(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
 		iter.Closer = cancel
+		defer close(pipe)
 
-	CHAIN:
 		for _, iter := range iters {
-		CURRENT:
-			for {
-				value, err := fun.IterateOne(wctx, iter)
-				switch {
-				case errors.Is(err, io.EOF):
-					break CURRENT
-				case erc.ContextExpired(err):
-					break CHAIN
-				}
-
-				err = fun.Blocking(pipe).Send().Write(wctx, value)
-				if err != nil {
-					break CHAIN
-				}
-			}
+			fun.Observe(wctx, iter, func(in T) {
+				// the only way this can error is that
+				// the context is canceled (in which
+				// case observe will always abort
+				// anyway,) or if this the background
+				// WaitFunc has returned, which it
+				// cannot have yet (because we're
+				// still running.)
+				fun.Blocking(pipe).Send().Ignore(wctx, in)
+			})
 		}
 	}).Start().Once()
 

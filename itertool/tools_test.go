@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -615,4 +616,47 @@ func TestAny(t *testing.T) {
 		check.True(t, fun.Is[int](in))
 	})
 	assert.Equal(t, count, 8)
+}
+
+func TestChain(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
+	iter := Chain(Slice(num), Slice(num))
+	n := fun.Count(ctx, iter)
+	assert.Equal(t, len(num)*2, n)
+
+	cancel()
+
+	iter = Chain(Slice(num), Slice(num))
+	n = fun.Count(ctx, iter)
+	assert.Equal(t, n, 0)
+}
+
+func TestDropZeros(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	all := make([]string, 100)
+	n := fun.Count(ctx, Slice(all))
+	assert.Equal(t, 100, n)
+	n = fun.Count(ctx, DropZeroValues(Slice(all)))
+	assert.Equal(t, 0, n)
+
+	fun.Observe(ctx, DropZeroValues(Slice(all)), func(in string) { assert.Zero(t, in) })
+}
+
+func TestWorker(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	count := &atomic.Int64{}
+	err := Worker(ctx, Slice([]fun.WaitFunc{
+		func(context.Context) { count.Add(1) },
+		func(context.Context) { count.Add(1) },
+		func(context.Context) { count.Add(1) },
+	}), Options{})
+	assert.NotError(t, err)
+	assert.Equal(t, count.Load(), 3)
 }
