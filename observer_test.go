@@ -1,0 +1,113 @@
+package fun
+
+import (
+	"io"
+	"sync"
+	"testing"
+
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
+)
+
+func TestObserver(t *testing.T) {
+	t.Run("Check", func(t *testing.T) {
+		var ob Observer[int] = func(in int) {
+			panic(io.EOF)
+
+		}
+		assert.ErrorIs(t, ob.Check(100), io.EOF)
+	})
+	t.Run("Safe", func(t *testing.T) {
+		count := 0
+		oe := func(err error) {
+			assert.ErrorIs(t, err, io.EOF)
+			if err != nil {
+				count++
+			}
+		}
+
+		var ob Observer[int] = func(in int) {
+			panic(io.EOF)
+
+		}
+		ob.Safe(oe)(100)
+		assert.Equal(t, 1, count)
+	})
+	t.Run("If", func(t *testing.T) {
+		count := 0
+		var ob Observer[int] = func(in int) {
+			check.Equal(t, in, 100)
+			count++
+		}
+
+		ob.If(false)(100)
+		assert.Equal(t, 0, count)
+		ob.If(true)(100)
+		assert.Equal(t, 1, count)
+	})
+	t.Run("When", func(t *testing.T) {
+		should := false
+		count := 0
+		var ob Observer[int] = func(in int) {
+			check.Equal(t, in, 100)
+			count++
+		}
+		wob := ob.When(func() bool { return should })
+		wob(100)
+		assert.Equal(t, 0, count)
+		should = true
+		wob(100)
+		assert.Equal(t, 1, count)
+		should = false
+		wob(100)
+		assert.Equal(t, 1, count)
+		should = true
+		wob(100)
+		assert.Equal(t, 2, count)
+	})
+	t.Run("Once", func(t *testing.T) {
+		count := 0
+		var ob Observer[int] = func(in int) {
+			check.Equal(t, in, 100)
+			count++
+		}
+		oob := ob.Once()
+		for i := 0; i < 100; i++ {
+			oob(100)
+		}
+		assert.Equal(t, 1, count)
+	})
+	t.Run("Chain", func(t *testing.T) {
+		count := 0
+		var ob Observer[int] = func(in int) {
+			check.Equal(t, in, 100)
+			count++
+		}
+
+		cob := ob.Chain(ob)
+		cob(100)
+
+		assert.Equal(t, 2, count)
+	})
+	t.Run("Lock", func(t *testing.T) {
+		// this is mostly just tempting the race detecor
+		wg := &sync.WaitGroup{}
+		count := 0
+		var ob Observer[int] = func(in int) {
+			defer wg.Done()
+			count++
+			check.Equal(t, in, 100)
+		}
+
+		lob := ob.Lock()
+
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go lob(100)
+		}
+		wg.Wait()
+
+		assert.Equal(t, count, 10)
+	})
+
+}
