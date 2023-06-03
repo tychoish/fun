@@ -40,8 +40,8 @@ func (mp *Map[K, V]) Set(it fun.Pair[K, V]) { mp.Store(it.Key, it.Value) }
 // value.
 func (mp *Map[K, V]) Ensure(key K) { mp.EnsureDefault(key, mp.Default.Make) }
 
-// Contain returns true if the key exists in the map or false otherwise.
-func (mp *Map[K, V]) Contains(key K) bool { _, ok := mp.mp.Load(key); return ok }
+// Check returns true if the key exists in the map or false otherwise.
+func (mp *Map[K, V]) Check(key K) bool { return fun.IsOk(mp.mp.Load(key)) }
 
 // Load retrieves the value from the map. The semantics are the same
 // as for maps in go: if the value does not exist it always returns

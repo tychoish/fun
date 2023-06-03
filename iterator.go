@@ -50,14 +50,10 @@ func Observe[T any](ctx context.Context, iter Iterator[T], fn Observer[T]) (err 
 			return nil // channel closed or complete.
 		}
 
-		if err = fn.Safe(item); err != nil {
+		if err = fn.Check(item); err != nil {
 			return err
 		}
 	}
-}
-
-type readOneable[T any] interface {
-	ReadOne(ctx context.Context) (T, error)
 }
 
 // IterateOne, like ReadOne reads one value from the iterator, and
@@ -72,7 +68,9 @@ type readOneable[T any] interface {
 // provided by the fun package, provide a special case which *does*
 // allow for safe and atomic concurrent use with fun.IterateOne.
 func IterateOne[T any](ctx context.Context, iter Iterator[T]) (T, error) {
-	if si, ok := iter.(readOneable[T]); ok {
+	if si, ok := iter.(interface {
+		ReadOne(ctx context.Context) (T, error)
+	}); ok {
 		return si.ReadOne(ctx)
 	}
 

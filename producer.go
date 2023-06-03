@@ -8,34 +8,57 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+// Producer is a function type that is a failrly common
+// constructor. It's signature is used to create iterators, as a
+// generator, and functions like a Future.
 type Producer[T any] func(context.Context) (T, error)
 
-func MakeFuture[T any](ch <-chan T) Producer[T] {
-	return func(ctx context.Context) (T, error) { return BlockingReceive(ch).Read(ctx) }
-}
+// MakeFuture constructs a producer that blocks to receive one
+// item from the specified channel. Subsequent calls to the producer
+// will block/yield additional items from the channel. The producer
+// will only return an error if the channel is closed (io.EOF) or the
+// context has expired.
+func MakeFuture[T any](ch <-chan T) Producer[T] { return BlockingReceive(ch).Read }
 
+// BlockingProducer constructs a producer that wraps a similar
+// function that does not take a context.
 func BlockingProducer[T any](fn func() (T, error)) Producer[T] {
 	return func(context.Context) (T, error) { return fn() }
 }
 
+// ConsistentProducer constructs a wrapper around a similar function
+// type that does not return an error or take a context. The resulting
+// function will never error.
 func ConsistentProducer[T any](fn func() T) Producer[T] {
 	return func(context.Context) (T, error) { return fn(), nil }
 }
 
+// Run executes the producer with a context hat is cacneled after the
+// producer returns. It is, itself a producer.
 func (pf Producer[T]) Run(ctx context.Context) (T, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	return pf(ctx)
 }
 
+// Background constructs a worker that runs the provided Producer in a
+// background thread and passes the produced value to the observe.
+//
+// The worker function's return value captures the procuder's error,
+// and will block until the producer has completed.
 func (pf Producer[T]) Background(ctx context.Context, of Observer[T]) Worker {
 	return pf.Worker(of).Future(ctx)
 }
 
+// Worker passes the produced value to an observer and returns a
+// worker that runs the producer, calls the observer, and returns the
+// error.
 func (pf Producer[T]) Worker(of Observer[T]) Worker {
 	return func(ctx context.Context) error { o, e := pf(ctx); of(o); return e }
 }
 
+// Safe returns a wrapped producer with a panic handler that converts
+// any panic to an error.
 func (pf Producer[T]) Safe() Producer[T] {
 	return func(ctx context.Context) (_ T, err error) {
 		defer func() { err = mergeWithRecover(err, recover()) }()
@@ -43,18 +66,53 @@ func (pf Producer[T]) Safe() Producer[T] {
 	}
 }
 
-func (pf Producer[T]) Must(ctx context.Context) T { return Must(pf(ctx)) }
-func (pf Producer[T]) Force() T                   { return Must(pf.Block()) }
-func (pf Producer[T]) Block() (T, error)          { return pf(internal.BackgroundContext) }
+// Chain runs both producers, with the following logic: if the root
+// producer errors, return that error (and a zero value,) run the next
+// producer. If the next producer errors, return the result of the
+// first producer and the second producer's error. If neither producer
+// errors, pass both results to the join function (jf) and return the
+// result.
+func (pf Producer[T]) Chain(next Producer[T], jf func(T, T) T) Producer[T] {
+	return func(ctx context.Context) (T, error) {
+		one, err := pf(ctx)
+		if err != nil {
+			return ZeroOf[T](), err
+		}
 
+		two, err := next(ctx)
+		if err != nil {
+			return one, err
+		}
+
+		return jf(one, two), nil
+	}
+}
+
+// Must runs the producer returning the constructed value and panicing
+// if the producer errors.
+func (pf Producer[T]) Must(ctx context.Context) T { return Must(pf(ctx)) }
+
+// Block runs the producer with a context that will ever expire.
+func (pf Producer[T]) Block() (T, error) { return pf(internal.BackgroundContext) }
+
+// Force combines the semantics of Must and Block: runs the producer
+// with a context that never expires and panics in the case of an
+// error.
+func (pf Producer[T]) Force() T { return Must(pf.Block()) }
+
+// Wait produces a wait function, using two observers to handle the
+// output of the Producer.
 func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) WaitFunc {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 
-func (pf Producer[T]) Check(of Observer[error]) func(context.Context) T {
-	return func(ctx context.Context) T { o, e := pf(ctx); of(e); return o }
-}
+// Check uses the error observer to consume the error from the
+// Producer and returns a function that takes a context and returns a value.
+func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
 
+// Future runs the producer in the bacgrkound, when function is
+// called, and returns a producer which, when called, blocks until the
+// original producer returns.
 func (pf Producer[T]) Future(ctx context.Context) Producer[T] {
 	out := make(chan T, 1)
 	var err error
@@ -67,6 +125,9 @@ func (pf Producer[T]) Future(ctx context.Context) Producer[T] {
 	}
 }
 
+// Once returns a producer that only executes ones, and caches the
+// return values, so that subsequent calls to the output producer will
+// return the same values.
 func (pf Producer[T]) Once() Producer[T] {
 	var (
 		out T
@@ -81,8 +142,19 @@ func (pf Producer[T]) Once() Producer[T] {
 	}
 }
 
-func (pf Producer[T]) Generator() Iterator[T]         { return Generator(pf) }
-func (pf Producer[T]) If(c bool) Producer[T]          { return pf.When(Wrapper(c)) }
+// Generator creates an iterator that calls the Producer function once
+// for every iteration, until it errors. Errors that are not context
+// cancellation errors or io.EOF are propgated to the iterators Close
+// method.
+func (pf Producer[T]) Generator() Iterator[T] { return Generator(pf) }
+
+// If returns a producer that will execute the root producer only if
+// the cond value is true. Otherwise, If will return the zero value
+// for T and a nil error.
+func (pf Producer[T]) If(cond bool) Producer[T] { return pf.When(Wrapper(cond)) }
+
+// After will return a Producer that will block until the provided
+// time is in the past, and then execute normally.
 func (pf Producer[T]) After(ts time.Time) Producer[T] { return pf.Delay(time.Until(ts)) }
 
 // Delay wraps a Producer in a function that will always wait for the
@@ -109,9 +181,13 @@ func (pf Producer[T]) Jitter(jf func() time.Duration) Producer[T] {
 	}
 }
 
-func (pf Producer[T]) When(c func() bool) Producer[T] {
+// When constructs a producer that will call the cond upon every
+// execution, and when true, will run and return the results of the
+// root producer. Otherwise When will return the zero value of T and a
+// nil error.
+func (pf Producer[T]) When(cond func() bool) Producer[T] {
 	return func(ctx context.Context) (out T, _ error) {
-		if c() {
+		if cond() {
 			return pf(ctx)
 
 		}
@@ -119,6 +195,9 @@ func (pf Producer[T]) When(c func() bool) Producer[T] {
 	}
 }
 
+// Lock creates a producer that runs the root mutex as per normal, but
+// under the protection of a mutex so that there's only one execution
+// of the producer at a time.
 func (pf Producer[T]) Lock() Producer[T] {
 	mtx := &sync.Mutex{}
 	return func(ctx context.Context) (T, error) {
@@ -133,6 +212,9 @@ type tuple[T, U any] struct {
 	Two U
 }
 
+// Limit runs the producer a specified number of times, and caches the
+// result of the last execution and returns that value for any
+// subsequent executions.
 func (pf Producer[T]) Limit(in int) Producer[T] {
 	resolver := limitExec[tuple[T, error]](in)
 
@@ -145,6 +227,8 @@ func (pf Producer[T]) Limit(in int) Producer[T] {
 	}
 }
 
+// TTL runs the producer only one time per specified interval. The
+// interval must me greater than 0.
 func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 	resolver := ttlExec[tuple[T, error]](dur)
 

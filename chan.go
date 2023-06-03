@@ -68,7 +68,7 @@ func NonBlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode:
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
-func (ro Receive[T]) Drop(ctx context.Context) bool { _, err := ro.Read(ctx); return err == nil }
+func (ro Receive[T]) Drop(ctx context.Context) bool { return IsOk(ro.Producer().Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
 func (ro Receive[T]) Ignore(ctx context.Context) { _, _ = ro.Check(ctx) }
@@ -83,7 +83,7 @@ func (ro Receive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(ctx);
 // Check performs the read operation and converts the error into an
 // "ok" value, returning true if receive was successful and false
 // otherwise.
-func (ro Receive[T]) Check(ctx context.Context) (T, bool) { o, e := ro.Read(ctx); return o, e == nil }
+func (ro Receive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer().Check(ctx) }
 
 // Read performs the read operation according to the
 // blocking/non-blocking semantics of the receive operation.
@@ -108,6 +108,10 @@ func (ro Receive[T]) Read(ctx context.Context) (T, error) {
 	}
 }
 
+// Producer returns the Read method as a producer for integration into
+// existing tools.
+func (ro Receive[T]) Producer() Producer[T] { return ro.Read }
+
 // Send provides access to channel send operations, and is
 // contstructed by the Send() method on the channel operation. The
 // primary method is Write(), with other methods provided for clarity.
@@ -129,7 +133,11 @@ func NonBlockingSend[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_bloc
 func (sm Send[T]) Check(ctx context.Context, it T) bool { return sm.Write(ctx, it) == nil }
 
 // Ignore performs a send and omits the error.
-func (sm Send[T]) Ignore(ctx context.Context, it T) { _ = sm.Write(ctx, it) }
+func (sm Send[T]) Ignore(ctx context.Context, it T) { _ = sm.Processor()(ctx, it) }
+
+// Processor returns the Write method as a processor for integration
+// into existing tools
+func (sm Send[T]) Processor() Processor[T] { return sm.Write }
 
 // Write sends the item into the channel captured by
 // Blocking/NonBlocking returning the appropriate error.

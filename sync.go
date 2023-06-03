@@ -68,6 +68,15 @@ func (wg *WaitGroup) IsDone() bool {
 	return wg.counter == 0
 }
 
+// WaitFunc returns with WaitGroups Wait method as a WaitFunc.
+func (wg *WaitGroup) WaitFunc() WaitFunc { return wg.Wait }
+
+// Worker returns a worker that will block on the wait group
+// returning and return the context's error if one exits.
+func (wg *WaitGroup) Worker() Worker {
+	return func(ctx context.Context) error { wg.Wait(ctx); return ctx.Err() }
+}
+
 // Wait blocks until either the context is canceled or all items have
 // completed.
 //

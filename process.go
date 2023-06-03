@@ -30,7 +30,7 @@ func BlockingProcessor[T any](fn func(T) error) Processor[T] {
 // function (decended from the context provided in the arguments,)
 // that is canceled when Run() returns to avoid leaking well behaved
 // resources outside of the scope of the function execution. Run can
-// also be passed as a Process func.
+// also be passed as a Processor func.
 func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(in).Run(ctx) }
 
 // Block runs the ProcessFunc with a context that will never be
@@ -75,29 +75,16 @@ func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
 	}
 }
 
+// If runs the processor function if, and only if the condition is
+// true. Otherwise the function does not run and the processor returns
+// nil.
+//
+// The resulting processor can be used more than once.
 func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(Wrapper(c)) }
 
-func (pf Processor[T]) Observer(ctx context.Context, oe Observer[error]) Observer[T] {
-	return func(in T) { oe(pf(ctx, in)) }
-}
-
-func (pf Processor[T]) Worker(in T) Worker {
-	return func(ctx context.Context) error { return pf(ctx, in) }
-}
-
-func (pf Processor[T]) Future(ctx context.Context, in T) Worker {
-	return pf.Worker(in).Future(ctx)
-}
-
-func (pf Processor[T]) Once() Processor[T] {
-	once := &sync.Once{}
-	var err error
-	return func(ctx context.Context, in T) error {
-		once.Do(func() { err = pf(ctx, in) })
-		return err
-	}
-}
-
+// When returns a processor function that runs if the conditional function
+// returns true, and does not run otherwise. The conditional function
+// is evaluated every time the returned processor is run.
 func (pf Processor[T]) When(c func() bool) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		if c() {
@@ -107,11 +94,62 @@ func (pf Processor[T]) When(c func() bool) Processor[T] {
 	}
 }
 
-var (
-	ErrLimitExceeded = errors.New("limit exceeded")
-	ErrInvalidInput  = errors.New("invalid input")
-)
+// Chain wraps the processor and executes both the root processor and
+// then the next processor, assuming the root processor is not
+// canceled and the context has not expired.
+func (pf Processor[T]) Chain(next Processor[T]) Processor[T] {
+	return func(ctx context.Context, in T) error {
+		if err := pf(ctx, in); err != nil {
+			return err
+		}
+		return next.If(ctx.Err() != nil)(ctx, in)
+	}
+}
 
+// Iterator creates a worker function that processes the iterator with
+// the processor function, merging/collecting all errors, and
+// respecting the worker's context. The processing does not begin
+// until the worker is called.
+func (pf Processor[T]) Iterator(iter Iterator[T]) Worker {
+	return func(ctx context.Context) (err error) {
+		oe := func(e error) { err = internal.MergeErrors(e, err) }
+		oe(Observe(ctx, iter, pf.Observer(ctx, oe)))
+		return
+	}
+}
+
+// Observer converts a processor into an observer, handling the error
+// with the error observer and using the provided context.
+func (pf Processor[T]) Observer(ctx context.Context, oe Observer[error]) Observer[T] {
+	return func(in T) { oe(pf(ctx, in)) }
+}
+
+// Worker converts the processor into a worker, passing the provide
+// input into the root processor function. The Processor is not run
+// until the worker is called.
+func (pf Processor[T]) Worker(in T) Worker {
+	return func(ctx context.Context) error { return pf(ctx, in) }
+}
+
+// Future begins processing the input immediately and returns a worker
+// function that returns the processor's error, and will block until
+// the processor returns.
+func (pf Processor[T]) Future(ctx context.Context, in T) Worker {
+	return pf.Worker(in).Future(ctx)
+}
+
+// Once make a processor that can only run once. Subsequent calls to
+// the processor return the cached error of the original run.
+func (pf Processor[T]) Once() Processor[T] {
+	once := &sync.Once{}
+	var err error
+	return func(ctx context.Context, in T) error {
+		once.Do(func() { err = pf(ctx, in) })
+		return err
+	}
+}
+
+// Lock wraps the Processor and protects its execution with a mutex.
 func (pf Processor[T]) Lock() Processor[T] {
 	mtx := &sync.Mutex{}
 	return func(ctx context.Context, arg T) error {
@@ -129,6 +167,10 @@ func (pf Processor[T]) Limit(in int) Processor[T] {
 	}
 }
 
+// TTL returns a Processor that runs once in the specified window, and
+// returns the error from the last run in between this interval. While
+// the executions of the underlying function happen in isolation,
+// in between, the processor is concurrently accessible.
 func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
 	resolver := ttlExec[error](dur)
 
@@ -136,6 +178,13 @@ func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
 		return resolver(func() error { return pf(ctx, arg) })
 	}
 }
+
+////////////////////////////////////////////////////////////////////////
+
+var (
+	ErrLimitExceeded = errors.New("limit exceeded")
+	ErrInvalidInput  = errors.New("invalid input")
+)
 
 func limitExec[T any](in int) func(func() T) T {
 	Invariant(in > 0, "limit must be greater than zero;", in)
@@ -172,14 +221,22 @@ func ttlExec[T any](dur time.Duration) func(op func() T) T {
 		lastAt time.Time
 		output T
 	)
-	mtx := &sync.Mutex{}
+	mtx := &sync.RWMutex{}
 
 	return func(op func() T) (out T) {
+		if out, ok := func() (T, bool) {
+			mtx.RLock()
+			defer mtx.RUnlock()
+			return output, !lastAt.IsZero() && time.Since(lastAt) < dur
+		}(); ok {
+			return out
+		}
+
 		mtx.Lock()
 		defer mtx.Unlock()
 
 		since := time.Since(lastAt)
-		if lastAt.IsZero() || since <= dur {
+		if lastAt.IsZero() || since >= dur {
 			output = op()
 			lastAt = time.Now()
 		}

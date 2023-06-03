@@ -124,9 +124,14 @@ func (wf WaitFunc) After(ts time.Time) WaitFunc {
 //
 // If the function produces a negative duration, there is no delay.
 func (wf WaitFunc) Jitter(dur func() time.Duration) WaitFunc { return wf.Worker().Jitter(dur).Ignore() }
-func (wf WaitFunc) Delay(dur time.Duration) WaitFunc         { return wf.Worker().Delay(dur).Ignore() }
-func (wf WaitFunc) When(cond func() bool) WaitFunc           { return wf.Worker().When(cond).Ignore() }
-func (wf WaitFunc) If(cond bool) WaitFunc                    { return wf.Worker().If(cond).Ignore() }
+
+// Delay wraps a WaitFunc in a function that will always wait for the
+// specified duration before running.
+//
+// If the value is negative, then there is always zero delay.
+func (wf WaitFunc) Delay(dur time.Duration) WaitFunc { return wf.Worker().Delay(dur).Ignore() }
+func (wf WaitFunc) When(cond func() bool) WaitFunc   { return wf.Worker().When(cond).Ignore() }
+func (wf WaitFunc) If(cond bool) WaitFunc            { return wf.Worker().If(cond).Ignore() }
 
 func (wf WaitFunc) Limit(in int) WaitFunc {
 	Invariant(in > 0, "limit must be greater than zero;", in)
@@ -162,4 +167,8 @@ func (wf WaitFunc) Lock() WaitFunc {
 		defer mtx.Unlock()
 		wf(ctx)
 	}
+}
+
+func (wf WaitFunc) Chain(next WaitFunc) WaitFunc {
+	return func(ctx context.Context) { wf(ctx); next.If(ctx.Err() != nil)(ctx) }
 }

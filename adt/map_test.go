@@ -220,9 +220,9 @@ func TestMap(t *testing.T) {
 		mp.Store("foo", 100)
 		mp.Store("bar", 42)
 		assert.Equal(t, 2, mp.Len())
-		assert.True(t, mp.Contains("foo"))
-		assert.True(t, mp.Contains("bar"))
-		assert.True(t, !mp.Contains("baz"))
+		assert.True(t, mp.Check("foo"))
+		assert.True(t, mp.Check("bar"))
+		assert.True(t, !mp.Check("baz"))
 		assert.Equal(t, 2, mp.Len())
 	})
 	t.Run("Get", func(t *testing.T) {

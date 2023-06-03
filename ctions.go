@@ -18,6 +18,11 @@ func Default[T comparable](input T, defaultValue T) T {
 	return input
 }
 
+// IsOk returns only the second argument passed to it, given a
+// function that returns two values where the second value is a
+// boolean, you can use IsOk to discard the first value.
+func IsOk[T any](_ T, ok bool) bool { return ok }
+
 // WhenCall runs a function when condition is true, and is a noop
 // otherwise.
 func WhenCall(cond bool, op func()) {

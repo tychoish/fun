@@ -12,11 +12,8 @@ import (
 // other similar situations
 type Worker func(context.Context) error
 
-// ObserveWorker has the same semantics as Observe, except that the
-// operation is wrapped in a WaitFunc, and executed when the WaitFunc
-// is called.
-func ObserveWorker[T any](iter Iterator[T], fn Observer[T]) Worker {
-	return func(ctx context.Context) error { return Observe(ctx, iter, fn) }
+func WorkerFuture(ch <-chan error) Worker {
+	return func(ctx context.Context) error { return internal.MergeErrors(BlockingReceive(ch).Read(ctx)) }
 }
 
 // Run is equivalent to calling the worker function directly, except
@@ -65,15 +62,22 @@ func (wf Worker) Signal(ctx context.Context) <-chan error {
 // new fun.Worker which will block for the context to expire or the
 // background worker to complete, which returns the error from the
 // background request.
+//
+// The underlying worker begins executing before future returns.
 func (wf Worker) Future(ctx context.Context) Worker {
 	out := wf.Signal(ctx)
-	return func(ctx context.Context) error { return internal.MergeErrors(MakeFuture(out)(ctx)) }
+	return WorkerFuture(out)
 }
 
+// Background starts the worker function in a go routine, passing the
+// error to the provided observer function.
 func (wf Worker) Background(ctx context.Context, ob Observer[error]) {
 	go func() { ob(wf.Safe()(ctx)) }()
 }
 
+// Once wraps the Worker in a function that will execute only
+// once. The return value (error) is cached, and can be accessed many
+// times without re-running the worker.
 func (wf Worker) Once() Worker {
 	once := &sync.Once{}
 	var err error
@@ -93,10 +97,24 @@ func (wf Worker) Wait(ob Observer[error]) WaitFunc {
 // Must converts a Worker function into a wait function; however,
 // if the worker produces an error Must converts the error into a
 // panic.
-func (wf Worker) Must() WaitFunc   { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
+func (wf Worker) Must() WaitFunc { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
+
+// Ignore converts the worker into a WaitFunc that discards the error
+// produced by the worker.
 func (wf Worker) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }
 
-func (wf Worker) If(cond bool) Worker { return wf.When(func() bool { return cond }) }
+// If returns a Worker function that runs only if the condition is
+// true. The error is always nil if the condition is false. If-ed
+// functions may be called more than once, and will run multiple
+// times potentiall.y
+func (wf Worker) If(cond bool) Worker { return wf.When(Wrapper(cond)) }
+
+// When wraps a Worker function that will only run if the condition
+// function returns true. If the condition is false the worker does
+// not execute. The condition function is called in between every operation.
+//
+// When worker functions may be called more than once, and will run
+// multiple times potentiall.
 func (wf Worker) When(cond func() bool) Worker {
 	return func(ctx context.Context) error {
 		if cond() {
@@ -104,10 +122,14 @@ func (wf Worker) When(cond func() bool) Worker {
 		}
 		return nil
 	}
-
 }
+
+// After returns a Worker that blocks until the timestamp provided is
+// in the past. Additional calls to this worker will run
+// immediately. If the timestamp is in the past the resulting worker
+// will run immediately.
 func (wf Worker) After(ts time.Time) Worker {
-	return func(ctx context.Context) error { return wf.Delay(time.Until(ts))(ctx) }
+	return wf.Jitter(func() time.Duration { return time.Until(ts) })
 }
 
 // Delay wraps a Worker in a function that will always wait for the
@@ -132,25 +154,46 @@ func (wf Worker) Jitter(jf func() time.Duration) Worker {
 			return wf(ctx)
 		}
 	}
-
 }
 
-func (wf Worker) Limit(in int) Worker {
-	resolver := limitExec[error](in)
+// Limit produces a worker than runs exactly n times. Each execution
+// is isolated from every other, but once the limit is exceeded, the
+// result of the *last* worker to execute is cached concurrent access
+// to that value is possible.
+func (wf Worker) Limit(n int) Worker {
+	resolver := limitExec[error](n)
 
 	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
 }
 
+// TTL produces a worker that will only run once during every
+// specified duration, when called more than once. During the interval
+// between calls, the previous error is returned. While each execution
+// of the root worker is protected by a mutex, the resulting worker
+// can be used in parallel during the intervals between calls.
 func (wf Worker) TTL(dur time.Duration) Worker {
 	resolver := ttlExec[error](dur)
 	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
 }
 
+// Lock produces a Worker that will be executed within the scope of a
+// (managed) mutex.
 func (wf Worker) Lock() Worker {
 	mtx := &sync.Mutex{}
+	return func(ctx context.Context) error { mtx.Lock(); defer mtx.Unlock(); return wf(ctx) }
+}
+
+// Check runs the worker and returns true (ok) if there was no error,
+// and false otherwise.
+func (wf Worker) Check(ctx context.Context) bool { return wf(ctx) == nil }
+
+// Chain melds two workers, calling the second worker if the first
+// succeeds and the context hasn't been canceled.
+func (wf Worker) Chain(next Worker) Worker {
 	return func(ctx context.Context) error {
-		mtx.Lock()
-		defer mtx.Unlock()
-		return wf(ctx)
+		if err := wf(ctx); err != nil {
+			return err
+		}
+		return next.If(ctx.Err() != nil)(ctx)
 	}
 }
