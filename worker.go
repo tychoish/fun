@@ -2,6 +2,8 @@ package fun
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 	"time"
 
@@ -12,8 +14,33 @@ import (
 // other similar situations
 type Worker func(context.Context) error
 
+// WorkerFuture constructs a worker from an error channel. The
+// resulting worker blocks until an error is produced in the error
+// channel, the error channel is closed, or the worker's context is
+// canceled. If the channel is closed, the worker will return a nil
+// error, and if the context is canceled, the worker will return a
+// context error. In all other cases the work will propagate the error
+// (or nil) recived from the channel.
 func WorkerFuture(ch <-chan error) Worker {
-	return func(ctx context.Context) error { return internal.MergeErrors(BlockingReceive(ch).Read(ctx)) }
+	return func(ctx context.Context) error {
+		if ch == nil {
+			return nil
+		}
+
+		// val and err cannot both be non-nil at the same
+		// time.
+		val, err := BlockingReceive(ch).Read(ctx)
+		switch {
+		case errors.Is(err, io.EOF):
+			return nil
+		case err != nil:
+			return err
+		case val != nil:
+			return val
+		default:
+			return nil
+		}
+	}
 }
 
 // Run is equivalent to calling the worker function directly, except
@@ -194,6 +221,6 @@ func (wf Worker) Chain(next Worker) Worker {
 		if err := wf(ctx); err != nil {
 			return err
 		}
-		return next.If(ctx.Err() != nil)(ctx)
+		return next.If(ctx.Err() == nil)(ctx)
 	}
 }
