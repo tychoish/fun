@@ -133,17 +133,26 @@ func NonBlockingSend[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_bloc
 func (sm Send[T]) Check(ctx context.Context, it T) bool { return sm.Write(ctx, it) == nil }
 
 // Ignore performs a send and omits the error.
-func (sm Send[T]) Ignore(ctx context.Context, it T) { _ = sm.Processor()(ctx, it) }
+func (sm Send[T]) Ignore(ctx context.Context, it T) { sm.Processor().Ignore(ctx, it) }
 
 // Processor returns the Write method as a processor for integration
 // into existing tools
 func (sm Send[T]) Processor() Processor[T] { return sm.Write }
 
+// Zero sends the zero value of T through the channel.
+func (sm Send[T]) Zero(ctx context.Context) error { return sm.Write(ctx, ZeroOf[T]()) }
+
+// Signal attempts to sends the Zero value of T through the channel
+// and returns when: the send succeeds, the channel is full and this
+// is a non-blocking send, the context is canceled, or the channel is
+// closed.
+func (sm Send[T]) Signal(ctx context.Context) { sm.Ignore(ctx, ZeroOf[T]()) }
+
 // Write sends the item into the channel captured by
 // Blocking/NonBlocking returning the appropriate error.
 //
 // The returned error is nil if the send was successful, and an io.EOF
-// if the channel is closed rather than a panic (as with the
+// if the channel is closed (or nil) rather than a panic (as with the
 // equivalent direct operation.) The error value is a context
 // cancelation error when the context is canceled, and for
 // non-blocking sends, if the channel did not accept the write,

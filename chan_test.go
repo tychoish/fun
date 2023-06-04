@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 )
@@ -52,6 +53,15 @@ func TestChannel(t *testing.T) {
 				Blocking(ch).Receive().Ignore(ctx)
 				assert.Equal(t, len(ch), 0)
 
+			})
+			t.Run("Zero", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := make(chan time.Time, 1)
+				assert.NotError(t, Blocking(ch).Send().Zero(ctx))
+				val := <-ch
+				assert.True(t, val.IsZero())
 			})
 
 			t.Run("NonBlocking", func(t *testing.T) {
