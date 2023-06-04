@@ -37,6 +37,9 @@ func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(i
 // canceled.
 func (pf Processor[T]) Block(in T) error { return pf.Worker(in).Block() }
 
+// Ignore runs the process function and discards the error.
+func (pf Processor[T]) Ignore(ctx context.Context, in T) { _ = pf(ctx, in) }
+
 // Wait converts a processor into a worker that will process the input
 // provided when executed.
 func (pf Processor[T]) Wait(in T, of Observer[error]) WaitFunc { return pf.Worker(in).Wait(of) }
@@ -211,7 +214,7 @@ func limitExec[T any](in int) func(func() T) T {
 }
 
 func ttlExec[T any](dur time.Duration) func(op func() T) T {
-	Invariant(dur < 0, "ttl must not be negative;", dur)
+	Invariant(dur >= 0, "ttl must not be negative;", dur)
 
 	if dur == 0 {
 		return func(op func() T) T { return op() }
