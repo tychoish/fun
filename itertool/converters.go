@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
 )
 
 // CollectChannel converts and iterator to a channel. The iterator is
@@ -38,12 +37,12 @@ func CollectSlice[T any](ctx context.Context, iter fun.Iterator[T]) ([]T, error)
 }
 
 // Slice produces an iterator for an arbitrary slice.
-func Slice[T any](in []T) fun.Iterator[T] { return internal.NewSliceIter(in) }
+func Slice[T any](in []T) fun.Iterator[T] { return fun.Sliceify(in).Iterator() }
 
 // Channel produces an iterator for a specified channel. The
 // iterator does not start any background threads.
 func Channel[T any](pipe <-chan T) fun.Iterator[T] {
-	return fun.Generator(fun.BlockingReceive(pipe).Read)
+	return fun.BlockingReceive(pipe).Producer().Generator()
 }
 
 // Variadic is a wrapper around Slice() for more ergonomic use at some

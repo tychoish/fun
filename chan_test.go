@@ -25,6 +25,19 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
+			t.Run("Processor", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := make(chan int, 2)
+				err := Blocking(ch).Processor()(ctx, 1)
+				assert.NotError(t, err)
+				assert.Equal(t, <-ch, 1)
+
+				err = NonBlocking(ch).Processor()(ctx, 3)
+				assert.NotError(t, err)
+				assert.Equal(t, <-ch, 3)
+			})
 			t.Run("ClosedWrite", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -130,27 +143,36 @@ func TestChannel(t *testing.T) {
 			defer cancel()
 
 			t.Run("Blocking", func(t *testing.T) {
-				ch := make(chan string, 1)
-				ch <- "hello world"
-				val, err := Blocking(ch).Receive().Read(ctx)
-				assert.NotError(t, err)
-				assert.Equal(t, val, "hello world")
+				t.Run("Chain", func(t *testing.T) {
+					ch := make(chan string, 1)
+					ch <- "hello world"
+					val, err := Blocking(ch).Receive().Read(ctx)
+					assert.NotError(t, err)
+					assert.Equal(t, val, "hello world")
 
-				ch <- "kip"
-				val, ok := Blocking(ch).Receive().Check(ctx)
-				assert.Equal(t, val, "kip")
-				assert.True(t, ok)
+					ch <- "kip"
+					val, ok := Blocking(ch).Receive().Check(ctx)
+					assert.Equal(t, val, "kip")
+					assert.True(t, ok)
 
-				ch <- "merlin"
-				assert.True(t, Blocking(ch).Receive().Drop(ctx))
-				// do this to verify if it the channel is now empty
-				_, err = NonBlocking(ch).Receive().Read(ctx)
-				assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+					ch <- "merlin"
+					assert.True(t, Blocking(ch).Receive().Drop(ctx))
+					// do this to verify if it the channel is now empty
+					_, err = NonBlocking(ch).Receive().Read(ctx)
+					assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
 
-				ch <- "deleuze"
-				val = Blocking(ch).Receive().Force(ctx)
-				assert.Equal(t, val, "deleuze")
-				assert.True(t, ok)
+					ch <- "deleuze"
+					val = Blocking(ch).Receive().Force(ctx)
+					assert.Equal(t, val, "deleuze")
+					assert.True(t, ok)
+				})
+				t.Run("Producer", func(t *testing.T) {
+					ch := make(chan string, 1)
+					ch <- "hello world"
+					val, err := Blocking(ch).Producer()(ctx)
+					assert.NotError(t, err)
+					assert.Equal(t, val, "hello world")
+				})
 			})
 			t.Run("NonBlocking", func(t *testing.T) {
 				ch := make(chan string, 1)
