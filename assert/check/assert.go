@@ -39,7 +39,7 @@ func NotEqual[T comparable](t testing.TB, valOne, valTwo T) {
 	}
 }
 
-func zeroOf[T any]() T { return *new(T) }
+func zeroOf[T any]() (out T) { return }
 
 // Zero fails a test if the value is not the zero-value for its type.
 func Zero[T comparable](t testing.TB, val T) {
