@@ -25,7 +25,7 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 }
 
 // Add adds a single item to the slice.
-func (s *Slice[T]) Add(in T) { *s = append(*s) }
+func (s *Slice[T]) Add(in T) { *s = append(*s, in) }
 
 // Append adds all of the items to the slice.
 func (s *Slice[T]) Append(in ...T) { s.Extend(in) }
@@ -72,10 +72,15 @@ func (s *Slice[T]) ResliceEnd(end int) { *s = (*s)[:end] }
 //
 // Slicing operations, can lead to panics if the indexes are out of
 // bounds.
-func (s *Slice[T]) Truncate(n int) { *s = (*s)[:len(*s)-n-1] }
+func (s *Slice[T]) Truncate(n int) { *s = (*s)[:len(*s)-n] }
 
-// Last returns the index of the last element in the slice.
+// Last returns the index of the last element in the slice. Empty
+// slices have `-1` last items.
 func (s Slice[T]) Last() int { return len(s) - 1 }
+
+// IsEmpty returns true when there are no items in the slice (or it is
+// nil.
+func (s Slice[T]) IsEmpty() bool { return len(s) == 0 }
 
 // Item returns the item at the specified index.
 //
