@@ -6,6 +6,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -42,15 +43,20 @@ type Iterable[T any] interface {
 // context cancelation error to its error, though the observed
 // iterator may return one in its close method.
 func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
-	defer func() { err = mergeWithRecover(i.Close(), recover()) }()
+	defer func() { err = internal.MergeErrors(err, mergeWithRecover(i.Close(), recover())) }()
 	proc := i.Producer()
 	for {
-		item, ok := proc.Check(ctx)
-		if !ok {
-			return nil // channel closed or complete.
+		item, err := proc(ctx)
+		switch {
+		case err == nil:
+			fn(item)
+		case errors.Is(err, io.EOF):
+			return nil
+		default:
+			// this is (realistically) only context
+			// cancelation errors
+			return err
 		}
-
-		fn(item)
 	}
 }
 
@@ -145,8 +151,10 @@ func (i *Iterator[T]) Next(ctx context.Context) bool {
 }
 
 func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
-	if i.operation == nil || i.closed.Load() || ctx.Err() != nil {
+	if i.operation == nil || i.closed.Load() {
 		return out, io.EOF
+	} else if err = ctx.Err(); err != nil {
+		return out, err
 	}
 
 	defer func() { WhenCall(err != nil, i.doClose) }()

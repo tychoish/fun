@@ -69,15 +69,9 @@ type Heap[T any] struct {
 // input iterators Close() error if one exists, and otherwise will
 // return the populated heap.
 func NewHeapFromIterator[T any](ctx context.Context, cmp LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
-	out := &Heap[T]{
-		LT: cmp,
-	}
+	out := &Heap[T]{LT: cmp}
 	out.lazySetup()
-
-	if err := iter.Observe(ctx, func(in T) { out.Push(in) }); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return out, iter.Observe(ctx, func(in T) { out.Push(in) })
 }
 
 func (h *Heap[T]) lazySetup() {

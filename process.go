@@ -155,8 +155,9 @@ func (pf Processor[T]) Once() Processor[T] {
 }
 
 // Lock wraps the Processor and protects its execution with a mutex.
-func (pf Processor[T]) Lock() Processor[T] {
-	mtx := &sync.Mutex{}
+func (pf Processor[T]) Lock() Processor[T] { return pf.WithLock(&sync.Mutex{}) }
+
+func (pf Processor[T]) WithLock(mtx *sync.Mutex) Processor[T] {
 	return func(ctx context.Context, arg T) error {
 		mtx.Lock()
 		defer mtx.Unlock()

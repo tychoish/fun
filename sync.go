@@ -5,8 +5,6 @@ import (
 	"sync"
 )
 
-func Once(fn func()) func() { once := &sync.Once{}; return func() { once.Do(fn) } }
-
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.WaitFunc). The
 // implementation is exceptionally simple. The only constraint, like

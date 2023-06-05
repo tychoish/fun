@@ -82,18 +82,15 @@ func TestIterator(t *testing.T) {
 
 			counter := &atomic.Int64{}
 
-			iter := syncIterImpl[int]{
-				mtx: &sync.Mutex{},
-				iter: fun.Generator(func(ctx context.Context) (int, error) {
-					if err := ctx.Err(); err != nil {
-						return 0, err
-					} else if val := counter.Add(1); val > 64 {
-						return 0, io.EOF
-					} else {
-						return int(val), nil
-					}
-				}),
-			}
+			iter := fun.Producer[int](func(ctx context.Context) (int, error) {
+				if err := ctx.Err(); err != nil {
+					return 0, err
+				} else if val := counter.Add(1); val > 64 {
+					return 0, io.EOF
+				} else {
+					return int(val), nil
+				}
+			}).Lock().Generator()
 			for {
 				val, err := iter.ReadOne(ctx)
 				testt.Log(t, err, val)
@@ -112,18 +109,16 @@ func TestIterator(t *testing.T) {
 
 			counter := &atomic.Int64{}
 
-			iter := syncIterImpl[int]{
-				mtx: &sync.Mutex{},
-				iter: fun.Generator(func(ctx context.Context) (int, error) {
-					if err := ctx.Err(); err != nil {
-						return 0, err
-					} else if val := counter.Add(1); val > 64 {
-						return 0, io.EOF
-					} else {
-						return int(val), nil
-					}
-				}),
-			}
+			iter := fun.Producer[int](func(ctx context.Context) (int, error) {
+				if err := ctx.Err(); err != nil {
+					return 0, err
+				} else if val := counter.Add(1); val > 64 {
+					return 0, io.EOF
+				} else {
+					return int(val), nil
+				}
+			}).Lock().Generator()
+
 			for {
 				val, err := iter.ReadOne(ctx)
 				testt.Log(t, err, val)

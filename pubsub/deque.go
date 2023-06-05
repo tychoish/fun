@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -238,23 +239,89 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 // towards the front. When the iterator reaches the beginning of the queue
 // it ends.
 func (dq *Deque[T]) Iterator() *fun.Iterator[T] {
-	defer dq.withLock()()
-	return fun.IterableProducer[T](&dqIterator[T]{list: dq, blocking: false, item: dq.root, direction: dqNext}).Generator()
+	return dq.Producer().Generator()
 }
 
 // IteratorReverse starts at the back of the queue and iterates
 // towards the front. When the iterator reaches the end of the queue
 // it ends.
 func (dq *Deque[T]) IteratorReverse() *fun.Iterator[T] {
+	return dq.ProducerReverse().Generator()
+}
+
+func (dq *Deque[T]) Producer() fun.Producer[T] {
 	defer dq.withLock()()
-	return fun.IterableProducer[T](&dqIterator[T]{list: dq, blocking: false, item: dq.root, direction: dqPrev}).Generator()
+	return dq.confProducer(dqNext, false).WithLock(&dq.mtx)
+}
+
+func (dq *Deque[T]) ProducerBlocking() fun.Producer[T] {
+	defer dq.withLock()()
+	return dq.confProducer(dqNext, true).WithLock(&dq.mtx)
+}
+
+func (dq *Deque[T]) ProducerReverse() fun.Producer[T] {
+	defer dq.withLock()()
+	return dq.confProducer(dqPrev, false).WithLock(&dq.mtx)
+}
+
+func (dq *Deque[T]) ProducerReverseBlocking() fun.Producer[T] {
+	defer dq.withLock()()
+	return dq.confProducer(dqPrev, true).WithLock(&dq.mtx)
+}
+
+func (dq *Deque[T]) confProducer(direction dqDirection, blocking bool) fun.Producer[T] {
+	var current *element[T]
+	return func(ctx context.Context) (out T, _ error) {
+		if current == nil {
+			current = dq.root
+		}
+
+		if current.getNextOrPrevious(direction) == dq.root && blocking {
+			if err := current.wait(ctx, direction); err != nil {
+				if errors.Is(err, ErrQueueClosed) {
+					return out, io.EOF
+				}
+				return out, err
+			}
+		}
+		next := current.getNextOrPrevious(direction)
+		if next == nil || next == dq.root {
+			return out, io.EOF
+		}
+
+		current = next
+		return current.item, nil
+	}
 }
 
 // Distributor produces a consuming Distributor implementation that
 // always accepts new Push operations by removing the oldest element
 // in the queue, with Pop operations returning the oldest elements
 // first (FIFO).
+//
+// If the deqe is full, the write operations block.
 func (dq *Deque[T]) Distributor() Distributor[T] {
+	return Distributor[T]{
+		push: dq.WaitPushBack,
+		pop:  dq.WaitFront,
+		size: dq.Len,
+	}
+}
+
+// DistributorLIFO produces a Distributor that adds items to the back
+// of a queue and all remove operations act on the back of the queue,
+// so the most recently added items are the first to be removed (LIFO).
+//
+// If the deqe is full, the write operations block.
+func (dq *Deque[T]) DistributorLIFO() Distributor[T] {
+	return Distributor[T]{
+		push: dq.WaitPushBack,
+		pop:  dq.WaitBack,
+		size: dq.Len,
+	}
+}
+
+func (dq *Deque[T]) DistributorNonBlocking() Distributor[T] {
 	return Distributor[T]{
 		push: ignorePopContext(dq.ForcePushBack),
 		pop:  dq.WaitFront,
@@ -262,13 +329,10 @@ func (dq *Deque[T]) Distributor() Distributor[T] {
 	}
 }
 
-// DistributorLIFO produces a Distributor that, when a caller attempts
-// to Push onto a full Deque, it will remove the first element in the
-// list, while all Pop operations are also from the front of the Deque.
-func (dq *Deque[T]) DistributorLIFO() Distributor[T] {
+func (dq *Deque[T]) DistributorNonBlockingLIFO() Distributor[T] {
 	return Distributor[T]{
-		push: ignorePopContext(dq.ForcePushFront),
-		pop:  dq.WaitFront,
+		push: ignorePopContext(dq.ForcePushBack),
+		pop:  dq.WaitBack,
 		size: dq.Len,
 	}
 }
@@ -340,83 +404,6 @@ func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, erro
 			return it, nil
 		}
 	}
-}
-
-type dqIterator[T any] struct {
-	mtx sync.Mutex
-
-	// these fields must be protected by the *list's* mutex
-	list      *Deque[T]
-	item      *element[T]
-	direction dqDirection
-	blocking  bool
-
-	closed bool
-	err    error
-	cache  T
-}
-
-func (iter *dqIterator[T]) Close() error {
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-
-	iter.closed = true
-	return iter.err
-}
-
-func (iter *dqIterator[T]) Value() T {
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-
-	return iter.cache
-}
-
-func (iter *dqIterator[T]) isClosed() bool {
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-
-	return iter.closed
-}
-
-func (iter *dqIterator[T]) Next(ctx context.Context) bool {
-	iter.list.mtx.Lock()
-	defer iter.list.mtx.Unlock()
-
-	if iter.isClosed() || ctx.Err() != nil {
-		return false
-	}
-
-	next := iter.item.getNextOrPrevious(iter.direction)
-	if iter.blocking && next.isRoot() {
-		// if it's a blocking iterator we should wait for a
-		// new item or someone to close the queue.
-		if err := iter.item.wait(ctx, dqNext); err != nil {
-			if errors.Is(err, ErrQueueClosed) {
-				_ = iter.Close()
-				return false
-			}
-			// if we get here the context is probably canceled.
-			return false
-		}
-		// otherwise we have a new next item
-		next = iter.item.getNextOrPrevious(iter.direction)
-	}
-
-	// if the next item is the same as us (should be impossible)
-	// or the root item, it means we've reached the end of the
-	// iterator.
-	if next == iter.item || next.isRoot() {
-		_ = iter.Close()
-		return false
-	}
-
-	// now we can update the state of the iterator
-	iter.mtx.Lock()
-	defer iter.mtx.Unlock()
-	iter.item = next
-	iter.cache = next.item
-
-	return true
 }
 
 type dqDirection bool

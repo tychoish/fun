@@ -131,65 +131,6 @@ func TestIteratorAlgoInts(t *testing.T) {
 	})
 }
 
-func TestWrap(t *testing.T) {
-	base := fun.SliceIterator([]string{"a", "b"})
-	wrapped := Synchronize[string](base)
-	maybeBase := wrapped.(interface{ Unwrap() fun.Iterable[string] })
-	if maybeBase == nil {
-		t.Fatal("should not be nil")
-	}
-	if maybeBase.Unwrap() != base {
-		t.Error("should be the same object")
-	}
-}
-
-func TestSplit(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	t.Run("Split", func(t *testing.T) {
-		input := fun.SliceIterator(GenerateRandomStringSlice(100))
-
-		splits := input.Split(0)
-		if splits != nil {
-			t.Fatal("should be nil if empty")
-		}
-
-		splits = input.Split(10)
-		if len(splits) != 10 {
-			t.Fatal("didn't make enough split")
-		}
-
-		set := &adt.Map[string, none]{}
-
-		wg := &fun.WaitGroup{}
-		for _, iter := range splits {
-			wg.Add(1)
-
-			go func(it fun.Iterable[string]) {
-
-				defer wg.Done()
-
-				for it.Next(ctx) {
-					set.Ensure(it.Value())
-				}
-
-			}(iter)
-
-		}
-
-		wg.Wait(ctx)
-
-		if set.Len() != 100 {
-			t.Error("did not iterate enough")
-
-		}
-
-	})
-}
-
 func TestTools(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < 10; i++ {
@@ -561,9 +502,8 @@ func TestChain(t *testing.T) {
 	n := iter.Count(ctx)
 	assert.Equal(t, len(num)*2, n)
 
+	iter = Chain[int](fun.SliceIterator(num), fun.SliceIterator(num), fun.SliceIterator(num), fun.SliceIterator(num))
 	cancel()
-
-	iter = Chain[int](fun.SliceIterator(num), fun.SliceIterator(num))
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
 }
@@ -573,12 +513,16 @@ func TestDropZeros(t *testing.T) {
 	defer cancel()
 
 	all := make([]string, 100)
-	n := (fun.SliceIterator(all).Count(ctx))
+	n := fun.SliceIterator(all).Count(ctx)
 	assert.Equal(t, 100, n)
-	n = (DropZeroValues[string](fun.SliceIterator(all))).Count(ctx)
+	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
 	DropZeroValues[string](fun.SliceIterator(all)).Observe(ctx, func(in string) { assert.Zero(t, in) })
+
+	all[45] = "49"
+	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
+	assert.Equal(t, 1, n)
 }
 
 func TestWorker(t *testing.T) {

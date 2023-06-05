@@ -2,7 +2,6 @@ package itertool
 
 import (
 	"context"
-	"errors"
 	"io"
 
 	"github.com/tychoish/fun"
@@ -94,23 +93,27 @@ func Chain[T any](iters ...fun.Iterable[T]) *fun.Iterator[T] {
 	pipe := make(chan T)
 	init := fun.WaitFunc(func(ctx context.Context) {
 		defer close(pipe)
+		iteriter := fun.SliceIterator(iters)
 
-	GROUP:
-		for _, iter := range iters {
+		// use direct iteration because this function has full
+		// ownership of the iterator and this is the easiest
+		// way to make sure that the outer iterator aborts
+		// when the context is canceled.
+		for iteriter.Next(ctx) {
+			iter := iteriter.Value()
 
-		ITERATOR:
+			// iterate using the helper, so we get more
+			// atomic iteration, and the ability to
+			// respond to cancellation/blocking from the
+			// outgoing function.
 			for {
 				val, err := fun.IterateOne(ctx, iter)
-
-				switch {
-				case err == nil:
+				if err == nil {
 					if fun.Blocking(pipe).Send().Check(ctx, val) {
-						continue ITERATOR
+						continue
 					}
-				case errors.Is(err, io.EOF):
-					continue GROUP
 				}
-				return
+				break
 			}
 		}
 	}).Launch().Once()

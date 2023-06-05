@@ -35,7 +35,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return MakeDistributorBroker(ctx, DistributorBuffer(d), BrokerOptions{})
+				return MakeDistributorBroker(ctx, d.Distributor(), BrokerOptions{})
 			},
 		},
 		{
@@ -222,7 +222,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return NewDequeBroker[T](ctx, queue, BrokerOptions{
+				return NewDequeBroker(ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 				})
 			},

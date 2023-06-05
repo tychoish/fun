@@ -29,13 +29,10 @@ type List[T any] struct {
 
 // NewListFromIterator builds a list from the elements in the
 // iterator. In general, any error would be the result of the input
-// iterators's close method.
+// iterators's close method
 func NewListFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*List[T], error) {
 	out := &List[T]{}
-	if err := iter.Observe(ctx, func(in T) { out.PushBack(in) }); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return out, iter.Observe(ctx, func(in T) { out.PushBack(in) })
 }
 
 // Append adds a variadic sequence of items to the end of the list.

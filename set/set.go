@@ -147,12 +147,7 @@ func (s syncSetImpl[T]) Delete(in T) {
 	s.set.Delete(in)
 }
 
-func (s syncSetImpl[T]) Iterator() fun.Iterable[T] {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	return s.set.Producer().WithLock(s.mtx).Generator()
-}
+func (s syncSetImpl[T]) Iterator() fun.Iterable[T] { return s.Producer().Generator() }
 
 func (s syncSetImpl[T]) Producer() fun.Producer[T] {
 	s.mtx.Lock()

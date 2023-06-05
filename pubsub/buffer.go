@@ -22,8 +22,8 @@ type Distributor[T any] struct {
 func (d Distributor[T]) Len() int                               { return d.size() }
 func (d Distributor[T]) Send(ctx context.Context, in T) error   { return d.push(ctx, in) }
 func (d Distributor[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
-func (d Distributor[T]) Producer() fun.Producer[T]              { return fun.Producer[T](d.Receive).Lock() }
-func (d Distributor[T]) Processor() fun.Processor[T]            { return fun.Processor[T](d.Send).Lock() }
+func (d Distributor[T]) Producer() fun.Producer[T]              { return d.Receive }
+func (d Distributor[T]) Processor() fun.Processor[T]            { return d.Send }
 
 // Iterator allows iterator-like access to a
 // distributor. These iterators are blocking and destructive. The

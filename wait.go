@@ -176,8 +176,9 @@ func (wf WaitFunc) TTL(dur time.Duration) WaitFunc {
 	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
 }
 
-func (wf WaitFunc) Lock() WaitFunc {
-	mtx := &sync.Mutex{}
+func (wf WaitFunc) Lock() WaitFunc { return wf.WithLock(&sync.Mutex{}) }
+
+func (wf WaitFunc) WithLock(mtx *sync.Mutex) WaitFunc {
 	return func(ctx context.Context) {
 		mtx.Lock()
 		defer mtx.Unlock()

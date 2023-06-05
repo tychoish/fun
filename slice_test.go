@@ -27,6 +27,10 @@ func TestSlice(t *testing.T) {
 		s := randomIntSlice(100)
 		assert.Equal(t, s[25], s.Item(25))
 	})
+	t.Run("Variadic", func(t *testing.T) {
+		s := Variadic(randomIntSlice(100)...)
+		assert.Equal(t, s[25], s.Item(25))
+	})
 	t.Run("AddItems", func(t *testing.T) {
 		t.Run("Add", func(t *testing.T) {
 			s := Slice[int]{}

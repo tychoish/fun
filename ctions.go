@@ -32,12 +32,6 @@ func WhenCall(cond bool, op func()) {
 	op()
 }
 
-// Flip returns two values in the opposite order. Which is
-// particularly useful for taking "check" type functions that return
-// an argument and a bool and passing them to "when" type functions
-// that take a bool and then an argument.
-func Flip[A any, B any](a A, b B) (B, A) { return b, a }
-
 // WhenDo calls the function when the condition is true, and returns
 // the result, or if the condition is false, the operation is a noop,
 // and returns zero-value for the type.

@@ -26,9 +26,11 @@ func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for name, builder := range map[string]func() Set[string]{
+		"Ordered/Basic":        func() Set[string] { return MakeOrdered[string]() },
+		"Ordered/Sync":         func() Set[string] { return Synchronize(MakeOrdered[string]()) },
 		"Unordered/Basic":      func() Set[string] { return NewUnordered[string]() },
 		"Unordered/BasicLarge": func() Set[string] { return MakeUnordered[string](100) },
-		"Ordered/Basic":        func() Set[string] { return MakeOrdered[string]() },
+		"Unordered/Sync":       func() Set[string] { return Synchronize(NewUnordered[string]()) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("EmptyIteraton", func(t *testing.T) {

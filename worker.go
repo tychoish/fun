@@ -205,8 +205,9 @@ func (wf Worker) TTL(dur time.Duration) Worker {
 
 // Lock produces a Worker that will be executed within the scope of a
 // (managed) mutex.
-func (wf Worker) Lock() Worker {
-	mtx := &sync.Mutex{}
+func (wf Worker) Lock() Worker { return wf.WithLock(&sync.Mutex{}) }
+
+func (wf Worker) WithLock(mtx *sync.Mutex) Worker {
 	return func(ctx context.Context) error { mtx.Lock(); defer mtx.Unlock(); return wf(ctx) }
 }
 

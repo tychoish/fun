@@ -110,7 +110,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, deque.Distributor(), opts)
+	return MakeDistributorBroker(ctx, deque.DistributorNonBlocking(), opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -123,7 +123,7 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // is fixed, and must be a positive integer greater than 0,
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
 func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
-	return MakeDistributorBroker(ctx, fun.Must(NewDeque[T](DequeOptions{Capacity: capacity})).DistributorLIFO(), opts)
+	return MakeDistributorBroker(ctx, fun.Must(NewDeque[T](DequeOptions{Capacity: capacity})).DistributorNonBlocking(), opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {

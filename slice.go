@@ -18,12 +18,12 @@ func Variadic[T any](in ...T) Slice[T] { return in }
 // keyword also works for these slices.
 func (s Slice[T]) Iterator() *Iterator[T] {
 	var idx int = -1
-	return Producer[T](func(context.Context) (out T, _ error) {
+	return Producer[T](func(ctx context.Context) (out T, _ error) {
 		if len(s) <= idx+1 {
 			return out, io.EOF
 		}
 		idx++
-		return s[idx], nil
+		return s[idx], ctx.Err()
 	}).Generator()
 }
 

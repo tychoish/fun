@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -17,26 +18,48 @@ func TestIteratorTools(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	t.Run("ObservePanicSafety", func(t *testing.T) {
-		called := 0
-		err := Sliceify([]int{1, 2, 34, 56}).Iterator().Observe(ctx, func(in int) {
-			called++
-			if in > 3 {
-				panic("eep!")
+	t.Run("Observe", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
+			iter := SliceIterator([]int{})
+			assert.NotError(t, iter.Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+
+			_, err := iter.ReadOne(ctx)
+			assert.ErrorIs(t, err, io.EOF)
+		})
+		t.Run("PanicSafety", func(t *testing.T) {
+			called := 0
+			err := Sliceify([]int{1, 2, 34, 56}).Iterator().Observe(ctx, func(in int) {
+				called++
+				if in > 3 {
+					panic("eep!")
+				}
+			})
+			if err == nil {
+				t.Fatal("should error")
+			}
+			if called != 3 {
+				t.Error(called)
+			}
+			if !errors.Is(err, ErrRecoveredPanic) {
+				t.Error(err)
 			}
 		})
-		if err == nil {
-			t.Fatal("should error")
-		}
-		if called != 3 {
-			t.Error(called)
-		}
-		if !errors.Is(err, ErrRecoveredPanic) {
-			t.Error(err)
-		}
-	})
-	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, SliceIterator([]int{}).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			count := 0
+			assert.Error(t, ctx.Err())
+			err := Sliceify([]int{1, 2, 34, 56}).Iterator().Observe(ctx, func(int) {
+				count++
+			})
+			t.Log(err)
+			if !errors.Is(err, context.Canceled) {
+				t.Error(err, ctx.Err())
+			}
+			if count != 0 {
+				t.Error("expected no ops", count)
+			}
+		})
 	})
 	t.Run("IterateOne", func(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
@@ -177,6 +200,62 @@ func TestIteratorTools(t *testing.T) {
 		}
 		assert.NotError(t, evens.Close())
 	})
+	t.Run("MapConverter", func(t *testing.T) {
+		in := map[string]string{
+			"hi":  "there",
+			"how": "are you doing",
+		}
+		iter := MapIterator(in)
+		seen := 0
+		for iter.Next(ctx) {
+			item := iter.Value()
+			switch {
+			case item.Key == "hi":
+				check.Equal(t, item.Value, "there")
+			case item.Key == "how":
+				check.Equal(t, item.Value, "are you doing")
+			default:
+				t.Errorf("unexpected value: %s", item)
+			}
+			seen++
+		}
+		assert.Equal(t, seen, len(in))
+	})
+	t.Run("Split", func(t *testing.T) {
+		input := SliceIterator(GenerateRandomStringSlice(100))
+
+		splits := input.Split(0)
+		if splits != nil {
+			t.Fatal("should be nil if empty")
+		}
+
+		splits = input.Split(10)
+		if len(splits) != 10 {
+			t.Fatal("didn't make enough split")
+		}
+
+		count := &atomic.Int64{}
+
+		wg := &WaitGroup{}
+		for _, iter := range splits {
+			wg.Add(1)
+
+			go func(it *Iterator[string]) {
+				defer wg.Done()
+				for it.Next(ctx) {
+					count.Add(1)
+				}
+
+			}(iter)
+
+		}
+
+		wg.Wait(ctx)
+
+		if count.Load() != 100 {
+			t.Error("did not iterate enough")
+		}
+	})
 }
 
 func testIntIter(t *testing.T, size int) *Iterator[int] {
@@ -210,4 +289,11 @@ func (iter *TestReadoneableImpl) ReadOne(ctx context.Context) (string, error) {
 		return "sparta", nil
 	}
 	return "", io.EOF
+}
+func GenerateRandomStringSlice(size int) []string {
+	out := make([]string, size)
+	for idx := range out {
+		out[idx] = fmt.Sprint("value=", idx)
+	}
+	return out
 }
