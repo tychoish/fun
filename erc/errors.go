@@ -8,11 +8,11 @@ package erc
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -91,19 +91,20 @@ func (e *Stack) Unwrap() error {
 	return nil
 }
 
-type esIterImpl struct {
-	current *Stack
-}
-
-func (_ *esIterImpl) Close() error { return nil }
-func (e *esIterImpl) Value() error { return e.current.err }
-func (e *esIterImpl) Next(ctx context.Context) bool {
-	if e.current.next == nil || ctx.Err() != nil {
-		return false
-	}
-
-	e.current = e.current.next
-	return e.current.err != nil
+func (e *Stack) Producer() fun.Producer[error] {
+	iter := &Stack{next: e}
+	return fun.Producer[error](func(ctx context.Context) (value error, err error) {
+		switch {
+		case iter.next == nil, iter.next.err == nil:
+			return nil, io.EOF
+		case ctx.Err() != nil:
+			return nil, ctx.Err()
+		default:
+			value = iter.err
+			iter = iter.next
+			return value, nil
+		}
+	})
 }
 
 // Iterator returns an iterator object over the contents of the
@@ -112,9 +113,7 @@ func (e *esIterImpl) Next(ctx context.Context) bool {
 // safe for concurrent access, and must only be used from one
 // goroutine, or with a synchronized approach. You may create multiple
 // Iterators on the same stack without issue.
-func (e *Stack) Iterator() fun.Iterator[error] {
-	return adt.NewIterator[error](&sync.Mutex{}, &esIterImpl{current: &Stack{next: e}})
-}
+func (e *Stack) Iterator() *fun.Iterator[error] { return e.Producer().Lock().Generator() }
 
 // Collector is a simplified version of the error collector in
 // github.com/tychoish/emt. The collector is thread safe and
@@ -149,11 +148,11 @@ func (ec *Collector) Observer() fun.Observer[error] { return ec.Add }
 // collector. The iterator proceeds from the current error to the
 // oldest error, and will not observe new errors added to the
 // collector.
-func (ec *Collector) Iterator() fun.Iterator[error] {
+func (ec *Collector) Iterator() *fun.Iterator[error] {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 
-	return adt.NewIterator[error](&ec.mu, &esIterImpl{current: &Stack{next: ec.stack}})
+	return ec.stack.Producer().WithLock(&ec.mu).Generator()
 }
 
 // Resolve returns an error of type *erc.Stack, or nil if there have

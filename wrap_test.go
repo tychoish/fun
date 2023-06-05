@@ -48,7 +48,7 @@ func TestWrap(t *testing.T) {
 		errs1 := Unwind(err)
 		errs2 := []error{}
 
-		assert.NotError(t, Observe(internal.BackgroundContext, UnwindIterator(err), func(in error) { errs2 = append(errs2, in) }))
+		assert.NotError(t, UnwindIterator(err).Observe(internal.BackgroundContext, func(in error) { errs2 = append(errs2, in) }))
 		assert.True(t, IsWrapped(err))
 		assert.Equal(t, len(errs1), len(errs2))
 		for idx := range errs1 {

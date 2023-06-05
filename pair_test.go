@@ -9,7 +9,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -74,7 +73,7 @@ func TestPairs(t *testing.T) {
 			p := Pairs[string, int]{}
 			err := p.ConsumeValues(
 				testt.Context(t),
-				internal.NewSliceIter([]int{1, 2, 3}),
+				SliceIterator([]int{1, 2, 3}),
 				func(in int) string { return fmt.Sprint(in) },
 			)
 			assert.NotError(t, err)

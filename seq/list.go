@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/tychoish/fun"
 )
@@ -29,9 +30,9 @@ type List[T any] struct {
 // NewListFromIterator builds a list from the elements in the
 // iterator. In general, any error would be the result of the input
 // iterators's close method.
-func NewListFromIterator[T any](ctx context.Context, iter fun.Iterator[T]) (*List[T], error) {
+func NewListFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*List[T], error) {
 	out := &List[T]{}
-	if err := fun.Observe(ctx, iter, func(in T) { out.PushBack(in) }); err != nil {
+	if err := iter.Observe(ctx, func(in T) { out.PushBack(in) }); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -312,68 +313,82 @@ func (l *List[T]) Front() *Element[T] { l.lazySetup(); return l.root.next }
 //	}
 func (l *List[T]) Back() *Element[T] { l.lazySetup(); return l.root.prev }
 
-// Iterator returns an iterator that produces elements from the list,
-// from the front to the back, compatible with the fun.Iterator
-// interface and tools in fun/itertool. The Iterator is not
-// synchronized with the values in the list, and will be exhausted
-// when you reach the end of the list. To access an iterator of the
-// *values* in the list, wrap this iterator using the seq.ListValues()
-// function to produce an iterator over the values.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visable.
-func (l *List[T]) Iterator() fun.Iterator[*Element[T]] { return &elemIter[T]{elem: l.root, dir: next} }
+func (l *List[T]) Producer() fun.Producer[T] {
+	l.lazySetup()
+	current := l.root
+	return func(ctx context.Context) (o T, _ error) {
+		current = current.Next()
+		if !current.Ok() || current == l.root {
+			return o, io.EOF
+		}
+		return current.Value(), nil
+	}
+}
+func (l *List[T]) ProducerPop() fun.Producer[T] {
+	l.lazySetup()
+	var current *Element[T]
+	return func(ctx context.Context) (o T, _ error) {
+		current = l.PopFront()
 
-// Values returns an iterator over the values in the list in
-// front-to-back order.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visable.
-func (l *List[T]) Values() fun.Iterator[T] { return listValues(l.Iterator()) }
+		if !current.Ok() || current == l.root {
+			return o, io.EOF
+		}
 
-// Reverse returns an iterator that produces elements from the list,
-// from the back to the front, compatible with the fun.Iterator
-// interface and tools in fun/itertool. The iterator is not
-// synchronized with the values in the list, and will be exhausted
-// when you reach the front of the list. To access an iterator of the
-// *values* in the list, wrap this iterator using the seq.ListValues()
-// function to produce an iterator over the values.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visable.
-func (l *List[T]) Reverse() fun.Iterator[*Element[T]] { return &elemIter[T]{elem: l.root, dir: prev} }
-
-// ReverseValues returns an iterator of the values in the list, in
-// back-to-front order.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visable.
-func (l *List[T]) ReverseValues() fun.Iterator[T] { return listValues(l.Reverse()) }
-
-// PopIterator produces an iterator that consumes elements from the
-// list as it iterates, moving front-to-back. To access an iterator of
-// the *values* in the list, use PopValues() for an iterator over the
-// values.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopIterator() fun.Iterator[*Element[T]] {
-	return &elemIter[T]{elem: l.root, dir: next, pop: true}
+		return current.item, nil
+	}
 }
 
-// PopValues produces an iterator that consumes the elements of the
-// list as it iterates moving front-to-back, and provides access to
-// the values.
+func (l *List[T]) ProducerReverse() fun.Producer[T] {
+	l.lazySetup()
+	current := l.root
+	return func(ctx context.Context) (o T, _ error) {
+		current = current.Previous()
+		if !current.Ok() || current == l.root {
+			return o, io.EOF
+		}
+		return current.Value(), nil
+	}
+}
+
+func (l *List[T]) ProducerReversePop() fun.Producer[T] {
+	l.lazySetup()
+	var current *Element[T]
+	return func(ctx context.Context) (o T, _ error) {
+		current = l.PopBack()
+		if !current.Ok() || current == l.root {
+			return o, io.EOF
+		}
+		return current.item, nil
+	}
+}
+
+// Iterator returns an iterator over the values in the list in
+// front-to-back order. The Iterator is not synchronized with the
+// values in the list, and will be exhausted when you reach the end of
+// the list.
+//
+// If you add values to the list during iteration *behind* where the
+// iterator is, these values will not be present in the iterator;
+// however, values added ahead of the iterator, will be visable.
+func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Generator() }
+
+// Reverse returns an iterator that produces elements from the list,
+// from the back to the front. The iterator is not
+// synchronized with the values in the list, and will be exhausted
+// when you reach the front of the list.
+//
+// If you add values to the list during iteration *behind* where the
+// iterator is, these values will not be present in the iterator;
+// however, values added ahead of the iterator, will be visable.
+func (l *List[T]) Reverse() *fun.Iterator[T] { return l.ProducerReverse().Generator() }
+
+// PopIterator produces an iterator that consumes elements from the
+// list as it iterates, moving front-to-back.
 //
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
 // however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopValues() fun.Iterator[T] { return listValues(l.PopIterator()) }
+func (l *List[T]) PopIterator() *fun.Iterator[T] { return l.ProducerPop().Generator() }
 
 // PopReverse produces an iterator that consumes elements from the
 // list as it iterates, moving back-to-front. To access an iterator of
@@ -383,18 +398,7 @@ func (l *List[T]) PopValues() fun.Iterator[T] { return listValues(l.PopIterator(
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
 // however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopReverse() fun.Iterator[*Element[T]] {
-	return &elemIter[T]{elem: l.root, dir: prev, pop: true}
-}
-
-// PopReverseValues produces an iterator that consumes the elements of the
-// list as it iterates moving back-to-front, and provides access to
-// the values.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopReverseValues() fun.Iterator[T] { return listValues(l.PopReverse()) }
+func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().Generator() }
 
 // Extend removes items from the front of the input list, and appends
 // them to the end of the current list.
@@ -440,70 +444,4 @@ func (l *List[T]) pop(it *Element[T]) *Element[T] {
 	it.uncheckedRemove()
 
 	return it
-}
-
-type direction bool
-
-const (
-	next = true
-	prev = false
-)
-
-type valIter[T any, I interface{ Value() T }] struct{ fun.Iterator[I] }
-
-func (iter *valIter[T, I]) Value() T { return iter.Iterator.Value().Value() }
-
-// listValues converts an iterator of List Elements to an iterator of
-// its values. The conversion does not have additional overhead
-// relative to the original iterator, and only overides the behavior
-// of the Value() method of the iterator.
-func listValues[T any](in fun.Iterator[*Element[T]]) fun.Iterator[T] {
-	return &valIter[T, *Element[T]]{Iterator: in}
-}
-
-type elemIter[T any] struct {
-	dir    direction
-	elem   *Element[T]
-	list   *List[T]
-	closed bool
-	pop    bool
-}
-
-func (iter *elemIter[T]) getNext(next direction) *Element[T] {
-	var elem *Element[T]
-	if next {
-		if iter.pop {
-			elem = iter.list.PopFront()
-		} else {
-			elem = iter.elem.next
-		}
-	} else {
-		if iter.pop {
-			elem = iter.list.PopBack()
-		} else {
-			elem = iter.elem.prev
-		}
-	}
-
-	return elem
-}
-
-func (iter *elemIter[T]) Close() error       { iter.closed = true; return nil }
-func (iter *elemIter[T]) Value() *Element[T] { return iter.elem }
-func (iter *elemIter[T]) Next(ctx context.Context) bool {
-	if iter.list == nil && iter.elem != nil {
-		iter.list = iter.elem.list
-	}
-
-	if iter.closed || (iter.list == nil && iter.elem == nil) || ctx.Err() != nil {
-		return false
-	}
-
-	next := iter.getNext(iter.dir)
-	if next == nil || iter.list.root == next || !next.ok {
-		return false
-	}
-
-	iter.elem = next
-	return true
 }

@@ -28,7 +28,7 @@ import (
 //
 // Use Group(itertool.Slice([]*Service)) to produce a group from a
 // slice of *Services,
-func Group(services fun.Iterator[*Service]) *Service {
+func Group(services *fun.Iterator[*Service]) *Service {
 	waiters := pubsub.NewUnlimitedQueue[func() error]()
 	wg := &fun.WaitGroup{}
 	ec := &erc.Collector{}
@@ -119,13 +119,13 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // When the service returns all worker Goroutines as well as the input
 // worker will have returned. Use a blocking pubsub iterator to
 // dispatch wait functions throughout the lifecycle of your program.
-func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
+func Wait(iter *fun.Iterator[fun.WaitFunc]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
 		Run: func(ctx context.Context) error {
 			for {
-				value, err := fun.IterateOne(ctx, iter)
+				value, err := iter.ReadOne(ctx)
 				if err != nil {
 					break
 				}
@@ -151,7 +151,7 @@ func Wait(iter fun.Iterator[fun.WaitFunc]) *Service {
 // *Service. For a long running service, use an iterator that is
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessIterator[T any](
-	iter fun.Iterator[T],
+	iter *fun.Iterator[T],
 	mapper fun.Processor[T],
 	opts itertool.Options,
 ) *Service {
@@ -185,7 +185,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 			iter := pipe.Distributor().Iterator()
 
 			for {
-				item, err := fun.IterateOne(ctx, iter)
+				item, err := iter.ReadOne(ctx)
 				if err != nil {
 					return nil
 				}
@@ -203,7 +203,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 
 			ec := &erc.Collector{}
 
-			ec.Add(itertool.ParallelForEach(ctx, cache.PopValues(),
+			ec.Add(itertool.ParallelForEach(ctx, cache.PopIterator(),
 				func(ctx context.Context, wf fun.Worker) error {
 					ec.Add(wf.Safe()(ctx))
 					return nil

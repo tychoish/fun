@@ -17,6 +17,6 @@ import (
 // special case with fun.IterateOne which does make it safe for
 // concurrent use, if the iterator is only accessed using
 // fun.IterateOne.
-func Synchronize[T any](in fun.Iterator[T]) fun.Iterator[T] {
+func Synchronize[T any](in fun.Iterable[T]) fun.Iterable[T] {
 	return adt.NewIterator(&sync.Mutex{}, in)
 }

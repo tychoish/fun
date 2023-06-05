@@ -9,7 +9,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
 )
 
 func makeMap(size int) Map[string, int] {
@@ -30,9 +29,9 @@ func TestMap(t *testing.T) {
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
 		check.Equal(t, len(mp.Pairs()), 100)
-		check.Equal(t, Count(ctx, mp.Iterator()), 100)
-		check.Equal(t, Count(ctx, mp.Keys()), 100)
-		check.Equal(t, Count(ctx, mp.Values()), 100)
+		check.Equal(t, mp.Iterator().Count(ctx), 100)
+		check.Equal(t, mp.Keys().Count(ctx), 100)
+		check.Equal(t, mp.Values().Count(ctx), 100)
 	})
 	t.Run("Extend", func(t *testing.T) {
 		mp := makeMap(100)
@@ -71,7 +70,7 @@ func TestMap(t *testing.T) {
 		num := int(time.Microsecond)
 		mp := makeMap(num)
 
-		check.True(t, Count(ctx, mp.Iterator()) == mp.Len())
+		check.True(t, mp.Iterator().Count(ctx) == mp.Len())
 
 		iter := mp.Iterator()
 		check.True(t, iter.Next(ctx))
@@ -80,7 +79,7 @@ func TestMap(t *testing.T) {
 
 		check.True(t, !iter.Next(ctx))
 
-		check.True(t, Count(ctx, mp.Iterator()) < num)
+		check.True(t, mp.Iterator().Count(ctx) < num)
 	})
 	t.Run("SetDefaultAndCheck", func(t *testing.T) {
 		mp := Map[string, bool]{}
@@ -136,7 +135,7 @@ func TestMap(t *testing.T) {
 		t.Run("Values", func(t *testing.T) {
 			mp := Map[string, int]{}
 			mp.ConsumeValues(ctx,
-				internal.NewSliceIter([]int{1, 2, 3}),
+				SliceIterator([]int{1, 2, 3}),
 				func(in int) string { return fmt.Sprint(in) },
 			)
 			check.Equal(t, mp["1"], 1)

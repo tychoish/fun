@@ -1,9 +1,26 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 )
+
+func IsTerminatingError(err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, io.EOF):
+		return true
+	case errors.Is(err, context.Canceled):
+		return true
+	case errors.Is(err, context.DeadlineExceeded):
+		return true
+	default:
+		return false
+	}
+}
 
 type MergedError struct {
 	Current error

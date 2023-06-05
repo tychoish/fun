@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/itertool"
 )
@@ -26,7 +25,8 @@ type Set[T comparable] interface {
 	Check(T) bool
 	// Iterator produces an Iterator implementation for the
 	// elements in the set.
-	Iterator() fun.Iterator[T]
+	Iterator() fun.Iterable[T]
+	Producer() fun.Producer[T]
 }
 
 // MakeUnordered constructs a set object, pre-allocating the specified
@@ -37,13 +37,13 @@ func MakeUnordered[T comparable](len int) Set[T] { return make(mapSetImpl[T], le
 func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T](0) }
 
 // Populate adds all elements in the iterator to the provided Set.
-func Populate[T comparable](ctx context.Context, set Set[T], iter fun.Iterator[T]) {
-	fun.InvariantMust(fun.Observe(ctx, iter, set.Add))
+func Populate[T comparable](ctx context.Context, set Set[T], iter *fun.Iterator[T]) {
+	fun.InvariantMust(iter.Observe(ctx, set.Add))
 }
 
 // BuildUnordered produces a new unordered set from the elements in
 // the iterator.
-func BuildUnordered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set[T] {
+func BuildUnordered[T comparable](ctx context.Context, iter *fun.Iterator[T]) Set[T] {
 	set := NewUnordered[T]()
 	Populate(ctx, set, iter)
 	return set
@@ -51,42 +51,38 @@ func BuildUnordered[T comparable](ctx context.Context, iter fun.Iterator[T]) Set
 
 // BuildOrderedFromPairs produces an unordered set from a sequence of pairs.
 func BuildOrderedFromPairs[K, V comparable](pairs fun.Pairs[K, V]) Set[fun.Pair[K, V]] {
-	return BuildOrdered(internal.BackgroundContext, fun.Iterator[fun.Pair[K, V]](internal.NewSliceIter(pairs)))
+	return BuildOrdered(internal.BackgroundContext, fun.Sliceify(pairs).Iterator())
 }
 
 // BuildUnorderedFromPairs produces an order-preserving set based on a
 // sequence of Pairs.
 func BuildUnorderedFromPairs[K, V comparable](pairs fun.Pairs[K, V]) Set[fun.Pair[K, V]] {
-	return BuildUnordered(internal.BackgroundContext, fun.Iterator[fun.Pair[K, V]](internal.NewSliceIter(pairs)))
+	return BuildUnordered(internal.BackgroundContext, fun.Sliceify(pairs).Iterator())
 }
 
-type mapSetImpl[T comparable] map[T]struct{}
+type mapSetImpl[T comparable] fun.Map[T, struct{}]
 
-func (s mapSetImpl[T]) Add(item T)        { s[item] = struct{}{} }
-func (s mapSetImpl[T]) Len() int          { return len(s) }
-func (s mapSetImpl[T]) Delete(item T)     { delete(s, item) }
-func (s mapSetImpl[T]) Check(item T) bool { _, ok := s[item]; return ok }
-func (s mapSetImpl[T]) Iterator() fun.Iterator[T] {
+func (s mapSetImpl[T]) Producer() fun.Producer[T] { return fun.Map[T, struct{}](s).Keys().Producer() }
+func (s mapSetImpl[T]) Add(item T)                { s[item] = struct{}{} }
+func (s mapSetImpl[T]) Len() int                  { return len(s) }
+func (s mapSetImpl[T]) Delete(item T)             { delete(s, item) }
+func (s mapSetImpl[T]) Check(item T) bool         { _, ok := s[item]; return ok }
+func (s mapSetImpl[T]) Iterator() fun.Iterable[T] {
 	pipe := make(chan T)
-	once := &sync.Once{}
-	iter := &internal.GeneratorIterator[T]{}
-	iter.Closer = func() { once.Do(func() { close(pipe) }) }
 
 	setup := fun.WaitFunc(func(ctx context.Context) {
-		defer iter.Closer()
+		defer close(pipe)
 		for item := range s {
 			if !fun.Blocking(pipe).Send().Check(ctx, item) {
 				return
 			}
 		}
-	}).Start().Once()
+	}).Launch().Once()
 
-	iter.Operation = func(ctx context.Context) (T, error) {
+	return fun.Generator(func(ctx context.Context) (T, error) {
 		setup(ctx)
 		return fun.Blocking(pipe).Receive().Read(ctx)
-	}
-
-	return iter
+	})
 }
 
 func (s mapSetImpl[T]) MarshalJSON() ([]byte, error) {
@@ -151,11 +147,18 @@ func (s syncSetImpl[T]) Delete(in T) {
 	s.set.Delete(in)
 }
 
-func (s syncSetImpl[T]) Iterator() fun.Iterator[T] {
+func (s syncSetImpl[T]) Iterator() fun.Iterable[T] {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	return adt.NewIterator(s.mtx, s.set.Iterator())
+	return s.set.Producer().WithLock(s.mtx).Generator()
+}
+
+func (s syncSetImpl[T]) Producer() fun.Producer[T] {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	return s.set.Producer().WithLock(s.mtx)
 }
 
 func (s syncSetImpl[T]) MarshalJSON() ([]byte, error) {
@@ -165,5 +168,5 @@ func (s syncSetImpl[T]) MarshalJSON() ([]byte, error) {
 func (s syncSetImpl[T]) UnmarshalJSON(in []byte) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	return fun.Observe(internal.BackgroundContext, itertool.UnmarshalJSON[T](in), s.set.Add)
+	return itertool.UnmarshalJSON[T](in).Observe(internal.BackgroundContext, s.set.Add)
 }

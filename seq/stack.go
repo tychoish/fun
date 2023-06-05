@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/tychoish/fun"
 )
@@ -20,9 +21,9 @@ type Stack[T any] struct {
 // NewListFromIterator builds a stack from the elements in the
 // iterator. In general, any error would be the result of the input
 // iterators's close method.
-func NewStackFromIterator[T any](ctx context.Context, iter fun.Iterator[T]) (*Stack[T], error) {
+func NewStackFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*Stack[T], error) {
 	out := &Stack[T]{}
-	if err := fun.Observe(ctx, iter, func(in T) { out.Push(in) }); err != nil {
+	if err := iter.Observe(ctx, func(in T) { out.Push(in) }); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -295,51 +296,34 @@ func (s *Stack[T]) Pop() *Item[T] {
 	return out
 }
 
+func (s *Stack[T]) Producer() fun.Producer[T] {
+	item := &Item[T]{next: s.head}
+	return func(ctx context.Context) (o T, _ error) {
+		item = item.Next()
+		if !item.Ok() {
+			return o, io.EOF
+		}
+		return item.Value(), nil
+	}
+}
+
+func (s *Stack[T]) ProducerPop() fun.Producer[T] {
+	var item *Item[T]
+	return func(ctx context.Context) (out T, _ error) {
+		item = s.Pop()
+		if item == s.head {
+			return out, io.EOF
+		}
+		return item.Value(), nil
+	}
+}
+
 // Iterator returns a non-destructive iterator over the Items in a
 // stack. Iterator will not observe new items added to the stack
 // during iteration.
-func (s *Stack[T]) Iterator() fun.Iterator[*Item[T]] { return newItemIter(s.head) }
-func (s *Stack[T]) Values() fun.Iterator[T]          { return stackValues(s.Iterator()) }
-func newItemIter[T any](it *Item[T]) *itemIter[T]    { return &itemIter[T]{next: &Item[T]{next: it}} }
+func (s *Stack[T]) Iterator() *fun.Iterator[T] { return s.Producer().Generator() }
 
 // PopIterator returns a destructive iterator over the Items in a
 // stack. PopIterator will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) PopIterator() fun.Iterator[*Item[T]] { return &itemIter[T]{pop: true, next: s.head} }
-func (s *Stack[T]) PopValues() fun.Iterator[T]          { return stackValues(s.PopIterator()) }
-
-// stackValues converts an iterator of stack Items to an iterator of
-// their values. The conversion does not have additional overhead
-// relative to the original iterator, and only overides the behavior
-// of the Value() method of the iterator.
-func stackValues[T any](in fun.Iterator[*Item[T]]) fun.Iterator[T] { return &valIter[T, *Item[T]]{in} }
-
-type itemIter[T any] struct {
-	next   *Item[T]
-	pop    bool
-	closed bool
-}
-
-func (iter *itemIter[T]) Value() *Item[T] { return iter.next }
-func (iter *itemIter[T]) Close() error    { iter.closed = true; return nil }
-func (iter *itemIter[T]) Next(ctx context.Context) bool {
-	if iter.closed || ctx.Err() != nil || iter.next == nil {
-		return false
-	}
-	next := iter.next.next
-
-	if iter.pop {
-		if iter.next.Remove() {
-			iter.next = next
-			return true
-		}
-
-		return false
-	}
-	if next == nil || !next.ok {
-		return false
-	}
-
-	iter.next = next
-	return true
-}
+func (s *Stack[T]) PopIterator() *fun.Iterator[T] { return s.ProducerPop().Generator() }

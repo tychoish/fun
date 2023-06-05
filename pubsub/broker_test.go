@@ -10,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/set"
 )
 
@@ -595,46 +594,70 @@ func TestBroker(t *testing.T) {
 	})
 	t.Run("ClosedQueue", func(t *testing.T) {
 		t.Parallel()
-		queue := NewUnlimitedQueue[string]()
-		fun.Invariant(queue.Close() == nil, "cannot error")
-		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
+		t.Run("PublishOne", func(t *testing.T) {
+			t.Parallel()
+			queue := NewUnlimitedQueue[string]()
+			fun.Invariant(queue.Close() == nil, "cannot error")
+			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
-		sa := time.Now()
-		nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-		defer ncancel()
-		broker.Publish(nctx, "foo")
-		broker.Publish(nctx, "foo")
-		if dur := time.Since(sa); dur < 10*time.Millisecond {
-			t.Error(dur)
-		}
-	})
+			sa := time.Now()
+			nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			defer ncancel()
+			broker.Publish(nctx, "foo")
+			dur := time.Since(sa)
+			if dur > time.Millisecond {
+				t.Error(dur)
+			}
+		})
+		t.Run("PublishOneWithSubScriber", func(t *testing.T) {
+			t.Parallel()
+			queue := NewUnlimitedQueue[string]()
+			fun.Invariant(queue.Close() == nil, "cannot error")
+			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
-	t.Run("ClosedQueue", func(t *testing.T) {
-		t.Parallel()
-		queue := NewUnlimitedQueue[string]()
-		fun.Invariant(queue.Close() == nil, "cannot error")
-		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
-
-		sa := time.Now()
-		nctx, ncancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-		defer ncancel()
-		for {
-			ch := broker.Subscribe(nctx)
+			sa := time.Now()
+			nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			defer ncancel()
+			ch := broker.Subscribe(ctx)
 			if ch == nil {
-				break
+				t.Error("should be able to subscribe")
 			}
 			broker.Publish(nctx, "foo")
-		}
-		// broker.Publish(nctx, "foo")
-		if dur := time.Since(sa); dur < 10*time.Millisecond {
-			t.Error(dur)
-		}
+			dur := time.Since(sa)
+			if dur > time.Millisecond {
+				t.Error(dur)
+			}
+		})
+		t.Run("PublishMany", func(t *testing.T) {
+			t.Parallel()
+			queue := NewUnlimitedQueue[string]()
+			fun.Invariant(queue.Close() == nil, "cannot error")
+			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
+
+			sa := time.Now()
+			nctx, ncancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer ncancel()
+			count := int64(0)
+			for {
+				ch := broker.Subscribe(nctx)
+				if ch == nil {
+					break
+				}
+				broker.Publish(nctx, "foo")
+				count++
+			}
+			dur := time.Since(sa)
+			if dur < 20*time.Millisecond || dur > 30*time.Millisecond {
+				t.Error(count, dur)
+			}
+		})
 	})
+
 	t.Run("Populate", func(t *testing.T) {
 		t.Parallel()
 		input := randomIntSlice(100)
 
-		iter := itertool.Slice(input)
+		iter := fun.SliceIterator(input)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()

@@ -40,6 +40,8 @@ func (pf Processor[T]) Block(in T) error { return pf.Worker(in).Block() }
 // Ignore runs the process function and discards the error.
 func (pf Processor[T]) Ignore(ctx context.Context, in T) { _ = pf(ctx, in) }
 
+func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
+
 // Wait converts a processor into a worker that will process the input
 // provided when executed.
 func (pf Processor[T]) Wait(in T, of Observer[error]) WaitFunc { return pf.Worker(in).Wait(of) }
@@ -113,10 +115,10 @@ func (pf Processor[T]) Chain(next Processor[T]) Processor[T] {
 // the processor function, merging/collecting all errors, and
 // respecting the worker's context. The processing does not begin
 // until the worker is called.
-func (pf Processor[T]) Iterator(iter Iterator[T]) Worker {
+func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		oe := func(e error) { err = internal.MergeErrors(e, err) }
-		oe(Observe(ctx, iter, pf.Observer(ctx, oe)))
+		oe(iter.Observe(ctx, pf.Observer(ctx, oe)))
 		return
 	}
 }
@@ -182,7 +184,27 @@ func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
 	}
 }
 
+// WithCancel creates a Processor and a cancel function which will
+// terminate the context that the root proccessor is running
+// with. This context isn't canceled *unless* the cancel function is
+// called (or the context passed to the Processor is canceled.)
+func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
+	var wctx context.Context
+	var cancel context.CancelFunc
+	once := &sync.Once{}
+
+	return func(ctx context.Context, in T) error {
+		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+		return pf(wctx, in)
+	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+}
+
 ////////////////////////////////////////////////////////////////////////
+
+type tuple[T, U any] struct {
+	One T
+	Two U
+}
 
 var (
 	ErrLimitExceeded = errors.New("limit exceeded")

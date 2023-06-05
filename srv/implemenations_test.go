@@ -22,7 +22,7 @@ func TestImplementationHelpers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(itertool.Variadic(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
+		svc := Wait(fun.VariadicIterator(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)
@@ -216,12 +216,12 @@ func TestImplementationHelpers(t *testing.T) {
 	})
 }
 
-func makeIterator(size int) fun.Iterator[int] {
+func makeIterator(size int) *fun.Iterator[int] {
 	slice := make([]int, size)
 	for i := 0; i < size; i++ {
 		slice[i] = rand.Intn(size)
 	}
-	return itertool.Slice(slice)
+	return fun.SliceIterator(slice)
 }
 
 func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {

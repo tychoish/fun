@@ -224,3 +224,18 @@ func (wf Worker) Chain(next Worker) Worker {
 		return next.If(ctx.Err() == nil)(ctx)
 	}
 }
+
+// WithCancel creates a Worker and a cancel function which will
+// terminate the context that the root Worker is running
+// with. This context isn't canceled *unless* the cancel function is
+// called (or the context passed to the Worker is canceled.)
+func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
+	var wctx context.Context
+	var cancel context.CancelFunc
+	once := &sync.Once{}
+
+	return func(ctx context.Context) error {
+		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+		return wf(wctx)
+	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+}

@@ -16,59 +16,64 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
 
 func getConstructors[T comparable](t *testing.T) []FixtureIteratorConstuctors[T] {
 	return []FixtureIteratorConstuctors[T]{
 		{
-			Name: "SliceIterator",
-			Constructor: func(elems []T) fun.Iterator[T] {
-				return Slice(elems)
+			Name: "SlicifyIterator",
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				return fun.Sliceify(elems).Iterator()
+			},
+		},
+		{
+			Name: "Slice",
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				return fun.SliceIterator(elems)
 			},
 		},
 		{
 			Name: "VariadicIterator",
-			Constructor: func(elems []T) fun.Iterator[T] {
-				return Variadic(elems...)
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				return fun.VariadicIterator(elems...)
 			},
 		},
 		{
 			Name: "ChannelIterator",
-			Constructor: func(elems []T) fun.Iterator[T] {
+			Constructor: func(elems []T) *fun.Iterator[T] {
 				vals := make(chan T, len(elems))
 				for idx := range elems {
 					vals <- elems[idx]
 				}
 				close(vals)
-				return Channel(vals)
+				return fun.Blocking(vals).Iterator()
 			},
 		},
-		{
-			Name: "QueueIterator",
-			Constructor: func(elems []T) fun.Iterator[T] {
-				cue, err := pubsub.NewQueue[T](pubsub.QueueOptions{
-					SoftQuota: len(elems),
-					HardLimit: 2 * len(elems),
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
+		// {
+		// 	Name: "QueueIterator",
+		// 	Constructor: func(elems []T) *fun.Iterator[T] {
+		// 		cue, err := pubsub.NewQueue[T](pubsub.QueueOptions{
+		// 			SoftQuota: len(elems),
+		// 			HardLimit: 2 * len(elems),
+		// 		})
+		// 		if err != nil {
+		// 			t.Fatal(err)
+		// 		}
 
-				for idx := range elems {
-					if err := cue.Add(elems[idx]); err != nil {
-						t.Fatal(err)
-					}
-				}
+		// 		for idx := range elems {
+		// 			if err := cue.Add(elems[idx]); err != nil {
+		// 				t.Fatal(err)
+		// 			}
+		// 		}
 
-				if err = cue.Close(); err != nil {
-					t.Fatal(err)
-				}
+		// 		if err = cue.Close(); err != nil {
+		// 			t.Fatal(err)
+		// 		}
 
-				return cue.Iterator()
-			},
-		},
+		// 		return cue.Iterator()
+		// 	},
+		// },
 	}
 
 }
@@ -86,26 +91,12 @@ func TestIteratorImplementations(t *testing.T) {
 		},
 	}
 
-	filters := []FixtureIteratorFilter[string]{
-		{
-			Name:   "Unsynchronized",
-			Filter: func(in fun.Iterator[string]) fun.Iterator[string] { return in },
-		},
-		{
-			Name: "Synchronized",
-			Filter: func(in fun.Iterator[string]) fun.Iterator[string] {
-				return Synchronize(in)
-
-			},
-		},
-	}
-
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(t, elems, getConstructors[string](t), filters)
+		RunIteratorImplementationTests(t, elems, getConstructors[string](t))
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorStringAlgoTests(t, elems, getConstructors[string](t), filters)
+		RunIteratorStringAlgoTests(t, elems, getConstructors[string](t))
 	})
 }
 
@@ -131,33 +122,19 @@ func TestIteratorAlgoInts(t *testing.T) {
 		},
 	}
 
-	filters := []FixtureIteratorFilter[int]{
-		{
-			Name:   "Unsynchronized",
-			Filter: func(in fun.Iterator[int]) fun.Iterator[int] { return in },
-		},
-		{
-			Name: "Synchronized",
-			Filter: func(in fun.Iterator[int]) fun.Iterator[int] {
-				return Synchronize(in)
-
-			},
-		},
-	}
-
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(t, elems, getConstructors[int](t), filters)
+		RunIteratorImplementationTests(t, elems, getConstructors[int](t))
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int](t), filters)
+		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int](t))
 	})
 }
 
 func TestWrap(t *testing.T) {
-	base := Slice([]string{"a", "b"})
-	wrapped := Synchronize(base)
-	maybeBase := wrapped.(interface{ Unwrap() fun.Iterator[string] })
+	base := fun.SliceIterator([]string{"a", "b"})
+	wrapped := Synchronize[string](base)
+	maybeBase := wrapped.(interface{ Unwrap() fun.Iterable[string] })
 	if maybeBase == nil {
 		t.Fatal("should not be nil")
 	}
@@ -166,67 +143,21 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-func TestRangeSplit(t *testing.T) {
+func TestSplit(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	t.Run("Range", func(t *testing.T) {
-		t.Run("Basic", func(t *testing.T) {
-			input := Slice(GenerateRandomStringSlice(10))
-
-			rf := Range(input)
-
-			set := map[string]none{}
-
-			var st string
-			for rf(ctx, &st) {
-				set[st] = none{}
-			}
-
-			if len(set) != 10 {
-				t.Error("did not sufficently iteratre", len(set))
-			}
-		})
-		t.Run("Parallel", func(t *testing.T) {
-			input := Slice(GenerateRandomStringSlice(100))
-
-			rf := Range(input)
-
-			set := &adt.Map[string, none]{}
-
-			wg := &fun.WaitGroup{}
-			for i := 0; i < 10; i++ {
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-
-					var st string
-					for rf(ctx, &st) {
-						set.Ensure(st)
-					}
-				}()
-			}
-
-			wg.Wait(ctx)
-
-			if set.Len() != 100 {
-				t.Error("did not iterate enough")
-
-			}
-		})
-	})
 	t.Run("Split", func(t *testing.T) {
-		input := Slice(GenerateRandomStringSlice(100))
+		input := fun.SliceIterator(GenerateRandomStringSlice(100))
 
-		splits := Split(0, input)
+		splits := input.Split(0)
 		if splits != nil {
 			t.Fatal("should be nil if empty")
 		}
 
-		splits = Split(10, input)
+		splits = input.Split(10)
 		if len(splits) != 10 {
 			t.Fatal("didn't make enough split")
 		}
@@ -237,7 +168,7 @@ func TestRangeSplit(t *testing.T) {
 		for _, iter := range splits {
 			wg.Add(1)
 
-			go func(it fun.Iterator[string]) {
+			go func(it fun.Iterable[string]) {
 
 				defer wg.Done()
 
@@ -285,7 +216,7 @@ func TestTools(t *testing.T) {
 					}
 				}()
 
-				output := CollectChannel(ctx, Channel(pipe))
+				output := fun.Blocking(pipe).Iterator().Channel(ctx)
 				runtime.Gosched()
 
 				count := 0
@@ -326,8 +257,8 @@ func TestTools(t *testing.T) {
 			catcher,
 			Options{},
 			func(ctx context.Context, in string) (int, error) { return 53, nil },
-			pipe,
-			output,
+			fun.Blocking(pipe).Iterator(),
+			fun.Blocking(output).Send(),
 		).Ignore().Add(ctx, wg)
 		time.Sleep(10 * time.Millisecond)
 		cancel()
@@ -356,7 +287,10 @@ func TestTools(t *testing.T) {
 		defer cancel()
 
 		pipe := make(chan string)
-		iter := Merge(Channel(pipe), Channel(pipe), Channel(pipe))
+		iter := Merge[string](
+			fun.Blocking(pipe).Iterator(),
+			fun.Blocking(pipe).Iterator(),
+			fun.Blocking(pipe).Iterator())
 
 		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -380,7 +314,7 @@ func TestParallelForEach(t *testing.T) {
 				seen := &adt.Map[int, none]{}
 
 				err := Process(ctx,
-					Slice(elems),
+					fun.SliceIterator(elems),
 					func(ctx context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
 
@@ -394,7 +328,7 @@ func TestParallelForEach(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out := fun.Must(CollectSlice(ctx, seen.Keys()))
+				out := fun.Must(seen.Keys().Slice(ctx))
 
 				testt.Log(t, "output", out)
 				testt.Log(t, "input", elems)
@@ -420,7 +354,7 @@ func TestParallelForEach(t *testing.T) {
 		seen := &adt.Map[int, none]{}
 
 		err := Process(ctx,
-			Slice(makeIntSlice(200)),
+			fun.SliceIterator(makeIntSlice(200)),
 			func(ctx context.Context, in int) error {
 				seen.Ensure(in)
 				runtime.Gosched()
@@ -444,7 +378,7 @@ func TestParallelForEach(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+		errs := fun.Must(es.Iterator().Slice(ctx))
 
 		if len(errs) != 200 {
 			// panics and expected
@@ -455,7 +389,7 @@ func TestParallelForEach(t *testing.T) {
 		seen := &adt.Map[int, none]{}
 
 		err := Process(ctx,
-			Slice(makeIntSlice(10)),
+			fun.SliceIterator(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
 				if in == 8 {
 					// make sure something else
@@ -485,7 +419,7 @@ func TestParallelForEach(t *testing.T) {
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+		errs := fun.Must(es.Iterator().Slice(ctx))
 		if len(errs) != 2 {
 			// panic + expected
 			t.Error(len(errs))
@@ -496,7 +430,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := Process(ctx,
-			Slice(makeIntSlice(10)),
+			fun.SliceIterator(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
 				if in == 8 {
 					cancel()
@@ -518,7 +452,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := Process(ctx,
-			Slice(makeIntSlice(10)),
+			fun.SliceIterator(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
@@ -534,9 +468,9 @@ func TestParallelForEach(t *testing.T) {
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+		errs := fun.Must(es.Iterator().Slice(ctx))
 		if len(errs) != 10 {
-			t.Error(len(errs))
+			t.Error(len(errs), errs)
 		}
 
 	})
@@ -545,7 +479,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := Process(ctx,
-			Slice(makeIntSlice(100)),
+			fun.SliceIterator(makeIntSlice(100)),
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
@@ -561,7 +495,7 @@ func TestParallelForEach(t *testing.T) {
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := fun.Must(CollectSlice(ctx, es.Iterator()))
+		errs := fun.Must(es.Iterator().Slice(ctx))
 		// it's two and not one because each worker thread
 		// ran one task before aborting
 		if len(errs) > 2 {
@@ -577,9 +511,9 @@ func TestEmptyIteration(t *testing.T) {
 	close(ch)
 
 	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, fun.Observe(ctx, Slice([]int{}), func(in int) { t.Fatal("should not be called") }))
-		assert.NotError(t, fun.Observe(ctx, Variadic[int](), func(in int) { t.Fatal("should not be called") }))
-		assert.NotError(t, fun.Observe(ctx, Channel(ch), func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, fun.SliceIterator([]int{}).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, fun.VariadicIterator[int]().Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, fun.ChannelIterator(ch).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
 	})
 
 }
@@ -589,10 +523,10 @@ func TestContains(t *testing.T) {
 	defer cancel()
 
 	t.Run("Exists", func(t *testing.T) {
-		assert.True(t, Contains(ctx, 1, Slice([]int{12, 3, 44, 1})))
+		assert.True(t, Contains[int](ctx, 1, fun.SliceIterator([]int{12, 3, 44, 1})))
 	})
 	t.Run("NotExists", func(t *testing.T) {
-		assert.True(t, !Contains(ctx, 1, Slice([]int{12, 3, 44})))
+		assert.True(t, !Contains[int](ctx, 1, fun.SliceIterator([]int{12, 3, 44})))
 	})
 }
 func TestUniq(t *testing.T) {
@@ -600,9 +534,9 @@ func TestUniq(t *testing.T) {
 	defer cancel()
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
-	assert.Equal(t, fun.Count(ctx, Slice(sl)), 8)
+	assert.Equal(t, fun.SliceIterator(sl).Count(ctx), 8)
 
-	assert.Equal(t, fun.Count(ctx, Uniq(Slice(sl))), 6)
+	assert.Equal(t, Uniq(fun.SliceIterator(sl)).Count(ctx), 6)
 }
 
 func TestAny(t *testing.T) {
@@ -611,7 +545,7 @@ func TestAny(t *testing.T) {
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
 	count := 0
-	fun.Observe(ctx, Any(Slice(sl)), func(in any) {
+	fun.SliceIterator(sl).Any().Observe(ctx, func(in any) {
 		count++
 		check.True(t, fun.Is[int](in))
 	})
@@ -623,14 +557,14 @@ func TestChain(t *testing.T) {
 	defer cancel()
 
 	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
-	iter := Chain(Slice(num), Slice(num))
-	n := fun.Count(ctx, iter)
+	iter := Chain[int](fun.SliceIterator(num), fun.SliceIterator(num))
+	n := iter.Count(ctx)
 	assert.Equal(t, len(num)*2, n)
 
 	cancel()
 
-	iter = Chain(Slice(num), Slice(num))
-	n = fun.Count(ctx, iter)
+	iter = Chain[int](fun.SliceIterator(num), fun.SliceIterator(num))
+	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
 }
 
@@ -639,12 +573,12 @@ func TestDropZeros(t *testing.T) {
 	defer cancel()
 
 	all := make([]string, 100)
-	n := fun.Count(ctx, Slice(all))
+	n := (fun.SliceIterator(all).Count(ctx))
 	assert.Equal(t, 100, n)
-	n = fun.Count(ctx, DropZeroValues(Slice(all)))
+	n = (DropZeroValues[string](fun.SliceIterator(all))).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	fun.Observe(ctx, DropZeroValues(Slice(all)), func(in string) { assert.Zero(t, in) })
+	DropZeroValues[string](fun.SliceIterator(all)).Observe(ctx, func(in string) { assert.Zero(t, in) })
 }
 
 func TestWorker(t *testing.T) {
@@ -652,7 +586,7 @@ func TestWorker(t *testing.T) {
 	defer cancel()
 
 	count := &atomic.Int64{}
-	err := Worker(ctx, Slice([]fun.WaitFunc{
+	err := Worker(ctx, fun.SliceIterator([]fun.WaitFunc{
 		func(context.Context) { count.Add(1) },
 		func(context.Context) { count.Add(1) },
 		func(context.Context) { count.Add(1) },

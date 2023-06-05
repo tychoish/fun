@@ -13,7 +13,7 @@ import (
 )
 
 type TestReadoneableImpl struct {
-	fun.Iterator[string]
+	fun.Iterable[string]
 	once bool
 }
 
@@ -41,7 +41,7 @@ func TestIterator(t *testing.T) {
 
 		t.Run("ReadOneable", func(t *testing.T) {
 			input := &TestReadoneableImpl{
-				Iterator: internal.NewSliceIter([]string{
+				Iterable: internal.NewSliceIter([]string{
 					fmt.Sprint(10),
 					fmt.Sprint(10),
 					fmt.Sprint(20),
@@ -62,8 +62,8 @@ func TestIterator(t *testing.T) {
 		for idx := range out {
 			out[idx] = idx + rand.Intn(10*idx+1)
 		}
-		iter := internal.NewSliceIter(out)
-		cpy := Slice[int](iter)
+		iter := fun.Sliceify(out).Iterator()
+		cpy := Slice(iter)
 		assert.EqualItems(t, out, cpy)
 	})
 }

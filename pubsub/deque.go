@@ -237,34 +237,17 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 // IteratorReverse starts at the back of the queue and iterates
 // towards the front. When the iterator reaches the beginning of the queue
 // it ends.
-func (dq *Deque[T]) Iterator() fun.Iterator[T] {
+func (dq *Deque[T]) Iterator() *fun.Iterator[T] {
 	defer dq.withLock()()
-	return &dqIterator[T]{list: dq, item: dq.root, direction: dqNext}
+	return fun.IterableProducer[T](&dqIterator[T]{list: dq, blocking: false, item: dq.root, direction: dqNext}).Generator()
 }
 
 // IteratorReverse starts at the back of the queue and iterates
 // towards the front. When the iterator reaches the end of the queue
 // it ends.
-func (dq *Deque[T]) IteratorReverse() fun.Iterator[T] {
+func (dq *Deque[T]) IteratorReverse() *fun.Iterator[T] {
 	defer dq.withLock()()
-	return &dqIterator[T]{list: dq, item: dq.root, direction: dqPrev}
-}
-
-// IteratorBlocking starts at the front of the deque, iterates to the
-// end and then waits for a new item to be pushed to the back of the
-// queue, the queue to be closed or the context to be canceled.
-func (dq *Deque[T]) IteratorBlocking() fun.Iterator[T] {
-	defer dq.withLock()()
-	return &dqIterator[T]{list: dq, blocking: true, item: dq.root, direction: dqNext}
-}
-
-// IteratorBlockingReverse starts at the back of the deque and
-// iterates toward the front, and then waits for a new item to be
-// pushed to the front of the queue, the queue to be closed or the
-// context to be canceled.
-func (dq *Deque[T]) IteratorBlockingReverse() fun.Iterator[T] {
-	defer dq.withLock()()
-	return &dqIterator[T]{list: dq, blocking: true, item: dq.root, direction: dqPrev}
+	return fun.IterableProducer[T](&dqIterator[T]{list: dq, blocking: false, item: dq.root, direction: dqPrev}).Generator()
 }
 
 // Distributor produces a consuming Distributor implementation that

@@ -68,13 +68,13 @@ type Heap[T any] struct {
 // iterator and corresponding comparison function. Will return the
 // input iterators Close() error if one exists, and otherwise will
 // return the populated heap.
-func NewHeapFromIterator[T any](ctx context.Context, cmp LessThan[T], iter fun.Iterator[T]) (*Heap[T], error) {
+func NewHeapFromIterator[T any](ctx context.Context, cmp LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
 	out := &Heap[T]{
 		LT: cmp,
 	}
 	out.lazySetup()
 
-	if err := fun.Observe(ctx, iter, func(in T) { out.Push(in) }); err != nil {
+	if err := iter.Observe(ctx, func(in T) { out.Push(in) }); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -128,7 +128,7 @@ func (h *Heap[T]) Pop() (T, bool) { h.lazySetup(); e := h.list.PopFront(); retur
 // Iterator provides an fun.Iterator interface to the heap. The
 // iterator consumes items from the heap, and will return when the
 // heap is empty.
-func (h *Heap[T]) Iterator() fun.Iterator[T] { h.lazySetup(); return h.list.PopValues() }
+func (h *Heap[T]) Iterator() fun.Iterable[T] { h.lazySetup(); return h.list.Iterator() }
 
 // IsSorted reports if the list is sorted from low to high, according
 // to the LessThan function.

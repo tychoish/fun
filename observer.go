@@ -30,6 +30,10 @@ func (of Observer[T]) Worker(in T) Worker { return func(context.Context) error {
 // function that observes the value when the WaitFunc runs.
 func (of Observer[T]) Wait(in T) WaitFunc { return func(context.Context) { of(in) } }
 
+// Caputre returns a function that observes the specified variable,
+// but only when executed later.
+func (of Observer[T]) Capture(in T) func() { return func() { of(in) } }
+
 // Processor converts the observer to an observer function. The
 // Processor will always return nil, and the context is ignored.
 func (of Observer[T]) Processor() Processor[T] {
@@ -38,8 +42,8 @@ func (of Observer[T]) Processor() Processor[T] {
 
 // Iterator produces a worker that processes every item in the
 // iterator with the observer function.
-func (of Observer[T]) Iterator(iter Iterator[T]) Worker {
-	return func(ctx context.Context) error { return Observe(ctx, iter, of) }
+func (of Observer[T]) Iterator(iter *Iterator[T]) Worker {
+	return func(ctx context.Context) error { return iter.Observe(ctx, of) }
 }
 
 // If returns an observer that only executes the root observer if the
@@ -50,7 +54,15 @@ func (of Observer[T]) If(cond bool) Observer[T] { return of.When(Wrapper(cond)) 
 // function if the condition function returns true. The condition
 // function is run every time the observer function runs.
 func (of Observer[T]) When(cond func() bool) Observer[T] {
-	return func(in T) { WhenCall(cond(), func() { of(in) }) }
+	return func(in T) { WhenCall(cond(), of.Capture(in)) }
+}
+
+// Filter creates an observer that only executes the root observer
+// when the condition function--which can inspect the input
+// object--returns true. Use this to filter out nil inputs, or
+// unactionable inputs.
+func (of Observer[T]) Filter(cond func(T) bool) Observer[T] {
+	return func(in T) { WhenCall(cond(in), of.Capture(in)) }
 }
 
 // Once produces an observer function that runs exactly once, and

@@ -11,14 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/itertool"
 )
-
-type errIterator[T any] struct{}
-
-func (errIterator[T]) Next(context.Context) bool { return false }
-func (errIterator[T]) Close() error              { return errors.New("iteration") }
-func (errIterator[T]) Value() T                  { return fun.ZeroOf[T]() }
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
 	t.Helper()
@@ -207,11 +200,11 @@ func TestSort(t *testing.T) {
 			}
 			SortListMerge(list, LessThanNative[int])
 			if !stdCheckSortedIntsFromList(ctx, t, list) {
-				t.Log(itertool.CollectSlice(ctx, list.Values()))
+				t.Log(list.Iterator().Slice(ctx))
 				t.Fatal("sort should be verified, externally")
 			}
 			if !IsSorted(list, LessThanNative[int]) {
-				t.Log(itertool.CollectSlice(ctx, list.Values()))
+				t.Log(list.Iterator().Slice(ctx))
 				t.Fatal("should be sorted")
 			}
 		})
@@ -220,8 +213,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			SortListMerge(list, LessThanNative[int])
 			SortListQuick(lcopy, LessThanNative[int])
-			listVals := fun.Must(itertool.CollectSlice(ctx, list.Values()))
-			copyVals := fun.Must(itertool.CollectSlice(ctx, lcopy.Values()))
+			listVals := fun.Must(list.Iterator().Slice(ctx))
+			copyVals := fun.Must(lcopy.Iterator().Slice(ctx))
 			t.Log("merge", listVals)
 			t.Log("quick", copyVals)
 			assert.Equal(t, len(listVals), len(copyVals))
@@ -254,15 +247,12 @@ func TestSort(t *testing.T) {
 			assert.ErrorIs(t, err, ErrUninitialized)
 		})
 		t.Run("IteratorConstructor", func(t *testing.T) {
-			iter := itertool.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+			iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
 			heap, err := NewHeapFromIterator(ctx, LessThanNative[int], iter)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)
 			assert.Equal(t, heap.list.Back().Value(), 9)
 			assert.Equal(t, heap.list.Front().Value(), 0)
-
-			_, err = NewHeapFromIterator[int](ctx, LessThanNative[int], errIterator[int]{})
-			assert.Error(t, err)
 		})
 		t.Run("Iterator", func(t *testing.T) {
 			heap := &Heap[int]{LT: LessThanNative[int]}
@@ -334,7 +324,7 @@ func TestSort(t *testing.T) {
 }
 func getSliceForList(ctx context.Context, t *testing.T, list *List[int]) []int {
 	t.Helper()
-	return fun.Must(itertool.CollectSlice(ctx, list.Values()))
+	return fun.Must(list.Iterator().Slice(ctx))
 }
 
 func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {

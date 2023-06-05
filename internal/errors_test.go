@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -131,4 +132,45 @@ func TestParsePanic(t *testing.T) {
 			t.Error(err)
 		}
 	})
+}
+
+func TestTerminatingError(t *testing.T) {
+	if err := io.EOF; !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+	if err := context.Canceled; !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+	if err := context.DeadlineExceeded; !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+
+	if err := fmt.Errorf("weird: %w", io.EOF); !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+	if err := fmt.Errorf("weird: %w", context.Canceled); !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+	if err := fmt.Errorf("weird: %w", context.DeadlineExceeded); !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+
+	other := errors.New("even")
+	if err := MergeErrors(other, io.EOF); !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+	if err := MergeErrors(other, context.Canceled); !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+	if err := MergeErrors(other, context.DeadlineExceeded); !IsTerminatingError(err) {
+		t.Error("expected terminating error:", err)
+	}
+
+	if err := other; IsTerminatingError(err) {
+		t.Error("not expecting terminating error:", err)
+
+	}
+	if IsTerminatingError(nil) {
+		t.Error("not expecting terminating error:", nil)
+	}
 }

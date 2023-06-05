@@ -19,7 +19,7 @@ import (
 func Generate[T any](
 	fn fun.Producer[T],
 	opts Options,
-) fun.Iterator[T] {
+) *fun.Iterator[T] {
 	if opts.OutputBufferSize < 0 {
 		opts.OutputBufferSize = 0
 	}
@@ -28,43 +28,29 @@ func Generate[T any](
 		opts.NumWorkers = 1
 	}
 
-	wg := &fun.WaitGroup{}
 	pipe := make(chan T, opts.OutputBufferSize)
-	catcher := &erc.Collector{}
-
-	out := &internal.GeneratorIterator[T]{
-		Error: catcher.Resolve,
-	}
+	ec := &erc.Collector{}
 
 	init := fun.WaitFunc(func(ctx context.Context) {
-		ctx, cancel := context.WithCancel(ctx)
-		out.Closer = cancel
+		wctx, cancel := context.WithCancel(ctx)
+
+		wg := &fun.WaitGroup{}
 
 		for i := 0; i < opts.NumWorkers; i++ {
-			generator(catcher, opts, fn, cancel, pipe).Add(ctx, wg)
+			generator(ec, opts, fn, cancel, pipe).Add(wctx, wg)
 		}
-		go func() {
-			// waits for the contest to be canceled
-			// (because Close(), or called in a defer in
-			// generator()) AND all workers to exit. It's
-			// blocking(background context), but safe
-			// because logically once the context in this
-			// function expires, it must espire shortly
-			// there after.
-			//
-			// a blocking/deadlock in the generator
-			// function is possible, and there's not much
-			// to be done there.
-			fun.WaitMerge(Variadic(fun.WaitContext(ctx), wg.Wait)).Block()
-			// once everyone is done, we can safely close
-			// the pipe.
-			close(pipe)
-		}()
+
+		wg.WaitFunc().AddHook(func() { cancel(); close(pipe) }).Go(ctx)
 	}).Once()
 
-	out.Operation = func(ctx context.Context) (T, error) { init(ctx); return fun.Blocking(pipe).Receive().Read(ctx) }
+	out := fun.Producer[T](func(ctx context.Context) (T, error) {
+		init(ctx) // runs once
+		return fun.Blocking(pipe).Receive().Read(ctx)
+	}).GeneratorWithHook(func(iter *fun.Iterator[T]) {
+		iter.AddError(ec.Resolve())
+	})
 
-	return Synchronize[T](out)
+	return out
 }
 
 func generator[T any](
@@ -99,8 +85,7 @@ func generator[T any](
 				}
 
 				erc.When(catcher, shouldCollectError(err), err)
-
-				if errors.Is(err, io.EOF) || erc.ContextExpired(err) || !opts.ContinueOnError {
+				if internal.IsTerminatingError(err) || !opts.ContinueOnError {
 					return
 				}
 

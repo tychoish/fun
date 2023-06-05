@@ -11,7 +11,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -127,12 +126,8 @@ func TestWait(t *testing.T) {
 	})
 	t.Run("Block", func(t *testing.T) {
 		wf := WaitFunc(func(ctx context.Context) {
-			if ctx == context.Background() {
-				// block runs through wait, so that
-				//  any threads spawned in the
-				//  WaitFunc are cleaned up when the
-				//  main wait function returns.
-				t.Error("background context not expected")
+			if ctx != context.Background() {
+				t.Error("background context expected")
 			}
 			time.Sleep(10 * time.Millisecond)
 		})
@@ -150,7 +145,7 @@ func TestWait(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
-		WaitMerge(internal.NewSliceIter(wfs))(ctx)
+		WaitMerge(SliceIterator(wfs))(ctx)
 		dur := time.Since(start)
 		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 			t.Error(dur)
@@ -168,7 +163,7 @@ func TestWait(t *testing.T) {
 			counter++
 		}
 
-		wf := of.Iterator(internal.NewSliceIter(ops))
+		wf := of.Iterator(SliceIterator(ops))
 
 		if len(seen) != 0 || counter != 0 {
 			t.Error("should be lazy execution", counter, seen)

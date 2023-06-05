@@ -2,8 +2,6 @@ package fun
 
 import (
 	"context"
-
-	"github.com/tychoish/fun/internal"
 )
 
 // Map is just a generic type wrapper around a map, mostly for the
@@ -82,8 +80,8 @@ func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 
 // Consume adds items to the map from an iterator of Pair
 // objects. Existing values for K are always overwritten.
-func (m Map[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
-	InvariantMust(Observe(ctx, iter, func(in Pair[K, V]) { m.AddPair(in) }))
+func (m Map[K, V]) Consume(ctx context.Context, iter *Iterator[Pair[K, V]]) {
+	InvariantMust(iter.Observe(ctx, func(in Pair[K, V]) { m.AddPair(in) }))
 }
 
 // ConsumeValues adds items to the map, using the function to generate
@@ -91,8 +89,8 @@ func (m Map[K, V]) Consume(ctx context.Context, iter Iterator[Pair[K, V]]) {
 //
 // This operation will panic (with an ErrInvariantValidation) if the
 // keyf panics.
-func (m Map[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf func(V) K) {
-	InvariantMust(Observe(ctx, iter, func(in V) { m[keyf(in)] = in }))
+func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *Iterator[V], keyf func(V) K) {
+	InvariantMust(iter.Observe(ctx, func(in V) { m[keyf(in)] = in }))
 }
 
 // Iterator converts a map into an iterator of fun.Pair objects. The
@@ -107,14 +105,10 @@ func (m Map[K, V]) ConsumeValues(ctx context.Context, iter Iterator[V], keyf fun
 // Use in combination with other iterator processing tools
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
-	iter := &internal.GeneratorIterator[Pair[K, V]]{}
+func (m Map[K, V]) Iterator() *Iterator[Pair[K, V]] {
 	pipe := make(chan Pair[K, V])
 
 	init := WaitFunc(func(ctx context.Context) {
-		ctx, cancel := context.WithCancel(ctx)
-		iter.Closer = cancel
-
 		defer close(pipe)
 
 		for k, v := range m {
@@ -122,18 +116,16 @@ func (m Map[K, V]) Iterator() Iterator[Pair[K, V]] {
 				break
 			}
 		}
-	}).Start().Once()
+	}).Launch().Once()
 
-	iter.Operation = func(ctx context.Context) (Pair[K, V], error) {
+	return Generator(func(ctx context.Context) (Pair[K, V], error) {
 		init(ctx)
 		return Blocking(pipe).Receive().Read(ctx)
-	}
-
-	return iter
+	})
 }
 
 // Keys provides an iterator over just the keys in the map.
-func (m Map[K, V]) Keys() Iterator[K] { return PairKeys(m.Iterator()) }
+func (m Map[K, V]) Keys() *Iterator[K] { return PairKeys(m.Iterator()) }
 
 // Values provides an iterator over just the values in the map.
-func (m Map[K, V]) Values() Iterator[V] { return PairValues(m.Iterator()) }
+func (m Map[K, V]) Values() *Iterator[V] { return PairValues(m.Iterator()) }

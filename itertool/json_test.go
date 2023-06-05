@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert/check"
 )
 
@@ -13,8 +14,8 @@ func TestJSON(t *testing.T) {
 	defer cancel()
 
 	t.Run("RoundTrip", func(t *testing.T) {
-		iter := Slice([]int{400, 300, 42})
-		out, err := MarshalJSON(ctx, iter)
+		iter := fun.SliceIterator([]int{400, 300, 42})
+		out, err := MarshalJSON[int](ctx, iter)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,8 +29,8 @@ func TestJSON(t *testing.T) {
 
 	})
 	t.Run("TypeMismatch", func(t *testing.T) {
-		list := Slice([]int{400, 300, 42})
-		out, err := MarshalJSON(ctx, list)
+		list := fun.SliceIterator([]int{400, 300, 42})
+		out, err := MarshalJSON[int](ctx, list)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -46,8 +47,8 @@ func TestJSON(t *testing.T) {
 		}
 	})
 	t.Run("Unmarshalable", func(t *testing.T) {
-		list := Slice([]func(){func() {}, nil})
-		out, err := MarshalJSON(ctx, list)
+		list := fun.SliceIterator([]func(){func() {}, nil})
+		out, err := MarshalJSON[func()](ctx, list)
 		if err == nil {
 			t.Fatal(string(out))
 		}
@@ -62,7 +63,7 @@ func TestJSON(t *testing.T) {
 	})
 	t.Run("UnmarshalNil", func(t *testing.T) {
 		iter := UnmarshalJSON[string](nil)
-		vals, err := CollectSlice(ctx, iter)
+		vals, err := iter.Slice(ctx)
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -72,7 +73,7 @@ func TestJSON(t *testing.T) {
 	})
 	t.Run("UnmarshalableType", func(t *testing.T) {
 		iter := UnmarshalJSON[func()]([]byte(`["foo", "arg"]`))
-		vals, err := CollectSlice(ctx, iter)
+		vals, err := iter.Slice(ctx)
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -82,7 +83,7 @@ func TestJSON(t *testing.T) {
 	})
 	t.Run("Unmarshal", func(t *testing.T) {
 		iter := UnmarshalJSON[string]([]byte(`["foo", "arg"]`))
-		vals, err := CollectSlice(ctx, iter)
+		vals, err := iter.Slice(ctx)
 		if err != nil {
 			t.Error(err)
 		}

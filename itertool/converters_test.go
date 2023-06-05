@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 )
@@ -17,7 +18,7 @@ func TestConverters(t *testing.T) {
 			"hi":  "there",
 			"how": "are you doing",
 		}
-		iter := FromMap(in)
+		iter := fun.MapIterator(in)
 		seen := 0
 		for iter.Next(ctx) {
 			item := iter.Value()

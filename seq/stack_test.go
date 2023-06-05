@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -37,14 +36,11 @@ func TestStack(t *testing.T) {
 		assert.ErrorIs(t, err, seq.ErrUninitialized)
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
-		iter := itertool.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+		iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
 		stack, err := seq.NewStackFromIterator(ctx, iter)
 		assert.NotError(t, err)
 		assert.Equal(t, stack.Len(), 10)
 		assert.Equal(t, stack.Head().Value(), 0)
-
-		_, err = seq.NewStackFromIterator[int](ctx, errIterator[int]{})
-		assert.Error(t, err)
 	})
 	t.Run("Constructor", func(t *testing.T) {
 		stack := &seq.Stack[int]{}
@@ -297,7 +293,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Content", func(t *testing.T) {
 			stack := GenerateStack(t, 100)
-			items := fun.Must(itertool.CollectSlice(ctx, stack.Values()))
+			items := fun.Must(stack.Iterator().Slice(ctx))
 			if len(items) != stack.Len() {
 				t.Fatal("unexpected collection", len(items), stack.Len())
 			}
@@ -330,7 +326,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Destructive", func(t *testing.T) {
 			stack := GenerateStack(t, 50)
-			iter := stack.PopValues()
+			iter := stack.PopIterator()
 			seen := 0
 			for iter.Next(ctx) {
 				seen++

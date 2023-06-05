@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
 )
 
 // Map provides a wrapper around the standard library's sync.Map type
@@ -155,7 +154,7 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) {
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces an iterator that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Iterator() fun.Iterator[fun.Pair[K, V]] {
+func (mp *Map[K, V]) Iterator() *fun.Iterator[fun.Pair[K, V]] {
 	return makeMapIterator(mp, func(k K, v V) fun.Pair[K, V] { return fun.MakePair(k, v) })
 }
 
@@ -165,7 +164,7 @@ func (mp *Map[K, V]) Iterator() fun.Iterator[fun.Pair[K, V]] {
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces an iterator that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Keys() fun.Iterator[K] {
+func (mp *Map[K, V]) Keys() *fun.Iterator[K] {
 	return makeMapIterator(mp, func(k K, _ V) K { return k })
 }
 
@@ -176,19 +175,17 @@ func (mp *Map[K, V]) Keys() fun.Iterator[K] {
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces an iterator that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Values() fun.Iterator[V] {
+func (mp *Map[K, V]) Values() *fun.Iterator[V] {
 	return makeMapIterator(mp, func(_ K, v V) V { return v })
 }
 
 func makeMapIterator[K comparable, V any, O any](
 	mp *Map[K, V],
 	rf func(K, V) O,
-) fun.Iterator[O] {
-	iter := &internal.GeneratorIterator[O]{}
+) *fun.Iterator[O] {
 	pipe := make(chan O)
-	init := fun.WaitFunc(func(ctx context.Context) {
-		ctx, iter.Closer = context.WithCancel(ctx)
 
+	init := fun.WaitFunc(func(ctx context.Context) {
 		defer close(pipe)
 		mp.Range(func(key K, value V) bool {
 			select {
@@ -198,12 +195,10 @@ func makeMapIterator[K comparable, V any, O any](
 				return true
 			}
 		})
-	}).Start().Once()
+	}).Launch().Once()
 
-	iter.Operation = func(ctx context.Context) (O, error) {
+	return fun.Producer[O](func(ctx context.Context) (O, error) {
 		init(ctx)
 		return fun.BlockingReceive(pipe).Read(ctx)
-	}
-
-	return NewIterator(&sync.Mutex{}, fun.Iterator[O](iter))
+	}).Lock().Generator()
 }

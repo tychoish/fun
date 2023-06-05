@@ -51,7 +51,7 @@ type fixture[T any] struct {
 	name     string
 	add      func(T) error
 	remove   func() (T, bool)
-	iterator func() fun.Iterator[T]
+	iterator func() *fun.Iterator[T]
 	close    func() error
 	len      func() int
 	elems    []T
@@ -303,6 +303,8 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 					t.Fatal(err)
 				}
 			}
+
+			assert.Equal(t, fix.len(), len(fix.elems))
 			seen := 0
 			iter := fix.iterator()
 
@@ -592,7 +594,7 @@ func TestDeque(t *testing.T) {
 			t.Error("should not pop empty list")
 		}
 		t.Run("Iterator", func(t *testing.T) {
-			for idx, iter := range []fun.Iterator[int]{
+			for idx, iter := range []fun.Iterable[int]{
 				dq.Iterator(),
 				dq.IteratorReverse(),
 			} {
@@ -658,74 +660,6 @@ func TestDeque(t *testing.T) {
 			t.Error("100 !=", out)
 		}
 	})
-	t.Run("BlockingIteratorForward", func(t *testing.T) {
-		t.Parallel()
-		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		for i := 0; i < 5; i++ {
-			if err := dq.PushFront(i); err != nil {
-				t.Fatal(err)
-			}
-		}
-		startAt := time.Now()
-		iter := dq.IteratorBlocking()
-		seen := 0
-		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		t.Cleanup(cancel)
-		for iter.Next(ctx) {
-			seen++
-			if time.Since(startAt) > 250*time.Millisecond {
-				t.Error("took to long to iterate", time.Since(startAt))
-			}
-			t.Log(time.Since(startAt))
-		}
-		if time.Since(startAt) <= 500*time.Millisecond {
-			t.Error("should have waited for the context to timeout", time.Since(startAt))
-		}
-		if ctx.Err() == nil {
-			t.Error("context should have canceled")
-		}
-		if seen != 5 {
-			t.Error("should have seen all items")
-		}
-	})
-	t.Run("BlockingIteratorReverse", func(t *testing.T) {
-		t.Parallel()
-		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		for i := 0; i < 5; i++ {
-			if err := dq.PushBack(i); err != nil {
-				t.Fatal(err)
-			}
-		}
-		startAt := time.Now()
-		iter := dq.IteratorBlockingReverse()
-		seen := 0
-		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		t.Cleanup(cancel)
-		for iter.Next(ctx) {
-			seen++
-			if time.Since(startAt) > 250*time.Millisecond {
-				t.Error("took to long to iterate", time.Since(startAt))
-			}
-			t.Log(time.Since(startAt))
-		}
-		if time.Since(startAt) <= 500*time.Millisecond {
-			t.Error("should have waited for the context to timeout", time.Since(startAt))
-		}
-		if ctx.Err() == nil {
-			t.Error("context should have canceled")
-		}
-		if seen != 5 {
-			t.Error("should have seen all items")
-		}
-	})
 
 	t.Run("Closed", func(t *testing.T) {
 		t.Parallel()
@@ -778,11 +712,9 @@ func TestDeque(t *testing.T) {
 			}
 		})
 		t.Run("Iterator", func(t *testing.T) {
-			for idx, iter := range []fun.Iterator[int]{
+			for idx, iter := range []fun.Iterable[int]{
 				dq.Iterator(),
 				dq.IteratorReverse(),
-				dq.IteratorBlocking(),
-				dq.IteratorBlockingReverse(),
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
 					seen := 0
@@ -796,11 +728,9 @@ func TestDeque(t *testing.T) {
 			}
 		})
 		t.Run("IteratorClosed", func(t *testing.T) {
-			for idx, iter := range []fun.Iterator[int]{
+			for idx, iter := range []fun.Iterable[int]{
 				dq.Iterator(),
 				dq.IteratorReverse(),
-				dq.IteratorBlocking(),
-				dq.IteratorBlockingReverse(),
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
 					seen := 0
@@ -822,29 +752,30 @@ func TestDeque(t *testing.T) {
 			}
 		})
 	})
-	t.Run("IteratorBlockingOnEmpty", func(t *testing.T) {
+	t.Run("IteratorHandlesEmpty", func(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		queue := NewUnlimitedDeque[int]()
 
-		iter := queue.IteratorBlocking()
-		toctx, toccancel := context.WithTimeout(ctx, time.Millisecond)
+		toctx, toccancel := context.WithTimeout(ctx, 4*time.Millisecond)
 		defer toccancel()
 		sa := time.Now()
+		iter := queue.Iterator()
 		if iter.Next(toctx) {
 			t.Error("should have reported false early", time.Since(sa))
 		}
-		go func() {
-			time.Sleep(2 * time.Millisecond)
-			_ = queue.PushFront(31)
-		}()
-		if !iter.Next(ctx) {
-			t.Error("should have reported item", time.Since(sa), iter.Value())
-		}
-	})
-	t.Run("EmptyIteration", func(t *testing.T) {
+		// iterator is empty, becomes closed
 
+		time.Sleep(2 * time.Millisecond)
+		t.Log(queue.PushFront(31), queue.Len())
+
+		// new itertor should fined item
+		iter = queue.Iterator()
+		if !iter.Next(ctx) {
+			t.Error("should have reported item", time.Since(sa), iter.Value(), queue.Len())
+		}
+		t.Log(iter.Close(), queue.Len())
 	})
 
 }
@@ -878,7 +809,7 @@ func TestDequeIntegration(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		runtime.Gosched()
 		wg.Add(1)
-		go func(iter fun.Iterator[int64]) {
+		go func(iter fun.Iterable[int64]) {
 			defer wg.Done()
 			runtime.Gosched()
 			for iter.Next(ctx) {
@@ -947,14 +878,14 @@ func TestDequeIntegration(t *testing.T) {
 			}()
 			for i := 0; i < worker; i++ {
 				wwg.Add(1)
-				go func(iter fun.Iterator[func()]) {
+				go func(iter fun.Iterable[func()]) {
 					defer wwg.Done()
 
 					for iter.Next(ctx) {
 						iter.Value()()
 						recv.Add(1)
 					}
-				}(queue.IteratorBlocking())
+				}(queue.Iterator())
 			}
 		}
 

@@ -11,7 +11,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -43,15 +42,12 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
-		iter := itertool.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+		iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
 		list, err := seq.NewListFromIterator(ctx, iter)
 		assert.NotError(t, err)
 		assert.Equal(t, list.Len(), 10)
 		assert.Equal(t, list.Back().Value(), 0)
 		assert.Equal(t, list.Front().Value(), 1)
-
-		_, err = seq.NewListFromIterator[int](ctx, errIterator[int]{})
-		assert.Error(t, err)
 	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := fun.Safe(func() bool {
@@ -141,7 +137,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), fun.Must(itertool.CollectSlice(ctx, list.Values())))
+			t.Log(seen, list.Len(), fun.Must(list.Iterator().Slice(ctx)))
 			t.Error(seen, len(expected), expected)
 
 		}
@@ -278,7 +274,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.Values()
+			iter := list.Iterator()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -307,7 +303,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.PopValues()
+			iter := list.PopIterator()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -342,7 +338,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.ReverseValues()
+			iter := list.Reverse()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -371,7 +367,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.PopReverseValues()
+			iter := list.PopReverse()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -566,14 +562,14 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 			// ["hello", "world"]
 			if list.Front().Value() != "hello" && list.Front().Next().Value() != "world" {
-				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
+				t.Fatal(list.Iterator().Slice(ctx))
 			}
 			if !list.Front().Swap(list.Back()) {
-				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
+				t.Fatal(list.Iterator().Slice(ctx))
 			}
 
 			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
-				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
+				t.Fatal(list.Iterator().Slice(ctx))
 			}
 		})
 		t.Run("Self", func(t *testing.T) {
@@ -582,7 +578,7 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 
 			if list.Front().Swap(list.Front()) {
-				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
+				t.Fatal(list.Iterator().Slice(ctx))
 			}
 		})
 		t.Run("NilList", func(t *testing.T) {
@@ -590,7 +586,7 @@ func TestList(t *testing.T) {
 			list.PushFront("hello")
 
 			if list.Front().Swap(seq.NewElement("world")) {
-				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
+				t.Fatal(list.Iterator().Slice(ctx))
 			}
 		})
 		t.Run("Root", func(t *testing.T) {
@@ -619,11 +615,11 @@ func TestList(t *testing.T) {
 			// [ 42, 84, 420, 840 ]
 
 			if !list.Back().Swap(list.Front().Next()) {
-				t.Fatal(itertool.CollectSlice(ctx, list.Values()))
+				t.Fatal(list.Iterator().Slice(ctx))
 				t.Fatal("should have swapped")
 			}
 			// expected: [42, 840, 420, 84]
-			slice := fun.Must(itertool.CollectSlice(ctx, list.Values()))
+			slice := fun.Must(list.Iterator().Slice(ctx))
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
@@ -632,8 +628,8 @@ func TestList(t *testing.T) {
 			idx := 0
 			iter := list.Iterator()
 			for iter.Next(ctx) {
-				if slice[idx] != iter.Value().Value() {
-					t.Error(idx, slice[idx], iter.Value().Value())
+				if slice[idx] != iter.Value() {
+					t.Error(idx, slice[idx], iter.Value())
 				}
 				idx++
 			}
@@ -680,10 +676,10 @@ func TestList(t *testing.T) {
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := seq.GetPopulatedList(t, 100)
-			itemsOne := fun.Must(itertool.CollectSlice(ctx, lOne.Values()))
+			itemsOne := fun.Must(lOne.Iterator().Slice(ctx))
 
 			lTwo := seq.GetPopulatedList(t, 100)
-			itemsTwo := fun.Must(itertool.CollectSlice(ctx, lTwo.Values()))
+			itemsTwo := fun.Must(lTwo.Iterator().Slice(ctx))
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())
@@ -694,7 +690,7 @@ func TestList(t *testing.T) {
 
 			lOne.Extend(lTwo)
 			combined := append(itemsOne, itemsTwo...)
-			iter := lOne.Values()
+			iter := lOne.Iterator()
 			idx := 0
 			for iter.Next(ctx) {
 				if combined[idx] != iter.Value() {
@@ -924,15 +920,17 @@ func BenchmarkList(b *testing.B) {
 
 				b.ResetTimer()
 				iter := list.Iterator()
+				var value int = -1
 				for j := 0; j < b.N; j++ {
 					idx := 0
 					for iter.Next(ctx) {
 						if idx > 2 && idx%2 != 0 {
-							iter.Value().Remove()
+							value = iter.Value()
 						}
 						idx++
 					}
 				}
+				assert.NotEqual(b, value, -1)
 			})
 			b.Run("RoundTrip", func(b *testing.B) {
 				b.Run("PooledElements", func(b *testing.B) {

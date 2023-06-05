@@ -12,7 +12,7 @@ import (
 // ParallelForEach, but otherwise is identical.
 func Process[T any](
 	ctx context.Context,
-	iter fun.Iterator[T],
+	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	opts Options,
 ) error {
@@ -41,7 +41,7 @@ var _ interface{ Safe() fun.Worker } = new(fun.WaitFunc)
 // Worker is implemented using ParallelForEach.
 func Worker[OP fun.Worker | fun.WaitFunc](
 	ctx context.Context,
-	iter fun.Iterator[OP],
+	iter *fun.Iterator[OP],
 	opts Options,
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
@@ -63,11 +63,10 @@ func Worker[OP fun.Worker | fun.WaitFunc](
 // Options.OutputBufferSize is ignored.
 func ParallelForEach[T any](
 	ctx context.Context,
-	iter fun.Iterator[T],
+	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	opts Options,
 ) (err error) {
-	iter = Synchronize(iter)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -81,7 +80,7 @@ func ParallelForEach[T any](
 		opts.NumWorkers = 1
 	}
 
-	splits := Split(opts.NumWorkers, iter)
+	splits := iter.Split(opts.NumWorkers)
 
 	for idx := range splits {
 		wg.Add(1)
@@ -97,7 +96,7 @@ func forEachWorker[T any](
 	catcher *erc.Collector,
 	wg *fun.WaitGroup,
 	opts Options,
-	iter fun.Iterator[T],
+	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	abort func(),
 ) {

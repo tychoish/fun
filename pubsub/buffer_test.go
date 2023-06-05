@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
@@ -131,7 +130,7 @@ func TestDistributor(t *testing.T) {
 
 			dist := queue.Distributor()
 
-			set := set.MakeNewOrdered[string]()
+			set := set.MakeOrdered[string]()
 			seen := 0
 			if queue.tracker.len() != 3 {
 				t.Fatal(queue.tracker.len())
@@ -139,17 +138,16 @@ func TestDistributor(t *testing.T) {
 
 			iter := dist.Iterator()
 			go func() {
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				queue.Close()
 			}()
-			if err := fun.Observe(ctx, iter, func(in string) { set.Add(in); seen++ }); err != nil {
-				t.Fatal(err)
+			if err := iter.Observe(ctx, func(in string) { set.Add(in); seen++ }); err != nil {
+				t.Fatal(seen, err)
 			}
 			if iter.Next(ctx) {
 				t.Error("iterator should be empty")
 			}
 			if set.Len() != 3 {
-				t.Log(itertool.CollectSlice(ctx, (set.Iterator())))
 				t.Error(set.Len())
 			}
 			if seen != 3 {
@@ -170,12 +168,12 @@ func TestDistributor(t *testing.T) {
 		t.Run("Integer", func(t *testing.T) {
 			t.Parallel()
 			t.Run("Buffered", func(t *testing.T) {
-				RunDistributorTests(t, iterSize, func() fun.Iterator[int] {
-					return itertool.Slice(randomIntSlice(iterSize))
+				RunDistributorTests(t, iterSize, func() fun.Iterable[int] {
+					return fun.SliceIterator(randomIntSlice(iterSize))
 				})
 			})
 			t.Run("Generated", func(t *testing.T) {
-				RunDistributorTests(t, iterSize, func() fun.Iterator[int] {
+				RunDistributorTests(t, iterSize, func() fun.Iterable[int] {
 					ch := make(chan int)
 					go func() {
 						defer close(ch)
@@ -184,21 +182,21 @@ func TestDistributor(t *testing.T) {
 						}
 					}()
 
-					return itertool.Channel(ch)
+					return fun.ChannelIterator(ch)
 				})
 			})
 		})
 		t.Run("StringSimple", func(t *testing.T) {
-			RunDistributorTests(t, iterSize, func() fun.Iterator[string] {
+			RunDistributorTests(t, iterSize, func() fun.Iterable[string] {
 				out := make([]string, iterSize)
 				for i := 0; i < iterSize; i++ {
 					out[i] = fmt.Sprintf("idx=%d random=%d", i, rand.Int63())
 				}
-				return itertool.Slice(out)
+				return fun.SliceIterator(out)
 			})
 		})
 		t.Run("RandomString", func(t *testing.T) {
-			RunDistributorTests(t, iterSize, func() fun.Iterator[string] {
+			RunDistributorTests(t, iterSize, func() fun.Iterable[string] {
 				ch := make(chan string)
 				go func() {
 					defer close(ch)
@@ -210,7 +208,7 @@ func TestDistributor(t *testing.T) {
 						ch <- string(str[:])
 					}
 				}()
-				return itertool.Channel(ch)
+				return fun.ChannelIterator(ch)
 			})
 		})
 	})
@@ -218,14 +216,14 @@ func TestDistributor(t *testing.T) {
 
 type DistGenerator[T comparable] struct {
 	Name      string
-	Generator func(*testing.T, fun.Iterator[T]) Distributor[T]
+	Generator func(*testing.T, fun.Iterable[T]) Distributor[T]
 }
 
 func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 	return []DistGenerator[T]{
 		{
 			Name: "ChannelBuffered",
-			Generator: func(t *testing.T, input fun.Iterator[T]) Distributor[T] {
+			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T, size)
 				for input.Next(ctx) {
@@ -238,7 +236,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DirectChannel",
-			Generator: func(t *testing.T, input fun.Iterator[T]) Distributor[T] {
+			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T)
 				go func() {
@@ -259,7 +257,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DistChannel",
-			Generator: func(t *testing.T, input fun.Iterator[T]) Distributor[T] {
+			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				ch := make(chan T)
 				out := DistributorChannel(ch)
@@ -279,7 +277,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DistQueue",
-			Generator: func(t *testing.T, input fun.Iterator[T]) Distributor[T] {
+			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.Distributor()
@@ -403,7 +401,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 	}
 }
 
-func RunDistributorTests[T comparable](t *testing.T, size int, producer func() fun.Iterator[T]) {
+func RunDistributorTests[T comparable](t *testing.T, size int, producer func() fun.Iterable[T]) {
 	t.Parallel()
 	for _, gent := range MakeGenerators[T](size) {
 		t.Run(gent.Name, func(t *testing.T) {

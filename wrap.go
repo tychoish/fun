@@ -70,7 +70,7 @@ func Unwind[T any](in T) []T {
 // result as an Iterator. The iterative approach may be more ergonomic
 // in some situations, but also eliminates the need to create a copy
 // the unwound stack of objects to a slice.
-func UnwindIterator[T any](root T) Iterator[T] {
+func UnwindIterator[T any](root T) *Iterator[T] {
 	var next *T
 	next = &root
 	return Generator(func(context.Context) (T, error) {

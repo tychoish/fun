@@ -469,7 +469,7 @@ func TestQueueIterator(t *testing.T) {
 		ctx := testt.Context(t)
 		queue := NewUnlimitedQueue[int]()
 		iter := queue.Iterator()
-		toctx, toccancel := context.WithTimeout(ctx, time.Millisecond)
+		toctx, toccancel := context.WithTimeout(ctx, 3*time.Millisecond)
 		defer toccancel()
 		sa := time.Now()
 		if iter.Next(toctx) {
@@ -479,8 +479,9 @@ func TestQueueIterator(t *testing.T) {
 			time.Sleep(2 * time.Millisecond)
 			_ = queue.Add(31)
 		}()
+		iter = queue.Iterator()
 		if !iter.Next(ctx) {
-			t.Error("should have reported item", time.Since(sa), iter.Value())
+			t.Error("should have reported item", time.Since(sa), iter.Value(), queue.Len(), queue.closed)
 		}
 	})
 

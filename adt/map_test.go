@@ -41,12 +41,6 @@ func (mp *Map[K, V]) Join(in *Map[K, V]) {
 	in.Range(func(k K, v V) bool { mp.Store(k, v); return true })
 }
 
-// StoreFrom extends an the content from a map, with the content of an
-// iterator of Pairs.
-func (mp *Map[K, V]) StoreFrom(ctx context.Context, iter fun.Iterator[fun.Pair[K, V]]) {
-	fun.InvariantMust(fun.Observe(ctx, iter, func(it fun.Pair[K, V]) { mp.Store(it.Key, it.Value) }))
-}
-
 // Append adds a sequence of pairs to the map.
 func (mp *Map[K, V]) Append(its ...fun.Pair[K, V]) { mp.Extend(its) }
 
@@ -269,41 +263,6 @@ func TestMap(t *testing.T) {
 
 			// the op:
 			mp.Join(mp2)
-
-			assert.Equal(t, 2, mp2.Len())
-			assert.Equal(t, 3, mp.Len())
-			assert.Equal(t, mp.Get("foo"), 500)
-		})
-	})
-	t.Run("StoreFrom", func(t *testing.T) {
-		t.Run("Disjoint", func(t *testing.T) {
-			mp := &Map[string, int]{}
-			mp.Store("foo", 100)
-			mp.Store("bar", 100)
-			mp2 := &Map[string, int]{}
-			mp2.Store("foofoo", 100)
-			mp2.Store("barfoo", 100)
-			assert.Equal(t, 2, mp.Len())
-			assert.Equal(t, 2, mp2.Len())
-
-			// the op:
-			mp.StoreFrom(testt.Context(t), mp2.Iterator())
-
-			assert.Equal(t, 2, mp2.Len())
-			assert.Equal(t, 4, mp.Len())
-		})
-		t.Run("Overlapping", func(t *testing.T) {
-			mp := &Map[string, int]{}
-			mp.Store("foo", 100)
-			mp.Store("bar", 100)
-			mp2 := &Map[string, int]{}
-			mp2.Store("foo", 500)
-			mp2.Store("baz", 100)
-			assert.Equal(t, 2, mp.Len())
-			assert.Equal(t, 2, mp2.Len())
-
-			// the op:
-			mp.StoreFrom(testt.Context(t), mp2.Iterator())
 
 			assert.Equal(t, 2, mp2.Len())
 			assert.Equal(t, 3, mp.Len())

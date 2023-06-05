@@ -48,14 +48,14 @@ func WaitForGroup(wg *sync.WaitGroup) WaitFunc {
 // iterator of WaitFuncs, starts a go routine running each, and wait
 // function and then blocks until all operations have returned, or the
 // context passed to the output function has been canceled.
-func WaitMerge(iter Iterator[WaitFunc]) WaitFunc {
+func WaitMerge(iter *Iterator[WaitFunc]) WaitFunc {
 	return func(ctx context.Context) {
 		wg := &WaitGroup{}
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = Observe(ctx, iter, func(fn WaitFunc) { fn.Add(ctx, wg) })
+			_ = iter.Observe(ctx, func(fn WaitFunc) { fn.Add(ctx, wg) })
 		}()
 
 		wg.Wait(ctx)
@@ -70,6 +70,21 @@ func (wf WaitFunc) Run(ctx context.Context) {
 	defer cancel()
 
 	wf(wctx)
+}
+
+// WithCancel creates a WaitFunc and a cancel function which will
+// terminate the context that the root WaitFunc is running
+// with. This context isn't canceled *unless* the cancel function is
+// called (or the context passed to the WaitFunc is canceled.)
+func (wf WaitFunc) WithCancel() (WaitFunc, context.CancelFunc) {
+	var wctx context.Context
+	var cancel context.CancelFunc
+	once := &sync.Once{}
+
+	return func(ctx context.Context) {
+		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+		wf(wctx)
+	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
 }
 
 func (wf WaitFunc) Once() WaitFunc {
@@ -88,7 +103,8 @@ func (wf WaitFunc) Future(ctx context.Context) WaitFunc {
 	return func(ctx context.Context) { WaitChannel(sig) }
 }
 
-func (wf WaitFunc) Start() WaitFunc { return func(ctx context.Context) { go wf(ctx) } }
+func (wf WaitFunc) Go(ctx context.Context) { go wf(ctx) }
+func (wf WaitFunc) Launch() WaitFunc       { return wf.Go }
 
 // Add starts a goroutine that waits for the WaitFunc to return,
 // incrementing and decrementing the sync.WaitGroup as
@@ -100,7 +116,7 @@ func (wf WaitFunc) Background(wg *WaitGroup) WaitFunc {
 }
 
 // Block runs the WaitFunc with a context that will never be canceled.
-func (wf WaitFunc) Block() { wf.Run(internal.BackgroundContext) }
+func (wf WaitFunc) Block() { wf(internal.BackgroundContext) }
 
 // Safe converts the WaitFunc into a Worker function that catchers
 // panics and returns them as errors using fun.Check.
@@ -169,6 +185,8 @@ func (wf WaitFunc) Lock() WaitFunc {
 	}
 }
 
-func (wf WaitFunc) Chain(next WaitFunc) WaitFunc {
-	return func(ctx context.Context) { wf(ctx); next.If(ctx.Err() != nil)(ctx) }
+func (wf WaitFunc) Chain(op WaitFunc) WaitFunc {
+	return func(ctx context.Context) { wf(ctx); op.If(ctx.Err() == nil)(ctx) }
 }
+
+func (wf WaitFunc) AddHook(op func()) WaitFunc { return func(ctx context.Context) { wf(ctx); op() } }

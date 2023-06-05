@@ -16,18 +16,18 @@ import (
 // races if both are iterating concurrently. As a special case the
 // fun.IterateOne function allows for safe, concurrent iteration of
 // these iterators.
-func NewIterator[T any](mtx *sync.Mutex, iter fun.Iterator[T]) fun.Iterator[T] {
+func NewIterator[T any](mtx *sync.Mutex, iter fun.Iterable[T]) fun.Iterable[T] {
 	return syncIterImpl[T]{
 		mtx:  mtx,
 		iter: iter,
 	}
 }
 
-func (iter syncIterImpl[T]) Unwrap() fun.Iterator[T] { return iter.iter }
+func (iter syncIterImpl[T]) Unwrap() fun.Iterable[T] { return iter.iter }
 
 type syncIterImpl[T any] struct {
 	mtx  *sync.Mutex
-	iter fun.Iterator[T]
+	iter fun.Iterable[T]
 }
 
 func (iter syncIterImpl[T]) Next(ctx context.Context) bool {
@@ -55,8 +55,10 @@ func (iter syncIterImpl[T]) ReadOne(ctx context.Context) (T, error) {
 	iter.mtx.Lock()
 	defer iter.mtx.Unlock()
 
-	if err := ctx.Err(); err != nil {
-		return fun.ZeroOf[T](), err
+	if si, ok := iter.iter.(interface {
+		ReadOne(ctx context.Context) (T, error)
+	}); ok {
+		return si.ReadOne(ctx)
 	}
 
 	if iter.iter.Next(ctx) {

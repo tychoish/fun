@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 )
 
 // stolen shamelessly from https://github.com/tendermint/tendermint/tree/master/internal/libs/queue
@@ -310,14 +310,6 @@ type entry[T any] struct {
 	link *entry[T]
 }
 
-// internal implementation of the queue iterator, operations must hold
-// the queue's mutex.
-type queueIterImpl[T any] struct {
-	queue  *Queue[T]
-	item   *entry[T]
-	closed bool
-}
-
 // Iterator produces an iterator implementation that wraps the
 // underlying queue linked list. The iterator respects the Queue's
 // mutex and is safe for concurrent access and current queue
@@ -325,54 +317,56 @@ type queueIterImpl[T any] struct {
 // modify the contents of the queue, and will only terminate when the
 // queue has been closed via the Close() method.
 //
-// To create a "consuming" iterator, a Distributor.
-func (q *Queue[T]) Iterator() fun.Iterator[T] { return adt.NewIterator(&q.mu, newQueueIter(q)) }
+// To create a "consuming" iterator, use a Distributor.
+func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().WithLock(&q.mu).Generator() }
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
 		push: ignorePopContext(q.Add),
-		pop: func(ctx context.Context) (T, error) {
+		pop: func(ctx context.Context) (_ T, err error) {
 			msg, ok := q.Remove()
 			if ok {
 				return msg, nil
 			}
-			return q.Wait(ctx)
+			msg, err = q.Wait(ctx)
+			return msg, filterQueueErrorsForIterator(err)
 		},
 		size: q.tracker.len,
 	}
 }
 
-func newQueueIter[T any](q *Queue[T]) fun.Iterator[T] { return &queueIterImpl[T]{queue: q} }
-func (iter *queueIterImpl[T]) Close() error           { iter.closed = true; return nil }
-func (iter *queueIterImpl[T]) Value() T               { return iter.item.item }
-
-func (iter *queueIterImpl[T]) Next(ctx context.Context) bool {
-	if ctx.Err() != nil {
-		return false
-	}
-
-	if iter.item == nil {
-		iter.item = iter.queue.front
-		// the sentinal is always non-nil, but the link has to
-		// be non-nil and so we bump here as a special case
-		if iter.item.link != nil {
-			iter.item = iter.item.link
-			return true
+func (q *Queue[T]) Producer() fun.Producer[T] {
+	var next *entry[T]
+	return func(ctx context.Context) (o T, _ error) {
+		if next == nil {
+			next = q.front
 		}
-	}
 
-	if iter.item.link == nil {
-		if iter.closed {
-			return false
+		if next.link == q.front {
+			return o, io.EOF
 		}
-		if err := iter.queue.unsafeWaitForNew(ctx); err != nil {
-			if errors.Is(err, ErrQueueClosed) {
-				iter.closed = true
-				return false
+
+		if next.link != nil {
+			next = next.link
+		} else if next.link == nil {
+			if q.closed {
+				return o, io.EOF
 			}
-			return false
-		}
-	}
 
-	iter.item = iter.item.link
-	return true
+			if err := q.unsafeWaitForNew(ctx); err != nil {
+				if errors.Is(err, ErrQueueClosed) {
+					return o, io.EOF
+				}
+				return o, err
+			}
+			if next.link != q.front {
+				next = next.link
+			}
+		}
+
+		if next.link == q.front {
+			return o, io.EOF
+		}
+
+		return next.item, nil
+	}
 }

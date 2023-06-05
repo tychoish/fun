@@ -3,7 +3,6 @@ package itertool
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -23,69 +22,62 @@ import (
 // is an *erc.Stack object. Panics in the map function are converted
 // to errors and handled according to the ContinueOnPanic option.
 func Map[T any, O any](
-	iter fun.Iterator[T],
+	iter *fun.Iterator[T],
 	mapper func(context.Context, T) (O, error),
 	opts Options,
-) fun.Iterator[O] {
+) *fun.Iterator[O] {
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
 	}
 
 	ec := &erc.Collector{}
-	wg := &fun.WaitGroup{}
-	out := &internal.GeneratorIterator[O]{}
-	output := make(chan O)
-	shutdown := &sync.Once{}
-	out.Closer = func() {
-		fun.WaitFunc(wg.Wait).Block()
-		shutdown.Do(func() { close(output) })
-	}
+	output := fun.Blocking(make(chan O))
 
-	setup := &sync.Once{}
-	out.Operation = func(ctx context.Context) (O, error) {
-		setup.Do(func() {
-			input := collectChannel(ctx, opts.NumWorkers, iter)
+	init := fun.WaitFunc(func(ctx context.Context) {
+		splits := iter.Split(opts.NumWorkers)
 
-			wctx, wcancel := context.WithCancel(ctx)
-			for i := 0; i < opts.NumWorkers; i++ {
-				worker := mapWorker(ec, opts, mapper, input, output)
-				worker.Wait(func(err error) {
+		wctx, wcancel := context.WithCancel(ctx)
+		wg := &fun.WaitGroup{}
+
+		for idx := range splits {
+			// for each split, run a mapWorker
+			mapWorker(ec, opts, mapper, splits[idx], output.Send()).
+				Wait(func(err error) {
+					// inspect the errors
 					if errors.Is(err, errAbortAllMapWorkers) {
 						wcancel()
 					}
 				}).Add(wctx, wg)
-			}
-			go func() {
-				out.Closer()
-				wcancel()
-			}()
-		})
+		}
 
-		out, err := fun.Blocking(output).Receive().Read(ctx)
-		if err == nil {
-			return out, nil
-		}
-		if ec.HasErrors() {
-			return out, ec.Resolve()
-		}
-		return out, err
-	}
-	return Synchronize[O](out)
+		// start a background op that waits for the
+		// waitgroup and closes the channel
+		wg.WaitFunc().AddHook(wcancel).AddHook(output.Close).Go(ctx)
+	}).Once()
+
+	out := fun.Producer[O](func(ctx context.Context) (O, error) {
+		init(ctx)
+		return output.Receive().Read(ctx)
+	}).GeneratorWithHook(func(iter *fun.Iterator[O]) {
+		iter.AddError(ec.Resolve())
+	})
+
+	return out
 }
 
 var errAbortAllMapWorkers = errors.New("abort-all-map-workers")
 
 func mapWorker[T any, O any](
-	catcher *erc.Collector,
+	ec *erc.Collector,
 	opts Options,
 	mapper func(context.Context, T) (O, error),
-	fromInput chan T,
-	toOutput chan O,
+	input *fun.Iterator[T],
+	output fun.Send[O],
 ) fun.Worker {
 	return func(ctx context.Context) error {
-	ITEM:
+		proc := input.Producer()
 		for {
-			value, ok := fun.Blocking(fromInput).Receive().Check(ctx)
+			value, ok := proc.Check(ctx)
 			if !ok {
 				return nil
 			}
@@ -100,25 +92,25 @@ func mapWorker[T any, O any](
 				return
 			}(value)
 			if err == nil {
-				if err := fun.Blocking(toOutput).Send().Write(ctx, o); err != nil {
+				if !output.Check(ctx, o) {
 					return nil
 				}
-				continue ITEM
+				continue
 			}
 
 			// handle errors
 			if errors.Is(err, fun.ErrRecoveredPanic) {
-				catcher.Add(err)
+				ec.Add(err)
 				if opts.ContinueOnPanic {
-					continue ITEM
+					continue
 				}
 				return errAbortAllMapWorkers
 			}
 
-			erc.When(catcher, opts.shouldCollectError(err), err)
+			erc.When(ec, opts.shouldCollectError(err), err)
 
 			if opts.ContinueOnError {
-				continue ITEM
+				continue
 			}
 
 			return errAbortAllMapWorkers

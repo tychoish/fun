@@ -33,6 +33,18 @@ func ConsistentProducer[T any](fn func() T) Producer[T] {
 	return func(context.Context) (T, error) { return fn(), nil }
 }
 
+func IterableProducer[T any](iter Iterable[T]) Producer[T] {
+	return func(ctx context.Context) (T, error) { return IterateOne(ctx, iter) }
+}
+
+func StaticProducer[T any](val T, err error) Producer[T] {
+	return func(context.Context) (T, error) { return val, err }
+}
+
+func ValueProducer[T any](val T) Producer[T] {
+	return func(context.Context) (T, error) { return val, nil }
+}
+
 // Run executes the producer with a context hat is cacneled after the
 // producer returns. It is, itself a producer.
 func (pf Producer[T]) Run(ctx context.Context) (T, error) {
@@ -109,8 +121,9 @@ func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) WaitFunc {
 // Check uses the error observer to consume the error from the
 // Producer and returns a function that takes a context and returns a value.
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
+func (pf Producer[T]) ForceCheck() (T, bool)               { return pf.Check(internal.BackgroundContext) }
 
-// Future runs the producer in the bacgrkound, when function is
+// Future runs the producer in the background, when function is
 // called, and returns a producer which, when called, blocks until the
 // original producer returns.
 func (pf Producer[T]) Future(ctx context.Context) Producer[T] {
@@ -146,7 +159,18 @@ func (pf Producer[T]) Once() Producer[T] {
 // for every iteration, until it errors. Errors that are not context
 // cancellation errors or io.EOF are propgated to the iterators Close
 // method.
-func (pf Producer[T]) Generator() Iterator[T] { return Generator(pf) }
+func (pf Producer[T]) Generator() *Iterator[T] {
+	op, cancel := pf.WithCancel()
+	return &Iterator[T]{operation: op, closer: cancel}
+}
+
+func (pf Producer[T]) GeneratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
+	once := &sync.Once{}
+	op, cancel := pf.WithCancel()
+	iter := &Iterator[T]{operation: op}
+	iter.closer = func() { once.Do(func() { hook(iter) }); cancel() }
+	return iter
+}
 
 // If returns a producer that will execute the root producer only if
 // the cond value is true. Otherwise, If will return the zero value
@@ -195,11 +219,7 @@ func (pf Producer[T]) When(cond func() bool) Producer[T] {
 	}
 }
 
-// Lock creates a producer that runs the root mutex as per normal, but
-// under the protection of a mutex so that there's only one execution
-// of the producer at a time.
-func (pf Producer[T]) Lock() Producer[T] {
-	mtx := &sync.Mutex{}
+func (pf Producer[T]) WithLock(mtx *sync.Mutex) Producer[T] {
 	return func(ctx context.Context) (T, error) {
 		mtx.Lock()
 		defer mtx.Unlock()
@@ -207,9 +227,27 @@ func (pf Producer[T]) Lock() Producer[T] {
 	}
 }
 
-type tuple[T, U any] struct {
-	One T
-	Two U
+// Lock creates a producer that runs the root mutex as per normal, but
+// under the protection of a mutex so that there's only one execution
+// of the producer at a time.
+func (pf Producer[T]) Lock() Producer[T] { return pf.WithLock(&sync.Mutex{}) }
+
+// WithCancel creates a Producer and a cancel function which will
+// terminate the context that the root Producer is running
+// with. This context isn't canceled *unless* the cancel function is
+// called (or the context passed to the Producer is canceled.)
+func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
+	var wctx context.Context
+	var cancel context.CancelFunc
+	once := &sync.Once{}
+
+	return func(ctx context.Context) (T, error) {
+		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+		if err := wctx.Err(); err != nil {
+			return ZeroOf[T](), err
+		}
+		return pf(ctx)
+	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
 }
 
 // Limit runs the producer a specified number of times, and caches the

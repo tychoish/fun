@@ -10,32 +10,25 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
-func generateIter(ctx context.Context, size int) fun.Iterator[string] {
+func generateIter(ctx context.Context, size int) *fun.Iterator[string] {
 	out := make([]string, size)
 	for i := 0; i < size; i++ {
 		out[i] = fmt.Sprintf("iter=%d", i)
 
 	}
-	return internal.NewSliceIter(out)
+	return fun.SliceIterator(out)
 }
 
 func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for name, builder := range map[string]func() Set[string]{
-		"Unordered/Basic":          func() Set[string] { return NewUnordered[string]() },
-		"Unordered/BasicLarge":     func() Set[string] { return MakeUnordered[string](100) },
-		"Unordered/SyncBasic":      func() Set[string] { return Synchronize(NewUnordered[string]()) },
-		"Unordered/SyncBasicLarge": func() Set[string] { return Synchronize(MakeUnordered[string](100)) },
-		"Ordered/Basic":            func() Set[string] { return NewOrdered[string]() },
-		"Ordered/BasicLarge":       func() Set[string] { return MakeOrdered[string](100) },
-		"Ordered/SyncBasic":        func() Set[string] { return Synchronize(NewOrdered[string]()) },
-		"Ordered/SyncBasicLarge":   func() Set[string] { return Synchronize(MakeOrdered[string](100)) },
-		"Ordered/Linked":           func() Set[string] { return MakeNewOrdered[string]() },
+		"Unordered/Basic":      func() Set[string] { return NewUnordered[string]() },
+		"Unordered/BasicLarge": func() Set[string] { return MakeUnordered[string](100) },
+		"Ordered/Basic":        func() Set[string] { return MakeOrdered[string]() },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("EmptyIteraton", func(t *testing.T) {
@@ -370,28 +363,6 @@ func TestSet(t *testing.T) {
 			})
 		}
 	})
-	t.Run("OrderedSetCleanup", func(t *testing.T) {
-		set := NewOrdered[int]()
-		for i := range make([]int, 500) {
-			set.Add(i)
-		}
-
-		os := set.(*orderedSetImpl[int])
-		for i := range make([]int, 300) {
-			if i%2 == 0 || i%3 == 0 {
-				set.Delete(i)
-			}
-		}
-		if l := len(os.set); l != 300 {
-			t.Fatal("unexpected size", l)
-		}
-		if l := len(os.elems); l != 308 {
-			t.Fatal("unexpected size", l)
-		}
-		if os.deletedCount != 8 {
-			t.Fatal("unexpected delete count", os.deletedCount)
-		}
-	})
 	t.Run("Unwrap", func(t *testing.T) {
 		t.Run("Set", func(t *testing.T) {
 			base := MakeUnordered[string](1)
@@ -406,68 +377,16 @@ func TestSet(t *testing.T) {
 			base := MakeUnordered[string](1)
 			base.Add("abc")
 			wrapped := Synchronize(base).Iterator()
-			maybeBase := wrapped.(interface{ Unwrap() fun.Iterator[string] }).Unwrap()
-			if maybeBase == nil {
+			maybeBase := fun.Unwrap(wrapped)
+			if maybeBase != nil {
 				t.Fatal("should not be nil")
-			}
-		})
-	})
-	t.Run("IteratorEdgeCases", func(t *testing.T) {
-		t.Run("DeletedElementIsSkipped", func(t *testing.T) {
-			base := MakeOrdered[string](2).(*orderedSetImpl[string])
-			base.Add("abc")
-			base.Add("123")
-			base.elems[1].deleted = true
-
-			count := 0
-			iter := base.Iterator()
-			for iter.Next(ctx) {
-				count++
-				if iter.Value() == "123" {
-					t.Error("unexpected value", iter.Value())
-				}
-			}
-			if count != 1 {
-				t.Error("iteration count", count)
-			}
-		})
-		t.Run("CanceledContext", func(t *testing.T) {
-			cctx, ccancel := context.WithCancel(ctx)
-			ccancel()
-
-			base := MakeOrdered[string](2).(*orderedSetImpl[string])
-			base.Add("abc")
-			base.Add("123")
-
-			count := 0
-			iter := base.Iterator()
-			for iter.Next(cctx) {
-				count++
-			}
-			if count != 0 {
-				t.Error("iteration count", count)
-			}
-		})
-		t.Run("OffTheEnd", func(t *testing.T) {
-			base := MakeOrdered[string](2).(*orderedSetImpl[string])
-			base.Add("abc")
-			base.Add("123")
-
-			count := 0
-			iter := base.Iterator().(*orderedSetIterImpl[string])
-			iter.lastIdx = 43
-			for iter.Next(ctx) {
-				count++
-			}
-			if count != 0 {
-				t.Error("iteration count", count)
 			}
 		})
 	})
 	t.Run("JSONCheck", func(t *testing.T) {
 		// want to make sure this works normally, without the
 		// extra cast, as above.
-		set := MakeNewOrdered[int]()
+		set := MakeOrdered[int]()
 		err := json.Unmarshal([]byte("[1,2,3]"), &set)
 		check.NotError(t, err)
 		check.Equal(t, 3, set.Len())
@@ -492,13 +411,7 @@ func BenchmarkSet(b *testing.B) {
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrdered[int]()
-			for j := 0; j < b.N; j++ {
-				operation(set)
-			}
-		})
-		b.Run("NewOrdered", func(b *testing.B) {
-			set := MakeNewOrdered[int]()
+			set := MakeOrdered[int]()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
@@ -523,13 +436,7 @@ func BenchmarkSet(b *testing.B) {
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrdered[int]()
-			for j := 0; j < b.N; j++ {
-				operation(set)
-			}
-		})
-		b.Run("NewOrdered", func(b *testing.B) {
-			set := MakeNewOrdered[int]()
+			set := MakeOrdered[int]()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
@@ -558,13 +465,7 @@ func BenchmarkSet(b *testing.B) {
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrdered[int]()
-			for j := 0; j < b.N; j++ {
-				operation(set)
-			}
-		})
-		b.Run("NewOrdered", func(b *testing.B) {
-			set := MakeNewOrdered[int]()
+			set := MakeOrdered[int]()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
@@ -590,13 +491,7 @@ func BenchmarkSet(b *testing.B) {
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrdered[int]()
-			for j := 0; j < b.N; j++ {
-				operation(set)
-			}
-		})
-		b.Run("NewOrdered", func(b *testing.B) {
-			set := MakeNewOrdered[int]()
+			set := MakeOrdered[int]()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}

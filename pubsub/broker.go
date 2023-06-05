@@ -6,6 +6,7 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -167,7 +168,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 					switch {
 					case errors.Is(err, ErrQueueFull) || errors.Is(err, ErrQueueNoCredit):
 						continue
-					case errors.Is(err, ErrQueueClosed):
+					case errors.Is(err, ErrQueueClosed) || errors.Is(err, io.EOF):
 						b.close()
 						return
 					}
@@ -196,7 +197,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 	}
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterator[chan T], msg T) {
+func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterable[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
 		wg := &fun.WaitGroup{}

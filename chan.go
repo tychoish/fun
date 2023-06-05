@@ -45,10 +45,13 @@ func Blocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: blockin
 // not sent.
 func NonBlocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: non_blocking, ch: ch} }
 
+func (op ChannelOp[T]) Close()                  { close(op.ch) }
+func (op ChannelOp[T]) Channel() chan T         { return op.ch }
 func (op ChannelOp[T]) Send() Send[T]           { return Send[T]{mode: op.mode, ch: op.ch} }
 func (op ChannelOp[T]) Receive() Receive[T]     { return Receive[T]{mode: op.mode, ch: op.ch} }
 func (op ChannelOp[T]) Producer() Producer[T]   { return op.Receive().Read }
 func (op ChannelOp[T]) Processor() Processor[T] { return op.Send().Write }
+func (op ChannelOp[T]) Iterator() *Iterator[T]  { return op.Receive().Producer().Generator() }
 
 // Receive, wraps a channel fore <-chan T operations. It is the type
 // returned by the Receive() method on ChannelOp. The primary method
@@ -66,6 +69,8 @@ func BlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: bl
 // NonBlockingReceive is the equivalent of NonBlocking(ch).Receive(),
 // except that it accepts a receive-only channel.
 func NonBlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: non_blocking, ch: ch} }
+
+func (ro Receive[T]) Iterator() *Iterator[T] { return ro.Producer().Generator() }
 
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns

@@ -61,7 +61,7 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
 	}
 }
 
-func collectIter[T any](ctx context.Context, t testing.TB, iter fun.Iterator[T]) []T {
+func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Iterator[T]) []T {
 	t.Helper()
 
 	out := []T{}
@@ -223,6 +223,14 @@ func TestError(t *testing.T) {
 			es := &Collector{}
 			errs := collectIter(ctx, t, es.Iterator())
 			assert.Zero(t, len(errs))
+		})
+		t.Run("ProducerCanceled", func(t *testing.T) {
+			es := &Collector{}
+			es.Add(errors.New("hello"))
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			_, err := es.stack.Producer()(ctx)
+			assert.ErrorIs(t, err, context.Canceled)
 		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}

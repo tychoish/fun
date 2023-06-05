@@ -1,9 +1,9 @@
 package fun
 
 import (
+	"context"
+	"io"
 	"sort"
-
-	"github.com/tychoish/fun/internal"
 )
 
 // Slice is just a local wrapper around a slice, providing a similarly
@@ -11,11 +11,21 @@ import (
 type Slice[T any] []T
 
 // Sliceify produces a slice object as a convenience constructor.
-func Sliceify[T any](in []T) Slice[T] { return in }
+func Sliceify[T any](in []T) Slice[T]  { return in }
+func Variadic[T any](in ...T) Slice[T] { return in }
 
 // Iterator returns an iterator to the items of the slice the range
 // keyword also works for these slices.
-func (s Slice[T]) Iterator() Iterator[T] { return internal.NewSliceIter(s) }
+func (s Slice[T]) Iterator() *Iterator[T] {
+	var idx int = -1
+	return Producer[T](func(context.Context) (out T, _ error) {
+		if len(s) <= idx+1 {
+			return out, io.EOF
+		}
+		idx++
+		return s[idx], nil
+	}).Generator()
+}
 
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false

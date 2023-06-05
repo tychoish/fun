@@ -19,7 +19,7 @@ func TestIteratorTools(t *testing.T) {
 
 	t.Run("ObservePanicSafety", func(t *testing.T) {
 		called := 0
-		err := Observe[int](ctx, internal.NewSliceIter([]int{1, 2, 34, 56}), func(in int) {
+		err := Sliceify([]int{1, 2, 34, 56}).Iterator().Observe(ctx, func(in int) {
 			called++
 			if in > 3 {
 				panic("eep!")
@@ -36,7 +36,7 @@ func TestIteratorTools(t *testing.T) {
 		}
 	})
 	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, Observe[int](ctx, internal.NewSliceIter([]int{}), func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, SliceIterator([]int{}).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
 	})
 	t.Run("IterateOne", func(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestIteratorTools(t *testing.T) {
 
 		t.Run("ReadOneable", func(t *testing.T) {
 			input := &TestReadoneableImpl{
-				Iterator: internal.NewSliceIter([]string{
+				Iterable: internal.NewSliceIter([]string{
 					fmt.Sprint(10),
 					fmt.Sprint(10),
 					fmt.Sprint(20),
@@ -78,7 +78,7 @@ func TestIteratorTools(t *testing.T) {
 
 	})
 	t.Run("Transform", func(t *testing.T) {
-		input := internal.NewSliceIter([]string{
+		input := SliceIterator([]string{
 			fmt.Sprint(10),
 			fmt.Sprint(10),
 			fmt.Sprint(20),
@@ -140,9 +140,11 @@ func TestIteratorTools(t *testing.T) {
 		t.Run("PropogateErrors", func(t *testing.T) {
 			count := 0
 			expected := errors.New("kip")
+			returned := false
 			iter := Generator(func(context.Context) (int, error) {
 				count++
 				if count > 10 {
+					returned = true
 					return 1000, expected
 				}
 				return count, nil
@@ -159,16 +161,17 @@ func TestIteratorTools(t *testing.T) {
 			if seen > count {
 				t.Error(seen, "vs", "count")
 			}
+			if !returned {
+				t.Error("should have returned error", count)
+			}
 			if err := iter.Close(); !errors.Is(err, expected) {
 				t.Error(err)
-
 			}
 		})
-
 	})
 	t.Run("Filter", func(t *testing.T) {
-		evens := Filter(testIntIter(t, 100), func(in int) bool { return in%2 == 0 })
-		assert.Equal(t, Count(ctx, evens), 50)
+		evens := testIntIter(t, 100).Filter(func(in int) bool { return in%2 == 0 })
+		assert.Equal(t, evens.Count(ctx), 50)
 		for evens.Next(ctx) {
 			assert.True(t, evens.Value()%2 == 0)
 		}
@@ -176,7 +179,7 @@ func TestIteratorTools(t *testing.T) {
 	})
 }
 
-func testIntIter(t *testing.T, size int) Iterator[int] {
+func testIntIter(t *testing.T, size int) *Iterator[int] {
 	t.Helper()
 
 	var count int
@@ -197,7 +200,7 @@ func testIntIter(t *testing.T, size int) Iterator[int] {
 }
 
 type TestReadoneableImpl struct {
-	Iterator[string]
+	Iterable[string]
 	once bool
 }
 

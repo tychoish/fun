@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -26,7 +25,7 @@ func TestIterator(t *testing.T) {
 		mp.Store("three", 3)
 		mp.Store("four", 4)
 
-		iter := NewIterator(&sync.Mutex{}, mp.Iterator())
+		iter := mp.Iterator()
 
 		seen := 0
 		for iter.Next(ctx) {
@@ -53,7 +52,7 @@ func TestIterator(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			mp.Store(fmt.Sprint("key=", i), i)
 		}
-		iter := NewIterator(&sync.Mutex{}, mp.Values()).(syncIterImpl[int])
+		iter := mp.Values()
 		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
 		for i := 0; i < 10; i++ {
@@ -85,7 +84,7 @@ func TestIterator(t *testing.T) {
 
 			iter := syncIterImpl[int]{
 				mtx: &sync.Mutex{},
-				iter: internal.NewGeneratorIterator(func(ctx context.Context) (int, error) {
+				iter: fun.Generator(func(ctx context.Context) (int, error) {
 					if err := ctx.Err(); err != nil {
 						return 0, err
 					} else if val := counter.Add(1); val > 64 {
@@ -115,7 +114,7 @@ func TestIterator(t *testing.T) {
 
 			iter := syncIterImpl[int]{
 				mtx: &sync.Mutex{},
-				iter: internal.NewGeneratorIterator(func(ctx context.Context) (int, error) {
+				iter: fun.Generator(func(ctx context.Context) (int, error) {
 					if err := ctx.Err(); err != nil {
 						return 0, err
 					} else if val := counter.Add(1); val > 64 {

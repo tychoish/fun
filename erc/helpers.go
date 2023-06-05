@@ -144,9 +144,7 @@ func Unwind(err error) []error {
 	case *Stack:
 		// the only way this can error is if the observer
 		// function panics, which it can't:
-		fun.InvariantMust(fun.Observe(internal.BackgroundContext,
-			e.Iterator(), func(err error) { out = append(out, err) },
-		))
+		fun.InvariantMust(e.Iterator().Observe(internal.BackgroundContext, func(err error) { out = append(out, err) }))
 	default:
 		out = fun.Unwind(err)
 	}
@@ -194,9 +192,9 @@ func Stream(ctx context.Context, errCh <-chan error) error {
 //
 // Because Consume() is a fun.ProcessFunc you can convert this into
 // fun.Worker and fun.WaitFunc objects as needed.
-func Consume(ctx context.Context, iter fun.Iterator[error]) error {
+func Consume(ctx context.Context, iter *fun.Iterator[error]) error {
 	ec := &Collector{}
-	ec.Add(fun.Observe(ctx, iter, ec.Observer()))
+	ec.Add(iter.Observe(ctx, ec.Observer()))
 	return ec.Resolve()
 }
 

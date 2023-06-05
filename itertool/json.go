@@ -21,7 +21,7 @@ func (_ errIter[T]) Value() T                  { return fun.ZeroOf[T]() }
 //
 // The contents of the iterator are marshaled as elements in an JSON
 // array.
-func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, error) {
+func MarshalJSON[T any](ctx context.Context, iter fun.Iterable[T]) ([]byte, error) {
 	buf := &internal.IgnoreNewLinesBuffer{}
 	enc := json.NewEncoder(buf)
 	_, _ = buf.Write([]byte("["))
@@ -54,11 +54,11 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterator[T]) ([]byte, erro
 // items. The implementation reads all items from the slice before
 // returning. Any errors encountered are propgated to the Close method
 // of the iterator.
-func UnmarshalJSON[T any](in []byte) fun.Iterator[T] {
+func UnmarshalJSON[T any](in []byte) *fun.Iterator[T] {
 	rv := []json.RawMessage{}
 
 	if err := json.Unmarshal(in, &rv); err != nil {
-		return errIter[T]{err: err}
+		return fun.StaticProducer(fun.ZeroOf[T](), err).Generator()
 	}
 	var idx int
 	return fun.Generator(func(ctx context.Context) (out T, err error) {
