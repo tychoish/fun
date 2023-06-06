@@ -30,11 +30,11 @@ func TestChannel(t *testing.T) {
 				defer cancel()
 
 				ch := make(chan int, 2)
-				err := Blocking(ch).Processor()(ctx, 1)
+				err := Blocking(ch).Send().Processor()(ctx, 1)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 1)
 
-				err = NonBlocking(ch).Processor()(ctx, 3)
+				err = NonBlocking(ch).Send().Processor()(ctx, 3)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
@@ -169,7 +169,7 @@ func TestChannel(t *testing.T) {
 				t.Run("Producer", func(t *testing.T) {
 					ch := make(chan string, 1)
 					ch <- "hello world"
-					val, err := Blocking(ch).Producer()(ctx)
+					val, err := Blocking(ch).Receive().Producer()(ctx)
 					assert.NotError(t, err)
 					assert.Equal(t, val, "hello world")
 				})

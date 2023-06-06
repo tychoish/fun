@@ -367,7 +367,7 @@ func (l *List[T]) ProducerReversePop() fun.Producer[T] {
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
 // however, values added ahead of the iterator, will be visable.
-func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Generator() }
+func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Iterator() }
 
 // Reverse returns an iterator that produces elements from the list,
 // from the back to the front. The iterator is not
@@ -377,7 +377,7 @@ func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Generator() 
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
 // however, values added ahead of the iterator, will be visable.
-func (l *List[T]) Reverse() *fun.Iterator[T] { return l.ProducerReverse().Generator() }
+func (l *List[T]) Reverse() *fun.Iterator[T] { return l.ProducerReverse().Iterator() }
 
 // PopIterator produces an iterator that consumes elements from the
 // list as it iterates, moving front-to-back.
@@ -385,7 +385,7 @@ func (l *List[T]) Reverse() *fun.Iterator[T] { return l.ProducerReverse().Genera
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
 // however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopIterator() *fun.Iterator[T] { return l.ProducerPop().Generator() }
+func (l *List[T]) PopIterator() *fun.Iterator[T] { return l.ProducerPop().Iterator() }
 
 // PopReverse produces an iterator that consumes elements from the
 // list as it iterates, moving back-to-front. To access an iterator of
@@ -395,7 +395,7 @@ func (l *List[T]) PopIterator() *fun.Iterator[T] { return l.ProducerPop().Genera
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
 // however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().Generator() }
+func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().Iterator() }
 
 // Extend removes items from the front of the input list, and appends
 // them to the end of the current list.

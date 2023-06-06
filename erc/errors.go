@@ -113,7 +113,7 @@ func (e *Stack) Producer() fun.Producer[error] {
 // safe for concurrent access, and must only be used from one
 // goroutine, or with a synchronized approach. You may create multiple
 // Iterators on the same stack without issue.
-func (e *Stack) Iterator() *fun.Iterator[error] { return e.Producer().Lock().Generator() }
+func (e *Stack) Iterator() *fun.Iterator[error] { return e.Producer().Lock().Iterator() }
 
 // Collector is a simplified version of the error collector in
 // github.com/tychoish/emt. The collector is thread safe and
@@ -152,7 +152,7 @@ func (ec *Collector) Iterator() *fun.Iterator[error] {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 
-	return ec.stack.Producer().WithLock(&ec.mu).Generator()
+	return ec.stack.Producer().WithLock(&ec.mu).Iterator()
 }
 
 // Resolve returns an error of type *erc.Stack, or nil if there have

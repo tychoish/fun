@@ -239,14 +239,14 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 // towards the front. When the iterator reaches the beginning of the queue
 // it ends.
 func (dq *Deque[T]) Iterator() *fun.Iterator[T] {
-	return dq.Producer().Generator()
+	return dq.Producer().Iterator()
 }
 
 // IteratorReverse starts at the back of the queue and iterates
 // towards the front. When the iterator reaches the end of the queue
 // it ends.
 func (dq *Deque[T]) IteratorReverse() *fun.Iterator[T] {
-	return dq.ProducerReverse().Generator()
+	return dq.ProducerReverse().Iterator()
 }
 
 func (dq *Deque[T]) Producer() fun.Producer[T] {
@@ -299,7 +299,7 @@ func (dq *Deque[T]) confProducer(direction dqDirection, blocking bool) fun.Produ
 // in the queue, with Pop operations returning the oldest elements
 // first (FIFO).
 //
-// If the deqe is full, the write operations block.
+// If the deque is full, the write operations block.
 func (dq *Deque[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
 		push: dq.WaitPushBack,
@@ -308,31 +308,10 @@ func (dq *Deque[T]) Distributor() Distributor[T] {
 	}
 }
 
-// DistributorLIFO produces a Distributor that adds items to the back
-// of a queue and all remove operations act on the back of the queue,
-// so the most recently added items are the first to be removed (LIFO).
-//
-// If the deqe is full, the write operations block.
-func (dq *Deque[T]) DistributorLIFO() Distributor[T] {
-	return Distributor[T]{
-		push: dq.WaitPushBack,
-		pop:  dq.WaitBack,
-		size: dq.Len,
-	}
-}
-
 func (dq *Deque[T]) DistributorNonBlocking() Distributor[T] {
 	return Distributor[T]{
-		push: ignorePopContext(dq.ForcePushBack),
+		push: fun.BlockingProcessor(dq.ForcePushBack),
 		pop:  dq.WaitFront,
-		size: dq.Len,
-	}
-}
-
-func (dq *Deque[T]) DistributorNonBlockingLIFO() Distributor[T] {
-	return Distributor[T]{
-		push: ignorePopContext(dq.ForcePushBack),
-		pop:  dq.WaitBack,
 		size: dq.Len,
 	}
 }

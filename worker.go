@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"sync"
 	"time"
 
@@ -33,10 +34,10 @@ func WorkerFuture(ch <-chan error) Worker {
 		switch {
 		case errors.Is(err, io.EOF):
 			return nil
-		case err != nil:
-			return err
 		case val != nil:
 			return val
+		case err != nil:
+			return err
 		default:
 			return nil
 		}
@@ -55,7 +56,7 @@ func (wf Worker) Run(ctx context.Context) error {
 // panics to errors.
 func (wf Worker) Safe() Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = mergeWithRecover(err, recover()) }()
+		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
 		return wf(ctx)
 	}
 }
@@ -67,9 +68,7 @@ func (wf Worker) Block() error { return wf.Run(internal.BackgroundContext) }
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are converted to errors for both the worker
 // function but not the observer function.
-func (wf Worker) Observe(ctx context.Context, ob Observer[error]) {
-	ob(wf.Safe()(ctx))
-}
+func (wf Worker) Observe(ctx context.Context, ob Observer[error]) { ob(wf.Safe()(ctx)) }
 
 // Signal runs the worker function in a background goroutine and
 // returns the error in an error channel, that returns when the
@@ -80,9 +79,9 @@ func (wf Worker) Observe(ctx context.Context, ob Observer[error]) {
 // the fun.Worker runs in a different go routine, a panic handler will
 // convert panics to errors.
 func (wf Worker) Signal(ctx context.Context) <-chan error {
-	out := make(chan error)
-	go func() { defer close(out); Blocking(out).Send().Ignore(ctx, wf.Safe()(ctx)) }()
-	return out
+	out := Blocking(make(chan error))
+	go func() { defer out.Close(); out.Send().Ignore(ctx, wf.Safe()(ctx)) }()
+	return out.Channel()
 }
 
 // Future runs the worker function in a go routine and returns a
@@ -237,6 +236,47 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 
 	return func(ctx context.Context) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		return wf(wctx)
+		if err := wctxChecker(wctx); err != nil {
+			return err
+		}
+		return wf(ctx)
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+}
+
+func wctxChecker(wctx context.Context) error {
+	switch {
+	case wctx == nil:
+		return context.Canceled
+	case wctx.Err() != nil:
+		return wctx.Err()
+	default:
+		return nil
+	}
+}
+
+func (wf Worker) PreHook(op func(context.Context)) Worker {
+	return func(ctx context.Context) error { op(ctx); return wf(ctx) }
+}
+
+func (wf Worker) PostHook(op func()) Worker {
+	return func(ctx context.Context) (err error) { err = wf(ctx); op(); return }
+}
+
+func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
+	ch := Blocking(make(chan error, internal.Min(n, runtime.NumCPU())))
+
+	oe := ch.Send().Processor().Force
+	for i := 0; i < n; i++ {
+		wf.Wait(oe).Add(ctx, wg)
+	}
+
+	wg.WaitFunc().PostHook(ch.Close).Go(ctx)
+
+	return func(ctx context.Context) (err error) {
+		iter := ch.Receive().Producer().Iterator()
+		for iter.Next(ctx) {
+			err = internal.MergeErrors(iter.Value(), err)
+		}
+		return
+	}
 }

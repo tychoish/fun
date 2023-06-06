@@ -40,6 +40,8 @@ func (pf Processor[T]) Block(in T) error { return pf.Worker(in).Block() }
 // Ignore runs the process function and discards the error.
 func (pf Processor[T]) Ignore(ctx context.Context, in T) { _ = pf(ctx, in) }
 
+func (pf Processor[T]) Check(ctx context.Context, in T) bool { return pf(ctx, in) == nil }
+
 func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
 // Wait converts a processor into a worker that will process the input
@@ -196,7 +198,10 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 
 	return func(ctx context.Context, in T) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		return pf(wctx, in)
+		if err := wctxChecker(wctx); err != nil {
+			return err
+		}
+		return pf(ctx, in)
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
 }
 

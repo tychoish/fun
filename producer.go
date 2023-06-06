@@ -33,10 +33,6 @@ func ConsistentProducer[T any](fn func() T) Producer[T] {
 	return func(context.Context) (T, error) { return fn(), nil }
 }
 
-func IterableProducer[T any](iter Iterable[T]) Producer[T] {
-	return func(ctx context.Context) (T, error) { return IterateOne(ctx, iter) }
-}
-
 func StaticProducer[T any](val T, err error) Producer[T] {
 	return func(context.Context) (T, error) { return val, err }
 }
@@ -73,10 +69,12 @@ func (pf Producer[T]) Worker(of Observer[T]) Worker {
 // any panic to an error.
 func (pf Producer[T]) Safe() Producer[T] {
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = mergeWithRecover(err, recover()) }()
+		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
 		return pf(ctx)
 	}
 }
+
+func (pf Producer[T]) Ignore(ctx context.Context) { _, _ = pf(ctx) }
 
 // Chain runs both producers, with the following logic: if the root
 // producer errors, return that error (and a zero value,) run the next
@@ -155,16 +153,16 @@ func (pf Producer[T]) Once() Producer[T] {
 	}
 }
 
-// Generator creates an iterator that calls the Producer function once
+// Iterator creates an iterator that calls the Producer function once
 // for every iteration, until it errors. Errors that are not context
 // cancellation errors or io.EOF are propgated to the iterators Close
 // method.
-func (pf Producer[T]) Generator() *Iterator[T] {
+func (pf Producer[T]) Iterator() *Iterator[T] {
 	op, cancel := pf.WithCancel()
 	return &Iterator[T]{operation: op, closer: cancel}
 }
 
-func (pf Producer[T]) GeneratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
+func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
 	once := &sync.Once{}
 	op, cancel := pf.WithCancel()
 	iter := &Iterator[T]{operation: op}
@@ -241,10 +239,10 @@ func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
 	var cancel context.CancelFunc
 	once := &sync.Once{}
 
-	return func(ctx context.Context) (T, error) {
+	return func(ctx context.Context) (out T, _ error) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctx.Err(); err != nil {
-			return ZeroOf[T](), err
+		if err := wctxChecker(wctx); err != nil {
+			return out, err
 		}
 		return pf(ctx)
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
@@ -276,5 +274,16 @@ func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 			return
 		})
 		return out.One, out.Two
+	}
+}
+
+func (pf Producer[T]) PreHook(op func(context.Context)) Producer[T] {
+	return func(ctx context.Context) (T, error) { op(ctx); return pf(ctx) }
+}
+func (pf Producer[T]) PostHook(op func()) Producer[T] {
+	return func(ctx context.Context) (o T, e error) {
+		o, e = pf(ctx)
+		e = internal.MergeErrors(Check(op), e)
+		return
 	}
 }

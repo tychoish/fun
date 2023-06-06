@@ -37,11 +37,13 @@ func Reduce[T any, O any](
 	}
 }
 
+type ComparableIterator[T comparable] fun.Iterator[T]
+
 // Contains processes an iterator of compareable type returning true
 // after the first element that equals item, and false otherwise.
-func Contains[T comparable](ctx context.Context, item T, iter fun.Iterable[T]) bool {
+func Contains[T comparable](ctx context.Context, item T, iter *fun.Iterator[T]) bool {
 	for {
-		v, err := fun.IterateOne(ctx, iter)
+		v, err := iter.ReadOne(ctx)
 		if err != nil {
 			break
 		}
@@ -67,14 +69,14 @@ func Uniq[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 			}
 		}
 		return fun.ZeroOf[T](), io.EOF
-	}).Generator()
+	}).Iterator()
 }
 
 // DropZeroValues processes an iterator removing all zero values.
-func DropZeroValues[T comparable](iter fun.Iterable[T]) *fun.Iterator[T] {
+func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 	return fun.Producer[T](func(ctx context.Context) (T, error) {
 		for {
-			item, err := fun.IterateOne(ctx, iter)
+			item, err := iter.ReadOne(ctx)
 			if err != nil {
 				return fun.ZeroOf[T](), err
 			}
@@ -83,16 +85,17 @@ func DropZeroValues[T comparable](iter fun.Iterable[T]) *fun.Iterator[T] {
 				return item, nil
 			}
 		}
-	}).Generator()
+	}).Iterator()
 }
 
 // Chain, like merge, takes a sequence of iterators and produces a
 // combined iterator. Chain processes each iterator provided in
 // sequence, where merge reads from all iterators in at once.
-func Chain[T any](iters ...fun.Iterable[T]) *fun.Iterator[T] {
-	pipe := make(chan T)
+func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
+	pipe := fun.Blocking(make(chan T))
+
 	init := fun.WaitFunc(func(ctx context.Context) {
-		defer close(pipe)
+		defer pipe.Close()
 		iteriter := fun.SliceIterator(iters)
 
 		// use direct iteration because this function has full
@@ -107,9 +110,9 @@ func Chain[T any](iters ...fun.Iterable[T]) *fun.Iterator[T] {
 			// respond to cancellation/blocking from the
 			// outgoing function.
 			for {
-				val, err := fun.IterateOne(ctx, iter)
+				val, err := iter.ReadOne(ctx)
 				if err == nil {
-					if fun.Blocking(pipe).Send().Check(ctx, val) {
+					if pipe.Send().Check(ctx, val) {
 						continue
 					}
 				}
@@ -118,8 +121,5 @@ func Chain[T any](iters ...fun.Iterable[T]) *fun.Iterator[T] {
 		}
 	}).Launch().Once()
 
-	return fun.Generator(func(ctx context.Context) (T, error) {
-		init(ctx)
-		return fun.Blocking(pipe).Receive().Read(ctx)
-	})
+	return pipe.Receive().Producer().PreHook(init).Iterator()
 }

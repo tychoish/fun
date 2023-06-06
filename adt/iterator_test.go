@@ -90,7 +90,7 @@ func TestIterator(t *testing.T) {
 				} else {
 					return int(val), nil
 				}
-			}).Lock().Generator()
+			}).Lock().Iterator()
 			for {
 				val, err := iter.ReadOne(ctx)
 				testt.Log(t, err, val)
@@ -117,7 +117,7 @@ func TestIterator(t *testing.T) {
 				} else {
 					return int(val), nil
 				}
-			}).Lock().Generator()
+			}).Lock().Iterator()
 
 			for {
 				val, err := iter.ReadOne(ctx)

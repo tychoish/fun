@@ -33,63 +33,6 @@ type Iterable[T any] interface {
 	Value() T
 }
 
-// Observe processes an iterator calling the observer function for
-// every element in the iterator and retruning when the iterator is
-// exhausted. Take care to ensure that the Observe function does not
-// block.
-//
-// The error returned captures any panics encountered as an error, as
-// well as the output of the Close() operation. Observe will not add a
-// context cancelation error to its error, though the observed
-// iterator may return one in its close method.
-func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
-	defer func() { err = internal.MergeErrors(err, mergeWithRecover(i.Close(), recover())) }()
-	proc := i.Producer()
-	for {
-		item, err := proc(ctx)
-		switch {
-		case err == nil:
-			fn(item)
-		case errors.Is(err, io.EOF):
-			return nil
-		default:
-			// this is (realistically) only context
-			// cancelation errors
-			return err
-		}
-	}
-}
-
-// IterateOne, like ReadOne reads one value from the iterator, and
-// returns it. The error values are either a context cancelation error
-// if the context is canceled, or io.EOF if there are no elements in
-// the iterator. The semantics of fun.IterateOne and fun.ReadOne are
-// the same.
-//
-// IterateOne does not provide atomic exclusion if multiple calls to
-// the iterator or IterateOne happen concurrently; however, the
-// adt.NewIterator wrapper, and most of the iterator implementations
-// provided by the fun package, provide a special case which *does*
-// allow for safe and atomic concurrent use with fun.IterateOne.
-func IterateOne[T any](ctx context.Context, iter Iterable[T]) (T, error) {
-	if si, ok := iter.(interface {
-		ReadOne(ctx context.Context) (T, error)
-	}); ok {
-		out, err := si.ReadOne(ctx)
-		return out, err
-	}
-
-	if iter.Next(ctx) {
-		return iter.Value(), nil
-	}
-
-	if e := ctx.Err(); e != nil {
-		return ZeroOf[T](), e
-	}
-
-	return ZeroOf[T](), io.EOF
-}
-
 type Iterator[T any] struct {
 	operation Producer[T]
 
@@ -109,7 +52,7 @@ type Iterator[T any] struct {
 // called. Any non-nil error returned by the generator function is
 // propagated to the close method, as long as it is not a context
 // cancellation error or an io.EOF error.
-func Generator[T any](op Producer[T]) *Iterator[T] { return op.Generator() }
+func Generator[T any](op Producer[T]) *Iterator[T] { return op.Iterator() }
 
 // MapIterator converts a map into an iterator of fun.Pair objects. The
 // iterator is panic-safe, and uses one go routine to track the
@@ -123,11 +66,35 @@ func Generator[T any](op Producer[T]) *Iterator[T] { return op.Generator() }
 // Use in combination with other iterator processing tools
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func MapIterator[K comparable, V any](in map[K]V) Iterable[Pair[K, V]] { return Mapify(in).Iterator() }
-func SliceIterator[T any](in []T) *Iterator[T]                         { return Sliceify(in).Iterator() }
-func VariadicIterator[T any](in ...T) *Iterator[T]                     { return SliceIterator(in) }
-func FromIterable[T any](in Iterable[T]) *Iterator[T]                  { return IterableProducer(in).Generator() }
-func ChannelIterator[T any](ch <-chan T) *Iterator[T]                  { return BlockingReceive(ch).Iterator() }
+func MapIterator[K comparable, V any](in map[K]V) *Iterator[Pair[K, V]] { return Mapify(in).Iterator() }
+func MapKeys[K comparable, V any](in map[K]V) *Iterator[K]              { return Mapify(in).Keys() }
+func MapValues[K comparable, V any](in map[K]V) *Iterator[V]            { return Mapify(in).Values() }
+func SliceIterator[T any](in []T) *Iterator[T]                          { return Sliceify(in).Iterator() }
+func VariadicIterator[T any](in ...T) *Iterator[T]                      { return SliceIterator(in) }
+
+func ChannelIterator[T any](ch <-chan T) *Iterator[T] {
+	return BlockingReceive(ch).Producer().Iterator()
+}
+
+func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
+	pipe := Blocking(make(chan T))
+
+	init := WaitFunc(func(ctx context.Context) {
+		wg := &WaitGroup{}
+		wctx, cancel := context.WithCancel(ctx)
+
+		// start a go routine for every iterator, to read from
+		// the incoming iterator and push it to the pipe
+		send := pipe.Send()
+		for idx := range iters {
+			send.Consume(iters[idx]).Ignore().Add(wctx, wg)
+		}
+
+		wg.WaitFunc().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
+	}).Once()
+
+	return pipe.Receive().Producer().PreHook(init).Iterator()
+}
 
 func (i *Iterator[T]) doClose()         { i.closeOnce.Do(func() { i.closed.Store(true); i.closer() }) }
 func (i *Iterator[T]) Close() error     { i.doClose(); return i.err }
@@ -163,7 +130,9 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 	switch {
 	case err == nil:
 		return out, nil
-	case internal.IsTerminatingError(err):
+	case errors.Is(err, io.EOF):
+		return out, err
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return out, err
 	default:
 		i.AddError(err)
@@ -187,7 +156,7 @@ func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
 				return item, nil
 			}
 		}
-	}).Generator()
+	}).Iterator()
 }
 
 // Any, as a special case of Transform converts an iterator of any
@@ -201,7 +170,7 @@ func (i *Iterator[T]) Any() *Iterator[any] {
 		}
 
 		return any(item), nil
-	}).Generator()
+	}).Iterator()
 }
 
 // Transform processes the input iterator of type I into an output
@@ -250,12 +219,13 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 		return nil
 	}
 
-	pipe := make(chan T)
+	pipe := Blocking(make(chan T))
 	setup := WaitFunc(func(ctx context.Context) {
-		defer close(pipe)
+		defer pipe.Close()
 		proc := i.Producer()
+		send := pipe.Send()
 		for {
-			if value, ok := proc.Check(ctx); !ok || !Blocking(pipe).Send().Check(ctx, value) {
+			if value, ok := proc.Check(ctx); !ok || !send.Check(ctx, value) {
 				return
 			}
 		}
@@ -264,14 +234,60 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 	output := make([]*Iterator[T], num)
 
 	for idx := range output {
-		output[idx] = Producer[T](func(ctx context.Context) (T, error) {
-			setup(ctx)
-			return Blocking(pipe).Receive().Read(ctx)
-		}).Generator()
-
+		output[idx] = pipe.Receive().Producer().PreHook(setup).Iterator()
 	}
 
 	return output
+}
+
+// Observe processes an iterator calling the observer function for
+// every element in the iterator and retruning when the iterator is
+// exhausted. Take care to ensure that the Observe function does not
+// block.
+//
+// The error returned captures any panics encountered as an error, as
+// well as the output of the Close() operation. Observe will not add a
+// context cancelation error to its error, though the observed
+// iterator may return one in its close method.
+func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
+	defer func() { err = internal.MergeErrors(err, internal.MergeErrors(i.Close(), ParsePanic(recover()))) }()
+	proc := i.Producer()
+	for {
+		item, err := proc(ctx)
+		switch {
+		case err == nil:
+			fn(item)
+		case errors.Is(err, io.EOF):
+			return nil
+		default:
+			// this is (realistically) only context
+			// cancelation errors
+			return err
+		}
+	}
+}
+
+func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) {
+	defer func() { err = internal.MergeErrors(err, internal.MergeErrors(i.Close(), ParsePanic(recover()))) }()
+
+	for i.Next(ctx) {
+		item := i.Value()
+
+		operr := fn(ctx, item)
+		switch {
+		case operr == nil:
+			continue
+		case errors.Is(operr, io.EOF):
+			return nil
+		case errors.Is(operr, context.Canceled), errors.Is(operr, context.DeadlineExceeded):
+			return operr
+		default:
+			i.AddError(operr)
+		}
+	}
+
+	// the close error is added in the defer
+	return err
 }
 
 // Slice converts an iterator to the slice of it's values, and

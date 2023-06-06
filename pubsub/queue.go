@@ -25,7 +25,7 @@ var (
 
 	// ErrQueueClosed is returned by the Add method of a closed queue, and by
 	// the Wait method of a closed empty queue.
-	ErrQueueClosed = errors.New("queue is closed")
+	ErrQueueClosed = fmt.Errorf("queue is closed: %w", io.EOF)
 
 	// Sentinel errors reported by the New constructor.
 	errHardLimit   = fmt.Errorf("hard limit must be > 0 and ≥ soft quota: %w", ErrConfigurationMalformed)
@@ -318,17 +318,17 @@ type entry[T any] struct {
 // queue has been closed via the Close() method.
 //
 // To create a "consuming" iterator, use a Distributor.
-func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().WithLock(&q.mu).Generator() }
+func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().WithLock(&q.mu).Iterator() }
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
-		push: ignorePopContext(q.Add),
+		push: fun.BlockingProcessor(q.Add),
 		pop: func(ctx context.Context) (_ T, err error) {
 			msg, ok := q.Remove()
 			if ok {
 				return msg, nil
 			}
 			msg, err = q.Wait(ctx)
-			return msg, filterQueueErrorsForIterator(err)
+			return msg, err
 		},
 		size: q.tracker.len,
 	}

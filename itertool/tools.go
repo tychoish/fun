@@ -2,6 +2,7 @@ package itertool
 
 import (
 	"errors"
+	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -45,13 +46,25 @@ type Options struct {
 }
 
 func (o Options) shouldCollectError(err error) bool {
-	return err != nil && errors.Is(err, fun.ErrRecoveredPanic) || (o.SkipErrorCheck == nil || !o.SkipErrorCheck(err)) || (!o.IncludeContextExpirationErrors || !erc.ContextExpired(err))
+	switch {
+	case errors.Is(err, fun.ErrRecoveredPanic):
+		return true
+	case o.SkipErrorCheck != nil && o.SkipErrorCheck(err):
+		return false
+	case erc.ContextExpired(err) && o.IncludeContextExpirationErrors:
+		return true
+	case errors.Is(err, io.EOF):
+		return false
+	}
+	return true
 }
 
-func (o Options) wrapErrorCheck(newCheck func(error) bool) func(error) bool {
-	oldCheck := o.SkipErrorCheck
-	return func(err error) bool {
-		return (oldCheck == nil || oldCheck(err)) &&
-			(newCheck == nil || newCheck(err))
+func (o *Options) init() {
+	if o.NumWorkers <= 0 {
+		o.NumWorkers = 1
+	}
+
+	if o.OutputBufferSize < 0 {
+		o.OutputBufferSize = 0
 	}
 }

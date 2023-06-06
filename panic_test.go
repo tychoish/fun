@@ -55,7 +55,7 @@ func TestPanics(t *testing.T) {
 			if err == nil {
 				t.Fatal(err)
 			}
-			if err.Error() != "panic: function runs: recovered panic" {
+			if err.Error() != "function runs: recovered panic" {
 				t.Error(err)
 			}
 		})
@@ -283,6 +283,42 @@ func TestPanics(t *testing.T) {
 			assert.Panic(t, func() { of.Wait("hi")(ctx) })
 			assert.True(t, called)
 		})
+	})
+}
+
+func TestParsePanic(t *testing.T) {
+	t.Run("NilInput", func(t *testing.T) {
+		err := ParsePanic(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("TwoErrors", func(t *testing.T) {
+		err := ParsePanic(io.EOF)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !errors.Is(err, io.EOF) {
+			t.Error("not EOF", err)
+		}
+		if !errors.Is(err, ErrRecoveredPanic) {
+			t.Error("not wrapped", err)
+		}
+	})
+	t.Run("NotErrorObject", func(t *testing.T) {
+		err := ParsePanic("EOF")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if errors.Is(err, io.EOF) {
+			t.Error("is EOF", err)
+		}
+		if !errors.Is(err, ErrRecoveredPanic) {
+			t.Error("not wrapped", err)
+		}
+		if err.Error() != "EOF: recovered panic" {
+			t.Error(err)
+		}
 	})
 }
 

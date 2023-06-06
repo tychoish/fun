@@ -70,11 +70,10 @@ func ParallelForEach[T any](
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	catcher := &erc.Collector{}
+	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
-	defer func() { err = catcher.Resolve() }()
-	defer erc.Check(catcher, iter.Close)
-	defer erc.Recover(catcher)
+	defer func() { err = ec.Resolve() }()
+	defer erc.Check(ec, iter.Close)
 
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
@@ -84,7 +83,7 @@ func ParallelForEach[T any](
 
 	for idx := range splits {
 		wg.Add(1)
-		go forEachWorker(ctx, catcher, wg, opts, splits[idx], fn, cancel)
+		go forEachWorker(ctx, ec, wg, opts, splits[idx], fn, cancel)
 	}
 
 	wg.Wait(internal.BackgroundContext)
@@ -93,7 +92,7 @@ func ParallelForEach[T any](
 
 func forEachWorker[T any](
 	ctx context.Context,
-	catcher *erc.Collector,
+	ec *erc.Collector,
 	wg *fun.WaitGroup,
 	opts Options,
 	iter *fun.Iterator[T],
@@ -101,21 +100,22 @@ func forEachWorker[T any](
 	abort func(),
 ) {
 	defer wg.Done()
-	defer erc.RecoverHook(catcher, func() {
+	defer erc.RecoverHook(ec, func() {
 		if ctx.Err() != nil {
 			return
 		}
+
 		if !opts.ContinueOnPanic {
 			abort()
 			return
 		}
 
 		wg.Add(1)
-		go forEachWorker(ctx, catcher, wg, opts, iter, fn, abort)
+		go forEachWorker(ctx, ec, wg, opts, iter, fn, abort)
 	})
 	for iter.Next(ctx) {
 		if err := fn(ctx, iter.Value()); err != nil {
-			erc.When(catcher, opts.shouldCollectError(err), err)
+			erc.When(ec, opts.shouldCollectError(err), err)
 
 			if opts.ContinueOnError {
 				continue

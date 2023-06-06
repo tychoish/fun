@@ -6,7 +6,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -26,9 +25,7 @@ func Map[T any, O any](
 	mapper func(context.Context, T) (O, error),
 	opts Options,
 ) *fun.Iterator[O] {
-	if opts.NumWorkers <= 0 {
-		opts.NumWorkers = 1
-	}
+	opts.init()
 
 	ec := &erc.Collector{}
 	output := fun.Blocking(make(chan O))
@@ -44,28 +41,20 @@ func Map[T any, O any](
 			mapWorker(ec, opts, mapper, splits[idx], output.Send()).
 				Wait(func(err error) {
 					// inspect the errors
-					if errors.Is(err, errAbortAllMapWorkers) {
-						wcancel()
-					}
+					fun.WhenCall(errors.Is(err, errAbortWorkers), wcancel)
 				}).Add(wctx, wg)
 		}
 
 		// start a background op that waits for the
 		// waitgroup and closes the channel
-		wg.WaitFunc().AddHook(wcancel).AddHook(output.Close).Go(ctx)
+		wg.WaitFunc().PostHook(wcancel).PostHook(output.Close).Go(ctx)
 	}).Once()
 
-	out := fun.Producer[O](func(ctx context.Context) (O, error) {
-		init(ctx)
-		return output.Receive().Read(ctx)
-	}).GeneratorWithHook(func(iter *fun.Iterator[O]) {
-		iter.AddError(ec.Resolve())
-	})
-
-	return out
+	return output.Receive().Producer().PreHook(init).
+		IteratorWithHook(erc.IteratorHook[O](ec))
 }
 
-var errAbortAllMapWorkers = errors.New("abort-all-map-workers")
+var errAbortWorkers = errors.New("abort-workers")
 
 func mapWorker[T any, O any](
 	ec *erc.Collector,
@@ -84,7 +73,7 @@ func mapWorker[T any, O any](
 			o, err := func(val T) (out O, err error) {
 				defer func() {
 					if r := recover(); r != nil {
-						err = internal.ParsePanic(r, fun.ErrRecoveredPanic)
+						err = fun.ParsePanic(r)
 					}
 				}()
 
@@ -98,22 +87,21 @@ func mapWorker[T any, O any](
 				continue
 			}
 
+			erc.When(ec, opts.shouldCollectError(err), err)
+
 			// handle errors
 			if errors.Is(err, fun.ErrRecoveredPanic) {
-				ec.Add(err)
 				if opts.ContinueOnPanic {
 					continue
 				}
-				return errAbortAllMapWorkers
+				return errAbortWorkers
 			}
-
-			erc.When(ec, opts.shouldCollectError(err), err)
 
 			if opts.ContinueOnError {
 				continue
 			}
 
-			return errAbortAllMapWorkers
+			return errAbortWorkers
 		}
 	}
 }

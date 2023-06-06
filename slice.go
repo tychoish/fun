@@ -24,7 +24,7 @@ func (s Slice[T]) Iterator() *Iterator[T] {
 		}
 		idx++
 		return s[idx], ctx.Err()
-	}).Generator()
+	}).Iterator()
 }
 
 // Sort reorders the slice using the provided com parator function,

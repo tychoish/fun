@@ -1,10 +1,8 @@
 package internal
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 )
@@ -95,82 +93,4 @@ func TestMerge(t *testing.T) {
 			}
 		})
 	})
-}
-
-func TestParsePanic(t *testing.T) {
-	base := errors.New("funtime")
-	t.Run("NilInput", func(t *testing.T) {
-		err := ParsePanic(nil, base)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("TwoErrors", func(t *testing.T) {
-		err := ParsePanic(io.EOF, base)
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if !errors.Is(err, io.EOF) {
-			t.Error("not EOF", err)
-		}
-		if !errors.Is(err, base) {
-			t.Error("not wrapped", err)
-		}
-	})
-	t.Run("NotErrorObject", func(t *testing.T) {
-		err := ParsePanic("EOF", base)
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if errors.Is(err, io.EOF) {
-			t.Error("is EOF", err)
-		}
-		if !errors.Is(err, base) {
-			t.Error("not wrapped", err)
-		}
-		if err.Error() != "EOF: funtime" {
-			t.Error(err)
-		}
-	})
-}
-
-func TestTerminatingError(t *testing.T) {
-	if err := io.EOF; !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-	if err := context.Canceled; !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-	if err := context.DeadlineExceeded; !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-
-	if err := fmt.Errorf("weird: %w", io.EOF); !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-	if err := fmt.Errorf("weird: %w", context.Canceled); !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-	if err := fmt.Errorf("weird: %w", context.DeadlineExceeded); !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-
-	other := errors.New("even")
-	if err := MergeErrors(other, io.EOF); !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-	if err := MergeErrors(other, context.Canceled); !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-	if err := MergeErrors(other, context.DeadlineExceeded); !IsTerminatingError(err) {
-		t.Error("expected terminating error:", err)
-	}
-
-	if err := other; IsTerminatingError(err) {
-		t.Error("not expecting terminating error:", err)
-
-	}
-	if IsTerminatingError(nil) {
-		t.Error("not expecting terminating error:", nil)
-	}
 }

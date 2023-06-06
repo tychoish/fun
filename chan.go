@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"github.com/tychoish/fun/internal"
@@ -10,7 +11,11 @@ import (
 // ErrSkippedNonBlockingChannelOperation is returned when sending into
 // a channel, in a non-blocking context, when the channel was full and
 // the send or receive was therefore skipped.
-var ErrSkippedNonBlockingChannelOperation = internal.ErrSkippedNonBlockingChannelOperation
+var ErrSkippedNonBlockingChannelOperation = errors.New("skipped non-blocking channel operation")
+
+// ZeroOf returns the zero-value for the type T specified as an
+// argument.
+func ZeroOf[T any]() (out T) { return }
 
 // blockingMode provides named constants for blocking/non-blocking
 // operations. They are fully internal, and only used indirectly.
@@ -45,13 +50,11 @@ func Blocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: blockin
 // not sent.
 func NonBlocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: non_blocking, ch: ch} }
 
-func (op ChannelOp[T]) Close()                  { close(op.ch) }
-func (op ChannelOp[T]) Channel() chan T         { return op.ch }
-func (op ChannelOp[T]) Send() Send[T]           { return Send[T]{mode: op.mode, ch: op.ch} }
-func (op ChannelOp[T]) Receive() Receive[T]     { return Receive[T]{mode: op.mode, ch: op.ch} }
-func (op ChannelOp[T]) Producer() Producer[T]   { return op.Receive().Read }
-func (op ChannelOp[T]) Processor() Processor[T] { return op.Send().Write }
-func (op ChannelOp[T]) Iterator() *Iterator[T]  { return op.Receive().Producer().Generator() }
+func (op ChannelOp[T]) Close()                 { close(op.ch) }
+func (op ChannelOp[T]) Channel() chan T        { return op.ch }
+func (op ChannelOp[T]) Send() Send[T]          { return Send[T]{mode: op.mode, ch: op.ch} }
+func (op ChannelOp[T]) Receive() Receive[T]    { return Receive[T]{mode: op.mode, ch: op.ch} }
+func (op ChannelOp[T]) Iterator() *Iterator[T] { return op.Receive().Producer().Iterator() }
 
 // Receive, wraps a channel fore <-chan T operations. It is the type
 // returned by the Receive() method on ChannelOp. The primary method
@@ -70,15 +73,13 @@ func BlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: bl
 // except that it accepts a receive-only channel.
 func NonBlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: non_blocking, ch: ch} }
 
-func (ro Receive[T]) Iterator() *Iterator[T] { return ro.Producer().Generator() }
-
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
 func (ro Receive[T]) Drop(ctx context.Context) bool { return IsOk(ro.Producer().Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
-func (ro Receive[T]) Ignore(ctx context.Context) { _, _ = ro.Check(ctx) }
+func (ro Receive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx) }
 
 // Force ignores the error returning only the value from Read. This is
 // either the value sent through the channel, or the zero value for
@@ -105,9 +106,35 @@ func (ro Receive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer()
 func (ro Receive[T]) Read(ctx context.Context) (T, error) {
 	switch ro.mode {
 	case blocking:
-		return internal.ReadOne(ctx, ro.ch)
+		select {
+		case <-ctx.Done():
+			return ZeroOf[T](), ctx.Err()
+		case obj, ok := <-ro.ch:
+			if !ok {
+				return ZeroOf[T](), io.EOF
+			}
+			if err := ctx.Err(); err != nil {
+				return ZeroOf[T](), err
+			}
+
+			return obj, nil
+		}
 	case non_blocking:
-		return internal.NonBlockingReadOne(ctx, ro.ch)
+		select {
+		case <-ctx.Done():
+			return ZeroOf[T](), ctx.Err()
+		case obj, ok := <-ro.ch:
+			if !ok {
+				return ZeroOf[T](), io.EOF
+			}
+			if err := ctx.Err(); err != nil {
+				return ZeroOf[T](), err
+			}
+
+			return obj, nil
+		default:
+			return ZeroOf[T](), ErrSkippedNonBlockingChannelOperation
+		}
 	default:
 		// this is impossible without an invalid blockingMode
 		// value
@@ -118,6 +145,26 @@ func (ro Receive[T]) Read(ctx context.Context) (T, error) {
 // Producer returns the Read method as a producer for integration into
 // existing tools.
 func (ro Receive[T]) Producer() Producer[T] { return ro.Read }
+
+func (ro Receive[T]) Consume(op Processor[T]) Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
+
+		var item T
+		for {
+			if item, err = ro.Read(ctx); err != nil {
+				break
+			}
+			if err = op(ctx, item); err != nil {
+				break
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+}
 
 // Send provides access to channel send operations, and is
 // contstructed by the Send() method on the channel operation. The
@@ -137,7 +184,7 @@ func NonBlockingSend[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_bloc
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
-func (sm Send[T]) Check(ctx context.Context, it T) bool { return sm.Write(ctx, it) == nil }
+func (sm Send[T]) Check(ctx context.Context, it T) bool { return sm.Processor().Check(ctx, it) }
 
 // Ignore performs a send and omits the error.
 func (sm Send[T]) Ignore(ctx context.Context, it T) { sm.Processor().Ignore(ctx, it) }
@@ -193,5 +240,26 @@ func (sm Send[T]) Write(ctx context.Context, it T) (err error) {
 		// outside of this project, because you'd need to
 		// construct an invalid Send object.
 		return io.EOF
+	}
+}
+
+func (sm Send[T]) Consume(iter *Iterator[T]) Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = internal.MergeErrors(iter.Close(), internal.MergeErrors(err, ParsePanic(recover()))) }()
+
+		var item T
+		for {
+			if item, err = iter.ReadOne(ctx); err != nil {
+				break
+			}
+			if err = sm.Write(ctx, item); err != nil {
+				break
+			}
+		}
+
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
 	}
 }

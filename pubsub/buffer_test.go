@@ -3,7 +3,6 @@ package pubsub
 import (
 	"context"
 	"fmt"
-	"io"
 	"math"
 	"math/rand"
 	"sync"
@@ -26,60 +25,6 @@ func TestDistributor(t *testing.T) {
 	t.Run("EdgeCases", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Channel", func(t *testing.T) {
-			t.Run("CloseSafety", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				ch := make(chan string, 100)
-				buf := DistributorChannel(ch)
-				if err := buf.Send(ctx, "merlin"); err != nil {
-					t.Error(err)
-				}
-				_, err := buf.Receive(ctx)
-				if err != nil {
-					t.Fatal(err)
-				}
-				close(ch)
-				_, err = buf.Receive(ctx)
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				errs := erc.Unwind(err)
-				if len(errs) != 1 {
-					t.Error(len(errs))
-				}
-
-				// repeat to make sure we don't accumulate
-				_, err = buf.Receive(ctx)
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				errs = erc.Unwind(err)
-				if len(errs) != 1 {
-					t.Error(len(errs))
-				}
-
-				// add another so that the rest of the test works
-				err = buf.Send(ctx, "merlin")
-				check.ErrorIs(t, err, io.EOF)
-
-				err = buf.Send(ctx, "kip")
-				check.ErrorIs(t, err, io.EOF)
-
-				errs = erc.Unwind(err)
-				if len(errs) != 1 {
-					// panic+expected
-					t.Error(len(errs))
-				}
-				err = buf.Send(ctx, "kip")
-				check.ErrorIs(t, err, io.EOF)
-
-				errs = erc.Unwind(err)
-				if len(errs) != 1 {
-					// panic and the other
-					t.Error(len(errs))
-				}
-			})
 			t.Run("Cancelation", func(t *testing.T) {
 				start := time.Now()
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -269,10 +214,11 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.Distributor()
+				send := out.Processor()
 				go func() {
 					defer queue.Close()
 					for input.Next(ctx) {
-						err := out.Send(ctx, input.Value())
+						err := send(ctx, input.Value())
 						if err != nil {
 							break
 						}
@@ -320,12 +266,13 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 				seen := set.Synchronize(set.MakeUnordered[T](size))
 				wg := &sync.WaitGroup{}
+				receive := d.Producer()
 				for i := 0; i < 8; i++ {
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
 						for {
-							pop, err := d.Receive(ctx)
+							pop, err := receive(ctx)
 							if err != nil {
 								break
 							}

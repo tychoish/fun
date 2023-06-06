@@ -51,6 +51,12 @@ func InvariantMust(err error, args ...any) {
 	if err == nil {
 		return
 	}
+	if len(args) == 0 {
+		panic(&internal.MergedError{
+			Current: err,
+			Wrapped: ErrInvariantViolation,
+		})
+	}
 
 	panic(&internal.MergedError{
 		Current: fmt.Errorf("%s: %w", fmt.Sprint(args...), err),
@@ -89,7 +95,7 @@ func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); retur
 // produce an error, and, if the function panics, converts it into an
 // error.
 func Check(fn func()) (err error) {
-	defer func() { err = buildRecoverError(recover()) }()
+	defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
 	fn()
 	return
 }
@@ -97,7 +103,7 @@ func Check(fn func()) (err error) {
 // Safe runs a function with a panic handler that converts the panic
 // to an error.
 func Safe[T any](fn func() T) (out T, err error) {
-	defer func() { err = buildRecoverError(recover()) }()
+	defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
 	out = fn()
 	return
 }
@@ -108,30 +114,19 @@ func Safe[T any](fn func() T) (out T, err error) {
 // be annotated with fun.ErrRecoveredPanic.
 func Protect[I any, O any](fn func(I) (O, error)) func(I) (O, error) {
 	return func(in I) (out O, err error) {
-		defer func() { err = mergeWithRecover(err, recover()) }()
+		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
 		return fn(in)
 	}
 }
 
-func buildRecoverError(r any) error {
-	if r == nil {
-		return nil
-	}
-
-	switch in := r.(type) {
-	case error:
-		return &internal.MergedError{
-			Current: in,
-			Wrapped: ErrRecoveredPanic,
-		}
-	default:
-		return &internal.MergedError{
-			Current: fmt.Errorf("panic: %v", in),
-			Wrapped: ErrRecoveredPanic,
+func ParsePanic(r any) error {
+	if r != nil {
+		switch err := r.(type) {
+		case error:
+			return internal.MergeErrors(err, ErrRecoveredPanic)
+		default:
+			return internal.MergeErrors(fmt.Errorf("%v", err), ErrRecoveredPanic)
 		}
 	}
-}
-
-func mergeWithRecover(err error, r any) error {
-	return internal.MergeErrors(err, buildRecoverError(r))
+	return nil
 }

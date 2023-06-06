@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 )
 
 // Generate creates an iterator using a generator pattern which
@@ -20,37 +19,22 @@ func Generate[T any](
 	fn fun.Producer[T],
 	opts Options,
 ) *fun.Iterator[T] {
-	if opts.OutputBufferSize < 0 {
-		opts.OutputBufferSize = 0
-	}
+	opts.init()
 
-	if opts.NumWorkers <= 0 {
-		opts.NumWorkers = 1
-	}
-
-	pipe := make(chan T, opts.OutputBufferSize)
+	pipe := fun.Blocking(make(chan T, opts.OutputBufferSize))
 	ec := &erc.Collector{}
 
 	init := fun.WaitFunc(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
-
 		wg := &fun.WaitGroup{}
+		send := pipe.Send()
 
-		for i := 0; i < opts.NumWorkers; i++ {
-			generator(ec, opts, fn, cancel, pipe).Add(wctx, wg)
-		}
+		generator(ec, opts, fn, cancel, send).StartGroup(wctx, wg, opts.NumWorkers)
 
-		wg.WaitFunc().AddHook(func() { cancel(); close(pipe) }).Go(ctx)
+		wg.WaitFunc().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
 	}).Once()
 
-	out := fun.Producer[T](func(ctx context.Context) (T, error) {
-		init(ctx) // runs once
-		return fun.Blocking(pipe).Receive().Read(ctx)
-	}).GeneratorWithHook(func(iter *fun.Iterator[T]) {
-		iter.AddError(ec.Resolve())
-	})
-
-	return out
+	return pipe.Receive().Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 
 func generator[T any](
@@ -58,41 +42,45 @@ func generator[T any](
 	opts Options,
 	fn fun.Producer[T],
 	abort func(),
-	out chan T,
+	out fun.Send[T],
 ) fun.WaitFunc {
 	return func(ctx context.Context) {
 		defer abort()
 
-		shouldCollectError := opts.wrapErrorCheck(func(err error) bool { return !errors.Is(err, io.EOF) })
 		for {
 			value, err := func() (out T, err error) {
 				defer func() {
 					if r := recover(); r != nil {
-						err = internal.ParsePanic(r, fun.ErrRecoveredPanic)
+						err = fun.ParsePanic(r)
 					}
 				}()
 				return fn(ctx)
 			}()
 
 			if err != nil {
+				erc.When(catcher, opts.shouldCollectError(err), err)
 				if errors.Is(err, fun.ErrRecoveredPanic) {
-					catcher.Add(err)
 					if opts.ContinueOnPanic {
 						continue
 					}
 
 					return
 				}
-
-				erc.When(catcher, shouldCollectError(err), err)
-				if internal.IsTerminatingError(err) || !opts.ContinueOnError {
+				switch {
+				case err == nil:
+					continue
+				case errors.Is(err, io.EOF):
+					return
+				case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+					return
+				case !opts.ContinueOnError:
 					return
 				}
 
 				continue
 			}
 
-			if !fun.Blocking(out).Send().Check(ctx, value) {
+			if !out.Check(ctx, value) {
 				return
 			}
 		}

@@ -22,12 +22,3 @@ func Slice[T any](iter *fun.Iterator[T]) []T {
 func Observe[T any](iter *fun.Iterator[T], fn fun.Observer[T]) {
 	fun.InvariantMust(iter.Observe(internal.BackgroundContext, fn))
 }
-
-// IterateOne has the same semantics as IterateOne except it
-// uses a blocking context, and if the iterator is blocking and there
-// are no more items, IterateOneBlocking will never return. Use with
-// caution, and in situations where you understand the iterator's
-// implementation.
-func IterateOne[T any](iter fun.Iterable[T]) (T, error) {
-	return fun.IterateOne(internal.BackgroundContext, iter)
-}

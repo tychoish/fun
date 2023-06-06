@@ -318,9 +318,9 @@ func (s *Stack[T]) ProducerPop() fun.Producer[T] {
 // Iterator returns a non-destructive iterator over the Items in a
 // stack. Iterator will not observe new items added to the stack
 // during iteration.
-func (s *Stack[T]) Iterator() *fun.Iterator[T] { return s.Producer().Generator() }
+func (s *Stack[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
 
 // PopIterator returns a destructive iterator over the Items in a
 // stack. PopIterator will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) PopIterator() *fun.Iterator[T] { return s.ProducerPop().Generator() }
+func (s *Stack[T]) PopIterator() *fun.Iterator[T] { return s.ProducerPop().Iterator() }

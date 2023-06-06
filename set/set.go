@@ -23,9 +23,9 @@ type Set[T comparable] interface {
 	Delete(T)
 	// Check returns true if the item is in the set.
 	Check(T) bool
-	// Iterator produces an Iterator implementation for the
+	// Iterator produces an Iterator over the
 	// elements in the set.
-	Iterator() fun.Iterable[T]
+	Iterator() *fun.Iterator[T]
 	Producer() fun.Producer[T]
 }
 
@@ -67,7 +67,7 @@ func (s mapSetImpl[T]) Add(item T)                { s[item] = struct{}{} }
 func (s mapSetImpl[T]) Len() int                  { return len(s) }
 func (s mapSetImpl[T]) Delete(item T)             { delete(s, item) }
 func (s mapSetImpl[T]) Check(item T) bool         { _, ok := s[item]; return ok }
-func (s mapSetImpl[T]) Iterator() fun.Iterable[T] {
+func (s mapSetImpl[T]) Iterator() *fun.Iterator[T] {
 	pipe := make(chan T)
 
 	setup := fun.WaitFunc(func(ctx context.Context) {
@@ -147,7 +147,7 @@ func (s syncSetImpl[T]) Delete(in T) {
 	s.set.Delete(in)
 }
 
-func (s syncSetImpl[T]) Iterator() fun.Iterable[T] { return s.Producer().Generator() }
+func (s syncSetImpl[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
 
 func (s syncSetImpl[T]) Producer() fun.Producer[T] {
 	s.mtx.Lock()

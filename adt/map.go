@@ -200,5 +200,5 @@ func makeMapIterator[K comparable, V any, O any](
 	return fun.Producer[O](func(ctx context.Context) (O, error) {
 		init(ctx)
 		return fun.BlockingReceive(pipe).Read(ctx)
-	}).Lock().Generator()
+	}).Lock().Iterator()
 }

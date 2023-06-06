@@ -85,11 +85,11 @@ func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() 
 // Recover calls the builtin recover() function and converts it to an
 // error that is populated in the collector. Run RecoverHook in defer
 // statements.
-func Recover(ec *Collector) { ec.Add(internal.ParsePanic(recover(), fun.ErrRecoveredPanic)) }
+func Recover(ec *Collector) { ec.Add(fun.ParsePanic(recover())) }
 
 // Recovery catches a panic, turns it into an error and passes it to
 // the provided observer function.
-func Recovery(ob fun.Observer[error]) { ob(internal.ParsePanic(recover(), fun.ErrRecoveredPanic)) }
+func Recovery(ob fun.Observer[error]) { ob(fun.ParsePanic(recover())) }
 
 // RecoverHook runs adds the output of recover() to the error
 // collector, and runs the specified hook if. If there was no panic,
@@ -184,7 +184,7 @@ func Collapse(errs ...error) error {
 // Because Stream() is a fun.ProcessFunc you can convert this into
 // fun.Worker and fun.WaitFunc objects as needed.
 func Stream(ctx context.Context, errCh <-chan error) error {
-	return Consume(ctx, fun.Generator(fun.BlockingReceive(errCh).Read))
+	return Consume(ctx, fun.ChannelIterator(errCh))
 }
 
 // Consume iterates through all errors in the fun.Iterator and
@@ -214,4 +214,8 @@ func Consume(ctx context.Context, iter *fun.Iterator[error]) error {
 //	}
 func Collect[T any](ec *Collector) func(T, error) T {
 	return func(out T, err error) T { ec.Add(err); return out }
+}
+
+func IteratorHook[T any](ec *Collector) fun.Observer[*fun.Iterator[T]] {
+	return func(it *fun.Iterator[T]) { it.AddError(ec.Resolve()) }
 }

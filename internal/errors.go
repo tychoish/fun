@@ -1,26 +1,9 @@
 package internal
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"io"
 )
-
-func IsTerminatingError(err error) bool {
-	switch {
-	case err == nil:
-		return false
-	case errors.Is(err, io.EOF):
-		return true
-	case errors.Is(err, context.Canceled):
-		return true
-	case errors.Is(err, context.DeadlineExceeded):
-		return true
-	default:
-		return false
-	}
-}
 
 type MergedError struct {
 	Current error
@@ -49,16 +32,4 @@ func (dwe *MergedError) Is(target error) bool {
 
 func (dwe *MergedError) As(target any) bool {
 	return errors.As(dwe.Current, target) || errors.As(dwe.Wrapped, target)
-}
-
-func ParsePanic(r any, baseErr error) error {
-	if r != nil {
-		switch err := r.(type) {
-		case error:
-			return MergeErrors(err, baseErr)
-		default:
-			return MergeErrors(fmt.Errorf("%v", err), baseErr)
-		}
-	}
-	return nil
 }

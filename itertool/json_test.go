@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/assert/check"
 )
 
 func TestJSON(t *testing.T) {
@@ -40,7 +39,7 @@ func TestJSON(t *testing.T) {
 			t.Error("shouldn't iterate")
 		}
 		if err := iter.Close(); err == nil {
-			t.Error("expected error")
+			t.Error("expected error", err)
 		}
 		if iter.Value() != "" {
 			t.Error(iter.Value())
@@ -53,19 +52,11 @@ func TestJSON(t *testing.T) {
 			t.Fatal(string(out))
 		}
 	})
-	t.Run("ErrorIter", func(t *testing.T) {
-		iter := &errIter[int]{err: context.Canceled}
-		out, err := MarshalJSON[int](ctx, iter)
-		if err == nil {
-			t.Fatal(string(out))
-		}
-		check.Zero(t, iter.Value())
-	})
 	t.Run("UnmarshalNil", func(t *testing.T) {
 		iter := UnmarshalJSON[string](nil)
 		vals, err := iter.Slice(ctx)
 		if err == nil {
-			t.Error("expected error")
+			t.Error("expected error", err)
 		}
 		if len(vals) != 0 {
 			t.Error(len(vals), vals)
@@ -75,7 +66,7 @@ func TestJSON(t *testing.T) {
 		iter := UnmarshalJSON[func()]([]byte(`["foo", "arg"]`))
 		vals, err := iter.Slice(ctx)
 		if err == nil {
-			t.Error("expected error")
+			t.Error("expected error", err)
 		}
 		if len(vals) != 0 {
 			t.Error(len(vals), vals)

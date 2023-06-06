@@ -8,11 +8,40 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/testt"
 )
+
+func testIntIter(t *testing.T, size int) *Iterator[int] {
+	t.Helper()
+
+	var count int
+
+	t.Cleanup(func() {
+		t.Helper()
+		check.Equal(t, count, size)
+	})
+
+	return Generator(func(context.Context) (int, error) {
+		if count >= size {
+			return 0, io.EOF
+		}
+		count++
+		return count - 1, nil
+	})
+
+}
+
+func GenerateRandomStringSlice(size int) []string {
+	out := make([]string, size)
+	for idx := range out {
+		out[idx] = fmt.Sprint("value=", idx)
+	}
+	return out
+}
 
 func TestIteratorTools(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -60,45 +89,6 @@ func TestIteratorTools(t *testing.T) {
 				t.Error("expected no ops", count)
 			}
 		})
-	})
-	t.Run("IterateOne", func(t *testing.T) {
-		t.Run("First", func(t *testing.T) {
-			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
-			assert.NotError(t, err)
-			assert.Equal(t, 101, it)
-		})
-
-		t.Run("Canceled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{101, 2, 34, 56}))
-			assert.ErrorIs(t, err, context.Canceled)
-			assert.Zero(t, it)
-		})
-		t.Run("Empty", func(t *testing.T) {
-			it, err := IterateOne[int](ctx, internal.NewSliceIter([]int{}))
-			assert.Zero(t, it)
-			assert.ErrorIs(t, err, io.EOF)
-		})
-
-		t.Run("ReadOneable", func(t *testing.T) {
-			input := &TestReadoneableImpl{
-				Iterable: internal.NewSliceIter([]string{
-					fmt.Sprint(10),
-					fmt.Sprint(10),
-					fmt.Sprint(20),
-					fmt.Sprint(2),
-				}),
-			}
-			val, err := IterateOne[string](ctx, input)
-			assert.NotError(t, err)
-			assert.Equal(t, "sparta", val)
-
-			val, err = IterateOne[string](ctx, input)
-			assert.ErrorIs(t, err, io.EOF)
-			assert.Zero(t, val)
-		})
-
 	})
 	t.Run("Transform", func(t *testing.T) {
 		input := SliceIterator([]string{
@@ -258,42 +248,225 @@ func TestIteratorTools(t *testing.T) {
 	})
 }
 
-func testIntIter(t *testing.T, size int) *Iterator[int] {
-	t.Helper()
+func TestInternalIterators(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	var count int
-
-	t.Cleanup(func() {
-		t.Helper()
-		check.Equal(t, count, size)
+	t.Run("Slice", func(t *testing.T) {
+		t.Run("End2End", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4})
+			seen := 0
+			for iter.Next(ctx) {
+				seen++
+				if iter.Value() > 4 || iter.Value() <= 0 {
+					t.Error(iter.Value())
+				}
+			}
+			if seen != 4 {
+				t.Error(seen)
+			}
+			if iter.Close() != nil {
+				t.Error(iter.Close())
+			}
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			iter := &Iterator[int]{
+				operation: func(context.Context) (int, error) { return 0, nil },
+				closer:    func() {},
+			}
+			seen := 0
+			for iter.Next(ctx) {
+				seen++
+			}
+			if seen != 0 {
+				t.Error(seen)
+			}
+			if iter.Close() != nil {
+				t.Error(iter.Close())
+			}
+		})
 	})
-
-	return Generator(func(context.Context) (int, error) {
-		if count >= size {
-			return 0, io.EOF
+	t.Run("ReadOne", func(t *testing.T) {
+		t.Parallel()
+		ch := make(chan string, 1)
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		ch <- "merlin"
+		defer cancel()
+		out, err := Blocking(ch).Receive().Read(ctx)
+		if err != nil {
+			t.Fatal(err)
 		}
-		count++
-		return count - 1, nil
+		if out != "merlin" {
+			t.Fatal(out)
+		}
+
+		ch <- "merlin"
+		cancel()
+		seenCondition := false
+		for i := 0; i < 10; i++ {
+			t.Log(i)
+			_, err = Blocking(ch).Receive().Read(ctx)
+			if errors.Is(err, context.Canceled) {
+				seenCondition = true
+			}
+			t.Log(err)
+
+			select {
+			case ch <- "merlin":
+			default:
+			}
+		}
+		if !seenCondition {
+			t.Error("should have observed a context canceled")
+
+		}
+	})
+	t.Run("ReadOneEOF", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		ch := make(chan string, 1)
+		close(ch)
+
+		_, err := Blocking(ch).Receive().Read(ctx)
+		if !errors.Is(err, io.EOF) {
+			t.Fatal(err)
+		}
+	})
+	t.Run("NonBlockingReadOne", func(t *testing.T) {
+		t.Parallel()
+		t.Run("BlockingCompatibility", func(t *testing.T) {
+			ch := make(chan string, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			ch <- "merlin"
+			defer cancel()
+			out, err := NonBlocking(ch).Receive().Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out != "merlin" {
+				t.Fatal(out)
+			}
+
+			ch <- "merlin"
+			cancel()
+			seenCondition := false
+			for i := 0; i < 10; i++ {
+				t.Log(i)
+				_, err = NonBlocking(ch).Receive().Read(ctx)
+				if errors.Is(err, context.Canceled) {
+					seenCondition = true
+				}
+				t.Log(err)
+
+				select {
+				case ch <- "merlin":
+				default:
+				}
+			}
+			if !seenCondition {
+				t.Error("should have observed a context canceled")
+
+			}
+		})
+		t.Run("NonBlocking", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan string)
+			out, err := NonBlocking(ch).Receive().Read(ctx)
+			assert.Zero(t, out)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+		})
+		t.Run("Closed", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := make(chan string)
+			close(ch)
+			out, err := NonBlocking(ch).Receive().Read(ctx)
+			assert.Zero(t, out)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, io.EOF)
+		})
+	})
+	t.Run("Merged", func(t *testing.T) {
+		ctx := testt.Context(t)
+		elems := GenerateRandomStringSlice(100)
+
+		iter := MergeIterators(
+			SliceIterator(elems),
+			SliceIterator(elems),
+			SliceIterator(elems),
+			SliceIterator(elems),
+			SliceIterator(elems),
+		)
+		seen := Mapify(make(map[string]struct{}, len(elems)))
+		var count int
+		for iter.Next(ctx) {
+			count++
+			seen.SetDefault(iter.Value())
+		}
+		if count != 5*len(elems) {
+			t.Fatal("did not iterate enough", count, 5*len(elems))
+		}
+		for idx, str := range elems {
+			testt.Log(t, "mismatch", idx, str)
+			assert.True(t, seen.Check(str))
+		}
+
+		if err := iter.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("MergeReleases", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		pipe := make(chan string)
+		iter := MergeIterators(
+			Blocking(pipe).Iterator(),
+			Blocking(pipe).Iterator(),
+			Blocking(pipe).Iterator(),
+		)
+
+		ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel()
+
+		if iter.Next(ctx) {
+			t.Error("no iteration", iter.Value())
+		}
 	})
 
 }
 
-type TestReadoneableImpl struct {
-	Iterable[string]
-	once bool
+func TestAny(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
+	count := 0
+	err := SliceIterator(sl).Any().Observe(ctx, func(in any) {
+		count++
+		check.True(t, Is[int](in))
+	})
+	assert.NotError(t, err)
+	assert.Equal(t, count, 8)
 }
 
-func (iter *TestReadoneableImpl) ReadOne(ctx context.Context) (string, error) {
-	if !iter.once {
-		iter.once = true
-		return "sparta", nil
-	}
-	return "", io.EOF
-}
-func GenerateRandomStringSlice(size int) []string {
-	out := make([]string, size)
-	for idx := range out {
-		out[idx] = fmt.Sprint("value=", idx)
-	}
-	return out
+func TestEmptyIteration(t *testing.T) {
+	ctx := testt.Context(t)
+
+	ch := make(chan int)
+	close(ch)
+
+	t.Run("EmptyObserve", func(t *testing.T) {
+		assert.NotError(t, SliceIterator([]int{}).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, VariadicIterator[int]().Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, ChannelIterator(ch).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+	})
+
 }

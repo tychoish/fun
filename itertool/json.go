@@ -9,25 +9,19 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-type errIter[T any] struct{ err error }
-
-func (e errIter[T]) Close() error              { return e.err }
-func (_ errIter[T]) Next(context.Context) bool { return false }
-func (_ errIter[T]) Value() T                  { return fun.ZeroOf[T]() }
-
 // MarshalJSON is useful for implementing json.Marshaler methods
 // from iterator-supporting types. Wrapping the standard library's
 // json encoding tools.
 //
 // The contents of the iterator are marshaled as elements in an JSON
 // array.
-func MarshalJSON[T any](ctx context.Context, iter fun.Iterable[T]) ([]byte, error) {
+func MarshalJSON[T any](ctx context.Context, iter *fun.Iterator[T]) ([]byte, error) {
 	buf := &internal.IgnoreNewLinesBuffer{}
 	enc := json.NewEncoder(buf)
 	_, _ = buf.Write([]byte("["))
 	first := true
 	for {
-		val, err := fun.IterateOne(ctx, iter)
+		val, err := iter.ReadOne(ctx)
 		if err != nil {
 			break
 		}
@@ -43,6 +37,8 @@ func MarshalJSON[T any](ctx context.Context, iter fun.Iterable[T]) ([]byte, erro
 	}
 
 	if err := iter.Close(); err != nil {
+		// TODO try and marshal with a producer that makes an
+		// actual error
 		return nil, err
 	}
 	_, _ = buf.Write([]byte("]"))
@@ -58,7 +54,7 @@ func UnmarshalJSON[T any](in []byte) *fun.Iterator[T] {
 	rv := []json.RawMessage{}
 
 	if err := json.Unmarshal(in, &rv); err != nil {
-		return fun.StaticProducer(fun.ZeroOf[T](), err).Generator()
+		return fun.StaticProducer(fun.ZeroOf[T](), err).Iterator()
 	}
 	var idx int
 	return fun.Generator(func(ctx context.Context) (out T, err error) {

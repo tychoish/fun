@@ -14,12 +14,6 @@ import (
 	"github.com/tychoish/fun/seq"
 )
 
-type errIterator[T any] struct{}
-
-func (errIterator[T]) Next(context.Context) bool { return false }
-func (errIterator[T]) Close() error              { return errors.New("iteration") }
-func (errIterator[T]) Value() T                  { return fun.ZeroOf[T]() }
-
 type jsonMarshlerError struct{}
 
 func (jsonMarshlerError) MarshalJSON() ([]byte, error) { return nil, errors.New("always") }

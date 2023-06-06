@@ -83,7 +83,10 @@ func (wf WaitFunc) WithCancel() (WaitFunc, context.CancelFunc) {
 
 	return func(ctx context.Context) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		wf(wctx)
+		if err := wctxChecker(wctx); err != nil {
+			return
+		}
+		wf(ctx)
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
 }
 
@@ -110,6 +113,12 @@ func (wf WaitFunc) Launch() WaitFunc       { return wf.Go }
 // incrementing and decrementing the sync.WaitGroup as
 // appropriate. The execution of the wait fun blocks on Add's context.
 func (wf WaitFunc) Add(ctx context.Context, wg *WaitGroup) { wf.Background(wg)(ctx) }
+
+func (wf WaitFunc) StartGroup(ctx context.Context, wg *WaitGroup, n int) {
+	for i := 0; i < n; i++ {
+		wf.Add(ctx, wg)
+	}
+}
 
 func (wf WaitFunc) Background(wg *WaitGroup) WaitFunc {
 	return func(ctx context.Context) { wg.Add(1); go func() { defer wg.Done(); wf(ctx) }() }
@@ -190,4 +199,7 @@ func (wf WaitFunc) Chain(op WaitFunc) WaitFunc {
 	return func(ctx context.Context) { wf(ctx); op.If(ctx.Err() == nil)(ctx) }
 }
 
-func (wf WaitFunc) AddHook(op func()) WaitFunc { return func(ctx context.Context) { wf(ctx); op() } }
+func (wf WaitFunc) PostHook(op func()) WaitFunc { return func(ctx context.Context) { wf(ctx); op() } }
+func (wf WaitFunc) PreHook(op func(context.Context)) WaitFunc {
+	return func(ctx context.Context) { op(ctx); wf(ctx) }
+}

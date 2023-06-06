@@ -197,7 +197,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 	}
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, iter fun.Iterable[chan T], msg T) {
+func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Iterator[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
 		wg := &fun.WaitGroup{}

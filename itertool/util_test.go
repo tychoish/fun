@@ -85,26 +85,6 @@ func RunIteratorImplementationTests[T comparable](
 
 						CheckSeenMap(t, elems, seen)
 					})
-					t.Run("Merged", func(t *testing.T) {
-						ctx := testt.Context(t)
-
-						iter := Merge(builder(), builder(), builder())
-						seen := make(map[T]struct{}, len(elems))
-						var count int
-						for iter.Next(ctx) {
-							count++
-							seen[iter.Value()] = struct{}{}
-						}
-						if count != 3*len(elems) {
-							t.Fatal("did not iterate enough", count, 3*len(elems))
-						}
-
-						CheckSeenMap(t, elems, seen)
-
-						if err := iter.Close(); err != nil {
-							t.Fatal(err)
-						}
-					})
 					t.Run("Canceled", func(t *testing.T) {
 						ctx := testt.Context(t)
 
@@ -378,7 +358,7 @@ func RunIteratorStringAlgoTests(
 						ctx := testt.Context(t)
 
 						out := Map(
-							Merge(builder(), builder(), builder()),
+							fun.MergeIterators(builder(), builder(), builder()),
 							func(ctx context.Context, str string) (string, error) {
 								for _, c := range []string{"a", "e", "i", "o", "u"} {
 									str = strings.ReplaceAll(str, c, "")

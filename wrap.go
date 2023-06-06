@@ -3,8 +3,6 @@ package fun
 import (
 	"context"
 	"io"
-
-	"github.com/tychoish/fun/internal"
 )
 
 // Wrapper produces a function that always returns the value
@@ -75,7 +73,7 @@ func UnwindIterator[T any](root T) *Iterator[T] {
 	next = &root
 	return Generator(func(context.Context) (T, error) {
 		if next == nil {
-			return internal.ZeroOf[T](), io.EOF
+			return ZeroOf[T](), io.EOF
 		}
 		item := *next
 
@@ -101,10 +99,6 @@ func IsWrapped[T any](in T) bool { return Is[wrapped[T]](in) }
 
 // Zero returns the zero-value for the type T of the input argument.
 func Zero[T any](T) T { return ZeroOf[T]() }
-
-// ZeroOf returns the zero-value for the type T specified as an
-// argument.
-func ZeroOf[T any]() T { return internal.ZeroOf[T]() }
 
 // IsZero returns true if the input value compares "true" to the zero
 // value for the type of the argument. If the type implements an

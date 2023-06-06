@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/testt"
 )
@@ -223,23 +222,6 @@ func TestTools(t *testing.T) {
 			}
 		}
 	})
-	t.Run("MergeReleases", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		pipe := make(chan string)
-		iter := Merge[string](
-			fun.Blocking(pipe).Iterator(),
-			fun.Blocking(pipe).Iterator(),
-			fun.Blocking(pipe).Iterator())
-
-		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
-
-		if iter.Next(ctx) {
-			t.Error("no iteration", iter.Value())
-		}
-	})
 }
 
 func TestParallelForEach(t *testing.T) {
@@ -445,20 +427,6 @@ func TestParallelForEach(t *testing.T) {
 	})
 }
 
-func TestEmptyIteration(t *testing.T) {
-	ctx := testt.Context(t)
-
-	ch := make(chan int)
-	close(ch)
-
-	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, fun.SliceIterator([]int{}).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
-		assert.NotError(t, fun.VariadicIterator[int]().Observe(ctx, func(in int) { t.Fatal("should not be called") }))
-		assert.NotError(t, fun.ChannelIterator(ch).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
-	})
-
-}
-
 func TestContains(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -470,6 +438,7 @@ func TestContains(t *testing.T) {
 		assert.True(t, !Contains[int](ctx, 1, fun.SliceIterator([]int{12, 3, 44})))
 	})
 }
+
 func TestUniq(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -478,19 +447,6 @@ func TestUniq(t *testing.T) {
 	assert.Equal(t, fun.SliceIterator(sl).Count(ctx), 8)
 
 	assert.Equal(t, Uniq(fun.SliceIterator(sl)).Count(ctx), 6)
-}
-
-func TestAny(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
-	count := 0
-	fun.SliceIterator(sl).Any().Observe(ctx, func(in any) {
-		count++
-		check.True(t, fun.Is[int](in))
-	})
-	assert.Equal(t, count, 8)
 }
 
 func TestChain(t *testing.T) {
