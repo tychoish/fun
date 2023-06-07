@@ -112,7 +112,7 @@ func (pf Producer[T]) Force() T { return Must(pf.Block()) }
 
 // Wait produces a wait function, using two observers to handle the
 // output of the Producer.
-func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) WaitFunc {
+func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) Operation {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 

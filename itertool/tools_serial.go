@@ -94,7 +94,7 @@ func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 	pipe := fun.Blocking(make(chan T))
 
-	init := fun.WaitFunc(func(ctx context.Context) {
+	init := fun.Operation(func(ctx context.Context) {
 		defer pipe.Close()
 		iteriter := fun.SliceIterator(iters)
 

@@ -13,7 +13,7 @@ import (
 // Processor are generic functions that take an argument (and a
 // context) and return an error. They're the type of function used by
 // the itertool.Process/itertool.ParallelForEach and useful in other
-// situations as a compliment to fun.Worker and WaitFunc.
+// situations as a compliment to fun.Worker and Operation.
 //
 // In general the implementations of the methods for processing
 // functions are wrappers around their similarly named fun.Worker
@@ -46,7 +46,7 @@ func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
 // Wait converts a processor into a worker that will process the input
 // provided when executed.
-func (pf Processor[T]) Wait(in T, of Observer[error]) WaitFunc { return pf.Worker(in).Wait(of) }
+func (pf Processor[T]) Wait(in T, of Observer[error]) Operation { return pf.Worker(in).Wait(of) }
 
 // Safe runs the producer, converted all panics into errors. Safe is
 // itself a processor.

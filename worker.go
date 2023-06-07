@@ -116,18 +116,18 @@ func (wf Worker) Once() Worker {
 // Wait converts a worker function into a wait function,
 // passing any error to the observer function. Only non-nil errors are
 // observed.
-func (wf Worker) Wait(ob Observer[error]) WaitFunc {
+func (wf Worker) Wait(ob Observer[error]) Operation {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
 // Must converts a Worker function into a wait function; however,
 // if the worker produces an error Must converts the error into a
 // panic.
-func (wf Worker) Must() WaitFunc { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
+func (wf Worker) Must() Operation { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
 
-// Ignore converts the worker into a WaitFunc that discards the error
+// Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
-func (wf Worker) Ignore() WaitFunc { return func(ctx context.Context) { _ = wf(ctx) } }
+func (wf Worker) Ignore() Operation { return func(ctx context.Context) { _ = wf(ctx) } }
 
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed
@@ -270,7 +270,7 @@ func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
 		wf.Wait(oe).Add(ctx, wg)
 	}
 
-	wg.WaitFunc().PostHook(ch.Close).Go(ctx)
+	wg.Operation().PostHook(ch.Close).Go(ctx)
 
 	return func(ctx context.Context) (err error) {
 		iter := ch.Receive().Producer().Iterator()

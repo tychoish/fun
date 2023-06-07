@@ -793,7 +793,7 @@ func TestDequeIntegration(t *testing.T) {
 		input := &atomic.Int64{}
 
 		wg := &fun.WaitGroup{}
-		signal := fun.WaitFunc(wg.Wait).Worker().Signal(ctx)
+		signal := fun.Operation(wg.Wait).Worker().Signal(ctx)
 
 		for i := 0; i < num; i++ {
 			wg.Add(1)

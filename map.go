@@ -108,7 +108,7 @@ func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *Iterator[V], keyf fu
 func (m Map[K, V]) Iterator() *Iterator[Pair[K, V]] {
 	pipe := make(chan Pair[K, V])
 
-	init := WaitFunc(func(ctx context.Context) {
+	init := Operation(func(ctx context.Context) {
 		defer close(pipe)
 
 		for k, v := range m {

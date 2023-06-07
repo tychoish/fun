@@ -119,7 +119,7 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // When the service returns all worker Goroutines as well as the input
 // worker will have returned. Use a blocking pubsub iterator to
 // dispatch wait functions throughout the lifecycle of your program.
-func Wait(iter *fun.Iterator[fun.WaitFunc]) *Service {
+func Wait(iter *fun.Iterator[fun.Operation]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
@@ -131,7 +131,7 @@ func Wait(iter *fun.Iterator[fun.WaitFunc]) *Service {
 				}
 
 				wg.Add(1)
-				go func(fn fun.WaitFunc) {
+				go func(fn fun.Operation) {
 					defer erc.Recover(ec)
 					defer wg.Done()
 					fn(ctx)
@@ -331,7 +331,7 @@ func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
 			return nil
 		},
 		Cleanup: func() error {
-			fun.WaitFunc(wg.Wait).Block()
+			fun.Operation(wg.Wait).Block()
 			return nil
 		},
 	}

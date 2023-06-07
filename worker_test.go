@@ -117,7 +117,7 @@ func TestWorker(t *testing.T) {
 			t.Run("Must", func(t *testing.T) {
 				expected := errors.New("merlin")
 				err := Check(func() {
-					var wf WaitFunc //nolint:gosimple
+					var wf Operation //nolint:gosimple
 					wf = Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
@@ -127,7 +127,7 @@ func TestWorker(t *testing.T) {
 				assert.NotError(t, err)
 
 				err = Check(func() {
-					var wf WaitFunc //nolint:gosimple
+					var wf Operation //nolint:gosimple
 					wf = Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()

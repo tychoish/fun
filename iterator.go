@@ -79,7 +79,7 @@ func ChannelIterator[T any](ch <-chan T) *Iterator[T] {
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
 
-	init := WaitFunc(func(ctx context.Context) {
+	init := Operation(func(ctx context.Context) {
 		wg := &WaitGroup{}
 		wctx, cancel := context.WithCancel(ctx)
 
@@ -90,7 +90,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 			send.Consume(iters[idx]).Ignore().Add(wctx, wg)
 		}
 
-		wg.WaitFunc().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
+		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
 	}).Once()
 
 	return pipe.Receive().Producer().PreHook(init).Iterator()
@@ -220,7 +220,7 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 	}
 
 	pipe := Blocking(make(chan T))
-	setup := WaitFunc(func(ctx context.Context) {
+	setup := Operation(func(ctx context.Context) {
 		defer pipe.Close()
 		proc := i.Producer()
 		send := pipe.Send()

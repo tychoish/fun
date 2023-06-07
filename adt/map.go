@@ -185,7 +185,7 @@ func makeMapIterator[K comparable, V any, O any](
 ) *fun.Iterator[O] {
 	pipe := make(chan O)
 
-	init := fun.WaitFunc(func(ctx context.Context) {
+	init := fun.Operation(func(ctx context.Context) {
 		defer close(pipe)
 		mp.Range(func(key K, value V) bool {
 			select {

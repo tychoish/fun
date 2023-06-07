@@ -486,7 +486,7 @@ func TestWorker(t *testing.T) {
 	defer cancel()
 
 	count := &atomic.Int64{}
-	err := Worker(ctx, fun.SliceIterator([]fun.WaitFunc{
+	err := Worker(ctx, fun.SliceIterator([]fun.Operation{
 		func(context.Context) { count.Add(1) },
 		func(context.Context) { count.Add(1) },
 		func(context.Context) { count.Add(1) },

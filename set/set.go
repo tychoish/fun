@@ -70,7 +70,7 @@ func (s mapSetImpl[T]) Check(item T) bool         { _, ok := s[item]; return ok 
 func (s mapSetImpl[T]) Iterator() *fun.Iterator[T] {
 	pipe := make(chan T)
 
-	setup := fun.WaitFunc(func(ctx context.Context) {
+	setup := fun.Operation(func(ctx context.Context) {
 		defer close(pipe)
 		for item := range s {
 			if !fun.Blocking(pipe).Send().Check(ctx, item) {

@@ -27,8 +27,8 @@ func (of Observer[T]) Check(in T) error { return Check(func() { of(in) }) }
 func (of Observer[T]) Worker(in T) Worker { return func(context.Context) error { return of.Check(in) } }
 
 // Wait captures a variable and converts an Observer into a wait
-// function that observes the value when the WaitFunc runs.
-func (of Observer[T]) Wait(in T) WaitFunc { return func(context.Context) { of(in) } }
+// function that observes the value when the Operation runs.
+func (of Observer[T]) Wait(in T) Operation { return func(context.Context) { of(in) } }
 
 // Caputre returns a function that observes the specified variable,
 // but only when executed later.

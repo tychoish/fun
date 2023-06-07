@@ -24,9 +24,9 @@ func Process[T any](
 // compile-time assertions that both worker types support the "safe"
 // interface needed for the Worker() tool.
 var _ interface{ Safe() fun.Worker } = new(fun.Worker)
-var _ interface{ Safe() fun.Worker } = new(fun.WaitFunc)
+var _ interface{ Safe() fun.Worker } = new(fun.Operation)
 
-// Worker takes iterators of fun.Worker or fun.WaitFunc lambdas
+// Worker takes iterators of fun.Worker or fun.Operation lambdas
 // and processes them in according to the configuration.
 //
 // All operations functions are processed using their respective
@@ -41,7 +41,7 @@ var _ interface{ Safe() fun.Worker } = new(fun.WaitFunc)
 // workloads do not remain in memory) containers.
 //
 // Worker is implemented using ParallelForEach.
-func Worker[OP fun.Worker | fun.WaitFunc](
+func Worker[OP fun.Worker | fun.Operation](
 	ctx context.Context,
 	iter *fun.Iterator[OP],
 	opts Options,
@@ -85,7 +85,7 @@ func ParallelForEach[T any](
 		forEachOperation(ec, opts, splits[idx], fn, cancel).Add(ctx, wg)
 	}
 
-	wg.WaitFunc().Block()
+	wg.Operation().Block()
 
 	return
 }
@@ -96,7 +96,7 @@ func forEachOperation[T any](
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	abort func(),
-) fun.WaitFunc {
+) fun.Operation {
 	return func(ctx context.Context) {
 		for {
 			value, err := iter.ReadOne(ctx)

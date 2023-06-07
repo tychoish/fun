@@ -25,14 +25,14 @@ func Generate[T any](
 	pipe := fun.Blocking(make(chan T, opts.OutputBufferSize))
 	ec := &erc.Collector{}
 
-	init := fun.WaitFunc(func(ctx context.Context) {
+	init := fun.Operation(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &fun.WaitGroup{}
 		send := pipe.Send()
 
 		generator(ec, opts, fn, cancel, send).StartGroup(wctx, wg, opts.NumWorkers)
 
-		wg.WaitFunc().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
+		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
 	}).Once()
 
 	return pipe.Receive().Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
@@ -44,7 +44,7 @@ func generator[T any](
 	fn fun.Producer[T],
 	abort func(),
 	out fun.Send[T],
-) fun.WaitFunc {
+) fun.Operation {
 	return func(ctx context.Context) {
 		defer abort()
 

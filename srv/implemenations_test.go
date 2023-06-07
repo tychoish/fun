@@ -22,7 +22,7 @@ func TestImplementationHelpers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(fun.VariadicIterator(fun.WaitFunc(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
+		svc := Wait(fun.VariadicIterator(fun.Operation(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)

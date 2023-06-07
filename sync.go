@@ -6,7 +6,7 @@ import (
 )
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
-// takes a context (and can be passed as a fun.WaitFunc). The
+// takes a context (and can be passed as a fun.Operation). The
 // implementation is exceptionally simple. The only constraint, like
 // sync.WaitGroup, is that you can never modify the value of the
 // internal counter such that it is negative, event transiently. The
@@ -68,8 +68,8 @@ func (wg *WaitGroup) IsDone() bool {
 	return wg.counter == 0
 }
 
-// WaitFunc returns with WaitGroups Wait method as a WaitFunc.
-func (wg *WaitGroup) WaitFunc() WaitFunc { return wg.Wait }
+// Operation returns with WaitGroups Wait method as a Operation.
+func (wg *WaitGroup) Operation() Operation { return wg.Wait }
 
 // Worker returns a worker that will block on the wait group
 // returning and return the context's error if one exits.
@@ -80,7 +80,7 @@ func (wg *WaitGroup) Worker() Worker {
 // Wait blocks until either the context is canceled or all items have
 // completed.
 //
-// Wait is pasable or usable as a fun.WaitFunc.
+// Wait is pasable or usable as a fun.Operation.
 //
 // In many cases, callers should not rely on the Wait operation
 // returning after the context expires: If Done() calls are used in
@@ -92,7 +92,7 @@ func (wg *WaitGroup) Worker() Worker {
 // context cancellation, being able to set a second deadline on
 // Waiting may be useful.
 //
-// Consider using `fun.WaitFunc(wg.Wait).Block()` if you want blocking
+// Consider using `fun.Operation(wg.Wait).Block()` if you want blocking
 // semantics with the other features of this WaitGroup implementation.
 func (wg *WaitGroup) Wait(ctx context.Context) {
 	wg.mu.Lock()

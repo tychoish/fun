@@ -125,7 +125,7 @@ func TestWait(t *testing.T) {
 		})
 	})
 	t.Run("Block", func(t *testing.T) {
-		wf := WaitFunc(func(ctx context.Context) {
+		wf := Operation(func(ctx context.Context) {
 			if ctx != context.Background() {
 				t.Error("background context expected")
 			}
@@ -138,7 +138,7 @@ func TestWait(t *testing.T) {
 		}
 	})
 	t.Run("Merge", func(t *testing.T) {
-		wfs := make([]WaitFunc, 100)
+		wfs := make([]Operation, 100)
 		for i := 0; i < 100; i++ {
 			wfs[i] = func(context.Context) { time.Sleep(10 * time.Millisecond) }
 		}
@@ -182,11 +182,11 @@ func TestWait(t *testing.T) {
 	})
 	t.Run("WorkerConverter", func(t *testing.T) {
 		called := &atomic.Bool{}
-		err := WaitFunc(func(context.Context) { called.Store(true) }).Worker()(testt.Context(t))
+		err := Operation(func(context.Context) { called.Store(true) }).Worker()(testt.Context(t))
 		assert.NotError(t, err)
 		assert.True(t, called.Load())
 		assert.Panic(t, func() {
-			WaitFunc(func(context.Context) { panic("hi") }).Run(testt.Context(t))
+			Operation(func(context.Context) { panic("hi") }).Run(testt.Context(t))
 		})
 	})
 	t.Run("WorkerCancel", func(t *testing.T) {
@@ -194,14 +194,14 @@ func TestWait(t *testing.T) {
 		cancel()
 
 		called := &atomic.Bool{}
-		err := WaitFunc(func(context.Context) { called.Store(true) }).Worker()(ctx)
+		err := Operation(func(context.Context) { called.Store(true) }).Worker()(ctx)
 		assert.Error(t, err)
 		assert.True(t, called.Load())
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 	t.Run("Safe", func(t *testing.T) {
 		expected := errors.New("safer")
-		err := WaitFunc(func(context.Context) { panic(expected) }).
+		err := Operation(func(context.Context) { panic(expected) }).
 			Safe()(testt.Context(t))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)

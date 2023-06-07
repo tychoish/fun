@@ -30,7 +30,7 @@ func Map[T any, O any](
 	ec := &erc.Collector{}
 	output := fun.Blocking(make(chan O))
 
-	init := fun.WaitFunc(func(ctx context.Context) {
+	init := fun.Operation(func(ctx context.Context) {
 		splits := iter.Split(opts.NumWorkers)
 
 		wctx, wcancel := context.WithCancel(ctx)
@@ -47,7 +47,7 @@ func Map[T any, O any](
 
 		// start a background op that waits for the
 		// waitgroup and closes the channel
-		wg.WaitFunc().PostHook(wcancel).PostHook(output.Close).Go(ctx)
+		wg.Operation().PostHook(wcancel).PostHook(output.Close).Go(ctx)
 	}).Once()
 
 	return output.Receive().Producer().PreHook(init).
