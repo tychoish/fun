@@ -451,7 +451,8 @@ func TestAny(t *testing.T) {
 	count := 0
 	err := SliceIterator(sl).Any().Observe(ctx, func(in any) {
 		count++
-		check.True(t, Is[int](in))
+		_, ok := in.(int)
+		check.True(t, ok)
 	})
 	assert.NotError(t, err)
 	assert.Equal(t, count, 8)

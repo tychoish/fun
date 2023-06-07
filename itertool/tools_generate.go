@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 )
 
 // Generate creates an iterator using a generator pattern which
@@ -50,7 +49,7 @@ func generator[T any](
 
 		for {
 			if value, err := func() (out T, err error) {
-				defer func() { err = internal.MergeErrors(err, fun.ParsePanic(recover())) }()
+				defer func() { err = erc.Merge(err, fun.ParsePanic(recover())) }()
 				return fn(ctx)
 			}(); err != nil {
 				erc.When(catcher, opts.shouldCollectError(err), err)

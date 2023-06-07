@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/internal"
 )
 
 type wrapTestType struct {
@@ -34,34 +33,6 @@ func TestWrap(t *testing.T) {
 		errs := Unwind(err)
 		assert.Equal(t, len(errs), 3)
 		assert.True(t, root == UnwrapedRoot(err))
-	})
-	t.Run("IsWrapFalse", func(t *testing.T) {
-		l := &wrapTestType{value: 42}
-		assert.True(t, !IsWrapped(l))
-	})
-	t.Run("IsWrap", func(t *testing.T) {
-		err := fmt.Errorf("hello: %w", errors.New("world"))
-		assert.True(t, IsWrapped(err))
-	})
-	t.Run("Unwinder", func(t *testing.T) {
-		err := fmt.Errorf("hello: %w", errors.New("world"))
-		errs1 := Unwind(err)
-		errs2 := []error{}
-
-		assert.NotError(t, UnwindIterator(err).Observe(internal.BackgroundContext, func(in error) { errs2 = append(errs2, in) }))
-		assert.True(t, IsWrapped(err))
-		assert.Equal(t, len(errs1), len(errs2))
-		for idx := range errs1 {
-			assert.True(t, errs1[idx] == errs2[idx])
-		}
-	})
-	t.Run("Is", func(t *testing.T) {
-		if Is[*testing.T](5) {
-			t.Error("Is should return false when types do not match ")
-		}
-		if !Is[int](100) {
-			t.Error("Is should return true when types match")
-		}
 	})
 	t.Run("Errors", func(t *testing.T) {
 		err := errors.New("root")

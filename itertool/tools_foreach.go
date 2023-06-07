@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 )
 
 // Process provides a (potentially) more sensible alternate name for
@@ -47,9 +46,7 @@ func Worker[OP fun.Worker | fun.Operation](
 	opts Options,
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
-		return any(op).(interface {
-			Safe() fun.Worker
-		}).Safe()(ctx)
+		return any(op).(interface{ Safe() fun.Worker }).Safe()(ctx)
 	}, opts)
 }
 
@@ -68,16 +65,14 @@ func ParallelForEach[T any](
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	opts Options,
-) (err error) {
+) error {
+	opts.init()
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	opts.init()
-
 	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
-	defer func() { err = ec.Resolve() }()
-	defer erc.Check(ec, iter.Close)
 
 	splits := iter.Split(opts.NumWorkers)
 
@@ -86,8 +81,8 @@ func ParallelForEach[T any](
 	}
 
 	wg.Operation().Block()
-
-	return
+	ec.Add(iter.Close())
+	return ec.Resolve()
 }
 
 func forEachOperation[T any](
@@ -105,7 +100,7 @@ func forEachOperation[T any](
 			}
 
 			if err := func(value T) (err error) {
-				defer func() { err = internal.MergeErrors(err, fun.ParsePanic(recover())) }()
+				defer func() { err = erc.Merge(err, fun.ParsePanic(recover())) }()
 
 				return fn(ctx, value)
 			}(value); err != nil {

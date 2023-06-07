@@ -4,23 +4,87 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"reflect"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
 )
 
-// ConstErr is a type alias for building/declaring sentinel errors
+// ConstError is a type alias for building/declaring sentinel errors
 // as constants.
-type ConstErr string
+type ConstError string
 
 // Error implements the error interface for ConstError.
-func (e ConstErr) Error() string { return string(e) }
+func (e ConstError) Error() string { return string(e) }
 
 // ContextExpired checks an error to see if it, or any of it's parent
 // contexts signal that a context has expired. This covers both
 // canceled contexts and ones which have exceeded their deadlines.
 func ContextExpired(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func IsTerminating(err error) bool { return errors.Is(err, io.EOF) || ContextExpired(err) }
+
+type isable[T any] interface{ Is(T) bool }
+
+type isCache struct {
+	target     error
+	comparable bool
+	check      isable[error]
+	checkable  bool
+}
+
+func IsBFS(err error, targets ...error) bool {
+	// cache "isComparable" from every target
+	cache := make([]isCache, len(targets))
+	for idx, target := range targets {
+		if target == nil && err == nil {
+			return true
+		}
+
+		cache[idx].target = targets[idx]
+		cache[idx].comparable = reflect.TypeOf(target).Comparable()
+		cache[idx].check, cache[idx].checkable = target.(interface{ Is(error) bool })
+
+		if cache[idx].comparable && err == target {
+			return true
+		}
+		if cache[idx].checkable && cache[idx].check.Is(err) {
+			return true
+		}
+	}
+	if err == nil {
+		return false
+	}
+
+	for {
+		err = errors.Unwrap(err)
+		for idx, target := range targets {
+			switch {
+			case target == nil && err == nil:
+				return true
+			case cache[idx].comparable && err == target:
+				return true
+			case cache[idx].checkable && cache[idx].check.Is(err):
+				return true
+			}
+		}
+
+		if err == nil {
+			return false
+		}
+	}
+}
+
+func IsDFS(err error, targets ...error) bool {
+	for _, target := range targets {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return true
 }
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
@@ -144,9 +208,9 @@ func Unwind(err error) []error {
 	case *Stack:
 		// the only way this can error is if the observer
 		// function panics, which it can't:
-		fun.InvariantMust(e.Iterator().Observe(internal.BackgroundContext, func(err error) { out = append(out, err) }))
+		return fun.Must(e.Iterator().Slice(internal.BackgroundContext))
 	default:
-		out = fun.Unwind(err)
+		return fun.Unwind(err)
 	}
 
 	return out

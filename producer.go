@@ -279,6 +279,7 @@ func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 
 func (pf Producer[T]) PreHook(op func(context.Context)) Producer[T] {
 	return func(ctx context.Context) (T, error) { op(ctx); return pf(ctx) }
+
 }
 func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	return func(ctx context.Context) (o T, e error) {

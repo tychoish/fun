@@ -62,7 +62,7 @@ func TestCollections(t *testing.T) {
 	t.Run("Wrap", func(t *testing.T) {
 		check.NotError(t, Wrap(nil, "hello"))
 		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
-		const expected ConstErr = "hello"
+		const expected ConstError = "hello"
 		err := Wrap(expected, "hello")
 		assert.Equal(t, err.Error(), "hello: hello")
 		assert.ErrorIs(t, err, expected)
@@ -78,15 +78,15 @@ func TestCollections(t *testing.T) {
 			}
 		})
 		t.Run("One", func(t *testing.T) {
-			const e ConstErr = "fourty-two"
+			const e ConstError = "fourty-two"
 			err := Collapse(e)
 			if !errors.Is(err, e) {
 				t.Error(err, e)
 			}
 		})
 		t.Run("Many", func(t *testing.T) {
-			const e0 ConstErr = "fourty-two"
-			const e1 ConstErr = "fourty-three"
+			const e0 ConstError = "fourty-two"
+			const e1 ConstError = "fourty-three"
 			err := Collapse(e0, e1)
 			if !errors.Is(err, e1) {
 				t.Error(err, e1)

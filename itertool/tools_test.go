@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -462,6 +463,24 @@ func TestChain(t *testing.T) {
 	cancel()
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
+}
+
+func TestUnwind(t *testing.T) {
+	err := fmt.Errorf("hello: %w", errors.New("world"))
+	errs1 := fun.Unwind(err)
+	assert.True(t, len(errs1) != 0)
+	errs2 := []error{}
+
+	assert.NotError(t, Unwind(err).Observe(internal.BackgroundContext, func(in error) { errs2 = append(errs2, in) }))
+	testt.Log(t, errs2)
+	assert.Equal(t, len(errs1), len(errs2))
+	for idx := range errs1 {
+		if errs1[idx] != errs2[idx] {
+			t.Error(idx, errs1[idx], errs2[idx])
+		} else {
+			testt.Log(t, "passed:", idx)
+		}
+	}
 }
 
 func TestDropZeros(t *testing.T) {

@@ -1,29 +1,9 @@
 package fun
 
-import (
-	"context"
-	"io"
-)
-
 // Wrapper produces a function that always returns the value
 // provided. Useful for bridging interface paradigms, and for storing
 // interface-typed objects in atomics.
 func Wrapper[T any](in T) func() T { return func() T { return in } }
-
-// Is a generic version of `errors.Is` that takes advantage of the
-// Unwrap function, and is useful for checking if an object of an
-// interface type is or wraps an implementation of the type
-// parameter.
-func Is[T any](in any) bool {
-	for {
-		if _, ok := in.(T); ok {
-			return true
-		}
-		if in = Unwrap(in); in == nil {
-			return false
-		}
-	}
-}
 
 // Unwrap is a generic equivalent of the `errors.Unwrap()` function
 // for any type that implements an `Unwrap() T` method. useful in
@@ -40,10 +20,11 @@ func Unwrap[T any](in T) T {
 // non-nil wrapped item
 func UnwrapedRoot[T any](in T) T {
 	for {
-		if !IsWrapped(in) {
+		u, ok := doUnwrap(in)
+		if !ok {
 			return in
 		}
-		in = Unwrap(in)
+		in = u.Unwrap()
 	}
 }
 
@@ -54,48 +35,26 @@ func Unwind[T any](in T) []T {
 
 	out = append(out, in)
 	for {
-		u, ok := doUnwrap(in)
-		if !ok {
-			break
+		switch wi := any(in).(type) {
+		case wrapped[T]:
+			in = wi.Unwrap()
+			out = append(out, in)
+		case wrappedMany[T]:
+			for _, item := range wi.Unwrap() {
+				out = append(out, Unwind(item)...)
+			}
+
+			return out
+		default:
+			return out
 		}
-		in = u.Unwrap()
-		out = append(out, in)
 	}
-	return out
-}
-
-// UnwindIterator unwinds an object as in unwind but produces the
-// result as an Iterator. The iterative approach may be more ergonomic
-// in some situations, but also eliminates the need to create a copy
-// the unwound stack of objects to a slice.
-func UnwindIterator[T any](root T) *Iterator[T] {
-	var next *T
-	next = &root
-	return Generator(func(context.Context) (T, error) {
-		if next == nil {
-			return ZeroOf[T](), io.EOF
-		}
-		item := *next
-
-		wrapped, ok := doUnwrap(item)
-		if !ok {
-			next = nil
-		} else {
-			ni := wrapped.Unwrap()
-			next = &ni
-		}
-
-		return item, nil
-	})
 }
 
 type wrapped[T any] interface{ Unwrap() T }
+type wrappedMany[T any] interface{ Unwrap() []T }
 
 func doUnwrap[T any](in T) (wrapped[T], bool) { u, ok := any(in).(wrapped[T]); return u, ok }
-
-// IsWrapped returns true if the object is wrapped (e.g. implements an
-// Unwrap() method returning its own type). and false otherwise.
-func IsWrapped[T any](in T) bool { return Is[wrapped[T]](in) }
 
 // Zero returns the zero-value for the type T of the input argument.
 func Zero[T any](T) T { return ZeroOf[T]() }
