@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/internal"
 )
 
 // Generate creates an iterator using a generator pattern which
@@ -48,39 +49,23 @@ func generator[T any](
 		defer abort()
 
 		for {
-			value, err := func() (out T, err error) {
-				defer func() {
-					if r := recover(); r != nil {
-						err = fun.ParsePanic(r)
-					}
-				}()
+			if value, err := func() (out T, err error) {
+				defer func() { err = internal.MergeErrors(err, fun.ParsePanic(recover())) }()
 				return fn(ctx)
-			}()
-
-			if err != nil {
+			}(); err != nil {
 				erc.When(catcher, opts.shouldCollectError(err), err)
+
 				if errors.Is(err, fun.ErrRecoveredPanic) {
 					if opts.ContinueOnPanic {
 						continue
 					}
-
-					return
-				}
-				switch {
-				case err == nil:
-					continue
-				case errors.Is(err, io.EOF):
-					return
-				case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-					return
-				case !opts.ContinueOnError:
 					return
 				}
 
-				continue
-			}
-
-			if !out.Check(ctx, value) {
+				if erc.ContextExpired(err) || errors.Is(err, io.EOF) || !opts.ContinueOnError {
+					return
+				}
+			} else if !out.Check(ctx, value) {
 				return
 			}
 		}

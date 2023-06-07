@@ -36,12 +36,13 @@ func MarshalJSON[T any](ctx context.Context, iter *fun.Iterator[T]) ([]byte, err
 		}
 	}
 
+	_, _ = buf.Write([]byte("]"))
+
 	if err := iter.Close(); err != nil {
 		// TODO try and marshal with a producer that makes an
 		// actual error
 		return nil, err
 	}
-	_, _ = buf.Write([]byte("]"))
 
 	return buf.Bytes(), nil
 }

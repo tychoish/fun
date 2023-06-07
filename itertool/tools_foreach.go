@@ -2,6 +2,8 @@ package itertool
 
 import (
 	"context"
+	"errors"
+	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -70,59 +72,59 @@ func ParallelForEach[T any](
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	opts.init()
+
 	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
 	defer func() { err = ec.Resolve() }()
 	defer erc.Check(ec, iter.Close)
 
-	if opts.NumWorkers <= 0 {
-		opts.NumWorkers = 1
-	}
-
 	splits := iter.Split(opts.NumWorkers)
 
 	for idx := range splits {
-		wg.Add(1)
-		go forEachWorker(ctx, ec, wg, opts, splits[idx], fn, cancel)
+		forEachOperation(ec, opts, splits[idx], fn, cancel).Add(ctx, wg)
 	}
 
-	wg.Wait(internal.BackgroundContext)
+	wg.WaitFunc().Block()
+
 	return
 }
 
-func forEachWorker[T any](
-	ctx context.Context,
+func forEachOperation[T any](
 	ec *erc.Collector,
-	wg *fun.WaitGroup,
 	opts Options,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	abort func(),
-) {
-	defer wg.Done()
-	defer erc.RecoverHook(ec, func() {
-		if ctx.Err() != nil {
-			return
-		}
-
-		if !opts.ContinueOnPanic {
-			abort()
-			return
-		}
-
-		wg.Add(1)
-		go forEachWorker(ctx, ec, wg, opts, iter, fn, abort)
-	})
-	for iter.Next(ctx) {
-		if err := fn(ctx, iter.Value()); err != nil {
-			erc.When(ec, opts.shouldCollectError(err), err)
-
-			if opts.ContinueOnError {
-				continue
+) fun.WaitFunc {
+	return func(ctx context.Context) {
+		for {
+			value, err := iter.ReadOne(ctx)
+			if err != nil {
+				return
 			}
 
-			abort()
-			return
+			if err := func(value T) (err error) {
+				defer func() { err = internal.MergeErrors(err, fun.ParsePanic(recover())) }()
+
+				return fn(ctx, value)
+			}(value); err != nil {
+				erc.When(ec, opts.shouldCollectError(err), err)
+
+				if errors.Is(err, fun.ErrRecoveredPanic) {
+					if opts.ContinueOnPanic {
+						continue
+					}
+
+					abort()
+					return
+				}
+
+				if erc.ContextExpired(err) || errors.Is(err, io.EOF) || !opts.ContinueOnError {
+					abort()
+					return
+				}
+			}
 		}
 	}
 }

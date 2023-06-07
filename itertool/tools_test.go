@@ -393,7 +393,7 @@ func TestParallelForEach(t *testing.T) {
 		}
 		errs := fun.Must(es.Iterator().Slice(ctx))
 		if len(errs) != 10 {
-			t.Error(len(errs), errs)
+			t.Error(len(errs), "!= 10", errs)
 		}
 
 	})

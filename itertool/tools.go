@@ -47,16 +47,13 @@ type Options struct {
 
 func (o Options) shouldCollectError(err error) bool {
 	switch {
-	case errors.Is(err, fun.ErrRecoveredPanic):
-		return true
-	case o.SkipErrorCheck != nil && o.SkipErrorCheck(err):
+	case err == nil || errors.Is(err, io.EOF) || o.SkipErrorCheck != nil && o.SkipErrorCheck(err):
 		return false
-	case erc.ContextExpired(err) && o.IncludeContextExpirationErrors:
+	case errors.Is(err, fun.ErrRecoveredPanic) || (erc.ContextExpired(err) && o.IncludeContextExpirationErrors):
 		return true
-	case errors.Is(err, io.EOF):
-		return false
+	default:
+		return true
 	}
-	return true
 }
 
 func (o *Options) init() {

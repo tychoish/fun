@@ -224,6 +224,14 @@ func TestCleanup(t *testing.T) {
 
 		assert.NotError(t, s.Start(ctx))
 
+		check.Equal(t, 0, count.Load())
+		for i := 0; i < 100; i++ {
+			check.NotError(t, pipe.Add(func(context.Context) error {
+				count.Add(1)
+				return nil
+			}))
+		}
+		check.Equal(t, 0, count.Load())
 		go func() {
 			defer close(signal)
 			check.Equal(t, 0, count.Load())
@@ -231,16 +239,10 @@ func TestCleanup(t *testing.T) {
 			check.Equal(t, 100, count.Load())
 		}()
 
-		for i := 0; i < 100; i++ {
-			check.NotError(t, pipe.Add(func(context.Context) error {
-				count.Add(1)
-				return nil
-			}))
-		}
-		time.Sleep(time.Millisecond)
 		check.True(t, s.Running())
 		check.Equal(t, 0, count.Load())
 		check.NotError(t, s.Shutdown())
+		check.NotError(t, s.Wait())
 		<-signal
 		check.Equal(t, 100, count.Load())
 	})
@@ -272,7 +274,7 @@ func TestCleanup(t *testing.T) {
 		}
 		check.True(t, HasCleanup(ctx))
 		check.Equal(t, 100, called)
-		time.Sleep(time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		check.Equal(t, 0, count.Load())
 
 		GetOrchestrator(ctx).Service().Close()

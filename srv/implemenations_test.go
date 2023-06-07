@@ -44,7 +44,7 @@ func TestImplementationHelpers(t *testing.T) {
 			srv := ProcessIterator(
 				makeIterator(100),
 				func(_ context.Context, in int) error { count.Add(1); return nil },
-				itertool.Options{NumWorkers: runtime.NumCPU()},
+				itertool.Options{NumWorkers: 2},
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
