@@ -56,9 +56,9 @@ func (mp *Map[K, V]) EnsureStore(k K, v V) bool { _, loaded := mp.mp.LoadOrStore
 // object.
 func (mp *Map[K, V]) EnsureSet(i fun.Pair[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
 
-func (mp *Map[K, V]) safeCast(v any, ok bool) (V, bool) {
+func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {
-		return fun.ZeroOf[V](), false
+		return out, false
 	}
 	return v.(V), ok
 }

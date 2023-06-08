@@ -55,7 +55,8 @@ func UnmarshalJSON[T any](in []byte) *fun.Iterator[T] {
 	rv := []json.RawMessage{}
 
 	if err := json.Unmarshal(in, &rv); err != nil {
-		return fun.StaticProducer(fun.ZeroOf[T](), err).Iterator()
+		var next T
+		return fun.StaticProducer(next, err).Iterator()
 	}
 	var idx int
 	return fun.Generator(func(ctx context.Context) (out T, err error) {

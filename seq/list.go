@@ -158,7 +158,7 @@ func (l *List[T]) UnmarshalJSON(in []byte) error {
 	if err := json.Unmarshal(in, &rv); err != nil {
 		return err
 	}
-	zero := fun.ZeroOf[T]()
+	var zero T
 	tail := l.Back()
 	for idx := range rv {
 		elem := NewElement(zero)
@@ -207,7 +207,8 @@ func (e *Element[T]) Drop() {
 	if !e.Remove() {
 		return
 	}
-	e.item = fun.ZeroOf[T]()
+	var empty T
+	e.item = empty
 	e.ok = false
 }
 
@@ -423,7 +424,7 @@ func (l *List[T]) lazySetup() {
 	}
 
 	if l.root == nil {
-		val := fun.ZeroOf[T]()
+		var val T
 		l.elementCreator = func(val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 		l.root = l.elementCreator(val)
 		l.root.next = l.root

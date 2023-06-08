@@ -346,9 +346,9 @@ func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
 // arbitrary elements, this isn't exposed and probably shouldn't be
 // because the interface to giving callers access to elements wouldn't
 // be ergonomic.
-func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
+func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 	if dq.closed || it.isRoot() {
-		return fun.ZeroOf[T](), false
+		return out, false
 	}
 
 	if it.prev.isRoot() {
@@ -372,10 +372,10 @@ func (dq *Deque[T]) pop(it *element[T]) (T, bool) {
 	return it.item, true
 }
 
-func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (T, error) {
+func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (out T, _ error) {
 	for {
 		if err := dq.root.getNextOrPrevious(direction).wait(ctx, direction); err != nil {
-			return fun.ZeroOf[T](), err
+			return out, err
 		}
 
 		it, ok := dq.pop(dq.root.getNextOrPrevious(direction))

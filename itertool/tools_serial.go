@@ -61,24 +61,24 @@ func Contains[T comparable](ctx context.Context, item T, iter *fun.Iterator[T]) 
 func Uniq[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 	set := fun.Mapify(map[T]struct{}{})
 
-	return fun.Producer[T](func(ctx context.Context) (T, error) {
+	return fun.Producer[T](func(ctx context.Context) (out T, _ error) {
 		for iter.Next(ctx) {
 			if val := iter.Value(); !set.Check(val) {
 				set.SetDefault(val)
 				return val, nil
 			}
 		}
-		return fun.ZeroOf[T](), io.EOF
+		return out, io.EOF
 	}).Iterator()
 }
 
 // DropZeroValues processes an iterator removing all zero values.
 func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
-	return fun.Producer[T](func(ctx context.Context) (T, error) {
+	return fun.Producer[T](func(ctx context.Context) (out T, _ error) {
 		for {
 			item, err := iter.ReadOne(ctx)
 			if err != nil {
-				return fun.ZeroOf[T](), err
+				return out, err
 			}
 
 			if !fun.IsZero(item) {

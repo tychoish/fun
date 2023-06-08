@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 )
 
@@ -36,8 +35,9 @@ func getElementPool[T any](val T) *adt.Pool[*Element[T]] {
 		pool.SetConstructor(func() *Element[T] {
 			e := &Element[T]{}
 			runtime.SetFinalizer(e, func(elem *Element[T]) {
+				var empty T
 				elem.ok = false
-				elem.item = fun.ZeroOf[T]()
+				elem.item = empty
 				go pool.Put(elem)
 			})
 			return e
@@ -67,8 +67,9 @@ func getItemPool[T any](val T) *adt.Pool[*Item[T]] {
 		pool.SetConstructor(func() *Item[T] {
 			i := &Item[T]{}
 			runtime.SetFinalizer(i, func(item *Item[T]) {
+				var empty T
 				item.ok = false
-				item.value = fun.ZeroOf[T]()
+				item.value = empty
 				go pool.Put(item)
 			})
 			return i

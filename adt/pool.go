@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
-
-	"github.com/tychoish/fun"
 )
 
 // Pool is an ergonomic wrapper around sync.Pool that provides some
@@ -31,7 +29,7 @@ type Pool[T any] struct {
 func (p *Pool[T]) init() {
 	p.once.Do(func() {
 		p.hook = NewAtomic(func(in T) T { return in })
-		p.constructor = NewAtomic(func() T { return fun.ZeroOf[T]() })
+		p.constructor = NewAtomic(func() (out T) { return out })
 		p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
 	})
 }

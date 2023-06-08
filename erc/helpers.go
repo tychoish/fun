@@ -37,7 +37,6 @@ type isCache struct {
 }
 
 func IsBFS(err error, targets ...error) bool {
-	// cache "isComparable" from every target
 	cache := make([]isCache, len(targets))
 	for idx, target := range targets {
 		if target == nil && err == nil {
@@ -203,7 +202,6 @@ func Unwind(err error) []error {
 		return nil
 	}
 
-	var out []error
 	switch e := err.(type) {
 	case *Stack:
 		// the only way this can error is if the observer
@@ -212,8 +210,6 @@ func Unwind(err error) []error {
 	default:
 		return fun.Unwind(err)
 	}
-
-	return out
 }
 
 // Merge produces a single error from two input errors. The output

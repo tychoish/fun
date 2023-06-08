@@ -69,18 +69,19 @@ func (a *Atomic[T]) Set(in T) { a.val.Store(in) }
 
 // Get resolves the atomic value, returning the zero value of the type
 // T if the value is unset.
-func (a *Atomic[T]) Get() T { return fun.ZeroWhenNil[T](a.val.Load()) }
+func (a *Atomic[T]) Get() (out T) { return castOrZero[T](a.val.Load()) }
 
 // Swap does an in place exchange of the contents of a value
 // exchanging the new value for the old. Unlike sync.Atomic.Swap() if
 // new is nil, adt.Atomic.Swap() does NOT panic, and instead
 // constructs the zero value of type T.
 func (a *Atomic[T]) Swap(new T) (old T) {
-	v := a.val.Swap(fun.ZeroWhenNil[T](new))
-	if v == nil {
+	switch v := a.val.Swap(castOrZero[T](new)).(type) {
+	case T:
+		return v
+	default:
 		return old
 	}
-	return v.(T)
 }
 
 // CompareAndSwap exposes the CompareAndSwap option for atomics that
@@ -115,24 +116,28 @@ func IsAtomicZero[T comparable](in AtomicValue[T]) bool {
 }
 
 func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
-	if in == nil {
-		return true
-	}
 	switch v := in.(type) {
 	case *Atomic[T]:
-		if v == nil {
-			return true
-		}
+		return v == nil
 	case *Synchronized[T]:
-		if v == nil {
-			return true
-		}
+		return v == nil
 	case interface{ IsZero() bool }:
-		if v.IsZero() {
-			return true
-		}
+		return v.IsZero()
+	default:
+		return v == nil
 	}
-	return false
+}
+
+// castOrZero takes a value of any type, and if that value is nil,
+// returns the zero value of the specified type. Otherwise,
+// castOrZero coerces the value into T and returns it.
+func castOrZero[T any](val any) (out T) {
+	switch converted := val.(type) {
+	case T:
+		return converted
+	default:
+		return out
+	}
 }
 
 // SafeSet sets the atomic to the given value only if the value is not

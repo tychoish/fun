@@ -163,12 +163,12 @@ func (q *Queue[T]) BlockingAdd(ctx context.Context, item T) error {
 // Remove removes and returns the frontmost (oldest) item in the queue and
 // reports whether an item was available.  If the queue is empty, Remove
 // returns nil, false.
-func (q *Queue[T]) Remove() (T, bool) {
+func (q *Queue[T]) Remove() (out T, _ bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	if q.tracker.len() == 0 {
-		return fun.ZeroOf[T](), false
+		return out, false
 	}
 	return q.popFront(), true
 }
@@ -177,12 +177,12 @@ func (q *Queue[T]) Remove() (T, bool) {
 // (oldest) item from the queue. If ctx ends before an item is available, Wait
 // returns a nil value and a context error. If the queue is closed while it is
 // still empty, Wait returns nil, ErrQueueClosed.
-func (q *Queue[T]) Wait(ctx context.Context) (T, error) {
+func (q *Queue[T]) Wait(ctx context.Context) (out T, _ error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	if err := q.unsafeWaitWhileEmpty(ctx); err != nil {
-		return fun.ZeroOf[T](), err
+		return out, err
 	}
 
 	return q.popFront(), nil

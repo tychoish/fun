@@ -206,6 +206,21 @@ func TestMnemonize(t *testing.T) {
 	}
 }
 
+func TestZero(t *testing.T) {
+	t.Run("OrNil", func(t *testing.T) {
+		assert.Zero(t, castOrZero[int](any(0)))
+		assert.True(t, castOrZero[bool](any(true)))
+		assert.True(t, !castOrZero[bool](any(false)))
+		assert.Equal(t, "hello world", castOrZero[string](any("hello world")))
+		assert.NotZero(t, castOrZero[time.Time](time.Now()))
+
+		var foo = "foo"
+		var tt testing.TB
+		assert.NotZero(t, castOrZero[*string](&foo))
+		assert.Zero(t, castOrZero[*testing.T](tt))
+	})
+}
+
 type swappable struct{ Atomic[int] }
 
 func (s *swappable) CompareAndSwap(a, b int) bool { return CompareAndSwap[int](&s.Atomic, a, b) }

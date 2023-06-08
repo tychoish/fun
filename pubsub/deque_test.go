@@ -314,9 +314,8 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 
 			for iter.Next(ctx) {
 				seen++
-				if fun.IsZero(iter.Value()) {
-					t.Fatal("problem at", seen)
-				}
+				t.Logf("%d: %T", seen, iter.Value())
+				assert.NotZero(t, iter.Value())
 			}
 			if seen != len(fix.elems) {
 				t.Fatal("did not iterate far enough", seen, len(fix.elems))
