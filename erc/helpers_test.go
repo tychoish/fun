@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -64,7 +66,7 @@ func TestCollections(t *testing.T) {
 	t.Run("Wrap", func(t *testing.T) {
 		check.NotError(t, Wrap(nil, "hello"))
 		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
-		const expected ConstError = "hello"
+		const expected ers.Error = "hello"
 		err := Wrap(expected, "hello")
 		assert.Equal(t, err.Error(), "hello: hello")
 		assert.ErrorIs(t, err, expected)
@@ -80,15 +82,15 @@ func TestCollections(t *testing.T) {
 			}
 		})
 		t.Run("One", func(t *testing.T) {
-			const e ConstError = "fourty-two"
+			const e ers.Error = "fourty-two"
 			err := Collapse(e)
 			if !errors.Is(err, e) {
 				t.Error(err, e)
 			}
 		})
 		t.Run("Many", func(t *testing.T) {
-			const e0 ConstError = "fourty-two"
-			const e1 ConstError = "fourty-three"
+			const e0 ers.Error = "fourty-two"
+			const e1 ers.Error = "fourty-three"
 			err := Collapse(e0, e1)
 			if !errors.Is(err, e1) {
 				t.Error(err, e1)
@@ -103,21 +105,12 @@ func TestCollections(t *testing.T) {
 			}
 		})
 	})
-	t.Run("Predicates", func(t *testing.T) {
-		assert.True(t, IsTerminating(io.EOF))
-		assert.True(t, IsTerminating(context.Canceled))
-		assert.True(t, IsTerminating(context.DeadlineExceeded))
-		assert.True(t, !IsTerminating(ConstError("hello")))
-		assert.True(t, IsTerminating(Merge(ConstError("beep"), io.EOF)))
-		assert.True(t, IsTerminating(Merge(ConstError("beep"), context.Canceled)))
-		assert.True(t, IsTerminating(Merge(ConstError("beep"), context.DeadlineExceeded)))
-	})
 	t.Run("IteratorHook", func(t *testing.T) {
 		ec := &Collector{}
 		count := 0
 		op := fun.Producer[int](func(context.Context) (int, error) {
 			count++
-			ec.Add(ConstError("hi"))
+			ec.Add(ers.Error("hi"))
 			if count > 32 {
 				return 0, io.EOF
 			}
@@ -173,19 +166,6 @@ func TestCollections(t *testing.T) {
 			})
 		})
 	})
-	t.Run("Checkf", func(t *testing.T) {
-		ec := &Collector{}
-		count := 0
-		Checkf(ec, func() error { count++; return nil }, "foo %s", "bar")
-		check.Equal(t, count, 1)
-		assert.NotError(t, ec.Resolve())
-		expected := errors.New("kip")
-		Checkf(ec, func() error { count++; return expected }, "foo %s", "bar")
-		assert.Error(t, ec.Resolve())
-		assert.ErrorIs(t, ec.Resolve(), expected)
-		check.Equal(t, count, 2)
-		assert.Equal(t, "foo bar: kip", ec.Resolve().Error())
-	})
 	t.Run("Recovery", func(t *testing.T) {
 		ob := func(err error) {
 			check.Error(t, err)
@@ -205,6 +185,38 @@ func TestCollections(t *testing.T) {
 		assert.Equal(t, out, 42)
 		assert.Error(t, ec.Resolve())
 		assert.Equal(t, ec.Resolve().Error(), "kip")
+	})
+}
+
+func TestWithTime(t *testing.T) {
+	err := errors.New("ERRNO=42")
+	t.Run("Nil", func(t *testing.T) {
+		ec := &Collector{}
+		WithTime(ec, nil)
+		if ec.HasErrors() {
+			t.Fatal(ec.Resolve())
+		}
+		if err := ec.Resolve(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("HasTimestamp", func(t *testing.T) {
+		ec := &Collector{}
+		now := time.Now()
+		WithTime(ec, err)
+		second := time.Now()
+		if !ec.HasErrors() {
+			t.Fatal("should have error")
+		}
+		if err := ec.Resolve(); err == nil {
+			t.Fatal("should resolve error")
+		}
+		if errTime := ers.GetTime(ec.Resolve()); !now.Before(errTime) {
+			t.Error(errTime, now)
+		}
+		if errTime := ers.GetTime(ec.Resolve()); !second.After(errTime) {
+			t.Error(errTime, second)
+		}
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -69,7 +70,7 @@ func (pf Producer[T]) Worker(of Observer[T]) Worker {
 // any panic to an error.
 func (pf Producer[T]) Safe() Producer[T] {
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
+		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
 		return pf(ctx)
 	}
 }
@@ -131,7 +132,7 @@ func (pf Producer[T]) Future(ctx context.Context) Producer[T] {
 
 	return func(ctx context.Context) (T, error) {
 		out, chErr := Blocking(out).Receive().Read(ctx)
-		err = internal.MergeErrors(err, chErr)
+		err = ers.Merge(err, chErr)
 		return out, err
 	}
 }
@@ -284,7 +285,14 @@ func (pf Producer[T]) PreHook(op func(context.Context)) Producer[T] {
 func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
-		e = internal.MergeErrors(Check(op), e)
+		e = ers.Merge(ers.Check(op), e)
 		return
+	}
+}
+
+func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
+	return func(ctx context.Context) (_ T, err error) {
+		defer func() { err = ers.Filter(err) }()
+		return pf(ctx)
 	}
 }

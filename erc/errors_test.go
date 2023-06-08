@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 )
 
 func (e *Stack) len() int {
@@ -305,27 +306,28 @@ func TestError(t *testing.T) {
 		t.Run("ContextHelper", func(t *testing.T) {
 			ec := &Collector{}
 			ec.Add(errors.New("foo"))
-			if ContextExpired(ec.Resolve()) {
+			if ers.ContextExpired(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
 			ec.Add(errors.New("foo"))
 			ec.Add(context.Canceled)
-			if !ContextExpired(ec.Resolve()) {
+			if !ers.ContextExpired(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 			ec = &Collector{}
 			ec.Add(errors.New("foo"))
-			if ContextExpired(ec.Resolve()) {
+			if ers.ContextExpired(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
 			ec.Add(context.DeadlineExceeded)
 			ec.Add(errors.New("foo"))
-			if !ContextExpired(ec.Resolve()) {
+			if !ers.ContextExpired(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 		})
+
 		t.Run("Safe", func(t *testing.T) {
 			ec := &Collector{}
 

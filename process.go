@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -119,7 +120,7 @@ func (pf Processor[T]) Chain(next Processor[T]) Processor[T] {
 // until the worker is called.
 func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		oe := func(e error) { err = internal.MergeErrors(e, err) }
+		oe := func(e error) { err = ers.Merge(e, err) }
 		oe(iter.Observe(ctx, pf.Observer(ctx, oe)))
 		return
 	}
@@ -203,6 +204,10 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 		}
 		return pf(ctx, in)
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+}
+
+func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
+	return func(ctx context.Context, in T) error { return ers.Filter(pf(ctx, in), errs...) }
 }
 
 ////////////////////////////////////////////////////////////////////////

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 )
 
 // Iterable provides a safe, context-respecting iterator paradigm for
@@ -98,7 +98,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 
 func (i *Iterator[T]) doClose()         { i.closeOnce.Do(func() { i.closed.Store(true); i.closer() }) }
 func (i *Iterator[T]) Close() error     { i.doClose(); return i.err }
-func (i *Iterator[T]) AddError(e error) { i.err = internal.MergeErrors(e, i.err) }
+func (i *Iterator[T]) AddError(e error) { i.err = ers.Merge(e, i.err) }
 
 func (i *Iterator[T]) ErrorObserver() Observer[error] { return i.AddError }
 func (i *Iterator[T]) Producer() Producer[T]          { return i.ReadOne }
@@ -250,7 +250,7 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 // context cancelation error to its error, though the observed
 // iterator may return one in its close method.
 func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
-	defer func() { err = internal.MergeErrors(err, internal.MergeErrors(i.Close(), ParsePanic(recover()))) }()
+	defer func() { err = ers.Merge(err, ers.Merge(i.Close(), ers.ParsePanic(recover()))) }()
 	proc := i.Producer()
 	for {
 		item, err := proc(ctx)
@@ -268,7 +268,7 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
 }
 
 func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) {
-	defer func() { err = internal.MergeErrors(err, internal.MergeErrors(i.Close(), ParsePanic(recover()))) }()
+	defer func() { err = ers.Merge(err, ers.Merge(i.Close(), ers.ParsePanic(recover()))) }()
 
 	for i.Next(ctx) {
 		item := i.Value()

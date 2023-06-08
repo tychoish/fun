@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
@@ -116,7 +117,7 @@ func TestWorker(t *testing.T) {
 			})
 			t.Run("Must", func(t *testing.T) {
 				expected := errors.New("merlin")
-				err := Check(func() {
+				err := ers.Check(func() {
 					var wf Operation //nolint:gosimple
 					wf = Worker(func(context.Context) error {
 						panic(expected)
@@ -126,7 +127,7 @@ func TestWorker(t *testing.T) {
 				// declaration shouldn't call
 				assert.NotError(t, err)
 
-				err = Check(func() {
+				err = ers.Check(func() {
 					var wf Operation //nolint:gosimple
 					wf = Worker(func(context.Context) error {
 						panic(expected)

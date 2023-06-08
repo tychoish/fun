@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/ers"
 )
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
@@ -228,7 +229,7 @@ func TestSort(t *testing.T) {
 	})
 	t.Run("Heap", func(t *testing.T) {
 		t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-			ok, err := fun.Safe(func() bool {
+			ok, err := ers.Safe(func() bool {
 				var list *Heap[string]
 				list.Push("hi")
 				return true

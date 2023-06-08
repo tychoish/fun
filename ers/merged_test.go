@@ -1,4 +1,4 @@
-package internal
+package ers
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ func TestMerge(t *testing.T) {
 		e1 := &errorTest{val: 100}
 		e2 := &errorTest{val: 200}
 
-		err := &MergedError{Current: e1, Wrapped: e2}
+		err := &Combined{Current: e1, Previous: e2}
 
 		if !errors.Is(err, e1) {
 			t.Error("shold be er1", err, e1)
@@ -51,7 +51,7 @@ func TestMerge(t *testing.T) {
 			e1 := &errorTest{val: 100}
 			e2 := &errorTest{val: 200}
 
-			err := MergeErrors(e1, e2)
+			err := Merge(e1, e2)
 
 			if err == nil {
 				t.Fatal("should be an error")
@@ -73,7 +73,7 @@ func TestMerge(t *testing.T) {
 		})
 		t.Run("FirstOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
-			err := MergeErrors(e1, nil)
+			err := Merge(e1, nil)
 			if err != e1 {
 				t.Error(err, e1)
 			}
@@ -81,13 +81,13 @@ func TestMerge(t *testing.T) {
 
 		t.Run("SecondOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
-			err := MergeErrors(nil, e1)
+			err := Merge(nil, e1)
 			if err != e1 {
 				t.Error(err, e1)
 			}
 		})
 		t.Run("Neither", func(t *testing.T) {
-			err := MergeErrors(nil, nil)
+			err := Merge(nil, nil)
 			if err != nil {
 				t.Error(err)
 			}

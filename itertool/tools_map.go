@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -71,7 +72,7 @@ func mapWorker[T any, O any](
 				return nil
 			}
 			o, err := func(val T) (out O, err error) {
-				defer func() { err = erc.Merge(err, fun.ParsePanic(recover())) }()
+				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
 
 				out, err = mapper(ctx, val)
 				return
@@ -86,7 +87,7 @@ func mapWorker[T any, O any](
 					return io.EOF
 				case hadPanic && opts.ContinueOnPanic:
 					continue
-				case !opts.ContinueOnError || erc.IsTerminating(err):
+				case !opts.ContinueOnError || ers.IsTerminating(err):
 					return io.EOF
 				case opts.ContinueOnError:
 					continue

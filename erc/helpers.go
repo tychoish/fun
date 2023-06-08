@@ -4,36 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 )
-
-// ConstError is a type alias for building/declaring sentinel errors
-// as constants.
-type ConstError string
-
-// Error implements the error interface for ConstError.
-func (e ConstError) Error() string { return string(e) }
-
-// ContextExpired checks an error to see if it, or any of it's parent
-// contexts signal that a context has expired. This covers both
-// canceled contexts and ones which have exceeded their deadlines.
-func ContextExpired(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
-
-func IsTerminating(err error) bool {
-	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded)
-}
-
-func Is(err error, targets ...error) bool {
-	for _, target := range targets {
-		if errors.Is(err, target) {
-			return true
-		}
-	}
-	return false
-}
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
 // error with the provided annotation. When the error is nil, Wrap
@@ -41,12 +15,10 @@ func Is(err error, targets ...error) bool {
 //
 // This, roughly mirrors the usage "github/pkg/errors.Wrap" but
 // taking advantage of newer standard library error wrapping.
-func Wrap(err error, annotation string) error {
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("%s: %w", annotation, err)
-}
+//
+// Deprecated: Use ers.Wrap instead. Non-collector helper functions
+// and types were moved to ers from erc.
+func Wrap(err error, annotation string) error { return ers.Wrap(err, annotation) }
 
 // Wrapf produces a wrapped error, if the error is non-nil, with a
 // formated wrap annotation. When the error is nil, Wrapf does not
@@ -54,13 +26,15 @@ func Wrap(err error, annotation string) error {
 //
 // This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
 // taking advantage of newer standard library error wrapping.
-func Wrapf(err error, tmpl string, args ...any) error {
-	if err == nil {
-		return nil
-	}
+//
+// Deprecated: Use ers.Wrapf instead. Non-collector helper functions
+// and types were moved to ers from erc.
+func Wrapf(err error, tmpl string, args ...any) error { return ers.Wrapf(err, tmpl, args...) }
 
-	return fmt.Errorf("%s: %w", fmt.Sprintf(tmpl, args...), err)
-}
+// WithTime adds the error to the collector, only if the error is
+// nil, and annotates that error object with a timestmap using the
+// ers.WithTime helper. Access the timestamp using ers.GetTime()
+func WithTime(ec *Collector, err error) { ec.Add(ers.WithTime(err)) }
 
 // When is a helper function, typcially useful for improving the
 // readability of validation code. If the condition is true, then When
@@ -97,11 +71,11 @@ func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() 
 // Recover calls the builtin recover() function and converts it to an
 // error that is populated in the collector. Run RecoverHook in defer
 // statements.
-func Recover(ec *Collector) { ec.Add(fun.ParsePanic(recover())) }
+func Recover(ec *Collector) { ec.Add(ers.ParsePanic(recover())) }
 
 // Recovery catches a panic, turns it into an error and passes it to
 // the provided observer function.
-func Recovery(ob fun.Observer[error]) { ob(fun.ParsePanic(recover())) }
+func Recovery(ob fun.Observer[error]) { ob(ers.ParsePanic(recover())) }
 
 // RecoverHook runs adds the output of recover() to the error
 // collector, and runs the specified hook if. If there was no panic,
@@ -127,19 +101,16 @@ func RecoverHook(ec *Collector, hook func()) {
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
-// Checkf executes a simple function and if it returns an error, adds
-// it to the collector, primarily for use in defer statements.
-func Checkf(ec *Collector, fn func() error, tmpl string, args ...any) {
-	ec.Add(Wrapf(fn(), tmpl, args...))
-}
-
 // Merge produces a single error from two input errors. The output
 // error behaves correctly for errors.Is and errors.As and Unwrap()
 // calls, for both errors, checked in order.
 //
 // If both errors are of the same root type and you investigate the
 // output error with errors.As, the first error's value will be used.
-func Merge(err1, err2 error) error { return internal.MergeErrors(err1, err2) }
+//
+// Deprecated: Use ers.Merge instead. Non-collector helper functions
+// and types were moved to ers from erc.
+func Merge(err1, err2 error) error { return ers.Merge(err1, err2) }
 
 // Collapse takes a slice of errors and converts it into an *erc.Stack
 // typed error.
@@ -197,6 +168,8 @@ func Collect[T any](ec *Collector) func(T, error) T {
 	return func(out T, err error) T { ec.Add(err); return out }
 }
 
+// IteratorHook adds errors to an iterator from a collector when the
+// iterator closes.
 func IteratorHook[T any](ec *Collector) fun.Observer[*fun.Iterator[T]] {
 	return func(it *fun.Iterator[T]) { it.AddError(ec.Resolve()) }
 }

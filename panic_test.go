@@ -1,16 +1,13 @@
 package fun
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -21,17 +18,8 @@ func TestPanics(t *testing.T) {
 		}())
 		assert.True(t, ok)
 	})
-	t.Run("SafeWithPanic", func(t *testing.T) {
-		ok, err := Safe(func() bool {
-			return Must(func() (bool, error) {
-				return true, errors.New("error")
-			}())
-		})
-		assert.Error(t, err)
-		check.True(t, !ok)
-	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
-		ok, err := Safe(func() bool {
+		ok, err := ers.Safe(func() bool {
 			return Must(func() (bool, error) {
 				return true, nil
 			}())
@@ -43,26 +31,9 @@ func TestPanics(t *testing.T) {
 			t.Error("should be zero value of T")
 		}
 	})
-	t.Run("Check", func(t *testing.T) {
-		t.Run("NoError", func(t *testing.T) {
-			err := Check(func() { t.Log("function runs") })
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-		t.Run("WithPanic", func(t *testing.T) {
-			err := Check(func() { panic("function runs") })
-			if err == nil {
-				t.Fatal(err)
-			}
-			if err.Error() != "function runs: recovered panic" {
-				t.Error(err)
-			}
-		})
-	})
 	t.Run("Invariant", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
-			err := Check(func() {
+			err := ers.Check(func() {
 				Invariant(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
@@ -72,13 +43,13 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
-			se := Check(func() { Invariant(false, err) })
+			se := ers.Check(func() { Invariant(false, err) })
 
 			assert.ErrorIs(t, se, err)
 		})
 		t.Run("ErrorPlus", func(t *testing.T) {
 			err := errors.New("kip")
-			se := Check(func() { Invariant(false, err, 42) })
+			se := ers.Check(func() { Invariant(false, err, 42) })
 			if !errors.Is(se, err) {
 				t.Fatal(err, se)
 			}
@@ -87,13 +58,13 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("NoError", func(t *testing.T) {
-			err := Check(func() { Invariant(false, 42) })
+			err := ers.Check(func() { Invariant(false, 42) })
 			if !strings.Contains(err.Error(), "42") {
 				t.Error(err)
 			}
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
-			err := Check(func() { Invariant(1 == 2) })
+			err := ers.Check(func() { Invariant(1 == 2) })
 			if !errors.Is(err, ErrInvariantViolation) {
 				t.Fatal(err)
 			}
@@ -110,7 +81,7 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("LongInvariant", func(t *testing.T) {
-			err := Check(func() {
+			err := ers.Check(func() {
 				Invariant(1 == 2,
 					"math is a construct",
 					"1 == 2",
@@ -125,62 +96,16 @@ func TestPanics(t *testing.T) {
 
 		})
 	})
-	t.Run("MergedError", func(t *testing.T) {
-		t.Run("Empty", func(t *testing.T) {
-			e := &errorTest{}
-			err := &internal.MergedError{}
-			if errors.As(err, &e) {
-				t.Fatal("should not validate")
-			}
-		})
-		t.Run("Current", func(t *testing.T) {
-			e := &errorTest{}
-			err := &internal.MergedError{
-				Current: &errorTest{val: 100},
-			}
-			if !errors.As(err, &e) {
-				t.Fatal("should not validate")
-			}
-			if e.val != 100 {
-				t.Fatal(e)
-			}
-		})
-		t.Run("Wrapped", func(t *testing.T) {
-			e := &errorTest{}
-			err := &internal.MergedError{
-				Wrapped: &errorTest{val: 100},
-			}
-			if !errors.As(err, &e) {
-				t.Fatal("should not validate")
-			}
-			if e.val != 100 {
-				t.Fatal(e)
-			}
-		})
-		t.Run("WrappedAndCurrent", func(t *testing.T) {
-			e := &errorTest{}
-			err := &internal.MergedError{
-				Wrapped: &errorTest{val: 1000},
-				Current: &errorTest{val: 9000},
-			}
-			if !errors.As(err, &e) {
-				t.Fatal("should not validate")
-			}
-			if e.val != 9000 {
-				t.Fatal(e)
-			}
-		})
-	})
 	t.Run("InvariantMust", func(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
-			err := Check(func() { InvariantMust(nil, "hello") })
+			err := ers.Check(func() { InvariantMust(nil, "hello") })
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 		t.Run("Expected", func(t *testing.T) {
 			root := errors.New("kip")
-			err := Check(func() { InvariantMust(root, "hello") })
+			err := ers.Check(func() { InvariantMust(root, "hello") })
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -189,7 +114,7 @@ func TestPanics(t *testing.T) {
 	t.Run("InvariantCheck", func(t *testing.T) {
 		t.Run("Propogate", func(t *testing.T) {
 			root := errors.New("kip")
-			err := Check(func() {
+			err := ers.Check(func() {
 				InvariantCheck(func() error { return root }, "annotate")
 			})
 			if err == nil {
@@ -207,23 +132,12 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("Nil", func(t *testing.T) {
-			err := Check(func() {
+			err := ers.Check(func() {
 				InvariantCheck(func() error { return nil }, "annotate")
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-		})
-	})
-	t.Run("Protect", func(t *testing.T) {
-		assert.NotPanic(t, func() {
-			value, err := Protect(func(int) (out string, err error) {
-				panic(context.Canceled)
-			})(1)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, context.Canceled)
-			assert.ErrorIs(t, err, ErrRecoveredPanic)
-			assert.Zero(t, value)
 		})
 	})
 	t.Run("MustBeOk", func(t *testing.T) {
@@ -285,45 +199,3 @@ func TestPanics(t *testing.T) {
 		})
 	})
 }
-
-func TestParsePanic(t *testing.T) {
-	t.Run("NilInput", func(t *testing.T) {
-		err := ParsePanic(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("TwoErrors", func(t *testing.T) {
-		err := ParsePanic(io.EOF)
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if !errors.Is(err, io.EOF) {
-			t.Error("not EOF", err)
-		}
-		if !errors.Is(err, ErrRecoveredPanic) {
-			t.Error("not wrapped", err)
-		}
-	})
-	t.Run("NotErrorObject", func(t *testing.T) {
-		err := ParsePanic("EOF")
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if errors.Is(err, io.EOF) {
-			t.Error("is EOF", err)
-		}
-		if !errors.Is(err, ErrRecoveredPanic) {
-			t.Error("not wrapped", err)
-		}
-		if err.Error() != "EOF: recovered panic" {
-			t.Error(err)
-		}
-	})
-}
-
-type errorTest struct {
-	val int
-}
-
-func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }

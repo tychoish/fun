@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 )
 
 // Stack represents the error type returned by an ErrorCollector
@@ -49,8 +49,8 @@ func (e *Stack) append(err error) *Stack {
 		}
 
 		return e
-	case *internal.MergedError:
-		return e.append(werr.Wrapped).append(werr.Current)
+	case *ers.Combined:
+		return e.append(werr.Previous).append(werr.Current)
 	default:
 		return &Stack{
 			next: e,

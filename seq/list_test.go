@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -44,7 +45,7 @@ func TestList(t *testing.T) {
 		assert.Equal(t, list.Front().Value(), 1)
 	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-		ok, err := fun.Safe(func() bool {
+		ok, err := ers.Safe(func() bool {
 			var list *seq.List[string]
 			list.PushBack("hi")
 			return true

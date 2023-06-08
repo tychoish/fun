@@ -14,7 +14,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/seq"
 	"github.com/tychoish/fun/testt"
 )
@@ -410,7 +410,7 @@ func TestService(t *testing.T) {
 				err = s.Worker()(ctx)
 			})
 			assert.Error(t, err)
-			assert.True(t, erc.ContextExpired(err))
+			assert.True(t, ers.ContextExpired(err))
 			assert.True(t, s.isStarted.Load())
 		})
 		t.Run("ErrorPropogate", func(t *testing.T) {

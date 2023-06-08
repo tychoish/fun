@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 // Process provides a (potentially) more sensible alternate name for
@@ -102,7 +103,7 @@ func forEachWorker[T any](
 			}
 
 			if err := func(value T) (err error) {
-				defer func() { err = erc.Merge(err, fun.ParsePanic(recover())) }()
+				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
 
 				return fn(ctx, value)
 			}(value); err != nil {
@@ -115,7 +116,7 @@ func forEachWorker[T any](
 					return io.EOF
 				case hadPanic && opts.ContinueOnPanic:
 					continue
-				case !opts.ContinueOnError || erc.IsTerminating(err):
+				case !opts.ContinueOnError || ers.IsTerminating(err):
 					return io.EOF
 				}
 			}

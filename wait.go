@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -130,7 +131,7 @@ func (wf Operation) Block() { wf(internal.BackgroundContext) }
 // Safe converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.
 func (wf Operation) Safe() Worker {
-	return func(ctx context.Context) error { return Check(func() { wf(ctx) }) }
+	return func(ctx context.Context) error { return ers.Check(func() { wf(ctx) }) }
 }
 
 // Worker converts a wait function into a fun.Worker. If the context

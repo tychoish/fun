@@ -4,16 +4,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 )
 
 var (
 	// ErrInvariantViolation is the root error of the error object that is
 	// the content of all panics produced by the Invariant helper.
 	ErrInvariantViolation = errors.New("invariant violation")
+
 	// ErrRecoveredPanic is at the root of any error returned by a
 	// function in the fun package that recovers from a panic.
-	ErrRecoveredPanic = errors.New("recovered panic")
+	ErrRecoveredPanic = ers.ErrRecoveredPanic
 )
 
 // Invariant panics if the condition is false Invariant panics,
@@ -26,18 +27,15 @@ func Invariant(cond bool, args ...any) {
 		case 1:
 			switch ei := args[0].(type) {
 			case error:
-				panic(&internal.MergedError{Current: ei, Wrapped: ErrInvariantViolation})
+				panic(ers.Merge(ei, ErrInvariantViolation))
 			case string:
-				panic(&internal.MergedError{Current: errors.New(ei), Wrapped: ErrInvariantViolation})
+				panic(ers.Merge(errors.New(ei), ErrInvariantViolation))
 			default:
 				panic(fmt.Errorf("[%v]: %w", args[0], ErrInvariantViolation))
 			}
 		default:
 			if err, ok := args[0].(error); ok {
-				panic(&internal.MergedError{
-					Current: fmt.Errorf("[%s]", args[1:]),
-					Wrapped: &internal.MergedError{Current: err, Wrapped: ErrInvariantViolation},
-				})
+				panic(ers.Merge(fmt.Errorf("[%s]", args[1:]), ers.Merge(err, ErrInvariantViolation)))
 			}
 			panic(fmt.Errorf("[%s]: %w", fmt.Sprintln(args...), ErrInvariantViolation))
 		}
@@ -52,16 +50,10 @@ func InvariantMust(err error, args ...any) {
 		return
 	}
 	if len(args) == 0 {
-		panic(&internal.MergedError{
-			Current: err,
-			Wrapped: ErrInvariantViolation,
-		})
+		panic(ers.Merge(err, ErrInvariantViolation))
 	}
 
-	panic(&internal.MergedError{
-		Current: fmt.Errorf("%s: %w", fmt.Sprint(args...), err),
-		Wrapped: ErrInvariantViolation,
-	})
+	panic(ers.Merge(fmt.Errorf("%s: %w", fmt.Sprint(args...), err), ErrInvariantViolation))
 }
 
 // InvariantCheck calls the function and if it returns an error panics
@@ -90,43 +82,3 @@ func Must[T any](arg T, err error) T { InvariantMust(err); return arg }
 //
 //	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); return out }
-
-// Check, like Safe, runs a function without arguments that does not
-// produce an error, and, if the function panics, converts it into an
-// error.
-func Check(fn func()) (err error) {
-	defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
-	fn()
-	return
-}
-
-// Safe runs a function with a panic handler that converts the panic
-// to an error.
-func Safe[T any](fn func() T) (out T, err error) {
-	defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
-	out = fn()
-	return
-}
-
-// Protect wraps a function with a panic handler, that will parse and
-// attach the content of the pantic to the error output (while
-// maintaining the functions orginial error.) All handled panics will
-// be annotated with fun.ErrRecoveredPanic.
-func Protect[I any, O any](fn func(I) (O, error)) func(I) (O, error) {
-	return func(in I) (out O, err error) {
-		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
-		return fn(in)
-	}
-}
-
-func ParsePanic(r any) error {
-	if r != nil {
-		switch err := r.(type) {
-		case error:
-			return internal.MergeErrors(err, ErrRecoveredPanic)
-		default:
-			return internal.MergeErrors(fmt.Errorf("%v", err), ErrRecoveredPanic)
-		}
-	}
-	return nil
-}

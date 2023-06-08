@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -111,7 +112,7 @@ func (or *Orchestrator) Service() *Service {
 					if err != nil {
 						// we only want to collect non-context
 						// cancelation and non queue-closed errors
-						erc.When(ec, (!errors.Is(err, pubsub.ErrQueueClosed) && !erc.ContextExpired(err)), err)
+						erc.When(ec, (!errors.Is(err, pubsub.ErrQueueClosed) && !ers.ContextExpired(err)), err)
 						break
 					}
 				}

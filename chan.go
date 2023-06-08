@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 )
 
 // ErrSkippedNonBlockingChannelOperation is returned when sending into
@@ -148,21 +148,21 @@ func (ro Receive[T]) Producer() Producer[T] { return ro.Read }
 
 func (ro Receive[T]) Consume(op Processor[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
+		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
 
-		var item T
+		var value T
 		for {
-			if item, err = ro.Read(ctx); err != nil {
-				break
+			value, err = ro.Read(ctx)
+			if err != nil {
+				return err
 			}
-			if err = op(ctx, item); err != nil {
-				break
+			if err = op(ctx, value); err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+				return err
 			}
 		}
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		return err
 	}
 }
 
@@ -245,7 +245,7 @@ func (sm Send[T]) Write(ctx context.Context, it T) (err error) {
 
 func (sm Send[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = internal.MergeErrors(iter.Close(), internal.MergeErrors(err, ParsePanic(recover()))) }()
+		defer func() { err = ers.Merge(iter.Close(), ers.Merge(err, ers.ParsePanic(recover()))) }()
 
 		var item T
 		for {

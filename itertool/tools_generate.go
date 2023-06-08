@@ -3,10 +3,10 @@ package itertool
 import (
 	"context"
 	"errors"
-	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 // Generate creates an iterator using a generator pattern which
@@ -49,7 +49,7 @@ func generator[T any](
 
 		for {
 			if value, err := func() (out T, err error) {
-				defer func() { err = erc.Merge(err, fun.ParsePanic(recover())) }()
+				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
 				return fn(ctx)
 			}(); err != nil {
 				erc.When(catcher, opts.shouldCollectError(err), err)
@@ -61,7 +61,7 @@ func generator[T any](
 					return
 				}
 
-				if erc.ContextExpired(err) || errors.Is(err, io.EOF) || !opts.ContinueOnError {
+				if ers.IsTerminating(err) || !opts.ContinueOnError {
 					return
 				}
 			} else if !out.Check(ctx, value) {

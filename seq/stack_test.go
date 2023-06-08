@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -18,7 +19,7 @@ func TestStack(t *testing.T) {
 	defer cancel()
 
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-		ok, err := fun.Safe(func() bool {
+		ok, err := ers.Safe(func() bool {
 			var list *seq.Stack[string]
 			list.Push("hi")
 			return true

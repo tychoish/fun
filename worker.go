@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -56,7 +57,7 @@ func (wf Worker) Run(ctx context.Context) error {
 // panics to errors.
 func (wf Worker) Safe() Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = internal.MergeErrors(err, ParsePanic(recover())) }()
+		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
 		return wf(ctx)
 	}
 }
@@ -264,8 +265,12 @@ func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
 	return func(ctx context.Context) (err error) {
 		iter := ch.Receive().Producer().Iterator()
 		for iter.Next(ctx) {
-			err = internal.MergeErrors(iter.Value(), err)
+			err = ers.Merge(iter.Value(), err)
 		}
 		return
 	}
+}
+
+func (wf Worker) WithoutErrors(errs ...error) Worker {
+	return func(ctx context.Context) error { return ers.Filter(wf(ctx), errs...) }
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
@@ -397,7 +398,7 @@ func Daemon(s *Service, minInterval time.Duration) *Service {
 					defer tcancel()
 					return baseRun(tctx)
 				}()
-				if erc.ContextExpired(err) || ctx.Err() != nil {
+				if ers.ContextExpired(err) || ctx.Err() != nil {
 					return nil
 				}
 				ec.Add(err)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -91,7 +91,7 @@ func TestWrap(t *testing.T) {
 			check.Equal(t, 3, len(errs))
 		})
 		t.Run("MergedSlice", func(t *testing.T) {
-			err := internal.MergeErrors(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
+			err := ers.Merge(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
 
 			errs := Unwind(err)
 			check.Equal(t, 4, len(errs))

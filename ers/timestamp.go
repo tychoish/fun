@@ -1,34 +1,10 @@
-package erc
+package ers
 
 import (
 	"errors"
 	"fmt"
 	"time"
 )
-
-type timestamped struct {
-	err error
-	ts  time.Time
-}
-
-// WithTime adds the error to the collector, only if the error is
-// nil, and annotates that error object with the Timestamp type
-// implemented in this package.
-func WithTime(ec *Collector, err error) { ec.Add(Time(err)) }
-
-// Time wraps an error with a timestamp implementation. The output of
-// time.Now will be captured when Time returns, and can be accessed
-// via the GetTime method or using the '%+v' formatting argument.
-//
-// The Timestamp errors, correctly supports errors.Is and errors.As,
-// passing through to the wrapped error.
-func Time(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	return &timestamped{err: err, ts: time.Now()}
-}
 
 // GetTime unwraps the error looking for an error type that
 // implements the timestamp interface:
@@ -45,6 +21,25 @@ func GetTime(err error) time.Time {
 		return irf.Time()
 	}
 	return time.Time{}
+}
+
+// WithTime wraps an error with a timestamp implementation. The output of
+// time.Now will be captured when WithTime returns, and can be accessed
+// via the GetTime method or using the '%+v' formatting argument.
+//
+// The Timestamp errors, correctly supports errors.Is and errors.As,
+// passing through to the wrapped error.
+func WithTime(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	return &timestamped{err: err, ts: time.Now()}
+}
+
+type timestamped struct {
+	err error
+	ts  time.Time
 }
 
 func (e *timestamped) Error() string      { return e.err.Error() }

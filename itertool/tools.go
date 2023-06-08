@@ -4,8 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 // Options describes the runtime options to several operations
@@ -49,7 +48,7 @@ func (o Options) shouldCollectError(err error) bool {
 	switch {
 	case err == nil || errors.Is(err, io.EOF) || o.SkipErrorCheck != nil && o.SkipErrorCheck(err):
 		return false
-	case errors.Is(err, fun.ErrRecoveredPanic) || (erc.ContextExpired(err) && o.IncludeContextExpirationErrors):
+	case errors.Is(err, ers.ErrRecoveredPanic) || (ers.ContextExpired(err) && o.IncludeContextExpirationErrors):
 		return true
 	default:
 		return true

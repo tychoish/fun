@@ -2,11 +2,13 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 )
 
 func TestChannel(t *testing.T) {
@@ -320,5 +322,109 @@ func TestChannel(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Consumption", func(t *testing.T) {
+		perr := errors.New("panic error")
+		experr := errors.New("anticpated")
 
+		t.Run("Receive", func(t *testing.T) {
+			t.Run("SimpleJob", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := Blocking(make(chan string))
+				var count int
+				sig := ch.Receive().Consume(func(ctx context.Context, in string) error {
+					defer func() { count++ }()
+					switch count {
+					case 0:
+						check.Equal(t, in, "hello world")
+					case 1:
+						check.Zero(t, in)
+					default:
+						check.Equal(t, in, "panic trigger")
+						panic(perr)
+					}
+					return nil
+				}).Signal(ctx)
+
+				assert.NotError(t, ch.Send().Write(ctx, "hello world"))
+				assert.NotError(t, ch.Send().Zero(ctx))
+				assert.NotError(t, ch.Send().Write(ctx, "panic trigger"))
+				assert.ErrorIs(t, <-sig, perr)
+
+				cancel()
+				ch.Close()
+				assert.NotError(t, <-sig)
+			})
+			t.Run("Error", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := Blocking(make(chan string, 4))
+				var count int
+				assert.NotError(t, ch.Send().Write(ctx, "hello world"))
+				assert.NotError(t, ch.Send().Zero(ctx))
+				assert.NotError(t, ch.Send().Write(ctx, "third"))
+				assert.NotError(t, ch.Send().Write(ctx, "beep"))
+				err := ch.Receive().Consume(func(ctx context.Context, in string) error {
+					defer func() { count++ }()
+					switch count {
+					case 0:
+						check.Equal(t, in, "hello world")
+					case 1:
+						check.Zero(t, in)
+					case 2:
+						check.Equal(t, in, "third")
+					case 3:
+						check.Equal(t, in, "beep")
+						return experr
+					}
+					return nil
+				}).Run(ctx)
+				check.Equal(t, count, 4)
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, experr)
+			})
+			t.Run("SuppressProcessorEOF", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := Blocking(make(chan string, 1))
+				var count int
+				assert.NotError(t, ch.Send().Write(ctx, "beep"))
+
+				err := ch.Receive().Consume(func(ctx context.Context, in string) error {
+					defer func() { count++ }()
+					check.Equal(t, in, "beep")
+					return io.EOF
+				}).Run(ctx)
+
+				check.Equal(t, count, 1)
+				assert.NotError(t, err)
+			})
+			t.Run("ReturnWriteErrors", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := Blocking(make(chan string, 1))
+				var count int
+				assert.NotError(t, ch.Send().Write(ctx, "beep"))
+				ch.Close()
+				err := ch.Receive().Consume(func(ctx context.Context, in string) error {
+					defer func() { count++ }()
+					check.Equal(t, in, "beep")
+					return nil
+				}).Run(ctx)
+
+				check.Equal(t, count, 1)
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, io.EOF)
+			})
+		})
+		t.Run("Send", func(t *testing.T) {
+			t.Run("WriteError", func(t *testing.T) {
+
+			})
+		})
+	})
 }
