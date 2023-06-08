@@ -84,7 +84,7 @@ func (e *Stack) As(target any) bool { return errors.As(e.err, target) }
 // Unwrap returns the next iterator in the stack, and is compatible
 // with errors.Unwrap.
 func (e *Stack) Unwrap() error {
-	if e.next != nil {
+	if e.next != nil && e.next.err != nil {
 		return e.next
 	}
 

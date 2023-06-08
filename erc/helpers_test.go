@@ -94,6 +94,7 @@ func TestCollections(t *testing.T) {
 			if !errors.Is(err, e0) {
 				t.Error(err, e0)
 			}
+			t.Log(err)
 			errs := Unwind(err)
 			if len(errs) != 2 {
 				t.Error(errs)
@@ -142,23 +143,6 @@ func TestCollections(t *testing.T) {
 			})
 		})
 	})
-	t.Run("CheckWhen", func(t *testing.T) {
-		t.Run("NotCalled", func(t *testing.T) {
-			ec := &Collector{}
-			called := false
-			CheckWhen(ec, false, func() error { called = true; return errors.New("kip") })
-			assert.NotError(t, ec.Resolve())
-			assert.True(t, !called)
-		})
-		t.Run("Called", func(t *testing.T) {
-			ec := &Collector{}
-			called := false
-			CheckWhen(ec, true, func() error { called = true; return errors.New("kip") })
-			assert.Error(t, ec.Resolve())
-			assert.True(t, called)
-		})
-	})
-
 	t.Run("Checkf", func(t *testing.T) {
 		ec := &Collector{}
 		count := 0

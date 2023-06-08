@@ -184,33 +184,12 @@ func Checkf(ec *Collector, fn func() error, tmpl string, args ...any) {
 	ec.Add(Wrapf(fn(), tmpl, args...))
 }
 
-// CheckWhen executes a simple function and if it returns an error, adds
-// it to the collector, primarily for use in defer statements.
-func CheckWhen(ec *Collector, cond bool, fn func() error) {
-	if cond {
-		ec.Add(fn())
-	}
-}
-
 // Unwind converts an error into a slice of errors in two cases:
 // First, if an error is an *erc.Stack, Unwind will return a slice
 // with all constituent errors. Second, if the error is wrapped or
 // merged, Unwind will unwrap the error object adding every
 // intermediate error.
-func Unwind(err error) []error {
-	if err == nil {
-		return nil
-	}
-
-	switch e := err.(type) {
-	case *Stack:
-		// the only way this can error is if the observer
-		// function panics, which it can't:
-		return fun.Must(e.Iterator().Slice(internal.BackgroundContext))
-	default:
-		return fun.Unwind(err)
-	}
-}
+func Unwind(err error) []error { return fun.Unwind(err) }
 
 // Merge produces a single error from two input errors. The output
 // error behaves correctly for errors.Is and errors.As and Unwrap()

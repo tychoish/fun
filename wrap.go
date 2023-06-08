@@ -35,16 +35,30 @@ func UnwrapedRoot[T any](in T) T {
 func Unwind[T any](in T) []T {
 	out := Sliceify([]T{})
 
-	out.Add(in)
+	switch any(in).(type) {
+	case nil:
+		return nil
+	default:
+		out.Add(in)
+	}
 
 	for {
 		switch wi := any(in).(type) {
-		case interface{ Unwrap() T }:
-			in = wi.Unwrap()
-			out.Add(in)
+		case nil:
+			return out
 		case interface{ Unwrap() []T }:
 			Sliceify(wi.Unwrap()).Observe(func(in T) { out.Extend(Unwind(in)) })
 			return out
+		case interface{ Unwrap() T }:
+			in = wi.Unwrap()
+
+			switch any(in).(type) {
+			case nil:
+				return out
+			default:
+				out.Add(in)
+			}
+
 		default:
 			return out
 		}
