@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
@@ -158,7 +157,7 @@ func TestDaemon(t *testing.T) {
 			check.Error(t, err)
 		})
 		assert.True(t, baseRunCounter.Load() >= 2)
-		assert.True(t, len(erc.Unwind(err)) >= 2)
+		assert.True(t, len(fun.Unwind(err)) >= 2)
 		assert.Substring(t, err.Error(), "kip")
 	})
 	t.Run("ShutdownTriggers", func(t *testing.T) {
@@ -183,7 +182,7 @@ func TestDaemon(t *testing.T) {
 			check.Error(t, err)
 		})
 		assert.True(t, baseRunCounter.Load() >= 2)
-		assert.True(t, len(erc.Unwind(err)) >= 2)
+		assert.True(t, len(fun.Unwind(err)) >= 2)
 		assert.Substring(t, err.Error(), "kip")
 	})
 	t.Run("CancelationTriggersAbort", func(t *testing.T) {

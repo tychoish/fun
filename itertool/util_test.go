@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -522,7 +521,7 @@ func RunIteratorStringAlgoTests(
 							}
 
 							if err.Error() != "beep" {
-								t.Log(len(erc.Unwind(err)))
+								t.Log(len(fun.Unwind(err)))
 								t.Fatalf("unexpected panic %q", err.Error())
 							}
 						})

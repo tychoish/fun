@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
@@ -40,7 +39,7 @@ func TestDistributor(t *testing.T) {
 					if err == nil {
 						t.Error("expected error")
 					}
-					errs := erc.Unwind(err)
+					errs := fun.Unwind(err)
 					if len(errs) != 1 {
 						t.Error(len(errs))
 					}

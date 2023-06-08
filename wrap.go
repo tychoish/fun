@@ -44,8 +44,6 @@ func Unwind[T any](in T) []T {
 
 	for {
 		switch wi := any(in).(type) {
-		case nil:
-			return out
 		case interface{ Unwrap() []T }:
 			Sliceify(wi.Unwrap()).Observe(func(in T) { out.Extend(Unwind(in)) })
 			return out
@@ -58,7 +56,6 @@ func Unwind[T any](in T) []T {
 			default:
 				out.Add(in)
 			}
-
 		default:
 			return out
 		}

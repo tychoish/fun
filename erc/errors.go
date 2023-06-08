@@ -158,7 +158,7 @@ func (ec *Collector) Iterator() *fun.Iterator[error] {
 // Resolve returns an error of type *erc.Stack, or nil if there have
 // been no errors added. The error stack respects errors.Is and
 // errors.As, and can be iterated or used in combination with
-// erc.Unwind() to introspect the available errors.
+// fun.Unwind() to introspect the available errors.
 func (ec *Collector) Resolve() error {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()

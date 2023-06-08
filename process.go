@@ -198,7 +198,7 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 
 	return func(ctx context.Context, in T) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctxChecker(wctx); err != nil {
+		if err := wctx.Err(); err != nil {
 			return err
 		}
 		return pf(ctx, in)

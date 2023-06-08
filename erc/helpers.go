@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
@@ -21,69 +20,19 @@ func (e ConstError) Error() string { return string(e) }
 // ContextExpired checks an error to see if it, or any of it's parent
 // contexts signal that a context has expired. This covers both
 // canceled contexts and ones which have exceeded their deadlines.
-func ContextExpired(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+func ContextExpired(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
+
+func IsTerminating(err error) bool {
+	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded)
 }
 
-func IsTerminating(err error) bool { return errors.Is(err, io.EOF) || ContextExpired(err) }
-
-type isable[T any] interface{ Is(T) bool }
-
-type isCache struct {
-	target     error
-	comparable bool
-	check      isable[error]
-	checkable  bool
-}
-
-func IsBFS(err error, targets ...error) bool {
-	cache := make([]isCache, len(targets))
-	for idx, target := range targets {
-		if target == nil && err == nil {
-			return true
-		}
-
-		cache[idx].target = targets[idx]
-		cache[idx].comparable = reflect.TypeOf(target).Comparable()
-		cache[idx].check, cache[idx].checkable = target.(interface{ Is(error) bool })
-
-		if cache[idx].comparable && err == target {
-			return true
-		}
-		if cache[idx].checkable && cache[idx].check.Is(err) {
-			return true
-		}
-	}
-	if err == nil {
-		return false
-	}
-
-	for {
-		err = errors.Unwrap(err)
-		for idx, target := range targets {
-			switch {
-			case target == nil && err == nil:
-				return true
-			case cache[idx].comparable && err == target:
-				return true
-			case cache[idx].checkable && cache[idx].check.Is(err):
-				return true
-			}
-		}
-
-		if err == nil {
-			return false
-		}
-	}
-}
-
-func IsDFS(err error, targets ...error) bool {
+func Is(err error, targets ...error) bool {
 	for _, target := range targets {
 		if errors.Is(err, target) {
 			return true
 		}
 	}
-	return true
+	return false
 }
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
@@ -183,13 +132,6 @@ func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 func Checkf(ec *Collector, fn func() error, tmpl string, args ...any) {
 	ec.Add(Wrapf(fn(), tmpl, args...))
 }
-
-// Unwind converts an error into a slice of errors in two cases:
-// First, if an error is an *erc.Stack, Unwind will return a slice
-// with all constituent errors. Second, if the error is wrapped or
-// merged, Unwind will unwrap the error object adding every
-// intermediate error.
-func Unwind(err error) []error { return fun.Unwind(err) }
 
 // Merge produces a single error from two input errors. The output
 // error behaves correctly for errors.Is and errors.As and Unwrap()

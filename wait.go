@@ -83,7 +83,7 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 
 	return func(ctx context.Context) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctxChecker(wctx); err != nil {
+		if err := wctx.Err(); err != nil {
 			return
 		}
 		wf(ctx)

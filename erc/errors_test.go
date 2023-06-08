@@ -309,8 +309,8 @@ func TestError(t *testing.T) {
 				t.Fatal(ec.Resolve())
 			}
 
-			ec.Add(context.Canceled)
 			ec.Add(errors.New("foo"))
+			ec.Add(context.Canceled)
 			if !ContextExpired(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
@@ -514,7 +514,7 @@ func TestError(t *testing.T) {
 	})
 	t.Run("Unwind", func(t *testing.T) {
 		t.Run("NoErrors", func(t *testing.T) {
-			errs := Unwind(nil)
+			errs := fun.Unwind[error](nil)
 			if errs != nil {
 				t.Fail()
 			}
@@ -524,7 +524,7 @@ func TestError(t *testing.T) {
 		})
 		t.Run("OneError", func(t *testing.T) {
 			err := errors.New("42")
-			errs := Unwind(err)
+			errs := fun.Unwind(err)
 			if len(errs) != 1 {
 				t.Fatal(len(errs))
 			}
@@ -534,7 +534,7 @@ func TestError(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				ec.Add(fmt.Errorf("%d", i))
 			}
-			errs := Unwind(ec.Resolve())
+			errs := fun.Unwind(ec.Resolve())
 			if len(errs) != 100 {
 				t.Fatal(len(errs))
 			}
@@ -545,7 +545,7 @@ func TestError(t *testing.T) {
 				err = fmt.Errorf("wrap %d: %w", i, err)
 			}
 
-			errs := Unwind(err)
+			errs := fun.Unwind(err)
 			if len(errs) != 101 {
 				t.Error(len(errs))
 			}

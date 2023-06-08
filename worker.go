@@ -236,22 +236,11 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 
 	return func(ctx context.Context) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctxChecker(wctx); err != nil {
+		if err := wctx.Err(); err != nil {
 			return err
 		}
 		return wf(ctx)
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
-}
-
-func wctxChecker(wctx context.Context) error {
-	switch {
-	case wctx == nil:
-		return context.Canceled
-	case wctx.Err() != nil:
-		return wctx.Err()
-	default:
-		return nil
-	}
 }
 
 func (wf Worker) PreHook(op func(context.Context)) Worker {

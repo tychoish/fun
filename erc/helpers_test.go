@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/testt"
 )
 
 type errorTest struct {
@@ -95,12 +97,40 @@ func TestCollections(t *testing.T) {
 				t.Error(err, e0)
 			}
 			t.Log(err)
-			errs := Unwind(err)
+			errs := fun.Unwind(err)
 			if len(errs) != 2 {
 				t.Error(errs)
 			}
 		})
 	})
+	t.Run("Predicates", func(t *testing.T) {
+		assert.True(t, IsTerminating(io.EOF))
+		assert.True(t, IsTerminating(context.Canceled))
+		assert.True(t, IsTerminating(context.DeadlineExceeded))
+		assert.True(t, !IsTerminating(ConstError("hello")))
+		assert.True(t, IsTerminating(Merge(ConstError("beep"), io.EOF)))
+		assert.True(t, IsTerminating(Merge(ConstError("beep"), context.Canceled)))
+		assert.True(t, IsTerminating(Merge(ConstError("beep"), context.DeadlineExceeded)))
+	})
+	t.Run("IteratorHook", func(t *testing.T) {
+		ec := &Collector{}
+		count := 0
+		op := fun.Producer[int](func(context.Context) (int, error) {
+			count++
+			ec.Add(ConstError("hi"))
+			if count > 32 {
+				return 0, io.EOF
+			}
+			return count, nil
+		})
+
+		iter := op.IteratorWithHook(IteratorHook[int](ec))
+		assert.Equal(t, iter.Count(testt.Context(t)), 32)
+		assert.Equal(t, len(fun.Unwind(ec.Resolve())), 33)
+		assert.Equal(t, len(fun.Unwind(iter.Close())), 33)
+		assert.Equal(t, len(fun.Unwind(iter.Close())), 33)
+	})
+
 	t.Run("Stream", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -122,7 +152,7 @@ func TestCollections(t *testing.T) {
 					t.Logf("%T", err)
 					t.Error("nil expected", err)
 				}
-				errs := Unwind(err)
+				errs := fun.Unwind(err)
 				if len(errs) != 1 {
 					t.Error(errs)
 				}
@@ -136,7 +166,7 @@ func TestCollections(t *testing.T) {
 					t.Logf("%T", err)
 					t.Error("nil expected", err)
 				}
-				errs := Unwind(err)
+				errs := fun.Unwind(err)
 				if len(errs) != 10 {
 					t.Error(errs)
 				}
