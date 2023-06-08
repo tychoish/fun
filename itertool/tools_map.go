@@ -3,6 +3,7 @@ package itertool
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
@@ -40,8 +41,7 @@ func Map[T any, O any](
 			// for each split, run a mapWorker
 			mapWorker(ec, opts, mapper, splits[idx], output.Send()).
 				Wait(func(err error) {
-					// inspect the errors
-					fun.WhenCall(errors.Is(err, errAbortWorkers), wcancel)
+					fun.WhenCall(errors.Is(err, io.EOF), wcancel)
 				}).Add(wctx, wg)
 		}
 
@@ -71,37 +71,31 @@ func mapWorker[T any, O any](
 				return nil
 			}
 			o, err := func(val T) (out O, err error) {
-				defer func() {
-					if r := recover(); r != nil {
-						err = fun.ParsePanic(r)
-					}
-				}()
+				defer func() { err = erc.Merge(err, fun.ParsePanic(recover())) }()
 
 				out, err = mapper(ctx, val)
 				return
 			}(value)
-			if err == nil {
-				if !output.Check(ctx, o) {
-					return nil
-				}
-				continue
-			}
+			if err != nil {
+				erc.When(ec, opts.shouldCollectError(err), err)
 
-			erc.When(ec, opts.shouldCollectError(err), err)
+				hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
-			// handle errors
-			if errors.Is(err, fun.ErrRecoveredPanic) {
-				if opts.ContinueOnPanic {
+				switch {
+				case hadPanic && !opts.ContinueOnPanic:
+					return io.EOF
+				case hadPanic && opts.ContinueOnPanic:
+					continue
+				case !opts.ContinueOnError || erc.IsTerminating(err):
+					return io.EOF
+				case opts.ContinueOnError:
 					continue
 				}
-				return errAbortWorkers
 			}
 
-			if opts.ContinueOnError {
-				continue
+			if !output.Check(ctx, o) {
+				return nil
 			}
-
-			return errAbortWorkers
 		}
 	}
 }

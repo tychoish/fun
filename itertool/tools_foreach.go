@@ -77,7 +77,10 @@ func ParallelForEach[T any](
 	splits := iter.Split(opts.NumWorkers)
 
 	for idx := range splits {
-		forEachOperation(ec, opts, splits[idx], fn, cancel).Add(ctx, wg)
+		forEachWorker(ec, opts, splits[idx], fn).
+			Wait(func(err error) {
+				fun.WhenCall(errors.Is(err, io.EOF), cancel)
+			}).Add(ctx, wg)
 	}
 
 	wg.Operation().Block()
@@ -85,18 +88,17 @@ func ParallelForEach[T any](
 	return ec.Resolve()
 }
 
-func forEachOperation[T any](
+func forEachWorker[T any](
 	ec *erc.Collector,
 	opts Options,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	abort func(),
-) fun.Operation {
-	return func(ctx context.Context) {
+) fun.Worker {
+	return func(ctx context.Context) error {
 		for {
 			value, err := iter.ReadOne(ctx)
 			if err != nil {
-				return
+				return nil
 			}
 
 			if err := func(value T) (err error) {
@@ -106,18 +108,15 @@ func forEachOperation[T any](
 			}(value); err != nil {
 				erc.When(ec, opts.shouldCollectError(err), err)
 
-				if errors.Is(err, fun.ErrRecoveredPanic) {
-					if opts.ContinueOnPanic {
-						continue
-					}
+				hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
-					abort()
-					return
-				}
-
-				if erc.ContextExpired(err) || errors.Is(err, io.EOF) || !opts.ContinueOnError {
-					abort()
-					return
+				switch {
+				case hadPanic && !opts.ContinueOnPanic:
+					return io.EOF
+				case hadPanic && opts.ContinueOnPanic:
+					continue
+				case !opts.ContinueOnError || erc.IsTerminating(err):
+					return io.EOF
 				}
 			}
 		}
