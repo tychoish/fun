@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/seq"
@@ -62,7 +61,8 @@ func Group(services *fun.Iterator[*Service]) *Service {
 			// waiters iterator won't block in this context, it's
 			// safe to call it with a background context, though
 			// it's worth being careful here
-			for iter.Next(internal.BackgroundContext) {
+			ctx := context.Background()
+			for iter.Next(ctx) {
 				wg.Add(1)
 				go func(wait func() error) {
 					defer erc.Recover(ec)
@@ -71,7 +71,7 @@ func Group(services *fun.Iterator[*Service]) *Service {
 				}(iter.Value())
 			}
 
-			wg.Wait(internal.BackgroundContext)
+			wg.Operation().Block()
 			return ec.Resolve()
 		},
 	}
@@ -153,12 +153,12 @@ func Wait(iter *fun.Iterator[fun.Operation]) *Service {
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessIterator[T any](
 	iter *fun.Iterator[T],
-	mapper fun.Processor[T],
+	processor fun.Processor[T],
 	opts itertool.Options,
 ) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx, iter, mapper, opts)
+			return itertool.ParallelForEach(ctx, iter, processor, opts)
 		},
 		Shutdown: iter.Close,
 	}
@@ -312,7 +312,7 @@ func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
 		},
 		Shutdown: func() error {
 			<-started
-			ctx, cancel := context.WithTimeout(internal.BackgroundContext, shutdownTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 			defer cancel()
 
 			if wg.IsDone() || sendSignal(c, syscall.SIGTERM) {

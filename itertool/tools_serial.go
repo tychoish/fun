@@ -37,8 +37,6 @@ func Reduce[T any, O any](
 	}
 }
 
-type ComparableIterator[T comparable] fun.Iterator[T]
-
 // Contains processes an iterator of compareable type returning true
 // after the first element that equals item, and false otherwise.
 func Contains[T comparable](ctx context.Context, item T, iter *fun.Iterator[T]) bool {

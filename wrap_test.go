@@ -116,8 +116,29 @@ func TestWrap(t *testing.T) {
 			errs = Unwind(err)
 			check.Equal(t, len(errs), 2)
 		})
+	})
+	t.Run("Cast", func(t *testing.T) {
+		var out string
+		var in any = "fooo"
+		var ok bool
+		// the real test is if this compiles
+		out, ok = Cast[string](in)
+		assert.True(t, ok)
+		assert.Equal(t, "fooo", out)
+
+		in = 1234
+		out, ok = Cast[string](in)
+		assert.True(t, !ok)
+		assert.Equal(t, "", out)
+	})
+	t.Run("IsType", func(t *testing.T) {
+		var in any = "fooo"
+		assert.True(t, IsType[string](in))
+		in = 1234
+		assert.True(t, !IsType[string](in))
 
 	})
+
 }
 
 type oneWrap struct {

@@ -1,7 +1,5 @@
 package fun
 
-import "github.com/tychoish/fun/internal"
-
 // Wrapper produces a function that always returns the value
 // provided. Useful for bridging interface paradigms, and for storing
 // interface-typed objects in atomics.
@@ -79,4 +77,5 @@ func IsZero[T comparable](in T) bool {
 	}
 }
 
-func IsType[T any](in any) bool { return internal.IsType[T](in) }
+func IsType[T any](in any) bool         { _, ok := in.(T); return ok }
+func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }

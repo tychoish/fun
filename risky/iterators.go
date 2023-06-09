@@ -1,8 +1,9 @@
 package risky
 
 import (
+	"context"
+
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
 )
 
 // Slice converts an iterator into a slice: this will not abort or
@@ -20,5 +21,5 @@ func Slice[T any](iter *fun.Iterator[T]) []T {
 // panic. In general fun.Observe only returns an error if the input
 // iterator errors or the observer function panics.
 func Observe[T any](iter *fun.Iterator[T], fn fun.Observer[T]) {
-	fun.InvariantMust(iter.Observe(internal.BackgroundContext, fn))
+	fun.InvariantMust(iter.Observe(context.Background(), fn))
 }

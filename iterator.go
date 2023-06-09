@@ -6,12 +6,14 @@ package fun
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/internal"
 )
 
 // Iterable provides a safe, context-respecting iterator paradigm for
@@ -284,7 +286,7 @@ func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) 
 			continue
 		case errors.Is(operr, io.EOF):
 			return nil
-		case errors.Is(operr, context.Canceled), errors.Is(operr, context.DeadlineExceeded):
+		case ers.Is(operr, context.Canceled, context.DeadlineExceeded):
 			return operr
 		default:
 			i.AddError(operr)
@@ -318,14 +320,69 @@ func (i *Iterator[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
 	go func() {
 		defer out.Close()
-		send := out.Send()
-		proc := i.Producer()
+		pipe := Pipe(i.Producer(), out.Send().Processor())
 		for {
-			if item, ok := proc.Check(ctx); !ok || !send.Check(ctx, item) {
+			if !pipe.Check(ctx) {
 				return
 			}
-
 		}
 	}()
 	return out.Channel()
+}
+
+// MarshalJSON is useful for implementing json.Marshaler methods
+// from iterator-supporting types. Wrapping the standard library's
+// json encoding tools.
+//
+// The contents of the iterator are marshaled as elements in an JSON
+// array.
+func (i *Iterator[T]) MarshalJSON() ([]byte, error) {
+	buf := &internal.IgnoreNewLinesBuffer{}
+	enc := json.NewEncoder(buf)
+	_, _ = buf.Write([]byte("["))
+	first := true
+
+	// decide to capture a context in the
+	// iterator or not care
+	ctx := context.TODO()
+
+	for {
+		val, err := i.ReadOne(ctx)
+		if err != nil {
+			break
+		}
+		if first {
+			first = false
+		} else {
+			_, _ = buf.Write([]byte(","))
+		}
+
+		if err := enc.Encode(val); err != nil {
+			return nil, err
+		}
+	}
+
+	_, _ = buf.Write([]byte("]"))
+
+	return buf.Bytes(), nil
+}
+
+func (i *Iterator[T]) UnmarshalJSON(in []byte) error {
+	rv := []json.RawMessage{}
+
+	if err := json.Unmarshal(in, &rv); err != nil {
+		return err
+	}
+	var idx int
+	i.operation = i.operation.Chain(func(ctx context.Context) (out T, err error) {
+		if idx >= len(rv) {
+			return out, io.EOF
+		}
+		err = json.Unmarshal(rv[idx], &out)
+		if err == nil {
+			idx++
+		}
+		return
+	})
+	return nil
 }

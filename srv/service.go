@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/internal"
 )
 
 var (
@@ -200,7 +199,7 @@ func (s *Service) Close() {
 // running the service, the shutdown hook, and any panics encountered
 // during the service's execution.
 func (s *Service) Wait() error {
-	return s.waitFor(internal.BackgroundContext)
+	return s.waitFor(context.Background())
 }
 
 func (s *Service) waitFor(ctx context.Context) error {

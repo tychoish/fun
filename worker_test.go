@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -12,7 +13,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -438,7 +438,7 @@ func TestWorker(t *testing.T) {
 				}()
 			}
 			time.Sleep(2 * time.Millisecond)
-			wg.Wait(internal.BackgroundContext)
+			wg.Wait(context.Background())
 			check.Equal(t, 0, wg.Num())
 			check.Equal(t, count.Load(), 0)
 		})
@@ -491,7 +491,68 @@ func TestWorker(t *testing.T) {
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
 	})
-	t.Run("After", func(t *testing.T) {
+	t.Run("While", func(t *testing.T) {
+		t.Parallel()
+		t.Run("PRoof", func(t *testing.T) {
+			ctx := testt.Context(t)
+			eone := errors.New("while errors")
+			etwo := errors.New("do errors")
+
+			whichErr := 2
+			one := func(context.Context) error { return WhenDo(whichErr == 1, func() error { return eone }) }
+			two := func(context.Context) error { return WhenDo(whichErr == 2, func() error { return etwo }) }
+
+			if e, f := one(ctx), two(ctx); e == nil && f == nil {
+				t.Error("can't both be nil")
+			}
+
+			whichErr = 1
+			if e, f := one(ctx), two(ctx); e == nil {
+				t.Log(e)
+				t.Error(f)
+			}
+		})
+		t.Run("Ordering", func(t *testing.T) {
+			ctx := testt.Context(t)
+
+			var (
+				ts1 time.Time
+				ts2 time.Time
+			)
+
+			one := func(context.Context) error { ts1 = time.Now(); time.Sleep(100 * time.Millisecond); return nil }
+			two := func(context.Context) error { ts2 = time.Now(); return nil }
+
+			if e, f := one(ctx), two(ctx); e != nil || f != nil {
+				t.Error("both should be nil", e, f)
+			}
+
+			if ts2.Before(ts1) {
+				t.Error("second was before first")
+			}
+			if dur := ts2.Sub(ts1); dur < 100*time.Millisecond {
+				t.Error("not enough delay", dur)
+			}
+		})
+		t.Run("Loop", func(t *testing.T) {
+			start := time.Now()
+			var wf Worker = func(ctx context.Context) error {
+				time.Sleep(time.Millisecond)
+				return WhenDo(time.Since(start) > 32*time.Millisecond, func() error { return io.EOF })
+			}
+			t.Run("Min", func(t *testing.T) {
+				assert.MinRuntime(t, 32*time.Millisecond, func() {
+					err := wf.While().Run(testt.ContextWithTimeout(t, 100*time.Millisecond))
+					assert.ErrorIs(t, err, io.EOF)
+				})
+			})
+			t.Run("Max", func(t *testing.T) {
+				assert.MaxRuntime(t, 40*time.Millisecond, func() {
+					err := wf.While().Run(testt.ContextWithTimeout(t, 100*time.Millisecond))
+					assert.ErrorIs(t, err, io.EOF)
+				})
+			})
+		})
 
 	})
 

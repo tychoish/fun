@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -289,7 +290,6 @@ func TestInternalIterators(t *testing.T) {
 		})
 	})
 	t.Run("ReadOne", func(t *testing.T) {
-		t.Parallel()
 		ch := make(chan string, 1)
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		ch <- "merlin"
@@ -485,4 +485,57 @@ func TestChain(t *testing.T) {
 	cancel()
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
+}
+
+func TestJSON(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		iter := SliceIterator([]int{400, 300, 42})
+		out, err := iter.MarshalJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(out) != "[400,300,42]" {
+			t.Error(string(out))
+		}
+		nl := []int{}
+		if err := json.Unmarshal(out, &nl); err != nil {
+			t.Error(err)
+		}
+	})
+	t.Run("MarshalErrors", func(t *testing.T) {
+		iter := SliceIterator([]Worker{func(context.Context) error { return nil }})
+		_, err := iter.MarshalJSON()
+		if err == nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("Unmarshal", func(t *testing.T) {
+		iter := Sliceify([]string{}).Iterator()
+		if err := iter.UnmarshalJSON([]byte(`["foo", "arg"]`)); err != nil {
+			t.Error(err)
+		}
+
+		vals, err := iter.Slice(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(vals) != 2 {
+			t.Fatal(len(vals), vals)
+		}
+		if vals[0] != "foo" {
+			t.Error(vals[0])
+		}
+		if vals[1] != "arg" {
+			t.Error(vals[1])
+		}
+
+		if err := iter.UnmarshalJSON([]byte(`[foo", "arg"]`)); err == nil {
+			t.Error(err)
+		}
+
+	})
 }

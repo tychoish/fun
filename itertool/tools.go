@@ -39,16 +39,18 @@ type Options struct {
 	// captured. All other error handling semantics
 	// (e.g. ContinueOnError) are applicable.
 	IncludeContextExpirationErrors bool
-	// SkipErrorCheck, when specified, should return true if the
-	// error should be skipped and false otherwise.
-	SkipErrorCheck func(error) bool
+	// ExcludededErrors is a list of that should not be included
+	// in the collected errors of the
+	// output. fun.ErrRecoveredPanic is always included and io.EOF
+	// is never included.
+	ExcludededErrors []error
 }
 
 func (o Options) shouldCollectError(err error) bool {
 	switch {
-	case err == nil || errors.Is(err, io.EOF) || o.SkipErrorCheck != nil && o.SkipErrorCheck(err):
+	case err == nil || errors.Is(err, io.EOF) || len(o.ExcludededErrors) > 1 && ers.Is(err, o.ExcludededErrors...):
 		return false
-	case errors.Is(err, ers.ErrRecoveredPanic) || (ers.ContextExpired(err) && o.IncludeContextExpirationErrors):
+	case errors.Is(err, ers.ErrRecoveredPanic) || (o.IncludeContextExpirationErrors && ers.ContextExpired(err)):
 		return true
 	default:
 		return true

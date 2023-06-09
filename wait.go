@@ -126,7 +126,7 @@ func (wf Operation) Background(wg *WaitGroup) Operation {
 }
 
 // Block runs the Operation with a context that will never be canceled.
-func (wf Operation) Block() { wf(internal.BackgroundContext) }
+func (wf Operation) Block() { wf(context.Background()) }
 
 // Safe converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.

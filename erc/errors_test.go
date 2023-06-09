@@ -41,6 +41,7 @@ func catcherIsEmpty(t *testing.T, catcher *Collector) {
 	if err := catcher.Resolve(); err != nil {
 		t.Error("should produce nil error", err)
 	}
+	check.Zero(t, catcher.Len())
 }
 
 func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
@@ -60,6 +61,7 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
 	if catcher.Resolve() == nil {
 		t.Error("should produce an error")
 	}
+	check.Equal(t, expectedNum, catcher.Len())
 }
 
 func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Iterator[T]) []T {
@@ -91,6 +93,7 @@ func TestError(t *testing.T) {
 		t.Run("InitialState", func(t *testing.T) {
 			catcher := &Collector{}
 			catcherIsEmpty(t, catcher)
+			check.Equal(t, 0, catcher.Len())
 		})
 		t.Run("AddNilErrors", func(t *testing.T) {
 			catcher := &Collector{}
@@ -99,6 +102,7 @@ func TestError(t *testing.T) {
 			var err error
 			catcher.Add(err)
 			catcherIsEmpty(t, catcher)
+			check.Equal(t, 0, catcher.Len())
 		})
 		t.Run("SingleError", func(t *testing.T) {
 			catcher := &Collector{}

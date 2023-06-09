@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/ers"
@@ -79,25 +80,59 @@ func (pf Producer[T]) Safe() Producer[T] {
 
 func (pf Producer[T]) Ignore(ctx context.Context) { _, _ = pf(ctx) }
 
-// Chain runs both producers, with the following logic: if the root
-// producer errors, return that error (and a zero value,) run the next
-// producer. If the next producer errors, return the result of the
-// first producer and the second producer's error. If neither producer
-// errors, pass both results to the join function (jf) and return the
-// result.
-func (pf Producer[T]) Chain(next Producer[T], jf func(T, T) T) Producer[T] {
-	return func(ctx context.Context) (T, error) {
-		one, err := pf(ctx)
-		if err != nil {
-			return ZeroOf[T](), err
-		}
+// Chain, on successive calls, runs the first producer until it
+// returns an io.EOF error, and then returns the results of the second
+// producer. If either producer returns another error (context
+// cancelation or otherwise,) those errors are returned.
+//
+// When the second function returns io.EOF, all successive calls will
+// return io.EOF.
+func (pf Producer[T]) Chain(next Producer[T]) Producer[T] {
+	const (
+		runFirstFunc int64 = iota
+		firstFunctionErrored
+		runSecondFunc
+		secondFunctionErrored
+	)
 
-		two, err := next(ctx)
-		if err != nil {
-			return one, err
-		}
+	var ferr error
+	var serr error
+	stage := &atomic.Int64{}
+	stage.Store(runFirstFunc)
 
-		return jf(one, two), nil
+	return func(ctx context.Context) (out T, _ error) {
+		switch stage.Load() {
+		case secondFunctionErrored:
+			return out, serr
+		case firstFunctionErrored:
+			return out, ferr
+		case runFirstFunc:
+			out, err := pf(ctx)
+			switch {
+			case err == nil:
+				return out, nil
+			case !errors.Is(err, io.EOF):
+				ferr = err
+				stage.Store(firstFunctionErrored)
+				return out, err
+			}
+			stage.Store(runSecondFunc)
+			fallthrough
+		case runSecondFunc:
+			out, err := next(ctx)
+			switch {
+			case err == nil:
+				return out, nil
+			case !errors.Is(err, io.EOF):
+				serr = err
+				stage.Store(secondFunctionErrored)
+				return out, err
+			default:
+				return out, err
+			}
+		default:
+			return out, io.EOF
+		}
 	}
 }
 
@@ -139,7 +174,7 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 func (pf Producer[T]) Must(ctx context.Context) T { return Must(pf(ctx)) }
 
 // Block runs the producer with a context that will ever expire.
-func (pf Producer[T]) Block() (T, error) { return pf(internal.BackgroundContext) }
+func (pf Producer[T]) Block() (T, error) { return pf(context.Background()) }
 
 // Force combines the semantics of Must and Block: runs the producer
 // with a context that never expires and panics in the case of an
@@ -155,7 +190,7 @@ func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) Operation {
 // Check uses the error observer to consume the error from the
 // Producer and returns a function that takes a context and returns a value.
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
-func (pf Producer[T]) ForceCheck() (T, bool)               { return pf.Check(internal.BackgroundContext) }
+func (pf Producer[T]) ForceCheck() (T, bool)               { return pf.Check(context.Background()) }
 
 // Future runs the producer in the background, when function is
 // called, and returns a producer which, when called, blocks until the

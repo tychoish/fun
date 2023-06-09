@@ -6,6 +6,7 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/ers"
@@ -45,6 +46,42 @@ func WorkerFuture(ch <-chan error) Worker {
 	}
 }
 
+func Pipe[T any](from Producer[T], to Processor[T]) Worker {
+	const (
+		runPipe int64 = iota
+		firstFunctionErrored
+		secondFunctionErrored
+	)
+
+	var ferr error
+	var serr error
+	stage := &atomic.Int64{}
+	stage.Store(runPipe)
+
+	return func(ctx context.Context) error {
+		switch stage.Load() {
+		case secondFunctionErrored:
+			return serr
+		case firstFunctionErrored:
+			return ferr
+		default: // runpipe
+			val, err := from(ctx)
+			if err != nil {
+				stage.Store(firstFunctionErrored)
+				ferr = err
+				return err
+			}
+			err = to(ctx, val)
+			if err != nil {
+				stage.Store(secondFunctionErrored)
+				serr = err
+				return err
+			}
+			return nil
+		}
+	}
+}
+
 // Run is equivalent to calling the worker function directly, except
 // the context passed to it is canceled when the worker function returns.
 func (wf Worker) Run(ctx context.Context) error {
@@ -64,7 +101,7 @@ func (wf Worker) Safe() Worker {
 
 // Block executes the worker function with a context that will never
 // expire and returns the error. Use with caution
-func (wf Worker) Block() error { return wf.Run(internal.BackgroundContext) }
+func (wf Worker) Block() error { return wf.Run(context.Background()) }
 
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are converted to errors for both the worker
@@ -214,6 +251,16 @@ func (wf Worker) WithLock(mtx *sync.Mutex) Worker {
 // Check runs the worker and returns true (ok) if there was no error,
 // and false otherwise.
 func (wf Worker) Check(ctx context.Context) bool { return wf(ctx) == nil }
+
+func (wf Worker) While() Worker {
+	return func(ctx context.Context) error {
+		for {
+			if err, cerr := wf(ctx), ctx.Err(); err != nil || cerr != nil {
+				return Default(err, cerr)
+			}
+		}
+	}
+}
 
 // Chain melds two workers, calling the second worker if the first
 // succeeds and the context hasn't been canceled.

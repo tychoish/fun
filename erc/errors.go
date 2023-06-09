@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -22,28 +23,35 @@ import (
 // method which returns a slice of the constituent errors for
 // additional use.
 type Stack struct {
-	err  error
-	next *Stack
+	err   error
+	next  *Stack
+	count int
 }
 
 func (e *Stack) append(err error) *Stack {
 	if err == nil {
 		return e
 	}
-
+	var count int
+	if e != nil {
+		count = e.count
+	}
 	switch werr := err.(type) {
 	case *Stack:
 		if werr.next == nil {
 			werr.next = e
+			werr.count = count + 1
 			return werr
 		}
 
 		for werr.next != nil {
 			if werr.err != nil {
 				e = &Stack{
-					err:  werr.err,
-					next: e,
+					err:   werr.err,
+					next:  e,
+					count: count + 1,
 				}
+				count = e.count
 			}
 			werr = werr.next
 		}
@@ -53,8 +61,9 @@ func (e *Stack) append(err error) *Stack {
 		return e.append(werr.Previous).append(werr.Current)
 	default:
 		return &Stack{
-			next: e,
-			err:  err,
+			next:  e,
+			err:   err,
+			count: count + 1,
 		}
 	}
 }
@@ -113,7 +122,7 @@ func (e *Stack) Producer() fun.Producer[error] {
 // safe for concurrent access, and must only be used from one
 // goroutine, or with a synchronized approach. You may create multiple
 // Iterators on the same stack without issue.
-func (e *Stack) Iterator() *fun.Iterator[error] { return e.Producer().Lock().Iterator() }
+func (e *Stack) Iterator() *fun.Iterator[error] { return e.Producer().Iterator() }
 
 // Collector is a simplified version of the error collector in
 // github.com/tychoish/emt. The collector is thread safe and
@@ -130,8 +139,7 @@ func (ec *Collector) Add(err error) {
 	if err == nil {
 		return
 	}
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
+	defer adt.With(adt.Lock(&ec.mu))
 	if ec.stack == nil {
 		ec.stack = &Stack{}
 	}
@@ -143,14 +151,20 @@ func (ec *Collector) Add(err error) {
 // fun.Observer[error] object for integration and use with the
 // function types.
 func (ec *Collector) Observer() fun.Observer[error] { return ec.Add }
+func (ec *Collector) Len() int {
+	defer adt.With(adt.Lock(&ec.mu))
+	if ec.stack == nil {
+		return 0
+	}
+	return ec.stack.count
+}
 
 // Iterator produces an iterator for all errors present in the
 // collector. The iterator proceeds from the current error to the
 // oldest error, and will not observe new errors added to the
 // collector.
 func (ec *Collector) Iterator() *fun.Iterator[error] {
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
+	defer adt.With(adt.Lock(&ec.mu))
 
 	return ec.stack.Producer().WithLock(&ec.mu).Iterator()
 }
@@ -160,8 +174,7 @@ func (ec *Collector) Iterator() *fun.Iterator[error] {
 // errors.As, and can be iterated or used in combination with
 // fun.Unwind() to introspect the available errors.
 func (ec *Collector) Resolve() error {
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
+	defer adt.With(adt.Lock(&ec.mu))
 
 	if ec.stack == nil {
 		return nil

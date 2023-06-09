@@ -39,6 +39,8 @@ func Wrapf(err error, tmpl string, args ...any) error {
 // canceled contexts and ones which have exceeded their deadlines.
 func ContextExpired(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
 
+func Ok(err error) bool { return err == nil }
+
 // IsTerminating returns true if the error is one of the sentinel
 // errors used by fun (and other packages!) to indicate that
 // processing/iteration has terminated. (e.g. context expiration a)
@@ -46,6 +48,9 @@ func IsTerminating(err error) bool {
 	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded)
 }
 
+// Is returns true if the error is one of the target errors, (or one
+// of it's constituent (wrapped) errors is a target error. ers.Is uses
+// errors.Is.
 func Is(err error, targets ...error) bool {
 	for _, target := range targets {
 		if errors.Is(err, target) {
@@ -55,16 +60,11 @@ func Is(err error, targets ...error) bool {
 	return false
 }
 
+// Filter takes an error and returns nil if the error is nil, or if
+// the error (or one of its wrapped errors,) is in the exclusion list.
 func Filter(err error, exclusions ...error) error {
-	if Is(err, exclusions...) {
+	if Ok(err) || Is(err, exclusions...) {
 		return nil
 	}
 	return err
-}
-
-func FilterOnly(err error, exclusions ...error) error {
-	if !Is(err, exclusions...) {
-		return err
-	}
-	return nil
 }

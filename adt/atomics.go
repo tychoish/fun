@@ -94,7 +94,7 @@ func CompareAndSwap[T comparable](a AtomicValue[T], old, new T) bool {
 	case *Atomic[T]:
 		return atom.val.CompareAndSwap(old, new)
 	case *Synchronized[T]:
-		defer atom.withLock()()
+		defer With(Lock(&atom.mtx))
 		if atom.obj == old {
 			atom.obj = new
 			return true

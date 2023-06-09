@@ -132,7 +132,7 @@ func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *Iterator[V], keyf
 
 // ConsumeMap adds all of the items in a map to the Pairs object.
 func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
-	InvariantMust(p.Consume(internal.BackgroundContext, Mapify(in).Iterator()))
+	InvariantMust(p.Consume(context.Background(), Mapify(in).Iterator()))
 }
 
 // ConsumeSlice adds all the values in the input slice to the Pairs

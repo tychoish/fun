@@ -9,18 +9,12 @@ package risky
 
 import (
 	"context"
-
-	"github.com/tychoish/fun/internal"
 )
 
 // Check takes two values and returns the first value and a second
 // "ok" value. The second value is true if the error is nil (isOK) and
 // false otherwise. This is not too risky.
 func Check[T any](out T, err error) (T, bool) { return out, err == nil }
-
-// CheckErr converts an error into an "ok" value. Returns true if the
-// error is nil and false otherwise. This is not too risky.
-func CheckErr(err error) bool { return err == nil }
 
 // Force swallows an error, and returns the output, as a non-panic'ing
 // form of fun.Must.
@@ -31,7 +25,7 @@ func Force[T any](out T, _ error) T { return out }
 // Block runs the function with a context that is never canceled. Use
 // this in cases where you don't want to plumb a context through *and*
 // the operation cannot block on the context.
-func Block[T any](fn func(context.Context) T) T { return fn(internal.BackgroundContext) }
+func Block[T any](fn func(context.Context) T) T { return fn(context.Background()) }
 
 // ForceOp, is like Force, except it takes the function and calls it
 // itself so that it can ignore a possible panic and return an
@@ -43,12 +37,14 @@ func ForceOp[T any](fn func() (T, error)) (out T) {
 	return out
 }
 
+func Cast[T any](in any) T { return in.(T) }
+
 // BlockForce combines Block with ForceOp to run a function with a
 // context that is never canceled, ignoring any panics and returning
 // the output value.
 func BlockForceOp[T any](fn func(context.Context) (T, error)) T {
 	defer Recover()
-	out, _ := fn(internal.BackgroundContext)
+	out, _ := fn(context.Background())
 	return out
 }
 

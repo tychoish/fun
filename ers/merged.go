@@ -3,19 +3,44 @@ package ers
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
-func Merge(err1, err2 error) error {
-	switch {
-	case err1 == nil && err2 == nil:
-		return nil
-	case err1 == nil && err2 != nil:
-		return err2
-	case err1 != nil && err2 == nil:
-		return err1
-	default:
-		return &Combined{Current: err1, Previous: err2}
+type Collector struct {
+	mtx sync.Mutex
+	err error
+	num int
+}
+
+func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
+func with(mtx *sync.Mutex)             { mtx.Unlock() }
+
+func (c *Collector) HasErrors() bool { defer with(lock(&c.mtx)); return c.err != nil }
+func (c *Collector) Resolve() error  { defer with(lock(&c.mtx)); return c.err }
+func (c *Collector) Len() int        { defer with(lock(&c.mtx)); return c.num }
+
+func (c *Collector) Add(err error) {
+	if err == nil {
+		return
 	}
+
+	defer with(lock(&c.mtx))
+	c.num++
+	c.err = Merge(err, c.err)
+}
+
+func Merge(one, two error) error {
+	switch {
+	case one == nil && two == nil:
+		return nil
+	case one == nil && two != nil:
+		return two
+	case one != nil && two == nil:
+		return one
+	default:
+		return &Combined{Current: one, Previous: two}
+	}
+
 }
 
 type Combined struct {

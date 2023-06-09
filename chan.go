@@ -202,6 +202,8 @@ func (sm Send[T]) Zero(ctx context.Context) error { return sm.Write(ctx, ZeroOf[
 // closed.
 func (sm Send[T]) Signal(ctx context.Context) { sm.Ignore(ctx, ZeroOf[T]()) }
 
+func (sm Send[T]) WorkerPipe(input Producer[T]) Worker { return Pipe(input, sm.Processor()) }
+
 // Write sends the item into the channel captured by
 // Blocking/NonBlocking returning the appropriate error.
 //
@@ -247,19 +249,8 @@ func (sm Send[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Merge(iter.Close(), ers.Merge(err, ers.ParsePanic(recover()))) }()
 
-		var item T
-		for {
-			if item, err = iter.ReadOne(ctx); err != nil {
-				break
-			}
-			if err = sm.Write(ctx, item); err != nil {
-				break
-			}
-		}
+		operation := sm.WorkerPipe(iter.Producer()).While()
 
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		return err
+		return operation(ctx)
 	}
 }

@@ -353,11 +353,9 @@ func (q *Queue[T]) Producer() fun.Producer[T] {
 			}
 
 			if err := q.unsafeWaitForNew(ctx); err != nil {
-				if errors.Is(err, ErrQueueClosed) {
-					return o, io.EOF
-				}
 				return o, err
 			}
+
 			if next.link != q.front {
 				next = next.link
 			}

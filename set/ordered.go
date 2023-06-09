@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/internal"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -52,11 +50,12 @@ func (lls *orderedLLSet[T]) Delete(it T) {
 }
 
 func (lls *orderedLLSet[T]) MarshalJSON() ([]byte, error) {
-	return itertool.MarshalJSON(internal.BackgroundContext, lls.Iterator())
+	return lls.Iterator().MarshalJSON()
 }
 
 func (lls *orderedLLSet[T]) UnmarshalJSON(in []byte) error {
-	iter := itertool.UnmarshalJSON[T](in)
-	Populate[T](internal.BackgroundContext, lls, iter)
+	iter := fun.SliceIterator([]T{})
+	iter.UnmarshalJSON(in)
+	Populate[T](context.Background(), lls, iter)
 	return iter.Close()
 }
