@@ -32,6 +32,9 @@ func WhenCall(cond bool, op func()) {
 	op()
 }
 
+// SafeCall only calls the operation when it's non-nil.
+func SafeCall(op func()) { WhenCall(op != nil, op) }
+
 // WhenDo calls the function when the condition is true, and returns
 // the result, or if the condition is false, the operation is a noop,
 // and returns zero-value for the type.

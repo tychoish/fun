@@ -58,9 +58,6 @@ func Worker[OP fun.Worker | fun.Operation](
 // by their processing speed (e.g. workers should not suffer from
 // head-of-line blocking,) and input iterators are consumed (safely)
 // as work is processed.
-//
-// Because there is no output in these operations
-// Options.OutputBufferSize is ignored.
 func ParallelForEach[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],

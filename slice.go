@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sort"
 )
@@ -123,6 +124,9 @@ func (s Slice[T]) Process(pf Processor[T]) Worker {
 	return func(ctx context.Context) error {
 		for idx := range s {
 			if err := pf(ctx, s[idx]); err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
 				return err
 			}
 		}

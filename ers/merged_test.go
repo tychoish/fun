@@ -3,8 +3,11 @@ package ers
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/tychoish/fun/assert"
 )
 
 type errorTest struct {
@@ -93,4 +96,24 @@ func TestMerge(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Splice", func(t *testing.T) {
+		errs := []error{io.EOF, ErrRecoveredPanic, fmt.Errorf("hello world")}
+		err := Splice(errs...)
+
+		assert.Error(t, err)
+		assert.True(t, Is(err, errs...))
+		assert.Equal(t, len(errs), len(unwind(err)))
+	})
+}
+
+func unwind[T any](in T) (out []T) {
+	for {
+		out = append(out, in)
+		u, ok := any(in).(interface{ Unwrap() T })
+		if ok {
+			in = u.Unwrap()
+			continue
+		}
+		return
+	}
 }

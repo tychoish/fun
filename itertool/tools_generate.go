@@ -20,8 +20,7 @@ func Generate[T any](
 	opts Options,
 ) *fun.Iterator[T] {
 	opts.init()
-
-	pipe := fun.Blocking(make(chan T, opts.OutputBufferSize))
+	pipe := fun.Blocking(make(chan T, opts.NumWorkers*2+1))
 	ec := &erc.Collector{}
 
 	init := fun.Operation(func(ctx context.Context) {

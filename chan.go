@@ -144,7 +144,8 @@ func (ro Receive[T]) Read(ctx context.Context) (T, error) {
 
 // Producer returns the Read method as a producer for integration into
 // existing tools.
-func (ro Receive[T]) Producer() Producer[T] { return ro.Read }
+func (ro Receive[T]) Producer() Producer[T]  { return ro.Read }
+func (ro Receive[T]) Iterator() *Iterator[T] { return ro.Producer().Iterator() }
 
 func (ro Receive[T]) Consume(op Processor[T]) Worker {
 	return func(ctx context.Context) (err error) {
@@ -247,7 +248,7 @@ func (sm Send[T]) Write(ctx context.Context, it T) (err error) {
 
 func (sm Send[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Merge(iter.Close(), ers.Merge(err, ers.ParsePanic(recover()))) }()
+		defer func() { err = ers.Splice(iter.Close(), err, ers.ParsePanic(recover())) }()
 
 		operation := sm.WorkerPipe(iter.Producer()).While()
 

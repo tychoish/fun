@@ -156,23 +156,22 @@ func unwinder[T any](
 	consume fun.Processor[T],
 	recursiveUnwinder fun.Processor[T],
 ) {
+	var val T
 
+UNWINDING:
 	for {
 		switch wi := in.(type) {
 		case interface{ Unwrap() T }:
-			val := wi.Unwrap()
+			val = wi.Unwrap()
 			in = val
-			if !consume.Check(ctx, val) {
-				return
+			if consume.Check(ctx, val) {
+				continue UNWINDING
 			}
 		case interface{ Unwrap() []T }:
-			fun.Sliceify(wi.Unwrap()).Iterator().Process(ctx, recursiveUnwinder)
-			return
+			fun.Sliceify(wi.Unwrap()).Process(recursiveUnwinder)
 		case interface{ Unwrap() *fun.Iterator[T] }:
 			wi.Unwrap().Process(ctx, recursiveUnwinder)
-			return
-		default:
-			return
 		}
+		return
 	}
 }

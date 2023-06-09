@@ -40,7 +40,15 @@ func Merge(one, two error) error {
 	default:
 		return &Combined{Current: one, Previous: two}
 	}
+}
 
+func Splice(errs ...error) (err error) {
+	for idx := len(errs) - 1; idx >= 0; idx-- {
+		if e := errs[idx]; e != nil {
+			err = Merge(e, err)
+		}
+	}
+	return err
 }
 
 type Combined struct {

@@ -401,10 +401,7 @@ func RunIteratorStringAlgoTests(
 									}
 									return inputs[rand.Intn(511)], nil
 								},
-								Options{
-									// should just become zero
-									OutputBufferSize: -1,
-								},
+								Options{},
 							)
 							sig := make(chan struct{})
 							go func() {

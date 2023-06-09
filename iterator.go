@@ -73,10 +73,7 @@ func MapKeys[K comparable, V any](in map[K]V) *Iterator[K]              { return
 func MapValues[K comparable, V any](in map[K]V) *Iterator[V]            { return Mapify(in).Values() }
 func SliceIterator[T any](in []T) *Iterator[T]                          { return Sliceify(in).Iterator() }
 func VariadicIterator[T any](in ...T) *Iterator[T]                      { return SliceIterator(in) }
-
-func ChannelIterator[T any](ch <-chan T) *Iterator[T] {
-	return BlockingReceive(ch).Producer().Iterator()
-}
+func ChannelIterator[T any](ch <-chan T) *Iterator[T]                   { return BlockingReceive(ch).Iterator() }
 
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
@@ -87,6 +84,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 
 		// start a go routine for every iterator, to read from
 		// the incoming iterator and push it to the pipe
+
 		send := pipe.Send()
 		for idx := range iters {
 			send.Consume(iters[idx]).Ignore().Add(wctx, wg)
@@ -98,10 +96,8 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	return pipe.Receive().Producer().PreHook(init).Iterator()
 }
 
-func (i *Iterator[T]) doClose()       { i.closeOnce.Do(func() { i.closed.Store(true); i.closer() }) }
-func (i *Iterator[T]) Close() error   { i.doClose(); return i.err }
-func (i *Iterator[T]) IsClosed() bool { return i.closed.Load() }
-
+func (i *Iterator[T]) doClose()                       { i.closeOnce.Do(func() { i.closed.Store(true); SafeCall(i.closer) }) }
+func (i *Iterator[T]) Close() error                   { i.doClose(); return i.err }
 func (i *Iterator[T]) AddError(e error)               { i.err = ers.Merge(e, i.err) }
 func (i *Iterator[T]) ErrorObserver() Observer[error] { return i.AddError }
 
@@ -257,7 +253,7 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 // context cancelation error to its error, though the observed
 // iterator may return one in its close method.
 func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
-	defer func() { err = ers.Merge(err, ers.Merge(i.Close(), ers.ParsePanic(recover()))) }()
+	defer func() { err = ers.Splice(i.Close(), err, ers.ParsePanic(recover())) }()
 	proc := i.Producer()
 	for {
 		item, err := proc(ctx)
@@ -275,7 +271,7 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
 }
 
 func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) {
-	defer func() { err = ers.Merge(err, ers.Merge(i.Close(), ers.ParsePanic(recover()))) }()
+	defer func() { err = ers.Splice(i.Close(), err, ers.ParsePanic(recover())) }()
 
 	for i.Next(ctx) {
 		item := i.Value()
@@ -286,7 +282,7 @@ func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) 
 			continue
 		case errors.Is(operr, io.EOF):
 			return nil
-		case ers.Is(operr, context.Canceled, context.DeadlineExceeded):
+		case ers.ContextExpired(operr):
 			return operr
 		default:
 			i.AddError(operr)

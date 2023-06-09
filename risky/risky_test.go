@@ -161,4 +161,10 @@ func TestOperations(t *testing.T) {
 		assert.Equal(t, 100, Try(func(i int) (int, error) { return 0, errors.New("foo") }, 100))
 		assert.Equal(t, 42, Try(func(i int) (int, error) { check.Equal(t, i, 100); return 42, nil }, 100))
 	})
+	t.Run("Cast", func(t *testing.T) {
+		assert.NotPanic(t, func() { Cast[int](100) })
+		assert.Panic(t, func() { Cast[int]("hello") })
+		assert.Equal(t, Cast[int](100), 100)
+		assert.Equal(t, Cast[string]("bond"), "bond")
+	})
 }

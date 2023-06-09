@@ -2,11 +2,13 @@ package fun
 
 import (
 	"context"
+	"io"
 	"math/rand"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/testt"
 )
 
 func randomIntSlice(size int) Slice[int] {
@@ -192,5 +194,52 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, s.Cap(), 0)
 		check.Equal(t, s.Len(), 0)
 		check.True(t, s.IsEmpty())
+	})
+	t.Run("Process", func(t *testing.T) {
+		const batchSize = 100
+		ctx := testt.Context(t)
+		t.Run("Full", func(t *testing.T) {
+			s := randomIntSlice(batchSize)
+			count := 0
+			worker := s.Process(func(ctx context.Context, in int) error {
+				count++
+				check.NotZero(t, in)
+				return nil
+			})
+			err := worker(ctx)
+			assert.Equal(t, count, batchSize)
+			assert.NotError(t, err)
+		})
+		t.Run("SafeAbort", func(t *testing.T) {
+			s := randomIntSlice(batchSize)
+			count := 0
+			worker := s.Process(func(ctx context.Context, in int) error {
+				count++
+				if count > batchSize/2 {
+					return io.EOF
+				}
+				check.NotZero(t, in)
+				return nil
+			})
+			err := worker(ctx)
+			check.Equal(t, count, batchSize/2)
+			check.NotError(t, err)
+		})
+		t.Run("PropogateError", func(t *testing.T) {
+			s := randomIntSlice(batchSize)
+			count := 0
+			worker := s.Process(func(ctx context.Context, in int) error {
+				count++
+				if count == 64 {
+					return ErrLimitExceeded
+				}
+				check.NotZero(t, in)
+				return nil
+			})
+			err := worker(ctx)
+			check.Equal(t, count, 64)
+			check.Error(t, err)
+			check.ErrorIs(t, err, ErrLimitExceeded)
+		})
 	})
 }

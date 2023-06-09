@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -536,6 +537,98 @@ func TestJSON(t *testing.T) {
 		if err := iter.UnmarshalJSON([]byte(`[foo", "arg"]`)); err == nil {
 			t.Error(err)
 		}
+	})
+	t.Run("Constructors", func(t *testing.T) {
+		ctx := testt.Context(t)
+		t.Run("MapKeys", func(t *testing.T) {
+			mp := Map[string, int]{}
+			mp.Add("big", 42)
+			mp.Add("small", 4)
+			mp.Add("orange", 400)
+			keys := MapKeys(mp)
 
+			count := 0
+			err := keys.Observe(ctx, func(in string) {
+				switch in {
+				case "big":
+					count++
+				case "small":
+					count++
+				case "orange":
+					count++
+				default:
+					t.Error("unexpected", in)
+				}
+			})
+			assert.Equal(t, 3, count)
+			assert.NotError(t, err)
+		})
+		t.Run("MapKeys", func(t *testing.T) {
+			mp := Map[string, int]{}
+			mp.Add("big", 42)
+			mp.Add("small", 4)
+			mp.Add("orange", 400)
+
+			keys := MapValues(mp)
+
+			count := 0
+			err := keys.Observe(ctx, func(in int) {
+				switch in {
+				case 42:
+					count++
+				case 4:
+					count++
+				case 400:
+					count++
+				default:
+					t.Error("unexpected", in)
+				}
+			})
+			assert.Equal(t, 3, count)
+			assert.NotError(t, err)
+		})
+	})
+	t.Run("ErrorObserver", func(t *testing.T) {
+		iter := &Iterator[string]{}
+		ec := iter.ErrorObserver()
+		ec(io.EOF)
+		ec(ErrInvalidInput)
+		ec(io.ErrUnexpectedEOF)
+		ec(context.Canceled)
+
+		err := iter.Close()
+		assert.Error(t, err)
+		assert.Equal(t, len(Unwind(err)), 4)
+
+		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		assert.True(t, ers.ContextExpired(err))
+		assert.True(t, ers.IsTerminating(err))
+		assert.ErrorIs(t, err, ErrInvalidInput)
+
+		assert.Equal(t, UnwrapedRoot(err), io.EOF)
+	})
+	t.Run("Channel", func(t *testing.T) {
+		iter := Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9}).Iterator()
+		ctx := testt.ContextWithTimeout(t, 3*time.Millisecond)
+		ch := iter.Channel(ctx)
+		count := 0
+		for {
+			select {
+			case <-ctx.Done():
+				t.Error("context should not have expired")
+				break
+			case it, ok := <-ch:
+				if !ok {
+					break
+				}
+
+				count++
+				check.NotZero(t, it)
+				continue
+			}
+			break
+		}
+		assert.Equal(t, 9, count)
+		assert.NotError(t, ctx.Err())
 	})
 }

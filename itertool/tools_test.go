@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"runtime"
@@ -15,8 +16,121 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
+
+func getConstructors[T comparable](t *testing.T) []FixtureIteratorConstuctors[T] {
+	return []FixtureIteratorConstuctors[T]{
+		{
+			Name: "SlicifyIterator",
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				return fun.Sliceify(elems).Iterator()
+			},
+		},
+		{
+			Name: "Slice",
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				return fun.SliceIterator(elems)
+			},
+		},
+		{
+			Name: "VariadicIterator",
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				return fun.VariadicIterator(elems...)
+			},
+		},
+		{
+			Name: "ChannelIterator",
+			Constructor: func(elems []T) *fun.Iterator[T] {
+				vals := make(chan T, len(elems))
+				for idx := range elems {
+					vals <- elems[idx]
+				}
+				close(vals)
+				return fun.Blocking(vals).Iterator()
+			},
+		},
+		// {
+		// 	Name: "QueueIterator",
+		// 	Constructor: func(elems []T) *fun.Iterator[T] {
+		// 		cue, err := pubsub.NewQueue[T](pubsub.QueueOptions{
+		// 			SoftQuota: len(elems),
+		// 			HardLimit: 2 * len(elems),
+		// 		})
+		// 		if err != nil {
+		// 			t.Fatal(err)
+		// 		}
+
+		// 		for idx := range elems {
+		// 			if err := cue.Add(elems[idx]); err != nil {
+		// 				t.Fatal(err)
+		// 			}
+		// 		}
+
+		// 		if err = cue.Close(); err != nil {
+		// 			t.Fatal(err)
+		// 		}
+
+		// 		return cue.Iterator()
+		// 	},
+		// },
+	}
+
+}
+
+func TestIteratorImplementations(t *testing.T) {
+	t.Parallel()
+	elems := []FixtureData[string]{
+		{
+			Name:     "Basic",
+			Elements: []string{"a", "b", "c", "d"},
+		},
+		{
+			Name:     "Large",
+			Elements: GenerateRandomStringSlice(100),
+		},
+	}
+
+	t.Run("SimpleOperations", func(t *testing.T) {
+		RunIteratorImplementationTests(t, elems, getConstructors[string](t))
+	})
+
+	t.Run("Aggregations", func(t *testing.T) {
+		RunIteratorStringAlgoTests(t, elems, getConstructors[string](t))
+	})
+}
+
+func TestIteratorAlgoInts(t *testing.T) {
+	t.Parallel()
+
+	elemGenerator := func() []int {
+		e := make([]int, 100)
+		for idx := range e {
+			e[idx] = idx
+		}
+		return e
+	}
+
+	elems := []FixtureData[int]{
+		{
+			Name:     "Basic",
+			Elements: []int{1, 2, 3, 4, 5},
+		},
+		{
+			Name:     "Large",
+			Elements: elemGenerator(),
+		},
+	}
+
+	t.Run("SimpleOperations", func(t *testing.T) {
+		RunIteratorImplementationTests(t, elems, getConstructors[int](t))
+	})
+
+	t.Run("Aggregations", func(t *testing.T) {
+		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int](t))
+	})
+}
 
 func TestTools(t *testing.T) {
 	t.Parallel()
@@ -353,7 +467,12 @@ func TestChain(t *testing.T) {
 }
 
 func TestUnwind(t *testing.T) {
-	err := fmt.Errorf("hello: %w", errors.New("world"))
+	err := ers.Splice(
+		fmt.Errorf("hello: %w", errors.New("world")),
+		fmt.Errorf("a: %w", io.EOF),
+		ers.Merge(fun.ErrInvariantViolation, fun.ErrRecoveredPanic),
+		fun.ErrLimitExceeded,
+	)
 	errs1 := fun.Unwind(err)
 	assert.True(t, len(errs1) != 0)
 	errs2 := []error{}

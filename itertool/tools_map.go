@@ -95,7 +95,7 @@ func mapWorker[T any, O any](
 			}
 
 			if !output.Check(ctx, o) {
-				return nil
+				return io.EOF
 			}
 		}
 	}
