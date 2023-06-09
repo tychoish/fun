@@ -2,6 +2,8 @@ package fun
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 	"time"
 
@@ -97,6 +99,39 @@ func (pf Producer[T]) Chain(next Producer[T], jf func(T, T) T) Producer[T] {
 
 		return jf(one, two), nil
 	}
+}
+
+func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
+	var (
+		firstExhausted  bool
+		secondExhausted bool
+	)
+
+	// This producer is
+	return Producer[T](func(ctx context.Context) (out T, _ error) {
+		switch {
+		case secondExhausted:
+			return out, io.EOF
+		case !firstExhausted:
+			value, err := pf(ctx)
+			switch {
+			case err == nil:
+				return value, nil
+			case errors.Is(err, io.EOF):
+				firstExhausted = true
+			default:
+				firstExhausted = true
+				return out, err
+			}
+		}
+
+		if value, err := next(ctx); err != nil {
+			secondExhausted = true
+			return out, err
+		} else {
+			return value, nil
+		}
+	}).Lock()
 }
 
 // Must runs the producer returning the constructed value and panicing

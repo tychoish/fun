@@ -35,13 +35,16 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 }
 
 // Add adds a single item to the slice.
-func (s *Slice[T]) Add(in T) { *s = append(*s, in) }
+func (s *Slice[T]) Add(in T)                { *s = append(*s, in) }
+func (s *Slice[T]) AddWhen(cond bool, in T) { WhenCall(cond, func() { s.Add(in) }) }
 
 // Append adds all of the items to the slice.
-func (s *Slice[T]) Append(in ...T) { s.Extend(in) }
+func (s *Slice[T]) Append(in ...T)                { s.Extend(in) }
+func (s *Slice[T]) AppendWhen(cond bool, in ...T) { WhenCall(cond, func() { s.Extend(in) }) }
 
 // Extend adds the items from the input slice to the root slice.
-func (s *Slice[T]) Extend(in []T) { *s = append(*s, in...) }
+func (s *Slice[T]) Extend(in []T)                { *s = append(*s, in...) }
+func (s *Slice[T]) ExtendWhen(cond bool, in []T) { WhenCall(cond, func() { s.Extend(in) }) }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }
@@ -58,6 +61,18 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 // Reset constructs a new empty slice releasing the original
 // allocation.
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
+
+func (s *Slice[T]) Observe(ob Observer[T]) {
+	sl := *s
+	for idx := range sl {
+		ob(sl[idx])
+	}
+}
+
+func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
+	s.Observe(func(in T) { o.AddWhen(p(in), in) })
+	return
+}
 
 // Reslice modifies the slice to set the new start and end indexes.
 //

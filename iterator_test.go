@@ -471,3 +471,18 @@ func TestEmptyIteration(t *testing.T) {
 	})
 
 }
+
+func TestChain(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
+	iter := SliceIterator(num).Chain(SliceIterator(num))
+	n := iter.Count(ctx)
+	assert.Equal(t, len(num)*2, n)
+
+	iter = SliceIterator(num).Chain(SliceIterator(num), SliceIterator(num), SliceIterator(num))
+	cancel()
+	n = iter.Count(ctx)
+	assert.Equal(t, n, 0)
+}

@@ -96,14 +96,26 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	return pipe.Receive().Producer().PreHook(init).Iterator()
 }
 
-func (i *Iterator[T]) doClose()         { i.closeOnce.Do(func() { i.closed.Store(true); i.closer() }) }
-func (i *Iterator[T]) Close() error     { i.doClose(); return i.err }
-func (i *Iterator[T]) AddError(e error) { i.err = ers.Merge(e, i.err) }
+func (i *Iterator[T]) doClose()       { i.closeOnce.Do(func() { i.closed.Store(true); i.closer() }) }
+func (i *Iterator[T]) Close() error   { i.doClose(); return i.err }
+func (i *Iterator[T]) IsClosed() bool { return i.closed.Load() }
 
+func (i *Iterator[T]) AddError(e error)               { i.err = ers.Merge(e, i.err) }
 func (i *Iterator[T]) ErrorObserver() Observer[error] { return i.AddError }
-func (i *Iterator[T]) Producer() Producer[T]          { return i.ReadOne }
-func (i *Iterator[T]) Value() T                       { return i.value }
 
+func (i *Iterator[T]) Producer() Producer[T] { return i.ReadOne }
+func (i *Iterator[T]) Value() T              { return i.value }
+
+// Next advances the iterator (using ReadOne) and caches the current
+// value for access with the Value() method. When Next is true, the
+// Value() will return the next item. When false, either the iterator
+// has been exhausted (e.g. the Producer function has returned io.EOF)
+// or the context passed to Next has been canceled.
+//
+// Using Next/Value cannot be done safely if iterator is accessed from
+// multiple go routines concurrently. In these cases use ReadOne
+// directly, or use Split to create an iterator that safely draws
+// items from the parent iterator.
 func (i *Iterator[T]) Next(ctx context.Context) bool {
 	if i.operation == nil || i.closed.Load() || ctx.Err() != nil {
 		return false
@@ -163,14 +175,7 @@ func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
 // type and converts it to an iterator of any (e.g. interface{})
 // values.
 func (i *Iterator[T]) Any() *Iterator[any] {
-	return Producer[any](func(ctx context.Context) (any, error) {
-		item, err := i.ReadOne(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		return any(item), nil
-	}).Iterator()
+	return Transform(i, func(in T) (any, error) { return any(in), nil })
 }
 
 // Transform processes the input iterator of type I into an output
@@ -178,14 +183,14 @@ func (i *Iterator[T]) Any() *Iterator[any] {
 // continue producing values as long as the input iterator produces
 // values, the context isn't canceled, or
 func Transform[I, O any](iter *Iterator[I], op func(in I) (O, error)) *Iterator[O] {
-	return Generator(func(ctx context.Context) (O, error) {
+	return Producer[O](func(ctx context.Context) (O, error) {
 		item, err := iter.ReadOne(ctx)
 		if err != nil {
 			return ZeroOf[O](), err
 		}
 
 		return op(item)
-	})
+	}).Iterator()
 }
 
 // Count returns the number of items observed by the iterator. Callers
@@ -288,6 +293,14 @@ func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) 
 
 	// the close error is added in the defer
 	return err
+}
+
+func (i *Iterator[T]) Chain(iters ...*Iterator[T]) *Iterator[T] {
+	proc := i.Producer()
+	for idx := range iters {
+		proc = proc.Join(iters[idx].ReadOne)
+	}
+	return proc.Iterator()
 }
 
 // Slice converts an iterator to the slice of it's values, and
