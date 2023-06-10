@@ -56,11 +56,6 @@ func InvariantMust(err error, args ...any) {
 	panic(ers.Merge(fmt.Errorf("%s: %w", fmt.Sprint(args...), err), ErrInvariantViolation))
 }
 
-// InvariantCheck calls the function and if it returns an error panics
-// with an ErrInvariantViolation error, wrapped with the error of the
-// function, and any annotation arguments.
-func InvariantCheck(fn func() error, args ...any) { InvariantMust(fn(), args...) }
-
 // IsInvariantViolation returns true if the argument is or resolves to
 // ErrInvariantViolation.
 func IsInvariantViolation(r any) bool {
@@ -80,5 +75,5 @@ func Must[T any](arg T, err error) T { InvariantMust(err); return arg }
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
+//	out := risky.ForceBeOk(func() (string ok) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); return out }

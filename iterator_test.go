@@ -17,6 +17,8 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
+type none struct{}
+
 func testIntIter(t *testing.T, size int) *Iterator[int] {
 	t.Helper()
 
@@ -59,7 +61,7 @@ func TestIteratorTools(t *testing.T) {
 		})
 		t.Run("PanicSafety", func(t *testing.T) {
 			called := 0
-			err := Sliceify([]int{1, 2, 34, 56}).Iterator().Observe(ctx, func(in int) {
+			err := SliceIterator([]int{1, 2, 34, 56}).Observe(ctx, func(in int) {
 				called++
 				if in > 3 {
 					panic("eep!")
@@ -80,7 +82,7 @@ func TestIteratorTools(t *testing.T) {
 			cancel()
 			count := 0
 			assert.Error(t, ctx.Err())
-			err := Sliceify([]int{1, 2, 34, 56}).Iterator().Observe(ctx, func(int) {
+			err := SliceIterator([]int{1, 2, 34, 56}).Observe(ctx, func(int) {
 				count++
 			})
 			t.Log(err)
@@ -191,27 +193,6 @@ func TestIteratorTools(t *testing.T) {
 			assert.True(t, evens.Value()%2 == 0)
 		}
 		assert.NotError(t, evens.Close())
-	})
-	t.Run("MapConverter", func(t *testing.T) {
-		in := map[string]string{
-			"hi":  "there",
-			"how": "are you doing",
-		}
-		iter := MapIterator(in)
-		seen := 0
-		for iter.Next(ctx) {
-			item := iter.Value()
-			switch {
-			case item.Key == "hi":
-				check.Equal(t, item.Value, "there")
-			case item.Key == "how":
-				check.Equal(t, item.Value, "are you doing")
-			default:
-				t.Errorf("unexpected value: %s", item)
-			}
-			seen++
-		}
-		assert.Equal(t, seen, len(in))
 	})
 	t.Run("Split", func(t *testing.T) {
 		input := SliceIterator(GenerateRandomStringSlice(100))
@@ -405,18 +386,19 @@ func TestInternalIterators(t *testing.T) {
 			SliceIterator(elems),
 			SliceIterator(elems),
 		)
-		seen := Mapify(make(map[string]struct{}, len(elems)))
+		seen := make(map[string]struct{}, len(elems))
 		var count int
 		for iter.Next(ctx) {
 			count++
-			seen.SetDefault(iter.Value())
+			seen[iter.Value()] = none{}
 		}
 		if count != 5*len(elems) {
 			t.Fatal("did not iterate enough", count, 5*len(elems))
 		}
 		for idx, str := range elems {
 			testt.Log(t, "mismatch", idx, str)
-			assert.True(t, seen.Check(str))
+			_, ok := seen[str]
+			assert.True(t, ok)
 		}
 
 		if err := iter.Close(); err != nil {
@@ -515,7 +497,7 @@ func TestJSON(t *testing.T) {
 	})
 
 	t.Run("Unmarshal", func(t *testing.T) {
-		iter := Sliceify([]string{}).Iterator()
+		iter := SliceIterator([]string{})
 		if err := iter.UnmarshalJSON([]byte(`["foo", "arg"]`)); err != nil {
 			t.Error(err)
 		}
@@ -538,56 +520,6 @@ func TestJSON(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	t.Run("Constructors", func(t *testing.T) {
-		ctx := testt.Context(t)
-		t.Run("MapKeys", func(t *testing.T) {
-			mp := Map[string, int]{}
-			mp.Add("big", 42)
-			mp.Add("small", 4)
-			mp.Add("orange", 400)
-			keys := MapKeys(mp)
-
-			count := 0
-			err := keys.Observe(ctx, func(in string) {
-				switch in {
-				case "big":
-					count++
-				case "small":
-					count++
-				case "orange":
-					count++
-				default:
-					t.Error("unexpected", in)
-				}
-			})
-			assert.Equal(t, 3, count)
-			assert.NotError(t, err)
-		})
-		t.Run("MapKeys", func(t *testing.T) {
-			mp := Map[string, int]{}
-			mp.Add("big", 42)
-			mp.Add("small", 4)
-			mp.Add("orange", 400)
-
-			keys := MapValues(mp)
-
-			count := 0
-			err := keys.Observe(ctx, func(in int) {
-				switch in {
-				case 42:
-					count++
-				case 4:
-					count++
-				case 400:
-					count++
-				default:
-					t.Error("unexpected", in)
-				}
-			})
-			assert.Equal(t, 3, count)
-			assert.NotError(t, err)
-		})
-	})
 	t.Run("ErrorObserver", func(t *testing.T) {
 		iter := &Iterator[string]{}
 		ec := iter.ErrorObserver()
@@ -608,7 +540,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, UnwrapedRoot(err), io.EOF)
 	})
 	t.Run("Channel", func(t *testing.T) {
-		iter := Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9}).Iterator()
+		iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 		ctx := testt.ContextWithTimeout(t, 3*time.Millisecond)
 		ch := iter.Channel(ctx)
 		count := 0

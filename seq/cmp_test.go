@@ -11,7 +11,9 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/risky"
 )
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
@@ -214,8 +216,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			SortListMerge(list, LessThanNative[int])
 			SortListQuick(lcopy, LessThanNative[int])
-			listVals := fun.Must(list.Iterator().Slice(ctx))
-			copyVals := fun.Must(lcopy.Iterator().Slice(ctx))
+			listVals := risky.Force(list.Iterator().Slice(ctx))
+			copyVals := risky.Force(lcopy.Iterator().Slice(ctx))
 			t.Log("merge", listVals)
 			t.Log("quick", copyVals)
 			assert.Equal(t, len(listVals), len(copyVals))
@@ -248,7 +250,7 @@ func TestSort(t *testing.T) {
 			assert.ErrorIs(t, err, ErrUninitialized)
 		})
 		t.Run("IteratorConstructor", func(t *testing.T) {
-			iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+			iter := dt.Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
 			heap, err := NewHeapFromIterator(ctx, LessThanNative[int], iter)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)
@@ -325,7 +327,7 @@ func TestSort(t *testing.T) {
 }
 func getSliceForList(ctx context.Context, t *testing.T, list *List[int]) []int {
 	t.Helper()
-	return fun.Must(list.Iterator().Slice(ctx))
+	return risky.Force(list.Iterator().Slice(ctx))
 }
 
 func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {

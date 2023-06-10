@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -42,10 +43,10 @@ func (mp *Map[K, V]) Join(in *Map[K, V]) {
 }
 
 // Append adds a sequence of pairs to the map.
-func (mp *Map[K, V]) Append(its ...fun.Pair[K, V]) { mp.Extend(its) }
+func (mp *Map[K, V]) Append(its ...dt.Pair[K, V]) { mp.Extend(its) }
 
 // Extend adds a slice of pairs to the map.
-func (mp *Map[K, V]) Extend(its []fun.Pair[K, V]) {
+func (mp *Map[K, V]) Extend(its []dt.Pair[K, V]) {
 	for _, it := range its {
 		mp.Store(it.Key, it.Value)
 	}
@@ -163,7 +164,7 @@ func TestMap(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 100; i++ {
-			mp.Set(fun.Pair[int, int]{Key: i, Value: rand.Int() + 43})
+			mp.Set(dt.Pair[int, int]{Key: i, Value: rand.Int() + 43})
 		}
 
 		for i := 0; i < 200; i++ {
@@ -272,12 +273,12 @@ func TestMap(t *testing.T) {
 	t.Run("Append", func(t *testing.T) {
 		mp := &Map[string, int]{}
 		assert.Equal(t, 0, mp.Len())
-		mp.Append(fun.MakePair("foo", 400))
+		mp.Append(dt.MakePair("foo", 400))
 		assert.Equal(t, 1, mp.Len())
-		mp.Append(fun.MakePair("foo", 42), fun.MakePair("bar", 3))
+		mp.Append(dt.MakePair("foo", 42), dt.MakePair("bar", 3))
 		assert.Equal(t, 2, mp.Len())
 		assert.Equal(t, 42, mp.Get("foo"))
-		mp.Append(fun.MakePair("foofoo", 42), fun.MakePair("baz", 3))
+		mp.Append(dt.MakePair("foofoo", 42), dt.MakePair("baz", 3))
 		assert.Equal(t, 4, mp.Len())
 	})
 	t.Run("JSON", func(t *testing.T) {
@@ -302,11 +303,11 @@ func TestMap(t *testing.T) {
 
 	t.Run("Ensure", func(t *testing.T) {
 		mp := &Map[string, int]{}
-		ok := mp.EnsureSet(fun.Pair[string, int]{Key: "hi", Value: 100})
+		ok := mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 100})
 		check.True(t, ok)
-		ok = mp.EnsureSet(fun.Pair[string, int]{Key: "hi", Value: 100})
+		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 100})
 		check.True(t, !ok)
-		ok = mp.EnsureSet(fun.Pair[string, int]{Key: "hi", Value: 10})
+		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 10})
 		check.True(t, !ok)
 	})
 	t.Run("Iterators", func(t *testing.T) {

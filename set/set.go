@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 )
 
 // Set describes a basic set interface, and fun provdies a
@@ -48,19 +49,19 @@ func BuildUnordered[T comparable](ctx context.Context, iter *fun.Iterator[T]) Se
 }
 
 // BuildOrderedFromPairs produces an unordered set from a sequence of pairs.
-func BuildOrderedFromPairs[K, V comparable](pairs fun.Pairs[K, V]) Set[fun.Pair[K, V]] {
-	return BuildOrdered(context.Background(), fun.Sliceify(pairs).Iterator())
+func BuildOrderedFromPairs[K, V comparable](pairs dt.Pairs[K, V]) Set[dt.Pair[K, V]] {
+	return BuildOrdered(context.Background(), dt.Sliceify(pairs).Iterator())
 }
 
 // BuildUnorderedFromPairs produces an order-preserving set based on a
 // sequence of Pairs.
-func BuildUnorderedFromPairs[K, V comparable](pairs fun.Pairs[K, V]) Set[fun.Pair[K, V]] {
-	return BuildUnordered(context.Background(), fun.Sliceify(pairs).Iterator())
+func BuildUnorderedFromPairs[K, V comparable](pairs dt.Pairs[K, V]) Set[dt.Pair[K, V]] {
+	return BuildUnordered(context.Background(), dt.Sliceify(pairs).Iterator())
 }
 
-type mapSetImpl[T comparable] fun.Map[T, struct{}]
+type mapSetImpl[T comparable] dt.Map[T, struct{}]
 
-func (s mapSetImpl[T]) Producer() fun.Producer[T] { return fun.Map[T, struct{}](s).Keys().Producer() }
+func (s mapSetImpl[T]) Producer() fun.Producer[T] { return dt.Map[T, struct{}](s).Keys().Producer() }
 func (s mapSetImpl[T]) Add(item T)                { s[item] = struct{}{} }
 func (s mapSetImpl[T]) Len() int                  { return len(s) }
 func (s mapSetImpl[T]) Delete(item T)             { delete(s, item) }
@@ -89,7 +90,7 @@ func (s mapSetImpl[T]) MarshalJSON() ([]byte, error) {
 }
 
 func (s mapSetImpl[T]) UnmarshalJSON(in []byte) error {
-	iter := fun.SliceIterator([]T{})
+	iter := dt.Sliceify([]T{}).Iterator()
 	iter.UnmarshalJSON(in)
 	Populate[T](context.Background(), s, iter)
 	return iter.Close()
@@ -161,7 +162,7 @@ func (s syncSetImpl[T]) UnmarshalJSON(in []byte) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	iter := fun.SliceIterator([]T{})
+	iter := dt.Sliceify([]T{}).Iterator()
 	iter.UnmarshalJSON(in)
 	Populate[T](context.Background(), s.set, iter)
 	return iter.Close()

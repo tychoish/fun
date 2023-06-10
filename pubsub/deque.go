@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/risky"
 )
 
 // Deque proves a basic double ended queue backed by a doubly linked
@@ -96,7 +97,7 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 
 // NewUnlimitedDeque constructs an unbounded Deque.
 func NewUnlimitedDeque[T any]() *Deque[T] {
-	return fun.Must(NewDeque[T](DequeOptions{Unlimited: true}))
+	return risky.Force(NewDeque[T](DequeOptions{Unlimited: true}))
 }
 
 func makeDeque[T any]() *Deque[T] {

@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/risky"
 )
 
 type (
@@ -43,11 +44,11 @@ type (
 //	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 //	defer cancel()
 //	ctx = srv.WithOrchestrator(ctx)
-//	defer fun.InvariantCheck(srv.GetOrchestrator(ctx).Service().Wait)
+//	defer func()  { risky.Force(srv.GetOrchestrator(ctx).Service().Wait()) }()
 //
-// In this example, InvariantCheck will run Wait at defer time, and
-// raise an ErrInvariantViolation panic with the contents of Wait's
-// error.
+// In this example, the wait will begin during shutdown and risky.Force
+// will raise an ErrInvariantViolation panic with the contents of
+// Wait's error.
 //
 // If an Orchestrator is already set on the context, this operation
 // panics with an invariant violation.
@@ -263,7 +264,7 @@ func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.Worker] {
 		opts.NumWorkers = 1
 	}
 
-	return fun.Must(pubsub.NewQueue[fun.Worker](
+	return risky.Force(pubsub.NewQueue[fun.Worker](
 		pubsub.QueueOptions{
 			SoftQuota:   2 * opts.NumWorkers,
 			HardLimit:   4 * opts.NumWorkers,

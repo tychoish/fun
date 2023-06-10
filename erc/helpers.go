@@ -152,7 +152,7 @@ func Consume(ctx context.Context, iter *fun.Iterator[error]) error {
 
 // Collect produces a function that will collect the error from a
 // function and add it to the collector returning the result. Use
-// this, like fun.Must to delay handling an error while also avoiding
+// this, like risky.Force to delay handling an error while also avoiding
 // declaring an extra error variable, without dropping the error
 // entirely.
 //

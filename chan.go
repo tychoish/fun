@@ -26,13 +26,13 @@ const (
 	non_blocking blockingMode = 2
 )
 
-// ChannelOp is a wrapper around a channel, to make it easier to write
+// ChanOp is a wrapper around a channel, to make it easier to write
 // clear code that uses and handles basic operations with single
 // channels. From a high level an operation might look like:
 //
 //	ch := make(chan string)
 //	err := fun.Blocking().Send()
-type ChannelOp[T any] struct {
+type ChanOp[T any] struct {
 	mode blockingMode
 	ch   chan T
 }
@@ -40,7 +40,7 @@ type ChannelOp[T any] struct {
 // Blocking produces a blocking Send instance. All Send/Check/Ignore
 // operations will block until the context is canceled, the channel is
 // canceled, or the send succeeds.
-func Blocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: blocking, ch: ch} }
+func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: blocking, ch: ch} }
 
 // NonBlocking produces a send instance that performs a non-blocking
 // send.
@@ -48,50 +48,54 @@ func Blocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: blockin
 // The Send() method, for non-blocking sends, will return
 // ErrSkipedNonBlockingSend if the channel was full and the object was
 // not sent.
-func NonBlocking[T any](ch chan T) ChannelOp[T] { return ChannelOp[T]{mode: non_blocking, ch: ch} }
+func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: non_blocking, ch: ch} }
 
-func (op ChannelOp[T]) Close()                 { close(op.ch) }
-func (op ChannelOp[T]) Channel() chan T        { return op.ch }
-func (op ChannelOp[T]) Send() Send[T]          { return Send[T]{mode: op.mode, ch: op.ch} }
-func (op ChannelOp[T]) Receive() Receive[T]    { return Receive[T]{mode: op.mode, ch: op.ch} }
-func (op ChannelOp[T]) Iterator() *Iterator[T] { return op.Receive().Producer().Iterator() }
+func (op ChanOp[T]) Close()                  { close(op.ch) }
+func (op ChanOp[T]) Channel() chan T         { return op.ch }
+func (op ChanOp[T]) Send() ChanSend[T]       { return ChanSend[T]{mode: op.mode, ch: op.ch} }
+func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
+func (op ChanOp[T]) Iterator() *Iterator[T]  { return op.Receive().Producer().Iterator() }
 
-// Receive, wraps a channel fore <-chan T operations. It is the type
-// returned by the Receive() method on ChannelOp. The primary method
+// ChanReceive, wraps a channel fore <-chan T operations. It is the type
+// returned by the ChanReceive() method on ChannelOp. The primary method
 // is Read(), with other methods provided as "self-documenting"
 // helpers.
-type Receive[T any] struct {
+type ChanReceive[T any] struct {
 	mode blockingMode
 	ch   <-chan T
 }
 
 // BlockingReceive is the equivalent of Blocking(ch).Receive(), except
 // that it accepts a receive-only channel.
-func BlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: blocking, ch: ch} }
+func BlockingReceive[T any](ch <-chan T) ChanReceive[T] {
+	return ChanReceive[T]{mode: blocking, ch: ch}
+}
 
 // NonBlockingReceive is the equivalent of NonBlocking(ch).Receive(),
 // except that it accepts a receive-only channel.
-func NonBlockingReceive[T any](ch <-chan T) Receive[T] { return Receive[T]{mode: non_blocking, ch: ch} }
+func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
+	return ChanReceive[T]{mode: non_blocking, ch: ch}
+}
 
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
-func (ro Receive[T]) Drop(ctx context.Context) bool { return IsOk(ro.Producer().Check(ctx)) }
+func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return IsOk(ro.Producer().Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
-func (ro Receive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx) }
+func (ro ChanReceive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx) }
 
 // Force ignores the error returning only the value from Read. This is
 // either the value sent through the channel, or the zero value for
 // T. Because zero values can be sent through channels, Force does not
 // provide a way to distinguish between "channel-closed" and "received
 // a zero value".
-func (ro Receive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(ctx); return }
+func (ro ChanReceive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(ctx); return }
 
 // Check performs the read operation and converts the error into an
 // "ok" value, returning true if receive was successful and false
 // otherwise.
-func (ro Receive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer().Check(ctx) }
+func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer().Check(ctx) }
 
 // Read performs the read operation according to the
 // blocking/non-blocking semantics of the receive operation.
@@ -103,7 +107,7 @@ func (ro Receive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer()
 //
 // In all cases when Read() returns an error, the return value is the
 // zero value for T.
-func (ro Receive[T]) Read(ctx context.Context) (T, error) {
+func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 	switch ro.mode {
 	case blocking:
 		select {
@@ -144,10 +148,10 @@ func (ro Receive[T]) Read(ctx context.Context) (T, error) {
 
 // Producer returns the Read method as a producer for integration into
 // existing tools.
-func (ro Receive[T]) Producer() Producer[T]  { return ro.Read }
-func (ro Receive[T]) Iterator() *Iterator[T] { return ro.Producer().Iterator() }
+func (ro ChanReceive[T]) Producer() Producer[T]  { return ro.Read }
+func (ro ChanReceive[T]) Iterator() *Iterator[T] { return ro.Producer().Iterator() }
 
-func (ro Receive[T]) Consume(op Processor[T]) Worker {
+func (ro ChanReceive[T]) Consume(op Processor[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
 
@@ -167,43 +171,43 @@ func (ro Receive[T]) Consume(op Processor[T]) Worker {
 	}
 }
 
-// Send provides access to channel send operations, and is
-// contstructed by the Send() method on the channel operation. The
+// ChanSend provides access to channel send operations, and is
+// contstructed by the ChanSend() method on the channel operation. The
 // primary method is Write(), with other methods provided for clarity.
-type Send[T any] struct {
+type ChanSend[T any] struct {
 	mode blockingMode
 	ch   chan<- T
 }
 
 // BlockingSend is equivalent to Blocking(ch).Send() except that
 // it accepts a send-only channel.
-func BlockingSend[T any](ch chan<- T) Send[T] { return Send[T]{mode: blocking, ch: ch} }
+func BlockingSend[T any](ch chan<- T) ChanSend[T] { return ChanSend[T]{mode: blocking, ch: ch} }
 
 // NonBlockingSend is equivalent to NonBlocking(ch).Send() except that
 // it accepts a send-only channel.
-func NonBlockingSend[T any](ch chan<- T) Send[T] { return Send[T]{mode: non_blocking, ch: ch} }
+func NonBlockingSend[T any](ch chan<- T) ChanSend[T] { return ChanSend[T]{mode: non_blocking, ch: ch} }
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
-func (sm Send[T]) Check(ctx context.Context, it T) bool { return sm.Processor().Check(ctx, it) }
+func (sm ChanSend[T]) Check(ctx context.Context, it T) bool { return sm.Processor().Check(ctx, it) }
 
 // Ignore performs a send and omits the error.
-func (sm Send[T]) Ignore(ctx context.Context, it T) { sm.Processor().Ignore(ctx, it) }
+func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { sm.Processor().Ignore(ctx, it) }
 
 // Processor returns the Write method as a processor for integration
 // into existing tools
-func (sm Send[T]) Processor() Processor[T] { return sm.Write }
+func (sm ChanSend[T]) Processor() Processor[T] { return sm.Write }
 
 // Zero sends the zero value of T through the channel.
-func (sm Send[T]) Zero(ctx context.Context) error { return sm.Write(ctx, ZeroOf[T]()) }
+func (sm ChanSend[T]) Zero(ctx context.Context) error { return sm.Write(ctx, ZeroOf[T]()) }
 
 // Signal attempts to sends the Zero value of T through the channel
 // and returns when: the send succeeds, the channel is full and this
 // is a non-blocking send, the context is canceled, or the channel is
 // closed.
-func (sm Send[T]) Signal(ctx context.Context) { sm.Ignore(ctx, ZeroOf[T]()) }
+func (sm ChanSend[T]) Signal(ctx context.Context) { sm.Ignore(ctx, ZeroOf[T]()) }
 
-func (sm Send[T]) WorkerPipe(input Producer[T]) Worker { return Pipe(input, sm.Processor()) }
+func (sm ChanSend[T]) WorkerPipe(input Producer[T]) Worker { return Pipe(input, sm.Processor()) }
 
 // Write sends the item into the channel captured by
 // Blocking/NonBlocking returning the appropriate error.
@@ -214,7 +218,7 @@ func (sm Send[T]) WorkerPipe(input Producer[T]) Worker { return Pipe(input, sm.P
 // cancelation error when the context is canceled, and for
 // non-blocking sends, if the channel did not accept the write,
 // ErrSkippedNonBlockingChannelOperation is returned.
-func (sm Send[T]) Write(ctx context.Context, it T) (err error) {
+func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 	defer func() {
 		if recover() != nil {
 			err = io.EOF
@@ -246,7 +250,7 @@ func (sm Send[T]) Write(ctx context.Context, it T) (err error) {
 	}
 }
 
-func (sm Send[T]) Consume(iter *Iterator[T]) Worker {
+func (sm ChanSend[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Splice(iter.Close(), err, ers.ParsePanic(recover())) }()
 

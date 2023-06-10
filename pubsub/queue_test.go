@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -491,7 +492,7 @@ func TestQueueIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
+			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
 
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
@@ -511,7 +512,7 @@ func TestQueueIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
+			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 
@@ -532,7 +533,7 @@ func TestQueueIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tt := fun.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
+			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
 			start := time.Now()

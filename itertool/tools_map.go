@@ -62,7 +62,7 @@ func mapWorker[T any, O any](
 	opts Options,
 	mapper func(context.Context, T) (O, error),
 	input *fun.Iterator[T],
-	output fun.Send[O],
+	output fun.ChanSend[O],
 ) fun.Worker {
 	return func(ctx context.Context) error {
 		proc := input.Producer()

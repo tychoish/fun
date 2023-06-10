@@ -54,27 +54,20 @@ type Iterator[T any] struct {
 // called. Any non-nil error returned by the generator function is
 // propagated to the close method, as long as it is not a context
 // cancellation error or an io.EOF error.
-func Generator[T any](op Producer[T]) *Iterator[T] { return op.Iterator() }
-
-// MapIterator converts a map into an iterator of fun.Pair objects. The
-// iterator is panic-safe, and uses one go routine to track the
-// progress through the map. As a result you should always, either
-// exhaust the iterator, cancel the context that you pass to the
-// iterator OR call iterator.Close().
-//
-// To use this iterator the items in the map are not copied, and the
-// iteration order is randomized following the convention in go.
-//
-// Use in combination with other iterator processing tools
-// (generators, observers, transformers, etc.) to limit the number of
-// times a collection of data must be coppied.
-func MapIterator[K comparable, V any](in map[K]V) *Iterator[Pair[K, V]] { return Mapify(in).Iterator() }
-func MapKeys[K comparable, V any](in map[K]V) *Iterator[K]              { return Mapify(in).Keys() }
-func MapValues[K comparable, V any](in map[K]V) *Iterator[V]            { return Mapify(in).Values() }
-func SliceIterator[T any](in []T) *Iterator[T]                          { return Sliceify(in).Iterator() }
-func VariadicIterator[T any](in ...T) *Iterator[T]                      { return SliceIterator(in) }
-func ChannelIterator[T any](ch <-chan T) *Iterator[T]                   { return BlockingReceive(ch).Iterator() }
-
+func Generator[T any](op Producer[T]) *Iterator[T]    { return op.Iterator() }
+func VariadicIterator[T any](in ...T) *Iterator[T]    { return SliceIterator(in) }
+func ChannelIterator[T any](ch <-chan T) *Iterator[T] { return BlockingReceive(ch).Iterator() }
+func SliceIterator[T any](in []T) *Iterator[T] {
+	s := in
+	var idx int = -1
+	return Producer[T](func(ctx context.Context) (out T, _ error) {
+		if len(s) <= idx+1 {
+			return out, io.EOF
+		}
+		idx++
+		return s[idx], ctx.Err()
+	}).Iterator()
+}
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
 

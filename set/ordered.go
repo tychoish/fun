@@ -4,17 +4,18 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/seq"
 )
 
 type orderedLLSet[T comparable] struct {
-	set   fun.Map[T, *seq.Element[T]]
+	set   dt.Map[T, *seq.Element[T]]
 	elems seq.List[T]
 }
 
 // MakeOrdered constructs an ordered set implementation.
 func MakeOrdered[T comparable]() Set[T] {
-	return &orderedLLSet[T]{set: fun.Map[T, *seq.Element[T]]{}}
+	return &orderedLLSet[T]{set: dt.Map[T, *seq.Element[T]]{}}
 }
 
 // BuildOrdered creates an ordered set (new implementation) from
@@ -54,7 +55,7 @@ func (lls *orderedLLSet[T]) MarshalJSON() ([]byte, error) {
 }
 
 func (lls *orderedLLSet[T]) UnmarshalJSON(in []byte) error {
-	iter := fun.SliceIterator([]T{})
+	iter := dt.Sliceify([]T{}).Iterator()
 	iter.UnmarshalJSON(in)
 	Populate[T](context.Background(), lls, iter)
 	return iter.Close()

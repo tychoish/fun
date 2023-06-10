@@ -1,9 +1,10 @@
-package fun
+package dt
 
 import (
 	"context"
 	"encoding/json"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -34,29 +35,29 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) Pairs[K, V] { return in }
 // Pair constructs an iterator of pairs, which it builds from a
 // sequence of values, generating the keys using the provided key
 // function.
-func BuildPairs[K comparable, V any](ctx context.Context, iter *Iterator[V], keyf func(V) K) *Iterator[Pair[K, V]] {
-	return Transform(iter, func(in V) (Pair[K, V], error) { return MakePair(keyf(in), in), nil })
+func BuildPairs[K comparable, V any](ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) *fun.Iterator[Pair[K, V]] {
+	return fun.Transform(iter, func(in V) (Pair[K, V], error) { return MakePair(keyf(in), in), nil })
 }
 
 // Iterator return an iterator over each key-value pairs.
-func (p Pairs[K, V]) Iterator() *Iterator[Pair[K, V]] { return SliceIterator(p) }
+func (p Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return Sliceify(p).Iterator() }
 
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
-func (p Pairs[K, V]) Keys() *Iterator[K] { return PairKeys(p.Iterator()) }
+func (p Pairs[K, V]) Keys() *fun.Iterator[K] { return PairKeys(p.Iterator()) }
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
-func (p Pairs[K, V]) Values() *Iterator[V] { return PairValues(p.Iterator()) }
+func (p Pairs[K, V]) Values() *fun.Iterator[V] { return PairValues(p.Iterator()) }
 
 // PairKeys converts an iterator of Pairs to an iterator of its keys.
-func PairKeys[K comparable, V any](iter *Iterator[Pair[K, V]]) *Iterator[K] {
-	return Transform(iter, func(p Pair[K, V]) (K, error) { return p.Key, nil })
+func PairKeys[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) *fun.Iterator[K] {
+	return fun.Transform(iter, func(p Pair[K, V]) (K, error) { return p.Key, nil })
 }
 
 // PairValues converts an iterator of pairs to an iterator of its values.
-func PairValues[K comparable, V any](iter *Iterator[Pair[K, V]]) *Iterator[V] {
-	return Transform(iter, func(p Pair[K, V]) (V, error) { return p.Value, nil })
+func PairValues[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) *fun.Iterator[V] {
+	return fun.Transform(iter, func(p Pair[K, V]) (V, error) { return p.Value, nil })
 }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
@@ -120,19 +121,19 @@ func (p Pairs[K, V]) Append(new ...Pair[K, V]) Pairs[K, V] { return append(p, ne
 func (p *Pairs[K, V]) Extend(toAdd Pairs[K, V]) { *p = append(*p, toAdd...) }
 
 // Consume adds items from an iterator of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) Consume(ctx context.Context, iter *Iterator[Pair[K, V]]) error {
+func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
 	return iter.Observe(ctx, func(item Pair[K, V]) { p.AddPair(item) })
 }
 
 // ConsumeValues adds all of the values in the input iterator,
 // generating the keys using the function provided.
-func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *Iterator[V], keyf func(V) K) error {
+func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) error {
 	return p.Consume(ctx, BuildPairs(ctx, iter, keyf))
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.
 func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
-	InvariantMust(p.Consume(context.Background(), Mapify(in).Iterator()))
+	fun.InvariantMust(p.Consume(context.Background(), Mapify(in).Iterator()))
 }
 
 // ConsumeSlice adds all the values in the input slice to the Pairs

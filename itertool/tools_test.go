@@ -17,6 +17,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -25,7 +26,7 @@ func getConstructors[T comparable](t *testing.T) []FixtureIteratorConstuctors[T]
 		{
 			Name: "SlicifyIterator",
 			Constructor: func(elems []T) *fun.Iterator[T] {
-				return fun.Sliceify(elems).Iterator()
+				return fun.SliceIterator(elems)
 			},
 		},
 		{
@@ -253,7 +254,7 @@ func TestParallelForEach(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out := fun.Must(seen.Keys().Slice(ctx))
+				out := risky.Force(seen.Keys().Slice(ctx))
 
 				testt.Log(t, "output", out)
 				testt.Log(t, "input", elems)
@@ -303,7 +304,7 @@ func TestParallelForEach(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		errs := fun.Must(es.Iterator().Slice(ctx))
+		errs := risky.Force(es.Iterator().Slice(ctx))
 
 		if len(errs) != 200 {
 			// panics and expected
@@ -344,7 +345,7 @@ func TestParallelForEach(t *testing.T) {
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := fun.Must(es.Iterator().Slice(ctx))
+		errs := risky.Force(es.Iterator().Slice(ctx))
 		if len(errs) != 2 {
 			// panic + expected
 			t.Error(len(errs))
@@ -393,7 +394,7 @@ func TestParallelForEach(t *testing.T) {
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := fun.Must(es.Iterator().Slice(ctx))
+		errs := risky.Force(es.Iterator().Slice(ctx))
 		if len(errs) != 10 {
 			t.Error(len(errs), "!= 10", errs)
 		}
@@ -420,7 +421,7 @@ func TestParallelForEach(t *testing.T) {
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := fun.Must(es.Iterator().Slice(ctx))
+		errs := risky.Force(es.Iterator().Slice(ctx))
 		// it's two and not one because each worker thread
 		// ran one task before aborting
 		if len(errs) > 2 {

@@ -11,7 +11,9 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/seq"
 )
 
@@ -37,7 +39,7 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
-		iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
+		iter := dt.Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
 		list, err := seq.NewListFromIterator(ctx, iter)
 		assert.NotError(t, err)
 		assert.Equal(t, list.Len(), 10)
@@ -132,7 +134,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), fun.Must(list.Iterator().Slice(ctx)))
+			t.Log(seen, list.Len(), risky.Force(list.Iterator().Slice(ctx)))
 			t.Error(seen, len(expected), expected)
 
 		}
@@ -614,7 +616,7 @@ func TestList(t *testing.T) {
 				t.Fatal("should have swapped")
 			}
 			// expected: [42, 840, 420, 84]
-			slice := fun.Must(list.Iterator().Slice(ctx))
+			slice := risky.Force(list.Iterator().Slice(ctx))
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
@@ -671,10 +673,10 @@ func TestList(t *testing.T) {
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := seq.GetPopulatedList(t, 100)
-			itemsOne := fun.Must(lOne.Iterator().Slice(ctx))
+			itemsOne := risky.Force(lOne.Iterator().Slice(ctx))
 
 			lTwo := seq.GetPopulatedList(t, 100)
-			itemsTwo := fun.Must(lTwo.Iterator().Slice(ctx))
+			itemsTwo := risky.Force(lTwo.Iterator().Slice(ctx))
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())

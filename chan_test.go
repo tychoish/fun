@@ -130,10 +130,10 @@ func TestChannel(t *testing.T) {
 
 					assert.True(t, !NonBlocking(ch).Send().Check(ctx, 1))
 
-					err = (Send[int]{ch: ch}).Write(ctx, 1)
+					err = (ChanSend[int]{ch: ch}).Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, io.EOF)
-					err = (Send[int]{mode: 42, ch: ch}).Write(ctx, 1)
+					err = (ChanSend[int]{mode: 42, ch: ch}).Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, io.EOF)
 				})
@@ -185,7 +185,7 @@ func TestChannel(t *testing.T) {
 				assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
 			})
 			t.Run("Invalid", func(t *testing.T) {
-				op := ChannelOp[string]{mode: 0, ch: make(chan string)}
+				op := ChanOp[string]{mode: 0, ch: make(chan string)}
 				val, err := op.Receive().Read(ctx)
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, io.EOF)
@@ -268,10 +268,10 @@ func TestChannel(t *testing.T) {
 
 					assert.True(t, !NonBlockingSend(ch).Check(ctx, 1))
 
-					err = (Send[int]{ch: ch}).Write(ctx, 1)
+					err = (ChanSend[int]{ch: ch}).Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, io.EOF)
-					err = (Send[int]{mode: 42, ch: ch}).Write(ctx, 1)
+					err = (ChanSend[int]{mode: 42, ch: ch}).Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, io.EOF)
 				})
@@ -314,7 +314,7 @@ func TestChannel(t *testing.T) {
 				assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
 			})
 			t.Run("Invalid", func(t *testing.T) {
-				op := ChannelOp[string]{mode: 0, ch: make(chan string)}
+				op := ChanOp[string]{mode: 0, ch: make(chan string)}
 				val, err := op.Receive().Read(ctx)
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, io.EOF)

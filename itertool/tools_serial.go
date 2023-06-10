@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -57,7 +58,7 @@ func Contains[T comparable](ctx context.Context, item T, iter *fun.Iterator[T]) 
 // in a map, returning the first instance of each equivalent object,
 // and skipping subsequent items
 func Uniq[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
-	set := fun.Mapify(map[T]struct{}{})
+	set := dt.Mapify(map[T]struct{}{})
 
 	return fun.Producer[T](func(ctx context.Context) (out T, _ error) {
 		for iter.Next(ctx) {
@@ -94,7 +95,7 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 
 	init := fun.Operation(func(ctx context.Context) {
 		defer pipe.Close()
-		iteriter := fun.SliceIterator(iters)
+		iteriter := dt.Sliceify(iters).Iterator()
 
 		// use direct iteration because this function has full
 		// ownership of the iterator and this is the easiest
@@ -168,7 +169,7 @@ UNWINDING:
 				continue UNWINDING
 			}
 		case interface{ Unwrap() []T }:
-			fun.Sliceify(wi.Unwrap()).Process(recursiveUnwinder)
+			dt.Sliceify(wi.Unwrap()).Process(recursiveUnwinder)
 		case interface{ Unwrap() *fun.Iterator[T] }:
 			wi.Unwrap().Process(ctx, recursiveUnwinder)
 		}

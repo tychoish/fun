@@ -1,4 +1,4 @@
-package fun
+package dt
 
 import (
 	"context"
@@ -6,15 +6,17 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
 
 func randomIntSlice(size int) Slice[int] {
 	out := make([]int, size)
 	for idx := range out {
-		out[idx] = rand.Intn(size + 1*2)
+		out[idx] = internal.Abs(rand.Intn(size) + 1)
 	}
 	return Sliceify(out)
 }
@@ -132,10 +134,13 @@ func TestSlice(t *testing.T) {
 	t.Run("Copy", func(t *testing.T) {
 		one := randomIntSlice(100)
 		two := one.Copy()
-		assert.EqualItems(t, one, two)
+		check.EqualItems(t, one, two)
+		one[77] = 33
 		two[77] = 42
-		assert.NotEqualItems(t, one, two)
-		assert.NotEqual(t, one[77], two[77])
+		testt.Log(t, "one", one)
+		testt.Log(t, "two", two)
+		check.NotEqualItems(t, one, two)
+		check.NotEqual(t, one[77], two[77])
 	})
 	t.Run("Sort", func(t *testing.T) {
 		one := randomIntSlice(100)
@@ -222,7 +227,7 @@ func TestSlice(t *testing.T) {
 				return nil
 			})
 			err := worker(ctx)
-			check.Equal(t, count, batchSize/2)
+			check.Equal(t, count, batchSize/2+1)
 			check.NotError(t, err)
 		})
 		t.Run("PropogateError", func(t *testing.T) {
@@ -231,7 +236,7 @@ func TestSlice(t *testing.T) {
 			worker := s.Process(func(ctx context.Context, in int) error {
 				count++
 				if count == 64 {
-					return ErrLimitExceeded
+					return fun.ErrLimitExceeded
 				}
 				check.NotZero(t, in)
 				return nil
@@ -239,7 +244,41 @@ func TestSlice(t *testing.T) {
 			err := worker(ctx)
 			check.Equal(t, count, 64)
 			check.Error(t, err)
-			check.ErrorIs(t, err, ErrLimitExceeded)
+			check.ErrorIs(t, err, fun.ErrLimitExceeded)
 		})
 	})
+	t.Run("When", func(t *testing.T) {
+		sl := Slice[int]{}
+		t.Run("Add", func(t *testing.T) {
+			sl.AddWhen(true, 1)
+			check.Equal(t, len(sl), 1)
+			sl.AddWhen(false, 100)
+			check.Equal(t, len(sl), 1)
+		})
+		sl.Reset()
+
+		t.Run("Append", func(t *testing.T) {
+			sl.AppendWhen(true, 1, 100, 1000)
+			check.Equal(t, len(sl), 3)
+			sl.AppendWhen(false, 42, 420, 4200)
+			check.Equal(t, len(sl), 3)
+		})
+		sl.Reset()
+
+		t.Run("Extend", func(t *testing.T) {
+			sl.ExtendWhen(true, Slice[int]{1, 100, 1000})
+			check.Equal(t, len(sl), 3)
+			sl.ExtendWhen(false, Slice[int]{42, 420, 4200})
+			check.Equal(t, len(sl), 3)
+		})
+	})
+	t.Run("Filter", func(t *testing.T) {
+		sl := Slice[int]{100, 100, 40, 42}
+		check.Equal(t, sl.Len(), 4)
+		next := sl.Filter(func(in int) bool { return in != 100 })
+		check.Equal(t, next.Len(), 2)
+		check.Equal(t, next[0], 40)
+		check.Equal(t, next[1], 42)
+	})
+
 }

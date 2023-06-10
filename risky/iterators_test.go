@@ -4,8 +4,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/dt"
 )
 
 func TestIterator(t *testing.T) {
@@ -14,7 +14,7 @@ func TestIterator(t *testing.T) {
 		for idx := range out {
 			out[idx] = idx + rand.Intn(10*idx+1)
 		}
-		iter := fun.Sliceify(out).Iterator()
+		iter := dt.Sliceify(out).Iterator()
 		cpy := Slice(iter)
 		assert.EqualItems(t, out, cpy)
 	})

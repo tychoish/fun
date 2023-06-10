@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
@@ -64,7 +65,7 @@ type OptionProvider[T any] func(T) error
 
 func Apply[T any](opt T, opts ...OptionProvider[T]) (err error) {
 	defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
-	return fun.Sliceify(opts).Process(func(_ context.Context, proc OptionProvider[T]) error {
+	return dt.Sliceify(opts).Process(func(_ context.Context, proc OptionProvider[T]) error {
 		err = ers.Merge(proc(opt), err)
 		return nil
 	}).Block()

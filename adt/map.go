@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 )
 
 // Map provides a wrapper around the standard library's sync.Map type
@@ -31,7 +32,7 @@ func (mp *Map[K, V]) Delete(key K) { mp.mp.Delete(key) }
 func (mp *Map[K, V]) Store(k K, v V) { mp.mp.Store(k, v) }
 
 // Set adds a key and value to the map from a Pair.
-func (mp *Map[K, V]) Set(it fun.Pair[K, V]) { mp.Store(it.Key, it.Value) }
+func (mp *Map[K, V]) Set(it dt.Pair[K, V]) { mp.Store(it.Key, it.Value) }
 
 // Ensure adds a key to the map if it does not already exist, using
 // the default value. The default value, is taken from the pool, which
@@ -52,9 +53,9 @@ func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key))
 // in the map.
 func (mp *Map[K, V]) EnsureStore(k K, v V) bool { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
 
-// EnsureSet has the same semantics as EnsureStore, but takes a fun.Pair
+// EnsureSet has the same semantics as EnsureStore, but takes a dt.Pair
 // object.
-func (mp *Map[K, V]) EnsureSet(i fun.Pair[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
+func (mp *Map[K, V]) EnsureSet(i dt.Pair[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {
@@ -154,8 +155,8 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) {
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces an iterator that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Iterator() *fun.Iterator[fun.Pair[K, V]] {
-	return makeMapIterator(mp, func(k K, v V) fun.Pair[K, V] { return fun.MakePair(k, v) })
+func (mp *Map[K, V]) Iterator() *fun.Iterator[dt.Pair[K, V]] {
+	return makeMapIterator(mp, func(k K, v V) dt.Pair[K, V] { return dt.MakePair(k, v) })
 }
 
 // Keys returns an iterator that renders all of the keys in the map.

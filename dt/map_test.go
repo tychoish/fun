@@ -1,4 +1,4 @@
-package fun
+package dt
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/testt"
 )
 
 func makeMap(size int) Map[string, int] {
@@ -135,7 +136,7 @@ func TestMap(t *testing.T) {
 		t.Run("Values", func(t *testing.T) {
 			mp := Map[string, int]{}
 			mp.ConsumeValues(ctx,
-				SliceIterator([]int{1, 2, 3}),
+				Sliceify([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
 			)
 			check.Equal(t, mp["1"], 1)
@@ -144,4 +145,76 @@ func TestMap(t *testing.T) {
 
 		})
 	})
+	t.Run("MapConverter", func(t *testing.T) {
+		in := map[string]string{
+			"hi":  "there",
+			"how": "are you doing",
+		}
+		iter := Mapify(in).Iterator()
+		seen := 0
+		for iter.Next(ctx) {
+			item := iter.Value()
+			switch {
+			case item.Key == "hi":
+				check.Equal(t, item.Value, "there")
+			case item.Key == "how":
+				check.Equal(t, item.Value, "are you doing")
+			default:
+				t.Errorf("unexpected value: %s", item)
+			}
+			seen++
+		}
+		assert.Equal(t, seen, len(in))
+	})
+	t.Run("Constructors", func(t *testing.T) {
+		ctx := testt.Context(t)
+		t.Run("MapKeys", func(t *testing.T) {
+			mp := Map[string, int]{}
+			mp.Add("big", 42)
+			mp.Add("small", 4)
+			mp.Add("orange", 400)
+			keys := MapKeys(mp)
+
+			count := 0
+			err := keys.Observe(ctx, func(in string) {
+				switch in {
+				case "big":
+					count++
+				case "small":
+					count++
+				case "orange":
+					count++
+				default:
+					t.Error("unexpected", in)
+				}
+			})
+			assert.Equal(t, 3, count)
+			assert.NotError(t, err)
+		})
+		t.Run("MapKeys", func(t *testing.T) {
+			mp := Map[string, int]{}
+			mp.Add("big", 42)
+			mp.Add("small", 4)
+			mp.Add("orange", 400)
+
+			keys := MapValues(mp)
+
+			count := 0
+			err := keys.Observe(ctx, func(in int) {
+				switch in {
+				case 42:
+					count++
+				case 4:
+					count++
+				case 400:
+					count++
+				default:
+					t.Error("unexpected", in)
+				}
+			})
+			assert.Equal(t, 3, count)
+			assert.NotError(t, err)
+		})
+	})
+
 }

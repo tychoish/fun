@@ -1,4 +1,4 @@
-package fun
+package dt
 
 import (
 	"context"
@@ -73,7 +73,7 @@ func TestPairs(t *testing.T) {
 			p := Pairs[string, int]{}
 			err := p.ConsumeValues(
 				testt.Context(t),
-				SliceIterator([]int{1, 2, 3}),
+				Sliceify([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
 			)
 			assert.NotError(t, err)

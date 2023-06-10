@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
@@ -34,12 +35,12 @@ func (tt *waitPushCase) check(t *testing.T) {
 func makeWaitPushCases() []*waitPushCase {
 	var cases []*waitPushCase
 
-	front := &waitPushCase{Name: "Front", dq: fun.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
+	front := &waitPushCase{Name: "Front", dq: risky.Force(NewDeque[int](DequeOptions{Capacity: 2}))}
 	front.Push = front.dq.WaitPushFront
 	front.Pop = front.dq.PopBack
 	cases = append(cases, front)
 
-	back := &waitPushCase{Name: "Back", dq: fun.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
+	back := &waitPushCase{Name: "Back", dq: risky.Force(NewDeque[int](DequeOptions{Capacity: 2}))}
 	back.Push = back.dq.WaitPushBack
 	back.Pop = back.dq.PopFront
 	cases = append(cases, back)
@@ -82,7 +83,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewQueue[T](QueueOptions{HardLimit: 100, SoftQuota: 60}))
+			cue := risky.Force(NewQueue[T](QueueOptions{HardLimit: 100, SoftQuota: 60}))
 
 			return fixture[T]{
 				name:     "QueueLimited",
@@ -161,7 +162,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 		},
 		// simple capacity
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:     "DequeCapacityPushFrontPopBackForward",
@@ -174,7 +175,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:     "DequeCapacityPushBackPopFrontReverse",
@@ -187,7 +188,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:     "DequeCapacityPushFrontPopBackReverse",
@@ -201,7 +202,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 		},
 
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:     "DequeCapacityPushBackPopFrontForward",
@@ -216,7 +217,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 
 		// bursty limited size
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
+			cue := risky.Force(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
 
 			return fixture[T]{
 				name:     "DequeBurstPushFrontPopBackForward",
@@ -229,7 +230,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
+			cue := risky.Force(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
 
 			return fixture[T]{
 				name:     "DequeBurstPushBackPopFrontReverse",
@@ -242,7 +243,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := fun.Must(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
+			cue := risky.Force(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
 
 			return fixture[T]{
 				name:     "DequeBurstPushFrontPopBackReverse",
@@ -786,7 +787,7 @@ func TestDequeIntegration(t *testing.T) {
 
 		t.Parallel()
 
-		queue := fun.Must(NewDeque[int64](DequeOptions{Unlimited: true}))
+		queue := risky.Force(NewDeque[int64](DequeOptions{Unlimited: true}))
 		ctx := testt.Context(t)
 		counter := &atomic.Int64{}
 		input := &atomic.Int64{}
@@ -854,7 +855,7 @@ func TestDequeIntegration(t *testing.T) {
 	t.Run("ProducerConsumer", func(t *testing.T) {
 		t.Parallel()
 		ctx := testt.ContextWithTimeout(t, time.Second)
-		queue := fun.Must(NewDeque[func()](DequeOptions{Unlimited: true}))
+		queue := risky.Force(NewDeque[func()](DequeOptions{Unlimited: true}))
 		sent := &atomic.Int64{}
 		recv := &atomic.Int64{}
 

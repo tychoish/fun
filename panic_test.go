@@ -110,12 +110,19 @@ func TestPanics(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
-	})
-	t.Run("InvariantCheck", func(t *testing.T) {
+		t.Run("Panic", func(t *testing.T) {
+			root := errors.New("kip")
+			err := ers.Check(func() { InvariantMust(root) })
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			assert.ErrorIs(t, err, root)
+			assert.ErrorIs(t, err, ErrInvariantViolation)
+		})
 		t.Run("Propogate", func(t *testing.T) {
 			root := errors.New("kip")
 			err := ers.Check(func() {
-				InvariantCheck(func() error { return root }, "annotate")
+				InvariantMust(root, "annotate")
 			})
 			if err == nil {
 				t.Fatal("expected error")
@@ -133,7 +140,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Nil", func(t *testing.T) {
 			err := ers.Check(func() {
-				InvariantCheck(func() error { return nil }, "annotate")
+				InvariantMust(nil, "annotate")
 			})
 			if err != nil {
 				t.Fatal(err)

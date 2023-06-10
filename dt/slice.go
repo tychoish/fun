@@ -1,10 +1,12 @@
-package fun
+package dt
 
 import (
 	"context"
 	"errors"
 	"io"
 	"sort"
+
+	"github.com/tychoish/fun"
 )
 
 // Slice is just a local wrapper around a slice, providing a similarly
@@ -17,16 +19,7 @@ func Variadic[T any](in ...T) Slice[T] { return in }
 
 // Iterator returns an iterator to the items of the slice the range
 // keyword also works for these slices.
-func (s Slice[T]) Iterator() *Iterator[T] {
-	var idx int = -1
-	return Producer[T](func(ctx context.Context) (out T, _ error) {
-		if len(s) <= idx+1 {
-			return out, io.EOF
-		}
-		idx++
-		return s[idx], ctx.Err()
-	}).Iterator()
-}
+func (s Slice[T]) Iterator() *fun.Iterator[T] { return fun.SliceIterator(s) }
 
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false
@@ -37,15 +30,15 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 
 // Add adds a single item to the slice.
 func (s *Slice[T]) Add(in T)                { *s = append(*s, in) }
-func (s *Slice[T]) AddWhen(cond bool, in T) { WhenCall(cond, func() { s.Add(in) }) }
+func (s *Slice[T]) AddWhen(cond bool, in T) { fun.WhenCall(cond, func() { s.Add(in) }) }
 
 // Append adds all of the items to the slice.
 func (s *Slice[T]) Append(in ...T)                { s.Extend(in) }
-func (s *Slice[T]) AppendWhen(cond bool, in ...T) { WhenCall(cond, func() { s.Extend(in) }) }
+func (s *Slice[T]) AppendWhen(cond bool, in ...T) { fun.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Extend adds the items from the input slice to the root slice.
 func (s *Slice[T]) Extend(in []T)                { *s = append(*s, in...) }
-func (s *Slice[T]) ExtendWhen(cond bool, in []T) { WhenCall(cond, func() { s.Extend(in) }) }
+func (s *Slice[T]) ExtendWhen(cond bool, in []T) { fun.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }
@@ -63,10 +56,9 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 // allocation.
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
 
-func (s *Slice[T]) Observe(ob Observer[T]) {
-	sl := *s
-	for idx := range sl {
-		ob(sl[idx])
+func (s Slice[T]) Observe(of fun.Observer[T]) {
+	for idx := range s {
+		of(s[idx])
 	}
 }
 
@@ -114,13 +106,7 @@ func (s Slice[T]) IsEmpty() bool { return len(s) == 0 }
 // operation panics.
 func (s Slice[T]) Item(index int) T { return s[index] }
 
-func (s Slice[T]) Observe(of Observer[T]) {
-	for idx := range s {
-		of(s[idx])
-	}
-}
-
-func (s Slice[T]) Process(pf Processor[T]) Worker {
+func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
 	return func(ctx context.Context) error {
 		for idx := range s {
 			if err := pf(ctx, s[idx]); err != nil {

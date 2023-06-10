@@ -41,7 +41,7 @@ func generator[T any](
 	opts Options,
 	fn fun.Producer[T],
 	abort func(),
-	out fun.Send[T],
+	out fun.ChanSend[T],
 ) fun.Operation {
 	return func(ctx context.Context) {
 		defer abort()

@@ -109,5 +109,23 @@ func TestObserver(t *testing.T) {
 
 		assert.Equal(t, count, 10)
 	})
+	t.Run("Filter", func(t *testing.T) {
+		count := 0
+		of := Observer[int](func(i int) { count++; check.Equal(t, i, 42) })
+		off := of.Filter(func(i int) bool { return i == 42 })
 
+		off(42)
+		off(42)
+
+		check.Equal(t, count, 2)
+
+		// if the filter didn't work, this would fail the
+		// assertion in the observer above, so this is
+		// actually test:
+		off(420)
+		off(4200)
+
+		check.Equal(t, count, 2)
+
+	})
 }
