@@ -13,10 +13,6 @@ import (
 // the send or receive was therefore skipped.
 var ErrSkippedNonBlockingChannelOperation = errors.New("skipped non-blocking channel operation")
 
-// ZeroOf returns the zero-value for the type T specified as an
-// argument.
-func ZeroOf[T any]() (out T) { return }
-
 // blockingMode provides named constants for blocking/non-blocking
 // operations. They are fully internal, and only used indirectly.
 type blockingMode int8
@@ -108,17 +104,18 @@ func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ro.Produc
 // In all cases when Read() returns an error, the return value is the
 // zero value for T.
 func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
+	var zero T
 	switch ro.mode {
 	case blocking:
 		select {
 		case <-ctx.Done():
-			return ZeroOf[T](), ctx.Err()
+			return zero, ctx.Err()
 		case obj, ok := <-ro.ch:
 			if !ok {
-				return ZeroOf[T](), io.EOF
+				return zero, io.EOF
 			}
 			if err := ctx.Err(); err != nil {
-				return ZeroOf[T](), err
+				return zero, err
 			}
 
 			return obj, nil
@@ -126,23 +123,23 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 	case non_blocking:
 		select {
 		case <-ctx.Done():
-			return ZeroOf[T](), ctx.Err()
+			return zero, ctx.Err()
 		case obj, ok := <-ro.ch:
 			if !ok {
-				return ZeroOf[T](), io.EOF
+				return zero, io.EOF
 			}
 			if err := ctx.Err(); err != nil {
-				return ZeroOf[T](), err
+				return zero, err
 			}
 
 			return obj, nil
 		default:
-			return ZeroOf[T](), ErrSkippedNonBlockingChannelOperation
+			return zero, ErrSkippedNonBlockingChannelOperation
 		}
 	default:
 		// this is impossible without an invalid blockingMode
 		// value
-		return ZeroOf[T](), io.EOF
+		return zero, io.EOF
 	}
 }
 
@@ -199,13 +196,13 @@ func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { sm.Processor().Ignore(
 func (sm ChanSend[T]) Processor() Processor[T] { return sm.Write }
 
 // Zero sends the zero value of T through the channel.
-func (sm ChanSend[T]) Zero(ctx context.Context) error { return sm.Write(ctx, ZeroOf[T]()) }
+func (sm ChanSend[T]) Zero(ctx context.Context) error { var v T; return sm.Write(ctx, v) }
 
 // Signal attempts to sends the Zero value of T through the channel
 // and returns when: the send succeeds, the channel is full and this
 // is a non-blocking send, the context is canceled, or the channel is
 // closed.
-func (sm ChanSend[T]) Signal(ctx context.Context) { sm.Ignore(ctx, ZeroOf[T]()) }
+func (sm ChanSend[T]) Signal(ctx context.Context) { var v T; sm.Ignore(ctx, v) }
 
 func (sm ChanSend[T]) WorkerPipe(input Producer[T]) Worker { return Pipe(input, sm.Processor()) }
 

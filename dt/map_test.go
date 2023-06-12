@@ -33,6 +33,7 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp.Iterator().Count(ctx), 100)
 		check.Equal(t, mp.Keys().Count(ctx), 100)
 		check.Equal(t, mp.Values().Count(ctx), 100)
+		check.Equal(t, MapIterator(mp).Count(ctx), 100)
 	})
 	t.Run("Extend", func(t *testing.T) {
 		mp := makeMap(100)

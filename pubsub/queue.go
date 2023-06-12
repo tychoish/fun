@@ -210,14 +210,17 @@ func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 	return nil
 }
 
-func (q *Queue[T]) unsafeWaitForNew(ctx context.Context) error {
+func (q *Queue[T]) waitForNew(ctx context.Context) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
 	go func() { <-ctx.Done(); q.nupdates.Broadcast() }()
 	defer cancel()
 
 	head := q.back
-	for head == q.back {
+	for head == q.back && q.back.link != q.front {
 		if q.closed {
 			return ErrQueueClosed
 		}
@@ -318,7 +321,7 @@ type entry[T any] struct {
 // queue has been closed via the Close() method.
 //
 // To create a "consuming" iterator, use a Distributor.
-func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().WithLock(&q.mu).Iterator() }
+func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().Iterator() }
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
 		push: fun.BlockingProcessor(q.Add),
@@ -352,17 +355,13 @@ func (q *Queue[T]) Producer() fun.Producer[T] {
 				return o, io.EOF
 			}
 
-			if err := q.unsafeWaitForNew(ctx); err != nil {
+			if err := q.waitForNew(ctx); err != nil {
 				return o, err
 			}
 
 			if next.link != q.front {
 				next = next.link
 			}
-		}
-
-		if next.link == q.front {
-			return o, io.EOF
 		}
 
 		return next.item, nil

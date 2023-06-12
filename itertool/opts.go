@@ -1,7 +1,6 @@
 package itertool
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -65,14 +64,18 @@ type OptionProvider[T any] func(T) error
 
 func Apply[T any](opt T, opts ...OptionProvider[T]) (err error) {
 	defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
-	return dt.Sliceify(opts).Process(func(_ context.Context, proc OptionProvider[T]) error {
+	dt.Sliceify(opts).Observe(func(proc OptionProvider[T]) {
 		err = ers.Merge(proc(opt), err)
-		return nil
-	}).Block()
+	})
+	return err
 }
 
-func ExcludeError(errs ...error) OptionProvider[*Options] {
-	return func(opts *Options) error { opts.ExcludededErrors = errs; return nil }
+func Set(opt *Options) OptionProvider[*Options] {
+	return func(o *Options) error { *o = *opt; return nil }
+}
+
+func AddExcludeErrors(errs ...error) OptionProvider[*Options] {
+	return func(opts *Options) error { opts.ExcludededErrors = append(opts.ExcludededErrors, errs...); return nil }
 }
 func IncludeContextErrors() OptionProvider[*Options] {
 	return func(opts *Options) error { opts.IncludeContextExpirationErrors = true; return nil }

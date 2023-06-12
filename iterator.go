@@ -148,11 +148,11 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map()
 func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
-	return Producer[T](func(ctx context.Context) (T, error) {
+	return Producer[T](func(ctx context.Context) (out T, _ error) {
 		for {
 			item, err := i.ReadOne(ctx)
 			if err != nil {
-				return ZeroOf[T](), err
+				return out, err
 			}
 
 			if check(item) {
@@ -174,10 +174,10 @@ func (i *Iterator[T]) Any() *Iterator[any] {
 // continue producing values as long as the input iterator produces
 // values, the context isn't canceled, or
 func Transform[I, O any](iter *Iterator[I], op func(in I) (O, error)) *Iterator[O] {
-	return Producer[O](func(ctx context.Context) (O, error) {
+	return Producer[O](func(ctx context.Context) (out O, _ error) {
 		item, err := iter.ReadOne(ctx)
 		if err != nil {
-			return ZeroOf[O](), err
+			return out, err
 		}
 
 		return op(item)

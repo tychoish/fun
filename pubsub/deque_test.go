@@ -777,7 +777,50 @@ func TestDeque(t *testing.T) {
 		}
 		t.Log(iter.Close(), queue.Len())
 	})
+	t.Run("Producer", func(t *testing.T) {
+		t.Run("BlockingEmpty", func(t *testing.T) {
+			t.Parallel()
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+			dq := NewUnlimitedDeque[string]()
+			_, err := dq.ProducerBlocking().Run(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.DeadlineExceeded)
+		})
+		t.Run("ReverseBlockingEmpty", func(t *testing.T) {
+			t.Parallel()
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+			dq := NewUnlimitedDeque[string]()
+			_, err := dq.ProducerReverseBlocking().Run(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.DeadlineExceeded)
+		})
+		t.Run("Production", func(t *testing.T) {
+			t.Parallel()
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+			dq := NewUnlimitedDeque[string]()
+			start := time.Now()
+			go func() {
+				select {
+				case <-ctx.Done():
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						t.Error("should not reach timeout")
+					}
+				case <-time.After(10 * time.Millisecond):
+					dq.PushBack("hello!")
+				}
+			}()
 
+			val, err := dq.ProducerBlocking().Run(ctx)
+			check.NotError(t, err)
+			check.Equal(t, val, "hello!")
+
+			dur := time.Since(start)
+
+			if dur < 10*time.Millisecond || dur > 25*time.Millisecond {
+				t.Error("duration out of bounds", dur)
+			}
+		})
+	})
 }
 
 func TestDequeIntegration(t *testing.T) {

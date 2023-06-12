@@ -55,7 +55,7 @@ func (m Map[K, V]) Load(key K) (V, bool) { v, ok := m[key]; return v, ok }
 
 // SetDefault set's sets the provided key in the map to the zero value
 // for the value type.
-func (m Map[K, V]) SetDefault(key K) { m[key] = fun.ZeroOf[V]() }
+func (m Map[K, V]) SetDefault(key K) { var vl V; m[key] = vl }
 
 // Pairs exports a map a Pairs object, which is an alias for a slice of
 // Pair objects.

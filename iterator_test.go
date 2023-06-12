@@ -94,6 +94,51 @@ func TestIteratorTools(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Process", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := 0
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return nil })
+			assert.NotError(t, err)
+			check.Equal(t, 9, count)
+		})
+		t.Run("Abort", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := 0
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return io.EOF })
+			assert.NotError(t, err)
+			assert.Equal(t, 1, count)
+		})
+		t.Run("OperationError", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := 0
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return ErrLimitExceeded })
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ErrLimitExceeded)
+			assert.Equal(t, 9, count)
+			assert.Equal(t, 9, len(Unwind(err)))
+		})
+		t.Run("Panic", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := 0
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; panic(ErrLimitExceeded) })
+			assert.Error(t, err)
+			check.Equal(t, 1, count)
+			check.ErrorIs(t, err, ErrRecoveredPanic)
+		})
+		t.Run("ContextExpired", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := 0
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; cancel(); return ctx.Err() })
+			assert.Error(t, err)
+			check.Equal(t, 1, count)
+			check.ErrorIs(t, err, context.Canceled)
+		})
+
+	})
 	t.Run("Transform", func(t *testing.T) {
 		input := SliceIterator([]string{
 			fmt.Sprint(10),

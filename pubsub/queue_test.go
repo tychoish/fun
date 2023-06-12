@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
@@ -451,10 +454,8 @@ func TestQueueIterator(t *testing.T) {
 		sig := make(chan struct{})
 		go func() {
 			defer close(sig)
-			queue.mu.Lock()
-			defer queue.mu.Unlock()
 
-			if err := queue.unsafeWaitForNew(ctx); !errors.Is(err, context.Canceled) {
+			if err := queue.waitForNew(ctx); !errors.Is(err, context.Canceled) {
 				t.Error(err)
 			}
 		}()
@@ -594,4 +595,30 @@ func TestQueueIterator(t *testing.T) {
 			}
 		})
 	})
+	t.Run("WaitOnEmpty", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+		queue := NewUnlimitedQueue[string]()
+		queue.front.link = queue.front
+		prod := queue.Producer()
+		out, err := prod(ctx)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, io.EOF)
+		assert.Zero(t, out)
+	})
+	t.Run("WaitOnClosed", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+		queue := NewUnlimitedQueue[string]()
+		sig := make(chan struct{})
+		prod := queue.Producer()
+		go func() {
+			defer close(sig)
+			v, err := prod(ctx)
+			check.Error(t, err)
+			check.ErrorIs(t, err, ErrQueueClosed)
+			check.Zero(t, v)
+		}()
+		time.Sleep(10 * time.Millisecond)
+		assert.NotError(t, queue.Close())
+	})
+
 }
