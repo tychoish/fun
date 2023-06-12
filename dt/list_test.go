@@ -1,4 +1,4 @@
-package seq_test
+package dt_test
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/risky"
-	"github.com/tychoish/fun/seq"
 )
 
 type jsonMarshlerError struct{}
@@ -26,7 +25,7 @@ func TestList(t *testing.T) {
 	defer cancel()
 	defer runtime.GC()
 	t.Run("Constructor", func(t *testing.T) {
-		list := &seq.List[int]{}
+		list := &dt.List[int]{}
 		if list.Len() != 0 {
 			t.Fatal("should initialize to zero")
 		}
@@ -40,7 +39,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
 		iter := dt.Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
-		list, err := seq.NewListFromIterator(ctx, iter)
+		list, err := dt.NewListFromIterator(ctx, iter)
 		assert.NotError(t, err)
 		assert.Equal(t, list.Len(), 10)
 		assert.Equal(t, list.Back().Value(), 0)
@@ -48,7 +47,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := ers.Safe(func() bool {
-			var list *seq.List[string]
+			var list *dt.List[string]
 			list.PushBack("hi")
 			return true
 		})
@@ -58,14 +57,14 @@ func TestList(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have gotten failure")
 		}
-		if !errors.Is(err, seq.ErrUninitialized) {
+		if !errors.Is(err, dt.ErrUninitialized) {
 			t.Error(err)
 		}
 		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-		assert.ErrorIs(t, err, seq.ErrUninitialized)
+		assert.ErrorIs(t, err, dt.ErrUninitialized)
 	})
 	t.Run("LengthTracks", func(t *testing.T) {
-		list := &seq.List[int]{}
+		list := &dt.List[int]{}
 
 		list.PushBack(1)
 		if list.Len() != 1 {
@@ -95,7 +94,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("FrontAndBack", func(t *testing.T) {
-		list := &seq.List[int]{}
+		list := &dt.List[int]{}
 
 		if list.Front().Ok() {
 			t.Error(list.Front())
@@ -113,7 +112,7 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("WrapAroundEffects", func(t *testing.T) {
-		list := &seq.List[int]{}
+		list := &dt.List[int]{}
 		for i := 0; i < 21; i++ {
 			if i%2 == 0 {
 				list.PushBack(i)
@@ -140,7 +139,7 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("CStyleIteration", func(t *testing.T) {
-		list := &seq.List[int]{}
+		list := &dt.List[int]{}
 		for i := 1; i <= 100; i++ {
 			list.PushBack(i)
 		}
@@ -188,7 +187,7 @@ func TestList(t *testing.T) {
 		})
 	})
 	t.Run("CStyleIterationDestructive", func(t *testing.T) {
-		list := &seq.List[int]{}
+		list := &dt.List[int]{}
 		for i := 1; i <= 100; i++ {
 			list.PushBack(i)
 		}
@@ -218,7 +217,7 @@ func TestList(t *testing.T) {
 			}
 		})
 
-		list = &seq.List[int]{}
+		list = &dt.List[int]{}
 		for i := 1; i <= 100; i++ {
 			list.PushBack(i)
 		}
@@ -250,7 +249,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			ct := 0
 			assert.NotPanic(t, func() {
 				iter := list.Iterator()
@@ -262,7 +261,7 @@ func TestList(t *testing.T) {
 			assert.Zero(t, ct)
 		})
 		t.Run("Forward", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
 			}
@@ -291,7 +290,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("ForwardPop", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
 			}
@@ -326,7 +325,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Reverse", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
 			}
@@ -355,7 +354,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("PopReverse", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
 			}
@@ -390,7 +389,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Closed", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
 			}
@@ -412,7 +411,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("Element", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			elem := seq.NewElement("hi")
+			elem := dt.NewElement("hi")
 			if fmt.Sprint(elem) != "hi" {
 				t.Fatal(fmt.Sprint(elem))
 			}
@@ -421,16 +420,16 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("ChainAppending", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			head := list.Front()
 			for i := 1; i <= 100; i++ {
-				head.Append(seq.NewElement(i))
+				head.Append(dt.NewElement(i))
 			}
 			if list.Len() != 100 {
 				t.Fatal(list.Len())
 			}
 			for i := 1; i <= 100; i++ {
-				head.Append(&seq.Element[int]{})
+				head.Append(&dt.Element[int]{})
 			}
 			if list.Len() != 100 {
 				t.Fatal(list.Len())
@@ -443,10 +442,10 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Remove", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			head := list.Front()
 			for i := 1; i <= 100; i++ {
-				head.Append(seq.NewElement(i))
+				head.Append(dt.NewElement(i))
 			}
 
 			if list.Len() != 100 {
@@ -470,7 +469,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("RemoveRoot", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			// this is the sentinel
 			head := list.Front()
 			if head.Ok() {
@@ -496,7 +495,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("SetOrphan", func(t *testing.T) {
-			elem := seq.NewElement("hello world!")
+			elem := dt.NewElement("hello world!")
 			if !elem.Ok() || elem.Value() != "hello world!" {
 				t.Fatal(elem.Value())
 			}
@@ -506,7 +505,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("SetListMember", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			list.PushFront(4242)
 			elem := list.Front()
 			if !elem.Ok() || elem.Value() != 4242 {
@@ -526,7 +525,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Drop", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			list.PushFront(4242)
 			list.PushFront(4242)
 			if list.Len() != 2 {
@@ -554,7 +553,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("Swap", func(t *testing.T) {
 		t.Run("FlipAdjacent", func(t *testing.T) {
-			list := &seq.List[string]{}
+			list := &dt.List[string]{}
 			list.PushBack("hello")
 			list.PushBack("world")
 			// ["hello", "world"]
@@ -570,7 +569,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Self", func(t *testing.T) {
-			list := &seq.List[string]{}
+			list := &dt.List[string]{}
 			list.PushBack("hello")
 			list.PushBack("world")
 
@@ -579,15 +578,15 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("NilList", func(t *testing.T) {
-			list := &seq.List[string]{}
+			list := &dt.List[string]{}
 			list.PushFront("hello")
 
-			if list.Front().Swap(seq.NewElement("world")) {
+			if list.Front().Swap(dt.NewElement("world")) {
 				t.Fatal(list.Iterator().Slice(ctx))
 			}
 		})
 		t.Run("Root", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			list.PushBack(42)
 			list.PushBack(84)
 
@@ -603,7 +602,7 @@ func TestList(t *testing.T) {
 
 		})
 		t.Run("NonAdjacent", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			list.PushBack(42)
 			list.PushBack(84)
 			list.PushBack(420)
@@ -635,8 +634,8 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("DifferentLists", func(t *testing.T) {
-			one := &seq.List[string]{}
-			two := &seq.List[string]{}
+			one := &dt.List[string]{}
+			two := &dt.List[string]{}
 			one.PushBack("hello")
 			two.PushBack("world")
 			if one.Front().Swap(two.Front()) {
@@ -644,7 +643,7 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Nil", func(t *testing.T) {
-			one := &seq.List[string]{}
+			one := &dt.List[string]{}
 			one.PushBack("hello")
 			one.PushBack("world")
 			if one.Front().Swap(nil) {
@@ -654,8 +653,8 @@ func TestList(t *testing.T) {
 	})
 	t.Run("Merge", func(t *testing.T) {
 		t.Run("Extend", func(t *testing.T) {
-			l1 := seq.GetPopulatedList(t, 100)
-			l2 := seq.GetPopulatedList(t, 100)
+			l1 := dt.GetPopulatedList(t, 100)
+			l2 := dt.GetPopulatedList(t, 100)
 			l2tail := l2.Back()
 
 			l1.Extend(l2)
@@ -672,10 +671,10 @@ func TestList(t *testing.T) {
 			}
 		})
 		t.Run("Order", func(t *testing.T) {
-			lOne := seq.GetPopulatedList(t, 100)
+			lOne := dt.GetPopulatedList(t, 100)
 			itemsOne := risky.Force(lOne.Iterator().Slice(ctx))
 
-			lTwo := seq.GetPopulatedList(t, 100)
+			lTwo := dt.GetPopulatedList(t, 100)
 			itemsTwo := risky.Force(lTwo.Iterator().Slice(ctx))
 
 			if len(itemsOne) != lOne.Len() {
@@ -706,7 +705,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("RoundTrip", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			list.PushBack(400)
 			list.PushBack(300)
 			list.PushBack(42)
@@ -717,7 +716,7 @@ func TestList(t *testing.T) {
 			if string(out) != "[400,300,42]" {
 				t.Error(string(out))
 			}
-			nl := &seq.List[int]{}
+			nl := &dt.List[int]{}
 
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
@@ -727,7 +726,7 @@ func TestList(t *testing.T) {
 			fun.Invariant(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 			list.Append(400, 300, 42)
 
 			out, err := list.MarshalJSON()
@@ -735,28 +734,28 @@ func TestList(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			nl := &seq.List[string]{}
+			nl := &dt.List[string]{}
 
 			if err := nl.UnmarshalJSON(out); err == nil {
 				t.Error("should have errored", nl.Front())
 			}
 		})
 		t.Run("ListUnmarshalNil", func(t *testing.T) {
-			list := &seq.List[int]{}
+			list := &dt.List[int]{}
 
 			if err := list.UnmarshalJSON(nil); err == nil {
 				t.Error("should error")
 			}
 		})
 		t.Run("ElementUnmarshalNil", func(t *testing.T) {
-			elem := seq.NewElement(0)
+			elem := dt.NewElement(0)
 
 			if err := elem.UnmarshalJSON(nil); err == nil {
 				t.Error("should error")
 			}
 		})
 		t.Run("NilPointerSafety", func(t *testing.T) {
-			list := &seq.List[jsonMarshlerError]{}
+			list := &dt.List[jsonMarshlerError]{}
 			list.PushBack(jsonMarshlerError{})
 			if out, err := list.MarshalJSON(); err == nil {
 				t.Fatal("expected error", string(out))
@@ -766,10 +765,10 @@ func TestList(t *testing.T) {
 }
 
 func BenchmarkList(b *testing.B) {
-	var e *seq.Element[int]
+	var e *dt.Element[int]
 	b.Run("SeedElemPool", func(b *testing.B) {
 		for i := 0; i < 200; i++ {
-			e = seq.NewElement(i)
+			e = dt.NewElement(i)
 		}
 		b.StopTimer()
 		if !e.Ok() {
@@ -812,7 +811,7 @@ func BenchmarkList(b *testing.B) {
 		b.Run("List", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				b.StopTimer()
-				list := &seq.List[int]{}
+				list := &dt.List[int]{}
 				list.PushBack(0)
 				list.PopBack()
 				b.StartTimer()
@@ -824,12 +823,12 @@ func BenchmarkList(b *testing.B) {
 		b.Run("ListElement", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				b.StopTimer()
-				list := &seq.List[int]{}
+				list := &dt.List[int]{}
 				list.PushBack(0)
 				list.PopBack()
 				b.StartTimer()
 				for i := 0; i < size; i++ {
-					list.Back().Append(seq.NewElement(i))
+					list.Back().Append(dt.NewElement(i))
 				}
 			}
 		})
@@ -847,7 +846,7 @@ func BenchmarkList(b *testing.B) {
 		b.Run("List", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				b.StopTimer()
-				list := &seq.List[int]{}
+				list := &dt.List[int]{}
 				list.PushBack(0)
 				list.PopBack()
 				b.StartTimer()
@@ -876,7 +875,7 @@ func BenchmarkList(b *testing.B) {
 		})
 		b.Run("List", func(b *testing.B) {
 			b.Run("Drop", func(b *testing.B) {
-				list := &seq.List[int]{}
+				list := &dt.List[int]{}
 				for i := 0; i < size; i++ {
 					list.PushFront(i)
 				}
@@ -893,7 +892,7 @@ func BenchmarkList(b *testing.B) {
 				}
 			})
 			b.Run("Remove", func(b *testing.B) {
-				list := &seq.List[int]{}
+				list := &dt.List[int]{}
 				for i := 0; i < size; i++ {
 					list.PushFront(i)
 				}
@@ -910,7 +909,7 @@ func BenchmarkList(b *testing.B) {
 				}
 			})
 			b.Run("Iterator", func(b *testing.B) {
-				list := &seq.List[int]{}
+				list := &dt.List[int]{}
 				for i := 0; i < size; i++ {
 					list.PushFront(i)
 				}
@@ -931,9 +930,9 @@ func BenchmarkList(b *testing.B) {
 			})
 			b.Run("RoundTrip", func(b *testing.B) {
 				b.Run("PooledElements", func(b *testing.B) {
-					list := &seq.List[int]{}
+					list := &dt.List[int]{}
 					for i := 0; i < size; i++ {
-						list.Front().Previous().Append(seq.NewElement(i))
+						list.Front().Previous().Append(dt.NewElement(i))
 					}
 
 					for j := 0; j < b.N; j++ {
@@ -947,7 +946,7 @@ func BenchmarkList(b *testing.B) {
 					}
 				})
 				b.Run("Values", func(b *testing.B) {
-					list := &seq.List[int]{}
+					list := &dt.List[int]{}
 					for i := 0; i < size; i++ {
 						list.PushFront(i)
 					}

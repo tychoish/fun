@@ -1,4 +1,4 @@
-package seq_test
+package dt_test
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/risky"
-	"github.com/tychoish/fun/seq"
 )
 
 func TestStack(t *testing.T) {
@@ -21,7 +21,7 @@ func TestStack(t *testing.T) {
 
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := ers.Safe(func() bool {
-			var list *seq.Stack[string]
+			var list *dt.Stack[string]
 			list.Push("hi")
 			return true
 		})
@@ -31,21 +31,21 @@ func TestStack(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have gotten failure")
 		}
-		if !errors.Is(err, seq.ErrUninitialized) {
+		if !errors.Is(err, dt.ErrUninitialized) {
 			t.Error(err)
 		}
 		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-		assert.ErrorIs(t, err, seq.ErrUninitialized)
+		assert.ErrorIs(t, err, dt.ErrUninitialized)
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
 		iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
-		stack, err := seq.NewStackFromIterator(ctx, iter)
+		stack, err := dt.NewStackFromIterator(ctx, iter)
 		assert.NotError(t, err)
 		assert.Equal(t, stack.Len(), 10)
 		assert.Equal(t, stack.Head().Value(), 0)
 	})
 	t.Run("Constructor", func(t *testing.T) {
-		stack := &seq.Stack[int]{}
+		stack := &dt.Stack[int]{}
 
 		if stack.Len() != 0 {
 			t.Fatal(stack.Len())
@@ -63,7 +63,7 @@ func TestStack(t *testing.T) {
 		}
 	})
 	t.Run("PopEmpty", func(t *testing.T) {
-		stack := &seq.Stack[int]{}
+		stack := &dt.Stack[int]{}
 
 		elem := stack.Pop()
 		// it didn't panic!
@@ -75,7 +75,7 @@ func TestStack(t *testing.T) {
 		}
 	})
 	t.Run("HeadEmpty", func(t *testing.T) {
-		stack := &seq.Stack[int]{}
+		stack := &dt.Stack[int]{}
 
 		elem := stack.Head()
 		// it didn't panic!
@@ -87,7 +87,7 @@ func TestStack(t *testing.T) {
 		}
 	})
 	t.Run("NonDestructiveAccess", func(t *testing.T) {
-		stack := &seq.Stack[int]{}
+		stack := &dt.Stack[int]{}
 		stack.Push(100)
 		stack.Push(42)
 		if stack.Head().Value() != 42 {
@@ -100,7 +100,7 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("Item", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			elem := &seq.Item[string]{}
+			elem := &dt.Item[string]{}
 			elem.Set("hi")
 			if fmt.Sprint(elem) != "hi" {
 				t.Fatal(fmt.Sprint(elem))
@@ -110,7 +110,7 @@ func TestStack(t *testing.T) {
 			}
 		})
 		t.Run("RemovingRoot", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Push(100)
 			if !stack.Head().Remove() {
 				t.Fatal("should have removed element")
@@ -126,7 +126,7 @@ func TestStack(t *testing.T) {
 			}
 		})
 		t.Run("SetRoot", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Push(100)
 			if val := stack.Pop(); !val.Ok() {
 				t.Fatal("should have removed element")
@@ -144,22 +144,22 @@ func TestStack(t *testing.T) {
 		})
 
 		t.Run("RemoveDetached", func(t *testing.T) {
-			item := seq.NewItem(100)
+			item := dt.NewItem(100)
 			if item.Remove() {
 				t.Fatal("shouldn't be able to remove detached self")
 			}
 		})
 		t.Run("AppendDetached", func(t *testing.T) {
-			item := seq.NewItem(100)
+			item := dt.NewItem(100)
 			if item != item.Append(nil) {
 				t.Error("nil appends should appear as noops")
 			}
-			if item != item.Append(seq.NewItem(200)) {
+			if item != item.Append(dt.NewItem(200)) {
 				t.Error("can't append to detached")
 			}
 		})
 		t.Run("AppendInSameList", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Push(100)
 			stack.Push(200)
 			stack.Push(400)
@@ -169,12 +169,12 @@ func TestStack(t *testing.T) {
 			}
 		})
 		t.Run("AppendInDifferentList", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Push(100)
 			stack.Push(200)
 			stack.Push(400)
 
-			stackTwo := &seq.Stack[int]{}
+			stackTwo := &dt.Stack[int]{}
 			stackTwo.Push(800)
 
 			if stack.Head() != stack.Head().Append(stackTwo.Head()) {
@@ -182,7 +182,7 @@ func TestStack(t *testing.T) {
 			}
 		})
 		t.Run("Removed", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Push(100)
 			poped := stack.Pop()
 			if poped.Remove() {
@@ -214,7 +214,7 @@ func TestStack(t *testing.T) {
 			})
 			t.Run("Empty", func(t *testing.T) {
 				one := GenerateStack(t, 16)
-				if one.Head().Attach(&seq.Stack[int]{}) {
+				if one.Head().Attach(&dt.Stack[int]{}) {
 					t.Error("do not attach empty stack")
 				}
 				if one.Len() != 16 {
@@ -233,7 +233,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Detach", func(t *testing.T) {
 			t.Run("UnconfiguredItem", func(t *testing.T) {
-				item := &seq.Item[string]{}
+				item := &dt.Item[string]{}
 				if item.Ok() {
 					t.Error("invalid item")
 				}
@@ -250,7 +250,7 @@ func TestStack(t *testing.T) {
 				}
 			})
 			t.Run("DetachedItem", func(t *testing.T) {
-				item := seq.NewItem(43)
+				item := dt.NewItem(43)
 				stack := item.Detach()
 				if stack.Head() != item || !item.In(stack) {
 					t.Fatal("item should be in the new list")
@@ -282,7 +282,7 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			list := &seq.Stack[int]{}
+			list := &dt.Stack[int]{}
 			ct := 0
 			assert.NotPanic(t, func() {
 				iter := list.Iterator()
@@ -343,7 +343,7 @@ func TestStack(t *testing.T) {
 			}
 		})
 		t.Run("EmptyStart", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			iter := stack.PopIterator()
 			seen := 0
 			for iter.Next(ctx) {
@@ -358,7 +358,7 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("RoundTrip", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Append(400, 300, 42)
 			out, err := stack.MarshalJSON()
 			if err != nil {
@@ -367,7 +367,7 @@ func TestStack(t *testing.T) {
 			if string(out) != "[42,300,400]" {
 				t.Error(string(out))
 			}
-			nl := &seq.Stack[int]{}
+			nl := &dt.Stack[int]{}
 
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
@@ -377,7 +377,7 @@ func TestStack(t *testing.T) {
 			fun.Invariant(nl.Head().Next().Next().Value() == stack.Head().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 			stack.Append(400, 300, 42)
 
 			out, err := stack.MarshalJSON()
@@ -385,28 +385,28 @@ func TestStack(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			nl := &seq.Stack[string]{}
+			nl := &dt.Stack[string]{}
 
 			if err := nl.UnmarshalJSON(out); err == nil {
 				t.Error("should have errored", nl.Head())
 			}
 		})
 		t.Run("StackUnmarshalNil", func(t *testing.T) {
-			stack := &seq.Stack[int]{}
+			stack := &dt.Stack[int]{}
 
 			if err := stack.UnmarshalJSON(nil); err == nil {
 				t.Error("should error")
 			}
 		})
 		t.Run("ItemUnmarshalNil", func(t *testing.T) {
-			elem := seq.NewItem(0)
+			elem := dt.NewItem(0)
 
 			if err := elem.UnmarshalJSON(nil); err == nil {
 				t.Error("should error")
 			}
 		})
 		t.Run("NilPointerSafety", func(t *testing.T) {
-			stack := &seq.Stack[jsonMarshlerError]{}
+			stack := &dt.Stack[jsonMarshlerError]{}
 			stack.Push(jsonMarshlerError{})
 			if out, err := stack.MarshalJSON(); err == nil {
 				t.Fatal("expected error", string(out))
@@ -415,9 +415,9 @@ func TestStack(t *testing.T) {
 	})
 }
 
-func GenerateStack(t *testing.T, size int) *seq.Stack[int] {
+func GenerateStack(t *testing.T, size int) *dt.Stack[int] {
 	t.Helper()
-	stack := &seq.Stack[int]{}
+	stack := &dt.Stack[int]{}
 	for i := 0; i < size; i++ {
 		stack.Push(1 + i + rand.Int())
 	}

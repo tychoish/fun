@@ -44,20 +44,14 @@ func (p Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return Sliceify(p).I
 
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
-func (p Pairs[K, V]) Keys() *fun.Iterator[K] { return PairKeys(p.Iterator()) }
+func (p Pairs[K, V]) Keys() *fun.Iterator[K] {
+	return fun.Transform(p.Iterator(), func(p Pair[K, V]) (K, error) { return p.Key, nil })
+}
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
-func (p Pairs[K, V]) Values() *fun.Iterator[V] { return PairValues(p.Iterator()) }
-
-// PairKeys converts an iterator of Pairs to an iterator of its keys.
-func PairKeys[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) *fun.Iterator[K] {
-	return fun.Transform(iter, func(p Pair[K, V]) (K, error) { return p.Key, nil })
-}
-
-// PairValues converts an iterator of pairs to an iterator of its values.
-func PairValues[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) *fun.Iterator[V] {
-	return fun.Transform(iter, func(p Pair[K, V]) (V, error) { return p.Value, nil })
+func (p Pairs[K, V]) Values() *fun.Iterator[V] {
+	return fun.Transform(p.Iterator(), func(p Pair[K, V]) (V, error) { return p.Value, nil })
 }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first

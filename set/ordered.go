@@ -5,17 +5,16 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/seq"
 )
 
 type orderedLLSet[T comparable] struct {
-	set   dt.Map[T, *seq.Element[T]]
-	elems seq.List[T]
+	set   dt.Map[T, *dt.Element[T]]
+	elems dt.List[T]
 }
 
 // MakeOrdered constructs an ordered set implementation.
 func MakeOrdered[T comparable]() Set[T] {
-	return &orderedLLSet[T]{set: dt.Map[T, *seq.Element[T]]{}}
+	return &orderedLLSet[T]{set: dt.Map[T, *dt.Element[T]]{}}
 }
 
 // BuildOrdered creates an ordered set (new implementation) from

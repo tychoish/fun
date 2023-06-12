@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/seq"
 )
 
 // Group makes it possible to have a collection of services, provided
@@ -172,7 +172,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 	// assume some reasonable defaults.
 	// copy the values out of the pipe so that we don't end up
 	// deadlocking or missing jobs. on shutdown.
-	cache := &seq.List[fun.Worker]{}
+	cache := &dt.List[fun.Worker]{}
 
 	return &Service{
 		Run: func(ctx context.Context) error {

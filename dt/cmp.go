@@ -1,4 +1,4 @@
-// Package seq provides single and double linked-list implementations
+// package dt provides single and double linked-list implementations
 // and tools (e.g. heap, sorting, iterators) for using these
 // structures.
 //
@@ -7,7 +7,7 @@
 // operations. These structures are not safe for access from multiple
 // concurrent go routines (see the queue/deque in the pubsub package
 // as an alternative for these use cases.)
-package seq
+package dt
 
 import (
 	"context"

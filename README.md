@@ -8,18 +8,21 @@ you *could* write one-offs for but shouldn't.
 
 Packages:
 
-- [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error collecting.)
-- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool) (iterator tools.)
-- [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message broker
-  and queues.)
-- [set](https://pkg.go.dev/github.com/tychoish/fun/set) (generic
-  ordered and unordered sets.)
-- [seq](https://pkg.go.dev/github.com/tychoish/fun/seq) (generic
-  linked lists.)
+- [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error
+  collection utilites.)
+- [ers](https://pkg.go.dev/github.com/tychoish/fun/erc) (error and
+  panic handling utilites.)
+- [dt](https://pkg.go.dev/github.com/tychoish/fun/dt) (generic
+  container datatypes, including ordered and unordered sets, singly
+  and doubly linked list, as well as wrappers around maps and slices.)
+- [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly typed
+  atomic data structures, wrappers, tools, and operations.)
+- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
+  (iterator tools.)
+- [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
+  broker and concurrency-safe queue and deque.)
 - [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
   orchestration and management framework.)
-- [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly
-  atomic data types and operations.)
 
 For more information, see the documentation, but of general interest:
 
@@ -30,13 +33,13 @@ For more information, see the documentation, but of general interest:
   load-shedding and message distribution patterns.
 - In `erc`, an error collector implementation for threadsafe error
   aggregation and introspection, particularly in worker-pool,
-  applications.
-- In `set`, a `Set` type, with ordered and unordered implementations.
+  applications. `ers` provides related functionality.
+- In `dt` a collection of data types and tools for manipulating
+  different container types, as well as implementations of linked
+  lists and sets.
 - Queue and Deque implementations (in `pubsub`) that provide
   thread-safe linked-list based implementations and `Wait` methods to
   block until new items added.
-- In `seq`, general purpose linked list implementations, with a
-  healthy feature set and flexible interface.
 - In `srv`, a service orchestration toolkit and lifecycle tools.
 - In `adt`, a collection of Atomic/Pool/Map operations that use
   generics to provide strongly typed interfaces for common operations.

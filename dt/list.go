@@ -1,4 +1,4 @@
-package seq
+package dt
 
 import (
 	"bytes"
@@ -58,7 +58,7 @@ type Element[T any] struct {
 // NewElement produces an unattached Element that you can use with
 // Append. Element.Append(NewElement()) is essentially the same as
 // List.PushBack().
-func NewElement[T any](val T) *Element[T] { return makeElement(val) }
+func NewElement[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 
 // String returns the string form of the value of the element.
 func (e *Element[T]) String() string { return fmt.Sprint(e.item) }

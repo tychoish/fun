@@ -1,4 +1,4 @@
-package seq
+package dt
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 )
 
 // Stack provides a generic singly linked list, with an interface that
-// is broadly similar to seq.List.
+// is broadly similar to dt.List.
 type Stack[T any] struct {
 	head            *Item[T]
 	length          int
@@ -42,7 +42,7 @@ type Item[T any] struct {
 }
 
 // NewItem produces a valid Item object for the specified value.
-func NewItem[T any](in T) *Item[T] { return makeItem(in) }
+func NewItem[T any](in T) *Item[T] { return &Item[T]{value: in, ok: true} }
 
 // String implements fmt.Stringer, and returns the string value of the
 // item's value.

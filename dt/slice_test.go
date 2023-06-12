@@ -280,5 +280,4 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, next[0], 40)
 		check.Equal(t, next[1], 42)
 	})
-
 }

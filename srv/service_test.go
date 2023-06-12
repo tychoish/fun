@@ -14,9 +14,9 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/risky"
-	"github.com/tychoish/fun/seq"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -182,7 +182,7 @@ func TestService(t *testing.T) {
 	})
 	t.Run("Group", func(t *testing.T) {
 		counter := &atomic.Int64{}
-		list := seq.List[*Service]{}
+		list := dt.List[*Service]{}
 		for i := 0; i < 100; i++ {
 			list.PushBack(&Service{
 				Name: fmt.Sprint(i),

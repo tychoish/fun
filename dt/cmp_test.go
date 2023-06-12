@@ -1,4 +1,4 @@
-package seq
+package dt
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/risky"
 )
@@ -250,7 +249,7 @@ func TestSort(t *testing.T) {
 			assert.ErrorIs(t, err, ErrUninitialized)
 		})
 		t.Run("IteratorConstructor", func(t *testing.T) {
-			iter := dt.Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
+			iter := Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
 			heap, err := NewHeapFromIterator(ctx, LessThanNative[int], iter)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)
@@ -334,14 +333,6 @@ func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[in
 	t.Helper()
 
 	return sort.IntsAreSorted(getSliceForList(ctx, t, list))
-}
-
-func randomIntSlice(size int) []int {
-	out := make([]int, size)
-	for idx := range out {
-		out[idx] = rand.Intn(size * 2)
-	}
-	return out
 }
 
 func BenchmarkSorts(b *testing.B) {
