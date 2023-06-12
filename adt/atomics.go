@@ -76,7 +76,8 @@ func (a *Atomic[T]) Get() (out T) { return castOrZero[T](a.val.Load()) }
 // new is nil, adt.Atomic.Swap() does NOT panic, and instead
 // constructs the zero value of type T.
 func (a *Atomic[T]) Swap(new T) (old T) {
-	switch v := a.val.Swap(castOrZero[T](new)).(type) {
+	// TODO: switch v := a.val.Swap(castOrZero[T](new)).(type) {
+	switch v := a.val.Swap(new).(type) {
 	case T:
 		return v
 	default:
@@ -134,10 +135,9 @@ func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
 func castOrZero[T any](val any) (out T) {
 	switch converted := val.(type) {
 	case T:
-		return converted
-	default:
-		return out
+		out = converted
 	}
+	return out
 }
 
 // SafeSet sets the atomic to the given value only if the value is not

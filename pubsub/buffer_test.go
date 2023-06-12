@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
@@ -62,7 +63,7 @@ func TestDistributor(t *testing.T) {
 
 			dist := queue.Distributor()
 
-			set := set.MakeOrdered[string]()
+			set := set.NewOrderedSet[string]()
 			seen := 0
 			if queue.tracker.len() != 3 {
 				t.Fatal(queue.tracker.len())
@@ -242,7 +243,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 			Name: "Seen",
 			Test: func(t *testing.T, d Distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-				seen := set.Synchronize(set.MakeUnordered[T]())
+				seen := set.Synchronize(dt.NewUnorderedSet[T]())
 				signal := make(chan struct{})
 				go func() {
 					defer close(signal)
@@ -263,7 +264,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 			Name: "PoolSeen",
 			Test: func(t *testing.T, d Distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-				seen := set.Synchronize(set.MakeUnordered[T]())
+				seen := set.Synchronize(dt.NewUnorderedSet[T]())
 				wg := &sync.WaitGroup{}
 				receive := d.Producer()
 				for i := 0; i < 8; i++ {

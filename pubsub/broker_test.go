@@ -10,6 +10,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/set"
 )
@@ -664,7 +665,7 @@ func TestBroker(t *testing.T) {
 		defer cancel()
 
 		broker := NewBroker[int](ctx, BrokerOptions{})
-		seen := set.Synchronize(set.MakeUnordered[int]())
+		seen := set.Synchronize(dt.NewUnorderedSet[int]())
 		sig := make(chan struct{})
 		sub := broker.Subscribe(ctx)
 		go func() {
