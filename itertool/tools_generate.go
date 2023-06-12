@@ -17,13 +17,17 @@ import (
 // configuration with the Map and ParallelForEach operations.
 func Generate[T any](
 	fn fun.Producer[T],
-	opts Options,
+	optp ...OptionProvider[*Options],
 ) *fun.Iterator[T] {
+	ec := &erc.Collector{}
+	opts := Options{}
+	ec.Add(Apply(&opts, optp...))
 	opts.init()
 	pipe := fun.Blocking(make(chan T, opts.NumWorkers*2+1))
-	ec := &erc.Collector{}
+	fun.WhenCall(ec.HasErrors(), pipe.Close)
 
 	init := fun.Operation(func(ctx context.Context) {
+
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &fun.WaitGroup{}
 		send := pipe.Send()

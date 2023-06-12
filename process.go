@@ -210,6 +210,8 @@ func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 	return func(ctx context.Context, in T) error { return ers.Filter(pf(ctx, in), errs...) }
 }
 
+func (pf Processor[T]) ReadFrom(prod Producer[T]) Worker { return Pipe(prod, pf) }
+
 ////////////////////////////////////////////////////////////////////////
 
 type tuple[T, U any] struct {

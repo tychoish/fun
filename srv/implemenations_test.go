@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,7 +43,7 @@ func TestImplementationHelpers(t *testing.T) {
 			srv := ProcessIterator(
 				makeIterator(100),
 				func(_ context.Context, in int) error { count.Add(1); return nil },
-				itertool.Options{NumWorkers: 2},
+				itertool.NumWorkers(2),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -68,7 +67,7 @@ func TestImplementationHelpers(t *testing.T) {
 					count.Add(1)
 					return nil
 				},
-				itertool.Options{NumWorkers: 50},
+				itertool.NumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -95,7 +94,7 @@ func TestImplementationHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				itertool.Options{NumWorkers: runtime.NumCPU()},
+				itertool.WorkerPerCPU(),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -115,7 +114,7 @@ func TestImplementationHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				itertool.Options{NumWorkers: 50},
+				itertool.WorkerPerCPU(),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 
@@ -144,7 +143,7 @@ func TestImplementationHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				itertool.Options{NumWorkers: runtime.NumCPU()},
+				itertool.NumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -172,7 +171,7 @@ func TestImplementationHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				itertool.Options{NumWorkers: 50},
+				itertool.NumWorkers(50),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 

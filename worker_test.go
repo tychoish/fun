@@ -555,5 +555,49 @@ func TestWorker(t *testing.T) {
 		})
 
 	})
+	t.Run("Pipe", func(t *testing.T) {
+		ctx := testt.Context(t)
+		expected := errors.New("cat")
+		errCt := 0
+		nopCt := 0
+		reset := func() { errCt = 0; nopCt = 0 }
+		errProd := func(ctx context.Context) (string, error) { errCt++; return "", expected }
+		nopProd := func(ctx context.Context) (string, error) { nopCt++; return "nop", nil }
+		errProc := func(ctx context.Context, in string) error { errCt++; return expected }
+		nopProc := func(ctx context.Context, in string) error { nopCt++; return nil }
 
+		var worker Worker
+
+		t.Run("FirstFail", func(t *testing.T) {
+			worker = Pipe(errProd, nopProc)
+			err := worker(ctx)
+			assert.ErrorIs(t, err, expected)
+			assert.Equal(t, errCt, 1)
+			assert.Equal(t, nopCt, 0)
+
+		})
+		t.Run("FirstFailCachesError", func(t *testing.T) {
+			err := worker(ctx)
+			assert.ErrorIs(t, err, expected)
+			assert.Equal(t, errCt, 1) // because cached
+			assert.Equal(t, nopCt, 0)
+		})
+
+		reset()
+
+		t.Run("SecondFails", func(t *testing.T) {
+			worker = Pipe(nopProd, errProc)
+
+			err := worker(ctx)
+			assert.ErrorIs(t, err, expected)
+			assert.Equal(t, errCt, 1)
+			assert.Equal(t, nopCt, 1)
+		})
+		t.Run("SecondFailureCaches", func(t *testing.T) {
+			err := worker(ctx)
+			assert.ErrorIs(t, err, expected)
+			assert.Equal(t, errCt, 1)
+			assert.Equal(t, nopCt, 1)
+		})
+	})
 }

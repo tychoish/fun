@@ -25,8 +25,10 @@ import (
 func Map[T any, O any](
 	iter *fun.Iterator[T],
 	mapper func(context.Context, T) (O, error),
-	opts Options,
+	optp ...OptionProvider[*Options],
 ) *fun.Iterator[O] {
+	opts := Options{}
+	Apply(&opts, optp...)
 	opts.init()
 
 	ec := &erc.Collector{}

@@ -109,7 +109,6 @@ func RunIteratorImplementationTests[T comparable](
 								func(ctx context.Context, input T) (T, error) {
 									panic("whoop")
 								},
-								Options{ContinueOnError: false},
 							).Slice(ctx)
 
 							if err == nil {
@@ -129,11 +128,8 @@ func RunIteratorImplementationTests[T comparable](
 								func(ctx context.Context, input T) (T, error) {
 									panic("whoop")
 								},
-								Options{
-									ContinueOnError: true,
-									ContinueOnPanic: false,
-									NumWorkers:      2,
-								},
+								NumWorkers(2),
+								ContinueOnError(),
 							).Slice(ctx)
 
 							if err == nil {
@@ -181,9 +177,7 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								Options{
-									ContinueOnError: true,
-								},
+								ContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Fatal("expected error")
@@ -208,10 +202,8 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								Options{
-									ContinueOnPanic: true,
-									NumWorkers:      1,
-								},
+								ContinueOnPanic(),
+								NumWorkers(1),
 							).Slice(ctx)
 
 							testt.Log(t, elems)
@@ -235,10 +227,7 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								Options{
-									NumWorkers:      1,
-									ContinueOnError: false,
-								},
+								NumWorkers(1),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -263,10 +252,8 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								Options{
-									NumWorkers:      4,
-									ContinueOnError: true,
-								},
+								NumWorkers(4),
+								ContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -340,7 +327,6 @@ func RunIteratorStringAlgoTests(
 							func(ctx context.Context, str string) (string, error) {
 								return str, nil
 							},
-							Options{},
 						)
 
 						vals, err := out.Slice(ctx)
@@ -364,9 +350,7 @@ func RunIteratorStringAlgoTests(
 								}
 								return strings.TrimSpace(str), nil
 							},
-							Options{
-								NumWorkers: 4,
-							},
+							NumWorkers(4),
 						)
 
 						vals, err := out.Slice(ctx)
@@ -401,7 +385,6 @@ func RunIteratorStringAlgoTests(
 									}
 									return inputs[rand.Intn(511)], nil
 								},
-								Options{},
 							)
 							sig := make(chan struct{})
 							go func() {
@@ -429,9 +412,7 @@ func RunIteratorStringAlgoTests(
 									}
 									return inputs[rand.Intn(511)], nil
 								},
-								Options{
-									NumWorkers: 4,
-								},
+								NumWorkers(4),
 							)
 							sig := make(chan struct{})
 							go func() {
@@ -454,7 +435,6 @@ func RunIteratorStringAlgoTests(
 								func(ctx context.Context) (string, error) {
 									panic("foo")
 								},
-								Options{},
 							)
 							if out.Next(ctx) {
 								t.Fatal("should not iterate when panic")
@@ -480,9 +460,7 @@ func RunIteratorStringAlgoTests(
 									}
 									return fmt.Sprint(count), nil
 								},
-								Options{
-									ContinueOnPanic: true,
-								},
+								ContinueOnPanic(),
 							)
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
@@ -507,7 +485,6 @@ func RunIteratorStringAlgoTests(
 									}
 									return "foo", nil
 								},
-								Options{},
 							)
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
@@ -536,9 +513,7 @@ func RunIteratorStringAlgoTests(
 									}
 									return "foo", nil
 								},
-								Options{
-									ContinueOnError: true,
-								},
+								ContinueOnError(),
 							)
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {

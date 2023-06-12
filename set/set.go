@@ -30,10 +30,10 @@ type Set[T comparable] interface {
 
 // MakeUnordered constructs a set object, pre-allocating the specified
 // length. Iteration order is randomized.
-func MakeUnordered[T comparable](len int) Set[T] { return make(mapSetImpl[T], len) }
+func MakeUnordered[T comparable]() Set[T] { return make(mapSetImpl[T]) }
 
 // NewUnordered constructs a set object for the given type, without prealocation.
-func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T](0) }
+func NewUnordered[T comparable]() Set[T] { return MakeUnordered[T]() }
 
 // Populate adds all elements in the iterator to the provided Set.
 func Populate[T comparable](ctx context.Context, set Set[T], iter *fun.Iterator[T]) {

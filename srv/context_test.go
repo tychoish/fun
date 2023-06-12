@@ -236,7 +236,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("Example", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", itertool.Options{NumWorkers: 4})
+		ctx = WithWorkerPool(ctx, "kip", itertool.NumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -258,7 +258,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("NegativeWorkersWork", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", itertool.Options{NumWorkers: -4})
+		ctx = WithWorkerPool(ctx, "kip", itertool.NumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -288,8 +288,8 @@ func TestWorkerPool(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		queue := pubsub.NewUnlimitedQueue[fun.Worker]()
-		ctx = WithWorkerPool(ctx, "merlin", itertool.Options{})
-		ctx = SetWorkerPool(ctx, "kip", queue, itertool.Options{})
+		ctx = WithWorkerPool(ctx, "merlin")
+		ctx = SetWorkerPool(ctx, "kip", queue)
 
 		if err := queue.Close(); err != nil {
 			t.Error(err)
@@ -318,13 +318,13 @@ func TestWorkerPool(t *testing.T) {
 		defer cancel()
 		wpCt := &atomic.Int64{}
 		ctx = SetShutdownSignal(ctx)
-		ctx = WithWorkerPool(ctx, "merlin", itertool.Options{NumWorkers: 50})
+		ctx = WithWorkerPool(ctx, "merlin", itertool.NumWorkers(50))
 		obCt := &atomic.Int64{}
 		expected := errors.New("kip")
 		ctx = WithObserverWorkerPool(ctx, "kip", func(err error) {
 			check.ErrorIs(t, err, expected)
 			obCt.Add(1)
-		}, itertool.Options{NumWorkers: 50})
+		}, itertool.NumWorkers(50))
 		for i := 0; i < 100; i++ {
 			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error { wpCt.Add(1); return nil })
 			assert.NotError(t, err)

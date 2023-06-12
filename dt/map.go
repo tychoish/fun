@@ -126,26 +126,27 @@ func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], key
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
 func (m Map[K, V]) Iterator() *fun.Iterator[Pair[K, V]] {
-	pipe := make(chan Pair[K, V])
+	pipe := fun.Blocking(make(chan Pair[K, V]))
 
 	init := fun.Operation(func(ctx context.Context) {
-		defer close(pipe)
-
+		defer pipe.Close()
+		send := pipe.Send()
 		for k, v := range m {
-			if !fun.Blocking(pipe).Send().Check(ctx, MakePair(k, v)) {
+			if !send.Check(ctx, MakePair(k, v)) {
 				break
 			}
 		}
 	}).Launch().Once()
 
-	return fun.Generator(func(ctx context.Context) (Pair[K, V], error) {
-		init(ctx)
-		return fun.Blocking(pipe).Receive().Read(ctx)
-	})
+	return pipe.Receive().Producer().PreHook(init).Iterator()
 }
 
 // Keys provides an iterator over just the keys in the map.
-func (m Map[K, V]) Keys() *fun.Iterator[K] { return PairKeys(m.Iterator()) }
+func (m Map[K, V]) Keys() *fun.Iterator[K] {
+	return fun.Transform(m.Iterator(), func(p Pair[K, V]) (K, error) { return p.Key, nil })
+}
 
 // Values provides an iterator over just the values in the map.
-func (m Map[K, V]) Values() *fun.Iterator[V] { return PairValues(m.Iterator()) }
+func (m Map[K, V]) Values() *fun.Iterator[V] {
+	return fun.Transform(m.Iterator(), func(p Pair[K, V]) (V, error) { return p.Value, nil })
+}

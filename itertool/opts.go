@@ -2,10 +2,9 @@ package itertool
 
 import (
 	"errors"
-	"fmt"
 	"io"
+	"runtime"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
@@ -86,11 +85,14 @@ func ContinueOnError() OptionProvider[*Options] {
 func ContinueOnPanic() OptionProvider[*Options] {
 	return func(opts *Options) error { opts.ContinueOnPanic = true; return nil }
 }
+func WorkerPerCPU() OptionProvider[*Options] {
+	return func(opts *Options) error { opts.NumWorkers = runtime.NumCPU(); return nil }
+}
 
 func NumWorkers(num int) OptionProvider[*Options] {
 	return func(opts *Options) error {
 		if num <= 0 {
-			return fmt.Errorf("cannot set workers to %d: %w", num, fun.ErrInvalidInput)
+			num = 1
 		}
 		opts.NumWorkers = num
 		return nil

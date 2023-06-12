@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -154,11 +153,11 @@ func Wait(iter *fun.Iterator[fun.Operation]) *Service {
 func ProcessIterator[T any](
 	iter *fun.Iterator[T],
 	processor fun.Processor[T],
-	opts itertool.Options,
+	optp ...itertool.OptionProvider[*itertool.Options],
 ) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx, iter, processor, opts)
+			return itertool.ParallelForEach(ctx, iter, processor, optp...)
 		},
 		Shutdown: iter.Close,
 	}
@@ -171,12 +170,6 @@ func ProcessIterator[T any](
 // operation. Cleanup functions are dispatched in parallel.
 func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 	// assume some reasonable defaults.
-	opts := itertool.Options{
-		ContinueOnPanic: true,
-		ContinueOnError: true,
-		NumWorkers:      runtime.NumCPU(),
-	}
-
 	// copy the values out of the pipe so that we don't end up
 	// deadlocking or missing jobs. on shutdown.
 	cache := &seq.List[fun.Worker]{}
@@ -209,7 +202,10 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 					ec.Add(wf.Safe()(ctx))
 					return nil
 				},
-				opts))
+				itertool.ContinueOnError(),
+				itertool.ContinueOnPanic(),
+				itertool.WorkerPerCPU(),
+			))
 
 			return ec.Resolve()
 		},
@@ -221,7 +217,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fun.Worker], opts itertool.Options) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...itertool.OptionProvider[*itertool.Options]) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
@@ -229,7 +225,7 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], opts itertool.Options) *Ser
 				func(ctx context.Context, fn fun.Worker) error {
 					return fn.Run(ctx)
 				},
-				opts,
+				optp...,
 			)
 		},
 		Shutdown: workQueue.Close,
@@ -253,7 +249,7 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], opts itertool.Options) *Ser
 func ObserverWorkerPool(
 	workQueue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
-	opts itertool.Options,
+	optp ...itertool.OptionProvider[*itertool.Options],
 ) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {
@@ -263,7 +259,7 @@ func ObserverWorkerPool(
 					observer(fn.Run(ctx))
 					return nil
 				},
-				opts,
+				optp...,
 			)
 		},
 		Shutdown: workQueue.Close,

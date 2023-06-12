@@ -68,6 +68,7 @@ func SliceIterator[T any](in []T) *Iterator[T] {
 		return s[idx], ctx.Err()
 	}).Iterator()
 }
+
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
 

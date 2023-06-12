@@ -664,7 +664,7 @@ func TestBroker(t *testing.T) {
 		defer cancel()
 
 		broker := NewBroker[int](ctx, BrokerOptions{})
-		seen := set.Synchronize(set.MakeUnordered[int](100))
+		seen := set.Synchronize(set.MakeUnordered[int]())
 		sig := make(chan struct{})
 		sub := broker.Subscribe(ctx)
 		go func() {

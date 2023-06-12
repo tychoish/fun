@@ -247,7 +247,7 @@ func TestParallelForEach(t *testing.T) {
 						seen.Ensure(in)
 						return nil
 					},
-					Options{NumWorkers: int(i)},
+					NumWorkers(int(i)),
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -287,10 +287,8 @@ func TestParallelForEach(t *testing.T) {
 				}
 				return nil
 			},
-			Options{
-				NumWorkers:      3,
-				ContinueOnPanic: true,
-			},
+			NumWorkers(3),
+			ContinueOnPanic(),
 		)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -328,10 +326,7 @@ func TestParallelForEach(t *testing.T) {
 				<-ctx.Done()
 				return nil
 			},
-			Options{
-				NumWorkers:      10,
-				ContinueOnPanic: false,
-			},
+			NumWorkers(10),
 		)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -362,10 +357,7 @@ func TestParallelForEach(t *testing.T) {
 				}
 				return nil
 			},
-			Options{
-				NumWorkers:      4,
-				ContinueOnPanic: false,
-			},
+			NumWorkers(10),
 		)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -380,10 +372,8 @@ func TestParallelForEach(t *testing.T) {
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
-			Options{
-				NumWorkers:      4,
-				ContinueOnError: true,
-			},
+			NumWorkers(4),
+			ContinueOnError(),
 		)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -407,10 +397,32 @@ func TestParallelForEach(t *testing.T) {
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
-			Options{
-				NumWorkers:      2,
-				ContinueOnError: false,
+			NumWorkers(2),
+		)
+		if err == nil {
+			t.Error("should have propogated an error")
+		}
+		var es *erc.Stack
+		if !errors.As(err, &es) {
+			t.Fatal(err)
+		}
+		errs := risky.Force(es.Iterator().Slice(ctx))
+		// it's two and not one because each worker thread
+		// ran one task before aborting
+		if len(errs) > 2 {
+			t.Error(len(errs))
+		}
+	})
+	t.Run("CollectAllErrors", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := Process(ctx,
+			fun.SliceIterator(makeIntSlice(100)),
+			func(ctx context.Context, in int) error {
+				return fmt.Errorf("errored=%d", in)
 			},
+			WorkerPerCPU(),
 		)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -491,7 +503,7 @@ func TestWorker(t *testing.T) {
 		func(context.Context) { count.Add(1) },
 		func(context.Context) { count.Add(1) },
 		func(context.Context) { count.Add(1) },
-	}), Options{})
+	}))
 	assert.NotError(t, err)
 	assert.Equal(t, count.Load(), 3)
 }

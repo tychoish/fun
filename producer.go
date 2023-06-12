@@ -296,6 +296,8 @@ func (pf Producer[T]) WithLock(mtx *sync.Mutex) Producer[T] {
 	}
 }
 
+func (pf Producer[T]) SendTo(proc Processor[T]) Worker { return Pipe(pf, proc) }
+
 // Lock creates a producer that runs the root mutex as per normal, but
 // under the protection of a mutex so that there's only one execution
 // of the producer at a time.

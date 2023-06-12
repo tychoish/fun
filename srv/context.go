@@ -229,8 +229,12 @@ func HasBaseContext(ctx context.Context) bool {
 //
 // Use AddToWorkerPool with the specified key to dispatch work to this
 // worker pool.
-func WithWorkerPool(ctx context.Context, key string, opts itertool.Options) context.Context {
-	return SetWorkerPool(ctx, key, getQueueForOpts(opts), opts)
+func WithWorkerPool(
+	ctx context.Context,
+	key string,
+	optp ...itertool.OptionProvider[*itertool.Options],
+) context.Context {
+	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
 
 // WithObserverWorkerPool setups a long running WorkerPool service,
@@ -255,11 +259,18 @@ func WithWorkerPool(ctx context.Context, key string, opts itertool.Options) cont
 // All errors encountered during the execution of worker functions,
 // including panics, are passed to the observer function and are not
 // retained.
-func WithObserverWorkerPool(ctx context.Context, key string, observer func(error), opts itertool.Options) context.Context {
-	return SetObserverWorkerPool(ctx, key, getQueueForOpts(opts), observer, opts)
+func WithObserverWorkerPool(
+	ctx context.Context,
+	key string,
+	observer fun.Observer[error],
+	optp ...itertool.OptionProvider[*itertool.Options],
+) context.Context {
+	return SetObserverWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(opts itertool.Options) *pubsub.Queue[fun.Worker] {
+func getQueueForOpts(optp ...itertool.OptionProvider[*itertool.Options]) *pubsub.Queue[fun.Worker] {
+	opts := itertool.Options{}
+	itertool.Apply(&opts, optp...)
 	if opts.NumWorkers <= 0 {
 		opts.NumWorkers = 1
 	}
@@ -291,10 +302,10 @@ func SetWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fun.Worker],
-	opts itertool.Options,
+	optp ...itertool.OptionProvider[*itertool.Options],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.InvariantMust(orca.Add(WorkerPool(queue, opts)))
+		fun.InvariantMust(orca.Add(WorkerPool(queue, optp...)))
 	})
 }
 
@@ -322,10 +333,10 @@ func SetObserverWorkerPool(
 	key string,
 	queue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
-	opts itertool.Options,
+	optp ...itertool.OptionProvider[*itertool.Options],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.InvariantMust(orca.Add(ObserverWorkerPool(queue, observer, opts)))
+		fun.InvariantMust(orca.Add(ObserverWorkerPool(queue, observer, optp...)))
 	})
 }
 

@@ -242,7 +242,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 			Name: "Seen",
 			Test: func(t *testing.T, d Distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-				seen := set.Synchronize(set.MakeUnordered[T](size))
+				seen := set.Synchronize(set.MakeUnordered[T]())
 				signal := make(chan struct{})
 				go func() {
 					defer close(signal)
@@ -263,7 +263,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 			Name: "PoolSeen",
 			Test: func(t *testing.T, d Distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-				seen := set.Synchronize(set.MakeUnordered[T](size))
+				seen := set.Synchronize(set.MakeUnordered[T]())
 				wg := &sync.WaitGroup{}
 				receive := d.Producer()
 				for i := 0; i < 8; i++ {

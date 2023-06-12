@@ -16,9 +16,9 @@ func Process[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	opts Options,
+	optp ...OptionProvider[*Options],
 ) error {
-	return ParallelForEach(ctx, iter, fn, opts)
+	return ParallelForEach(ctx, iter, fn, optp...)
 }
 
 // compile-time assertions that both worker types support the "safe"
@@ -44,11 +44,11 @@ var _ interface{ Safe() fun.Worker } = new(fun.Operation)
 func Worker[OP fun.Worker | fun.Operation](
 	ctx context.Context,
 	iter *fun.Iterator[OP],
-	opts Options,
+	optp ...OptionProvider[*Options],
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
 		return any(op).(interface{ Safe() fun.Worker }).Safe()(ctx)
-	}, opts)
+	}, optp...)
 }
 
 // ParallelForEach processes the iterator in parallel, and is
@@ -62,8 +62,10 @@ func ParallelForEach[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	opts Options,
+	optp ...OptionProvider[*Options],
 ) error {
+	opts := Options{}
+	fun.InvariantMust(Apply(&opts, optp...))
 	opts.init()
 
 	ctx, cancel := context.WithCancel(ctx)

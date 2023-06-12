@@ -27,11 +27,10 @@ func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for name, builder := range map[string]func() Set[string]{
-		"Ordered/Basic":        func() Set[string] { return MakeOrdered[string]() },
-		"Ordered/Sync":         func() Set[string] { return Synchronize(MakeOrdered[string]()) },
-		"Unordered/Basic":      func() Set[string] { return NewUnordered[string]() },
-		"Unordered/BasicLarge": func() Set[string] { return MakeUnordered[string](100) },
-		"Unordered/Sync":       func() Set[string] { return Synchronize(NewUnordered[string]()) },
+		"Ordered/Basic":   func() Set[string] { return MakeOrdered[string]() },
+		"Ordered/Sync":    func() Set[string] { return Synchronize(MakeOrdered[string]()) },
+		"Unordered/Basic": func() Set[string] { return NewUnordered[string]() },
+		"Unordered/Sync":  func() Set[string] { return Synchronize(NewUnordered[string]()) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("EmptyIteraton", func(t *testing.T) {
@@ -368,7 +367,7 @@ func TestSet(t *testing.T) {
 	})
 	t.Run("Unwrap", func(t *testing.T) {
 		t.Run("Set", func(t *testing.T) {
-			base := MakeUnordered[string](1)
+			base := MakeUnordered[string]()
 			base.Add("abc")
 			wrapped := Synchronize(base)
 			maybeBase := wrapped.(interface{ Unwrap() Set[string] }).Unwrap()
@@ -377,7 +376,7 @@ func TestSet(t *testing.T) {
 			}
 		})
 		t.Run("SetIter", func(t *testing.T) {
-			base := MakeUnordered[string](1)
+			base := MakeUnordered[string]()
 			base.Add("abc")
 			wrapped := Synchronize(base).Iterator()
 			maybeBase := fun.Unwrap(wrapped)
