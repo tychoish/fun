@@ -124,24 +124,24 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 	ctx := context.Background()
 	iter := s.unsafeIterator()
 
-	if !s.isOrdered() {
-		for iter.Next(ctx) {
-			if !other.Check(iter.Value()) {
+	if s.isOrdered() {
+		otherIter := other.Iterator()
+		for iter.Next(ctx) && otherIter.Next(ctx) {
+			if iter.Value() != otherIter.Value() {
 				return false
 			}
 		}
 
-		return iter.Close() == nil
+		return iter.Close() == nil && otherIter.Close() == nil
 	}
 
-	otherIter := other.Iterator()
-	for iter.Next(ctx) && otherIter.Next(ctx) {
-		if iter.Value() != otherIter.Value() {
+	for iter.Next(ctx) {
+		if !other.Check(iter.Value()) {
 			return false
 		}
 	}
 
-	return iter.Close() == nil && otherIter.Close() == nil
+	return iter.Close() == nil
 }
 
 func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Iterator().MarshalJSON() }
