@@ -478,7 +478,7 @@ func TestWorker(t *testing.T) {
 		wf = wf.Jitter(func() time.Duration { return delay })
 		start := time.Now()
 		check.NotError(t, wf(ctx))
-		dur := time.Since(start)
+		dur := time.Since(start).Truncate(time.Millisecond)
 		testt.Logf(t, "op took %s with delay %s", dur, delay)
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.True(t, dur < 200*time.Millisecond)
@@ -486,7 +486,7 @@ func TestWorker(t *testing.T) {
 		delay = time.Millisecond
 		start = time.Now()
 		check.NotError(t, wf(ctx))
-		dur = time.Since(start)
+		dur = time.Since(start).Truncate(time.Millisecond)
 		testt.Logf(t, "op took %s with delay %s", dur, delay)
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)

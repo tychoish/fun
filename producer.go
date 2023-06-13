@@ -100,21 +100,28 @@ func (pf Producer[T]) Chain(next Producer[T]) Producer[T] {
 	stage := &atomic.Int64{}
 	stage.Store(runFirstFunc)
 
-	return func(ctx context.Context) (out T, _ error) {
+	return func(ctx context.Context) (out T, err error) {
 		switch stage.Load() {
 		case secondFunctionErrored:
 			return out, serr
 		case firstFunctionErrored:
 			return out, ferr
 		case runFirstFunc:
-			out, err := pf(ctx)
-			switch {
-			case err == nil:
-				return out, nil
-			case !errors.Is(err, io.EOF):
-				ferr = err
-				stage.Store(firstFunctionErrored)
-				return out, err
+
+		RETRY:
+			for {
+				out, err := pf(ctx)
+				switch {
+				case err == nil:
+					return out, nil
+				case errors.Is(err, ErrIteratorSkip):
+					continue RETRY
+				case !errors.Is(err, io.EOF):
+					ferr = err
+					stage.Store(firstFunctionErrored)
+					return out, err
+				}
+				break RETRY
 			}
 			stage.Store(runSecondFunc)
 			fallthrough
@@ -140,32 +147,42 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 	var (
 		firstExhausted  bool
 		secondExhausted bool
+		zero            T
 	)
 
 	// This producer is
-	return Producer[T](func(ctx context.Context) (out T, _ error) {
+	return Producer[T](func(ctx context.Context) (value T, err error) {
 		switch {
 		case secondExhausted:
-			return out, io.EOF
+			return zero, io.EOF
 		case !firstExhausted:
-			value, err := pf(ctx)
-			switch {
-			case err == nil:
-				return value, nil
-			case errors.Is(err, io.EOF):
-				firstExhausted = true
-			default:
-				firstExhausted = true
-				return out, err
+
+		RETRY:
+			for {
+				value, err = pf(ctx)
+				switch {
+				case err == nil:
+					return value, nil
+				case errors.Is(err, ErrIteratorSkip):
+					continue RETRY
+				case errors.Is(err, io.EOF):
+					firstExhausted = true
+					break RETRY
+				default:
+					firstExhausted = true
+					return zero, err
+				}
+			}
+
+			fallthrough
+		case firstExhausted:
+			if value, err = next(ctx); err != nil {
+				secondExhausted = true
+				return zero, err
 			}
 		}
 
-		if value, err := next(ctx); err != nil {
-			secondExhausted = true
-			return out, err
-		} else {
-			return value, nil
-		}
+		return value, nil
 	}).Lock()
 }
 

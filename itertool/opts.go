@@ -5,6 +5,7 @@ import (
 	"io"
 	"runtime"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
@@ -49,8 +50,10 @@ func (o *Options) init() {
 }
 
 func (o Options) shouldCollectError(err error) bool {
+	errs := append([]error{io.EOF, fun.ErrIteratorSkip}, o.ExcludededErrors...)
+
 	switch {
-	case err == nil || errors.Is(err, io.EOF) || len(o.ExcludededErrors) > 1 && ers.Is(err, o.ExcludededErrors...):
+	case err == nil || ers.Is(err, errs...):
 		return false
 	case errors.Is(err, ers.ErrRecoveredPanic):
 		return true
@@ -76,7 +79,13 @@ func Set(opt *Options) OptionProvider[*Options] {
 }
 
 func AddExcludeErrors(errs ...error) OptionProvider[*Options] {
-	return func(opts *Options) error { opts.ExcludededErrors = append(opts.ExcludededErrors, errs...); return nil }
+	return func(opts *Options) error {
+		if ers.Is(fun.ErrRecoveredPanic, errs...) {
+			return errors.New("cannot exclude recovered panics")
+		}
+		opts.ExcludededErrors = append(opts.ExcludededErrors, errs...)
+		return nil
+	}
 }
 func IncludeContextErrors() OptionProvider[*Options] {
 	return func(opts *Options) error { opts.IncludeContextExpirationErrors = true; return nil }

@@ -66,11 +66,22 @@ func Pipe[T any](from Producer[T], to Processor[T]) Worker {
 		case firstFunctionErrored:
 			return ferr
 		default: // runpipe
-			val, err := from(ctx)
-			if err != nil {
-				stage.Store(firstFunctionErrored)
-				ferr = err
-				return err
+			var val T
+			var err error
+
+		RETRY:
+			for {
+				val, err = from(ctx)
+				switch {
+				case err == nil:
+					break RETRY
+				case errors.Is(err, ErrIteratorSkip):
+					continue
+				default:
+					stage.Store(firstFunctionErrored)
+					ferr = err
+					return err
+				}
 			}
 
 			if err = to(ctx, val); err != nil {

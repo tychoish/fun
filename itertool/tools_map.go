@@ -89,6 +89,8 @@ func mapWorker[T any, O any](
 					return io.EOF
 				case hadPanic && opts.ContinueOnPanic:
 					continue
+				case errors.Is(err, fun.ErrIteratorSkip):
+					continue
 				case !opts.ContinueOnError || ers.IsTerminating(err):
 					return io.EOF
 				case opts.ContinueOnError:

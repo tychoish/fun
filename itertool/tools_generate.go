@@ -56,17 +56,19 @@ func generator[T any](
 				return fn(ctx)
 			}(); err != nil {
 				erc.When(catcher, opts.shouldCollectError(err), err)
+				hasPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
-				if errors.Is(err, fun.ErrRecoveredPanic) {
-					if opts.ContinueOnPanic {
-						continue
-					}
+				switch {
+				case hasPanic && opts.ContinueOnPanic:
+					continue
+				case hasPanic && !opts.ContinueOnPanic:
+					return
+				case errors.Is(err, fun.ErrIteratorSkip):
+					continue
+				case ers.IsTerminating(err) || !opts.ContinueOnError:
 					return
 				}
 
-				if ers.IsTerminating(err) || !opts.ContinueOnError {
-					return
-				}
 			} else if !out.Check(ctx, value) {
 				return
 			}

@@ -66,7 +66,7 @@ func ParallelForEach[T any](
 ) error {
 	opts := Options{}
 	fun.InvariantMust(Apply(&opts, optp...))
-
+	fn = fn.Safe()
 	opts.init()
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -78,10 +78,9 @@ func ParallelForEach[T any](
 	splits := iter.Split(opts.NumWorkers)
 
 	for idx := range splits {
-		forEachWorker(ec, opts, splits[idx], fn).
-			Wait(func(err error) {
-				fun.WhenCall(errors.Is(err, io.EOF), cancel)
-			}).Add(ctx, wg)
+		forEachWorker(ec, opts, splits[idx], fn).Wait(func(err error) {
+			fun.WhenCall(errors.Is(err, io.EOF), cancel)
+		}).Add(ctx, wg)
 	}
 
 	wg.Operation().Block()
@@ -102,11 +101,7 @@ func forEachWorker[T any](
 				return nil
 			}
 
-			if err := func(value T) (err error) {
-				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
-
-				return fn(ctx, value)
-			}(value); err != nil {
+			if err := fn(ctx, value); err != nil {
 				erc.When(ec, opts.shouldCollectError(err), err)
 
 				hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
@@ -115,6 +110,8 @@ func forEachWorker[T any](
 				case hadPanic && !opts.ContinueOnPanic:
 					return io.EOF
 				case hadPanic && opts.ContinueOnPanic:
+					continue
+				case errors.Is(err, fun.ErrIteratorSkip):
 					continue
 				case !opts.ContinueOnError || ers.IsTerminating(err):
 					return io.EOF

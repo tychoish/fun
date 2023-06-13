@@ -31,6 +31,7 @@ func Reduce[T any, O any](
 		}
 
 		value, err = reducer(item, value)
+
 		if err != nil {
 			catcher.Add(err)
 			return value, err
