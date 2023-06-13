@@ -52,8 +52,10 @@ func (o Options) shouldCollectError(err error) bool {
 	switch {
 	case err == nil || errors.Is(err, io.EOF) || len(o.ExcludededErrors) > 1 && ers.Is(err, o.ExcludededErrors...):
 		return false
-	case errors.Is(err, ers.ErrRecoveredPanic) || (o.IncludeContextExpirationErrors && ers.ContextExpired(err)):
+	case errors.Is(err, ers.ErrRecoveredPanic):
 		return true
+	case !o.IncludeContextExpirationErrors && ers.ContextExpired(err):
+		return false
 	default:
 		return true
 	}

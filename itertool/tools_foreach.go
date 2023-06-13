@@ -66,6 +66,7 @@ func ParallelForEach[T any](
 ) error {
 	opts := Options{}
 	fun.InvariantMust(Apply(&opts, optp...))
+
 	opts.init()
 
 	ctx, cancel := context.WithCancel(ctx)

@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
@@ -434,9 +435,40 @@ func TestParallelForEach(t *testing.T) {
 		errs := risky.Force(es.Iterator().Slice(ctx))
 		// it's two and not one because each worker thread
 		// ran one task before aborting
-		if len(errs) > 2 {
+		if len(errs) > runtime.NumCPU() {
 			t.Error(len(errs))
 		}
+	})
+	t.Run("IncludeContextErrors", func(t *testing.T) {
+		t.Run("SuppressErrorsByDefault", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := Process(ctx,
+				fun.SliceIterator(makeIntSlice(2)),
+				func(ctx context.Context, in int) error {
+					return context.Canceled
+				},
+			)
+			check.NotError(t, err)
+			if err != nil {
+				t.Error("should have skipped all errors", err)
+			}
+		})
+		t.Run("WithErrors", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := Process(ctx,
+				fun.SliceIterator(makeIntSlice(2)),
+				func(ctx context.Context, in int) error {
+					return context.Canceled
+				},
+				IncludeContextErrors(),
+			)
+			check.Error(t, err)
+			check.ErrorIs(t, err, context.Canceled)
+		})
 	})
 }
 
