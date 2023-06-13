@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/set"
 )
 
 type BrokerFixture[T comparable] struct {
@@ -665,7 +664,8 @@ func TestBroker(t *testing.T) {
 		defer cancel()
 
 		broker := NewBroker[int](ctx, BrokerOptions{})
-		seen := set.Synchronize(dt.NewUnorderedSet[int]())
+		seen := &dt.Set[int]{}
+		seen.Synchronize()
 		sig := make(chan struct{})
 		sub := broker.Subscribe(ctx)
 		go func() {

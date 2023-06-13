@@ -32,13 +32,6 @@ type Pairs[K comparable, V any] []Pair[K, V]
 // To build Pairs objects from other types, use the Consume methods.
 func MakePairs[K comparable, V any](in ...Pair[K, V]) Pairs[K, V] { return in }
 
-// Pair constructs an iterator of pairs, which it builds from a
-// sequence of values, generating the keys using the provided key
-// function.
-func BuildPairs[K comparable, V any](ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) *fun.Iterator[Pair[K, V]] {
-	return fun.Transform(iter, func(in V) (Pair[K, V], error) { return MakePair(keyf(in), in), nil })
-}
-
 // Iterator return an iterator over each key-value pairs.
 func (p Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return Sliceify(p).Iterator() }
 
@@ -122,7 +115,7 @@ func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]
 // ConsumeValues adds all of the values in the input iterator,
 // generating the keys using the function provided.
 func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) error {
-	return p.Consume(ctx, BuildPairs(ctx, iter, keyf))
+	return p.Consume(ctx, fun.Transform(iter, func(in V) (Pair[K, V], error) { return MakePair(keyf(in), in), nil }))
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.

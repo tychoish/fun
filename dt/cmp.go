@@ -1,6 +1,5 @@
-// package dt provides single and double linked-list implementations
-// and tools (e.g. heap, sorting, iterators) for using these
-// structures.
+// package dt provides container type implementations and
+// interfaces.
 //
 // All top level structures in this package can be trivially
 // constructed and provide high level interfaces for most common
@@ -12,55 +11,16 @@ package dt
 import (
 	"context"
 	"sort"
-	"time"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt/cmp"
 )
-
-// Orderable describes all native types which (currently) support the
-// < operator. To order custom types, use the OrderableUser interface.
-//
-// In the future an equivalent oderable type specification is likely
-// to enter the standard library, which will supercede this type.
-type Orderable interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | ~string
-}
-
-// OrderableUser allows users to define a method on their types which
-// implement a method to provide a LessThan operation.
-type OrderableUser[T any] interface{ LessThan(T) bool }
-
-// LessThan describes a less than operation, typically provided by one
-// of the following operations.
-type LessThan[T any] func(a, b T) bool
-
-// LessThanNative provides a wrapper around the < operator for types
-// that support it, and can be used for sorting lists of compatible
-// types.
-func LessThanNative[T Orderable](a, b T) bool { return a < b }
-
-// LessThanCustom converts types that implement OrderableUser
-// interface.
-func LessThanCustom[T OrderableUser[T]](a, b T) bool { return a.LessThan(b) }
-
-// LessThanConverter provides a function to convert a non-orderable
-// type to an orderable type. Use this for
-func LessThanConverter[T any, S Orderable](converter func(T) S) LessThan[T] {
-	return func(a, b T) bool { return LessThanNative(converter(a), converter(b)) }
-}
-
-// LessThanTime compares time using the time.Time.Before() method.
-func LessThanTime(a, b time.Time) bool { return a.Before(b) }
-
-// Reverse wraps an existing LessThan operator and reverses it's
-// direction.
-func Reverse[T any](fn LessThan[T]) LessThan[T] { return func(a, b T) bool { return !fn(a, b) } }
 
 // Heap provides a min-order heap using the Heap.LT comparison
 // operator to sort from lowest to highest. Push operations will panic
 // if LT is not set.
 type Heap[T any] struct {
-	LT   LessThan[T]
+	LT   cmp.LessThan[T]
 	list *List[T]
 }
 
@@ -68,7 +28,7 @@ type Heap[T any] struct {
 // iterator and corresponding comparison function. Will return the
 // input iterators Close() error if one exists, and otherwise will
 // return the populated heap.
-func NewHeapFromIterator[T any](ctx context.Context, cmp LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
+func NewHeapFromIterator[T any](ctx context.Context, cmp cmp.LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
 	out := &Heap[T]{LT: cmp}
 	out.lazySetup()
 	return out, iter.Observe(ctx, func(in T) { out.Push(in) })
@@ -126,12 +86,12 @@ func (h *Heap[T]) Iterator() *fun.Iterator[T] { h.lazySetup(); return h.list.Ite
 
 // IsSorted reports if the list is sorted from low to high, according
 // to the LessThan function.
-func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
-	if list == nil || list.Len() <= 1 {
+func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
+	if l == nil || l.Len() <= 1 {
 		return true
 	}
 
-	for item := list.root.Next(); item.next.Ok(); item = item.Next() {
+	for item := l.root.Next(); item.next.Ok(); item = item.Next() {
 		if lt(item.Value(), item.Previous().Value()) {
 			return false
 		}
@@ -139,7 +99,7 @@ func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 	return true
 }
 
-// SortListMerge sorts the list, using the provided comparison
+// SortMerge sorts the list, using the provided comparison
 // function and a Merge Sort operation. This is something of a novelty
 // in most cases, as removing the elements from the list, adding to a
 // slice and then using sort.Slice() from the standard library, and
@@ -147,24 +107,24 @@ func IsSorted[T any](list *List[T], lt LessThan[T]) bool {
 //
 // The operation will modify the input list, replacing it with an new
 // list operation.
-func SortListMerge[T any](list *List[T], lt LessThan[T]) { *list = *mergeSort(list, lt) }
+func (l *List[T]) SortMerge(lt cmp.LessThan[T]) { *l = *mergeSort(l, lt) }
 
-// SortListQuick sorts the list, by removing the elements, adding them
+// SortQuick sorts the list, by removing the elements, adding them
 // to a slice, and then using sort.SliceStable(). In many cases this
 // performs better than the merge sort implementation.
-func SortListQuick[T any](list *List[T], lt LessThan[T]) {
-	elems := make([]*Element[T], 0, list.Len())
+func (l *List[T]) SortQuick(lt cmp.LessThan[T]) {
+	elems := make([]*Element[T], 0, l.Len())
 
-	for list.Len() > 0 {
-		elems = append(elems, list.PopFront())
+	for l.Len() > 0 {
+		elems = append(elems, l.PopFront())
 	}
 	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
 	for idx := range elems {
-		list.Back().Append(elems[idx])
+		l.Back().Append(elems[idx])
 	}
 }
 
-func mergeSort[T any](head *List[T], lt LessThan[T]) *List[T] {
+func mergeSort[T any](head *List[T], lt cmp.LessThan[T]) *List[T] {
 	if head.Len() < 2 {
 		return head
 	}
@@ -187,7 +147,7 @@ func split[T any](list *List[T]) *List[T] {
 	return out
 }
 
-func merge[T any](lt LessThan[T], a, b *List[T]) *List[T] {
+func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 	out := &List[T]{}
 	out.lazySetup()
 	for a.Len() != 0 && b.Len() != 0 {

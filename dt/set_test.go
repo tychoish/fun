@@ -25,11 +25,11 @@ func generateIter(ctx context.Context, size int) *fun.Iterator[string] {
 func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	for name, builder := range map[string]func() Set[string]{
-		"Ordered/Basic":   func() Set[string] { return NewOrderedSet[string]() },
-		"Ordered/Sync":    func() Set[string] { s := NewOrderedSet[string](); s.Synchronize(); return s },
-		"Unordered/Basic": func() Set[string] { return NewUnorderedSet[string]() },
-		"Unordered/Sync":  func() Set[string] { s := NewUnorderedSet[string](); s.Synchronize(); return s },
+	for name, builder := range map[string]func() *Set[string]{
+		"Unordered/Basic": func() *Set[string] { s := &Set[string]{}; return s },
+		"Ordered/Basic":   func() *Set[string] { s := &Set[string]{}; s.Order(); return s },
+		"Unordered/Sync":  func() *Set[string] { s := &Set[string]{}; s.Synchronize(); return s },
+		"Ordered/Sync":    func() *Set[string] { s := &Set[string]{}; s.Order(); s.Synchronize(); return s },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("EmptyIteraton", func(t *testing.T) {
@@ -135,13 +135,13 @@ func TestSet(t *testing.T) {
 					t.Error("set item should have been present")
 				}
 			})
-			for populatorName, populator := range map[string]func(Set[string]){
-				"Three": func(set Set[string]) {
+			for populatorName, populator := range map[string]func(*Set[string]){
+				"Three": func(set *Set[string]) {
 					set.Add("a")
 					set.Add("b")
 					set.Add("c")
 				},
-				"Numbers": func(set Set[string]) {
+				"Numbers": func(set *Set[string]) {
 					for i := 0; i < 100; i++ {
 						set.Add(fmt.Sprint(i))
 					}
@@ -242,7 +242,8 @@ func TestSet(t *testing.T) {
 	t.Run("JSONCheck", func(t *testing.T) {
 		// want to make sure this works normally, without the
 		// extra cast, as above.
-		set := NewOrderedSet[int]()
+		set := &Set[int]{}
+		set.Order()
 		err := json.Unmarshal([]byte("[1,2,3]"), &set)
 		check.NotError(t, err)
 		check.Equal(t, 3, set.Len())
@@ -255,26 +256,27 @@ func BenchmarkSet(b *testing.B) {
 
 	const size = 10000
 	b.Run("Append", func(b *testing.B) {
-		operation := func(set Set[int]) {
+		operation := func(set *Set[int]) {
 			for i := 0; i < size; i++ {
 				set.Add(i * i)
 			}
 		}
 		b.Run("Map", func(b *testing.B) {
-			set := NewUnorderedSet[int]()
+			set := &Set[int]{}
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrderedSet[int]()
+			set := &Set[int]{}
+			set.Order()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
 		})
 	})
 	b.Run("Mixed", func(b *testing.B) {
-		operation := func(set Set[int]) {
+		operation := func(set *Set[int]) {
 			var last int
 			for i := 0; i < size; i++ {
 				val := i * i * size
@@ -286,13 +288,14 @@ func BenchmarkSet(b *testing.B) {
 			}
 		}
 		b.Run("Map", func(b *testing.B) {
-			set := NewUnorderedSet[int]()
+			set := &Set[int]{}
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrderedSet[int]()
+			set := &Set[int]{}
+			set.Order()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
@@ -300,7 +303,7 @@ func BenchmarkSet(b *testing.B) {
 	})
 
 	b.Run("Deletion", func(b *testing.B) {
-		operation := func(set Set[int]) {
+		operation := func(set *Set[int]) {
 			for i := 0; i < size; i++ {
 				set.Add(i)
 				set.Add(i * size)
@@ -315,13 +318,14 @@ func BenchmarkSet(b *testing.B) {
 
 		}
 		b.Run("Map", func(b *testing.B) {
-			set := NewUnorderedSet[int]()
+			set := &Set[int]{}
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrderedSet[int]()
+			set := &Set[int]{}
+			set.Order()
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
@@ -329,7 +333,7 @@ func BenchmarkSet(b *testing.B) {
 	})
 
 	b.Run("Iteration", func(b *testing.B) {
-		operation := func(set Set[int]) {
+		operation := func(set *Set[int]) {
 			for i := 0; i < size; i++ {
 				set.Add(i * size)
 			}
@@ -341,13 +345,15 @@ func BenchmarkSet(b *testing.B) {
 			iter.Close()
 		}
 		b.Run("Map", func(b *testing.B) {
-			set := NewUnorderedSet[int]()
+			set := &Set[int]{}
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}
 		})
 		b.Run("Ordered", func(b *testing.B) {
-			set := NewOrderedSet[int]()
+			set := &Set[int]{}
+			set.Order()
+
 			for j := 0; j < b.N; j++ {
 				operation(set)
 			}

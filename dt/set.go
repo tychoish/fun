@@ -10,10 +10,8 @@ import (
 
 type atomic[T comparable] struct{ val stdatomic.Value }
 
-func (a *atomic[T]) Get() T                         { return a.resolve(a.val.Load()) }
-func (a *atomic[T]) Set(in T)                       { a.val.Store(in) }
-func (a *atomic[T]) Swap(new T) T                   { return a.resolve(a.val.Swap(new)) }
-func (a *atomic[T]) CompareAndSwap(old, new T) bool { return a.val.CompareAndSwap(old, new) }
+func (a *atomic[T]) Get() T        { return a.resolve(a.val.Load()) }
+func (a *atomic[T]) Set(in T) bool { return a.val.CompareAndSwap(nil, in) }
 
 func (*atomic[T]) resolve(in any) (val T) {
 	switch c := in.(type) {
@@ -27,35 +25,42 @@ func (*atomic[T]) resolve(in any) (val T) {
 type Set[T comparable] struct {
 	hash Map[T, *Element[T]]
 	list *List[T]
-	mtx  *atomic[*sync.Mutex]
+	mtx  atomic[*sync.Mutex]
 }
 
-func NewOrderedSet[T comparable]() Set[T] {
-	return Set[T]{hash: make(Map[T, *Element[T]]), list: &List[T]{}, mtx: &atomic[*sync.Mutex]{}}
+func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
+func (s *Set[T]) Order() {
+	defer s.with(s.lock())
+	if s.list != nil {
+		return
+	}
+	fun.Invariant(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
+	s.list = &List[T]{}
 }
 
-func NewUnorderedSet[T comparable]() Set[T] {
-	return Set[T]{hash: make(Map[T, *Element[T]]), mtx: &atomic[*sync.Mutex]{}}
-}
-
-func (s Set[T]) Synchronize() { s.mtx.CompareAndSwap(nil, &sync.Mutex{}) }
-
-func (s Set[T]) WithLock(mtx *sync.Mutex) {
+func (s *Set[T]) WithLock(mtx *sync.Mutex) {
 	fun.Invariant(mtx != nil, "mutexes must be non-nil")
-	fun.Invariant(s.mtx.CompareAndSwap(nil, mtx), "cannot override an existing mutex")
+	fun.Invariant(s.mtx.Set(mtx), "cannot override an existing mutex")
 }
 
-func (s Set[T]) isOrdered() bool   { return s.list != nil }
-func (s Set[T]) lock() *sync.Mutex { m := s.mtx.Get(); fun.WhenCall(m != nil, m.Lock); return m }
-func (Set[T]) with(m *sync.Mutex)  { fun.WhenCall(m != nil, m.Unlock) }
+func (s *Set[T]) isOrdered() bool { return s.list != nil }
 
-func (s Set[T]) Add(in T)                   { _ = s.AddCheck(in) }
-func (s Set[T]) Len() int                   { defer s.with(s.lock()); return len(s.hash) }
-func (s Set[T]) Check(in T) bool            { defer s.with(s.lock()); return s.hash.Check(in) }
-func (s Set[T]) Delete(in T)                { defer s.with(s.lock()); _ = s.delete(in) }
-func (s Set[T]) DeleteCheck(in T) bool      { defer s.with(s.lock()); return s.delete(in) }
-func (s Set[T]) Iterator() *fun.Iterator[T] { defer s.with(s.lock()); return s.unsafeIterator() }
-func (s Set[T]) AddCheck(in T) (ok bool) {
+func (s *Set[T]) init()            { s.hash = Map[T, *Element[T]]{} }
+func (*Set[T]) with(m *sync.Mutex) { fun.WhenCall(m != nil, m.Unlock) }
+func (s *Set[T]) lock() *sync.Mutex {
+	m := s.mtx.Get()
+	fun.WhenCall(m != nil, m.Lock)
+	fun.WhenCall(s.hash == nil, s.init)
+	return m
+}
+
+func (s *Set[T]) Add(in T)                   { _ = s.AddCheck(in) }
+func (s *Set[T]) Len() int                   { defer s.with(s.lock()); return len(s.hash) }
+func (s *Set[T]) Check(in T) bool            { defer s.with(s.lock()); return s.hash.Check(in) }
+func (s *Set[T]) Delete(in T)                { defer s.with(s.lock()); _ = s.delete(in) }
+func (s *Set[T]) DeleteCheck(in T) bool      { defer s.with(s.lock()); return s.delete(in) }
+func (s *Set[T]) Iterator() *fun.Iterator[T] { defer s.with(s.lock()); return s.unsafeIterator() }
+func (s *Set[T]) AddCheck(in T) (ok bool) {
 	defer s.with(s.lock())
 	ok = s.hash.Check(in)
 	if ok {
@@ -74,11 +79,11 @@ func (s Set[T]) AddCheck(in T) (ok bool) {
 	return
 }
 
-func (s Set[T]) Populate(iter *fun.Iterator[T]) {
+func (s *Set[T]) Populate(iter *fun.Iterator[T]) {
 	fun.InvariantMust(iter.Observe(context.Background(), s.Add))
 }
 
-func (s Set[T]) delete(in T) bool {
+func (s *Set[T]) delete(in T) bool {
 	e, ok := s.hash.Load(in)
 	if !ok {
 		return false
@@ -89,14 +94,14 @@ func (s Set[T]) delete(in T) bool {
 	return true
 }
 
-func (s Set[T]) unsafeIterator() *fun.Iterator[T] {
+func (s *Set[T]) unsafeIterator() *fun.Iterator[T] {
 	if s.list != nil {
 		return s.list.Iterator()
 	}
 	return s.hash.Keys()
 }
 
-func (s Set[T]) Producer() fun.Producer[T] {
+func (s *Set[T]) Producer() fun.Producer[T] {
 	defer s.with(s.lock())
 
 	if s.list != nil {
@@ -109,11 +114,10 @@ func (s Set[T]) Producer() fun.Producer[T] {
 // Equal tests two sets, returning true if the items in the sets have
 // equal values. If the iterators are ordered, order is
 // considered.
-func (s Set[T]) Equal(other Set[T]) bool {
+func (s *Set[T]) Equal(other *Set[T]) bool {
 	defer s.with(s.lock())
-	defer other.with(other.lock())
 
-	if s.Len() != other.Len() || s.isOrdered() != other.isOrdered() {
+	if len(s.hash) != other.Len() || s.isOrdered() != other.isOrdered() {
 		return false
 	}
 
@@ -140,9 +144,9 @@ func (s Set[T]) Equal(other Set[T]) bool {
 	return iter.Close() == nil && otherIter.Close() == nil
 }
 
-func (s Set[T]) MarshalJSON() ([]byte, error) { return s.Iterator().MarshalJSON() }
+func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Iterator().MarshalJSON() }
 
-func (s Set[T]) UnmarshalJSON(in []byte) error {
+func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	iter := Sliceify([]T{}).Iterator()
 	iter.UnmarshalJSON(in)
 	s.Populate(iter)

@@ -13,8 +13,8 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/risky"
-	"github.com/tychoish/fun/set"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -277,7 +277,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 				t.Fatal("add did not work")
 			}
 
-			set := set.NewUnordered[T]()
+			set := &dt.Set[T]{}
 			for i := len(fix.elems); i > 0; i-- {
 				out, ok := fix.remove()
 				if !ok {
