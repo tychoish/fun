@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
@@ -50,6 +53,22 @@ func TestSet(t *testing.T) {
 				if set.Len() != 0 {
 					t.Fatal("initalized non-empty set")
 				}
+
+				// safe to set order more than once
+				check.NotPanic(t, set.Order)
+				check.NotPanic(t, set.Order)
+
+				// nil mutexes should always panic
+				check.Panic(t, func() { set.WithLock(nil) })
+
+				// some are pre-configured with locks.
+				if set.mtx.Get() == nil {
+					// first attept should pass
+					check.NotPanic(t, func() { set.WithLock(&sync.Mutex{}) })
+					// second set should panic
+					check.Panic(t, func() { set.WithLock(&sync.Mutex{}) })
+				}
+
 			})
 			t.Run("JSON", func(t *testing.T) {
 				set := builder()
@@ -99,6 +118,31 @@ func TestSet(t *testing.T) {
 					t.Error("should have only added key once")
 				}
 			})
+			t.Run("AvoidLeaks", func(t *testing.T) {
+				set := builder()
+				set.Add("abc")
+				set.Add("def")
+
+				ctx, cancel := context.WithCancel(context.Background())
+				before := runtime.NumGoroutine()
+				_, err := set.hash.ProducerKeys()(ctx)
+				assert.NotError(t, err)
+				_, err = set.hash.ProducerValues()(ctx)
+				assert.NotError(t, err)
+
+				during := runtime.NumGoroutine()
+				testt.Log(t, "before", before, "vs during", during)
+				assert.True(t, during >= before)
+
+				time.Sleep(50 * time.Millisecond)
+				cancel()
+				time.Sleep(50 * time.Millisecond)
+
+				after := runtime.NumGoroutine()
+				testt.Log(t, "before", before, "vs after", after)
+				assert.True(t, before >= after)
+			})
+
 			t.Run("Delete", func(t *testing.T) {
 				set := builder()
 				set.Add("abc")
@@ -165,76 +209,63 @@ func TestSet(t *testing.T) {
 							t.Fatal("size should not change", size, set.Len())
 						}
 					})
-					// t.Run("Equality", func(t *testing.T) {
-					// 	set := builder()
-					// 	populator(set)
+					t.Run("Equality", func(t *testing.T) {
+						set := builder()
+						populator(set)
 
-					// 	set2 := builder()
-					// 	populator(set2)
-					// 	if !Equal(ctx, set, set2) {
-					// 		t.Fatal("sets should be equal")
-					// 	}
-					// })
-					// t.Run("EqualityCancelation", func(t *testing.T) {
-					// 	cctx, ccancel := context.WithCancel(ctx)
-					// 	ccancel()
+						set2 := builder()
+						populator(set2)
+						if !set.Equal(set2) {
+							t.Fatal("sets should be equal")
+						}
+					})
+					t.Run("InqualitySizeSimple", func(t *testing.T) {
+						set := builder()
+						populator(set)
 
-					// 	set := builder()
-					// 	populator(set)
+						set2 := builder()
+						set2.Add("foo")
+						if set.Equal(set2) {
+							t.Fatal("sets should not be equal")
+						}
+					})
+					t.Run("InqualitySizeComplex", func(t *testing.T) {
+						set := builder()
+						populator(set)
+						count := 0
+						iter := set.Iterator()
+						collected := []string{}
+						for iter.Next(ctx) {
+							count++
+							if iter.Value() == "" {
+								continue
+							}
+							collected = append(collected, iter.Value())
+						}
 
-					// 	set2 := builder()
-					// 	populator(set2)
+						if err := iter.Close(); err != nil {
+							t.Fatal(err)
+						} else if len(collected) == 0 {
+							t.Fatal("should have items")
+						}
 
-					// 	if Equal(cctx, set, set2) {
-					// 		t.Fatal("context cancellation disrupts iteration")
-					// 	}
-					// })
-					// t.Run("InqualitySizeSimple", func(t *testing.T) {
-					// 	set := builder()
-					// 	populator(set)
+						set2 := builder()
+						populator(set2)
 
-					// 	set2 := builder()
-					// 	set2.Add("foo")
-					// 	if Equal(ctx, set, set2) {
-					// 		t.Fatal("sets should not be equal")
-					// 	}
-					// })
-					// t.Run("InqualitySizeComplex", func(t *testing.T) {
-					// 	set := builder()
-					// 	populator(set)
-					// 	count := 0
-					// 	iter := set.Iterator()
-					// 	collected := []string{}
-					// 	for iter.Next(ctx) {
-					// 		count++
-					// 		if iter.Value() == "" {
-					// 			continue
-					// 		}
-					// 		collected = append(collected, iter.Value())
-					// 	}
+						if !set.Equal(set2) {
+							t.Fatal("sets should be equal")
+						}
 
-					// 	if err := iter.Close(); err != nil {
-					// 		t.Fatal(err)
-					// 	} else if len(collected) == 0 {
-					// 		t.Fatal("should have items")
-					// 	}
+						set2.Delete(collected[1])
+						set2.Add("foo")
+						if set.Len() != set2.Len() {
+							t.Fatal("test bug")
+						}
 
-					// 	set2 := builder()
-					// 	populator(set2)
-
-					// 	if !Equal(ctx, set, set2) {
-					// 		t.Fatal("sets should be equal")
-					// 	}
-
-					// 	set2.Delete(collected[1])
-					// 	set2.Add("foo")
-					// 	if set.Len() != set2.Len() {
-					// 		t.Fatal("test bug")
-					// 	}
-					// 	if Equal(ctx, set, set2) {
-					// 		t.Fatal("sets should not be equal")
-					// 	}
-					// })
+						if set.Equal(set2) {
+							t.Fatal("sets should not be equal")
+						}
+					})
 				})
 			}
 		})

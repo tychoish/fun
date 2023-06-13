@@ -125,7 +125,15 @@ func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], key
 // Use in combination with other iterator processing tools
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func (m Map[K, V]) Iterator() *fun.Iterator[Pair[K, V]] {
+func (m Map[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return m.Producer().Iterator() }
+
+// Keys provides an iterator over just the keys in the map.
+func (m Map[K, V]) Keys() *fun.Iterator[K] { return m.ProducerKeys().Iterator() }
+
+// Values provides an iterator over just the values in the map.
+func (m Map[K, V]) Values() *fun.Iterator[V] { return m.ProducerValues().Iterator() }
+
+func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -138,15 +146,37 @@ func (m Map[K, V]) Iterator() *fun.Iterator[Pair[K, V]] {
 		}
 	}).Launch().Once()
 
-	return pipe.Receive().Producer().PreHook(init).Iterator()
+	return pipe.Receive().Producer().PreHook(init)
 }
 
-// Keys provides an iterator over just the keys in the map.
-func (m Map[K, V]) Keys() *fun.Iterator[K] {
-	return fun.Transform(m.Iterator(), func(p Pair[K, V]) (K, error) { return p.Key, nil })
+func (m Map[K, V]) ProducerKeys() fun.Producer[K] {
+	pipe := fun.Blocking(make(chan K))
+
+	init := fun.Operation(func(ctx context.Context) {
+		defer pipe.Close()
+		send := pipe.Send()
+		for k := range m {
+			if !send.Check(ctx, k) {
+				break
+			}
+		}
+	}).Launch().Once()
+
+	return pipe.Receive().Producer().PreHook(init)
 }
 
-// Values provides an iterator over just the values in the map.
-func (m Map[K, V]) Values() *fun.Iterator[V] {
-	return fun.Transform(m.Iterator(), func(p Pair[K, V]) (V, error) { return p.Value, nil })
+func (m Map[K, V]) ProducerValues() fun.Producer[V] {
+	pipe := fun.Blocking(make(chan V))
+
+	init := fun.Operation(func(ctx context.Context) {
+		defer pipe.Close()
+		send := pipe.Send()
+		for k := range m {
+			if !send.Check(ctx, m[k]) {
+				break
+			}
+		}
+	}).Launch().Once()
+
+	return pipe.Receive().Producer().PreHook(init)
 }

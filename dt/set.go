@@ -59,7 +59,7 @@ func (s *Set[T]) Len() int                   { defer s.with(s.lock()); return le
 func (s *Set[T]) Check(in T) bool            { defer s.with(s.lock()); return s.hash.Check(in) }
 func (s *Set[T]) Delete(in T)                { defer s.with(s.lock()); _ = s.delete(in) }
 func (s *Set[T]) DeleteCheck(in T) bool      { defer s.with(s.lock()); return s.delete(in) }
-func (s *Set[T]) Iterator() *fun.Iterator[T] { defer s.with(s.lock()); return s.unsafeIterator() }
+func (s *Set[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
 func (s *Set[T]) AddCheck(in T) (ok bool) {
 	defer s.with(s.lock())
 	ok = s.hash.Check(in)
@@ -108,7 +108,7 @@ func (s *Set[T]) Producer() fun.Producer[T] {
 		return s.list.Producer()
 	}
 
-	return s.hash.Keys().Producer()
+	return s.hash.ProducerKeys()
 }
 
 // Equal tests two sets, returning true if the items in the sets have
