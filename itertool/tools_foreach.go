@@ -73,7 +73,9 @@ func ParallelForEach[T any](
 	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
 
-	fn = makeProcessor(fn, fun.Observer[error](ec.Add).Filter(opts.ErrorFilter()), opts)
+	fn = makeProcessor(fn, fun.Observer[error](ec.Add).
+		Filter(func(err error) bool { return err != nil }).
+		Filter(opts.ErrorFilter()), opts)
 
 	splits := iter.Split(opts.NumWorkers)
 	for idx := range splits {
@@ -109,7 +111,7 @@ func makeProcessor[T any](fn fun.Processor[T], oberr fun.Observer[error], opts O
 	fn = fn.Safe()
 	return func(ctx context.Context, in T) error {
 		if err := fn(ctx, in); err != nil {
-			if !opts.HandleErrors(oberr, err) {
+			if !opts.HandleAbortableErrors(oberr, err) {
 				return io.EOF
 			}
 		}

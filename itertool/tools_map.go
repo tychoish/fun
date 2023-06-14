@@ -66,8 +66,10 @@ func mapWorker[T any, O any](
 	input *fun.Iterator[T],
 	output fun.ChanSend[O],
 ) fun.Worker {
-	filter := opts.ErrorFilter()
 	proc := input.Producer()
+	oberr := ec.Observer().
+		Filter(func(err error) bool { return !ers.Ok(err) }).
+		Filter(opts.ErrorFilter())
 
 	return func(ctx context.Context) error {
 		for {
@@ -75,27 +77,16 @@ func mapWorker[T any, O any](
 			if !ok {
 				return nil
 			}
+
 			o, err := func(val T) (_ O, err error) {
 				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
 				return mapper(ctx, val)
 			}(value)
 			if err != nil {
-				erc.When(ec, filter(err), err)
-
-				hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
-
-				switch {
-				case hadPanic && !opts.ContinueOnPanic:
-					return io.EOF
-				case hadPanic && opts.ContinueOnPanic:
-					continue
-				case errors.Is(err, fun.ErrIteratorSkip):
-					continue
-				case !opts.ContinueOnError || ers.IsTerminating(err):
-					return io.EOF
-				case opts.ContinueOnError:
+				if opts.HandleAbortableErrors(oberr, err) {
 					continue
 				}
+				return io.EOF
 			}
 
 			if !output.Check(ctx, o) {

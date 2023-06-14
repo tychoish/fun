@@ -29,7 +29,9 @@ func Generate[T any](
 
 	fn = fn.Safe()
 
-	oberr := fun.Observer[error](ec.Add).Filter(opts.ErrorFilter())
+	oberr := fun.Observer[error](ec.Add).
+		Filter(func(err error) bool { return err != nil }).
+		Filter(opts.ErrorFilter())
 	init := fun.Operation(func(ctx context.Context) {
 
 		wctx, cancel := context.WithCancel(ctx)
@@ -57,7 +59,7 @@ func generator[T any](
 	return func(ctx context.Context) error {
 		for {
 			if value, err := fn(ctx); err != nil {
-				if opts.HandleErrors(oberr, err) {
+				if opts.HandleAbortableErrors(oberr, err) {
 					continue
 				}
 				return io.EOF

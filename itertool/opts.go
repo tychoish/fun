@@ -54,8 +54,6 @@ func (o Options) ErrorFilter() func(err error) bool {
 	errs := append([]error{io.EOF, fun.ErrIteratorSkip}, o.ExcludededErrors...)
 	return func(err error) bool {
 		switch {
-		case err == nil:
-			return false
 		case errors.Is(err, ers.ErrRecoveredPanic):
 			return true
 		case ers.Is(err, errs...):
@@ -68,7 +66,7 @@ func (o Options) ErrorFilter() func(err error) bool {
 	}
 }
 
-func (opts Options) HandleErrors(of fun.Observer[error], err error) bool {
+func (opts Options) HandleAbortableErrors(of fun.Observer[error], err error) bool {
 	of(err)
 	hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
@@ -79,10 +77,10 @@ func (opts Options) HandleErrors(of fun.Observer[error], err error) bool {
 		return true
 	case errors.Is(err, fun.ErrIteratorSkip):
 		return true
-	case !opts.ContinueOnError || ers.IsTerminating(err):
+	case ers.IsTerminating(err):
 		return false
 	default:
-		return true
+		return opts.ContinueOnError
 	}
 }
 
