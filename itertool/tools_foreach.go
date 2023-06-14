@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 )
 
 // Process provides a (potentially) more sensible alternate name for
@@ -66,7 +65,6 @@ func ParallelForEach[T any](
 ) error {
 	opts := Options{}
 	fun.InvariantMust(Apply(&opts, optp...))
-	fn = fn.Safe()
 	opts.init()
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -75,10 +73,11 @@ func ParallelForEach[T any](
 	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
 
-	splits := iter.Split(opts.NumWorkers)
+	fn = makeProcessor(fn, fun.Observer[error](ec.Add).Filter(opts.ErrorFilter()), opts)
 
+	splits := iter.Split(opts.NumWorkers)
 	for idx := range splits {
-		forEachWorker(ec, opts, splits[idx], fn).Wait(func(err error) {
+		forEachWorker(splits[idx], fn).Wait(func(err error) {
 			fun.WhenCall(errors.Is(err, io.EOF), cancel)
 		}).Add(ctx, wg)
 	}
@@ -89,8 +88,6 @@ func ParallelForEach[T any](
 }
 
 func forEachWorker[T any](
-	ec *erc.Collector,
-	opts Options,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 ) fun.Worker {
@@ -102,21 +99,20 @@ func forEachWorker[T any](
 			}
 
 			if err := fn(ctx, value); err != nil {
-				erc.When(ec, opts.shouldCollectError(err), err)
-
-				hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
-
-				switch {
-				case hadPanic && !opts.ContinueOnPanic:
-					return io.EOF
-				case hadPanic && opts.ContinueOnPanic:
-					continue
-				case errors.Is(err, fun.ErrIteratorSkip):
-					continue
-				case !opts.ContinueOnError || ers.IsTerminating(err):
-					return io.EOF
-				}
+				return err
 			}
 		}
+	}
+}
+
+func makeProcessor[T any](fn fun.Processor[T], oberr fun.Observer[error], opts Options) fun.Processor[T] {
+	fn = fn.Safe()
+	return func(ctx context.Context, in T) error {
+		if err := fn(ctx, in); err != nil {
+			if !opts.HandleErrors(oberr, err) {
+				return io.EOF
+			}
+		}
+		return nil
 	}
 }

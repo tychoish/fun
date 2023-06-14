@@ -66,21 +66,21 @@ func mapWorker[T any, O any](
 	input *fun.Iterator[T],
 	output fun.ChanSend[O],
 ) fun.Worker {
+	filter := opts.ErrorFilter()
+	proc := input.Producer()
+
 	return func(ctx context.Context) error {
-		proc := input.Producer()
 		for {
 			value, ok := proc.Check(ctx)
 			if !ok {
 				return nil
 			}
-			o, err := func(val T) (out O, err error) {
+			o, err := func(val T) (_ O, err error) {
 				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
-
-				out, err = mapper(ctx, val)
-				return
+				return mapper(ctx, val)
 			}(value)
 			if err != nil {
-				erc.When(ec, opts.shouldCollectError(err), err)
+				erc.When(ec, filter(err), err)
 
 				hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 

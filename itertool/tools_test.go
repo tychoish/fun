@@ -352,13 +352,13 @@ func TestParallelForEach(t *testing.T) {
 		err := Process(ctx,
 			fun.SliceIterator(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
-				if in == 8 {
+				if in == 4 {
 					cancel()
 					panic("gotcha")
 				}
 				return nil
 			},
-			NumWorkers(10),
+			NumWorkers(8),
 		)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -379,6 +379,8 @@ func TestParallelForEach(t *testing.T) {
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
+		testt.Log(t, err)
+
 		var es *erc.Stack
 		if !errors.As(err, &es) {
 			t.Fatal(err)

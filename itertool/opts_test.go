@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/testt"
 )
@@ -30,5 +31,12 @@ func TestOptionProvider(t *testing.T) {
 		check.NotContains(t, conf.ExcludededErrors, eone)
 		check.NotContains(t, conf.ExcludededErrors, etwo)
 	})
-
+	t.Run("Error", func(t *testing.T) {
+		of := AddExcludeErrors(fun.ErrRecoveredPanic)
+		opt := &Options{}
+		assert.Equal(t, 0, len(opt.ExcludededErrors))
+		err := of(opt)
+		assert.Error(t, err)
+		assert.Substring(t, err.Error(), "cannot exclude recovered panics")
+	})
 }

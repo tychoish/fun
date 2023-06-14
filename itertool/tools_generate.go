@@ -3,10 +3,10 @@ package itertool
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 )
 
 // Generate creates an iterator using a generator pattern which
@@ -23,16 +23,24 @@ func Generate[T any](
 	opts := Options{}
 	ec.Add(Apply(&opts, optp...))
 	opts.init()
+
 	pipe := fun.Blocking(make(chan T, opts.NumWorkers*2+1))
 	fun.WhenCall(ec.HasErrors(), pipe.Close)
 
+	fn = fn.Safe()
+
+	oberr := fun.Observer[error](ec.Add).Filter(opts.ErrorFilter())
 	init := fun.Operation(func(ctx context.Context) {
 
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &fun.WaitGroup{}
 		send := pipe.Send()
 
-		generator(ec, opts, fn, cancel, send).StartGroup(wctx, wg, opts.NumWorkers)
+		generator(fn, send, oberr, opts).
+			Wait(func(err error) {
+				fun.WhenCall(errors.Is(err, io.EOF), cancel)
+			}).
+			StartGroup(wctx, wg, opts.NumWorkers)
 
 		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
 	}).Once()
@@ -41,36 +49,20 @@ func Generate[T any](
 }
 
 func generator[T any](
-	catcher *erc.Collector,
-	opts Options,
 	fn fun.Producer[T],
-	abort func(),
 	out fun.ChanSend[T],
-) fun.Operation {
-	return func(ctx context.Context) {
-		defer abort()
-
+	oberr fun.Observer[error],
+	opts Options,
+) fun.Worker {
+	return func(ctx context.Context) error {
 		for {
-			if value, err := func() (out T, err error) {
-				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
-				return fn(ctx)
-			}(); err != nil {
-				erc.When(catcher, opts.shouldCollectError(err), err)
-				hasPanic := errors.Is(err, fun.ErrRecoveredPanic)
-
-				switch {
-				case hasPanic && opts.ContinueOnPanic:
+			if value, err := fn(ctx); err != nil {
+				if opts.HandleErrors(oberr, err) {
 					continue
-				case hasPanic && !opts.ContinueOnPanic:
-					return
-				case errors.Is(err, fun.ErrIteratorSkip):
-					continue
-				case ers.IsTerminating(err) || !opts.ContinueOnError:
-					return
 				}
-
+				return io.EOF
 			} else if !out.Check(ctx, value) {
-				return
+				return io.EOF
 			}
 		}
 	}

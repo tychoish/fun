@@ -2,6 +2,7 @@ package itertool
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"runtime"
 
@@ -49,15 +50,36 @@ func (o *Options) init() {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
 }
 
-func (o Options) shouldCollectError(err error) bool {
+func (o Options) ErrorFilter() func(err error) bool {
 	errs := append([]error{io.EOF, fun.ErrIteratorSkip}, o.ExcludededErrors...)
+	return func(err error) bool {
+		switch {
+		case err == nil:
+			return false
+		case errors.Is(err, ers.ErrRecoveredPanic):
+			return true
+		case ers.Is(err, errs...):
+			return false
+		case !o.IncludeContextExpirationErrors && ers.ContextExpired(err):
+			return false
+		default:
+			return true
+		}
+	}
+}
+
+func (opts Options) HandleErrors(of fun.Observer[error], err error) bool {
+	of(err)
+	hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
 	switch {
-	case err == nil || ers.Is(err, errs...):
+	case hadPanic && !opts.ContinueOnPanic:
 		return false
-	case errors.Is(err, ers.ErrRecoveredPanic):
+	case hadPanic && opts.ContinueOnPanic:
 		return true
-	case !o.IncludeContextExpirationErrors && ers.ContextExpired(err):
+	case errors.Is(err, fun.ErrIteratorSkip):
+		return true
+	case !opts.ContinueOnError || ers.IsTerminating(err):
 		return false
 	default:
 		return true
@@ -81,7 +103,7 @@ func Set(opt *Options) OptionProvider[*Options] {
 func AddExcludeErrors(errs ...error) OptionProvider[*Options] {
 	return func(opts *Options) error {
 		if ers.Is(fun.ErrRecoveredPanic, errs...) {
-			return errors.New("cannot exclude recovered panics")
+			return fmt.Errorf("cannot exclude recovered panics: %w", fun.ErrInvalidInput)
 		}
 		opts.ExcludededErrors = append(opts.ExcludededErrors, errs...)
 		return nil
