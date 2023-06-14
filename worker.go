@@ -322,7 +322,7 @@ func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
 	wg.Operation().PostHook(ch.Close).Go(ctx)
 
 	return func(ctx context.Context) (err error) {
-		iter := ch.Receive().Producer().Iterator()
+		iter := ch.Iterator()
 		for iter.Next(ctx) {
 			err = ers.Merge(iter.Value(), err)
 		}

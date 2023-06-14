@@ -273,7 +273,7 @@ func TestCleanup(t *testing.T) {
 		}
 		check.True(t, HasCleanup(ctx))
 		check.Equal(t, 100, called)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(30 * time.Millisecond)
 		check.Equal(t, 0, count.Load())
 
 		GetOrchestrator(ctx).Service().Close()

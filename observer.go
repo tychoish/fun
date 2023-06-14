@@ -21,7 +21,7 @@ func (of Observer[T]) Safe(oe Observer[error]) Observer[T] { return func(in T) {
 
 // Check runs the observer function with a panic handler and converts
 // a possible panic to an error.
-func (of Observer[T]) Check(in T) error { return ers.Check(func() { of(in) }) }
+func (of Observer[T]) Check(in T) error { return ers.Check(of.Capture(in)) }
 
 // Worker captures a variable and returns a worker function which
 // will, when executed, observe the input value. These worker

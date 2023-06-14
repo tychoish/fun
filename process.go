@@ -119,10 +119,8 @@ func (pf Processor[T]) Chain(next Processor[T]) Processor[T] {
 // respecting the worker's context. The processing does not begin
 // until the worker is called.
 func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker {
-	return func(ctx context.Context) (err error) {
-		oe := func(e error) { err = ers.Merge(e, err) }
-		oe(iter.Observe(ctx, pf.Observer(ctx, oe)))
-		return
+	return func(ctx context.Context) error {
+		return iter.Process(ctx, pf)
 	}
 }
 
