@@ -141,22 +141,76 @@ func TestIteratorTools(t *testing.T) {
 
 	})
 	t.Run("Transform", func(t *testing.T) {
-		input := SliceIterator([]string{
-			fmt.Sprint(10),
-			fmt.Sprint(10),
-			fmt.Sprint(20),
-			fmt.Sprint(2),
+		t.Run("Basic", func(t *testing.T) {
+			input := SliceIterator([]string{
+				fmt.Sprint(10),
+				fmt.Sprint(10),
+				fmt.Sprint(20),
+				fmt.Sprint(2),
+			})
+			calls := 0
+
+			out := Transform[string](input, func(in string) (int, error) { calls++; return strconv.Atoi(in) })
+			sum := 0
+			for out.Next(ctx) {
+				sum += out.Value()
+			}
+			assert.NotError(t, out.Close())
+			assert.Equal(t, 42, sum)
+			assert.Equal(t, calls, 4)
 		})
+		t.Run("Skips", func(t *testing.T) {
+			input := SliceIterator([]string{
+				fmt.Sprint(10),
+				fmt.Sprint(10),
+				fmt.Sprint(20),
+				fmt.Sprint(2),
+			})
+			calls := 0
 
-		out := Transform[string](input, func(in string) (int, error) { return strconv.Atoi(in) })
-		sum := 0
-		for out.Next(ctx) {
-			sum += out.Value()
-		}
-		assert.NotError(t, out.Close())
-		assert.Equal(t, 42, sum)
+			out := Transform[string](input, func(in string) (int, error) {
+				if in == "2" {
+					return 0, ErrIteratorSkip
+				}
+				calls++
+				return strconv.Atoi(in)
+			})
+			sum := 0
+			for out.Next(ctx) {
+				sum += out.Value()
+			}
+			assert.NotError(t, out.Close())
+			assert.Equal(t, 40, sum)
+			assert.Equal(t, calls, 3)
+		})
+		t.Run("ErrorPropogation", func(t *testing.T) {
+			input := SliceIterator([]string{
+				fmt.Sprint(10),
+				fmt.Sprint(10),
+				fmt.Sprint(20),
+				fmt.Sprint(2),
+			})
+			calls := 0
+
+			out := Transform[string](input, func(in string) (int, error) {
+				if in == "20" {
+					return 0, ErrInvalidInput
+				}
+				calls++
+				return strconv.Atoi(in)
+			})
+			sum := 0
+			for out.Next(ctx) {
+				sum += out.Value()
+			}
+			assert.Error(t, out.Close())
+			assert.ErrorIs(t, out.Close(), ErrInvalidInput)
+
+			assert.Equal(t, 20, sum)
+			assert.Equal(t, calls, 2)
+
+		})
 	})
-
 	t.Run("Generator", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

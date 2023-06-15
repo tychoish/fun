@@ -128,4 +128,12 @@ func TestObserver(t *testing.T) {
 		check.Equal(t, count, 2)
 
 	})
+	t.Run("Error", func(t *testing.T) {
+		called := 0
+		oef := ErrorObserver(func(err error) { called++ })
+		oef(nil)
+		check.Equal(t, called, 0)
+		oef(io.EOF)
+		check.Equal(t, called, 1)
+	})
 }

@@ -51,6 +51,10 @@ func (o *Options) init() {
 }
 
 func (opts Options) HandleAbortableErrors(of fun.Observer[error], err error) bool {
+	if err == nil {
+		return true
+	}
+
 	hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
 	switch {

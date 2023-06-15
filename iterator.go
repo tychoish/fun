@@ -177,21 +177,20 @@ func (i *Iterator[T]) Any() *Iterator[any] {
 // continue producing values as long as the input iterator produces
 // values, the context isn't canceled, or
 func Transform[I, O any](iter *Iterator[I], op func(in I) (O, error)) *Iterator[O] {
+	var zero O
 	return Producer[O](func(ctx context.Context) (out O, _ error) {
 		for {
-			item, err := iter.ReadOne(ctx)
-			if err != nil {
-				return out, err
-			}
-			out, err = op(item)
-			if err != nil {
-				if errors.Is(err, ErrIteratorSkip) {
+			if item, err := iter.ReadOne(ctx); err == nil {
+				if out, err = op(item); err == nil {
+					return out, nil
+				} else if errors.Is(err, ErrIteratorSkip) {
 					continue
 				}
-				return out, err
-			}
 
-			return out, nil
+				return zero, err
+			} else if !errors.Is(err, ErrIteratorSkip) {
+				return zero, err
+			}
 		}
 	}).Iterator()
 }
@@ -265,8 +264,6 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
 		switch {
 		case err == nil:
 			fn(item)
-		case errors.Is(err, ErrIteratorSkip):
-			continue
 		case errors.Is(err, io.EOF):
 			return nil
 		default:
@@ -285,9 +282,7 @@ func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) 
 
 		operr := fn(ctx, item)
 		switch {
-		case operr == nil:
-			continue
-		case errors.Is(operr, ErrIteratorSkip):
+		case operr == nil || errors.Is(operr, ErrIteratorSkip):
 			continue
 		case errors.Is(operr, io.EOF):
 			return nil

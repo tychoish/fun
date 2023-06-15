@@ -46,51 +46,50 @@ func WorkerFuture(ch <-chan error) Worker {
 	}
 }
 
+// Pipe sends the output of a producer into the processor as if it
+// were a pipe. As a Worker this operation is delayed until the worker
+// is called.
+//
+// If both operations succeed, then the worker will return nil. If
+// either function returns an error, it is cached, and successive
+// calls to the worker will return the same error. The only limitation
+// is that there is no way to distinguish between an error encountered
+// by the Producer and one by the processor.
+//
+// If the producer returns ErrIteratorSkip, it will be called again.
 func Pipe[T any](from Producer[T], to Processor[T]) Worker {
-	const (
-		runPipe int64 = iota
-		firstFunctionErrored
-		secondFunctionErrored
+	hasErrored := &atomic.Bool{}
+	var (
+		err error
+		val T
 	)
 
-	var ferr error
-	var serr error
-	stage := &atomic.Int64{}
-	stage.Store(runPipe)
-
 	return func(ctx context.Context) error {
-		switch stage.Load() {
-		case secondFunctionErrored:
-			return serr
-		case firstFunctionErrored:
-			return ferr
-		default: // runpipe
-			var val T
-			var err error
+		if hasErrored.Load() {
+			return err
+		}
 
-		RETRY:
-			for {
-				val, err = from(ctx)
-				switch {
-				case err == nil:
-					break RETRY
-				case errors.Is(err, ErrIteratorSkip):
-					continue
-				default:
-					stage.Store(firstFunctionErrored)
-					ferr = err
-					return err
-				}
-			}
-
-			if err = to(ctx, val); err != nil {
-				stage.Store(secondFunctionErrored)
-				serr = err
+	RETRY:
+		for {
+			val, err = from(ctx)
+			switch {
+			case err == nil:
+				break RETRY
+			case errors.Is(err, ErrIteratorSkip):
+				continue
+			default:
+				hasErrored.Store(true)
 				return err
 			}
-			return nil
 		}
+
+		if err = to(ctx, val); err != nil {
+			hasErrored.Store(true)
+			return err
+		}
+		return nil
 	}
+
 }
 
 // Run is equivalent to calling the worker function directly, except

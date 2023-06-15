@@ -39,4 +39,21 @@ func TestOptionProvider(t *testing.T) {
 		assert.Error(t, err)
 		assert.Substring(t, err.Error(), "cannot exclude recovered panics")
 	})
+	t.Run("HandleErrorEdgecases", func(t *testing.T) {
+		opt := &Options{}
+		t.Run("NilError", func(t *testing.T) {
+			called := 0
+			of := func(err error) { called++ }
+
+			check.True(t, opt.HandleAbortableErrors(of, nil))
+			check.Equal(t, 0, called)
+		})
+		t.Run("Continue", func(t *testing.T) {
+			called := 0
+			of := func(err error) { called++ }
+
+			check.True(t, opt.HandleAbortableErrors(of, fun.ErrIteratorSkip))
+			check.Equal(t, 0, called)
+		})
+	})
 }
