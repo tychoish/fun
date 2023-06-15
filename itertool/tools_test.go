@@ -195,13 +195,12 @@ func TestTools(t *testing.T) {
 		wg := &fun.WaitGroup{}
 		pipe <- t.Name()
 
-		mapWorker(
-			fun.Blocking(pipe).Receive().Producer(),
-			fun.Blocking(output).Send(),
-			func(ctx context.Context, in string) (int, error) { return 53, nil },
-			catcher,
-			Options{},
-		).Ignore().Add(ctx, wg)
+		var mf mapper[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
+		mf.Safe().Processor(fun.Blocking(output).Send().Write, catcher.Add, Options{}).
+			ReadAll(fun.Blocking(pipe).Receive().Producer()).
+			Ignore().
+			Add(ctx, wg)
+
 		time.Sleep(10 * time.Millisecond)
 		cancel()
 

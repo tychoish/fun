@@ -27,15 +27,13 @@ func Generate[T any](
 	pipe := fun.Blocking(make(chan T, opts.NumWorkers*2+1))
 	fun.WhenCall(ec.HasErrors(), pipe.Close)
 
-	fn = fn.Safe()
-
 	init := fun.Operation(func(ctx context.Context) {
 
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &fun.WaitGroup{}
 		send := pipe.Send()
 
-		generator(fn, send, ec.Add, opts).
+		send.Processor().ReadAll(makeProducer(fn, ec.Add, opts)).
 			Wait(func(err error) {
 				fun.WhenCall(errors.Is(err, io.EOF), cancel)
 			}).
@@ -47,21 +45,21 @@ func Generate[T any](
 	return pipe.Receive().Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 
-func generator[T any](
+func makeProducer[T any](
 	fn fun.Producer[T],
-	out fun.ChanSend[T],
 	oberr fun.Observer[error],
 	opts Options,
-) fun.Worker {
-	return func(ctx context.Context) error {
-		for {
-			if value, err := fn(ctx); err != nil {
-				if !opts.HandleAbortableErrors(oberr, err) {
-					return io.EOF
-				}
-			} else if !out.Check(ctx, value) {
-				return io.EOF
+) fun.Producer[T] {
+	fn = fn.Safe()
+	var zero T
+	return func(ctx context.Context) (T, error) {
+		if value, err := fn(ctx); err != nil {
+			if !opts.HandleAbortableErrors(oberr, err) {
+				return zero, io.EOF
 			}
+			return zero, fun.ErrIteratorSkip
+		} else {
+			return value, nil
 		}
 	}
 }

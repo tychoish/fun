@@ -210,7 +210,23 @@ func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 
 func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) }
 
-func (pf Processor[T]) ReadAll(prod Producer[T]) Worker { return Pipe(prod, pf).While() }
+func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
+	return func(ctx context.Context) error {
+		for {
+			out, err := prod(ctx)
+			switch {
+			case err == nil:
+				if err := pf(ctx, out); err != nil {
+					return err
+				}
+			case errors.Is(err, ErrIteratorSkip):
+				continue
+			default:
+				return nil
+			}
+		}
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////
 

@@ -313,9 +313,8 @@ func (pf Producer[T]) WithLock(mtx *sync.Mutex) Producer[T] {
 	}
 }
 
-func (pf Producer[T]) SendOne(proc Processor[T]) Worker { return Pipe(pf, proc) }
-
-func (pf Producer[T]) SendAll(proc Processor[T]) Worker { return Pipe(pf, proc).While() }
+func (pf Producer[T]) SendOne(proc Processor[T]) Worker { return proc.ReadOne(pf) }
+func (pf Producer[T]) SendAll(proc Processor[T]) Worker { return proc.ReadAll(pf) }
 
 // Lock creates a producer that runs the root mutex as per normal, but
 // under the protection of a mutex so that there's only one execution

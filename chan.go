@@ -52,6 +52,9 @@ func (op ChanOp[T]) Send() ChanSend[T]       { return ChanSend[T]{mode: op.mode,
 func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
 func (op ChanOp[T]) Iterator() *Iterator[T]  { return op.Receive().Producer().Iterator() }
 
+func (op ChanOp[T]) Processor() Processor[T] { return op.Send().Processor() }
+func (op ChanOp[T]) Producer() Producer[T]   { return op.Receive().Producer() }
+
 // ChanReceive, wraps a channel fore <-chan T operations. It is the type
 // returned by the ChanReceive() method on ChannelOp. The primary method
 // is Read(), with other methods provided as "self-documenting"

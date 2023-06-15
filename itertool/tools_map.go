@@ -24,15 +24,17 @@ import (
 // to errors and handled according to the ContinueOnPanic option.
 func Map[T any, O any](
 	iter *fun.Iterator[T],
-	mapper func(context.Context, T) (O, error),
+	mapFn func(context.Context, T) (O, error),
 	optp ...OptionProvider[*Options],
 ) *fun.Iterator[O] {
+
 	opts := Options{}
 	Apply(&opts, optp...)
 	opts.init()
 
 	ec := &erc.Collector{}
 	output := fun.Blocking(make(chan O))
+	var mf mapper[T, O] = mapFn
 
 	init := fun.Operation(func(ctx context.Context) {
 		splits := iter.Split(opts.NumWorkers)
@@ -42,7 +44,9 @@ func Map[T any, O any](
 
 		for idx := range splits {
 			// for each split, run a mapWorker
-			mapWorker(splits[idx].Producer(), output.Send(), mapper, ec, opts).
+
+			mf.Safe().Processor(output.Send().Write, ec.Add, opts).
+				ReadAll(splits[idx].Producer()).
 				Wait(func(err error) {
 					fun.WhenCall(errors.Is(err, io.EOF), wcancel)
 				}).Add(wctx, wg)
@@ -57,36 +61,33 @@ func Map[T any, O any](
 		IteratorWithHook(erc.IteratorHook[O](ec))
 }
 
-func mapWorker[T any, O any](
-	input fun.Producer[T],
-	output fun.ChanSend[O],
-	mapper func(context.Context, T) (O, error),
-	ec *erc.Collector,
-	opts Options,
-) fun.Worker {
-	oberr := ec.Observer()
+type mapper[T any, O any] func(context.Context, T) (O, error)
 
-	return func(ctx context.Context) error {
-		for {
-			value, ok := input.Check(ctx)
-			if !ok {
+func (mf mapper[T, O]) Safe() mapper[T, O] {
+	return func(ctx context.Context, val T) (_ O, err error) {
+		defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
+		return mf(ctx, val)
+	}
+}
+
+func (mf mapper[T, O]) Processor(
+	output fun.Processor[O],
+	ec fun.Observer[error],
+	opts Options,
+) fun.Processor[T] {
+	return func(ctx context.Context, in T) error {
+		val, err := mf(ctx, in)
+		if err != nil {
+			if opts.HandleAbortableErrors(ec, err) {
 				return nil
 			}
-
-			o, err := func(val T) (_ O, err error) {
-				defer func() { err = erc.Merge(err, ers.ParsePanic(recover())) }()
-				return mapper(ctx, val)
-			}(value)
-			if err != nil {
-				if opts.HandleAbortableErrors(oberr, err) {
-					continue
-				}
-				return io.EOF
-			}
-
-			if !output.Check(ctx, o) {
-				return io.EOF
-			}
+			return io.EOF
 		}
+
+		if !output.Check(ctx, val) {
+			return io.EOF
+		}
+
+		return nil
 	}
 }

@@ -62,12 +62,15 @@ func ParallelForEach[T any](
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
 	optp ...OptionProvider[*Options],
-) error {
+) (err error) {
 	opts := &Options{}
-	fun.InvariantMust(Apply(opts, optp...))
 	opts.init()
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	err = Apply(opts, optp...)
+	fun.WhenCall(err != nil, cancel)
 
 	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
@@ -76,7 +79,7 @@ func ParallelForEach[T any](
 
 	splits := iter.Split(opts.NumWorkers)
 	for idx := range splits {
-		iterPipe(splits[idx].Producer(), operation, ec.Add, opts).
+		operation.ReadAll(splits[idx].Producer()).
 			Wait(func(err error) { fun.WhenCall(errors.Is(err, io.EOF), cancel) }).
 			Add(ctx, wg)
 	}
@@ -86,7 +89,11 @@ func ParallelForEach[T any](
 	return ec.Resolve()
 }
 
-func makeProcessor[T any](fn fun.Processor[T], oberr fun.Observer[error], opts *Options) fun.Processor[T] {
+func makeProcessor[T any](
+	fn fun.Processor[T],
+	oberr fun.Observer[error],
+	opts *Options,
+) fun.Processor[T] {
 	fn = fn.Safe()
 	return func(ctx context.Context, in T) error {
 		if err := fn(ctx, in); err != nil {
@@ -95,26 +102,5 @@ func makeProcessor[T any](fn fun.Processor[T], oberr fun.Observer[error], opts *
 			}
 		}
 		return nil
-	}
-}
-
-func iterPipe[T any](
-	input fun.Producer[T],
-	output fun.Processor[T],
-	oberr fun.Observer[error],
-	opts *Options,
-) fun.Worker {
-	return func(ctx context.Context) error {
-		for {
-			value, ok := input.Check(ctx)
-			if !ok {
-				return nil
-			}
-			if err := output(ctx, value); err != nil {
-				if !opts.HandleAbortableErrors(oberr, err) {
-					return io.EOF
-				}
-			}
-		}
 	}
 }

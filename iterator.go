@@ -227,21 +227,14 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 	}
 
 	pipe := Blocking(make(chan T))
-	setup := Operation(func(ctx context.Context) {
-		defer pipe.Close()
-		proc := i.Producer()
-		send := pipe.Send()
-		for {
-			if value, ok := proc.Check(ctx); !ok || !send.Check(ctx, value) {
-				return
-			}
-		}
-	}).Launch().Once()
+	setup := pipe.Processor().
+		ReadAll(i.Producer()).
+		PostHook(pipe.Close).
+		Ignore().Launch().Once()
 
 	output := make([]*Iterator[T], num)
-
 	for idx := range output {
-		output[idx] = pipe.Receive().Producer().PreHook(setup).Iterator()
+		output[idx] = pipe.Producer().PreHook(setup).Iterator()
 	}
 
 	return output
