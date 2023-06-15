@@ -33,7 +33,7 @@ func UnwrapedRoot[T any](in T) T {
 // Unwind uses the Unwrap operation to build a list of the "wrapped"
 // objects.
 func Unwind[T any](in T) []T {
-	out := []T{}
+	var out []T
 
 	switch any(in).(type) {
 	case nil:

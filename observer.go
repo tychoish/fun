@@ -84,3 +84,7 @@ func (of Observer[T]) Lock() Observer[T] {
 // Chain creates an observer function that runs both the root observer
 // and the "next" observer.
 func (of Observer[T]) Chain(next Observer[T]) Observer[T] { return func(in T) { of(in); next(in) } }
+
+func ErrorObserver(of Observer[error]) Observer[error] {
+	return of.Filter(func(err error) bool { return err != nil })
+}

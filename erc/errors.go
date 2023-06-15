@@ -104,7 +104,7 @@ func (e *Stack) Producer() fun.Producer[error] {
 	iter := &Stack{next: e}
 	return fun.Producer[error](func(ctx context.Context) (value error, err error) {
 		switch {
-		case iter.next == nil, iter.next.err == nil:
+		case iter.next == nil || iter.next.err == nil:
 			return nil, io.EOF
 		case ctx.Err() != nil:
 			return nil, ctx.Err()

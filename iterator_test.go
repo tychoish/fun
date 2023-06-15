@@ -113,6 +113,7 @@ func TestIteratorTools(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return ErrLimitExceeded })
+			testt.Log(t, Unwind(err))
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ErrLimitExceeded)
 			assert.Equal(t, 9, count)

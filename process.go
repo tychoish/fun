@@ -208,7 +208,9 @@ func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 	return func(ctx context.Context, in T) error { return ers.Filter(pf(ctx, in), errs...) }
 }
 
-func (pf Processor[T]) ReadFrom(prod Producer[T]) Worker { return Pipe(prod, pf) }
+func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) }
+
+func (pf Processor[T]) ReadAll(prod Producer[T]) Worker { return Pipe(prod, pf).While() }
 
 ////////////////////////////////////////////////////////////////////////
 

@@ -204,8 +204,6 @@ func (sm ChanSend[T]) Zero(ctx context.Context) error { var v T; return sm.Write
 // closed.
 func (sm ChanSend[T]) Signal(ctx context.Context) { var v T; sm.Ignore(ctx, v) }
 
-func (sm ChanSend[T]) WorkerPipe(input Producer[T]) Worker { return Pipe(input, sm.Processor()) }
-
 // Write sends the item into the channel captured by
 // Blocking/NonBlocking returning the appropriate error.
 //
@@ -250,9 +248,6 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 func (sm ChanSend[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Splice(iter.Close(), err, ers.ParsePanic(recover())) }()
-
-		operation := sm.WorkerPipe(iter.Producer()).While()
-
-		return operation(ctx)
+		return iter.Process(ctx, sm.Processor())
 	}
 }

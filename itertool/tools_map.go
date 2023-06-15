@@ -42,7 +42,7 @@ func Map[T any, O any](
 
 		for idx := range splits {
 			// for each split, run a mapWorker
-			mapWorker(ec, opts, mapper, splits[idx], output.Send()).
+			mapWorker(splits[idx].Producer(), output.Send(), mapper, ec, opts).
 				Wait(func(err error) {
 					fun.WhenCall(errors.Is(err, io.EOF), wcancel)
 				}).Add(wctx, wg)
@@ -57,23 +57,18 @@ func Map[T any, O any](
 		IteratorWithHook(erc.IteratorHook[O](ec))
 }
 
-var errAbortWorkers = errors.New("abort-workers")
-
 func mapWorker[T any, O any](
+	input fun.Producer[T],
+	output fun.ChanSend[O],
+	mapper func(context.Context, T) (O, error),
 	ec *erc.Collector,
 	opts Options,
-	mapper func(context.Context, T) (O, error),
-	input *fun.Iterator[T],
-	output fun.ChanSend[O],
 ) fun.Worker {
-	proc := input.Producer()
-	oberr := ec.Observer().
-		Filter(func(err error) bool { return !ers.Ok(err) }).
-		Filter(opts.ErrorFilter())
+	oberr := ec.Observer()
 
 	return func(ctx context.Context) error {
 		for {
-			value, ok := proc.Check(ctx)
+			value, ok := input.Check(ctx)
 			if !ok {
 				return nil
 			}

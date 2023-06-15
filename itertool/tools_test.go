@@ -196,11 +196,11 @@ func TestTools(t *testing.T) {
 		pipe <- t.Name()
 
 		mapWorker(
+			fun.Blocking(pipe).Receive().Producer(),
+			fun.Blocking(output).Send(),
+			func(ctx context.Context, in string) (int, error) { return 53, nil },
 			catcher,
 			Options{},
-			func(ctx context.Context, in string) (int, error) { return 53, nil },
-			fun.Blocking(pipe).Iterator(),
-			fun.Blocking(output).Send(),
 		).Ignore().Add(ctx, wg)
 		time.Sleep(10 * time.Millisecond)
 		cancel()
@@ -227,8 +227,6 @@ func TestTools(t *testing.T) {
 }
 
 func TestParallelForEach(t *testing.T) {
-	t.Parallel()
-
 	ctx := testt.Context(t)
 
 	t.Run("Basic", func(t *testing.T) {
@@ -364,13 +362,15 @@ func TestParallelForEach(t *testing.T) {
 			t.Error("should have propogated an error")
 		}
 	})
-	t.Run("CollectAllErrors", func(t *testing.T) {
+	t.Run("CollectAllContinuedErrors", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		count := &atomic.Int64{}
 
-		err := Process(ctx,
+		err := ParallelForEach(ctx,
 			fun.SliceIterator(makeIntSlice(10)),
 			func(ctx context.Context, in int) error {
+				count.Add(1)
 				return fmt.Errorf("errored=%d", in)
 			},
 			NumWorkers(4),
@@ -380,18 +380,19 @@ func TestParallelForEach(t *testing.T) {
 			t.Error("should have propogated an error")
 		}
 		testt.Log(t, err)
+		check.Equal(t, 10, count.Load())
 
 		var es *erc.Stack
 		if !errors.As(err, &es) {
 			t.Fatal(err)
 		}
-		errs := risky.Force(es.Iterator().Slice(ctx))
+		errs := fun.Unwind(err)
 		if len(errs) != 10 {
 			t.Error(len(errs), "!= 10", errs)
 		}
 
 	})
-	t.Run("CollectAllErrors", func(t *testing.T) {
+	t.Run("CollectAllErrors/Double", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -416,7 +417,7 @@ func TestParallelForEach(t *testing.T) {
 			t.Error(len(errs))
 		}
 	})
-	t.Run("CollectAllErrors", func(t *testing.T) {
+	t.Run("CollectAllErrors/Cores", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 

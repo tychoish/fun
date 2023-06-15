@@ -51,7 +51,6 @@ func Pipe[T any](from Producer[T], to Processor[T]) Worker {
 		runPipe int64 = iota
 		firstFunctionErrored
 		secondFunctionErrored
-		completeNoError
 	)
 
 	var ferr error

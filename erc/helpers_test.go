@@ -50,13 +50,16 @@ func TestCollections(t *testing.T) {
 		t.Run("FirstOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
 			err := Merge(e1, nil)
-			assert.True(t, err == e1)
+			testt.Log(t, err)
+			testt.Logf(t, "%T", err)
+
+			assert.ErrorIs(t, err, e1)
 		})
 
 		t.Run("SecondOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
 			err := Merge(nil, e1)
-			assert.True(t, err == e1)
+			assert.ErrorIs(t, err, e1)
 		})
 		t.Run("Neither", func(t *testing.T) {
 			err := Merge(nil, nil)
@@ -120,6 +123,8 @@ func TestCollections(t *testing.T) {
 		iter := op.IteratorWithHook(IteratorHook[int](ec))
 		assert.Equal(t, iter.Count(testt.Context(t)), 32)
 		assert.Equal(t, len(fun.Unwind(ec.Resolve())), 33)
+		testt.Logf(t, "%T", iter.Close())
+		testt.Log(t, fun.Unwind(iter.Close()))
 		assert.Equal(t, len(fun.Unwind(iter.Close())), 33)
 		assert.Equal(t, len(fun.Unwind(iter.Close())), 33)
 	})

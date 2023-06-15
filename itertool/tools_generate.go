@@ -29,16 +29,13 @@ func Generate[T any](
 
 	fn = fn.Safe()
 
-	oberr := fun.Observer[error](ec.Add).
-		Filter(func(err error) bool { return err != nil }).
-		Filter(opts.ErrorFilter())
 	init := fun.Operation(func(ctx context.Context) {
 
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &fun.WaitGroup{}
 		send := pipe.Send()
 
-		generator(fn, send, oberr, opts).
+		generator(fn, send, ec.Add, opts).
 			Wait(func(err error) {
 				fun.WhenCall(errors.Is(err, io.EOF), cancel)
 			}).
@@ -59,10 +56,9 @@ func generator[T any](
 	return func(ctx context.Context) error {
 		for {
 			if value, err := fn(ctx); err != nil {
-				if opts.HandleAbortableErrors(oberr, err) {
-					continue
+				if !opts.HandleAbortableErrors(oberr, err) {
+					return io.EOF
 				}
-				return io.EOF
 			} else if !out.Check(ctx, value) {
 				return io.EOF
 			}
