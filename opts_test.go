@@ -1,10 +1,9 @@
-package itertool
+package fun
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/testt"
@@ -12,15 +11,15 @@ import (
 
 func TestOptionProvider(t *testing.T) {
 	t.Run("Set", func(t *testing.T) {
-		conf := &Options{ExcludededErrors: []error{fun.ErrLimitExceeded}}
-		newc := &Options{ContinueOnPanic: true, ExcludededErrors: []error{fun.ErrRecoveredPanic, fun.ErrInvariantViolation}}
+		conf := &WorkerGroupOptions{ExcludededErrors: []error{ErrLimitExceeded}}
+		newc := &WorkerGroupOptions{ContinueOnPanic: true, ExcludededErrors: []error{ErrRecoveredPanic, ErrInvariantViolation}}
 		eone := errors.New("cat")
 		etwo := errors.New("3")
 
 		testt.Log(t, "before", conf)
-		err := Apply(conf,
+		err := ApplyOptions(conf,
 			AddExcludeErrors(eone, etwo),
-			func(o *Options) error {
+			func(o *WorkerGroupOptions) error {
 				return nil
 			},
 			Set(newc))
@@ -32,15 +31,15 @@ func TestOptionProvider(t *testing.T) {
 		check.NotContains(t, conf.ExcludededErrors, etwo)
 	})
 	t.Run("Error", func(t *testing.T) {
-		of := AddExcludeErrors(fun.ErrRecoveredPanic)
-		opt := &Options{}
+		of := AddExcludeErrors(ErrRecoveredPanic)
+		opt := &WorkerGroupOptions{}
 		assert.Equal(t, 0, len(opt.ExcludededErrors))
 		err := of(opt)
 		assert.Error(t, err)
 		assert.Substring(t, err.Error(), "cannot exclude recovered panics")
 	})
 	t.Run("HandleErrorEdgecases", func(t *testing.T) {
-		opt := &Options{}
+		opt := &WorkerGroupOptions{}
 		t.Run("NilError", func(t *testing.T) {
 			called := 0
 			of := func(err error) { called++ }
@@ -52,7 +51,7 @@ func TestOptionProvider(t *testing.T) {
 			called := 0
 			of := func(err error) { called++ }
 
-			check.True(t, opt.CanContinueOnError(of, fun.ErrIteratorSkip))
+			check.True(t, opt.CanContinueOnError(of, ErrIteratorSkip))
 			check.Equal(t, 0, called)
 		})
 	})

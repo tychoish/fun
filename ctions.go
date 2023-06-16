@@ -55,15 +55,3 @@ func Contains[T comparable](item T, slice []T) bool {
 	}
 	return false
 }
-
-// Apply processes an input slice, with the provided function,
-// returning a new slice that holds the result.
-func Apply[T any](fn func(T) T, in []T) []T {
-	out := make([]T, len(in))
-
-	for idx := range in {
-		out[idx] = fn(in[idx])
-	}
-
-	return out
-}

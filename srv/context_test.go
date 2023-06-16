@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -236,7 +235,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("Example", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", itertool.NumWorkers(4))
+		ctx = WithWorkerPool(ctx, "kip", fun.NumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -258,7 +257,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("NegativeWorkersWork", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", itertool.NumWorkers(4))
+		ctx = WithWorkerPool(ctx, "kip", fun.NumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -318,13 +317,13 @@ func TestWorkerPool(t *testing.T) {
 		defer cancel()
 		wpCt := &atomic.Int64{}
 		ctx = SetShutdownSignal(ctx)
-		ctx = WithWorkerPool(ctx, "merlin", itertool.NumWorkers(50))
+		ctx = WithWorkerPool(ctx, "merlin", fun.NumWorkers(50))
 		obCt := &atomic.Int64{}
 		expected := errors.New("kip")
 		ctx = WithObserverWorkerPool(ctx, "kip", func(err error) {
 			check.ErrorIs(t, err, expected)
 			obCt.Add(1)
-		}, itertool.NumWorkers(50))
+		}, fun.NumWorkers(50))
 		for i := 0; i < 100; i++ {
 			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error { wpCt.Add(1); return nil })
 			assert.NotError(t, err)

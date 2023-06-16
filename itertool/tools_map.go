@@ -25,17 +25,26 @@ import (
 func Map[T any, O any](
 	iter *fun.Iterator[T],
 	mapFn func(context.Context, T) (O, error),
-	optp ...OptionProvider[*Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) *fun.Iterator[O] {
+	opts := fun.WorkerGroupOptions{}
+	err := fun.ApplyOptions(&opts, optp...)
+	var hook = func(*fun.Iterator[O]) {}
+	if opts.ErrorObserver == nil {
+		ec := &erc.Collector{}
+		opts.ErrorObserver = ec.Add
+		opts.ErrorResolver = ec.Resolve
+		hook = erc.IteratorHook[O](ec)
+	}
 
-	opts := Options{}
-	Apply(&opts, optp...)
-	opts.init()
+	opts.ErrorObserver(err)
 
-	ec := &erc.Collector{}
 	output := fun.Blocking(make(chan O))
+	fun.WhenCall(err != nil, output.Close)
+
 	var mf mapper[T, O] = mapFn
 	mf = mf.Safe()
+
 	init := fun.Operation(func(ctx context.Context) {
 		splits := iter.Split(opts.NumWorkers)
 
@@ -45,7 +54,7 @@ func Map[T any, O any](
 		for idx := range splits {
 			// for each split, run a mapWorker
 
-			mf.Processor(output.Send().Write, ec.Add, opts).
+			mf.Processor(output.Send().Write, opts).
 				ReadAll(splits[idx].Producer()).
 				Wait(func(err error) {
 					fun.WhenCall(errors.Is(err, io.EOF), wcancel)
@@ -58,8 +67,7 @@ func Map[T any, O any](
 		wg.Operation().PostHook(wcancel).PostHook(output.Close).Go(ctx)
 	}).Once()
 
-	return output.Receive().Producer().PreHook(init).
-		IteratorWithHook(erc.IteratorHook[O](ec))
+	return output.Receive().Producer().PreHook(init).IteratorWithHook(hook)
 }
 
 type mapper[T any, O any] func(context.Context, T) (O, error)
@@ -73,13 +81,12 @@ func (mf mapper[T, O]) Safe() mapper[T, O] {
 
 func (mf mapper[T, O]) Processor(
 	output fun.Processor[O],
-	ec fun.Observer[error],
-	opts Options,
+	opts fun.WorkerGroupOptions,
 ) fun.Processor[T] {
 	return func(ctx context.Context, in T) error {
 		val, err := mf(ctx, in)
 		if err != nil {
-			if opts.CanContinueOnError(ec, err) {
+			if opts.CanContinueOnError(err) {
 				return nil
 			}
 			return io.EOF

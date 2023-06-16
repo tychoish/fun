@@ -11,7 +11,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
@@ -43,7 +42,7 @@ func TestImplementationHelpers(t *testing.T) {
 			srv := ProcessIterator(
 				makeIterator(100),
 				func(_ context.Context, in int) error { count.Add(1); return nil },
-				itertool.NumWorkers(2),
+				fun.NumWorkers(2),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -67,7 +66,7 @@ func TestImplementationHelpers(t *testing.T) {
 					count.Add(1)
 					return nil
 				},
-				itertool.NumWorkers(50),
+				fun.NumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -94,7 +93,7 @@ func TestImplementationHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				itertool.WorkerPerCPU(),
+				fun.WorkerPerCPU(),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -114,7 +113,7 @@ func TestImplementationHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				itertool.WorkerPerCPU(),
+				fun.WorkerPerCPU(),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 
@@ -143,7 +142,7 @@ func TestImplementationHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				itertool.NumWorkers(50),
+				fun.NumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -171,7 +170,7 @@ func TestImplementationHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				itertool.NumWorkers(50),
+				fun.NumWorkers(50),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 

@@ -36,7 +36,8 @@ func TestWrap(t *testing.T) {
 		err := fmt.Errorf("bar: %w", fmt.Errorf("foo: %w", root))
 		errs := Unwind(err)
 		assert.Equal(t, len(errs), 3)
-		assert.True(t, root == UnwrapedRoot(err))
+		ur := UnwrapedRoot(err)
+		assert.True(t, root == ur)
 	})
 	t.Run("Errors", func(t *testing.T) {
 		err := errors.New("root")

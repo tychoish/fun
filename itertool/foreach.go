@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/erc"
 )
 
 // Process provides a (potentially) more sensible alternate name for
@@ -15,7 +14,7 @@ func Process[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	optp ...OptionProvider[*Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) error {
 	return ParallelForEach(ctx, iter, fn, optp...)
 }
@@ -43,7 +42,7 @@ var _ interface{ Safe() fun.Worker } = new(fun.Operation)
 func Worker[OP fun.Worker | fun.Operation](
 	ctx context.Context,
 	iter *fun.Iterator[OP],
-	optp ...OptionProvider[*Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
 		return any(op).(interface{ Safe() fun.Worker }).Safe()(ctx)
@@ -61,22 +60,27 @@ func ParallelForEach[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	optp ...OptionProvider[*Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) (err error) {
-	opts := &Options{}
-	opts.init()
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	err = Apply(opts, optp...)
+	opts := &fun.WorkerGroupOptions{}
+	err = fun.ApplyOptions(opts, optp...)
 	fun.WhenCall(err != nil, cancel)
 
-	ec := &erc.Collector{}
+	if opts.ErrorObserver == nil {
+		opts.ErrorObserver = iter.ErrorObserver().Lock()
+		opts.ErrorResolver = iter.Close
+	}
+
 	wg := &fun.WaitGroup{}
 
 	operation := fn.Safe().FilterErrors(func(err error) error {
-		return fun.WhenDo(!opts.CanContinueOnError(ec.Add, err), fun.Wrapper(io.EOF))
+		return fun.WhenDo(
+			!opts.CanContinueOnError(err),
+			fun.Wrapper(io.EOF),
+		)
 	})
 
 	splits := iter.Split(opts.NumWorkers)
@@ -87,6 +91,5 @@ func ParallelForEach[T any](
 	}
 
 	wg.Operation().Block()
-	ec.Add(iter.Close())
-	return ec.Resolve()
+	return opts.ErrorResolver()
 }

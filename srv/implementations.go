@@ -153,7 +153,7 @@ func Wait(iter *fun.Iterator[fun.Operation]) *Service {
 func ProcessIterator[T any](
 	iter *fun.Iterator[T],
 	processor fun.Processor[T],
-	optp ...itertool.OptionProvider[*itertool.Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
@@ -202,9 +202,9 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 					ec.Add(wf.Safe()(ctx))
 					return nil
 				},
-				itertool.ContinueOnError(),
-				itertool.ContinueOnPanic(),
-				itertool.WorkerPerCPU(),
+				fun.ContinueOnError(),
+				fun.ContinueOnPanic(),
+				fun.WorkerPerCPU(),
 			))
 
 			return ec.Resolve()
@@ -217,7 +217,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...itertool.OptionProvider[*itertool.Options]) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupOptions]) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
@@ -249,7 +249,7 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...itertool.OptionProv
 func ObserverWorkerPool(
 	workQueue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
-	optp ...itertool.OptionProvider[*itertool.Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {

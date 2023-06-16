@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 )
@@ -232,7 +231,7 @@ func HasBaseContext(ctx context.Context) bool {
 func WithWorkerPool(
 	ctx context.Context,
 	key string,
-	optp ...itertool.OptionProvider[*itertool.Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) context.Context {
 	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
@@ -263,17 +262,14 @@ func WithObserverWorkerPool(
 	ctx context.Context,
 	key string,
 	observer fun.Observer[error],
-	optp ...itertool.OptionProvider[*itertool.Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) context.Context {
 	return SetObserverWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(optp ...itertool.OptionProvider[*itertool.Options]) *pubsub.Queue[fun.Worker] {
-	opts := itertool.Options{}
-	itertool.Apply(&opts, optp...)
-	if opts.NumWorkers <= 0 {
-		opts.NumWorkers = 1
-	}
+func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupOptions]) *pubsub.Queue[fun.Worker] {
+	opts := fun.WorkerGroupOptions{}
+	fun.ApplyOptions(&opts, optp...)
 
 	return risky.Force(pubsub.NewQueue[fun.Worker](
 		pubsub.QueueOptions{
@@ -302,7 +298,7 @@ func SetWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fun.Worker],
-	optp ...itertool.OptionProvider[*itertool.Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.InvariantMust(orca.Add(WorkerPool(queue, optp...)))
@@ -333,7 +329,7 @@ func SetObserverWorkerPool(
 	key string,
 	queue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
-	optp ...itertool.OptionProvider[*itertool.Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.InvariantMust(orca.Add(ObserverWorkerPool(queue, observer, optp...)))

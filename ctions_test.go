@@ -35,19 +35,6 @@ func TestContains(t *testing.T) {
 	})
 }
 
-func TestApply(t *testing.T) {
-	primes := []int{1, 3, 5, 7, 9, 11, 17, 19}
-	magnitutde := Apply(func(in int) int { return in * 10 }, primes)
-	assert.Equal(t, len(primes), len(magnitutde))
-	assert.Equal(t, len(primes), 8)
-
-	for idx := range primes {
-		assert.Zero(t, magnitutde[idx]%primes[idx])
-		assert.NotEqual(t, magnitutde[idx], primes[idx])
-		assert.Equal(t, magnitutde[idx]/10, primes[idx])
-	}
-}
-
 func TestPtr(t *testing.T) {
 	out := Ptr(123)
 	assert.True(t, out != nil)

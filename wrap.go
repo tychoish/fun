@@ -30,6 +30,20 @@ func UnwrapedRoot[T any](in T) T {
 	}
 }
 
+func CountWraps[T any](in T) int {
+	count := 0
+
+	for {
+		switch wi := any(in).(type) {
+		case interface{ Unwrap() T }:
+			count++
+			in = wi.Unwrap()
+		default:
+			return count
+		}
+	}
+}
+
 // Unwind uses the Unwrap operation to build a list of the "wrapped"
 // objects.
 func Unwind[T any](in T) []T {

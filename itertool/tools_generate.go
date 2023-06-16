@@ -17,15 +17,20 @@ import (
 // configuration with the Map and ParallelForEach operations.
 func Generate[T any](
 	fn fun.Producer[T],
-	optp ...OptionProvider[*Options],
+	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
 ) *fun.Iterator[T] {
-	ec := &erc.Collector{}
-	opts := Options{}
-	ec.Add(Apply(&opts, optp...))
-	opts.init()
-
+	opts := fun.WorkerGroupOptions{}
+	err := fun.ApplyOptions(&opts, optp...)
+	var hook = func(*fun.Iterator[T]) {}
+	if opts.ErrorObserver == nil {
+		ec := &erc.Collector{}
+		opts.ErrorObserver = ec.Add
+		opts.ErrorResolver = ec.Resolve
+		hook = erc.IteratorHook[T](ec)
+	}
+	opts.ErrorObserver(err)
 	pipe := fun.Blocking(make(chan T, opts.NumWorkers*2+1))
-	fun.WhenCall(ec.HasErrors(), pipe.Close)
+	fun.WhenCall(err != nil, pipe.Close)
 
 	init := fun.Operation(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
@@ -37,7 +42,7 @@ func Generate[T any](
 		pipe.Processor().
 			ReadAll(func(ctx context.Context) (T, error) {
 				if value, err := fn(ctx); err != nil {
-					if opts.CanContinueOnError(ec.Add, err) {
+					if opts.CanContinueOnError(err) {
 						return zero, fun.ErrIteratorSkip
 					}
 
@@ -54,5 +59,5 @@ func Generate[T any](
 		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
 	}).Once()
 
-	return pipe.Receive().Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
+	return pipe.Receive().Producer().PreHook(init).IteratorWithHook(hook)
 }

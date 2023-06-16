@@ -1,4 +1,4 @@
-package itertool
+package fun
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"io"
 	"runtime"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
@@ -43,50 +42,61 @@ type WorkerGroupOptions struct {
 	// output. fun.ErrRecoveredPanic is always included and io.EOF
 	// is never included.
 	ExcludededErrors []error
+	// ErrorObserver is used to collect and aggregate errors in
+	// the collector.
+	ErrorObserver Observer[error]
+	ErrorResolver func() error
 }
 
-func (o *WorkerGroupOptions) init() {
+func (o *WorkerGroupOptions) Validate() error {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
+	return nil
 }
 
-func (o WorkerGroupOptions) CanContinueOnError(of fun.Observer[error], err error) bool {
+func (o WorkerGroupOptions) CanContinueOnError(err error) bool {
 	if err == nil {
 		return true
 	}
 
-	hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
+	hadPanic := errors.Is(err, ErrRecoveredPanic)
 
 	switch {
 	case hadPanic && !o.ContinueOnPanic:
-		of(err)
+		o.ErrorObserver(err)
 		return false
 	case hadPanic && o.ContinueOnPanic:
-		of(err)
+		o.ErrorObserver(err)
 		return true
-	case errors.Is(err, fun.ErrIteratorSkip):
+	case errors.Is(err, ErrIteratorSkip):
 		return true
 	case errors.Is(err, io.EOF):
 		return false
 	case ers.ContextExpired(err):
 		if o.IncludeContextExpirationErrors {
-			of(err)
+			o.ErrorObserver(err)
 		}
 
 		return false
 	default:
-		of(err)
+		o.ErrorObserver(err)
 		return o.ContinueOnError
 	}
 }
 
 type OptionProvider[T any] func(T) error
 
-func Apply[T any](opt T, opts ...OptionProvider[T]) (err error) {
+func ApplyOptions[T any](opt T, opts ...OptionProvider[T]) (err error) {
 	defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
 	for idx := range opts {
 		err = ers.Merge(opts[idx](opt), err)
 	}
-	return err
+
+	switch validator := any(opt).(type) {
+	case interface{ Validate() error }:
+		return ers.Merge(validator.Validate(), err)
+	default:
+		return err
+	}
 }
 
 func Set(opt *WorkerGroupOptions) OptionProvider[*WorkerGroupOptions] {
@@ -95,22 +105,26 @@ func Set(opt *WorkerGroupOptions) OptionProvider[*WorkerGroupOptions] {
 
 func AddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error {
-		if ers.Is(fun.ErrRecoveredPanic, errs...) {
-			return fmt.Errorf("cannot exclude recovered panics: %w", fun.ErrInvalidInput)
+		if ers.Is(ErrRecoveredPanic, errs...) {
+			return fmt.Errorf("cannot exclude recovered panics: %w", ErrInvalidInput)
 		}
 		opts.ExcludededErrors = append(opts.ExcludededErrors, errs...)
 		return nil
 	}
 }
+
 func IncludeContextErrors() OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error { opts.IncludeContextExpirationErrors = true; return nil }
 }
+
 func ContinueOnError() OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error { opts.ContinueOnError = true; return nil }
 }
+
 func ContinueOnPanic() OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error { opts.ContinueOnPanic = true; return nil }
 }
+
 func WorkerPerCPU() OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error { opts.NumWorkers = runtime.NumCPU(); return nil }
 }
@@ -121,6 +135,19 @@ func NumWorkers(num int) OptionProvider[*WorkerGroupOptions] {
 			num = 1
 		}
 		opts.NumWorkers = num
+		return nil
+	}
+}
+
+func ErrorCollector(
+	ec interface {
+		Add(error)
+		Resolve() error
+	},
+) OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error {
+		opts.ErrorObserver = ec.Add
+		opts.ErrorResolver = ec.Resolve
 		return nil
 	}
 }

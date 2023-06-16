@@ -637,7 +637,8 @@ func TestJSON(t *testing.T) {
 		assert.True(t, ers.IsTerminating(err))
 		assert.ErrorIs(t, err, ErrInvalidInput)
 
-		assert.Equal(t, UnwrapedRoot(err), io.EOF)
+		root := UnwrapedRoot(err)
+		assert.Equal(t, root, io.EOF)
 	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
