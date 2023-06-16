@@ -204,8 +204,11 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
 }
 
+func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
+	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
+}
 func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
-	return func(ctx context.Context, in T) error { return ers.Filter(pf(ctx, in), errs...) }
+	return pf.FilterErrors(ers.FilterRemove(errs...))
 }
 
 func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) }

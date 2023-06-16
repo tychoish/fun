@@ -117,9 +117,6 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 			if !ok {
 				return zero, io.EOF
 			}
-			if err := ctx.Err(); err != nil {
-				return zero, err
-			}
 
 			return obj, nil
 		}
@@ -130,9 +127,6 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 		case obj, ok := <-ro.ch:
 			if !ok {
 				return zero, io.EOF
-			}
-			if err := ctx.Err(); err != nil {
-				return zero, err
 			}
 
 			return obj, nil

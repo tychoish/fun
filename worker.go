@@ -327,7 +327,11 @@ func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
 		return
 	}
 }
+func (wf Worker) FilterErrors(ef ers.Filter) Worker {
+	return func(ctx context.Context) error { return ef(wf(ctx)) }
+}
 
 func (wf Worker) WithoutErrors(errs ...error) Worker {
-	return func(ctx context.Context) error { return ers.Filter(wf(ctx), errs...) }
+	filter := ers.FilterRemove(errs...)
+	return func(ctx context.Context) error { return filter(wf(ctx)) }
 }

@@ -3,9 +3,11 @@ package ers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 )
 
@@ -36,17 +38,18 @@ func TestErrors(t *testing.T) {
 	t.Run("Filter", func(t *testing.T) {
 		err := Merge(Error("beep"), context.Canceled)
 		check.Error(t, err)
-		check.NotError(t, Filter(err, context.Canceled))
-		check.NotError(t, Filter(err, context.Canceled, io.EOF))
-		check.Error(t, Filter(err, io.EOF))
-		check.NotError(t, Filter(nil, io.EOF))
-		check.NotError(t, Filter(nil, nil))
+		check.NotError(t, FilterRemove(context.Canceled)(err))
+		check.NotError(t, FilterRemove(context.Canceled, io.EOF)(err))
+		check.Error(t, FilterRemove(io.EOF)(err))
+		check.Error(t, FilterRemove(nil)(io.EOF))
+		check.NotError(t, FilterRemove(io.EOF)(nil))
+		check.NotError(t, FilterRemove(nil)(nil))
 
 		err = Merge(Error("beep"), io.EOF)
 		check.Error(t, err)
-		check.Error(t, Filter(err, context.Canceled))
-		check.NotError(t, Filter(err, io.EOF))
-		check.NotError(t, Filter(err, io.EOF, context.DeadlineExceeded))
+		check.Error(t, FilterRemove(context.Canceled)(err))
+		check.NotError(t, FilterRemove(io.EOF)(err))
+		check.NotError(t, FilterRemove(io.EOF, context.DeadlineExceeded)(err))
 
 	})
 	t.Run("Collector", func(t *testing.T) {
@@ -71,9 +74,31 @@ func TestErrors(t *testing.T) {
 
 		err := ec.Resolve()
 		check.Error(t, err)
-		check.Error(t, Filter(err, io.EOF, context.DeadlineExceeded))
-		check.NotError(t, Filter(err, context.Canceled))
-		check.NotError(t, Filter(err, ErrCountMeOut))
+		check.Error(t, FilterRemove(io.EOF, context.DeadlineExceeded)(err))
+		check.NotError(t, FilterRemove(context.Canceled)(err))
+
+		check.NotError(t, FilterRemove(ErrCountMeOut)(err))
 		check.ErrorIs(t, err, ErrCountMeOut)
+	})
+	t.Run("FilterToRoot", func(t *testing.T) {
+		filter := FilterToRoot()
+		t.Run("Nil", func(t *testing.T) {
+			assert.Zero(t, filter(nil))
+		})
+		t.Run("Spliced", func(t *testing.T) {
+			list := Splice(Error("hello"), Error("this"), io.EOF)
+			root := filter(list)
+			assert.Equal(t, io.EOF, root)
+		})
+		t.Run("Stdlib", func(t *testing.T) {
+			err := fmt.Errorf("hello: %w", io.EOF)
+			root := filter(err)
+			assert.Equal(t, io.EOF, root)
+		})
+		t.Run("Merged", func(t *testing.T) {
+			err := Merge(errors.New("hello"), io.EOF)
+			root := filter(err)
+			assert.Equal(t, io.EOF, root)
+		})
 	})
 }

@@ -623,4 +623,57 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, 0, procCt)
 		})
 	})
+	t.Run("FilterError", func(t *testing.T) {
+		ctx := testt.Context(t)
+		var wf Worker = func(context.Context) error {
+			return io.EOF
+		}
+		assert.ErrorIs(t, wf(ctx), io.EOF)
+		fwf := wf.FilterErrors(func(error) error { return nil })
+		assert.NotError(t, fwf(ctx))
+		assert.ErrorIs(t, wf(ctx), io.EOF)
+		fwf = wf.FilterErrors(func(error) error { return context.Canceled })
+		assert.ErrorIs(t, fwf(ctx), context.Canceled)
+	})
+	t.Run("WithoutError", func(t *testing.T) {
+		ctx := testt.Context(t)
+		var wf Worker = func(context.Context) error {
+			return io.EOF
+		}
+		assert.ErrorIs(t, wf(ctx), io.EOF)
+		fwf := wf.WithoutErrors(io.EOF, context.Canceled)
+		assert.NotError(t, fwf(ctx))
+		assert.ErrorIs(t, wf(ctx), io.EOF)
+		wf = func(context.Context) error { return nil }
+		fwf = wf.WithoutErrors(io.EOF, context.Canceled)
+		assert.NotError(t, fwf(ctx))
+	})
+	t.Run("PreHook", func(t *testing.T) {
+		count := 0
+		rctx := testt.Context(t)
+		var wf Worker = func(ctx context.Context) error {
+			testt.Log(t, count)
+			check.True(t, count == 1 || count == 4)
+			check.Equal(t, rctx, ctx)
+			count++
+			return nil
+		}
+
+		wf = wf.PreHook(func(ctx context.Context) {
+			testt.Log(t, count)
+			check.True(t, count == 0 || count == 3)
+			check.Equal(t, rctx, ctx)
+			count++
+		})
+		check.NotError(t, wf(rctx))
+		check.Equal(t, 2, count)
+		wf = wf.PreHook(func(ctx context.Context) {
+			testt.Log(t, count)
+			check.Equal(t, count, 2)
+			check.Equal(t, rctx, ctx)
+			count++
+		})
+		check.NotError(t, wf(rctx))
+		check.Equal(t, 5, count)
+	})
 }

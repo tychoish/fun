@@ -381,8 +381,9 @@ func (pf Producer[T]) PostHook(op func()) Producer[T] {
 }
 
 func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
-	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = ers.Filter(err) }()
-		return pf(ctx)
-	}
+	return pf.FilterErrors(ers.FilterRemove(errs...))
+}
+
+func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
+	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
 }

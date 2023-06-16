@@ -40,7 +40,7 @@ func TestMerge(t *testing.T) {
 		if !strings.Contains(err.Error(), "100") {
 			t.Error(err)
 		}
-		if !strings.Contains(err.Error(), "200") {
+		if !strings.Contains(err.Error(), "[error: 200]") {
 			t.Error(err)
 		}
 		ue := errors.Unwrap(err)

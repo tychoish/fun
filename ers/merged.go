@@ -57,7 +57,9 @@ type Combined struct {
 }
 
 func (dwe *Combined) Unwrap() error { return dwe.Previous }
-func (dwe *Combined) Error() string { return fmt.Sprintf("%v: %v", dwe.Current, dwe.Previous) }
+func (dwe *Combined) Error() string {
+	return fmt.Sprintf("%v [%v]", dwe.Current, findRoot(dwe.Previous))
+}
 
 func (dwe *Combined) Is(target error) bool {
 	return errors.Is(dwe.Current, target) || errors.Is(dwe.Previous, target)
