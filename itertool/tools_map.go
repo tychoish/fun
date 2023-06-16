@@ -78,7 +78,7 @@ func (mf mapper[T, O]) Processor(
 	return func(ctx context.Context, in T) error {
 		val, err := mf(ctx, in)
 		if err != nil {
-			if opts.HandleAbortableErrors(ec, err) {
+			if opts.continueOnError(ec, err) {
 				return nil
 			}
 			return io.EOF

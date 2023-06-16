@@ -94,7 +94,7 @@ func makeErrorFilter(
 	opts *Options,
 ) func(error) error {
 	return func(err error) error {
-		if opts.HandleAbortableErrors(oberr, err) {
+		if opts.continueOnError(oberr, err) {
 			return nil
 		}
 		return io.EOF

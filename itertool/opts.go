@@ -50,7 +50,7 @@ func (o *Options) init() {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
 }
 
-func (opts Options) HandleAbortableErrors(of fun.Observer[error], err error) bool {
+func (o Options) continueOnError(of fun.Observer[error], err error) bool {
 	if err == nil {
 		return true
 	}
@@ -58,10 +58,10 @@ func (opts Options) HandleAbortableErrors(of fun.Observer[error], err error) boo
 	hadPanic := errors.Is(err, fun.ErrRecoveredPanic)
 
 	switch {
-	case hadPanic && !opts.ContinueOnPanic:
+	case hadPanic && !o.ContinueOnPanic:
 		of(err)
 		return false
-	case hadPanic && opts.ContinueOnPanic:
+	case hadPanic && o.ContinueOnPanic:
 		of(err)
 		return true
 	case errors.Is(err, fun.ErrIteratorSkip):
@@ -69,11 +69,11 @@ func (opts Options) HandleAbortableErrors(of fun.Observer[error], err error) boo
 	case errors.Is(err, io.EOF):
 		return false
 	case ers.ContextExpired(err):
-		fun.WhenCall(opts.IncludeContextExpirationErrors, func() { of(err) })
+		fun.WhenCall(o.IncludeContextExpirationErrors, func() { of(err) })
 		return false
 	default:
 		of(err)
-		return opts.ContinueOnError
+		return o.ContinueOnError
 	}
 }
 

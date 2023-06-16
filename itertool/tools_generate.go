@@ -54,7 +54,7 @@ func makeProducer[T any](
 	var zero T
 	return func(ctx context.Context) (T, error) {
 		if value, err := fn(ctx); err != nil {
-			if !opts.HandleAbortableErrors(oberr, err) {
+			if !opts.continueOnError(oberr, err) {
 				return zero, io.EOF
 			}
 			return zero, fun.ErrIteratorSkip
