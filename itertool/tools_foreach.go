@@ -75,7 +75,9 @@ func ParallelForEach[T any](
 	ec := &erc.Collector{}
 	wg := &fun.WaitGroup{}
 
-	operation := fn.Safe().FilterErrors(makeErrorFilter(ec.Add, opts))
+	operation := fn.Safe().FilterErrors(func(err error) error {
+		return fun.WhenDo(!opts.CanContinueOnError(ec.Add, err), fun.Wrapper(io.EOF))
+	})
 
 	splits := iter.Split(opts.NumWorkers)
 	for idx := range splits {
@@ -87,16 +89,4 @@ func ParallelForEach[T any](
 	wg.Operation().Block()
 	ec.Add(iter.Close())
 	return ec.Resolve()
-}
-
-func makeErrorFilter(
-	oberr fun.Observer[error],
-	opts *Options,
-) func(error) error {
-	return func(err error) error {
-		if opts.continueOnError(oberr, err) {
-			return nil
-		}
-		return io.EOF
-	}
 }

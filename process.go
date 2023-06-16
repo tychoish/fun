@@ -11,6 +11,11 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
+var (
+	ErrLimitExceeded = errors.New("limit exceeded")
+	ErrInvalidInput  = errors.New("invalid input")
+)
+
 // Processor are generic functions that take an argument (and a
 // context) and return an error. They're the type of function used by
 // the itertool.Process/itertool.ParallelForEach and useful in other
@@ -237,11 +242,6 @@ type tuple[T, U any] struct {
 	One T
 	Two U
 }
-
-var (
-	ErrLimitExceeded = errors.New("limit exceeded")
-	ErrInvalidInput  = errors.New("invalid input")
-)
 
 func limitExec[T any](in int) func(func() T) T {
 	Invariant(in > 0, "limit must be greater than zero;", in)

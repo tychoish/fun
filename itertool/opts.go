@@ -7,15 +7,14 @@ import (
 	"runtime"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
-// Options describes the runtime options to several operations
+// WorkerGroupOptions describes the runtime options to several operations
 // operations. The zero value of this struct provides a usable strict
 // operation.
-type Options struct {
+type WorkerGroupOptions struct {
 	// NumWorkers describes the number of parallel workers
 	// processing the incoming iterator items and running the map
 	// function. All values less than 1 are converted to 1. Any
@@ -46,11 +45,11 @@ type Options struct {
 	ExcludededErrors []error
 }
 
-func (o *Options) init() {
+func (o *WorkerGroupOptions) init() {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
 }
 
-func (o Options) continueOnError(of fun.Observer[error], err error) bool {
+func (o WorkerGroupOptions) CanContinueOnError(of fun.Observer[error], err error) bool {
 	if err == nil {
 		return true
 	}
@@ -69,7 +68,10 @@ func (o Options) continueOnError(of fun.Observer[error], err error) bool {
 	case errors.Is(err, io.EOF):
 		return false
 	case ers.ContextExpired(err):
-		fun.WhenCall(o.IncludeContextExpirationErrors, func() { of(err) })
+		if o.IncludeContextExpirationErrors {
+			of(err)
+		}
+
 		return false
 	default:
 		of(err)
@@ -81,18 +83,18 @@ type OptionProvider[T any] func(T) error
 
 func Apply[T any](opt T, opts ...OptionProvider[T]) (err error) {
 	defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
-	dt.Sliceify(opts).Observe(func(proc OptionProvider[T]) {
-		err = ers.Merge(proc(opt), err)
-	})
+	for idx := range opts {
+		err = ers.Merge(opts[idx](opt), err)
+	}
 	return err
 }
 
-func Set(opt *Options) OptionProvider[*Options] {
-	return func(o *Options) error { *o = *opt; return nil }
+func Set(opt *WorkerGroupOptions) OptionProvider[*WorkerGroupOptions] {
+	return func(o *WorkerGroupOptions) error { *o = *opt; return nil }
 }
 
-func AddExcludeErrors(errs ...error) OptionProvider[*Options] {
-	return func(opts *Options) error {
+func AddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error {
 		if ers.Is(fun.ErrRecoveredPanic, errs...) {
 			return fmt.Errorf("cannot exclude recovered panics: %w", fun.ErrInvalidInput)
 		}
@@ -100,21 +102,21 @@ func AddExcludeErrors(errs ...error) OptionProvider[*Options] {
 		return nil
 	}
 }
-func IncludeContextErrors() OptionProvider[*Options] {
-	return func(opts *Options) error { opts.IncludeContextExpirationErrors = true; return nil }
+func IncludeContextErrors() OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error { opts.IncludeContextExpirationErrors = true; return nil }
 }
-func ContinueOnError() OptionProvider[*Options] {
-	return func(opts *Options) error { opts.ContinueOnError = true; return nil }
+func ContinueOnError() OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error { opts.ContinueOnError = true; return nil }
 }
-func ContinueOnPanic() OptionProvider[*Options] {
-	return func(opts *Options) error { opts.ContinueOnPanic = true; return nil }
+func ContinueOnPanic() OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error { opts.ContinueOnPanic = true; return nil }
 }
-func WorkerPerCPU() OptionProvider[*Options] {
-	return func(opts *Options) error { opts.NumWorkers = runtime.NumCPU(); return nil }
+func WorkerPerCPU() OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error { opts.NumWorkers = runtime.NumCPU(); return nil }
 }
 
-func NumWorkers(num int) OptionProvider[*Options] {
-	return func(opts *Options) error {
+func NumWorkers(num int) OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error {
 		if num <= 0 {
 			num = 1
 		}

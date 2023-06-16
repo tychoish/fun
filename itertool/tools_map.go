@@ -35,7 +35,7 @@ func Map[T any, O any](
 	ec := &erc.Collector{}
 	output := fun.Blocking(make(chan O))
 	var mf mapper[T, O] = mapFn
-
+	mf = mf.Safe()
 	init := fun.Operation(func(ctx context.Context) {
 		splits := iter.Split(opts.NumWorkers)
 
@@ -45,11 +45,12 @@ func Map[T any, O any](
 		for idx := range splits {
 			// for each split, run a mapWorker
 
-			mf.Safe().Processor(output.Send().Write, ec.Add, opts).
+			mf.Processor(output.Send().Write, ec.Add, opts).
 				ReadAll(splits[idx].Producer()).
 				Wait(func(err error) {
 					fun.WhenCall(errors.Is(err, io.EOF), wcancel)
-				}).Add(wctx, wg)
+				}).
+				Add(wctx, wg)
 		}
 
 		// start a background op that waits for the
@@ -78,7 +79,7 @@ func (mf mapper[T, O]) Processor(
 	return func(ctx context.Context, in T) error {
 		val, err := mf(ctx, in)
 		if err != nil {
-			if opts.continueOnError(ec, err) {
+			if opts.CanContinueOnError(ec, err) {
 				return nil
 			}
 			return io.EOF
