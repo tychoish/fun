@@ -60,7 +60,7 @@ func TestWorker(t *testing.T) {
 					assert.Equal(t, wg.Num(), 1)
 					count.Add(1)
 					return nil
-				}).Wait(func(err error) {
+				}).Operation(func(err error) {
 					assert.Equal(t, wg.Num(), 1)
 					count.Add(1)
 					assert.NotError(t, err)
@@ -100,7 +100,7 @@ func TestWorker(t *testing.T) {
 				wf := Worker(func(ctx context.Context) error {
 					called.Store(true)
 					return expected
-				}).Wait(func(err error) {
+				}).Operation(func(err error) {
 					observed.Store(true)
 					check.ErrorIs(t, err, expected)
 				})

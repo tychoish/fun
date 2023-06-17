@@ -161,10 +161,10 @@ func (wf Worker) Once() Worker {
 	}
 }
 
-// Wait converts a worker function into a wait function,
+// Operation converts a worker function into a wait function,
 // passing any error to the observer function. Only non-nil errors are
 // observed.
-func (wf Worker) Wait(ob Observer[error]) Operation {
+func (wf Worker) Operation(ob Observer[error]) Operation {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
@@ -314,7 +314,7 @@ func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
 
 	oe := ch.Send().Processor().Force
 	for i := 0; i < n; i++ {
-		wf.Wait(oe).Add(ctx, wg)
+		wf.Operation(oe).Add(ctx, wg)
 	}
 
 	wg.Operation().PostHook(ch.Close).Go(ctx)

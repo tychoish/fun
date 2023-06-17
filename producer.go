@@ -208,9 +208,9 @@ func (pf Producer[T]) Block() (T, error) { return pf(context.Background()) }
 // error.
 func (pf Producer[T]) Force() T { return Must(pf.Block()) }
 
-// Wait produces a wait function, using two observers to handle the
+// Operation produces a wait function, using two observers to handle the
 // output of the Producer.
-func (pf Producer[T]) Wait(of Observer[T], eo Observer[error]) Operation {
+func (pf Producer[T]) Operation(of Observer[T], eo Observer[error]) Operation {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 
@@ -428,7 +428,7 @@ func (pf Producer[T]) GenerateParallel(
 					return value, nil
 				}
 			}).
-			Wait(func(err error) {
+			Operation(func(err error) {
 				WhenCall(errors.Is(err, io.EOF), cancel)
 			}).
 			StartGroup(wctx, wg, opts.NumWorkers)

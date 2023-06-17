@@ -17,19 +17,6 @@ func Unwrap[T any](in T) (out T) {
 	}
 }
 
-// UnwrapedRoot unwinds a wrapped object and returns the innermost
-// non-nil wrapped item
-func UnwrapedRoot[T any](in T) T {
-	for {
-		switch wi := any(in).(type) {
-		case interface{ Unwrap() T }:
-			in = wi.Unwrap()
-		default:
-			return in
-		}
-	}
-}
-
 func CountWraps[T any](in T) int {
 	count := 1
 
@@ -38,6 +25,9 @@ func CountWraps[T any](in T) int {
 		case interface{ Unwrap() T }:
 			count++
 			in = wi.Unwrap()
+		case interface{ Unwrap() []T }:
+			count += len(wi.Unwrap())
+			return count
 		default:
 			return count
 		}
@@ -49,20 +39,17 @@ func CountWraps[T any](in T) int {
 func Unwind[T any](in T) []T {
 	var out []T
 
-	switch any(in).(type) {
-	case nil:
-		return nil
-	default:
-		out = append(out, in)
-	}
-
 	for {
 		switch wi := any(in).(type) {
 		case interface{ Unwrap() []T }:
 			items := wi.Unwrap()
-			for _, it := range items {
-				out = append(out, Unwind(it)...)
+			for _, i := range items {
+				if any(i) == nil {
+					continue
+				}
+				out = append(out, i)
 			}
+
 			return out
 		case interface{ Unwrap() T }:
 			in = wi.Unwrap()
@@ -73,8 +60,10 @@ func Unwind[T any](in T) []T {
 			default:
 				out = append(out, in)
 			}
-		default:
+		case nil:
 			return out
+		default:
+			return append(out, in)
 		}
 	}
 }

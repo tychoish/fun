@@ -434,7 +434,7 @@ func (i *Iterator[T]) ProcessParallel(
 	splits := i.Split(opts.NumWorkers)
 	for idx := range splits {
 		operation.ReadAll(splits[idx].Producer()).
-			Wait(func(err error) { WhenCall(errors.Is(err, io.EOF), cancel) }).
+			Operation(func(err error) { WhenCall(errors.Is(err, io.EOF), cancel) }).
 			Add(ctx, wg)
 	}
 

@@ -50,9 +50,11 @@ func (pf Processor[T]) Check(ctx context.Context, in T) bool { return pf(ctx, in
 
 func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
-// Wait converts a processor into a worker that will process the input
+// Operation converts a processor into a worker that will process the input
 // provided when executed.
-func (pf Processor[T]) Wait(in T, of Observer[error]) Operation { return pf.Worker(in).Wait(of) }
+func (pf Processor[T]) Operation(in T, of Observer[error]) Operation {
+	return pf.Worker(in).Operation(of)
+}
 
 // Safe runs the producer, converted all panics into errors. Safe is
 // itself a processor.

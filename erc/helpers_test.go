@@ -112,16 +112,17 @@ func TestCollections(t *testing.T) {
 		ec := &Collector{}
 		count := 0
 		op := fun.Producer[int](func(context.Context) (int, error) {
-			count++
 			ec.Add(ers.Error("hi"))
-			if count > 32 {
+			if count >= 32 {
 				return 0, io.EOF
 			}
+			count++
 			return count, nil
 		})
 
 		iter := op.IteratorWithHook(IteratorHook[int](ec))
 		assert.Equal(t, iter.Count(testt.Context(t)), 32)
+		testt.Log(t, fun.Unwind(ec.Resolve()))
 		assert.Equal(t, len(fun.Unwind(ec.Resolve())), 33)
 		testt.Logf(t, "%T", iter.Close())
 		testt.Log(t, fun.Unwind(iter.Close()))
@@ -152,7 +153,7 @@ func TestCollections(t *testing.T) {
 				}
 				errs := fun.Unwind(err)
 				if len(errs) != 1 {
-					t.Error(errs)
+					t.Error(errs, len(errs))
 				}
 			})
 			t.Run("Many", func(t *testing.T) {

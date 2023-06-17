@@ -151,8 +151,16 @@ func TestSmoke(t *testing.T) {
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 16)
 		})
-
 	})
+	t.Run("Monotonic", func(t *testing.T) {
+		const size = 37017
+		count := 0
+		last := -1
+		Monotonic(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in })
+		check.Equal(t, size, count)
+		check.Equal(t, last, count)
+	})
+
 }
 
 func TestContains(t *testing.T) {

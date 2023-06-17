@@ -13,8 +13,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/ers"
 )
 
 // Stack represents the error type returned by an ErrorCollector
@@ -57,8 +55,11 @@ func (e *Stack) append(err error) *Stack {
 		}
 
 		return e
-	case *ers.Combined:
-		return e.append(werr.Previous).append(werr.Current)
+	case interface{ Unwrap() []error }:
+		for _, err := range werr.Unwrap() {
+			e = e.append(err)
+		}
+		return e
 	default:
 		return &Stack{
 			next:  e,
@@ -92,12 +93,11 @@ func (e *Stack) As(target any) bool { return errors.As(e.err, target) }
 
 // Unwrap returns the next iterator in the stack, and is compatible
 // with errors.Unwrap.
-func (e *Stack) Unwrap() error {
-	if e.next != nil && e.next.err != nil {
-		return e.next
+func (e *Stack) Unwrap() []error {
+	if e == nil || e.next == nil {
+		return nil
 	}
-
-	return nil
+	return fun.Must(e.Iterator().Slice(context.Background()))
 }
 
 func (e *Stack) Producer() fun.Producer[error] {
@@ -109,8 +109,8 @@ func (e *Stack) Producer() fun.Producer[error] {
 		case ctx.Err() != nil:
 			return nil, ctx.Err()
 		default:
-			value = iter.err
 			iter = iter.next
+			value = iter.err
 			return value, nil
 		}
 	})
@@ -134,12 +134,15 @@ type Collector struct {
 	stack *Stack
 }
 
+func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
+func with(mtx *sync.Mutex)             { mtx.Unlock() }
+
 // Add collects an error if that error is non-nil.
 func (ec *Collector) Add(err error) {
 	if err == nil {
 		return
 	}
-	defer adt.With(adt.Lock(&ec.mu))
+	defer with(lock(&ec.mu))
 	if ec.stack == nil {
 		ec.stack = &Stack{}
 	}
@@ -152,7 +155,7 @@ func (ec *Collector) Add(err error) {
 // function types.
 func (ec *Collector) Observer() fun.Observer[error] { return ec.Add }
 func (ec *Collector) Len() int {
-	defer adt.With(adt.Lock(&ec.mu))
+	defer with(lock(&ec.mu))
 	if ec.stack == nil {
 		return 0
 	}
@@ -164,7 +167,7 @@ func (ec *Collector) Len() int {
 // oldest error, and will not observe new errors added to the
 // collector.
 func (ec *Collector) Iterator() *fun.Iterator[error] {
-	defer adt.With(adt.Lock(&ec.mu))
+	defer with(lock(&ec.mu))
 
 	return ec.stack.Producer().WithLock(&ec.mu).Iterator()
 }
@@ -174,7 +177,7 @@ func (ec *Collector) Iterator() *fun.Iterator[error] {
 // errors.As, and can be iterated or used in combination with
 // fun.Unwind() to introspect the available errors.
 func (ec *Collector) Resolve() error {
-	defer adt.With(adt.Lock(&ec.mu))
+	defer with(lock(&ec.mu))
 
 	if ec.stack == nil {
 		return nil

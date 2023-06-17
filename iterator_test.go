@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,6 +17,28 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
+
+type Collector struct {
+	mtx sync.Mutex
+	err error
+	num int
+}
+
+func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
+func with(mtx *sync.Mutex)             { mtx.Unlock() }
+
+func (c *Collector) HasErrors() bool { defer with(lock(&c.mtx)); return c.err != nil }
+func (c *Collector) Resolve() error  { defer with(lock(&c.mtx)); return c.err }
+func (c *Collector) Len() int        { defer with(lock(&c.mtx)); return c.num }
+func (c *Collector) Add(err error) {
+	if err == nil {
+		return
+	}
+
+	defer with(lock(&c.mtx))
+	c.num++
+	c.err = ers.Merge(err, c.err)
+}
 
 type none struct{}
 
@@ -648,9 +671,6 @@ func TestJSON(t *testing.T) {
 		assert.True(t, ers.ContextExpired(err))
 		assert.True(t, ers.IsTerminating(err))
 		assert.ErrorIs(t, err, ErrInvalidInput)
-
-		root := UnwrapedRoot(err)
-		assert.Equal(t, root, io.EOF)
 	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})

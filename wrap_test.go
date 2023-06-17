@@ -31,14 +31,6 @@ func TestWrap(t *testing.T) {
 		assert.Equal(t, Wrapper(1)(), 1)
 		assert.Equal(t, Wrapper("hello")(), "hello")
 	})
-	t.Run("RootUnWrapp", func(t *testing.T) {
-		root := errors.New("hello")
-		err := fmt.Errorf("bar: %w", fmt.Errorf("foo: %w", root))
-		errs := Unwind(err)
-		assert.Equal(t, len(errs), 3)
-		ur := UnwrapedRoot(err)
-		assert.True(t, root == ur)
-	})
 	t.Run("Errors", func(t *testing.T) {
 		err := errors.New("root")
 		wrapped := fmt.Errorf("wrap: %w", err)
@@ -90,18 +82,18 @@ func TestWrap(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			var err error = slwrap{out: []error{io.EOF, errors.New("basebase")}}
 			errs := Unwind(err)
-			check.Equal(t, 3, len(errs))
+			check.Equal(t, 2, len(errs))
 		})
 		t.Run("MergedSlice", func(t *testing.T) {
 			err := ers.Merge(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
 
 			errs := Unwind(err)
-			check.Equal(t, 4, len(errs))
+			check.Equal(t, 3, len(errs))
 		})
 		t.Run("WithNils", func(t *testing.T) {
 			var err error = slwrap{out: []error{io.EOF, nil, errors.New("basebase"), nil}}
 			errs := Unwind(err)
-			check.Equal(t, 3, len(errs))
+			check.Equal(t, 2, len(errs))
 			testt.Log(t, errs, err)
 		})
 		t.Run("NilUnwrap", func(t *testing.T) {
@@ -112,11 +104,11 @@ func TestWrap(t *testing.T) {
 
 			err = &oneWrap{}
 			errs = Unwind(err)
-			check.Equal(t, len(errs), 1)
+			check.Equal(t, len(errs), 0)
 
 			err = &oneWrap{out: &oneWrap{}}
 			errs = Unwind(err)
-			check.Equal(t, len(errs), 2)
+			check.Equal(t, len(errs), 1)
 		})
 	})
 	t.Run("Cast", func(t *testing.T) {

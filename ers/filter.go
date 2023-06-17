@@ -41,6 +41,12 @@ func findRoot(err error) error {
 			return nil
 		case interface{ Unwrap() error }:
 			err = wi.Unwrap()
+		case interface{ Unwrap() []error }:
+			sl := wi.Unwrap()
+			if len(sl) == 0 {
+				return err
+			}
+			return sl[len(sl)-1]
 		default:
 			return err
 		}

@@ -358,7 +358,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal("should have errors")
 			}
 			if errs := fun.Unwind(err); len(errs) != 100 {
-				t.Fatal(len(errs))
+				t.Fatal(len(errs), errs)
 			}
 		})
 		t.Run("StartRunningServices", func(t *testing.T) {

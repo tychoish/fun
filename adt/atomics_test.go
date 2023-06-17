@@ -221,6 +221,26 @@ func TestZero(t *testing.T) {
 	})
 }
 
+func IsOK[T any](t testing.TB) func(T, bool) T {
+	return func(in T, ok bool) T {
+		t.Helper()
+		if !ok {
+			t.Errorf("ok value %t for %T and [%v]", ok, in, in)
+		}
+		return in
+	}
+}
+
+func IsNotOK[T any](t testing.TB) func(T, bool) T {
+	return func(in T, ok bool) T {
+		t.Helper()
+		if ok {
+			t.Errorf("ok value %t for %T and [%v]", ok, in, in)
+		}
+		return in
+	}
+}
+
 type swappable struct{ Atomic[int] }
 
 func (s *swappable) CompareAndSwap(a, b int) bool { return CompareAndSwap[int](&s.Atomic, a, b) }

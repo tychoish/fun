@@ -47,7 +47,7 @@ func Map[T any, O any](
 
 			mf.Processor(output.Send().Write, opts).
 				ReadAll(splits[idx].Producer()).
-				Wait(func(err error) {
+				Operation(func(err error) {
 					WhenCall(errors.Is(err, io.EOF), wcancel)
 				}).
 				Add(wctx, wg)

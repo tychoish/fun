@@ -138,6 +138,13 @@ func NumWorkers(num int) OptionProvider[*WorkerGroupOptions] {
 	}
 }
 
+// WithErrorCollector sets an error collector implementation for later
+// use in the WorkerGroupOptions. The resulting function will only
+// error if the collector is nil, however, this method will override
+// an existing error collector.
+//
+// ErrorCollectors are used by some operations to collect, aggregate, and
+// distribute errors from operations to the caller.
 func WithErrorCollector(
 	ec interface {
 		Add(error)
@@ -156,6 +163,7 @@ func WithErrorCollector(
 	}
 }
 
+// SetErrorCollector saves an error collector
 func SetErrorCollector(
 	ec interface {
 		Add(error)

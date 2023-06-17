@@ -162,6 +162,8 @@ func TestError(t *testing.T) {
 
 			check.ErrorIs(t, es.Resolve(), fun.ErrRecoveredPanic)
 
+			t.Log(es.Resolve())
+			t.Log(fun.Unwind(es.Resolve()))
 			if !errors.Is(es.Resolve(), err) {
 				t.Error(es.Resolve(), "error not propogated")
 			}

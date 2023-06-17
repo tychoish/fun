@@ -201,7 +201,7 @@ func TestPanics(t *testing.T) {
 				panic("hi")
 			}
 
-			assert.Panic(t, func() { of.Wait("hi")(ctx) })
+			assert.Panic(t, func() { of.Operation("hi")(ctx) })
 			assert.True(t, called)
 		})
 	})

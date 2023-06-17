@@ -3,31 +3,8 @@ package ers
 import (
 	"errors"
 	"fmt"
-	"sync"
+	"sync/atomic"
 )
-
-type Collector struct {
-	mtx sync.Mutex
-	err error
-	num int
-}
-
-func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
-func with(mtx *sync.Mutex)             { mtx.Unlock() }
-
-func (c *Collector) HasErrors() bool { defer with(lock(&c.mtx)); return c.err != nil }
-func (c *Collector) Resolve() error  { defer with(lock(&c.mtx)); return c.err }
-func (c *Collector) Len() int        { defer with(lock(&c.mtx)); return c.num }
-
-func (c *Collector) Add(err error) {
-	if err == nil {
-		return
-	}
-
-	defer with(lock(&c.mtx))
-	c.num++
-	c.err = Merge(err, c.err)
-}
 
 func Merge(one, two error) error {
 	switch {
@@ -56,9 +33,42 @@ type Combined struct {
 	Previous error
 }
 
-func (dwe *Combined) Unwrap() error { return dwe.Previous }
+var count = &atomic.Int64{}
+
+func (dwe *Combined) Unwrap() (out []error) {
+	for _, err := range []error{dwe.Current, dwe.Previous} {
+		switch e := err.(type) {
+		case interface{ Unwrap() []error }:
+			out = append(out, e.Unwrap()...)
+		case nil:
+			continue
+		default:
+			out = append(out, e)
+		}
+	}
+	return
+}
+
+func (dwe *Combined) findRoot() error {
+	if dwe.Previous == nil {
+		return nil
+	}
+
+	errs := dwe.Unwrap()
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs[len(errs)-1]
+}
+
 func (dwe *Combined) Error() string {
-	return fmt.Sprintf("%v [%v]", dwe.Current, findRoot(dwe.Previous))
+	if root := dwe.findRoot(); root != nil {
+		return fmt.Sprintf("%v [%v]", dwe.Current, root)
+	}
+	if dwe.Current == nil {
+		return "nil-error"
+	}
+	return dwe.Current.Error()
 }
 
 func (dwe *Combined) Is(target error) bool {

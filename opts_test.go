@@ -38,6 +38,14 @@ func TestOptionProvider(t *testing.T) {
 		assert.Error(t, err)
 		assert.Substring(t, err.Error(), "cannot exclude recovered panics")
 	})
+	t.Run("Collector", func(t *testing.T) {
+		opt := &WorkerGroupOptions{}
+		check.Error(t, WithErrorCollector(nil)(opt))
+		check.NotError(t, WithErrorCollector(&Collector{})(opt))
+		// because they cannot be overridden:
+		check.NotError(t, SetErrorCollector(nil)(opt))
+	})
+
 	t.Run("HandleErrorEdgecases", func(t *testing.T) {
 		opt := &WorkerGroupOptions{}
 		t.Run("NilError", func(t *testing.T) {

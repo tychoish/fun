@@ -58,43 +58,25 @@ func TestErrors(t *testing.T) {
 		check.NotError(t, err)
 
 	})
-	t.Run("Collector", func(t *testing.T) {
-		ec := &Collector{}
-		check.Zero(t, ec.Len())
-		check.NotError(t, ec.Resolve())
-		check.True(t, !ec.HasErrors())
-		const ErrCountMeOut Error = "countm-me-out"
-		op := func() error { return ErrCountMeOut }
-
-		ec.Add(Merge(Error("beep"), context.Canceled))
-		check.True(t, ec.HasErrors())
-		check.Equal(t, 1, ec.Len())
-		ec.Add(op())
-		check.Equal(t, 2, ec.Len())
-		ec.Add(Error("boop"))
-		check.Equal(t, 3, ec.Len())
-
-		ec.Add(nil)
-		check.Equal(t, 3, ec.Len())
-		check.True(t, ec.HasErrors())
-
-		err := ec.Resolve()
-		check.Error(t, err)
-		check.Error(t, FilterRemove(io.EOF, context.DeadlineExceeded)(err))
-		check.NotError(t, FilterRemove(context.Canceled)(err))
-
-		check.NotError(t, FilterRemove(ErrCountMeOut)(err))
-		check.ErrorIs(t, err, ErrCountMeOut)
-	})
 	t.Run("FilterToRoot", func(t *testing.T) {
 		filter := FilterToRoot()
 		t.Run("Nil", func(t *testing.T) {
 			assert.Zero(t, filter(nil))
 		})
+		t.Run("SliceEdge", func(t *testing.T) {
+			err := &Combined{}
+			assert.Equal(t, filter(err), error(err))
+		})
 		t.Run("Spliced", func(t *testing.T) {
 			list := Splice(Error("hello"), Error("this"), io.EOF)
 			root := filter(list)
 			assert.Equal(t, io.EOF, root)
+		})
+		t.Run("EmptyWrap", func(t *testing.T) {
+			list := Splice()
+			root := filter(list)
+			assert.Equal(t, list, root)
+
 		})
 		t.Run("Stdlib", func(t *testing.T) {
 			err := fmt.Errorf("hello: %w", io.EOF)

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -246,4 +247,15 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 	}).Launch().Once()
 
 	return pipe.Receive().Producer().PreHook(init).Iterator()
+}
+
+func Monotonic(max int) *fun.Iterator[int] {
+	state := &atomic.Int64{}
+	return fun.Generator(fun.BlockingProducer(func() (int, error) {
+		prev := int(state.Add(1))
+		if prev <= max {
+			return prev, nil
+		}
+		return -1, io.EOF
+	}))
 }

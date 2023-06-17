@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 )
 
 type errorTest struct {
@@ -43,11 +44,6 @@ func TestMerge(t *testing.T) {
 		if !strings.Contains(err.Error(), "[error: 200]") {
 			t.Error(err)
 		}
-		ue := errors.Unwrap(err)
-		if ue != e2 {
-			t.Error(ue)
-		}
-
 	})
 	t.Run("MergeErrors", func(t *testing.T) {
 		t.Run("Both", func(t *testing.T) {
@@ -104,9 +100,27 @@ func TestMerge(t *testing.T) {
 		assert.True(t, Is(err, errs...))
 		assert.Equal(t, len(errs), len(unwind(err)))
 	})
+	t.Run("FindRoot", func(t *testing.T) {
+		err := &Combined{Current: Error("hi")}
+		check.Equal(t, err.findRoot(), nil)
+		err.Previous = &Combined{}
+		check.Equal(t, err.findRoot(), error(err.Current))
+		weird := &Combined{Current: nil, Previous: &Combined{}}
+		check.True(t, weird.findRoot() == nil)
+	})
+	t.Run("ErrStringEdges", func(t *testing.T) {
+		err := &Combined{}
+		check.Equal(t, err.Error(), "nil-error")
+		err = &Combined{Current: Error("hi")}
+		check.Equal(t, err.Error(), "hi")
+	})
 }
 
 func unwind[T any](in T) (out []T) {
+	if us, ok := any(in).(interface{ Unwrap() []T }); ok {
+		return us.Unwrap()
+	}
+
 	for {
 		out = append(out, in)
 		u, ok := any(in).(interface{ Unwrap() T })

@@ -398,7 +398,7 @@ func TestService(t *testing.T) {
 		err := s.Wait()
 		errs := fun.Unwind(err)
 		assert.Error(t, err)
-		check.Equal(t, len(errs), 4) // ++ panic
+		check.Equal(t, len(errs), 4) // ++ panic recovery
 		assert.Error(t, oberr.Get())
 		assert.Equal(t, err.Error(), oberr.Get().Error())
 	})
