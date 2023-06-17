@@ -85,6 +85,7 @@ func TestWrap(t *testing.T) {
 			if errs[100].Error() != "base" {
 				t.Error(errs[100])
 			}
+			check.Equal(t, 101, CountWraps(err))
 		})
 		t.Run("Slice", func(t *testing.T) {
 			var err error = slwrap{out: []error{io.EOF, errors.New("basebase")}}
@@ -139,7 +140,6 @@ func TestWrap(t *testing.T) {
 		assert.True(t, !IsType[string](in))
 
 	})
-
 }
 
 type oneWrap struct {

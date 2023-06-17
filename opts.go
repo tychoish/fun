@@ -93,10 +93,9 @@ func ApplyOptions[T any](opt T, opts ...OptionProvider[T]) (err error) {
 
 	switch validator := any(opt).(type) {
 	case interface{ Validate() error }:
-		return ers.Merge(validator.Validate(), err)
-	default:
-		return err
+		err = ers.Merge(validator.Validate(), err)
 	}
+	return err
 }
 
 func Set(opt *WorkerGroupOptions) OptionProvider[*WorkerGroupOptions] {
@@ -139,15 +138,34 @@ func NumWorkers(num int) OptionProvider[*WorkerGroupOptions] {
 	}
 }
 
-func ErrorCollector(
+func WithErrorCollector(
 	ec interface {
 		Add(error)
 		Resolve() error
 	},
 ) OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error {
+		if ec == nil {
+			return errors.New("cannot use a nil error collector")
+		}
+
 		opts.ErrorObserver = ec.Add
 		opts.ErrorResolver = ec.Resolve
+
 		return nil
+	}
+}
+
+func SetErrorCollector(
+	ec interface {
+		Add(error)
+		Resolve() error
+	},
+) OptionProvider[*WorkerGroupOptions] {
+	return func(opts *WorkerGroupOptions) error {
+		if opts.ErrorObserver != nil {
+			return nil
+		}
+		return WithErrorCollector(ec)(opts)
 	}
 }

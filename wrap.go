@@ -31,7 +31,7 @@ func UnwrapedRoot[T any](in T) T {
 }
 
 func CountWraps[T any](in T) int {
-	count := 0
+	count := 1
 
 	for {
 		switch wi := any(in).(type) {

@@ -139,6 +139,18 @@ func TestIteratorTools(t *testing.T) {
 			check.ErrorIs(t, err, context.Canceled)
 		})
 
+		t.Run("Parallel", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := &atomic.Int64{}
+			err := iter.ProcessParallel(ctx,
+				func(ctx context.Context, i int) error { count.Add(1); return nil },
+				NumWorkers(2),
+				ContinueOnError(),
+				ContinueOnPanic(),
+			)
+			assert.NotError(t, err)
+			check.Equal(t, 9, count.Load())
+		})
 	})
 	t.Run("Transform", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {

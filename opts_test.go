@@ -42,16 +42,15 @@ func TestOptionProvider(t *testing.T) {
 		opt := &WorkerGroupOptions{}
 		t.Run("NilError", func(t *testing.T) {
 			called := 0
-			of := func(err error) { called++ }
+			opt.ErrorObserver = func(err error) { called++ }
 
-			check.True(t, opt.CanContinueOnError(of, nil))
+			check.True(t, opt.CanContinueOnError(nil))
 			check.Equal(t, 0, called)
 		})
 		t.Run("Continue", func(t *testing.T) {
 			called := 0
-			of := func(err error) { called++ }
-
-			check.True(t, opt.CanContinueOnError(of, ErrIteratorSkip))
+			opt.ErrorObserver = func(err error) { called++ }
+			check.True(t, opt.CanContinueOnError(ErrIteratorSkip))
 			check.Equal(t, 0, called)
 		})
 	})

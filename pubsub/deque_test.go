@@ -594,7 +594,7 @@ func TestDeque(t *testing.T) {
 			t.Error("should not pop empty list")
 		}
 		t.Run("Iterator", func(t *testing.T) {
-			for idx, iter := range []fun.Iterable[int]{
+			for idx, iter := range []*fun.Iterator[int]{
 				dq.Iterator(),
 				dq.IteratorReverse(),
 			} {
@@ -712,7 +712,7 @@ func TestDeque(t *testing.T) {
 			}
 		})
 		t.Run("Iterator", func(t *testing.T) {
-			for idx, iter := range []fun.Iterable[int]{
+			for idx, iter := range []*fun.Iterator[int]{
 				dq.Iterator(),
 				dq.IteratorReverse(),
 			} {
@@ -728,7 +728,7 @@ func TestDeque(t *testing.T) {
 			}
 		})
 		t.Run("IteratorClosed", func(t *testing.T) {
-			for idx, iter := range []fun.Iterable[int]{
+			for idx, iter := range []*fun.Iterator[int]{
 				dq.Iterator(),
 				dq.IteratorReverse(),
 			} {
@@ -852,7 +852,7 @@ func TestDequeIntegration(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		runtime.Gosched()
 		wg.Add(1)
-		go func(iter fun.Iterable[int64]) {
+		go func(iter *fun.Iterator[int64]) {
 			defer wg.Done()
 			runtime.Gosched()
 			for iter.Next(ctx) {
@@ -921,7 +921,7 @@ func TestDequeIntegration(t *testing.T) {
 			}()
 			for i := 0; i < worker; i++ {
 				wwg.Add(1)
-				go func(iter fun.Iterable[func()]) {
+				go func(iter *fun.Iterator[func()]) {
 					defer wwg.Done()
 
 					for iter.Next(ctx) {

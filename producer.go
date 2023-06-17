@@ -24,6 +24,16 @@ type Producer[T any] func(context.Context) (T, error)
 // context has expired.
 func MakeFuture[T any](ch <-chan T) Producer[T] { return BlockingReceive(ch).Read }
 
+// MakePipe creates a linked pair of functions for transmitting data
+// via these function types and with their associated tools.
+//
+// As an implementation detail, these are blocking sends/receives
+// against a single-element channel.
+func MakePipe[T any]() (Processor[T], Producer[T]) {
+	pipe := Blocking(make(chan T, 1))
+	return pipe.Processor(), pipe.Producer()
+}
+
 // BlockingProducer constructs a producer that wraps a similar
 // function that does not take a context.
 func BlockingProducer[T any](fn func() (T, error)) Producer[T] {
@@ -386,4 +396,51 @@ func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
 
 func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
+}
+
+// ParallelGenerate creates an iterator using a generator pattern which
+// produces items until the generator function returns
+// io.EOF, or the context (passed to the first call to
+// Next()) is canceled. Parallel operation, and continue on
+// error/continue-on-panic semantics are available and share
+// configuration with the Map and Proces operations.
+func (pf Producer[T]) GenerateParallel(
+	optp ...OptionProvider[*WorkerGroupOptions],
+) *Iterator[T] {
+	opts := &WorkerGroupOptions{}
+	pipe := Blocking(make(chan T, opts.NumWorkers*2+1))
+
+	init := Operation(func(ctx context.Context) {
+		wctx, cancel := context.WithCancel(ctx)
+		wg := &WaitGroup{}
+
+		pf = pf.Safe()
+		var zero T
+		pipe.Processor().
+			ReadAll(func(ctx context.Context) (T, error) {
+				if value, err := pf(ctx); err != nil {
+					if opts.CanContinueOnError(err) {
+						return zero, ErrIteratorSkip
+					}
+
+					return zero, io.EOF
+				} else {
+					return value, nil
+				}
+			}).
+			Wait(func(err error) {
+				WhenCall(errors.Is(err, io.EOF), cancel)
+			}).
+			StartGroup(wctx, wg, opts.NumWorkers)
+
+		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
+	}).Once()
+
+	iter := pipe.Receive().Producer().PreHook(init).Iterator()
+	err := ApplyOptions(opts, optp...)
+	WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = iter.ErrorObserver().Lock() })
+	opts.ErrorObserver(err)
+	WhenCall(err != nil, pipe.Close)
+
+	return iter
 }

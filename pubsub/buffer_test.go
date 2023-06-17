@@ -101,12 +101,12 @@ func TestDistributor(t *testing.T) {
 		t.Run("Integer", func(t *testing.T) {
 			t.Parallel()
 			t.Run("Buffered", func(t *testing.T) {
-				RunDistributorTests(t, iterSize, func() fun.Iterable[int] {
+				RunDistributorTests(t, iterSize, func() *fun.Iterator[int] {
 					return fun.SliceIterator(randomIntSlice(iterSize))
 				})
 			})
 			t.Run("Generated", func(t *testing.T) {
-				RunDistributorTests(t, iterSize, func() fun.Iterable[int] {
+				RunDistributorTests(t, iterSize, func() *fun.Iterator[int] {
 					ch := make(chan int)
 					go func() {
 						defer close(ch)
@@ -120,7 +120,7 @@ func TestDistributor(t *testing.T) {
 			})
 		})
 		t.Run("StringSimple", func(t *testing.T) {
-			RunDistributorTests(t, iterSize, func() fun.Iterable[string] {
+			RunDistributorTests(t, iterSize, func() *fun.Iterator[string] {
 				out := make([]string, iterSize)
 				for i := 0; i < iterSize; i++ {
 					out[i] = fmt.Sprintf("idx=%d random=%d", i, rand.Int63())
@@ -129,7 +129,7 @@ func TestDistributor(t *testing.T) {
 			})
 		})
 		t.Run("RandomString", func(t *testing.T) {
-			RunDistributorTests(t, iterSize, func() fun.Iterable[string] {
+			RunDistributorTests(t, iterSize, func() *fun.Iterator[string] {
 				ch := make(chan string)
 				go func() {
 					defer close(ch)
@@ -149,14 +149,14 @@ func TestDistributor(t *testing.T) {
 
 type DistGenerator[T comparable] struct {
 	Name      string
-	Generator func(*testing.T, fun.Iterable[T]) Distributor[T]
+	Generator func(*testing.T, *fun.Iterator[T]) Distributor[T]
 }
 
 func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 	return []DistGenerator[T]{
 		{
 			Name: "ChannelBuffered",
-			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
+			Generator: func(t *testing.T, input *fun.Iterator[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T, size)
 				for input.Next(ctx) {
@@ -169,7 +169,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DirectChannel",
-			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
+			Generator: func(t *testing.T, input *fun.Iterator[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T)
 				go func() {
@@ -190,7 +190,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DistChannel",
-			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
+			Generator: func(t *testing.T, input *fun.Iterator[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				ch := make(chan T)
 				out := DistributorChannel(ch)
@@ -210,7 +210,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DistQueue",
-			Generator: func(t *testing.T, input fun.Iterable[T]) Distributor[T] {
+			Generator: func(t *testing.T, input *fun.Iterator[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.Distributor()
@@ -338,7 +338,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 	}
 }
 
-func RunDistributorTests[T comparable](t *testing.T, size int, producer func() fun.Iterable[T]) {
+func RunDistributorTests[T comparable](t *testing.T, size int, producer func() *fun.Iterator[T]) {
 	t.Parallel()
 	for _, gent := range MakeGenerators[T](size) {
 		t.Run(gent.Name, func(t *testing.T) {

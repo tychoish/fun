@@ -18,25 +18,50 @@ import (
 
 var ErrIteratorSkip = errors.New("skip-iteration")
 
-// Iterable provides a safe, context-respecting iterator paradigm for
-// iterable objects, along with a set of consumer functions and basic
-// implementations.
+// Iterator provides a safe, context-respecting iteration/sequence
+// paradigm, and entire tool kit for consumer functions, converters,
+// and generation options.
 //
-// The itertool package provides a number of tools and paradigms for
-// creating and processing Iterable objects, including Generators, Map
-// and Reduce as well as Split and Merge to combine or divide
-// iterators.
+// As the basis and heart of a programming model, iterators make it
+// possible to think about groups or sequences of objects or work,
+// that can be constructed and populated lazily, and provide a
+// collection of interfaces for processing and manipulating data.
 //
-// In general, Iterators cannot be safe for access from multiple
-// concurrent goroutines, because it is impossible to synchronize
-// calls to Next() and Value(); however, itertool.Range() and
-// itertool.Split() provide support for these workloads.
-type Iterable[T any] interface {
-	Next(context.Context) bool
-	Close() error
-	Value() T
-}
-
+// Beyond the iterator interactive tools provided in this package, the
+// itertool package provdes some additional helpers and tools, while
+// the adt and dt packages provide simple iterations and tooling
+// around iterators.
+//
+// The canonical way to use an iterator is with the core Next()
+// Value() and Close() methods: Next takes a context and advances the
+// iterator. Next, which is typically called in single-clause for loop
+// (e.g. as in while loop) returns false when the iterator has no
+// items, after which the iterator should be closed and cannot be
+// re-started. When Next() returns true, the iterator is advanced, and
+// the output of Value() will provide the value at the current
+// position in the iterator. Next() will block if the iterator has not
+// been closed, and the operation with Produces or Generates new items
+// for the iterator blocks, (or continues iterating) until the
+// iterator is exhausted, or closed.
+//
+// However, additional methods, such as ReadOne, the Producer()
+// function (which is a wrapper around ReadOne) provide a different
+// iteraction paradim: they combine the Next() and value operations
+// into a single function call. When the iterator is exhausted these
+// methods return the `io.EOF` error.
+//
+// In all cases, checking the Close() value of the iterator makes it
+// possible to see any errors encountered during the operation of the
+// iterator.
+//
+// Using Next/Value cannot be used concurrently, as there is no way to
+// synchronize the Next/Value calls with respect to eachother: it's
+// possible in this mode to both miss and/or get duplicate values from
+// the iterator in this case. If the generator/producer function in
+// the iterator is safe for concurrent use, then ReadOne can be used
+// safely. As a rule, all tooling in the fun package uses ReadOne
+// except in a few cases where a caller has exclusive access to the
+// iterator.
 type Iterator[T any] struct {
 	operation Producer[T]
 
@@ -378,4 +403,41 @@ func (i *Iterator[T]) UnmarshalJSON(in []byte) error {
 		return
 	})
 	return nil
+}
+
+func (i *Iterator[T]) ProcessParallel(
+	ctx context.Context,
+	fn Processor[T],
+	optp ...OptionProvider[*WorkerGroupOptions],
+) (err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	opts := &WorkerGroupOptions{}
+	err = ApplyOptions(opts, optp...)
+	WhenCall(err != nil, cancel)
+
+	if opts.ErrorObserver == nil {
+		opts.ErrorObserver = i.ErrorObserver().Lock()
+		opts.ErrorResolver = i.Close
+	}
+
+	wg := &WaitGroup{}
+
+	operation := fn.Safe().FilterErrors(func(err error) error {
+		return WhenDo(
+			!opts.CanContinueOnError(err),
+			Wrapper(io.EOF),
+		)
+	})
+
+	splits := i.Split(opts.NumWorkers)
+	for idx := range splits {
+		operation.ReadAll(splits[idx].Producer()).
+			Wait(func(err error) { WhenCall(errors.Is(err, io.EOF), cancel) }).
+			Add(ctx, wg)
+	}
+
+	wg.Operation().Block()
+	return opts.ErrorResolver()
 }

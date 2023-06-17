@@ -96,6 +96,27 @@ func (ro ChanReceive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(c
 // otherwise.
 func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer().Check(ctx) }
 
+// Ok attempts to read from a channel returns true either when the
+// channel is blocked or an item is read from the channel and false
+// when the channel has been closed.
+func (ro ChanReceive[T]) Ok() bool {
+	switch ro.mode {
+	case blocking:
+		_, ok := <-ro.ch
+		return ok
+	case non_blocking:
+		select {
+		case _, ok := <-ro.ch:
+			return ok
+		default:
+			return true
+		}
+	default:
+		// should be impossible outside of the package,
+		panic(ErrInvariantViolation)
+	}
+}
+
 // Read performs the read operation according to the
 // blocking/non-blocking semantics of the receive operation.
 //

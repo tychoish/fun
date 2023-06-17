@@ -51,6 +51,12 @@ func TestErrors(t *testing.T) {
 		check.NotError(t, FilterRemove(io.EOF)(err))
 		check.NotError(t, FilterRemove(io.EOF, context.DeadlineExceeded)(err))
 
+		err = Error("boop")
+		err = FilterConvert(io.EOF)(err)
+		check.Equal(t, err, io.EOF)
+		err = FilterConvert(io.EOF)(nil)
+		check.NotError(t, err)
+
 	})
 	t.Run("Collector", func(t *testing.T) {
 		ec := &Collector{}

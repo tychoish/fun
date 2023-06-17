@@ -4,12 +4,71 @@
 package adt
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
 )
+
+func MakePipe[T any]() (proc fun.Processor[T], prod fun.Producer[T], closer func()) {
+	mtx := &sync.Mutex{}
+	cond := sync.NewCond(mtx)
+	var current T
+	var observed bool
+	closed := &atomic.Bool{}
+
+	proc = func(ctx context.Context, in T) error {
+		cc := fun.NonBlockingReceive(ctx.Done())
+
+		mtx.Lock()
+		defer mtx.Unlock()
+
+		for !observed && cc.Ok() && !closed.Load() {
+			cond.Wait()
+		}
+
+		if closed.Load() {
+			return io.EOF
+		}
+
+		if !cc.Ok() {
+			return ctx.Err()
+		}
+
+		defer cond.Signal()
+		current = in
+		observed = false
+		return nil
+	}
+	var zero T
+	prod = func(ctx context.Context) (T, error) {
+		cc := fun.NonBlockingReceive(ctx.Done())
+
+		mtx.Lock()
+		defer mtx.Unlock()
+
+		for observed && cc.Ok() && !closed.Load() {
+			cond.Wait()
+		}
+
+		if closed.Load() {
+			return zero, io.EOF
+		}
+
+		if !cc.Ok() {
+			return zero, ctx.Err()
+		}
+
+		out := current
+		observed = true
+		return out, nil
+	}
+
+	return proc, prod, func() { closed.Store(true) }
+}
 
 // AtomicValue describes the public interface of the Atomic type. Use
 // this definition to compose atomic types into other interfaces.
