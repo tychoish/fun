@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -271,7 +272,7 @@ func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
 // If returns a producer that will execute the root producer only if
 // the cond value is true. Otherwise, If will return the zero value
 // for T and a nil error.
-func (pf Producer[T]) If(cond bool) Producer[T] { return pf.When(Wrapper(cond)) }
+func (pf Producer[T]) If(cond bool) Producer[T] { return pf.When(ft.Wrapper(cond)) }
 
 // After will return a Producer that will block until the provided
 // time is in the past, and then execute normally.
@@ -281,7 +282,7 @@ func (pf Producer[T]) After(ts time.Time) Producer[T] { return pf.Delay(time.Unt
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Producer[T]) Delay(d time.Duration) Producer[T] { return pf.Jitter(Wrapper(d)) }
+func (pf Producer[T]) Delay(d time.Duration) Producer[T] { return pf.Jitter(ft.Wrapper(d)) }
 
 // Jitter wraps a Producer that runs the jitter function (jf) once
 // before every execution of the resulting fucntion, and waits for the
@@ -344,7 +345,7 @@ func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant(wctx != nil, "must start the operation before calling cancel")
 		return pf(wctx)
-	}, func() { once.Do(func() {}); SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
 // Limit runs the producer a specified number of times, and caches the
@@ -427,7 +428,7 @@ func (pf Producer[T]) GenerateParallel(
 				}
 			}).
 			Operation(func(err error) {
-				WhenCall(errors.Is(err, io.EOF), cancel)
+				ft.WhenCall(errors.Is(err, io.EOF), cancel)
 			}).
 			StartGroup(wctx, wg, opts.NumWorkers)
 
@@ -436,9 +437,9 @@ func (pf Producer[T]) GenerateParallel(
 
 	iter := pipe.Receive().Producer().PreHook(init).Iterator()
 	err := ApplyOptions(opts, optp...)
-	WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = iter.ErrorObserver().Lock() })
+	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = iter.ErrorObserver().Lock() })
 	opts.ErrorObserver(err)
-	WhenCall(err != nil, pipe.Close)
+	ft.WhenCall(err != nil, pipe.Close)
 
 	return iter
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -87,7 +88,7 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant(wctx != nil, "must start the operation before calling cancel")
 		wf(wctx)
-	}, func() { once.Do(func() {}); SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
 func (wf Operation) Once() Operation {

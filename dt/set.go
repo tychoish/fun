@@ -6,6 +6,7 @@ import (
 	stdatomic "sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 )
 
 type atomic[T comparable] struct{ val stdatomic.Value }
@@ -46,11 +47,11 @@ func (s *Set[T]) WithLock(mtx *sync.Mutex) {
 func (s *Set[T]) isOrdered() bool { return s.list != nil }
 
 func (s *Set[T]) init()            { s.hash = Map[T, *Element[T]]{} }
-func (*Set[T]) with(m *sync.Mutex) { fun.WhenCall(m != nil, m.Unlock) }
+func (*Set[T]) with(m *sync.Mutex) { ft.WhenCall(m != nil, m.Unlock) }
 func (s *Set[T]) lock() *sync.Mutex {
 	m := s.mtx.Get()
-	fun.WhenCall(m != nil, m.Lock)
-	fun.WhenCall(s.hash == nil, s.init)
+	ft.WhenCall(m != nil, m.Lock)
+	ft.WhenCall(s.hash == nil, s.init)
 	return m
 }
 
@@ -89,7 +90,7 @@ func (s *Set[T]) delete(in T) bool {
 		return false
 	}
 
-	fun.WhenDo(e != nil, e.Remove)
+	ft.WhenDo(e != nil, e.Remove)
 	delete(s.hash, in)
 	return true
 }

@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -117,7 +118,9 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	return pipe.Receive().Producer().PreHook(init).Iterator()
 }
 
-func (i *Iterator[T]) doClose()                       { i.closeOnce.Do(func() { i.closed.Store(true); SafeCall(i.closer) }) }
+func (i *Iterator[T]) doClose() {
+	i.closeOnce.Do(func() { i.closed.Store(true); ft.SafeCall(i.closer) })
+}
 func (i *Iterator[T]) Close() error                   { i.doClose(); return i.err }
 func (i *Iterator[T]) AddError(e error)               { i.err = ers.Merge(e, i.err) }
 func (i *Iterator[T]) ErrorObserver() Observer[error] { return i.AddError }
@@ -155,7 +158,7 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 		return out, err
 	}
 
-	defer func() { WhenCall(err != nil, i.doClose) }()
+	defer func() { ft.WhenCall(err != nil, i.doClose) }()
 
 	out, err = i.operation(ctx)
 	switch {
@@ -226,7 +229,7 @@ func (i *Iterator[T]) Count(ctx context.Context) int {
 	proc := i.Producer()
 	var count int
 	for {
-		if !IsOk(proc.Check(ctx)) {
+		if !ft.IsOk(proc.Check(ctx)) {
 			break
 		}
 
@@ -415,7 +418,7 @@ func (i *Iterator[T]) ProcessParallel(
 
 	opts := &WorkerGroupOptions{}
 	err = ApplyOptions(opts, optp...)
-	WhenCall(err != nil, cancel)
+	ft.WhenCall(err != nil, cancel)
 
 	if opts.ErrorObserver == nil {
 		opts.ErrorObserver = i.ErrorObserver().Lock()
@@ -425,16 +428,16 @@ func (i *Iterator[T]) ProcessParallel(
 	wg := &WaitGroup{}
 
 	operation := fn.Safe().FilterErrors(func(err error) error {
-		return WhenDo(
+		return ft.WhenDo(
 			!opts.CanContinueOnError(err),
-			Wrapper(io.EOF),
+			ft.Wrapper(io.EOF),
 		)
 	})
 
 	splits := i.Split(opts.NumWorkers)
 	for idx := range splits {
 		operation.ReadAll(splits[idx].Producer()).
-			Operation(func(err error) { WhenCall(errors.Is(err, io.EOF), cancel) }).
+			Operation(func(err error) { ft.WhenCall(errors.Is(err, io.EOF), cancel) }).
 			Add(ctx, wg)
 	}
 

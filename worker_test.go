@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -499,8 +500,8 @@ func TestWorker(t *testing.T) {
 			etwo := errors.New("do errors")
 
 			whichErr := 2
-			one := func(context.Context) error { return WhenDo(whichErr == 1, func() error { return eone }) }
-			two := func(context.Context) error { return WhenDo(whichErr == 2, func() error { return etwo }) }
+			one := func(context.Context) error { return ft.WhenDo(whichErr == 1, func() error { return eone }) }
+			two := func(context.Context) error { return ft.WhenDo(whichErr == 2, func() error { return etwo }) }
 
 			if e, f := one(ctx), two(ctx); e == nil && f == nil {
 				t.Error("can't both be nil")
@@ -538,7 +539,7 @@ func TestWorker(t *testing.T) {
 			start := time.Now()
 			var wf Worker = func(ctx context.Context) error {
 				time.Sleep(time.Millisecond)
-				return WhenDo(time.Since(start) > 32*time.Millisecond, func() error { return io.EOF })
+				return ft.WhenDo(time.Since(start) > 32*time.Millisecond, func() error { return io.EOF })
 			}
 			t.Run("Min", func(t *testing.T) {
 				assert.MinRuntime(t, 32*time.Millisecond, func() {

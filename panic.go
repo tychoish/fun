@@ -73,5 +73,5 @@ func Must[T any](arg T, err error) T { InvariantMust(err); return arg }
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := risky.ForceBeOk(func() (string ok) { return "hello world", true })
+//	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); return out }

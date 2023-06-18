@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -112,8 +113,8 @@ func TestProducer(t *testing.T) {
 			ctx := testt.Context(t)
 			ch := make(chan *string, 2)
 			prod := MakeFuture(ch)
-			ch <- Ptr("hi")
-			ch <- Ptr("hi")
+			ch <- ft.Ptr("hi")
+			ch <- ft.Ptr("hi")
 			check.NotZero(t, prod.Must(ctx))
 		})
 		t.Run("Blocking", func(t *testing.T) {

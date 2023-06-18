@@ -1,10 +1,5 @@
 package fun
 
-// Wrapper produces a function that always returns the value
-// provided. Useful for bridging interface paradigms, and for storing
-// interface-typed objects in atomics.
-func Wrapper[T any](in T) func() T { return func() T { return in } }
-
 // Unwrap is a generic equivalent of the `errors.Unwrap()` function
 // for any type that implements an `Unwrap() T` method. useful in
 // combination with Is.
@@ -67,21 +62,3 @@ func Unwind[T any](in T) []T {
 		}
 	}
 }
-
-// IsZero returns true if the input value compares "true" to the zero
-// value for the type of the argument. If the type implements an
-// IsZero() method (e.g. time.Time), then IsZero returns that value,
-// otherwise, IsZero constructs a zero valued object of type T and
-// compares the input value to the zero value.
-func IsZero[T comparable](in T) bool {
-	switch val := any(in).(type) {
-	case interface{ IsZero() bool }:
-		return val.IsZero()
-	default:
-		var comp T
-		return in == comp
-	}
-}
-
-func IsType[T any](in any) bool         { _, ok := in.(T); return ok }
-func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }

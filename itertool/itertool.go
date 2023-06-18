@@ -17,6 +17,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 // Process provides a (potentially) more sensible alternate name for
@@ -209,7 +210,7 @@ func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 				return out, err
 			}
 
-			if !fun.IsZero(item) {
+			if !ft.IsZero(item) {
 				return item, nil
 			}
 		}

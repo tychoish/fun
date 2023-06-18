@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -48,7 +49,7 @@ func Map[T any, O any](
 			mf.Processor(output.Send().Write, opts).
 				ReadAll(splits[idx].Producer()).
 				Operation(func(err error) {
-					WhenCall(errors.Is(err, io.EOF), wcancel)
+					ft.WhenCall(errors.Is(err, io.EOF), wcancel)
 				}).
 				Add(wctx, wg)
 		}
@@ -60,10 +61,10 @@ func Map[T any, O any](
 
 	outputIter := output.Receive().Producer().PreHook(init).Iterator()
 	err := ApplyOptions(opts, optp...)
-	WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })
+	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })
 
 	outputIter.AddError(err)
-	WhenCall(err != nil, output.Close)
+	ft.WhenCall(err != nil, output.Close)
 
 	return outputIter
 }

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 // Observer describes a function that operates on a single object, but
@@ -50,13 +51,13 @@ func (of Observer[T]) Iterator(iter *Iterator[T]) Worker {
 
 // If returns an observer that only executes the root observer if the
 // condition is true.
-func (of Observer[T]) If(cond bool) Observer[T] { return of.When(Wrapper(cond)) }
+func (of Observer[T]) If(cond bool) Observer[T] { return of.When(ft.Wrapper(cond)) }
 
 // When returns an observer function that only executes the observer
 // function if the condition function returns true. The condition
 // function is run every time the observer function runs.
 func (of Observer[T]) When(cond func() bool) Observer[T] {
-	return func(in T) { WhenCall(cond(), of.Capture(in)) }
+	return func(in T) { ft.WhenCall(cond(), of.Capture(in)) }
 }
 
 // Filter creates an observer that only executes the root observer
@@ -64,7 +65,7 @@ func (of Observer[T]) When(cond func() bool) Observer[T] {
 // object--returns true. Use this to filter out nil inputs, or
 // unactionable inputs.
 func (of Observer[T]) Filter(cond func(T) bool) Observer[T] {
-	return func(in T) { WhenCall(cond(in), of.Capture(in)) }
+	return func(in T) { ft.WhenCall(cond(in), of.Capture(in)) }
 }
 
 // Once produces an observer function that runs exactly once, and

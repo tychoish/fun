@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 )
 
 // AtomicValue describes the public interface of the Atomic type. Use
@@ -109,11 +110,11 @@ func CompareAndSwap[T comparable](a AtomicValue[T], old, new T) bool {
 }
 
 // IsAtomicZero checks an atomic value for a comparable type to see if
-// it's zero. The fun.IsZero() function can't correctly check both that
+// it's zero. The ft.IsZero() function can't correctly check both that
 // the Atomic is zero and that it holds a zero value, and because
 // atomics need not be comparable this can't be a method on Atomic.
 func IsAtomicZero[T comparable](in AtomicValue[T]) bool {
-	return isAtomicValueNil(in) || fun.IsZero(in.Get())
+	return isAtomicValueNil(in) || ft.IsZero(in.Get())
 }
 
 func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
@@ -143,7 +144,7 @@ func castOrZero[T any](val any) (out T) {
 // SafeSet sets the atomic to the given value only if the value is not
 // the Zero value for that type.
 func SafeSet[T comparable](atom AtomicValue[T], value T) {
-	if !fun.IsZero(value) && !isAtomicValueNil(atom) {
+	if !ft.IsZero(value) && !isAtomicValueNil(atom) {
 		atom.Set(value)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
@@ -24,12 +23,6 @@ func TestWrap(t *testing.T) {
 		if nl != nil {
 			t.Fatal("should be nil")
 		}
-	})
-	t.Run("Wrapper", func(t *testing.T) {
-		assert.NotError(t, Wrapper[error](nil)())
-		assert.Error(t, Wrapper(errors.New("Hello"))())
-		assert.Equal(t, Wrapper(1)(), 1)
-		assert.Equal(t, Wrapper("hello")(), "hello")
 	})
 	t.Run("Errors", func(t *testing.T) {
 		err := errors.New("root")
@@ -111,27 +104,6 @@ func TestWrap(t *testing.T) {
 			check.Equal(t, len(errs), 1)
 		})
 	})
-	t.Run("Cast", func(t *testing.T) {
-		var out string
-		var in any = "fooo"
-		var ok bool
-		// the real test is if this compiles
-		out, ok = Cast[string](in)
-		assert.True(t, ok)
-		assert.Equal(t, "fooo", out)
-
-		in = 1234
-		out, ok = Cast[string](in)
-		assert.True(t, !ok)
-		assert.Equal(t, "", out)
-	})
-	t.Run("IsType", func(t *testing.T) {
-		var in any = "fooo"
-		assert.True(t, IsType[string](in))
-		in = 1234
-		assert.True(t, !IsType[string](in))
-
-	})
 }
 
 type oneWrap struct {
@@ -147,14 +119,3 @@ type slwrap struct {
 
 func (s slwrap) Unwrap() []error { return s.out }
 func (s slwrap) Error() string   { return fmt.Sprint("error:", len(s.out), s.out) }
-
-func TestIsZero(t *testing.T) {
-	assert.True(t, !IsZero(100))
-	assert.True(t, !IsZero(true))
-	assert.True(t, !IsZero("hello world"))
-	assert.True(t, !IsZero(time.Now()))
-	assert.True(t, IsZero(0))
-	assert.True(t, IsZero(false))
-	assert.True(t, IsZero(""))
-	assert.True(t, IsZero(time.Time{}))
-}

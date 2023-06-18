@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -189,7 +190,7 @@ func (wf Worker) Ignore() Operation { return func(ctx context.Context) { _ = wf(
 // true. The error is always nil if the condition is false. If-ed
 // functions may be called more than once, and will run multiple
 // times potentiall.y
-func (wf Worker) If(cond bool) Worker { return wf.When(Wrapper(cond)) }
+func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrapper(cond)) }
 
 // When wraps a Worker function that will only run if the condition
 // function returns true. If the condition is false the worker does
@@ -218,7 +219,7 @@ func (wf Worker) After(ts time.Time) Worker {
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(Wrapper(dur)) }
+func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrapper(dur)) }
 
 // Jitter wraps a Worker that runs the jitter function (jf) once
 // before every execution of the resulting fucntion, and waits for the
@@ -274,7 +275,7 @@ func (wf Worker) While() Worker {
 	return func(ctx context.Context) error {
 		for {
 			if err, cerr := wf(ctx), ctx.Err(); err != nil || cerr != nil {
-				return Default(err, cerr)
+				return ft.Default(err, cerr)
 			}
 		}
 	}
@@ -304,7 +305,7 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant(wctx != nil, "must start the operation before calling cancel")
 		return wf(wctx)
-	}, func() { once.Do(func() {}); SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
 func (wf Worker) PreHook(op func(context.Context)) Worker {

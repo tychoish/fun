@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 )
 
 // Slice is just a local wrapper around a slice, providing a similarly
@@ -30,15 +31,15 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 
 // Add adds a single item to the slice.
 func (s *Slice[T]) Add(in T)                { *s = append(*s, in) }
-func (s *Slice[T]) AddWhen(cond bool, in T) { fun.WhenCall(cond, func() { s.Add(in) }) }
+func (s *Slice[T]) AddWhen(cond bool, in T) { ft.WhenCall(cond, func() { s.Add(in) }) }
 
 // Append adds all of the items to the slice.
 func (s *Slice[T]) Append(in ...T)                { s.Extend(in) }
-func (s *Slice[T]) AppendWhen(cond bool, in ...T) { fun.WhenCall(cond, func() { s.Extend(in) }) }
+func (s *Slice[T]) AppendWhen(cond bool, in ...T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Extend adds the items from the input slice to the root slice.
 func (s *Slice[T]) Extend(in []T)                { *s = append(*s, in...) }
-func (s *Slice[T]) ExtendWhen(cond bool, in []T) { fun.WhenCall(cond, func() { s.Extend(in) }) }
+func (s *Slice[T]) ExtendWhen(cond bool, in []T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }

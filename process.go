@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -70,7 +71,7 @@ func (pf Processor[T]) After(ts time.Time) Processor[T] { return pf.Delay(time.U
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(Wrapper(dur)) }
+func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(ft.Wrapper(dur)) }
 
 // Jitter wraps a Processor that runs the jitter function (jf) once
 // before every execution of the resulting fucntion, and waits for the
@@ -95,7 +96,7 @@ func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
 // nil.
 //
 // The resulting processor can be used more than once.
-func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(Wrapper(c)) }
+func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(ft.Wrapper(c)) }
 
 // When returns a processor function that runs if the conditional function
 // returns true, and does not run otherwise. The conditional function
@@ -206,7 +207,7 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant(wctx != nil, "must start the operation before calling cancel")
 		return pf(wctx, in)
-	}, func() { once.Do(func() {}); SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
 func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
