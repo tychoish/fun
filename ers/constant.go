@@ -15,6 +15,8 @@ package ers
 // correctly handles unwrapping and casting Error-typed error objects.
 type Error string
 
+func New(str string) error { return Error(str) }
+
 // Error implements the error interface for ConstError.
 func (e Error) Error() string { return string(e) }
 

@@ -25,20 +25,28 @@ type Worker func(context.Context) error
 // context error. In all other cases the work will propagate the error
 // (or nil) recived from the channel.
 func WorkerFuture(ch <-chan error) Worker {
+	var cache error
+	pipe := BlockingReceive(ch)
 	return func(ctx context.Context) error {
 		if ch == nil {
 			return nil
 		}
+		if pipe.ch == nil {
+			return cache
+		}
 
 		// val and err cannot both be non-nil at the same
 		// time.
-		val, err := BlockingReceive(ch).Read(ctx)
+		val, err := pipe.Read(ctx)
 		switch {
 		case errors.Is(err, io.EOF):
-			return nil
+			pipe.ch = nil
+			return cache
 		case val != nil:
+			cache = val
 			return val
 		case err != nil:
+			cache = err
 			return err
 		default:
 			return nil
@@ -294,11 +302,9 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 
 	return func(ctx context.Context) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctx.Err(); err != nil {
-			return err
-		}
-		return wf(ctx)
-	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+		Invariant(wctx != nil, "must start the operation before calling cancel")
+		return wf(wctx)
+	}, func() { once.Do(func() {}); SafeCall(cancel) }
 }
 
 func (wf Worker) PreHook(op func(context.Context)) Worker {

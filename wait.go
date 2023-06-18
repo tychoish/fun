@@ -83,14 +83,11 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 	var wctx context.Context
 	var cancel context.CancelFunc
 	once := &sync.Once{}
-
 	return func(ctx context.Context) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctx.Err(); err != nil {
-			return
-		}
-		wf(ctx)
-	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+		Invariant(wctx != nil, "must start the operation before calling cancel")
+		wf(wctx)
+	}, func() { once.Do(func() {}); SafeCall(cancel) }
 }
 
 func (wf Operation) Once() Operation {

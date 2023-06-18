@@ -676,4 +676,40 @@ func TestWorker(t *testing.T) {
 		check.NotError(t, wf(rctx))
 		check.Equal(t, 5, count)
 	})
+	t.Run("WithCancel", func(t *testing.T) {
+		ctx := testt.Context(t)
+		wf, cancel := Worker(func(ctx context.Context) error {
+			timer := time.NewTimer(time.Hour)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				check.ErrorIs(t, ctx.Err(), context.Canceled)
+				return nil
+			case <-timer.C:
+				t.Error("should not have reached this timeout")
+			}
+			return ers.Error("unreachable")
+		}).WithCancel()
+		assert.MinRuntime(t, 40*time.Millisecond, func() {
+			assert.MaxRuntime(t, 75*time.Millisecond, func() {
+				go func() { time.Sleep(60 * time.Millisecond); cancel() }()
+				time.Sleep(time.Millisecond)
+				check.NotError(t, wf(ctx))
+			})
+		})
+	})
+	t.Run("WorkerFuture", func(t *testing.T) {
+		ctx := testt.Context(t)
+		ch := make(chan error, 1)
+		wf := WorkerFuture(ch)
+		root := ers.New("will-be-cached")
+		ch <- root
+		err := wf(ctx)
+		check.ErrorIs(t, err, root)
+		close(ch)
+		check.ErrorIs(t, wf(ctx), root)
+		check.ErrorIs(t, wf(ctx), root)
+		check.ErrorIs(t, wf(ctx), root)
+	})
+
 }

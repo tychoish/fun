@@ -94,7 +94,7 @@ func TestMerge(t *testing.T) {
 	})
 	t.Run("Splice", func(t *testing.T) {
 		errs := []error{io.EOF, ErrRecoveredPanic, fmt.Errorf("hello world")}
-		err := Splice(errs...)
+		err := Join(errs...)
 
 		assert.Error(t, err)
 		assert.True(t, Is(err, errs...))

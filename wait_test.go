@@ -102,6 +102,79 @@ func TestWait(t *testing.T) {
 			t.Fatal("should have returned after completion", "delayed completion", time.Since(start))
 		}
 	})
+	t.Run("Constructor", func(t *testing.T) {
+		ctx := testt.Context(t)
+		count := 0
+		op := BlockingOperation(func() { count++ })
+		assert.Equal(t, count, 0)
+		op(ctx)
+		assert.Equal(t, count, 1)
+		op(nil)
+		assert.Equal(t, count, 2)
+
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+		op(ctx)
+		assert.Equal(t, count, 3)
+	})
+	t.Run("WithCancel", func(t *testing.T) {
+		ctx := testt.Context(t)
+		wf, cancel := Operation(func(ctx context.Context) {
+			timer := time.NewTimer(time.Hour)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				check.ErrorIs(t, ctx.Err(), context.Canceled)
+				return
+			case <-timer.C:
+				t.Error("should not have reached this timeout")
+			}
+		}).WithCancel()
+		assert.MinRuntime(t, 40*time.Millisecond, func() {
+			assert.MaxRuntime(t, 75*time.Millisecond, func() {
+				go func() { time.Sleep(60 * time.Millisecond); cancel() }()
+				time.Sleep(time.Millisecond)
+				wf(ctx)
+			})
+		})
+	})
+	t.Run("If", func(t *testing.T) {
+		ctx := testt.Context(t)
+		called := 0
+		wf := Operation(func(ctx context.Context) {
+			called++
+		})
+
+		wf.If(false)(ctx)
+		check.Zero(t, called)
+		wf.If(true)(ctx)
+		check.Equal(t, 1, called)
+		wf.If(true)(ctx)
+		check.Equal(t, 2, called)
+		wf.If(false)(ctx)
+		check.Equal(t, 2, called)
+		wf(ctx)
+		check.Equal(t, 3, called)
+	})
+	t.Run("When", func(t *testing.T) {
+		ctx := testt.Context(t)
+		called := 0
+		wf := Operation(func(ctx context.Context) {
+			called++
+		})
+
+		wf.When(func() bool { return false })(ctx)
+		check.Zero(t, called)
+		wf.When(func() bool { return true })(ctx)
+		check.Equal(t, 1, called)
+		wf.When(func() bool { return true })(ctx)
+		check.Equal(t, 2, called)
+		wf.When(func() bool { return false })(ctx)
+		check.Equal(t, 2, called)
+		wf(ctx)
+		check.Equal(t, 3, called)
+	})
+
 	t.Run("WaitContext", func(t *testing.T) {
 		t.Run("BaseBlocking", func(t *testing.T) {
 			bctx := context.Background()

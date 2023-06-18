@@ -15,11 +15,11 @@ import (
 func TestPairs(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		ps := Mapify(map[string]string{"in": "out"}).Pairs()
-		ps.Add("in", "in")
+		ps.Pair("in", "in").Pair("in", "what").Add("in", "out")
 		ps.AddPair(MakePair("in", "in"))
 		mp := ps.Map()
 		assert.Equal(t, len(mp), 1)
-		assert.Equal(t, len(ps), 3)
+		assert.Equal(t, len(ps), 5)
 		assert.Equal(t, mp["in"], "out") // first value wins
 	})
 	t.Run("IterationOrder", func(t *testing.T) {

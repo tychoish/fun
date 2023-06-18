@@ -342,11 +342,9 @@ func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
 
 	return func(ctx context.Context) (out T, _ error) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctx.Err(); err != nil {
-			return out, err
-		}
-		return pf(ctx)
-	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+		Invariant(wctx != nil, "must start the operation before calling cancel")
+		return pf(wctx)
+	}, func() { once.Do(func() {}); SafeCall(cancel) }
 }
 
 // Limit runs the producer a specified number of times, and caches the

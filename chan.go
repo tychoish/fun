@@ -265,7 +265,7 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 
 func (sm ChanSend[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Splice(iter.Close(), err, ers.ParsePanic(recover())) }()
+		defer func() { err = ers.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
 		return iter.Process(ctx, sm.Processor())
 	}
 }

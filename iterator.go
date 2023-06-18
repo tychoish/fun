@@ -275,7 +275,7 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 // context cancelation error to its error, though the observed
 // iterator may return one in its close method.
 func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
-	defer func() { err = ers.Splice(i.Close(), err, ers.ParsePanic(recover())) }()
+	defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
 	proc := i.Producer()
 	for {
 		item, err := proc(ctx)
@@ -293,7 +293,7 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
 }
 
 func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) {
-	defer func() { err = ers.Splice(i.Close(), err, ers.ParsePanic(recover())) }()
+	defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
 
 	for i.Next(ctx) {
 		item := i.Value()
@@ -440,4 +440,21 @@ func (i *Iterator[T]) ProcessParallel(
 
 	wg.Operation().Block()
 	return opts.ErrorResolver()
+}
+
+func (i *Iterator[T]) ProcessFuture(fn Processor[T], optp ...OptionProvider[*WorkerGroupOptions]) Worker {
+	return func(ctx context.Context) error { return i.ProcessParallel(ctx, fn, optp...) }
+}
+
+func (i *Iterator[T]) Buffer(n int) *Iterator[T] {
+	buf := Blocking(make(chan T, n))
+	pipe := buf.Send().Consume(i).Operation(i.ErrorObserver()).PostHook(buf.Close).Once().Launch()
+	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
+}
+
+func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
+	buf := Blocking(make(chan T, n))
+	pipe := i.ProcessFuture(buf.Processor(), NumWorkers(n)).Operation(i.ErrorObserver()).PostHook(buf.Close).Once().Launch()
+	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
+
 }

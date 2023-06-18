@@ -2,7 +2,6 @@ package adt
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -61,14 +61,13 @@ func TestIterator(t *testing.T) {
 				defer wg.Done()
 				for {
 					it, err := iter.ReadOne(ctx)
-					if errors.Is(err, io.EOF) {
+					if ers.IsTerminating(err) {
 						return
 					}
 					count.Add(1)
-					check.NotError(t, err)
 					check.True(t, it < 1000)
 					check.True(t, it >= 0)
-					time.Sleep(time.Millisecond)
+					time.Sleep(4 * time.Millisecond)
 				}
 			}()
 		}

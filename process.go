@@ -204,11 +204,9 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 
 	return func(ctx context.Context, in T) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		if err := wctx.Err(); err != nil {
-			return err
-		}
-		return pf(ctx, in)
-	}, func() { once.Do(func() {}); WhenCall(cancel != nil, cancel) }
+		Invariant(wctx != nil, "must start the operation before calling cancel")
+		return pf(wctx, in)
+	}, func() { once.Do(func() {}); SafeCall(cancel) }
 }
 
 func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {

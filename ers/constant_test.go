@@ -41,7 +41,7 @@ func TestConstant(t *testing.T) {
 		err = errors.New("for-test")
 
 		assert.True(t, ErrForTest.Is(err))
-		assert.True(t, ErrForTest.Is(Error("for-test")))
+		assert.True(t, ErrForTest.Is(New("for-test")))
 		assert.True(t, ErrForTest.Is(ErrForTest))
 		assert.True(t, Error("for-test").Is(err))
 		assert.True(t, !Error("").Is(err))

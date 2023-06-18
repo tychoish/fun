@@ -93,6 +93,10 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 // duplicate key.
 func (p *Pairs[K, V]) Add(k K, v V) { *p = p.Append(Pair[K, V]{Key: k, Value: v}) }
 
+// Pair provides a chainable version of Add() for building collections
+// of pairs inline.
+func (p *Pairs[K, V]) Pair(k K, v V) *Pairs[K, V] { p.Add(k, v); return p }
+
 // AddPair adds a single pair to the slice of pairs.
 func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) { *p = p.Append(pair) }
 

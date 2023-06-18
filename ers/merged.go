@@ -19,7 +19,7 @@ func Merge(one, two error) error {
 	}
 }
 
-func Splice(errs ...error) (err error) {
+func Join(errs ...error) (err error) {
 	for idx := len(errs) - 1; idx >= 0; idx-- {
 		if e := errs[idx]; e != nil {
 			err = Merge(e, err)

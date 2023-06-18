@@ -70,7 +70,7 @@ func GenerateRandomStringSlice(size int) []string {
 	return out
 }
 
-func TestIteratorTools(t *testing.T) {
+func TestIterator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -364,12 +364,22 @@ func TestIteratorTools(t *testing.T) {
 			t.Error("did not iterate enough")
 		}
 	})
-}
-
-func TestInternalIterators(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+	t.Run("Buffer", func(t *testing.T) {
+		ctx := testt.Context(t)
+		input := SliceIterator(GenerateRandomStringSlice(128))
+		buf := input.Buffer(256)
+		check.Equal(t, buf.Count(ctx), 128)
+		check.True(t, buf.closed.Load())
+		check.True(t, input.closed.Load())
+	})
+	t.Run("ParallelBuffer", func(t *testing.T) {
+		ctx := testt.Context(t)
+		input := SliceIterator(GenerateRandomStringSlice(128))
+		buf := input.ParallelBuffer(256)
+		check.Equal(t, buf.Count(ctx), 128)
+		check.True(t, buf.closed.Load())
+		check.True(t, input.closed.Load())
+	})
 	t.Run("Slice", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4})

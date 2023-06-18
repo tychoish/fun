@@ -68,12 +68,12 @@ func TestErrors(t *testing.T) {
 			assert.Equal(t, filter(err), error(err))
 		})
 		t.Run("Spliced", func(t *testing.T) {
-			list := Splice(Error("hello"), Error("this"), io.EOF)
+			list := Join(Error("hello"), Error("this"), io.EOF)
 			root := filter(list)
 			assert.Equal(t, io.EOF, root)
 		})
 		t.Run("EmptyWrap", func(t *testing.T) {
-			list := Splice()
+			list := Join()
 			root := filter(list)
 			assert.Equal(t, list, root)
 
