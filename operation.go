@@ -115,12 +115,16 @@ func (wf Operation) Launch() Operation      { return wf.Go }
 // appropriate. The execution of the wait fun blocks on Add's context.
 func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wf.Background(wg)(ctx) }
 
+// StartGroup runs n groups, incrementing the waitgroup as
+// appropriate.
 func (wf Operation) StartGroup(ctx context.Context, wg *WaitGroup, n int) {
-	for i := 0; i < n; i++ {
-		wf.Add(ctx, wg)
-	}
+	ft.DoTimes(n, func() { wf.Add(ctx, wg) })
 }
 
+// Backgrounds creates a new operation which, when the resulting
+// operation is called, starts the root operation in the background
+// and returns immediately. use the wait group, or it's Operation to
+// block on the completion of the background execution.
 func (wf Operation) Background(wg *WaitGroup) Operation {
 	return func(ctx context.Context) { wg.Add(1); go func() { defer wg.Done(); wf(ctx) }() }
 }

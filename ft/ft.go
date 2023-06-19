@@ -50,6 +50,13 @@ func WhenCall(cond bool, op func()) {
 	op()
 }
 
+// DoTimes runs the specified option n times.
+func DoTimes(n int, op func()) {
+	for i := 0; i < n; i++ {
+		op()
+	}
+}
+
 // SafeCall only calls the operation when it's non-nil.
 func SafeCall(op func()) { WhenCall(op != nil, op) }
 
