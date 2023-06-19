@@ -13,7 +13,7 @@ var ErrInvariantViolation = errors.New("invariant violation")
 
 // ErrRecoveredPanic is at the root of any error returned by a
 // function in the fun package that recovers from a panic.
-var ErrRecoveredPanic = ers.ErrRecoveredPanic
+var ErrRecoveredPanic error = ers.ErrRecoveredPanic
 
 // Invariant panics if the condition is false Invariant panics,
 // passing an error that is rooted by ErrInvariantViolation.
@@ -25,15 +25,15 @@ func Invariant(cond bool, args ...any) {
 		case 1:
 			switch ei := args[0].(type) {
 			case error:
-				panic(ers.Merge(ei, ErrInvariantViolation))
+				panic(ers.Join(ei, ErrInvariantViolation))
 			case string:
-				panic(ers.Merge(errors.New(ei), ErrInvariantViolation))
+				panic(ers.Join(errors.New(ei), ErrInvariantViolation))
 			default:
 				panic(fmt.Errorf("[%v]: %w", args[0], ErrInvariantViolation))
 			}
 		default:
 			if err, ok := args[0].(error); ok {
-				panic(ers.Merge(fmt.Errorf("[%s]", args[1:]), ers.Merge(err, ErrInvariantViolation)))
+				panic(ers.Join(fmt.Errorf("[%s]", args[1:]), ers.Join(err, ErrInvariantViolation)))
 			}
 			panic(fmt.Errorf("[%s]: %w", fmt.Sprintln(args...), ErrInvariantViolation))
 		}
@@ -48,10 +48,10 @@ func InvariantMust(err error, args ...any) {
 		return
 	}
 	if len(args) == 0 {
-		panic(ers.Merge(err, ErrInvariantViolation))
+		panic(ers.Join(err, ErrInvariantViolation))
 	}
 
-	panic(ers.Merge(fmt.Errorf("%s: %w", fmt.Sprint(args...), err), ErrInvariantViolation))
+	panic(ers.Join(fmt.Errorf("%s: %w", fmt.Sprint(args...), err), ErrInvariantViolation))
 }
 
 // IsInvariantViolation returns true if the argument is or resolves to

@@ -113,7 +113,7 @@ func (wf Worker) Run(ctx context.Context) error {
 // panics to errors.
 func (wf Worker) Safe() Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return wf(ctx)
 	}
 }
@@ -329,7 +329,7 @@ func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
 	return func(ctx context.Context) (err error) {
 		iter := ch.Iterator()
 		for iter.Next(ctx) {
-			err = ers.Merge(iter.Value(), err)
+			err = ers.Join(iter.Value(), err)
 		}
 		return
 	}

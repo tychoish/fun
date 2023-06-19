@@ -37,7 +37,7 @@ func (c *Collector) Add(err error) {
 
 	defer with(lock(&c.mtx))
 	c.num++
-	c.err = ers.Merge(err, c.err)
+	c.err = ers.Join(err, c.err)
 }
 
 type none struct{}

@@ -110,7 +110,7 @@ func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 //
 // Deprecated: Use ers.Merge instead. Non-collector helper functions
 // and types were moved to ers from erc.
-func Merge(err1, err2 error) error { return ers.Merge(err1, err2) }
+func Merge(err1, err2 error) error { return ers.Join(err1, err2) }
 
 // Collapse takes a slice of errors and converts it into an *erc.Stack
 // typed error.

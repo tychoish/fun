@@ -86,14 +86,14 @@ func (o WorkerGroupOptions) CanContinueOnError(err error) bool {
 type OptionProvider[T any] func(T) error
 
 func ApplyOptions[T any](opt T, opts ...OptionProvider[T]) (err error) {
-	defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
+	defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 	for idx := range opts {
-		err = ers.Merge(opts[idx](opt), err)
+		err = ers.Join(opts[idx](opt), err)
 	}
 
 	switch validator := any(opt).(type) {
 	case interface{ Validate() error }:
-		err = ers.Merge(validator.Validate(), err)
+		err = ers.Join(validator.Validate(), err)
 	}
 	return err
 }

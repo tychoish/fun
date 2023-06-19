@@ -1,7 +1,6 @@
 package ers
 
 import (
-	"context"
 	"errors"
 	"io"
 	"testing"
@@ -33,18 +32,6 @@ func TestPanics(t *testing.T) {
 			if err.Error() != "function runs [recovered panic]" {
 				t.Error(err)
 			}
-		})
-	})
-
-	t.Run("Protect", func(t *testing.T) {
-		assert.NotPanic(t, func() {
-			value, err := Protect(func(int) (out string, err error) {
-				panic(context.Canceled)
-			})(1)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, context.Canceled)
-			assert.ErrorIs(t, err, ErrRecoveredPanic)
-			assert.Zero(t, value)
 		})
 	})
 	t.Run("ParsePanic", func(t *testing.T) {

@@ -17,17 +17,17 @@ func TestErrors(t *testing.T) {
 		check.True(t, IsTerminating(context.Canceled))
 		check.True(t, IsTerminating(context.DeadlineExceeded))
 		check.True(t, !IsTerminating(Error("hello")))
-		check.True(t, IsTerminating(Merge(Error("beep"), io.EOF)))
-		check.True(t, IsTerminating(Merge(Error("beep"), context.Canceled)))
-		check.True(t, IsTerminating(Merge(Error("beep"), context.DeadlineExceeded)))
+		check.True(t, IsTerminating(Join(Error("beep"), io.EOF)))
+		check.True(t, IsTerminating(Join(Error("beep"), context.Canceled)))
+		check.True(t, IsTerminating(Join(Error("beep"), context.DeadlineExceeded)))
 
 		check.True(t, !ContextExpired(io.EOF))
-		check.True(t, !ContextExpired(Merge(Error("beep"), io.EOF)))
+		check.True(t, !ContextExpired(Join(Error("beep"), io.EOF)))
 
 		check.True(t, ContextExpired(context.Canceled))
 		check.True(t, ContextExpired(context.DeadlineExceeded))
-		check.True(t, ContextExpired(Merge(Error("beep"), context.DeadlineExceeded)))
-		check.True(t, ContextExpired(Merge(Error("beep"), context.Canceled)))
+		check.True(t, ContextExpired(Join(Error("beep"), context.DeadlineExceeded)))
+		check.True(t, ContextExpired(Join(Error("beep"), context.Canceled)))
 	})
 	t.Run("Ok", func(t *testing.T) {
 		var err error
@@ -36,7 +36,7 @@ func TestErrors(t *testing.T) {
 		check.True(t, !Ok(err))
 	})
 	t.Run("Filter", func(t *testing.T) {
-		err := Merge(Error("beep"), context.Canceled)
+		err := Join(Error("beep"), context.Canceled)
 		check.Error(t, err)
 		check.NotError(t, FilterRemove(context.Canceled)(err))
 		check.NotError(t, FilterRemove(context.Canceled, io.EOF)(err))
@@ -45,7 +45,7 @@ func TestErrors(t *testing.T) {
 		check.NotError(t, FilterRemove(io.EOF)(nil))
 		check.NotError(t, FilterRemove(nil)(nil))
 
-		err = Merge(Error("beep"), io.EOF)
+		err = Join(Error("beep"), io.EOF)
 		check.Error(t, err)
 		check.Error(t, FilterRemove(context.Canceled)(err))
 		check.NotError(t, FilterRemove(io.EOF)(err))
@@ -64,7 +64,7 @@ func TestErrors(t *testing.T) {
 			assert.Zero(t, filter(nil))
 		})
 		t.Run("SliceEdge", func(t *testing.T) {
-			err := &Combined{}
+			err := &mergederr{}
 			assert.Equal(t, filter(err), error(err))
 		})
 		t.Run("Spliced", func(t *testing.T) {
@@ -84,7 +84,7 @@ func TestErrors(t *testing.T) {
 			assert.Equal(t, io.EOF, root)
 		})
 		t.Run("Merged", func(t *testing.T) {
-			err := Merge(errors.New("hello"), io.EOF)
+			err := Join(errors.New("hello"), io.EOF)
 			root := filter(err)
 			assert.Equal(t, io.EOF, root)
 		})

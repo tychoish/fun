@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 )
 
-func Merge(one, two error) error {
+func merge(one, two error) error {
 	switch {
 	case one == nil && two == nil:
 		return nil
@@ -15,27 +15,37 @@ func Merge(one, two error) error {
 	case one != nil && two == nil:
 		return one
 	default:
-		return &Combined{Current: one, Previous: two}
+		return &mergederr{Current: one, Previous: two}
 	}
 }
 
-func Join(errs ...error) (err error) {
-	for idx := len(errs) - 1; idx >= 0; idx-- {
-		if e := errs[idx]; e != nil {
-			err = Merge(e, err)
+func Join(errs ...error) error {
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	case 2:
+		return merge(errs[0], errs[1])
+	default:
+		var err error
+		for idx := len(errs) - 1; idx >= 0; idx-- {
+			if e := errs[idx]; e != nil {
+				err = merge(e, err)
+			}
 		}
+		return err
 	}
-	return err
 }
 
-type Combined struct {
+type mergederr struct {
 	Current  error
 	Previous error
 }
 
 var count = &atomic.Int64{}
 
-func (dwe *Combined) Unwrap() (out []error) {
+func (dwe *mergederr) Unwrap() (out []error) {
 	for _, err := range []error{dwe.Current, dwe.Previous} {
 		switch e := err.(type) {
 		case interface{ Unwrap() []error }:
@@ -49,7 +59,7 @@ func (dwe *Combined) Unwrap() (out []error) {
 	return
 }
 
-func (dwe *Combined) findRoot() error {
+func (dwe *mergederr) findRoot() error {
 	if dwe.Previous == nil {
 		return nil
 	}
@@ -61,7 +71,7 @@ func (dwe *Combined) findRoot() error {
 	return errs[len(errs)-1]
 }
 
-func (dwe *Combined) Error() string {
+func (dwe *mergederr) Error() string {
 	if root := dwe.findRoot(); root != nil {
 		return fmt.Sprintf("%v [%v]", dwe.Current, root)
 	}
@@ -71,10 +81,10 @@ func (dwe *Combined) Error() string {
 	return dwe.Current.Error()
 }
 
-func (dwe *Combined) Is(target error) bool {
+func (dwe *mergederr) Is(target error) bool {
 	return errors.Is(dwe.Current, target) || errors.Is(dwe.Previous, target)
 }
 
-func (dwe *Combined) As(target any) bool {
+func (dwe *mergederr) As(target any) bool {
 	return errors.As(dwe.Current, target) || errors.As(dwe.Previous, target)
 }

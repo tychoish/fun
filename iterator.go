@@ -122,7 +122,7 @@ func (i *Iterator[T]) doClose() {
 	i.closeOnce.Do(func() { i.closed.Store(true); ft.SafeCall(i.closer) })
 }
 func (i *Iterator[T]) Close() error                   { i.doClose(); return i.err }
-func (i *Iterator[T]) AddError(e error)               { i.err = ers.Merge(e, i.err) }
+func (i *Iterator[T]) AddError(e error)               { i.err = ers.Join(e, i.err) }
 func (i *Iterator[T]) ErrorObserver() Observer[error] { return i.AddError }
 
 func (i *Iterator[T]) Producer() Producer[T] { return i.ReadOne }

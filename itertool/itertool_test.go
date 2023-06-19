@@ -1,13 +1,16 @@
 package itertool
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
@@ -160,7 +163,79 @@ func TestSmoke(t *testing.T) {
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
+	t.Run("Lines", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		last := sha256.Sum256([]byte(fmt.Sprint(time.Now().UTC().UnixMilli())))
+		buf.WriteString(fmt.Sprintf("%x", last))
+		for i := 1; i < 128; i++ {
+			next := sha256.Sum256(last[:])
+			buf.WriteString(fmt.Sprintf("\n%x", next))
+			next = last
+		}
 
+		count := 0
+		ctx := testt.Context(t)
+		var prev string
+		Lines(buf).Observe(ctx, func(line string) {
+			count++
+			assert.Equal(t, len(line), 64)
+			assert.NotEqual(t, prev, line)
+			line = prev
+		})
+		check.Equal(t, count, 128)
+	})
+	t.Run("JSON", func(t *testing.T) {
+		t.Run("Error", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+
+			iter := JSON[int](buf)
+			count := 0
+			ctx := testt.Context(t)
+			for iter.Next(ctx) {
+				count++
+				check.Equal(t, 0, iter.Value())
+			}
+			err := iter.Close()
+			testt.Log(t, err)
+
+			check.Equal(t, 0, count)
+			check.Error(t, err)
+		})
+		t.Run("Pass", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+			buf.WriteString(`{"a": 1}`)
+			buf.Write([]byte("\n"))
+
+			iter := JSON[map[string]int](buf)
+			count := 0
+			ctx := testt.Context(t)
+			for iter.Next(ctx) {
+				count++
+				mp := iter.Value()
+				check.True(t, mp != nil)
+				check.Equal(t, len(mp), 1)
+				check.Equal(t, mp["a"], 1)
+			}
+			err := iter.Close()
+			testt.Log(t, err)
+			check.Equal(t, 4, count)
+			check.NotError(t, err)
+		})
+	})
 }
 
 func TestContains(t *testing.T) {

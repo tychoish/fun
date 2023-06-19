@@ -73,7 +73,7 @@ type mapper[T any, O any] func(context.Context, T) (O, error)
 
 func (mf mapper[T, O]) Safe() mapper[T, O] {
 	return func(ctx context.Context, val T) (_ O, err error) {
-		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return mf(ctx, val)
 	}
 }
@@ -105,7 +105,7 @@ func (i *Iterator[T]) Reduce(
 ) Producer[T] {
 	var value T = initalValue
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = ers.Merge(err, ers.ParsePanic(recover())) }()
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
 		for {
 			item, err := i.ReadOne(ctx)

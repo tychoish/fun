@@ -78,7 +78,7 @@ func TestWrap(t *testing.T) {
 			check.Equal(t, 2, len(errs))
 		})
 		t.Run("MergedSlice", func(t *testing.T) {
-			err := ers.Merge(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
+			err := ers.Join(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
 
 			errs := Unwind(err)
 			check.Equal(t, 3, len(errs))

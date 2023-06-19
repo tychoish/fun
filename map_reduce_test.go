@@ -1027,7 +1027,7 @@ func RunIteratorStringAlgoTests(
 		const ErrCountMeOut ers.Error = "countm-me-out"
 		op := func() error { return ErrCountMeOut }
 
-		ec.Add(ers.Merge(ers.Error("beep"), context.Canceled))
+		ec.Add(ers.Join(ers.Error("beep"), context.Canceled))
 		check.True(t, ec.HasErrors())
 		check.Equal(t, 1, ec.Len())
 		ec.Add(op())

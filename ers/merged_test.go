@@ -22,7 +22,7 @@ func TestMerge(t *testing.T) {
 		e1 := &errorTest{val: 100}
 		e2 := &errorTest{val: 200}
 
-		err := &Combined{Current: e1, Previous: e2}
+		err := &mergederr{Current: e1, Previous: e2}
 
 		if !errors.Is(err, e1) {
 			t.Error("shold be er1", err, e1)
@@ -50,7 +50,7 @@ func TestMerge(t *testing.T) {
 			e1 := &errorTest{val: 100}
 			e2 := &errorTest{val: 200}
 
-			err := Merge(e1, e2)
+			err := Join(e1, e2)
 
 			if err == nil {
 				t.Fatal("should be an error")
@@ -72,7 +72,7 @@ func TestMerge(t *testing.T) {
 		})
 		t.Run("FirstOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
-			err := Merge(e1, nil)
+			err := Join(e1, nil)
 			if err != e1 {
 				t.Error(err, e1)
 			}
@@ -80,13 +80,13 @@ func TestMerge(t *testing.T) {
 
 		t.Run("SecondOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
-			err := Merge(nil, e1)
+			err := Join(nil, e1)
 			if err != e1 {
 				t.Error(err, e1)
 			}
 		})
 		t.Run("Neither", func(t *testing.T) {
-			err := Merge(nil, nil)
+			err := Join(nil, nil)
 			if err != nil {
 				t.Error(err)
 			}
@@ -100,18 +100,24 @@ func TestMerge(t *testing.T) {
 		assert.True(t, Is(err, errs...))
 		assert.Equal(t, len(errs), len(unwind(err)))
 	})
+	t.Run("SpliceOne", func(t *testing.T) {
+		root := Error("root-error")
+		err := Join(root)
+		assert.Equal(t, err.Error(), root.Error())
+	})
+
 	t.Run("FindRoot", func(t *testing.T) {
-		err := &Combined{Current: Error("hi")}
+		err := &mergederr{Current: Error("hi")}
 		check.Equal(t, err.findRoot(), nil)
-		err.Previous = &Combined{}
+		err.Previous = &mergederr{}
 		check.Equal(t, err.findRoot(), error(err.Current))
-		weird := &Combined{Current: nil, Previous: &Combined{}}
+		weird := &mergederr{Current: nil, Previous: &mergederr{}}
 		check.True(t, weird.findRoot() == nil)
 	})
 	t.Run("ErrStringEdges", func(t *testing.T) {
-		err := &Combined{}
+		err := &mergederr{}
 		check.Equal(t, err.Error(), "nil-error")
-		err = &Combined{Current: Error("hi")}
+		err = &mergederr{Current: Error("hi")}
 		check.Equal(t, err.Error(), "hi")
 	})
 }

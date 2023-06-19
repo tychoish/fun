@@ -110,7 +110,5 @@ func TestWrap(t *testing.T) {
 		assert.NotPanic(t, func() { SafeCall(nil) })
 		assert.NotPanic(t, func() { SafeCall(fn) })
 		check.Equal(t, count, 2)
-
 	})
-
 }
