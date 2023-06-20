@@ -65,6 +65,7 @@ func TestTools(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < 10; i++ {
 		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
+			t.Parallel()
 			t.Run("CancelCollectChannel", func(t *testing.T) {
 				bctx, bcancel := context.WithCancel(context.Background())
 				defer bcancel()
@@ -117,6 +118,7 @@ func TestTools(t *testing.T) {
 }
 
 func TestMapReduce(t *testing.T) {
+	t.Parallel()
 	t.Run("MapWorkerSendingBlocking", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -250,8 +252,9 @@ func TestParallelForEach(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		for i := int64(-1); i <= 12; i++ {
 			t.Run(fmt.Sprintf("Threads%d", i), func(t *testing.T) {
+				i := i
+				t.Parallel()
 				elems := makeIntSlice(200)
-
 				seen := &atomic.Int64{}
 				count := &atomic.Int64{}
 

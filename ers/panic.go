@@ -4,10 +4,6 @@ import (
 	"fmt"
 )
 
-// ErrRecoveredPanic is at the root of any error returned by a
-// function in the fun package that recovers from a panic.
-const ErrRecoveredPanic = Error("recovered panic")
-
 // ParsePanic converts a panic to an error, if it is not, and attaching
 // the ErrRecoveredPanic error to that error. If no panic is
 // detected, ParsePanic returns nil.

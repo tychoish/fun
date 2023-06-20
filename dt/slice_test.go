@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/testt"
 )
@@ -236,7 +236,7 @@ func TestSlice(t *testing.T) {
 			worker := s.Process(func(ctx context.Context, in int) error {
 				count++
 				if count == 64 {
-					return fun.ErrLimitExceeded
+					return ers.ErrLimitExceeded
 				}
 				check.NotZero(t, in)
 				return nil
@@ -244,7 +244,7 @@ func TestSlice(t *testing.T) {
 			err := worker(ctx)
 			check.Equal(t, count, 64)
 			check.Error(t, err)
-			check.ErrorIs(t, err, fun.ErrLimitExceeded)
+			check.ErrorIs(t, err, ers.ErrLimitExceeded)
 		})
 	})
 	t.Run("When", func(t *testing.T) {

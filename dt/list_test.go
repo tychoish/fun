@@ -57,11 +57,11 @@ func TestList(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have gotten failure")
 		}
-		if !errors.Is(err, dt.ErrUninitialized) {
+		if !errors.Is(err, dt.ErrUninitializedContainer) {
 			t.Error(err)
 		}
 		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-		assert.ErrorIs(t, err, dt.ErrUninitialized)
+		assert.ErrorIs(t, err, dt.ErrUninitializedContainer)
 	})
 	t.Run("LengthTracks", func(t *testing.T) {
 		list := &dt.List[int]{}

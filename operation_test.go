@@ -11,10 +11,11 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
-func TestWait(t *testing.T) {
+func TestOperation(t *testing.T) {
 	t.Parallel()
 	t.Run("WaitGroupEndToEnd", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -278,5 +279,80 @@ func TestWait(t *testing.T) {
 			Safe()(testt.Context(t))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
+	})
+	t.Run("PreHook", func(t *testing.T) {
+		ops := []string{}
+
+		BlockingOperation(func() { ops = append(ops, "main") }).
+			PreHook(BlockingOperation(func() { ops = append(ops, "pre") })).
+			Block()
+
+		// check call order
+		check.EqualItems(t, ops, []string{"pre", "main"})
+	})
+	t.Run("Chain", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			ops := []string{}
+			BlockingOperation(func() { ops = append(ops, "first") }).
+				Join(BlockingOperation(func() { ops = append(ops, "second") })).Block()
+			// check call order
+			check.EqualItems(t, ops, []string{"first", "second"})
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			ops := []string{}
+			BlockingOperation(func() { ops = append(ops, "first") }).
+				Join(BlockingOperation(func() { ops = append(ops, "second") }))(ctx)
+			// check call order
+			check.EqualItems(t, ops, []string{"first"})
+
+		})
+	})
+	t.Run("Lock", func(t *testing.T) {
+		t.Run("NilLockPanics", func(t *testing.T) {
+			ctx := testt.Context(t)
+			count := 0
+			op := Operation(func(context.Context) { count++ })
+			check.Panic(t, func() { op.WithLock(nil)(ctx) })
+			check.Equal(t, 0, count)
+		})
+		// the rest of the tests are really just "tempt the
+		// race detector"
+		t.Run("ManagedLock", func(t *testing.T) {
+			ctx := testt.Context(t)
+			count := 0
+			op := Operation(func(context.Context) { count++ })
+			wg := &WaitGroup{}
+			op.Lock().StartGroup(ctx, wg, 128)
+			wg.Wait(ctx)
+			assert.Equal(t, count, 128)
+		})
+		t.Run("CustomLock", func(t *testing.T) {
+			ctx := testt.Context(t)
+			count := 0
+			op := Operation(func(context.Context) { count++ })
+			wg := &WaitGroup{}
+			mu := &sync.Mutex{}
+			op.WithLock(mu).StartGroup(ctx, wg, 128)
+			wg.Wait(ctx)
+			assert.Equal(t, count, 128)
+		})
+		t.Run("ForBackground", func(t *testing.T) {
+			count := 0
+			op := Operation(func(context.Context) {
+				count++
+			}).Lock()
+			ctx := testt.Context(t)
+
+			jobs := []Operation{}
+
+			ft.DoTimes(128, func() { jobs = append(jobs, op) })
+
+			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessOperation(), NumWorkers(4))
+			assert.NotError(t, err)
+			check.Equal(t, count, 128)
+		})
 	})
 }

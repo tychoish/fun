@@ -135,17 +135,17 @@ func TestIterator(t *testing.T) {
 		t.Run("OperationError", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return ErrLimitExceeded })
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return ers.ErrLimitExceeded })
 			testt.Log(t, Unwind(err))
 			assert.Error(t, err)
-			assert.ErrorIs(t, err, ErrLimitExceeded)
+			assert.ErrorIs(t, err, ers.ErrLimitExceeded)
 			assert.Equal(t, 9, count)
 			assert.Equal(t, 9, len(Unwind(err)))
 		})
 		t.Run("Panic", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; panic(ErrLimitExceeded) })
+			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; panic(ers.ErrLimitExceeded) })
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, ErrRecoveredPanic)
@@ -229,7 +229,7 @@ func TestIterator(t *testing.T) {
 
 			out := Transform[string](input, func(in string) (int, error) {
 				if in == "20" {
-					return 0, ErrInvalidInput
+					return 0, ers.ErrInvalidInput
 				}
 				calls++
 				return strconv.Atoi(in)
@@ -239,7 +239,7 @@ func TestIterator(t *testing.T) {
 				sum += out.Value()
 			}
 			assert.Error(t, out.Close())
-			assert.ErrorIs(t, out.Close(), ErrInvalidInput)
+			assert.ErrorIs(t, out.Close(), ers.ErrInvalidInput)
 
 			assert.Equal(t, 20, sum)
 			assert.Equal(t, calls, 2)
@@ -506,7 +506,7 @@ func TestIterator(t *testing.T) {
 			out, err := NonBlocking(ch).Receive().Read(ctx)
 			assert.Zero(t, out)
 			assert.Error(t, err)
-			assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+			assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 		})
 		t.Run("Closed", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -605,11 +605,13 @@ func TestChain(t *testing.T) {
 	defer cancel()
 
 	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
-	iter := SliceIterator(num).Chain(SliceIterator(num))
+	iter := SliceIterator(num).Join(SliceIterator(num))
+
 	n := iter.Count(ctx)
+
 	assert.Equal(t, len(num)*2, n)
 
-	iter = SliceIterator(num).Chain(SliceIterator(num), SliceIterator(num), SliceIterator(num))
+	iter = SliceIterator(num).Join(SliceIterator(num), SliceIterator(num), SliceIterator(num))
 	cancel()
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
@@ -669,7 +671,7 @@ func TestJSON(t *testing.T) {
 		iter := &Iterator[string]{}
 		ec := iter.ErrorObserver()
 		ec(io.EOF)
-		ec(ErrInvalidInput)
+		ec(ers.ErrInvalidInput)
 		ec(io.ErrUnexpectedEOF)
 		ec(context.Canceled)
 
@@ -680,7 +682,7 @@ func TestJSON(t *testing.T) {
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 		assert.True(t, ers.ContextExpired(err))
 		assert.True(t, ers.IsTerminating(err))
-		assert.ErrorIs(t, err, ErrInvalidInput)
+		assert.ErrorIs(t, err, ers.ErrInvalidInput)
 	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})

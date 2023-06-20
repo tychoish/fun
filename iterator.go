@@ -17,7 +17,9 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-var ErrIteratorSkip = errors.New("skip-iteration")
+// ErrIteratorSkip instructs consumers of Iterators and related
+// processors to ignore the
+const ErrIteratorSkip = ers.Error("skip-iteration")
 
 // Iterator provides a safe, context-respecting iteration/sequence
 // paradigm, and entire tool kit for consumer functions, converters,
@@ -318,7 +320,7 @@ func (i *Iterator[T]) Process(ctx context.Context, fn Processor[T]) (err error) 
 	return err
 }
 
-func (i *Iterator[T]) Chain(iters ...*Iterator[T]) *Iterator[T] {
+func (i *Iterator[T]) Join(iters ...*Iterator[T]) *Iterator[T] {
 	proc := i.Producer()
 	for idx := range iters {
 		proc = proc.Join(iters[idx].ReadOne)
@@ -395,7 +397,7 @@ func (i *Iterator[T]) UnmarshalJSON(in []byte) error {
 		return err
 	}
 	var idx int
-	i.operation = i.operation.Chain(func(ctx context.Context) (out T, err error) {
+	i.operation = i.operation.Join(func(ctx context.Context) (out T, err error) {
 		if idx >= len(rv) {
 			return out, io.EOF
 		}

@@ -273,7 +273,7 @@ func Lines(in io.Reader) *fun.Iterator[string] {
 	scanner := bufio.NewScanner(in)
 	return fun.Generator(func(ctx context.Context) (string, error) {
 		if !scanner.Scan() {
-			return "", erc.Merge(io.EOF, scanner.Err())
+			return "", ers.Join(io.EOF, scanner.Err())
 		}
 		return strings.TrimSpace(scanner.Text()), nil
 	})

@@ -31,11 +31,11 @@ func TestStack(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have gotten failure")
 		}
-		if !errors.Is(err, dt.ErrUninitialized) {
+		if !errors.Is(err, dt.ErrUninitializedContainer) {
 			t.Error(err)
 		}
 		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-		assert.ErrorIs(t, err, dt.ErrUninitialized)
+		assert.ErrorIs(t, err, dt.ErrUninitializedContainer)
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
 		iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})

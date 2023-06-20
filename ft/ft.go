@@ -1,5 +1,7 @@
 package ft
 
+import "sync"
+
 // IsZero returns true if the input value compares "true" to the zero
 // value for the type of the argument. If the type implements an
 // IsZero() method (e.g. time.Time), then IsZero returns that value,
@@ -59,6 +61,24 @@ func DoTimes(n int, op func()) {
 
 // SafeCall only calls the operation when it's non-nil.
 func SafeCall(op func()) { WhenCall(op != nil, op) }
+
+// SafeWrap wraps an operation with SafeCall so that the resulting
+// operation is never nil, and will never panic if the input operation
+// is nil.
+func SafeWrap(op func()) func() { return func() { SafeCall(op) } }
+
+// Flip takes two arguments and returns them in the opposite
+// order. Intended to wrap other functions to reduce the friction when
+// briding APIs
+func Flip[A any, B any](first A, second B) (B, A) { return second, first }
+
+func IgnoreFirst[A any, B any](first A, second B) B  { return second }
+func IgnoreSecond[A any, B any](first A, second B) A { return first }
+
+// Once uses a sync.Once to wrap to provide an output function that
+// will execute at most one time, while eliding/managing the sync.Once
+// object.
+func Once(f func()) func() { o := &sync.Once{}; return func() { f = SafeWrap(f); o.Do(f) } }
 
 // WhenDo calls the function when the condition is true, and returns
 // the result, or if the condition is false, the operation is a noop,

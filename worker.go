@@ -25,15 +25,16 @@ type Worker func(context.Context) error
 // error, and if the context is canceled, the worker will return a
 // context error. In all other cases the work will propagate the error
 // (or nil) recived from the channel.
+//
+// You can call the resulting worker function more than once: if there
+// are multiple errors produced or passed to the channel, they will be
+// propogated; however, after the channel is closed subsequent calls
+// to the worker function will return nil.
 func WorkerFuture(ch <-chan error) Worker {
-	var cache error
 	pipe := BlockingReceive(ch)
 	return func(ctx context.Context) error {
-		if ch == nil {
+		if ch == nil || pipe.ch == nil {
 			return nil
-		}
-		if pipe.ch == nil {
-			return cache
 		}
 
 		// val and err cannot both be non-nil at the same
@@ -42,12 +43,12 @@ func WorkerFuture(ch <-chan error) Worker {
 		switch {
 		case errors.Is(err, io.EOF):
 			pipe.ch = nil
-			return cache
+			return nil
 		case val != nil:
-			cache = val
+			// actual error
 			return val
 		case err != nil:
-			cache = err
+			// context error?
 			return err
 		default:
 			return nil
@@ -120,7 +121,8 @@ func (wf Worker) Safe() Worker {
 
 // Block executes the worker function with a context that will never
 // expire and returns the error. Use with caution
-func (wf Worker) Block() error { return wf.Run(context.Background()) }
+func (wf Worker) Block() error                              { return wf.Run(context.Background()) }
+func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are converted to errors for both the worker
@@ -199,12 +201,7 @@ func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrapper(cond)) }
 // When worker functions may be called more than once, and will run
 // multiple times potentiall.
 func (wf Worker) When(cond func() bool) Worker {
-	return func(ctx context.Context) error {
-		if cond() {
-			return wf(ctx)
-		}
-		return nil
-	}
+	return func(ctx context.Context) error { return ft.WhenDo(cond(), wf.futureOp(ctx)) }
 }
 
 // After returns a Worker that blocks until the timestamp provided is
@@ -281,9 +278,9 @@ func (wf Worker) While() Worker {
 	}
 }
 
-// Chain melds two workers, calling the second worker if the first
+// Join melds two workers, calling the second worker if the first
 // succeeds and the context hasn't been canceled.
-func (wf Worker) Chain(next Worker) Worker {
+func (wf Worker) Join(next Worker) Worker {
 	return func(ctx context.Context) error {
 		if err := wf(ctx); err != nil {
 			return err
@@ -316,22 +313,22 @@ func (wf Worker) PostHook(op func()) Worker {
 	return func(ctx context.Context) (err error) { err = wf(ctx); op(); return }
 }
 
-func (wf Worker) StartGroup(ctx context.Context, wg *WaitGroup, n int) Worker {
-	ch := Blocking(make(chan error, internal.Min(n, runtime.NumCPU())))
-
+func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
+	ch := Blocking(make(chan error, internal.Max(n, runtime.NumCPU())))
 	oe := ch.Send().Processor().Force
-	for i := 0; i < n; i++ {
-		wf.Operation(oe).Add(ctx, wg)
-	}
 
+	wg := &WaitGroup{}
+	mu := &sync.Mutex{}
+
+	prod := ch.Producer()
+	op := wf.Operation(oe).WithLock(mu)
+
+	ft.DoTimes(n, func() { op.Add(ctx, wg) })
 	wg.Operation().PostHook(ch.Close).Go(ctx)
 
 	return func(ctx context.Context) (err error) {
-		iter := ch.Iterator()
-		for iter.Next(ctx) {
-			err = ers.Join(iter.Value(), err)
-		}
-		return
+		errs, err := prod.Iterator().Slice(ctx)
+		return ers.Join(append(errs, err)...)
 	}
 }
 func (wf Worker) FilterErrors(ef ers.Filter) Worker {

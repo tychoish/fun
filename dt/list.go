@@ -4,16 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/tychoish/fun"
 )
-
-// ErrUninitialized is the content of the panic produced when you
-// attempt to perform an operation on an uninitialized sequence.
-var ErrUninitialized = errors.New("initialized container")
 
 // List provides a doubly linked list. Callers are responsible for
 // their own concurrency control and bounds checking, and should
@@ -420,7 +415,7 @@ func (l *List[T]) Copy() *List[T] {
 
 func (l *List[T]) lazySetup() {
 	if l == nil {
-		panic(ErrUninitialized)
+		panic(ErrUninitializedContainer)
 	}
 
 	if l.root == nil {

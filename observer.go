@@ -82,10 +82,6 @@ func (of Observer[T]) Lock() Observer[T] {
 	return func(in T) { mtx.Lock(); defer mtx.Unlock(); of(in) }
 }
 
-// Chain creates an observer function that runs both the root observer
+// Join creates an observer function that runs both the root observer
 // and the "next" observer.
-func (of Observer[T]) Chain(next Observer[T]) Observer[T] { return func(in T) { of(in); next(in) } }
-
-func ErrorObserver(of Observer[error]) Observer[error] {
-	return of.Filter(func(err error) bool { return err != nil })
-}
+func (of Observer[T]) Join(next Observer[T]) Observer[T] { return func(in T) { of(in); next(in) } }

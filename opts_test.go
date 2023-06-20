@@ -6,12 +6,13 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
 func TestOptionProvider(t *testing.T) {
 	t.Run("Set", func(t *testing.T) {
-		conf := &WorkerGroupOptions{ExcludededErrors: []error{ErrLimitExceeded}}
+		conf := &WorkerGroupOptions{ExcludededErrors: []error{ers.ErrLimitExceeded}}
 		newc := &WorkerGroupOptions{ContinueOnPanic: true, ExcludededErrors: []error{ErrRecoveredPanic, ErrInvariantViolation}}
 		eone := errors.New("cat")
 		etwo := errors.New("3")

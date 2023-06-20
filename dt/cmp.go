@@ -36,7 +36,7 @@ func NewHeapFromIterator[T any](ctx context.Context, cmp cmp.LessThan[T], iter *
 
 func (h *Heap[T]) lazySetup() {
 	if h == nil || h.LT == nil {
-		panic(ErrUninitialized)
+		panic(ErrUninitializedContainer)
 	}
 
 	if h.list == nil {

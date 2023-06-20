@@ -15,6 +15,8 @@ import (
 // operation returns or the context is canceled.
 type Operation func(context.Context)
 
+// BlockingOperation converts a function that takes no arguments into
+// an Operation.
 func BlockingOperation(in func()) Operation { return func(context.Context) { in() } }
 
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a
@@ -42,9 +44,7 @@ func WaitContext(ctx context.Context) Operation { return WaitChannel(ctx.Done())
 // goroutine, use the fun.WaitGroup type.
 func WaitForGroup(wg *sync.WaitGroup) Operation {
 	sig := make(chan struct{})
-
 	go func() { defer close(sig); wg.Wait() }()
-
 	return WaitChannel(sig)
 }
 
@@ -144,10 +144,6 @@ func (wf Operation) Worker() Worker {
 	return func(ctx context.Context) (err error) { wf(ctx); return ctx.Err() }
 }
 
-func (wf Operation) After(ts time.Time) Operation {
-	return func(ctx context.Context) { wf.Delay(time.Until(ts))(ctx) }
-}
-
 // Jitter wraps a Operation that runs the jitter function (jf) once
 // before every execution of the resulting fucntion, and waits for the
 // resulting duration before running the Operation operation.
@@ -162,6 +158,7 @@ func (wf Operation) Jitter(dur func() time.Duration) Operation {
 //
 // If the value is negative, then there is always zero delay.
 func (wf Operation) Delay(dur time.Duration) Operation { return wf.Worker().Delay(dur).Ignore() }
+func (wf Operation) After(ts time.Time) Operation      { return wf.Worker().Delay(time.Until(ts)).Ignore() }
 func (wf Operation) When(cond func() bool) Operation   { return wf.Worker().When(cond).Ignore() }
 func (wf Operation) If(cond bool) Operation            { return wf.Worker().If(cond).Ignore() }
 
@@ -170,21 +167,18 @@ func (wf Operation) Limit(in int) Operation {
 	counter := &atomic.Int64{}
 	mtx := &sync.Mutex{}
 
-	return func(ctx context.Context) {
+	return wf.When(func() bool {
 		if counter.CompareAndSwap(int64(in), int64(in)) {
-			return
+			return false
 		}
 
-		func() {
-			mtx.Lock()
-			defer mtx.Unlock()
+		mtx.Lock()
+		defer mtx.Unlock()
 
-			num := counter.Load()
+		num := counter.Load()
 
-			counter.CompareAndSwap(int64(in), internal.Min(int64(in), num+1))
-		}()
-		wf(ctx)
-	}
+		return counter.CompareAndSwap(int64(num), internal.Min(int64(in), num+1))
+	})
 }
 
 func (wf Operation) TTL(dur time.Duration) Operation {
@@ -202,11 +196,9 @@ func (wf Operation) WithLock(mtx *sync.Mutex) Operation {
 	}
 }
 
-func (wf Operation) Chain(op Operation) Operation {
+func (wf Operation) Join(op Operation) Operation {
 	return func(ctx context.Context) { wf(ctx); op.If(ctx.Err() == nil)(ctx) }
 }
 
-func (wf Operation) PostHook(op func()) Operation { return func(ctx context.Context) { wf(ctx); op() } }
-func (wf Operation) PreHook(op func(context.Context)) Operation {
-	return func(ctx context.Context) { op(ctx); wf(ctx) }
-}
+func (wf Operation) PostHook(op func()) Operation   { return func(ctx context.Context) { wf(ctx); op() } }
+func (wf Operation) PreHook(op Operation) Operation { return func(c context.Context) { op(c); wf(c) } }

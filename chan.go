@@ -9,10 +9,10 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// ErrSkippedNonBlockingChannelOperation is returned when sending into
+// ErrNonBlockingChannelOperationSkipped is returned when sending into
 // a channel, in a non-blocking context, when the channel was full and
 // the send or receive was therefore skipped.
-var ErrSkippedNonBlockingChannelOperation = errors.New("skipped non-blocking channel operation")
+const ErrNonBlockingChannelOperationSkipped = ers.Error("non-blocking channel operation skipped")
 
 // blockingMode provides named constants for blocking/non-blocking
 // operations. They are fully internal, and only used indirectly.
@@ -153,7 +153,7 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 
 			return obj, nil
 		default:
-			return zero, ErrSkippedNonBlockingChannelOperation
+			return zero, ErrNonBlockingChannelOperationSkipped
 		}
 	default:
 		// this is impossible without an invalid blockingMode
@@ -254,7 +254,7 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 		case sm.ch <- it:
 			return nil
 		default:
-			return ErrSkippedNonBlockingChannelOperation
+			return ErrNonBlockingChannelOperationSkipped
 		}
 	default:
 		// it should be impossible to provoke an EOF error

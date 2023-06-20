@@ -101,32 +101,9 @@ func RecoverHook(ec *Collector, hook func()) {
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
-// Merge produces a single error from two input errors. The output
-// error behaves correctly for errors.Is and errors.As and Unwrap()
-// calls, for both errors, checked in order.
-//
-// If both errors are of the same root type and you investigate the
-// output error with errors.As, the first error's value will be used.
-//
-// Deprecated: Use ers.Merge instead. Non-collector helper functions
-// and types were moved to ers from erc.
-func Merge(err1, err2 error) error { return ers.Join(err1, err2) }
-
-// Collapse takes a slice of errors and converts it into an *erc.Stack
+// Join takes a slice of errors and converts it into an *erc.Stack
 // typed error.
-func Collapse(errs ...error) error {
-	if len(errs) == 0 {
-		return nil
-	}
-
-	ec := &Collector{}
-
-	for idx := range errs {
-		ec.Add(errs[idx])
-	}
-
-	return ec.Resolve()
-}
+func Join(errs ...error) error { return ers.Join(errs...) }
 
 // Stream collects all errors from an error channel, and returns the
 // aggregated error. Stream blocks until the context expires (but

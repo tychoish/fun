@@ -2,34 +2,34 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 )
 
 // stolen shamelessly from https://github.com/tendermint/tendermint/tree/master/internal/libs/queue
 
-// queue implements a dynamic FIFO queue with a fixed upper bound
-// and a flexible quota mechanism to handle bursty load.
-var (
+const (
 	// ErrQueueFull is returned by the Add method of a queue when the queue has
 	// reached its hard capacity limit.
-	ErrQueueFull = errors.New("queue is full")
+	ErrQueueFull = ers.Error("queue is full")
 
 	// ErrQueueNoCredit is returned by the Add method of a queue when the queue has
 	// exceeded its soft quota and there is insufficient burst credit.
-	ErrQueueNoCredit = errors.New("insufficient burst credit")
+	ErrQueueNoCredit = ers.Error("insufficient burst credit")
+)
 
+var (
 	// ErrQueueClosed is returned by the Add method of a closed queue, and by
 	// the Wait method of a closed empty queue.
 	ErrQueueClosed = fmt.Errorf("queue is closed: %w", io.EOF)
 
 	// Sentinel errors reported by the New constructor.
-	errHardLimit   = fmt.Errorf("hard limit must be > 0 and ≥ soft quota: %w", ErrConfigurationMalformed)
-	errBurstCredit = fmt.Errorf("burst credit must be non-negative: %w", ErrConfigurationMalformed)
+	errHardLimit   = fmt.Errorf("hard limit must be > 0 and ≥ soft quota: %w", ers.ErrMalformedConfiguration)
+	errBurstCredit = fmt.Errorf("burst credit must be non-negative: %w", ers.ErrMalformedConfiguration)
 )
 
 // A Queue is a limited-capacity FIFO queue of arbitrary data items.

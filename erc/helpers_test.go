@@ -27,7 +27,7 @@ func TestCollections(t *testing.T) {
 			e1 := &errorTest{val: 100}
 			e2 := &errorTest{val: 200}
 
-			err := Merge(e1, e2)
+			err := Join(e1, e2)
 
 			if err == nil {
 				t.Fatal("should be an error")
@@ -49,7 +49,7 @@ func TestCollections(t *testing.T) {
 		})
 		t.Run("FirstOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
-			err := Merge(e1, nil)
+			err := Join(e1, nil)
 			testt.Log(t, err)
 			testt.Logf(t, "%T", err)
 
@@ -58,11 +58,11 @@ func TestCollections(t *testing.T) {
 
 		t.Run("SecondOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
-			err := Merge(nil, e1)
+			err := Join(nil, e1)
 			assert.ErrorIs(t, err, e1)
 		})
 		t.Run("Neither", func(t *testing.T) {
-			err := Merge(nil, nil)
+			err := Join(nil, nil)
 			assert.NotError(t, err)
 		})
 	})
@@ -80,13 +80,13 @@ func TestCollections(t *testing.T) {
 	})
 	t.Run("Collapse", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			if err := Collapse(); err != nil {
+			if err := Join(); err != nil {
 				t.Error("should be nil", err)
 			}
 		})
 		t.Run("One", func(t *testing.T) {
 			const e ers.Error = "fourty-two"
-			err := Collapse(e)
+			err := Join(e)
 			if !errors.Is(err, e) {
 				t.Error(err, e)
 			}
@@ -94,7 +94,7 @@ func TestCollections(t *testing.T) {
 		t.Run("Many", func(t *testing.T) {
 			const e0 ers.Error = "fourty-two"
 			const e1 ers.Error = "fourty-three"
-			err := Collapse(e0, e1)
+			err := Join(e0, e1)
 			if !errors.Is(err, e1) {
 				t.Error(err, e1)
 			}

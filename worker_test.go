@@ -18,6 +18,7 @@ import (
 )
 
 func TestWorker(t *testing.T) {
+	t.Parallel()
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
 			start := time.Now()
@@ -281,7 +282,7 @@ func TestWorker(t *testing.T) {
 
 			count := 0
 			var wf Worker = func(context.Context) error { count++; return nil }
-			wf = wf.Chain(wf)
+			wf = wf.Join(wf)
 			check.NotError(t, wf(ctx))
 			assert.Equal(t, count, 2)
 
@@ -298,7 +299,7 @@ func TestWorker(t *testing.T) {
 
 			count := 0
 			var wf Worker = func(context.Context) error { count++; return expected }
-			wf = wf.Chain(func(context.Context) error { count++; return nil })
+			wf = wf.Join(func(context.Context) error { count++; return nil })
 			err := wf(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, expected)
@@ -708,9 +709,9 @@ func TestWorker(t *testing.T) {
 		err := wf(ctx)
 		check.ErrorIs(t, err, root)
 		close(ch)
-		check.ErrorIs(t, wf(ctx), root)
-		check.ErrorIs(t, wf(ctx), root)
-		check.ErrorIs(t, wf(ctx), root)
+		check.NotError(t, wf(ctx))
+		check.NotError(t, wf(ctx))
+		check.NotError(t, wf(ctx))
 	})
 
 }

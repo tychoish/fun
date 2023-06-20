@@ -105,7 +105,8 @@ func Set(opt *WorkerGroupOptions) OptionProvider[*WorkerGroupOptions] {
 func AddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupOptions] {
 	return func(opts *WorkerGroupOptions) error {
 		if ers.Is(ErrRecoveredPanic, errs...) {
-			return fmt.Errorf("cannot exclude recovered panics: %w", ErrInvalidInput)
+
+			return fmt.Errorf("cannot exclude recovered panics: %w", ers.ErrInvalidInput)
 		}
 		opts.ExcludededErrors = append(opts.ExcludededErrors, errs...)
 		return nil

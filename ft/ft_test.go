@@ -111,4 +111,43 @@ func TestWrap(t *testing.T) {
 		assert.NotPanic(t, func() { SafeCall(fn) })
 		check.Equal(t, count, 2)
 	})
+	t.Run("DoTimes", func(t *testing.T) {
+		count := 0
+		DoTimes(42, func() { count++ })
+		assert.Equal(t, count, 42)
+	})
+	t.Run("SafeWrap", func(t *testing.T) {
+		var f func()
+		assert.NotPanic(t, SafeWrap(f))
+		assert.Panic(t, f)
+
+		var called bool
+		f = func() { called = true }
+		SafeWrap(f)()
+		assert.True(t, called)
+	})
+	t.Run("Once", func(t *testing.T) {
+		count := 0
+		op := func() { count++ }
+		DoTimes(128, Once(op))
+		assert.Equal(t, count, 1)
+	})
+	t.Run("Flip", func(t *testing.T) {
+		op := func() (int, bool) { return 42, true }
+		num, ok := op()
+		check.True(t, ok)
+		check.Equal(t, 42, num)
+		ok, num = Flip(op())
+	})
+	t.Run("Ignore", func(t *testing.T) {
+		const first int = 42
+		const second bool = true
+		t.Run("First", func(t *testing.T) {
+			assert.Equal(t, second, IgnoreFirst(func() (int, bool) { return first, second }()))
+		})
+		t.Run("Second", func(t *testing.T) {
+			assert.Equal(t, first, IgnoreSecond(func() (int, bool) { return first, second }()))
+		})
+	})
+
 }

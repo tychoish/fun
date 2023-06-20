@@ -12,10 +12,44 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-var (
-	ErrLimitExceeded = errors.New("limit exceeded")
-	ErrInvalidInput  = errors.New("invalid input")
-)
+// HF provides namespaced access to the Handlers/constructors provided
+// by the handler's type.
+var HF Handlers = Handlers{}
+
+// The Handlers type serves to namespace constructors of common
+// operations and specializations of generic functions provided by
+// this package.
+type Handlers struct{}
+
+// ProcessWorker constructs a Processor function for running Worker
+// functions. Use in combination with Process and ProcessParallel, and
+// to build worker pools.
+//
+// The Handlers type serves to namespace these constructors, for
+// interface clarity purposes. Use the HF variable to access this
+// method as in:
+//
+//	fun.HF.ProcessWorker()
+func (Handlers) ProcessWorker() Processor[Worker] {
+	return func(ctx context.Context, wf Worker) error { return wf(ctx) }
+}
+
+// ProcessOperation constructs a Processor function for running Worker
+// functions. Use in combination with Process and ProcessParallel, and
+// to build worker pools.
+//
+// The Handlers type serves to namespace these constructors, for
+// interface clarity purposes. Use the HF variable to access this
+// method as in:
+//
+//	fun.HF.ProcessOperation()
+func (Handlers) ProcessOperation() Processor[Operation] {
+	return func(ctx context.Context, op Operation) error { return op.Safe()(ctx) }
+}
+
+func (Handlers) ErrorObserver(of Observer[error]) Observer[error] {
+	return of.Filter(func(err error) bool { return err != nil })
+}
 
 // Processor are generic functions that take an argument (and a
 // context) and return an error. They're the type of function used by
@@ -110,10 +144,10 @@ func (pf Processor[T]) When(c func() bool) Processor[T] {
 	}
 }
 
-// Chain wraps the processor and executes both the root processor and
+// Join wraps the processor and executes both the root processor and
 // then the next processor, assuming the root processor is not
 // canceled and the context has not expired.
-func (pf Processor[T]) Chain(next Processor[T]) Processor[T] {
+func (pf Processor[T]) Join(next Processor[T]) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		if err := pf(ctx, in); err != nil {
 			return err
@@ -213,6 +247,7 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }
+
 func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 	return pf.FilterErrors(ers.FilterRemove(errs...))
 }

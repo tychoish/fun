@@ -2,6 +2,8 @@ package fun
 
 import (
 	"context"
+	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 )
 
 func TestProcess(t *testing.T) {
+	t.Parallel()
 	t.Run("Risky", func(t *testing.T) {
 		called := 0
 		pf := BlockingProcessor(func(in int) error {
@@ -171,10 +174,68 @@ func TestProcess(t *testing.T) {
 		check.Equal(t, called, 0)
 		wf := pf.Future(ctx, 42)
 		check.Equal(t, called, 0)
-		check.Error(t, wf(ctx))
-		check.Equal(t, called, 1)
 		check.ErrorIs(t, wf(ctx), root)
 		check.Equal(t, called, 1)
 	})
+	t.Run("Lock", func(t *testing.T) {
+		t.Run("NilLockPanics", func(t *testing.T) {
+			ctx := testt.Context(t)
+			count := 0
+			op := Processor[int](func(_ context.Context, in int) error {
+				count++
+				check.Equal(t, in, 42)
+				return nil
+			})
+			check.Panic(t, func() { assert.NotError(t, op.WithLock(nil)(ctx, 42)) })
+			check.Equal(t, count, 0)
+		})
+		// the rest of the tests are really just "tempt the
+		// race detector"
+		t.Run("ManagedLock", func(t *testing.T) {
+			ctx := testt.Context(t)
+			count := 0
+			op := Processor[int](func(_ context.Context, in int) error {
+				count++
+				check.Equal(t, in, 42)
+				return nil
+			})
 
+			future := op.Worker(42).StartGroup(ctx, 128)
+			assert.NotError(t, future(ctx))
+			assert.Equal(t, count, 128)
+		})
+		t.Run("CustomLock", func(t *testing.T) {
+			ctx := testt.Context(t)
+			count := 0
+			op := Processor[int](func(_ context.Context, in int) error {
+				count++
+				check.Equal(t, in, 42)
+				return nil
+			})
+			mu := &sync.Mutex{}
+			wf := op.WithLock(mu).Worker(42).StartGroup(ctx, 128)
+			assert.NotError(t, wf(ctx))
+			assert.Equal(t, count, 128)
+		})
+	})
+	t.Run("WithoutErrors", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		count := 0
+		var err error
+		var pf Processor[int] = func(_ context.Context, in int) error { count++; assert.Equal(t, in, 42); return err }
+
+		err = ers.Error("hello")
+		pf = pf.WithoutErrors(io.EOF)
+		assert.Equal(t, count, 0)
+		assert.Error(t, pf(ctx, 42))
+		assert.Equal(t, count, 1)
+		err = io.EOF
+		assert.NotError(t, pf(ctx, 42))
+		assert.Equal(t, count, 2)
+		err = context.Canceled
+		assert.Error(t, pf(ctx, 42))
+		assert.Equal(t, count, 3)
+	})
 }

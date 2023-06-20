@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -80,6 +81,12 @@ func (pf Producer[T]) Worker(of Observer[T]) Worker {
 	return func(ctx context.Context) error { o, e := pf(ctx); of(o); return e }
 }
 
+// Operation produces a wait function, using two observers to handle the
+// output of the Producer.
+func (pf Producer[T]) Operation(of Observer[T], eo Observer[error]) Operation {
+	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
+}
+
 // Safe returns a wrapped producer with a panic handler that converts
 // any panic to an error.
 func (pf Producer[T]) Safe() Producer[T] {
@@ -91,32 +98,35 @@ func (pf Producer[T]) Safe() Producer[T] {
 
 func (pf Producer[T]) Ignore(ctx context.Context) { _, _ = pf(ctx) }
 
-// Chain, on successive calls, runs the first producer until it
+// Join, on successive calls, runs the first producer until it
 // returns an io.EOF error, and then returns the results of the second
 // producer. If either producer returns another error (context
 // cancelation or otherwise,) those errors are returned.
 //
 // When the second function returns io.EOF, all successive calls will
 // return io.EOF.
-func (pf Producer[T]) Chain(next Producer[T]) Producer[T] {
+func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 	const (
 		runFirstFunc int64 = iota
 		firstFunctionErrored
 		runSecondFunc
 		secondFunctionErrored
+		eof
 	)
 
+	var zero T
 	var ferr error
 	var serr error
 	stage := &atomic.Int64{}
 	stage.Store(runFirstFunc)
 
 	return func(ctx context.Context) (out T, err error) {
+		fmt.Println(">>", stage.Load(), pf, next)
 		switch stage.Load() {
 		case secondFunctionErrored:
-			return out, serr
+			return zero, serr
 		case firstFunctionErrored:
-			return out, ferr
+			return zero, ferr
 		case runFirstFunc:
 
 		RETRY:
@@ -130,71 +140,36 @@ func (pf Producer[T]) Chain(next Producer[T]) Producer[T] {
 				case !errors.Is(err, io.EOF):
 					ferr = err
 					stage.Store(firstFunctionErrored)
-					return out, err
+					return zero, err
 				}
 				break RETRY
 			}
 			stage.Store(runSecondFunc)
 			fallthrough
 		case runSecondFunc:
-			out, err := next(ctx)
-			switch {
-			case err == nil:
-				return out, nil
-			case !errors.Is(err, io.EOF):
-				serr = err
-				stage.Store(secondFunctionErrored)
-				return out, err
-			default:
-				return out, err
-			}
-		default:
-			return out, io.EOF
-		}
-	}
-}
 
-func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
-	var (
-		firstExhausted  bool
-		secondExhausted bool
-		zero            T
-	)
-
-	// This producer is
-	return Producer[T](func(ctx context.Context) (value T, err error) {
-		switch {
-		case secondExhausted:
-			return zero, io.EOF
-		case !firstExhausted:
-
-		RETRY:
+		RETRY_SECOND:
 			for {
-				value, err = pf(ctx)
+				out, err = next(ctx)
 				switch {
 				case err == nil:
-					return value, nil
+					return out, nil
 				case errors.Is(err, ErrIteratorSkip):
-					continue RETRY
-				case errors.Is(err, io.EOF):
-					firstExhausted = true
-					break RETRY
+					continue RETRY_SECOND
+				case !errors.Is(err, io.EOF):
+					serr = err
+					stage.Store(secondFunctionErrored)
+					return zero, err
 				default:
-					firstExhausted = true
+					stage.Store(eof)
 					return zero, err
 				}
 			}
 
-			fallthrough
-		case firstExhausted:
-			if value, err = next(ctx); err != nil {
-				secondExhausted = true
-				return zero, err
-			}
+		default:
+			return out, io.EOF
 		}
-
-		return value, nil
-	}).Lock()
+	}
 }
 
 // Must runs the producer returning the constructed value and panicing
@@ -209,16 +184,10 @@ func (pf Producer[T]) Block() (T, error) { return pf(context.Background()) }
 // error.
 func (pf Producer[T]) Force() T { return Must(pf.Block()) }
 
-// Operation produces a wait function, using two observers to handle the
-// output of the Producer.
-func (pf Producer[T]) Operation(of Observer[T], eo Observer[error]) Operation {
-	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
-}
-
 // Check uses the error observer to consume the error from the
 // Producer and returns a function that takes a context and returns a value.
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
-func (pf Producer[T]) ForceCheck() (T, bool)               { return pf.Check(context.Background()) }
+func (pf Producer[T]) CheckBlock() (T, bool)               { return pf.Check(context.Background()) }
 
 // Future runs the producer in the background, when function is
 // called, and returns a producer which, when called, blocks until the
@@ -377,10 +346,10 @@ func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 	}
 }
 
-func (pf Producer[T]) PreHook(op func(context.Context)) Producer[T] {
+func (pf Producer[T]) PreHook(op Operation) Producer[T] {
 	return func(ctx context.Context) (T, error) { op(ctx); return pf(ctx) }
-
 }
+
 func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)

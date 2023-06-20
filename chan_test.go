@@ -87,7 +87,7 @@ func TestChannel(t *testing.T) {
 					ch := make(chan int)
 
 					err := NonBlocking(ch).Send().Write(ctx, 3)
-					assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+					assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 					close(ch)
 					out, ok := <-ch
 					assert.True(t, !ok)
@@ -161,7 +161,7 @@ func TestChannel(t *testing.T) {
 					assert.True(t, Blocking(ch).Receive().Drop(ctx))
 					// do this to verify if it the channel is now empty
 					_, err = NonBlocking(ch).Receive().Read(ctx)
-					assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+					assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 
 					ch <- "deleuze"
 					val = Blocking(ch).Receive().Force(ctx)
@@ -182,7 +182,7 @@ func TestChannel(t *testing.T) {
 				assert.True(t, !NonBlocking(ch).Receive().Drop(ctx))
 				val, err := NonBlocking(ch).Receive().Read(ctx)
 				assert.Zero(t, val)
-				assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+				assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 			})
 			t.Run("Invalid", func(t *testing.T) {
 				op := ChanOp[string]{mode: 0, ch: make(chan string)}
@@ -225,7 +225,7 @@ func TestChannel(t *testing.T) {
 					ch := make(chan int)
 
 					err := NonBlockingSend(ch).Write(ctx, 3)
-					assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+					assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 					close(ch)
 					out, ok := <-ch
 					assert.True(t, !ok)
@@ -298,7 +298,7 @@ func TestChannel(t *testing.T) {
 				assert.True(t, BlockingReceive(ch).Drop(ctx))
 				// do this to verify if it the channel is now empty
 				_, err = NonBlockingReceive(ch).Read(ctx)
-				assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+				assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 
 				ch <- "deleuze"
 				val = BlockingReceive(ch).Force(ctx)
@@ -311,7 +311,7 @@ func TestChannel(t *testing.T) {
 				assert.True(t, !NonBlockingReceive(ch).Drop(ctx))
 				val, err := NonBlockingReceive(ch).Read(ctx)
 				assert.Zero(t, val)
-				assert.ErrorIs(t, err, ErrSkippedNonBlockingChannelOperation)
+				assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 			})
 			t.Run("Invalid", func(t *testing.T) {
 				op := ChanOp[string]{mode: 0, ch: make(chan string)}

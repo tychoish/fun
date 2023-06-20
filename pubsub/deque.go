@@ -2,13 +2,13 @@ package pubsub
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -43,10 +43,6 @@ type DequeOptions struct {
 	QueueOptions *QueueOptions
 }
 
-// ErrConfigurationError is the returned by the queue and deque
-// constructors if their configurations are malformed.
-var ErrConfigurationMalformed = errors.New("configuration error")
-
 // Validate ensures that the options are consistent. Exported as a
 // convenience function. All errors have ErrConfigurationMalformed as
 // their root.
@@ -62,12 +58,12 @@ func (opts *DequeOptions) Validate() error {
 	}
 
 	if opts.Capacity > 0 && opts.QueueOptions != nil {
-		return fmt.Errorf("cannot specify a capcity with queue options: %w", ErrConfigurationMalformed)
+		return fmt.Errorf("cannot specify a capcity with queue options: %w", ers.ErrMalformedConfiguration)
 	}
 
 	// positive capcity and another valid configuration
 	if opts.Unlimited {
-		return fmt.Errorf("cannot specify unlimited with another configuration: %w", ErrConfigurationMalformed)
+		return fmt.Errorf("cannot specify unlimited with another configuration: %w", ers.ErrMalformedConfiguration)
 	}
 	return nil
 }

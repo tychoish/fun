@@ -84,7 +84,7 @@ func TestObserver(t *testing.T) {
 			count++
 		}
 
-		cob := ob.Chain(ob)
+		cob := ob.Join(ob)
 		cob(100)
 
 		assert.Equal(t, 2, count)
@@ -126,11 +126,10 @@ func TestObserver(t *testing.T) {
 		off(4200)
 
 		check.Equal(t, count, 2)
-
 	})
 	t.Run("Error", func(t *testing.T) {
 		called := 0
-		oef := ErrorObserver(func(err error) { called++ })
+		oef := HF.ErrorObserver(func(err error) { called++ })
 		oef(nil)
 		check.Equal(t, called, 0)
 		oef(io.EOF)

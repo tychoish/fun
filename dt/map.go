@@ -4,7 +4,12 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 )
+
+// ErrUninitializedContainer is the content of the panic produced when you
+// attempt to perform an operation on an uninitialized sequence.
+const ErrUninitializedContainer = ers.Error("uninitialized container")
 
 // Map is just a generic type wrapper around a map, mostly for the
 // purpose of being able to interact with Pair[K,V] objects and

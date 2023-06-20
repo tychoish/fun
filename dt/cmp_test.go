@@ -157,12 +157,12 @@ func TestSort(t *testing.T) {
 			if err == nil {
 				t.Fatal("should have gotten failure")
 			}
-			if !errors.Is(err, ErrUninitialized) {
+			if !errors.Is(err, ErrUninitializedContainer) {
 				t.Error(err)
 			}
 
 			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
-			assert.ErrorIs(t, err, ErrUninitialized)
+			assert.ErrorIs(t, err, ErrUninitializedContainer)
 		})
 		t.Run("IteratorConstructor", func(t *testing.T) {
 			iter := Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()

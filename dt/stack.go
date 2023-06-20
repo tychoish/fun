@@ -251,7 +251,7 @@ func (s *Stack[T]) UnmarshalJSON(in []byte) error {
 
 func (s *Stack[T]) lazyInit() {
 	if s == nil {
-		panic(ErrUninitialized)
+		panic(ErrUninitializedContainer)
 	}
 
 	if s.head == nil {
