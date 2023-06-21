@@ -290,5 +290,4 @@ func JSON[T any](in io.Reader) *fun.Iterator[T] {
 		}
 		return out, err
 	}))
-
 }
