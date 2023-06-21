@@ -184,8 +184,9 @@ func TestIterator(t *testing.T) {
 				fmt.Sprint(2),
 			})
 			calls := 0
-
-			out := Transform[string](input, func(in string) (int, error) { calls++; return strconv.Atoi(in) })
+			out := ConvertIterator(input,
+				ConverterErr(func(in string) (int, error) { calls++; return strconv.Atoi(in) }),
+			)
 			sum := 0
 			for out.Next(ctx) {
 				sum += out.Value()
@@ -203,13 +204,13 @@ func TestIterator(t *testing.T) {
 			})
 			calls := 0
 
-			out := Transform[string](input, func(in string) (int, error) {
+			out := ConvertIterator(input, ConverterErr(func(in string) (int, error) {
 				if in == "2" {
 					return 0, ErrIteratorSkip
 				}
 				calls++
 				return strconv.Atoi(in)
-			})
+			}))
 			sum := 0
 			for out.Next(ctx) {
 				sum += out.Value()
@@ -227,13 +228,13 @@ func TestIterator(t *testing.T) {
 			})
 			calls := 0
 
-			out := Transform[string](input, func(in string) (int, error) {
+			out := ConvertIterator(input, ConverterErr(func(in string) (int, error) {
 				if in == "20" {
 					return 0, ers.ErrInvalidInput
 				}
 				calls++
 				return strconv.Atoi(in)
-			})
+			}))
 			sum := 0
 			for out.Next(ctx) {
 				sum += out.Value()

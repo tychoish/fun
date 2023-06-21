@@ -98,9 +98,9 @@ func TestWrap(t *testing.T) {
 		assert.True(t, IsZero(time.Time{}))
 	})
 	t.Run("IsOk", func(t *testing.T) {
-		assert.True(t, IsOk(100, true))
-		assert.True(t, !IsOk(100, false))
-		assert.True(t, IsOk(func() (int, bool) { return 100, true }()))
+		assert.True(t, IsOK(100, true))
+		assert.True(t, !IsOK(100, false))
+		assert.True(t, IsOK(func() (int, bool) { return 100, true }()))
 	})
 	t.Run("SafeCall", func(t *testing.T) {
 		count := 0

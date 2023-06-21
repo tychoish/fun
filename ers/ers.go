@@ -39,10 +39,10 @@ func Wrapf(err error, tmpl string, args ...any) error {
 // canceled contexts and ones which have exceeded their deadlines.
 func ContextExpired(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
 
-// Ok returns true when the error is nil, and false otherwise. It
+// OK returns true when the error is nil, and false otherwise. It
 // should always be inlined, and mostly exists for clarity at call
-// sites in bool/Ok check relevant contexts.
-func Ok(err error) bool { return err == nil }
+// sites in bool/OK check relevant contexts.
+func OK(err error) bool { return err == nil }
 
 // IsTerminating returns true if the error is one of the sentinel
 // errors used by fun (and other packages!) to indicate that

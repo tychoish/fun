@@ -7,7 +7,7 @@ type Filter func(error) error
 // Filter takes an error and returns nil if the error is nil, or if
 // the error (or one of its wrapped errors,) is in the exclusion list.
 func FilterRemove(exclusions ...error) Filter {
-	return FilterCheck(func(err error) bool { return Ok(err) || len(exclusions) == 0 || Is(err, exclusions...) })
+	return FilterCheck(func(err error) bool { return OK(err) || len(exclusions) == 0 || Is(err, exclusions...) })
 }
 
 // FilterCheck is an error filter that returns nil when the check is
@@ -23,7 +23,7 @@ func FilterCheck(ep func(error) bool) Filter {
 
 func FilterConvert(output error) Filter {
 	return func(err error) error {
-		if Ok(err) {
+		if OK(err) {
 			return nil
 		}
 		return output

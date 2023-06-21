@@ -128,7 +128,7 @@ func TestMapReduce(t *testing.T) {
 		wg := &WaitGroup{}
 		pipe <- t.Name()
 
-		var mf mapper[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
+		var mf Transform[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
 		mf.Safe().Processor(Blocking(output).Send().Write, &WorkerGroupOptions{}).
 			ReadAll(Blocking(pipe).Receive().Producer()).
 			Ignore().
@@ -530,6 +530,7 @@ func RunIteratorImplementationTests[T comparable](
 							if err == nil {
 								t.Error("expected error")
 							}
+
 							check.ErrorIs(t, err, ErrRecoveredPanic)
 							testt.Log(t, len(out), ":", out)
 							if len(out) != 0 {

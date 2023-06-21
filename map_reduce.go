@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -26,7 +27,49 @@ import (
 // not set.
 func Map[T any, O any](
 	input *Iterator[T],
-	mapFn func(context.Context, T) (O, error),
+	mpf Transform[T, O],
+	optp ...OptionProvider[*WorkerGroupOptions],
+) *Iterator[O] {
+	return mpf.ParallelTransform(input, optp...)
+}
+
+type Transform[T any, O any] func(context.Context, T) (O, error)
+
+func Converter[T any, O any](op func(T) O) Transform[T, O] {
+	return func(_ context.Context, in T) (O, error) { return op(in), nil }
+}
+func ConverterOK[T any, O any](op func(T) (O, bool)) Transform[T, O] {
+	return func(ctx context.Context, in T) (out O, err error) {
+		var ok bool
+		out, ok = op(in)
+		if !ok {
+			err = ErrIteratorSkip
+		}
+
+		return
+	}
+}
+
+func ConverterErr[T any, O any](op func(T) (O, error)) Transform[T, O] {
+	return func(ctx context.Context, in T) (O, error) { return op(in) }
+}
+
+func MakeMaper[T any, O any](in Processor[T], out Producer[O]) Transform[T, O] {
+	var zero O
+	return func(ctx context.Context, val T) (O, error) {
+		if err := in(ctx, val); err != nil {
+			return zero, err
+		}
+		return out(ctx)
+	}
+}
+
+func (mpf Transform[T, O]) Transform(iter *Iterator[T]) *Iterator[O] {
+	return mpf.Producer(iter).Iterator()
+}
+
+func (mpf Transform[T, O]) ParallelTransform(
+	iter *Iterator[T],
 	optp ...OptionProvider[*WorkerGroupOptions],
 ) *Iterator[O] {
 	output := Blocking(make(chan O))
@@ -40,9 +83,8 @@ func Map[T any, O any](
 	init := Operation(func(ctx context.Context) {
 		wctx, wcancel := context.WithCancel(ctx)
 		wg := &WaitGroup{}
-		mf := mapper[T, O](mapFn).Safe()
-
-		splits := input.Split(opts.NumWorkers)
+		mf := mpf.Safe()
+		splits := iter.Split(opts.NumWorkers)
 		for idx := range splits {
 			// for each split, run a mapWorker
 
@@ -59,30 +101,112 @@ func Map[T any, O any](
 		wg.Operation().PostHook(wcancel).PostHook(output.Close).Go(ctx)
 	}).Once()
 
-	outputIter := output.Receive().Producer().PreHook(init).Iterator()
+	outputIter := output.Producer().PreHook(init).Iterator()
 	err := ApplyOptions(opts, optp...)
 	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })
 
 	outputIter.AddError(err)
 	ft.WhenCall(err != nil, output.Close)
-
 	return outputIter
 }
 
-type mapper[T any, O any] func(context.Context, T) (O, error)
+func (mpf Transform[T, O]) Producer(iter *Iterator[T]) Producer[O] {
+	var zero O
+	return Producer[O](func(ctx context.Context) (out O, _ error) {
+		for {
+			if item, err := iter.ReadOne(ctx); err == nil {
+				if out, err = mpf(ctx, item); err == nil {
+					return out, nil
+				} else if errors.Is(err, ErrIteratorSkip) {
+					continue
+				}
 
-func (mf mapper[T, O]) Safe() mapper[T, O] {
+				return zero, err
+			} else if !errors.Is(err, ErrIteratorSkip) {
+				return zero, err
+			}
+		}
+	})
+}
+
+func (mpf Transform[T, O]) ProducerPipe(input Producer[T]) Producer[O] {
+	var zero O
+	return func(ctx context.Context) (O, error) {
+		mid, err := input(ctx)
+		if err != nil {
+			return zero, err
+		}
+		return mpf(ctx, mid)
+	}
+}
+
+func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O]) {
+	pipe := Blocking(make(chan T, 1))
+	prod := pipe.Producer()
+	var zero O
+	return pipe.Processor(), func(ctx context.Context) (O, error) {
+		middle, err := prod(ctx)
+		if err != nil {
+			return zero, err
+		}
+		return mpf(ctx, middle)
+	}
+}
+
+func (mpf Transform[T, O]) Block() func(T) (O, error) {
+	return func(in T) (O, error) { return mpf(context.Background(), in) }
+}
+
+func (mpf Transform[T, O]) BlockCheck() func(T) (O, bool) {
+	mpfb := mpf.Block()
+	return func(in T) (O, bool) {
+		return ers.SafeOK(func() (O, error) { return mpfb(in) })
+	}
+}
+
+func (mpf Transform[T, O]) Lock() Transform[T, O] {
+	mu := &sync.Mutex{}
+	return mpf.WithLock(mu)
+}
+
+func (mpf Transform[T, O]) WithLock(mu *sync.Mutex) Transform[T, O] {
+	return func(ctx context.Context, val T) (O, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return mpf(ctx, val)
+	}
+}
+
+func (mpf Transform[T, O]) Run(input *Iterator[T]) *Iterator[O] {
+	return mpf.ProducerPipe(input.ReadOne).Iterator()
+}
+
+func (mpf Transform[T, O]) Worker(in Producer[T], out Processor[O]) Worker {
+	return func(ctx context.Context) error {
+		first, err := in(ctx)
+		if err != nil {
+			return err
+		}
+		second, err := mpf(ctx, first)
+		if err != nil {
+			return err
+		}
+		return out(ctx, second)
+	}
+}
+
+func (mf Transform[T, O]) Safe() Transform[T, O] {
 	return func(ctx context.Context, val T) (_ O, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return mf(ctx, val)
 	}
 }
 
-func (mf mapper[T, O]) Processor(
+func (mf Transform[T, O]) Processor(
 	output Processor[O],
 	opts *WorkerGroupOptions,
 ) Processor[T] {
-	return func(ctx context.Context, in T) error {
+	return Processor[T](func(ctx context.Context, in T) error {
 		val, err := mf(ctx, in)
 		if err != nil {
 			if opts.CanContinueOnError(err) {
@@ -96,35 +220,5 @@ func (mf mapper[T, O]) Processor(
 		}
 
 		return nil
-	}
-}
-
-func (i *Iterator[T]) Reduce(
-	reducer func(T, T) (T, error),
-	initalValue T,
-) Producer[T] {
-	var value T = initalValue
-	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
-
-		for {
-			item, err := i.ReadOne(ctx)
-			if err != nil {
-				return value, nil
-			}
-
-			out, err := reducer(item, value)
-			switch {
-			case err == nil:
-				value = out
-				continue
-			case errors.Is(err, ErrIteratorSkip):
-				continue
-			case errors.Is(err, io.EOF):
-				return value, nil
-			default:
-				return value, err
-			}
-		}
-	}
+	})
 }

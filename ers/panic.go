@@ -35,3 +35,6 @@ func Safe[T any](fn func() T) (out T, err error) {
 	out = fn()
 	return
 }
+
+// SafeOK
+func SafeOK[T any](fn func() (T, error)) (T, bool) { out, err := fn(); return out, OK(err) }

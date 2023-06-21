@@ -346,10 +346,24 @@ func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 	}
 }
 
+// PreHook configures an operation function to run before the returned
+// producer. If the pre-hook panics, it is converted to an error which
+// is aggregated with the (potential) error from the producer, and
+// returned with the producer's output.
 func (pf Producer[T]) PreHook(op Operation) Producer[T] {
-	return func(ctx context.Context) (T, error) { op(ctx); return pf(ctx) }
+	return func(ctx context.Context) (out T, err error) {
+		e := ers.Check(func() { op(ctx) })
+		out, err = pf(ctx)
+		return out, ers.Join(err, e)
+	}
 }
 
+// PostHook appends a function to the execution of the producer. If
+// the function panics it is converted to an error and aggregated with
+// the error of the producer.
+//
+// Useful for calling context.CancelFunc, closers, or incrementing
+// counters as neccessary.
 func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
@@ -358,10 +372,16 @@ func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	}
 }
 
+// WithoutErrors returns a Producer function that wraps the root
+// producer and, after running the root producer, and makes the error
+// value of the producer nil if the error returned is in the error
+// list. The produced value in these cases is almost always the zero
+// value for the type.
 func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
 	return pf.FilterErrors(ers.FilterRemove(errs...))
 }
 
+// FilterErrors passes the error of the root Producer function
 func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
 }

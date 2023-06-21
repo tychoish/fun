@@ -18,6 +18,27 @@ type Slice[T any] []T
 func Sliceify[T any](in []T) Slice[T]  { return in }
 func Variadic[T any](in ...T) Slice[T] { return in }
 
+func Transform[T any, O any](in Slice[T], op func(in T) (O, error)) (Slice[O], error) {
+	out := make([]O, 0, len(in))
+
+LOOP:
+	for idx := range in {
+		n, err := op(in[idx])
+		switch {
+		case err == nil:
+			out = append(out, n)
+		case errors.Is(err, fun.ErrIteratorSkip):
+			continue LOOP
+		case errors.Is(err, io.EOF):
+			break LOOP
+		default:
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
 // Iterator returns an iterator to the items of the slice the range
 // keyword also works for these slices.
 func (s Slice[T]) Iterator() *fun.Iterator[T] { return fun.SliceIterator(s) }

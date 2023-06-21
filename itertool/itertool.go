@@ -283,12 +283,12 @@ func Lines(in io.Reader) *fun.Iterator[string] {
 // documents into objects in the form of an iterator.
 func JSON[T any](in io.Reader) *fun.Iterator[T] {
 	var zero T
-	return fun.Transform[string, T](Lines(in), func(in string) (out T, err error) {
+	return fun.ConvertIterator(Lines(in), fun.ConverterErr(func(in string) (out T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err
 		}
 		return out, err
-	})
+	}))
 
 }

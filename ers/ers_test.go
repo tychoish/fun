@@ -31,9 +31,9 @@ func TestErrors(t *testing.T) {
 	})
 	t.Run("Ok", func(t *testing.T) {
 		var err error
-		check.True(t, Ok(err))
+		check.True(t, OK(err))
 		err = errors.New("hi")
-		check.True(t, !Ok(err))
+		check.True(t, !OK(err))
 	})
 	t.Run("Filter", func(t *testing.T) {
 		err := Join(Error("beep"), context.Canceled)

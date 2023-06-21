@@ -99,6 +99,14 @@ func SliceIterator[T any](in []T) *Iterator[T] {
 	}).Iterator()
 }
 
+// ConvertIterator processes the input iterator of type T into an
+// output iterator of type O. It's implementation uses the Generator,
+// will continue producing values as long as the input iterator
+// produces values, the context isn't canceled, or exhausted.
+func ConvertIterator[T, O any](iter *Iterator[T], op Transform[T, O]) *Iterator[O] {
+	return op.Transform(iter)
+}
+
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
 
@@ -199,30 +207,37 @@ func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
 // type and converts it to an iterator of any (e.g. interface{})
 // values.
 func (i *Iterator[T]) Any() *Iterator[any] {
-	return Transform(i, func(in T) (any, error) { return any(in), nil })
+	return Converter(func(in T) any { return any(in) }).Transform(i)
 }
 
-// Transform processes the input iterator of type I into an output
-// iterator of type O. It's implementation uses the Generator, will
-// continue producing values as long as the input iterator produces
-// values, the context isn't canceled, or
-func Transform[I, O any](iter *Iterator[I], op func(in I) (O, error)) *Iterator[O] {
-	var zero O
-	return Producer[O](func(ctx context.Context) (out O, _ error) {
-		for {
-			if item, err := iter.ReadOne(ctx); err == nil {
-				if out, err = op(item); err == nil {
-					return out, nil
-				} else if errors.Is(err, ErrIteratorSkip) {
-					continue
-				}
+func (i *Iterator[T]) Reduce(
+	reducer func(T, T) (T, error),
+	initalValue T,
+) Producer[T] {
+	var value T = initalValue
+	return func(ctx context.Context) (_ T, err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
-				return zero, err
-			} else if !errors.Is(err, ErrIteratorSkip) {
-				return zero, err
+		for {
+			item, err := i.ReadOne(ctx)
+			if err != nil {
+				return value, nil
+			}
+
+			out, err := reducer(item, value)
+			switch {
+			case err == nil:
+				value = out
+				continue
+			case errors.Is(err, ErrIteratorSkip):
+				continue
+			case errors.Is(err, io.EOF):
+				return value, nil
+			default:
+				return value, err
 			}
 		}
-	}).Iterator()
+	}
 }
 
 // Count returns the number of items observed by the iterator. Callers
@@ -231,7 +246,7 @@ func (i *Iterator[T]) Count(ctx context.Context) int {
 	proc := i.Producer()
 	var count int
 	for {
-		if !ft.IsOk(proc.Check(ctx)) {
+		if !ft.IsOK(proc.Check(ctx)) {
 			break
 		}
 

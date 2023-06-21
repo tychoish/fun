@@ -80,7 +80,7 @@ func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
-func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOk(ro.Producer().Check(ctx)) }
+func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOK(ro.Producer().Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
 func (ro ChanReceive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx) }

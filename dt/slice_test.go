@@ -2,10 +2,12 @@ package dt
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"testing"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
@@ -279,5 +281,52 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, next.Len(), 2)
 		check.Equal(t, next[0], 40)
 		check.Equal(t, next[1], 42)
+	})
+	t.Run("Transform", func(t *testing.T) {
+		t.Run("ContinueEarlEnd", func(t *testing.T) {
+			count := 0
+			out, err := Transform(randomIntSlice(100),
+				func(in int) (string, error) {
+					count++
+					if count >= 50 {
+						return "", io.EOF
+					}
+					if count%2 == 0 {
+						return "", fun.ErrIteratorSkip
+					}
+					return fmt.Sprint(in), nil
+				})
+			check.NotError(t, err)
+			check.Equal(t, count, 50)
+			check.Equal(t, len(out), 25)
+			check.Equal(t, cap(out), 100)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			out, err := Transform(randomIntSlice(100),
+				func(in int) (string, error) {
+					count++
+					return fmt.Sprint(in), nil
+				})
+			check.NotError(t, err)
+			check.Equal(t, count, 100)
+			check.Equal(t, len(out), 100)
+			check.Equal(t, cap(out), 100)
+		})
+		t.Run("EarlyError", func(t *testing.T) {
+			count := 0
+			out, err := Transform(randomIntSlice(100),
+				func(in int) (string, error) {
+					if count < 10 {
+						count++
+						return fmt.Sprint(in), nil
+					}
+					return "", ers.ErrInvalidInput
+				})
+			check.Error(t, err)
+			check.ErrorIs(t, err, ers.ErrInvalidInput)
+			check.Equal(t, count, 10)
+			check.True(t, out == nil)
+		})
 	})
 }

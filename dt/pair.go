@@ -38,13 +38,13 @@ func (p Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return Sliceify(p).I
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
 func (p Pairs[K, V]) Keys() *fun.Iterator[K] {
-	return fun.Transform(p.Iterator(), func(p Pair[K, V]) (K, error) { return p.Key, nil })
+	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Transform(p.Iterator())
 }
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
 func (p Pairs[K, V]) Values() *fun.Iterator[V] {
-	return fun.Transform(p.Iterator(), func(p Pair[K, V]) (V, error) { return p.Value, nil })
+	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Transform(p.Iterator())
 }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
@@ -119,7 +119,7 @@ func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]
 // ConsumeValues adds all of the values in the input iterator,
 // generating the keys using the function provided.
 func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) error {
-	return p.Consume(ctx, fun.Transform(iter, func(in V) (Pair[K, V], error) { return MakePair(keyf(in), in), nil }))
+	return p.Consume(ctx, fun.Converter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Transform(iter))
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.
@@ -130,10 +130,7 @@ func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
 // ConsumeSlice adds all the values in the input slice to the Pairs
 // object, creating the keys using the function provide.
 func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
-	for idx := range in {
-		value := in[idx]
-		p.Add(keyf(value), value)
-	}
+	Sliceify(in).Observe(func(value V) { p.Add(keyf(value), value) })
 }
 
 // Map converts a list of pairs to the equivalent map. If there are
