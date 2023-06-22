@@ -89,4 +89,26 @@ func TestErrors(t *testing.T) {
 			assert.Equal(t, io.EOF, root)
 		})
 	})
+	t.Run("InvariantViolation", func(t *testing.T) {
+		assert.True(t, IsInvariantViolation(ErrInvariantViolation))
+		assert.True(t, IsInvariantViolation(Join(io.EOF, Error("hello"), ErrInvariantViolation)))
+		assert.True(t, !IsInvariantViolation(nil))
+		assert.True(t, !IsInvariantViolation(9001))
+		assert.True(t, !IsInvariantViolation(io.EOF))
+	})
+	t.Run("Wrapped", func(t *testing.T) {
+		err := errors.New("base")
+		for i := 0; i < 100; i++ {
+			err = fmt.Errorf("wrap %d: %w", i, err)
+		}
+
+		errs := Unwind(err)
+		if len(errs) != 101 {
+			t.Error(len(errs))
+		}
+		if errs[100].Error() != "base" {
+			t.Error(errs[100])
+		}
+		check.Equal(t, 101, len(Unwind(err)))
+	})
 }

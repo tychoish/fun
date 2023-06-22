@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -350,9 +351,38 @@ func TestOperation(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op) })
 
-			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessOperation(), NumWorkers(4))
+			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessOperation(), WorkerGroupConfNumWorkers(4))
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
+		})
+	})
+	t.Run("Signal", func(t *testing.T) {
+		count := &atomic.Int64{}
+		op := Operation(func(context.Context) {
+			time.Sleep(10 * time.Millisecond)
+			count.Add(1)
+		})
+		ctx := testt.Context(t)
+		sig := op.Signal(ctx)
+		check.Equal(t, count.Load(), 0)
+		<-sig
+		check.Equal(t, count.Load(), 1)
+	})
+	t.Run("Future", func(t *testing.T) {
+		count := &atomic.Int64{}
+		op := Operation(func(context.Context) {
+			time.Sleep(10 * time.Millisecond)
+			count.Add(1)
+		})
+		ctx := testt.Context(t)
+		opwait := op.Future(ctx)
+		check.Equal(t, count.Load(), 0)
+		time.Sleep(12 * time.Millisecond)
+		runtime.Gosched()
+		time.Sleep(12 * time.Millisecond)
+		check.Equal(t, count.Load(), 1)
+		check.MaxRuntime(t, 5*time.Millisecond, func() {
+			opwait(ctx)
 		})
 	})
 }

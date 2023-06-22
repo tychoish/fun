@@ -40,7 +40,7 @@ func (wg *WaitGroup) Add(num int) {
 	defer wg.mu.Unlock()
 	wg.init()
 
-	Invariant(wg.counter+num >= 0, "cannot decrement waitgroup to less than 0: ", wg.counter, " + ", num)
+	Invariant.IsTrue(wg.counter+num >= 0, "cannot decrement waitgroup to less than 0: ", wg.counter, " + ", num)
 
 	wg.counter += num
 

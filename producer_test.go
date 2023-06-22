@@ -2,7 +2,6 @@ package fun
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -211,7 +210,7 @@ func TestProducer(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op.Background(ctx, obv)) })
 
-			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessWorker(), NumWorkers(4))
+			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessWorker(), WorkerGroupConfNumWorkers(4))
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 			check.Equal(t, obct, 128)
@@ -393,7 +392,6 @@ func producerContinuesOnce[T any](out T, counter *atomic.Int64) Producer[T] {
 		once.Do(func() {
 			out = zero
 			err = ErrIteratorSkip
-			fmt.Println("pow")
 		})
 		if counter.Add(1) > 2 {
 			return zero, io.EOF

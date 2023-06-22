@@ -69,4 +69,16 @@ func TestPanics(t *testing.T) {
 			}
 		})
 	})
+	t.Run("SafeOK", func(t *testing.T) {
+		t.Run("Not", func(t *testing.T) {
+			num, ok := SafeOK(func() (int, error) { return 42, io.EOF })
+			assert.True(t, !ok)
+			assert.Zero(t, num)
+		})
+		t.Run("Passes", func(t *testing.T) {
+			num, ok := SafeOK(func() (int, error) { return 42, nil })
+			assert.True(t, ok)
+			assert.Equal(t, 42, num)
+		})
+	})
 }

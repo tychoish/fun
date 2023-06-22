@@ -182,7 +182,7 @@ func (wf Worker) Operation(ob Observer[error]) Operation {
 // Must converts a Worker function into a wait function; however,
 // if the worker produces an error Must converts the error into a
 // panic.
-func (wf Worker) Must() Operation { return func(ctx context.Context) { InvariantMust(wf(ctx)) } }
+func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant.Must(wf(ctx)) } }
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
@@ -300,7 +300,7 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 
 	return func(ctx context.Context) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant(wctx != nil, "must start the operation before calling cancel")
+		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
 		return wf(wctx)
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }

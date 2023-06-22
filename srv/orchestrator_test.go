@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -164,7 +165,7 @@ func TestOrchestrator(t *testing.T) {
 			if err == nil {
 				t.Fatal(err)
 			}
-			if errs := fun.Unwind(err); len(errs) != 100 {
+			if errs := ers.Unwind(err); len(errs) != 100 {
 				t.Error(100, len(errs))
 			}
 		})
@@ -203,7 +204,7 @@ func TestOrchestrator(t *testing.T) {
 			if err == nil {
 				t.Error("should have errors")
 			}
-			if errs := fun.Unwind(err); len(errs) != 100 {
+			if errs := ers.Unwind(err); len(errs) != 100 {
 				t.Error(100, len(errs))
 			}
 		})
@@ -256,7 +257,7 @@ func TestOrchestrator(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			errs := fun.Unwind(err)
+			errs := ers.Unwind(err)
 			if len(errs) != 200 {
 				t.Log(errs)
 				t.Error(len(errs))
@@ -357,7 +358,7 @@ func TestOrchestrator(t *testing.T) {
 			if err == nil {
 				t.Fatal("should have errors")
 			}
-			if errs := fun.Unwind(err); len(errs) != 100 {
+			if errs := ers.Unwind(err); len(errs) != 100 {
 				t.Fatal(len(errs), errs)
 			}
 		})
@@ -410,7 +411,7 @@ func TestOrchestrator(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			errs := fun.Unwind(err)
+			errs := ers.Unwind(err)
 			check.Equal(t, len(errs), 200)
 			testt.Log(t, errs)
 		})

@@ -3,7 +3,6 @@ package fun
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -121,7 +120,6 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 	stage.Store(runFirstFunc)
 
 	return func(ctx context.Context) (out T, err error) {
-		fmt.Println(">>", stage.Load(), pf, next)
 		switch stage.Load() {
 		case secondFunctionErrored:
 			return zero, serr
@@ -312,7 +310,7 @@ func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
 
 	return func(ctx context.Context) (out T, _ error) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant(wctx != nil, "must start the operation before calling cancel")
+		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
 		return pf(wctx)
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
@@ -393,9 +391,9 @@ func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
 // error/continue-on-panic semantics are available and share
 // configuration with the Map and Proces operations.
 func (pf Producer[T]) GenerateParallel(
-	optp ...OptionProvider[*WorkerGroupOptions],
+	optp ...OptionProvider[*WorkerGroupConf],
 ) *Iterator[T] {
-	opts := &WorkerGroupOptions{}
+	opts := &WorkerGroupConf{}
 	pipe := Blocking(make(chan T, opts.NumWorkers*2+1))
 
 	init := Operation(func(ctx context.Context) {
@@ -425,7 +423,7 @@ func (pf Producer[T]) GenerateParallel(
 	}).Once()
 
 	iter := pipe.Receive().Producer().PreHook(init).Iterator()
-	err := ApplyOptions(opts, optp...)
+	err := JoinOptionProviders(optp...).Apply(opts)
 	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = iter.ErrorObserver().Lock() })
 	opts.ErrorObserver(err)
 	ft.WhenCall(err != nil, pipe.Close)

@@ -495,8 +495,8 @@ func TestQueueIterator(t *testing.T) {
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
 
-			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
-			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant.IsTrue(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant.IsTrue(tt.BlockingAdd(ctx, 1) == nil)
 
 			canceled, trigger := context.WithCancel(context.Background())
 			trigger()
@@ -514,8 +514,8 @@ func TestQueueIterator(t *testing.T) {
 			defer cancel()
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
-			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
-			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant.IsTrue(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant.IsTrue(tt.BlockingAdd(ctx, 1) == nil)
 
 			if err := tt.Close(); err != nil {
 				t.Fatal(err)
@@ -535,8 +535,8 @@ func TestQueueIterator(t *testing.T) {
 			defer cancel()
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
-			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
-			fun.Invariant(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant.IsTrue(tt.BlockingAdd(ctx, 1) == nil)
+			fun.Invariant.IsTrue(tt.BlockingAdd(ctx, 1) == nil)
 			start := time.Now()
 			sig := make(chan struct{})
 			var end time.Time

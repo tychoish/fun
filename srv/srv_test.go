@@ -3,10 +3,15 @@ package srv
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -99,4 +104,43 @@ func testCheckOrderingEffects(t *testing.T, s *Service) {
 			return nil
 		}
 	}
+}
+
+func makeIterator(size int) *fun.Iterator[int] {
+	slice := make([]int, size)
+	for i := 0; i < size; i++ {
+		slice[i] = rand.Intn(size)
+	}
+	return fun.SliceIterator(slice)
+}
+
+func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {
+	t.Helper()
+	queue := pubsub.NewUnlimitedQueue[fun.Worker]()
+
+	for i := 0; i < size; i++ {
+		assert.NotError(t, queue.Add(func(ctx context.Context) error {
+			time.Sleep(2 * time.Millisecond)
+			count.Add(1)
+			return nil
+		}))
+	}
+	queue.Close()
+	return queue
+}
+
+func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {
+	t.Helper()
+	queue := pubsub.NewUnlimitedQueue[fun.Worker]()
+
+	for i := 0; i < size; i++ {
+		idx := i
+		assert.NotError(t, queue.Add(func(ctx context.Context) error {
+			time.Sleep(2 * time.Millisecond)
+			count.Add(1)
+			return fmt.Errorf("%d.%q", idx, t.Name())
+		}))
+	}
+	queue.Close()
+	return queue
 }

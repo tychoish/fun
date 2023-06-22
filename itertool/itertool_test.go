@@ -46,7 +46,7 @@ func TestSmoke(t *testing.T) {
 				return rv + int16(out), nil
 			},
 			0,
-			fun.NumWorkers(2),
+			fun.WorkerGroupConfNumWorkers(2),
 		)
 		ctx := testt.Context(t)
 

@@ -39,7 +39,7 @@ func Group(services *fun.Iterator[*Service]) *Service {
 				go func(s *Service) {
 					defer erc.Recover(ec)
 					defer wg.Done()
-					defer func() { fun.Invariant(waiters.Add(s.Wait) == nil) }()
+					defer func() { fun.Invariant.IsTrue(waiters.Add(s.Wait) == nil) }()
 					ec.Add(s.Start(ctx))
 				}(services.Value())
 			}
@@ -153,7 +153,7 @@ func Wait(iter *fun.Iterator[fun.Operation]) *Service {
 func ProcessIterator[T any](
 	iter *fun.Iterator[T],
 	processor fun.Processor[T],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
@@ -202,9 +202,9 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 					ec.Add(wf.Safe()(ctx))
 					return nil
 				},
-				fun.ContinueOnError(),
-				fun.ContinueOnPanic(),
-				fun.WorkerPerCPU(),
+				fun.WorkerGroupConfContinueOnError(),
+				fun.WorkerGroupConfContinueOnPanic(),
+				fun.WorkerGroupConfWorkerPerCPU(),
 			))
 
 			return ec.Resolve()
@@ -217,7 +217,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupOptions]) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
@@ -249,7 +249,7 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 func ObserverWorkerPool(
 	workQueue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {
@@ -288,7 +288,7 @@ func Broker[T any](broker *pubsub.Broker[T]) *Service {
 // until the underlying command has returned, potentially blocking
 // until the command returns.
 func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
-	fun.Invariant(c != nil, "exec.Cmd must be non-nil")
+	fun.Invariant.IsTrue(c != nil, "exec.Cmd must be non-nil")
 
 	started := make(chan struct{})
 	wg := &fun.WaitGroup{}

@@ -60,7 +60,8 @@ func DoTimes(n int, op func()) {
 }
 
 // SafeCall only calls the operation when it's non-nil.
-func SafeCall(op func()) { WhenCall(op != nil, op) }
+func SafeCall(op func())          { WhenCall(op != nil, op) }
+func SafeDo[T any](op func() T) T { return WhenDo(op != nil, op) }
 
 // SafeWrap wraps an operation with SafeCall so that the resulting
 // operation is never nil, and will never panic if the input operation

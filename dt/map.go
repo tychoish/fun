@@ -106,7 +106,7 @@ func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 // Consume adds items to the map from an iterator of Pair
 // objects. Existing values for K are always overwritten.
 func (m Map[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) {
-	fun.InvariantMust(iter.Observe(ctx, func(in Pair[K, V]) { m.AddPair(in) }))
+	fun.Invariant.Must(iter.Observe(ctx, func(in Pair[K, V]) { m.AddPair(in) }))
 }
 
 // ConsumeValues adds items to the map, using the function to generate
@@ -115,7 +115,7 @@ func (m Map[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) 
 // This operation will panic (with an ErrInvariantValidation) if the
 // keyf panics.
 func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) {
-	fun.InvariantMust(iter.Observe(ctx, func(in V) { m[keyf(in)] = in }))
+	fun.Invariant.Must(iter.Observe(ctx, func(in V) { m[keyf(in)] = in }))
 }
 
 // Iterator converts a map into an iterator of dt.Pair objects. The

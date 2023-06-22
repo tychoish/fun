@@ -5,9 +5,11 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -34,22 +36,22 @@ func TestPanics(t *testing.T) {
 	t.Run("Invariant", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
 			err := ers.Check(func() {
-				Invariant(1 == 2, "math is a construct")
+				Invariant.OK(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ErrInvariantViolation)
 			assert.ErrorIs(t, err, ErrRecoveredPanic)
-			assert.True(t, IsInvariantViolation(err))
+			assert.True(t, ers.IsInvariantViolation(err))
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ers.Check(func() { Invariant(false, err) })
+			se := ers.Check(func() { Invariant.IsTrue(false, err) })
 
 			assert.ErrorIs(t, se, err)
 		})
 		t.Run("ErrorPlus", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ers.Check(func() { Invariant(false, err, 42) })
+			se := ers.Check(func() { Invariant.OK(false, err, 42) })
 			if !errors.Is(se, err) {
 				t.Fatal(err, se)
 			}
@@ -58,13 +60,13 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("NoError", func(t *testing.T) {
-			err := ers.Check(func() { Invariant(false, 42) })
+			err := ers.Check(func() { Invariant.IsTrue(false, 42) })
 			if !strings.Contains(err.Error(), "42") {
 				t.Error(err)
 			}
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
-			err := ers.Check(func() { Invariant(1 == 2) })
+			err := ers.Check(func() { Invariant.IsTrue(1 == 2) })
 			if !errors.Is(err, ErrInvariantViolation) {
 				t.Fatal(err)
 			}
@@ -73,16 +75,16 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("CheckError", func(t *testing.T) {
-			if IsInvariantViolation(nil) {
+			if ers.IsInvariantViolation(nil) {
 				t.Error("nil error shouldn't read as invariant")
 			}
-			if IsInvariantViolation(errors.New("foo")) {
+			if ers.IsInvariantViolation(errors.New("foo")) {
 				t.Error("arbitrary errors are not invariants")
 			}
 		})
 		t.Run("LongInvariant", func(t *testing.T) {
 			err := ers.Check(func() {
-				Invariant(1 == 2,
+				Invariant.IsTrue(1 == 2,
 					"math is a construct",
 					"1 == 2",
 				)
@@ -98,21 +100,21 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("InvariantMust", func(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
-			err := ers.Check(func() { InvariantMust(nil, "hello") })
+			err := ers.Check(func() { Invariant.Must(nil, "hello") })
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 		t.Run("Expected", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ers.Check(func() { InvariantMust(root, "hello") })
+			err := ers.Check(func() { Invariant.Must(root, "hello") })
 			if err == nil {
 				t.Fatal("expected error")
 			}
 		})
 		t.Run("Panic", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ers.Check(func() { InvariantMust(root) })
+			err := ers.Check(func() { Invariant.Must(root) })
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -122,7 +124,7 @@ func TestPanics(t *testing.T) {
 		t.Run("Propogate", func(t *testing.T) {
 			root := errors.New("kip")
 			err := ers.Check(func() {
-				InvariantMust(root, "annotate")
+				Invariant.Must(root, "annotate")
 			})
 			if err == nil {
 				t.Fatal("expected error")
@@ -140,7 +142,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Nil", func(t *testing.T) {
 			err := ers.Check(func() {
-				InvariantMust(nil, "annotate")
+				Invariant.Must(nil, "annotate")
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -155,6 +157,18 @@ func TestPanics(t *testing.T) {
 		assert.Panic(t, func() {
 			foo := MustBeOk(func() (string, bool) { return "foo", false }())
 			assert.Equal(t, "foo", foo)
+		})
+	})
+	t.Run("Sugar", func(t *testing.T) {
+		t.Run("IsFalse", func(t *testing.T) {
+			assert.Panic(t, func() { Invariant.IsFalse(true, "can't be false") })
+			assert.Panic(t, func() { Invariant.IsFalse(true, "can't be false") })
+			assert.Panic(t, func() { Invariant.IsFalse(true, "can't be false") })
+			assert.Panic(t, func() { Invariant.IsFalse(ft.Ptr(3) != ft.Ptr(5), "can't be false") })
+			assert.Panic(t, func() { Invariant.IsFalse(&time.Time{} != ft.Ptr(time.Now()), "can't be false") })
+			assert.NotPanic(t, func() { Invariant.IsFalse(true == false, "can't be false") })
+			assert.NotPanic(t, func() { Invariant.IsFalse(false, "can't be false") })
+			assert.NotPanic(t, func() { Invariant.IsFalse(!true, "can't be false") })
 		})
 	})
 	t.Run("Observer", func(t *testing.T) {
@@ -204,5 +218,6 @@ func TestPanics(t *testing.T) {
 			assert.Panic(t, func() { of.Operation("hi")(ctx) })
 			assert.True(t, called)
 		})
+
 	})
 }

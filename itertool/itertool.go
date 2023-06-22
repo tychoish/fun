@@ -26,7 +26,7 @@ func Process[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) error {
 	return ParallelForEach(ctx, iter, fn, optp...)
 }
@@ -54,7 +54,7 @@ var _ interface{ Safe() fun.Worker } = new(fun.Operation)
 func Worker[OP fun.Worker | fun.Operation](
 	ctx context.Context,
 	iter *fun.Iterator[OP],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
 		return any(op).(interface{ Safe() fun.Worker }).Safe()(ctx)
@@ -72,9 +72,9 @@ func ParallelForEach[T any](
 	ctx context.Context,
 	iter *fun.Iterator[T],
 	fn fun.Processor[T],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) error {
-	return iter.ProcessParallel(ctx, fn, append(optp, fun.SetErrorCollector(&erc.Collector{}))...)
+	return iter.ProcessParallel(ctx, fn, append(optp, fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}))...)
 }
 
 // Generate creates an iterator using a generator pattern which
@@ -85,7 +85,7 @@ func ParallelForEach[T any](
 // configuration with the Map and ParallelForEach operations.
 func Generate[T any](
 	fn fun.Producer[T],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *fun.Iterator[T] {
 	return fn.GenerateParallel(optp...)
 }
@@ -108,7 +108,7 @@ func Generate[T any](
 func Map[T any, O any](
 	input *fun.Iterator[T],
 	mapFn func(context.Context, T) (O, error),
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *fun.Iterator[O] {
 	return fun.Map(input, mapFn, optp...)
 }
@@ -129,7 +129,7 @@ func MapReduce[T any, O any, R any](
 	mapFn func(context.Context, T) (O, error),
 	reduceFn func(O, R) (R, error),
 	initialReduceValue R,
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) fun.Producer[R] {
 	return func(ctx context.Context) (R, error) {
 		return Reduce(ctx, Map(input, mapFn, optp...), reduceFn, initialReduceValue)

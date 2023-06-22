@@ -399,7 +399,7 @@ func TestList(t *testing.T) {
 					t.Error("iterator should be open", i)
 				}
 			}
-			fun.Invariant(iter.Close() == nil)
+			fun.Invariant.IsTrue(iter.Close() == nil)
 			for i := 0; i < 50; i++ {
 				if iter.Next(ctx) {
 					t.Error("iterator should be closed", i)
@@ -721,9 +721,9 @@ func TestList(t *testing.T) {
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
 			}
-			fun.Invariant(nl.Front().Value() == list.Front().Value())
-			fun.Invariant(nl.Front().Next().Value() == list.Front().Next().Value())
-			fun.Invariant(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
+			fun.Invariant.IsTrue(nl.Front().Value() == list.Front().Value())
+			fun.Invariant.IsTrue(nl.Front().Next().Value() == list.Front().Next().Value())
+			fun.Invariant.IsTrue(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			list := &dt.List[int]{}

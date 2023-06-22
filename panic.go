@@ -1,7 +1,6 @@
 package fun
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tychoish/fun/ers"
@@ -15,9 +14,16 @@ const ErrInvariantViolation = ers.ErrInvariantViolation
 // function in the fun package that recovers from a panic.
 const ErrRecoveredPanic = ers.ErrRecoveredPanic
 
-// Invariant panics if the condition is false Invariant panics,
-// passing an error that is rooted by ErrInvariantViolation.
-func Invariant(cond bool, args ...any) {
+var Invariant = RuntimeInvariant{}
+
+type RuntimeInvariant struct{}
+
+func (RuntimeInvariant) IsTrue(cond bool, args ...any)  { Invariant.OK(cond, args...) }
+func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.OK(!cond, args...) }
+
+// OK panics if the condition is false, passing an error that is
+// rooted in InvariantViolation. Otherwise the operation is a noop.
+func (RuntimeInvariant) OK(cond bool, args ...any) {
 	if !cond {
 		switch len(args) {
 		case 0:
@@ -27,7 +33,7 @@ func Invariant(cond bool, args ...any) {
 			case error:
 				panic(ers.Join(ei, ErrInvariantViolation))
 			case string:
-				panic(ers.Join(errors.New(ei), ErrInvariantViolation))
+				panic(ers.Join(ers.New(ei), ErrInvariantViolation))
 			default:
 				panic(fmt.Errorf("[%v]: %w", args[0], ErrInvariantViolation))
 			}
@@ -40,10 +46,10 @@ func Invariant(cond bool, args ...any) {
 	}
 }
 
-// InvariantMust raises an invariant error if the error is not
+// Must raises an invariant error if the error is not
 // nil. The content of the panic is both--via wrapping--an
 // ErrInvariantViolation and the error itself.
-func InvariantMust(err error, args ...any) {
+func (RuntimeInvariant) Must(err error, args ...any) {
 	if err == nil {
 		return
 	}
@@ -54,24 +60,13 @@ func InvariantMust(err error, args ...any) {
 	panic(ers.Join(fmt.Errorf("%s: %w", fmt.Sprint(args...), err), ErrInvariantViolation))
 }
 
-// IsInvariantViolation returns true if the argument is or resolves to
-// ErrInvariantViolation.
-func IsInvariantViolation(r any) bool {
-	err, ok := r.(error)
-	if r == nil || !ok {
-		return false
-	}
-
-	return errors.Is(err, ErrInvariantViolation)
-}
-
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.
-func Must[T any](arg T, err error) T { InvariantMust(err); return arg }
+func Must[T any](arg T, err error) T { Invariant.Must(err); return arg }
 
 // MustBeOk raises an invariant violation if the ok value is false,
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
 //	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
-func MustBeOk[T any](out T, ok bool) T { Invariant(ok, "ok check failed"); return out }
+func MustBeOk[T any](out T, ok bool) T { Invariant.OK(ok, "ok check failed"); return out }

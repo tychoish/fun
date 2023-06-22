@@ -10,10 +10,10 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// WorkerGroupOptions describes the runtime options to several operations
+// WorkerGroupConf describes the runtime options to several operations
 // operations. The zero value of this struct provides a usable strict
 // operation.
-type WorkerGroupOptions struct {
+type WorkerGroupConf struct {
 	// NumWorkers describes the number of parallel workers
 	// processing the incoming iterator items and running the map
 	// function. All values less than 1 are converted to 1. Any
@@ -43,17 +43,25 @@ type WorkerGroupOptions struct {
 	// is never included.
 	ExcludededErrors []error
 	// ErrorObserver is used to collect and aggregate errors in
-	// the collector.
+	// the collector. For operations with shorter runtime
+	// `erc.Collector.Add` is a good choice, though different
+	// strategies may make sense in different
+	// cases. (erc.Collector has a mutex and stories collected
+	// errors in memory.)
 	ErrorObserver Observer[error]
+	// ErrorResolver should return an aggregated error collected
+	// during the execution of worker
+	// threads. `erc.Collector.Resolve` suffices when collecting
+	// with an erc.Collector.
 	ErrorResolver func() error
 }
 
-func (o *WorkerGroupOptions) Validate() error {
+func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
 	return nil
 }
 
-func (o WorkerGroupOptions) CanContinueOnError(err error) bool {
+func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	if err == nil {
 		return true
 	}
@@ -85,25 +93,47 @@ func (o WorkerGroupOptions) CanContinueOnError(err error) bool {
 
 type OptionProvider[T any] func(T) error
 
-func ApplyOptions[T any](opt T, opts ...OptionProvider[T]) (err error) {
-	defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
-	for idx := range opts {
-		err = ers.Join(opts[idx](opt), err)
+func JoinOptionProviders[T any](op ...OptionProvider[T]) OptionProvider[T] {
+	switch len(op) {
+	case 0:
+		return func(T) error { return nil }
+	case 1:
+		return op[0]
+	default:
+		return op[0].Join(op[1:]...)
 	}
+}
 
-	switch validator := any(opt).(type) {
+func (op OptionProvider[T]) Apply(in T) error {
+	err := op(in)
+	switch validator := any(in).(type) {
 	case interface{ Validate() error }:
 		err = ers.Join(validator.Validate(), err)
 	}
 	return err
+
+}
+func (op OptionProvider[T]) Join(opps ...OptionProvider[T]) OptionProvider[T] {
+	opps = append([]OptionProvider[T]{op}, opps...)
+	return func(option T) (err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		for idx := range opps {
+			if opps[idx] == nil {
+				continue
+			}
+			err = ers.Join(opps[idx](option), err)
+		}
+
+		return err
+	}
 }
 
-func Set(opt *WorkerGroupOptions) OptionProvider[*WorkerGroupOptions] {
-	return func(o *WorkerGroupOptions) error { *o = *opt; return nil }
+func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
+	return func(o *WorkerGroupConf) error { *o = *opt; return nil }
 }
 
-func AddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error {
+func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error {
 		if ers.Is(ErrRecoveredPanic, errs...) {
 
 			return fmt.Errorf("cannot exclude recovered panics: %w", ers.ErrInvalidInput)
@@ -113,24 +143,24 @@ func AddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupOptions] {
 	}
 }
 
-func IncludeContextErrors() OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error { opts.IncludeContextExpirationErrors = true; return nil }
+func WorkerGroupConfIncludeContextErrors() OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error { opts.IncludeContextExpirationErrors = true; return nil }
 }
 
-func ContinueOnError() OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error { opts.ContinueOnError = true; return nil }
+func WorkerGroupConfContinueOnError() OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error { opts.ContinueOnError = true; return nil }
 }
 
-func ContinueOnPanic() OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error { opts.ContinueOnPanic = true; return nil }
+func WorkerGroupConfContinueOnPanic() OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error { opts.ContinueOnPanic = true; return nil }
 }
 
-func WorkerPerCPU() OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error { opts.NumWorkers = runtime.NumCPU(); return nil }
+func WorkerGroupConfWorkerPerCPU() OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error { opts.NumWorkers = runtime.NumCPU(); return nil }
 }
 
-func NumWorkers(num int) OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error {
+func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error {
 		if num <= 0 {
 			num = 1
 		}
@@ -139,42 +169,41 @@ func NumWorkers(num int) OptionProvider[*WorkerGroupOptions] {
 	}
 }
 
-// WithErrorCollector sets an error collector implementation for later
+// WorkerGroupConfWithErrorCollector saves an error collector
+func WorkerGroupConfErrorObserver(observer Observer[error]) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error {
+		opts.ErrorObserver = observer
+		return nil
+	}
+}
+
+func WorkerGroupConfErrorResolver(resolver func() error) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error {
+		opts.ErrorResolver = resolver
+		return nil
+	}
+}
+
+// WorkerGroupConfWithErrorCollector sets an error collector implementation for later
 // use in the WorkerGroupOptions. The resulting function will only
 // error if the collector is nil, however, this method will override
 // an existing error collector.
 //
 // ErrorCollectors are used by some operations to collect, aggregate, and
 // distribute errors from operations to the caller.
-func WithErrorCollector(
+func WorkerGroupConfWithErrorCollector(
 	ec interface {
 		Add(error)
 		Resolve() error
 	},
-) OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error {
+) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) (err error) {
 		if ec == nil {
 			return errors.New("cannot use a nil error collector")
 		}
-
-		opts.ErrorObserver = ec.Add
-		opts.ErrorResolver = ec.Resolve
-
-		return nil
-	}
-}
-
-// SetErrorCollector saves an error collector
-func SetErrorCollector(
-	ec interface {
-		Add(error)
-		Resolve() error
-	},
-) OptionProvider[*WorkerGroupOptions] {
-	return func(opts *WorkerGroupOptions) error {
-		if opts.ErrorObserver != nil {
-			return nil
-		}
-		return WithErrorCollector(ec)(opts)
+		return ers.Join(
+			WorkerGroupConfErrorObserver(ec.Add)(opts),
+			WorkerGroupConfErrorResolver(ec.Resolve)(opts),
+		)
 	}
 }

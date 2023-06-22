@@ -14,9 +14,210 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
+
+func TestHelpers(t *testing.T) {
+	t.Parallel()
+	t.Run("Wait", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		svc := Wait(fun.VariadicIterator(fun.Operation(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
+		start := time.Now()
+		if err := svc.Start(ctx); err != nil {
+			t.Error(err)
+		}
+
+		if err := svc.Wait(); err != nil {
+			t.Error(err)
+		}
+
+		dur := time.Since(start)
+		if dur < 10*time.Millisecond || dur > 20*time.Millisecond {
+			t.Error(dur)
+		}
+	})
+	t.Run("Process", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Large", func(t *testing.T) {
+			count := atomic.Int64{}
+			srv := ProcessIterator(
+				makeIterator(100),
+				func(_ context.Context, in int) error { count.Add(1); return nil },
+				fun.WorkerGroupConfNumWorkers(2),
+			)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if count.Load() != 100 {
+				t.Error(count.Load())
+			}
+		})
+		t.Run("Large", func(t *testing.T) {
+			count := atomic.Int64{}
+			srv := ProcessIterator(
+				makeIterator(50),
+				func(_ context.Context, in int) error {
+					time.Sleep(5 * time.Millisecond)
+					count.Add(1)
+					return nil
+				},
+				fun.WorkerGroupConfNumWorkers(50),
+			)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			start := time.Now()
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if count.Load() != 50 {
+				t.Error(count.Load())
+			}
+			if time.Since(start) < 5*time.Millisecond || time.Since(start) > 20*time.Millisecond {
+				t.Error(time.Since(start))
+			}
+		})
+	})
+
+	t.Run("WorkerPool", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Small", func(t *testing.T) {
+			count := &atomic.Int64{}
+			srv := WorkerPool(
+				makeQueue(t, 100, count),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if count.Load() != 100 {
+				t.Error(count.Load())
+			}
+		})
+		t.Run("Large", func(t *testing.T) {
+			count := &atomic.Int64{}
+			srv := WorkerPool(
+				makeQueue(t, 100, count),
+				fun.WorkerGroupConfWorkerPerCPU(),
+			)
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if count.Load() != 100 {
+				t.Error(count.Load())
+			}
+			assert.NotError(t, ctx.Err())
+		})
+	})
+
+	t.Run("ObserverWorkerPool", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Small", func(t *testing.T) {
+			count := &atomic.Int64{}
+			errCount := &atomic.Int64{}
+			srv := ObserverWorkerPool(
+				makeErroringQueue(t, 100, count),
+				func(err error) {
+					t.Log(err)
+					check.Error(t, err)
+					errCount.Add(1)
+				},
+				fun.WorkerGroupConfNumWorkers(50),
+			)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if count.Load() != 100 {
+				t.Error(count.Load())
+			}
+			if errCount.Load() != 100 {
+				t.Error("did not observe correct errors", errCount.Load())
+			}
+		})
+		t.Run("Large", func(t *testing.T) {
+			count := &atomic.Int64{}
+			errCount := &atomic.Int64{}
+			srv := ObserverWorkerPool(
+				makeErroringQueue(t, 100, count),
+				func(err error) {
+					check.Error(t, err)
+					errCount.Add(1)
+				},
+				fun.WorkerGroupConfNumWorkers(50),
+			)
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+			if count.Load() != 100 {
+				t.Error(count.Load())
+			}
+			if errCount.Load() != 100 {
+				t.Error("did not observe correct errors", errCount.Load())
+			}
+			assert.NotError(t, ctx.Err())
+		})
+	})
+
+	t.Run("Broker", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		broker := pubsub.NewBroker[int](ctx, pubsub.BrokerOptions{})
+		srv := Broker(broker)
+		if err := srv.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		ch := broker.Subscribe(ctx)
+		sig := make(chan struct{})
+		go func() {
+			defer close(sig)
+			num := <-ch
+			if num != 42 {
+				t.Error(num)
+			}
+		}()
+
+		broker.Publish(ctx, 42)
+		fun.WaitChannel(sig)(ctx)
+	})
+}
 
 func TestCmd(t *testing.T) {
 	t.Parallel()
@@ -157,7 +358,7 @@ func TestDaemon(t *testing.T) {
 			check.Error(t, err)
 		})
 		assert.True(t, baseRunCounter.Load() >= 2)
-		assert.True(t, len(fun.Unwind(err)) >= 2)
+		assert.True(t, len(ers.Unwind(err)) >= 2)
 		assert.Substring(t, err.Error(), "kip")
 	})
 	t.Run("ShutdownTriggers", func(t *testing.T) {
@@ -182,7 +383,7 @@ func TestDaemon(t *testing.T) {
 			check.Error(t, err)
 		})
 		assert.True(t, baseRunCounter.Load() >= 2)
-		assert.True(t, len(fun.Unwind(err)) >= 2)
+		assert.True(t, len(ers.Unwind(err)) >= 2)
 		assert.Substring(t, err.Error(), "kip")
 	})
 	t.Run("CancelationTriggersAbort", func(t *testing.T) {
@@ -211,6 +412,7 @@ func TestDaemon(t *testing.T) {
 }
 
 func TestCleanup(t *testing.T) {
+	t.Parallel()
 	t.Run("Basic", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -297,5 +499,4 @@ func TestCleanup(t *testing.T) {
 		assert.True(t, out != nil)
 		assert.ErrorIs(t, out, err)
 	})
-
 }

@@ -21,5 +21,5 @@ func Slice[T any](iter *fun.Iterator[T]) []T {
 // panic. In general fun.Observe only returns an error if the input
 // iterator errors or the observer function panics.
 func Observe[T any](iter *fun.Iterator[T], fn fun.Observer[T]) {
-	fun.InvariantMust(iter.Observe(context.Background(), fn))
+	fun.Invariant.Must(iter.Observe(context.Background(), fn))
 }

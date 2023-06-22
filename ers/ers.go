@@ -51,6 +51,17 @@ func IsTerminating(err error) bool {
 	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded)
 }
 
+// IsInvariantViolation returns true if the argument is or resolves to
+// ErrInvariantViolation.
+func IsInvariantViolation(r any) bool {
+	err, ok := r.(error)
+	if r == nil || !ok {
+		return false
+	}
+
+	return errors.Is(err, ErrInvariantViolation)
+}
+
 // Is returns true if the error is one of the target errors, (or one
 // of it's constituent (wrapped) errors is a target error. ers.Is uses
 // errors.Is.

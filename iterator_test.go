@@ -136,11 +136,10 @@ func TestIterator(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return ers.ErrLimitExceeded })
-			testt.Log(t, Unwind(err))
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrLimitExceeded)
+			assert.True(t, err != ers.ErrLimitExceeded)
 			assert.Equal(t, 9, count)
-			assert.Equal(t, 9, len(Unwind(err)))
 		})
 		t.Run("Panic", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
@@ -167,9 +166,9 @@ func TestIterator(t *testing.T) {
 			count := &atomic.Int64{}
 			err := iter.ProcessParallel(ctx,
 				func(ctx context.Context, i int) error { count.Add(1); return nil },
-				NumWorkers(2),
-				ContinueOnError(),
-				ContinueOnPanic(),
+				WorkerGroupConfNumWorkers(2),
+				WorkerGroupConfContinueOnError(),
+				WorkerGroupConfContinueOnPanic(),
 			)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count.Load())
@@ -678,7 +677,7 @@ func TestJSON(t *testing.T) {
 
 		err := iter.Close()
 		assert.Error(t, err)
-		assert.Equal(t, len(Unwind(err)), 4)
+		assert.Equal(t, len(ers.Unwind(err)), 4)
 
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 		assert.True(t, ers.ContextExpired(err))

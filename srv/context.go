@@ -62,7 +62,7 @@ func WithOrchestrator(ctx context.Context) context.Context {
 func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
 	svc := or.Service()
 	if !svc.Running() {
-		fun.InvariantMust(svc.Start(ctx), "orchestrator must start")
+		fun.Invariant.Must(svc.Start(ctx), "orchestrator must start")
 	}
 
 	return context.WithValue(ctx, orchestratorCtxKey{}, or)
@@ -73,7 +73,7 @@ func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
 func GetOrchestrator(ctx context.Context) *Orchestrator {
 	or, ok := ctx.Value(orchestratorCtxKey{}).(*Orchestrator)
 
-	fun.Invariant(ok, "orchestrator was not correctly attached")
+	fun.Invariant.IsTrue(ok, "orchestrator was not correctly attached")
 
 	return or
 }
@@ -101,14 +101,14 @@ func WithCleanup(ctx context.Context) context.Context {
 	}
 	pipe := pubsub.NewUnlimitedQueue[fun.Worker]()
 
-	fun.InvariantMust(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
+	fun.Invariant.Must(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
 
 	return context.WithValue(ctx, cleanupCtxKey{}, pipe)
 }
 
 func getCleanup(ctx context.Context) *pubsub.Queue[fun.Worker] {
 	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.Worker])
-	fun.Invariant(ok, "cleanup service not configured")
+	fun.Invariant.IsTrue(ok, "cleanup service not configured")
 	return val
 }
 
@@ -117,7 +117,7 @@ func getCleanup(ctx context.Context) *pubsub.Queue[fun.Worker] {
 // service was not previously configured, or if you attempt to add a
 // new cleanup function while shutdown is running.
 func AddCleanup(ctx context.Context, cleanup fun.Worker) {
-	fun.InvariantMust(getCleanup(ctx).Add(cleanup))
+	fun.Invariant.Must(getCleanup(ctx).Add(cleanup))
 }
 
 // AddCleanupError adds an error to the cleanup handler which is
@@ -151,7 +151,7 @@ func SetShutdownSignal(ctx context.Context) context.Context {
 func GetShutdownSignal(ctx context.Context) context.CancelFunc {
 	cancel, ok := ctx.Value(shutdownTriggerCtxKey{}).(context.CancelFunc)
 
-	fun.Invariant(ok, "Shutdown cancel function was not correctly attached")
+	fun.Invariant.IsTrue(ok, "Shutdown cancel function was not correctly attached")
 
 	return cancel
 }
@@ -187,7 +187,7 @@ func SetBaseContext(ctx context.Context) context.Context {
 func GetBaseContext(ctx context.Context) context.Context {
 	bctx, ok := ctx.Value(baseContextCxtKey{}).(context.Context)
 
-	fun.Invariant(ok, "base context was not correctly attached")
+	fun.Invariant.IsTrue(ok, "base context was not correctly attached")
 
 	return bctx
 }
@@ -231,7 +231,7 @@ func HasBaseContext(ctx context.Context) bool {
 func WithWorkerPool(
 	ctx context.Context,
 	key string,
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
@@ -262,14 +262,14 @@ func WithObserverWorkerPool(
 	ctx context.Context,
 	key string,
 	observer fun.Observer[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return SetObserverWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupOptions]) *pubsub.Queue[fun.Worker] {
-	opts := fun.WorkerGroupOptions{}
-	fun.ApplyOptions(&opts, optp...)
+func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Queue[fun.Worker] {
+	opts := &fun.WorkerGroupConf{}
+	fun.Invariant.Must(fun.JoinOptionProviders(optp...).Apply(opts))
 
 	return risky.Force(pubsub.NewQueue[fun.Worker](
 		pubsub.QueueOptions{
@@ -298,10 +298,10 @@ func SetWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fun.Worker],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.InvariantMust(orca.Add(WorkerPool(queue, optp...)))
+		fun.Invariant.Must(orca.Add(WorkerPool(queue, optp...)))
 	})
 }
 
@@ -329,10 +329,10 @@ func SetObserverWorkerPool(
 	key string,
 	queue *pubsub.Queue[fun.Worker],
 	observer fun.Observer[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupOptions],
+	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.InvariantMust(orca.Add(ObserverWorkerPool(queue, observer, optp...)))
+		fun.Invariant.Must(orca.Add(ObserverWorkerPool(queue, observer, optp...)))
 	})
 }
 

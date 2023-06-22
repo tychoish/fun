@@ -321,7 +321,7 @@ func TestStack(t *testing.T) {
 				seen++
 				iter.Value()
 			}
-			fun.Invariant(iter.Close() == nil)
+			fun.Invariant.IsTrue(iter.Close() == nil)
 			if seen != stack.Len() {
 				t.Fatal("did not see all values")
 			}
@@ -334,7 +334,7 @@ func TestStack(t *testing.T) {
 				seen++
 				iter.Value()
 			}
-			fun.Invariant(iter.Close() == nil)
+			fun.Invariant.IsTrue(iter.Close() == nil)
 			if seen != 50 {
 				t.Fatal("did not see all values", seen)
 			}
@@ -350,7 +350,7 @@ func TestStack(t *testing.T) {
 				seen++
 				iter.Value()
 			}
-			fun.Invariant(iter.Close() == nil)
+			fun.Invariant.IsTrue(iter.Close() == nil)
 			if seen != 0 {
 				t.Fatal("stack should be empty", stack.Len())
 			}
@@ -372,9 +372,9 @@ func TestStack(t *testing.T) {
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
 			}
-			fun.Invariant(nl.Head().Value() == stack.Head().Value())
-			fun.Invariant(nl.Head().Next().Value() == stack.Head().Next().Value())
-			fun.Invariant(nl.Head().Next().Next().Value() == stack.Head().Next().Next().Value())
+			fun.Invariant.IsTrue(nl.Head().Value() == stack.Head().Value())
+			fun.Invariant.IsTrue(nl.Head().Next().Value() == stack.Head().Next().Value())
+			fun.Invariant.IsTrue(nl.Head().Next().Next().Value() == stack.Head().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			stack := &dt.Stack[int]{}

@@ -239,7 +239,7 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 
 	return func(ctx context.Context, in T) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant(wctx != nil, "must start the operation before calling cancel")
+		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
 		return pf(wctx, in)
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
@@ -280,7 +280,7 @@ type tuple[T, U any] struct {
 }
 
 func limitExec[T any](in int) func(func() T) T {
-	Invariant(in > 0, "limit must be greater than zero;", in)
+	Invariant.IsTrue(in > 0, "limit must be greater than zero;", in)
 	counter := &atomic.Int64{}
 	mtx := &sync.Mutex{}
 
@@ -304,7 +304,7 @@ func limitExec[T any](in int) func(func() T) T {
 }
 
 func ttlExec[T any](dur time.Duration) func(op func() T) T {
-	Invariant(dur >= 0, "ttl must not be negative;", dur)
+	Invariant.IsTrue(dur >= 0, "ttl must not be negative;", dur)
 
 	if dur == 0 {
 		return func(op func() T) T { return op() }

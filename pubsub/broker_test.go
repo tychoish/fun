@@ -598,7 +598,7 @@ func TestBroker(t *testing.T) {
 		t.Run("PublishOne", func(t *testing.T) {
 			t.Parallel()
 			queue := NewUnlimitedQueue[string]()
-			fun.Invariant(queue.Close() == nil, "cannot error")
+			fun.Invariant.IsTrue(queue.Close() == nil, "cannot error")
 			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
 			sa := time.Now()
@@ -613,7 +613,7 @@ func TestBroker(t *testing.T) {
 		t.Run("PublishOneWithSubScriber", func(t *testing.T) {
 			t.Parallel()
 			queue := NewUnlimitedQueue[string]()
-			fun.Invariant(queue.Close() == nil, "cannot error")
+			fun.Invariant.IsTrue(queue.Close() == nil, "cannot error")
 			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
 			sa := time.Now()
@@ -632,7 +632,7 @@ func TestBroker(t *testing.T) {
 		t.Run("PublishMany", func(t *testing.T) {
 			t.Parallel()
 			queue := NewUnlimitedQueue[string]()
-			fun.Invariant(queue.Close() == nil, "cannot error")
+			fun.Invariant.IsTrue(queue.Close() == nil, "cannot error")
 			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
 			sa := time.Now()

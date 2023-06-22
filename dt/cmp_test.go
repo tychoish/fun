@@ -200,7 +200,7 @@ func TestSort(t *testing.T) {
 					t.Error(seen, last, ">", current)
 				}
 			}
-			fun.Invariant(iter.Close() == nil)
+			fun.Invariant.IsTrue(iter.Close() == nil)
 			if seen != 100 {
 				t.Log("saw incorrect number of items", seen)
 			}

@@ -39,7 +39,7 @@ func TestDistributor(t *testing.T) {
 					if err == nil {
 						t.Error("expected error")
 					}
-					errs := fun.Unwind(err)
+					errs := dt.Unwind(err)
 					if len(errs) != 1 {
 						t.Error(len(errs))
 					}

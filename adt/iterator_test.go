@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
@@ -35,7 +36,7 @@ func TestIterator(t *testing.T) {
 				t.Error(item)
 			}
 		}
-		uiter := fun.Unwrap(iter)
+		uiter := dt.Unwrap(iter)
 		if uiter == iter {
 			t.Error("unwrap should not be the same")
 		}

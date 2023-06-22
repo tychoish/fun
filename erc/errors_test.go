@@ -163,7 +163,7 @@ func TestError(t *testing.T) {
 			check.ErrorIs(t, es.Resolve(), fun.ErrRecoveredPanic)
 
 			t.Log(es.Resolve())
-			t.Log(fun.Unwind(es.Resolve()))
+			t.Log(ers.Unwind(es.Resolve()))
 			if !errors.Is(es.Resolve(), err) {
 				t.Error(es.Resolve(), "error not propogated")
 			}
@@ -522,7 +522,7 @@ func TestError(t *testing.T) {
 	})
 	t.Run("Unwind", func(t *testing.T) {
 		t.Run("NoErrors", func(t *testing.T) {
-			errs := fun.Unwind[error](nil)
+			errs := ers.Unwind(nil)
 			if errs != nil {
 				t.Fail()
 			}
@@ -532,7 +532,7 @@ func TestError(t *testing.T) {
 		})
 		t.Run("OneError", func(t *testing.T) {
 			err := errors.New("42")
-			errs := fun.Unwind(err)
+			errs := ers.Unwind(err)
 			if len(errs) != 1 {
 				t.Fatal(len(errs))
 			}
@@ -542,7 +542,7 @@ func TestError(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				ec.Add(fmt.Errorf("%d", i))
 			}
-			errs := fun.Unwind(ec.Resolve())
+			errs := ers.Unwind(ec.Resolve())
 			if len(errs) != 100 {
 				t.Fatal(len(errs))
 			}
@@ -553,7 +553,7 @@ func TestError(t *testing.T) {
 				err = fmt.Errorf("wrap %d: %w", i, err)
 			}
 
-			errs := fun.Unwind(err)
+			errs := ers.Unwind(err)
 			if len(errs) != 101 {
 				t.Error(len(errs))
 			}

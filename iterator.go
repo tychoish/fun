@@ -104,7 +104,7 @@ func SliceIterator[T any](in []T) *Iterator[T] {
 // will continue producing values as long as the input iterator
 // produces values, the context isn't canceled, or exhausted.
 func ConvertIterator[T, O any](iter *Iterator[T], op Transform[T, O]) *Iterator[O] {
-	return op.Transform(iter)
+	return op.Convert(iter)
 }
 
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
@@ -207,7 +207,7 @@ func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
 // type and converts it to an iterator of any (e.g. interface{})
 // values.
 func (i *Iterator[T]) Any() *Iterator[any] {
-	return Converter(func(in T) any { return any(in) }).Transform(i)
+	return Converter(func(in T) any { return any(in) }).Convert(i)
 }
 
 func (i *Iterator[T]) Reduce(
@@ -428,13 +428,13 @@ func (i *Iterator[T]) UnmarshalJSON(in []byte) error {
 func (i *Iterator[T]) ProcessParallel(
 	ctx context.Context,
 	fn Processor[T],
-	optp ...OptionProvider[*WorkerGroupOptions],
+	optp ...OptionProvider[*WorkerGroupConf],
 ) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	opts := &WorkerGroupOptions{}
-	err = ApplyOptions(opts, optp...)
+	opts := &WorkerGroupConf{}
+	err = JoinOptionProviders(optp...).Apply(opts)
 	ft.WhenCall(err != nil, cancel)
 
 	if opts.ErrorObserver == nil {
@@ -462,7 +462,7 @@ func (i *Iterator[T]) ProcessParallel(
 	return opts.ErrorResolver()
 }
 
-func (i *Iterator[T]) ProcessFuture(fn Processor[T], optp ...OptionProvider[*WorkerGroupOptions]) Worker {
+func (i *Iterator[T]) ProcessFuture(fn Processor[T], optp ...OptionProvider[*WorkerGroupConf]) Worker {
 	return func(ctx context.Context) error { return i.ProcessParallel(ctx, fn, optp...) }
 }
 
@@ -474,7 +474,7 @@ func (i *Iterator[T]) Buffer(n int) *Iterator[T] {
 
 func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := i.ProcessFuture(buf.Processor(), NumWorkers(n)).Operation(i.ErrorObserver()).PostHook(buf.Close).Once().Launch()
+	pipe := i.ProcessFuture(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorObserver()).PostHook(buf.Close).Once().Launch()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 
 }

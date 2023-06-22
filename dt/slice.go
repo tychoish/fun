@@ -15,8 +15,9 @@ import (
 type Slice[T any] []T
 
 // Sliceify produces a slice object as a convenience constructor.
-func Sliceify[T any](in []T) Slice[T]  { return in }
-func Variadic[T any](in ...T) Slice[T] { return in }
+func Sliceify[T any](in []T) Slice[T]                 { return in }
+func Variadic[T any](in ...T) Slice[T]                { return in }
+func SlicePrepend[T any](first T, rest ...T) Slice[T] { return append([]T{first}, rest...) }
 
 func Transform[T any, O any](in Slice[T], op func(in T) (O, error)) (Slice[O], error) {
 	out := make([]O, 0, len(in))

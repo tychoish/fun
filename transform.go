@@ -28,9 +28,9 @@ import (
 func Map[T any, O any](
 	input *Iterator[T],
 	mpf Transform[T, O],
-	optp ...OptionProvider[*WorkerGroupOptions],
+	optp ...OptionProvider[*WorkerGroupConf],
 ) *Iterator[O] {
-	return mpf.ParallelTransform(input, optp...)
+	return mpf.ProcessParallel(input, optp...)
 }
 
 type Transform[T any, O any] func(context.Context, T) (O, error)
@@ -64,16 +64,16 @@ func MakeMaper[T any, O any](in Processor[T], out Producer[O]) Transform[T, O] {
 	}
 }
 
-func (mpf Transform[T, O]) Transform(iter *Iterator[T]) *Iterator[O] {
+func (mpf Transform[T, O]) Convert(iter *Iterator[T]) *Iterator[O] {
 	return mpf.Producer(iter).Iterator()
 }
 
-func (mpf Transform[T, O]) ParallelTransform(
+func (mpf Transform[T, O]) ProcessParallel(
 	iter *Iterator[T],
-	optp ...OptionProvider[*WorkerGroupOptions],
+	optp ...OptionProvider[*WorkerGroupConf],
 ) *Iterator[O] {
 	output := Blocking(make(chan O))
-	opts := &WorkerGroupOptions{}
+	opts := &WorkerGroupConf{}
 
 	// this operations starts the background thread for the
 	// mapper/iterator, but doesn't run until the first
@@ -102,7 +102,8 @@ func (mpf Transform[T, O]) ParallelTransform(
 	}).Once()
 
 	outputIter := output.Producer().PreHook(init).Iterator()
-	err := ApplyOptions(opts, optp...)
+
+	err := JoinOptionProviders(optp...).Apply(opts)
 	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })
 
 	outputIter.AddError(err)
@@ -127,17 +128,6 @@ func (mpf Transform[T, O]) Producer(iter *Iterator[T]) Producer[O] {
 			}
 		}
 	})
-}
-
-func (mpf Transform[T, O]) ProducerPipe(input Producer[T]) Producer[O] {
-	var zero O
-	return func(ctx context.Context) (O, error) {
-		mid, err := input(ctx)
-		if err != nil {
-			return zero, err
-		}
-		return mpf(ctx, mid)
-	}
 }
 
 func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O]) {
@@ -177,8 +167,11 @@ func (mpf Transform[T, O]) WithLock(mu *sync.Mutex) Transform[T, O] {
 	}
 }
 
-func (mpf Transform[T, O]) Run(input *Iterator[T]) *Iterator[O] {
-	return mpf.ProducerPipe(input.ReadOne).Iterator()
+func (mpf Transform[T, O]) Safe() Transform[T, O] {
+	return func(ctx context.Context, val T) (_ O, err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		return mpf(ctx, val)
+	}
 }
 
 func (mpf Transform[T, O]) Worker(in Producer[T], out Processor[O]) Worker {
@@ -195,19 +188,12 @@ func (mpf Transform[T, O]) Worker(in Producer[T], out Processor[O]) Worker {
 	}
 }
 
-func (mf Transform[T, O]) Safe() Transform[T, O] {
-	return func(ctx context.Context, val T) (_ O, err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
-		return mf(ctx, val)
-	}
-}
-
-func (mf Transform[T, O]) Processor(
+func (mpf Transform[T, O]) Processor(
 	output Processor[O],
-	opts *WorkerGroupOptions,
+	opts *WorkerGroupConf,
 ) Processor[T] {
 	return Processor[T](func(ctx context.Context, in T) error {
-		val, err := mf(ctx, in)
+		val, err := mpf(ctx, in)
 		if err != nil {
 			if opts.CanContinueOnError(err) {
 				return nil

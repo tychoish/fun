@@ -16,6 +16,8 @@ import (
 )
 
 func TestContext(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Orchestrator", func(t *testing.T) {
 		t.Run("Panics", func(t *testing.T) {
 			ec := &erc.Collector{}
@@ -235,7 +237,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("Example", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", fun.NumWorkers(4))
+		ctx = WithWorkerPool(ctx, "kip", fun.WorkerGroupConfNumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -257,7 +259,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("NegativeWorkersWork", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", fun.NumWorkers(4))
+		ctx = WithWorkerPool(ctx, "kip", fun.WorkerGroupConfNumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -317,13 +319,13 @@ func TestWorkerPool(t *testing.T) {
 		defer cancel()
 		wpCt := &atomic.Int64{}
 		ctx = SetShutdownSignal(ctx)
-		ctx = WithWorkerPool(ctx, "merlin", fun.NumWorkers(50))
+		ctx = WithWorkerPool(ctx, "merlin", fun.WorkerGroupConfNumWorkers(50))
 		obCt := &atomic.Int64{}
 		expected := errors.New("kip")
 		ctx = WithObserverWorkerPool(ctx, "kip", func(err error) {
 			check.ErrorIs(t, err, expected)
 			obCt.Add(1)
-		}, fun.NumWorkers(50))
+		}, fun.WorkerGroupConfNumWorkers(50))
 		for i := 0; i < 100; i++ {
 			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error { wpCt.Add(1); return nil })
 			assert.NotError(t, err)

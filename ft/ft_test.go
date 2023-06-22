@@ -149,5 +149,11 @@ func TestWrap(t *testing.T) {
 			assert.Equal(t, first, IgnoreSecond(func() (int, bool) { return first, second }()))
 		})
 	})
-
+	t.Run("SafeOK", func(t *testing.T) {
+		assert.True(t, !SafeDo[bool](nil))
+		assert.True(t, nil == SafeDo[*bool](nil))
+		assert.True(t, nil == SafeDo[*testing.T](nil))
+		assert.Equal(t, 1, SafeDo(func() int { return 1 }))
+		assert.Equal(t, 412, SafeDo(func() int { return 412 }))
+	})
 }

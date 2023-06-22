@@ -129,7 +129,7 @@ func TestMapReduce(t *testing.T) {
 		pipe <- t.Name()
 
 		var mf Transform[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
-		mf.Safe().Processor(Blocking(output).Send().Write, &WorkerGroupOptions{}).
+		mf.Safe().Processor(Blocking(output).Send().Write, &WorkerGroupConf{}).
 			ReadAll(Blocking(pipe).Receive().Producer()).
 			Ignore().
 			Add(ctx, wg)
@@ -269,7 +269,7 @@ func TestParallelForEach(t *testing.T) {
 						seen.Add(int64(in))
 						return nil
 					},
-					NumWorkers(int(i)))
+					WorkerGroupConfNumWorkers(int(i)))
 
 				if err != nil {
 					t.Fatal(err)
@@ -299,9 +299,9 @@ func TestParallelForEach(t *testing.T) {
 					}
 					return nil
 				},
-				NumWorkers(3),
-				ContinueOnPanic(),
-				SetErrorCollector(&Collector{}),
+				WorkerGroupConfNumWorkers(3),
+				WorkerGroupConfContinueOnPanic(),
+				WorkerGroupConfWithErrorCollector(&Collector{}),
 			)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -313,7 +313,7 @@ func TestParallelForEach(t *testing.T) {
 		if count.Load() != 200 {
 			t.Error(count.Load())
 		}
-		check.Equal(t, 201, CountWraps(err))
+		check.Equal(t, 200, len(ers.Unwind(err)))
 	})
 	t.Run("AbortOnPanic", func(t *testing.T) {
 		seenCount := &atomic.Int64{}
@@ -335,7 +335,7 @@ func TestParallelForEach(t *testing.T) {
 					<-ctx.Done()
 					return nil
 				},
-				NumWorkers(10),
+				WorkerGroupConfNumWorkers(10),
 			)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -344,7 +344,7 @@ func TestParallelForEach(t *testing.T) {
 		if seenCount.Load() != 9 {
 			t.Error("should have only seen one", seenCount.Load())
 		}
-		errs := Unwind(err)
+		errs := ers.Unwind(err)
 		if len(errs) != 2 {
 			// panic + expected
 			t.Error(len(errs))
@@ -363,7 +363,7 @@ func TestParallelForEach(t *testing.T) {
 					}
 					return nil
 				},
-				NumWorkers(8),
+				WorkerGroupConfNumWorkers(8),
 			)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -380,8 +380,8 @@ func TestParallelForEach(t *testing.T) {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
 				},
-				NumWorkers(4),
-				ContinueOnError(),
+				WorkerGroupConfNumWorkers(4),
+				WorkerGroupConfContinueOnError(),
 			)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -389,7 +389,7 @@ func TestParallelForEach(t *testing.T) {
 		testt.Log(t, err)
 		check.Equal(t, 10, count.Load())
 
-		errs := Unwind(err)
+		errs := ers.Unwind(err)
 		if len(errs) != 10 {
 			t.Error(len(errs), "!= 10", errs)
 		}
@@ -404,13 +404,13 @@ func TestParallelForEach(t *testing.T) {
 				func(ctx context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
-				NumWorkers(2),
+				WorkerGroupConfNumWorkers(2),
 			)
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
 
-		errs := Unwind(err)
+		errs := ers.Unwind(err)
 		// it's two and not one because each worker thread
 		// ran one task before aborting
 		if len(errs) > 2 {
@@ -425,13 +425,13 @@ func TestParallelForEach(t *testing.T) {
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
-			WorkerPerCPU(),
+			WorkerGroupConfWorkerPerCPU(),
 		)
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
 
-		errs := Unwind(err)
+		errs := ers.Unwind(err)
 		// it's two and not one because each worker thread
 		// ran one task before aborting
 		if len(errs) > runtime.NumCPU() {
@@ -461,7 +461,7 @@ func TestParallelForEach(t *testing.T) {
 				func(ctx context.Context, in int) error {
 					return context.Canceled
 				},
-				IncludeContextErrors(),
+				WorkerGroupConfIncludeContextErrors(),
 			)
 			check.Error(t, err)
 			check.ErrorIs(t, err, context.Canceled)
@@ -545,8 +545,8 @@ func RunIteratorImplementationTests[T comparable](
 								func(ctx context.Context, input T) (T, error) {
 									panic("whoop")
 								},
-								NumWorkers(2),
-								ContinueOnError(),
+								WorkerGroupConfNumWorkers(2),
+								WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 
 							if err == nil {
@@ -594,7 +594,7 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								ContinueOnError(),
+								WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Fatal("expected error")
@@ -619,8 +619,8 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								ContinueOnPanic(),
-								NumWorkers(1),
+								WorkerGroupConfContinueOnPanic(),
+								WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 
 							testt.Log(t, elems)
@@ -644,7 +644,7 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								NumWorkers(1),
+								WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -669,8 +669,8 @@ func RunIteratorIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								NumWorkers(4),
-								ContinueOnError(),
+								WorkerGroupConfNumWorkers(4),
+								WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -767,7 +767,7 @@ func RunIteratorStringAlgoTests(
 								}
 								return strings.TrimSpace(str), nil
 							},
-							NumWorkers(4),
+							WorkerGroupConfNumWorkers(4),
 						)
 
 						vals, err := out.Slice(ctx)
@@ -825,7 +825,7 @@ func RunIteratorStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).GenerateParallel(NumWorkers(4))
+							}).GenerateParallel(WorkerGroupConfNumWorkers(4))
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -870,7 +870,7 @@ func RunIteratorStringAlgoTests(
 									}
 									return fmt.Sprint(count), nil
 								},
-							).GenerateParallel(ContinueOnPanic())
+							).GenerateParallel(WorkerGroupConfContinueOnPanic())
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
 								t.Log(err, output)
@@ -903,7 +903,7 @@ func RunIteratorStringAlgoTests(
 							}
 
 							if err.Error() != "beep" {
-								t.Log(len(Unwind(err)))
+								t.Log(len(ers.Unwind(err)))
 								t.Fatalf("unexpected panic %q", err.Error())
 							}
 						})
@@ -919,7 +919,7 @@ func RunIteratorStringAlgoTests(
 									return "", io.EOF
 								}
 								return "foo", nil
-							}).GenerateParallel(ContinueOnError())
+							}).GenerateParallel(WorkerGroupConfContinueOnError())
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {

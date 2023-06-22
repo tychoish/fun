@@ -86,7 +86,7 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 	once := &sync.Once{}
 	return func(ctx context.Context) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant(wctx != nil, "must start the operation before calling cancel")
+		Invariant.IsTrue(wctx != nil, "must start the operation before calling cancel")
 		wf(wctx)
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
@@ -163,7 +163,7 @@ func (wf Operation) When(cond func() bool) Operation   { return wf.Worker().When
 func (wf Operation) If(cond bool) Operation            { return wf.Worker().If(cond).Ignore() }
 
 func (wf Operation) Limit(in int) Operation {
-	Invariant(in > 0, "limit must be greater than zero;", in)
+	Invariant.OK(in > 0, "limit must be greater than zero;", in)
 	counter := &atomic.Int64{}
 	mtx := &sync.Mutex{}
 

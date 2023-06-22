@@ -102,7 +102,7 @@ func TestCollections(t *testing.T) {
 				t.Error(err, e0)
 			}
 			t.Log(err)
-			errs := fun.Unwind(err)
+			errs := ers.Unwind(err)
 			if len(errs) != 2 {
 				t.Error(errs)
 			}
@@ -122,12 +122,12 @@ func TestCollections(t *testing.T) {
 
 		iter := op.IteratorWithHook(IteratorHook[int](ec))
 		assert.Equal(t, iter.Count(testt.Context(t)), 32)
-		testt.Log(t, fun.Unwind(ec.Resolve()))
-		assert.Equal(t, len(fun.Unwind(ec.Resolve())), 33)
+		testt.Log(t, ers.Unwind(ec.Resolve()))
+		assert.Equal(t, len(ers.Unwind(ec.Resolve())), 33)
 		testt.Logf(t, "%T", iter.Close())
-		testt.Log(t, fun.Unwind(iter.Close()))
-		assert.Equal(t, len(fun.Unwind(iter.Close())), 33)
-		assert.Equal(t, len(fun.Unwind(iter.Close())), 33)
+		testt.Log(t, ers.Unwind(iter.Close()))
+		assert.Equal(t, len(ers.Unwind(iter.Close())), 33)
+		assert.Equal(t, len(ers.Unwind(iter.Close())), 33)
 	})
 
 	t.Run("Stream", func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestCollections(t *testing.T) {
 					t.Logf("%T", err)
 					t.Error("nil expected", err)
 				}
-				errs := fun.Unwind(err)
+				errs := ers.Unwind(err)
 				if len(errs) != 1 {
 					t.Error(errs, len(errs))
 				}
@@ -159,13 +159,13 @@ func TestCollections(t *testing.T) {
 			t.Run("Many", func(t *testing.T) {
 				ch := getPopulatedErrChan(10)
 				close(ch)
-				fun.Invariant(len(ch) == 10)
+				fun.Invariant.IsTrue(len(ch) == 10)
 				err := Stream(ctx, ch)
 				if err == nil {
 					t.Logf("%T", err)
 					t.Error("nil expected", err)
 				}
-				errs := fun.Unwind(err)
+				errs := ers.Unwind(err)
 				if len(errs) != 10 {
 					t.Error(errs)
 				}

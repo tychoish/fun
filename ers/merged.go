@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sync/atomic"
+
+	"github.com/tychoish/fun/internal"
 )
 
 func merge(one, two error) error {
@@ -37,6 +39,8 @@ func Join(errs ...error) error {
 		return err
 	}
 }
+
+func Unwind(in error) (out []error) { return internal.Unwind(in) }
 
 type mergederr struct {
 	Current  error

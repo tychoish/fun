@@ -36,5 +36,10 @@ func Safe[T any](fn func() T) (out T, err error) {
 	return
 }
 
-// SafeOK
-func SafeOK[T any](fn func() (T, error)) (T, bool) { out, err := fn(); return out, OK(err) }
+// SafeOK runs a function and checking
+func SafeOK[T any](fn func() (T, error)) (out T, ok bool) {
+	if value, err := fn(); OK(err) {
+		out, ok = value, true
+	}
+	return
+}

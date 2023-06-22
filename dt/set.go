@@ -35,13 +35,13 @@ func (s *Set[T]) Order() {
 	if s.list != nil {
 		return
 	}
-	fun.Invariant(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
+	fun.Invariant.OK(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
 	s.list = &List[T]{}
 }
 
 func (s *Set[T]) WithLock(mtx *sync.Mutex) {
-	fun.Invariant(mtx != nil, "mutexes must be non-nil")
-	fun.Invariant(s.mtx.Set(mtx), "cannot override an existing mutex")
+	fun.Invariant.OK(mtx != nil, "mutexes must be non-nil")
+	fun.Invariant.OK(s.mtx.Set(mtx), "cannot override an existing mutex")
 }
 
 func (s *Set[T]) isOrdered() bool { return s.list != nil }
@@ -81,7 +81,7 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 }
 
 func (s *Set[T]) Populate(iter *fun.Iterator[T]) {
-	fun.InvariantMust(iter.Observe(context.Background(), s.Add))
+	fun.Invariant.Must(iter.Observe(context.Background(), s.Add))
 }
 
 func (s *Set[T]) delete(in T) bool {
