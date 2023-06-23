@@ -152,7 +152,7 @@ func (pf Processor[T]) Join(next Processor[T]) Processor[T] {
 		if err := pf(ctx, in); err != nil {
 			return err
 		}
-		return next.If(ctx.Err() != nil)(ctx, in)
+		return next.If(ctx.Err() == nil)(ctx, in)
 	}
 }
 

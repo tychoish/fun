@@ -56,6 +56,12 @@ func (op ChanOp[T]) Iterator() *Iterator[T]  { return op.Receive().Producer().It
 func (op ChanOp[T]) Processor() Processor[T] { return op.Send().Processor() }
 func (op ChanOp[T]) Producer() Producer[T]   { return op.Receive().Producer() }
 
+// Pipe creates a linked pair of functions for transmitting data via
+// these interfaces.
+func (op ChanOp[T]) Pipe() (Processor[T], Producer[T]) {
+	return op.Processor(), op.Producer()
+}
+
 // ChanReceive, wraps a channel fore <-chan T operations. It is the type
 // returned by the ChanReceive() method on ChannelOp. The primary method
 // is Read(), with other methods provided as "self-documenting"

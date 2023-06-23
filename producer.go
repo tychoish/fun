@@ -25,16 +25,6 @@ type Producer[T any] func(context.Context) (T, error)
 // context has expired.
 func MakeFuture[T any](ch <-chan T) Producer[T] { return BlockingReceive(ch).Read }
 
-// MakePipe creates a linked pair of functions for transmitting data
-// via these function types and with their associated tools.
-//
-// As an implementation detail, these are blocking sends/receives
-// against a single-element channel.
-func MakePipe[T any]() (Processor[T], Producer[T]) {
-	pipe := Blocking(make(chan T, 1))
-	return pipe.Processor(), pipe.Producer()
-}
-
 // BlockingProducer constructs a producer that wraps a similar
 // function that does not take a context.
 func BlockingProducer[T any](fn func() (T, error)) Producer[T] {

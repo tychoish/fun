@@ -30,6 +30,23 @@ func FilterConvert(output error) Filter {
 	}
 }
 
+// Extract iterates through a list of untyped objects and removes the
+// errors from the list, returning both the errors and the remaining
+// items.
+func ExtractErrors(in []any) (rest []any, errs []error) {
+	for idx := range in {
+		switch val := in[idx].(type) {
+		case nil:
+			continue
+		case error:
+			errs = append(errs, val)
+		default:
+			rest = append(rest, val)
+		}
+	}
+	return
+}
+
 // FilterToRoot produces a filter which always returns only the root/MOST
 // wrapped error present in an error object.
 func FilterToRoot() Filter { return findRoot }

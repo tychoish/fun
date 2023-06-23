@@ -22,7 +22,7 @@ func TestMerge(t *testing.T) {
 		e1 := &errorTest{val: 100}
 		e2 := &errorTest{val: 200}
 
-		err := &mergederr{Current: e1, Previous: e2}
+		err := &mergederr{current: e1, previous: e2}
 
 		if !errors.Is(err, e1) {
 			t.Error("shold be er1", err, e1)
@@ -107,17 +107,20 @@ func TestMerge(t *testing.T) {
 	})
 
 	t.Run("FindRoot", func(t *testing.T) {
-		err := &mergederr{Current: Error("hi")}
-		check.Equal(t, err.findRoot(), nil)
-		err.Previous = &mergederr{}
-		check.Equal(t, err.findRoot(), error(err.Current))
-		weird := &mergederr{Current: nil, Previous: &mergederr{}}
-		check.True(t, weird.findRoot() == nil)
+		err := &mergederr{current: Error("hi")}
+		_, root := err.rootSize()
+		check.Equal(t, root, nil)
+		err.previous = &mergederr{}
+		_, root = err.rootSize()
+		check.Equal(t, root, error(err.current))
+		weird := &mergederr{current: nil, previous: &mergederr{}}
+		_, root = weird.rootSize()
+		check.True(t, root == nil)
 	})
 	t.Run("ErrStringEdges", func(t *testing.T) {
 		err := &mergederr{}
-		check.Equal(t, err.Error(), "nil-error")
-		err = &mergederr{Current: Error("hi")}
+		check.Equal(t, err.Error(), "<nil>")
+		err = &mergederr{current: Error("hi")}
 		check.Equal(t, err.Error(), "hi")
 	})
 }

@@ -111,4 +111,14 @@ func TestErrors(t *testing.T) {
 		}
 		check.Equal(t, 101, len(Unwind(err)))
 	})
+	t.Run("ExtractErrors", func(t *testing.T) {
+		args, errs := ExtractErrors([]any{nil, Error("hi"), 1, true})
+		check.Equal(t, len(errs), 1)
+		check.Equal(t, len(args), 2)
+		var nerr error
+		args, errs = ExtractErrors([]any{nil, Error("hi"), func() error { return nil }(), nerr, 2, false})
+		check.Equal(t, len(errs), 1)
+		check.Equal(t, len(args), 2)
+	})
+
 }

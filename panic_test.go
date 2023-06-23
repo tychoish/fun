@@ -53,7 +53,9 @@ func TestPanics(t *testing.T) {
 			err := errors.New("kip")
 			se := ers.Check(func() { Invariant.OK(false, err, 42) })
 			if !errors.Is(se, err) {
-				t.Fatal(err, se)
+				t.Log("se", se)
+				t.Log("err", err)
+				t.FailNow()
 			}
 			if !strings.Contains(se.Error(), "42") {
 				t.Error(err)

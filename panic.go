@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/tychoish/fun/ers"
@@ -14,7 +15,7 @@ const ErrInvariantViolation = ers.ErrInvariantViolation
 // function in the fun package that recovers from a panic.
 const ErrRecoveredPanic = ers.ErrRecoveredPanic
 
-var Invariant = RuntimeInvariant{}
+var Invariant RuntimeInvariant = RuntimeInvariant{}
 
 type RuntimeInvariant struct{}
 
@@ -35,13 +36,12 @@ func (RuntimeInvariant) OK(cond bool, args ...any) {
 			case string:
 				panic(ers.Join(ers.New(ei), ErrInvariantViolation))
 			default:
-				panic(fmt.Errorf("[%v]: %w", args[0], ErrInvariantViolation))
+				panic(fmt.Errorf("%v: %w", args[0], ErrInvariantViolation))
 			}
 		default:
-			if err, ok := args[0].(error); ok {
-				panic(ers.Join(fmt.Errorf("[%s]", args[1:]), ers.Join(err, ErrInvariantViolation)))
-			}
-			panic(fmt.Errorf("[%s]: %w", fmt.Sprintln(args...), ErrInvariantViolation))
+			var errs []error
+			args, errs = ers.ExtractErrors(args)
+			panic(ers.Join(errors.New(fmt.Sprintln(args...)), ers.Join(append(errs, ErrInvariantViolation)...)))
 		}
 	}
 }

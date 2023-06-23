@@ -105,7 +105,7 @@ func TestTools(t *testing.T) {
 						}
 					case <-sig:
 						break CONSUME
-					case <-time.After(10 * time.Millisecond):
+					case <-time.After(50 * time.Millisecond):
 						break CONSUME
 					}
 				}
@@ -1051,4 +1051,17 @@ func RunIteratorStringAlgoTests(
 		check.NotError(t, ers.FilterRemove(ErrCountMeOut)(err))
 		check.ErrorIs(t, err, ErrCountMeOut)
 	})
+	t.Run("ConverterOK", func(t *testing.T) {
+		ctx := testt.Context(t)
+		tfrm := ConverterOK(func(in string) (string, bool) { return in, true })
+		out, err := tfrm(ctx, "hello")
+		check.Equal(t, out, "hello")
+		check.NotError(t, err)
+		tfrm = ConverterOK(func(in string) (string, bool) { return in, false })
+		out, err = tfrm(ctx, "bye")
+		check.Error(t, err)
+		check.ErrorIs(t, err, ErrIteratorSkip)
+		check.Equal(t, out, "bye")
+	})
+
 }

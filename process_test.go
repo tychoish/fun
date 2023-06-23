@@ -238,4 +238,79 @@ func TestProcess(t *testing.T) {
 		assert.Error(t, pf(ctx, 42))
 		assert.Equal(t, count, 3)
 	})
+	t.Run("ReadOne", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		nopCt := 0
+		var nopProd Producer[string] = func(ctx context.Context) (string, error) { nopCt++; return "nop", nil }
+		var nopProc Processor[string] = func(ctx context.Context, in string) error { nopCt++; check.Equal(t, in, "nop"); return nil }
+		op := nopProc.ReadOne(nopProd)
+		check.Equal(t, nopCt, 0)
+		check.NotError(t, op(ctx))
+		check.Equal(t, nopCt, 2)
+	})
+	t.Run("Join", func(t *testing.T) {
+		onect, twoct := 0, 0
+		reset := func() { onect, twoct = 0, 0 }
+		t.Run("Basic", func(t *testing.T) {
+			var one Processor[string] = func(ctx context.Context, in string) error { onect++; check.Equal(t, in, t.Name()); return ctx.Err() }
+			var two Processor[string] = func(ctx context.Context, in string) error { twoct++; check.Equal(t, in, t.Name()); return ctx.Err() }
+
+			pf := one.Join(two)
+			check.NotError(t, pf(testt.Context(t), t.Name()))
+			check.Equal(t, onect, 1)
+			check.Equal(t, twoct, 1)
+			reset()
+
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			var one Processor[string] = func(ctx context.Context, in string) error { onect++; check.Equal(t, in, t.Name()); return ctx.Err() }
+			var two Processor[string] = func(ctx context.Context, in string) error { twoct++; check.Equal(t, in, t.Name()); return ctx.Err() }
+
+			pf := one.Join(two)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			err := pf(ctx, t.Name())
+			check.Error(t, err)
+			check.ErrorIs(t, err, context.Canceled)
+			check.Equal(t, onect, 1)
+			check.Equal(t, twoct, 0)
+			reset()
+
+		})
+		t.Run("CancelBetweenShouldNoopSecond", func(t *testing.T) {
+			sig1 := make(chan struct{})
+			sig2 := make(chan struct{})
+			sig3 := make(chan struct{})
+			one := Processor[string](func(ctx context.Context, in string) error {
+				defer close(sig1)
+				<-sig2
+				onect++
+				check.Equal(t, in, t.Name())
+
+				return nil
+			})
+			two := Processor[string](func(ctx context.Context, in string) error {
+				twoct++
+				check.Equal(t, in, t.Name())
+				return nil
+			})
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			pf := one.Join(two)
+			go func() { defer close(sig3); check.NotError(t, pf(ctx, t.Name())) }()
+			close(sig2)
+			<-sig1
+			check.Equal(t, onect, 1)
+			check.Equal(t, twoct, 0)
+			<-sig3
+		})
+
+	})
+
 }

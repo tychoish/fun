@@ -23,7 +23,7 @@ func ParsePanic(r any) error {
 // produce an error, and, if the function panics, converts it into an
 // error.
 func Check(fn func()) (err error) {
-	defer func() { err = Join(err, ParsePanic(recover())) }()
+	defer func() { err = ParsePanic(recover()) }()
 	fn()
 	return
 }
@@ -31,7 +31,7 @@ func Check(fn func()) (err error) {
 // Safe runs a function with a panic handler that converts the panic
 // to an error.
 func Safe[T any](fn func() T) (out T, err error) {
-	defer func() { err = Join(err, ParsePanic(recover())) }()
+	defer func() { err = ParsePanic(recover()) }()
 	out = fn()
 	return
 }

@@ -3,7 +3,6 @@ package ers
 import (
 	"errors"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -17,7 +16,7 @@ func merge(one, two error) error {
 	case one != nil && two == nil:
 		return one
 	default:
-		return &mergederr{Current: one, Previous: two}
+		return &mergederr{current: one, previous: two}
 	}
 }
 
@@ -43,14 +42,12 @@ func Join(errs ...error) error {
 func Unwind(in error) (out []error) { return internal.Unwind(in) }
 
 type mergederr struct {
-	Current  error
-	Previous error
+	current  error
+	previous error
 }
 
-var count = &atomic.Int64{}
-
 func (dwe *mergederr) Unwrap() (out []error) {
-	for _, err := range []error{dwe.Current, dwe.Previous} {
+	for _, err := range []error{dwe.current, dwe.previous} {
 		switch e := err.(type) {
 		case interface{ Unwrap() []error }:
 			out = append(out, e.Unwrap()...)
@@ -63,32 +60,38 @@ func (dwe *mergederr) Unwrap() (out []error) {
 	return
 }
 
-func (dwe *mergederr) findRoot() error {
-	if dwe.Previous == nil {
-		return nil
+func (dwe *mergederr) rootSize() (size int, err error) {
+	if dwe.previous == nil {
+		if !OK(dwe.current) {
+			return 1, nil
+		}
+		return 0, nil
 	}
 
 	errs := dwe.Unwrap()
-	if len(errs) == 0 {
-		return nil
+	l := len(errs)
+
+	if l == 0 {
+		return 0, nil
 	}
-	return errs[len(errs)-1]
+
+	return l, errs[l-1]
 }
 
 func (dwe *mergederr) Error() string {
-	if root := dwe.findRoot(); root != nil {
-		return fmt.Sprintf("%v [%v]", dwe.Current, root)
+	if size, root := dwe.rootSize(); root != nil {
+		return fmt.Sprintf("%v [%v] <%d>", dwe.current, root, size)
 	}
-	if dwe.Current == nil {
-		return "nil-error"
+	if dwe.current == nil {
+		return "<nil>"
 	}
-	return dwe.Current.Error()
+	return dwe.current.Error()
 }
 
 func (dwe *mergederr) Is(target error) bool {
-	return errors.Is(dwe.Current, target) || errors.Is(dwe.Previous, target)
+	return errors.Is(dwe.current, target) || errors.Is(dwe.previous, target)
 }
 
 func (dwe *mergederr) As(target any) bool {
-	return errors.As(dwe.Current, target) || errors.As(dwe.Previous, target)
+	return errors.As(dwe.current, target) || errors.As(dwe.previous, target)
 }

@@ -183,8 +183,12 @@ func TestIterator(t *testing.T) {
 				fmt.Sprint(2),
 			})
 			calls := 0
+
 			out := ConvertIterator(input,
-				ConverterErr(func(in string) (int, error) { calls++; return strconv.Atoi(in) }),
+				ConverterOK(func(in string) (int, bool) {
+					calls++
+					return ers.SafeOK(func() (int, error) { return strconv.Atoi(in) })
+				}),
 			)
 			sum := 0
 			for out.Next(ctx) {
