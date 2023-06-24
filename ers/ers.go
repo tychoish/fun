@@ -13,11 +13,11 @@ import (
 //
 // This, roughly mirrors the usage "github/pkg/errors.Wrap" but
 // taking advantage of newer standard library error wrapping.
-func Wrap(err error, annotation string) error {
+func Wrap(err error, annotation ...any) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%s: %w", annotation, err)
+	return fmt.Errorf("%s: %w", fmt.Sprint(annotation...), err)
 }
 
 // Wrapf produces a wrapped error, if the error is non-nil, with a

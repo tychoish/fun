@@ -41,6 +41,18 @@ func TestPanics(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		t.Run("ArbitraryObject", func(t *testing.T) {
+			err := ParsePanic(t)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+
+			check.Substring(t, err.Error(), "testing.T")
+			if !errors.Is(err, ErrRecoveredPanic) {
+				t.Error("not wrapped", err)
+			}
+		})
+
 		t.Run("TwoErrors", func(t *testing.T) {
 			err := ParsePanic(io.EOF)
 			if err == nil {
@@ -59,7 +71,7 @@ func TestPanics(t *testing.T) {
 				t.Fatal("expected error")
 			}
 			if errors.Is(err, io.EOF) {
-				t.Error("is EOF", err)
+				t.Error(err)
 			}
 			if !errors.Is(err, ErrRecoveredPanic) {
 				t.Error("not wrapped", err)

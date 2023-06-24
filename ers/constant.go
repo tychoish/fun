@@ -32,7 +32,7 @@ func (e Error) Is(err error) bool {
 		case Error:
 			return x == e
 		default:
-			return err.Error() == e.Error()
+			return false
 		}
 	}
 }

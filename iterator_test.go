@@ -118,10 +118,18 @@ func TestIterator(t *testing.T) {
 		})
 	})
 	t.Run("Process", func(t *testing.T) {
-		t.Run("Basic", func(t *testing.T) {
+		t.Run("Process", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return nil })
+			assert.NotError(t, err)
+			check.Equal(t, 9, count)
+		})
+		t.Run("ProcessWorker", func(t *testing.T) {
+			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			count := 0
+			op := Processor[int](func(ctx context.Context, i int) error { count++; return nil }).Iterator(iter)
+			err := op(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
 		})

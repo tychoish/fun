@@ -35,6 +35,8 @@ func (RuntimeInvariant) OK(cond bool, args ...any) {
 				panic(ers.Join(ei, ErrInvariantViolation))
 			case string:
 				panic(ers.Join(ers.New(ei), ErrInvariantViolation))
+			case func() error:
+				panic(ers.Join(ei(), ErrInvariantViolation))
 			default:
 				panic(fmt.Errorf("%v: %w", args[0], ErrInvariantViolation))
 			}
@@ -46,18 +48,11 @@ func (RuntimeInvariant) OK(cond bool, args ...any) {
 	}
 }
 
-// Must raises an invariant error if the error is not
-// nil. The content of the panic is both--via wrapping--an
-// ErrInvariantViolation and the error itself.
+// Must raises an invariant error if the error is not nil. The content
+// of the panic is both--via wrapping--an ErrInvariantViolation and
+// the error itself.
 func (RuntimeInvariant) Must(err error, args ...any) {
-	if err == nil {
-		return
-	}
-	if len(args) == 0 {
-		panic(ers.Join(err, ErrInvariantViolation))
-	}
-
-	panic(ers.Join(fmt.Errorf("%s: %w", fmt.Sprint(args...), err), ErrInvariantViolation))
+	Invariant.OK(err == nil, func() error { return ers.Wrap(err, args...) })
 }
 
 // Must wraps a function that returns a value and an error, and

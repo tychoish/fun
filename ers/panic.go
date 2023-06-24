@@ -12,8 +12,10 @@ func ParsePanic(r any) error {
 		switch err := r.(type) {
 		case error:
 			return Join(err, ErrRecoveredPanic)
+		case string:
+			return Join(New(err), ErrRecoveredPanic)
 		default:
-			return Join(fmt.Errorf("%v", err), ErrRecoveredPanic)
+			return Join(fmt.Errorf("[%T]: %v", err, err), ErrRecoveredPanic)
 		}
 	}
 	return nil
