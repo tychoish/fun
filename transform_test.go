@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -342,7 +343,7 @@ func TestParallelForEach(t *testing.T) {
 		}
 		check.True(t, paned.Load())
 		if seenCount.Load() != 9 {
-			t.Error("should have only seen one", seenCount.Load())
+			t.Error("should have only seen", 9, "saw", seenCount.Load())
 		}
 		errs := ers.Unwind(err)
 		if len(errs) != 2 {
@@ -1143,6 +1144,84 @@ func RunIteratorStringAlgoTests(
 		})
 
 		check.Equal(t, count.Load(), 128)
+	})
+	t.Run("Pipe", func(t *testing.T) {
+		t.Run("Serial", func(t *testing.T) {
+			var root error
+			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
+			proc, prod := tfm.Pipe()
+			ctx := testt.Context(t)
+			for i := 0; i < 100; i++ {
+				assert.NotError(t, proc(ctx, i))
+				assert.Equal(t, fmt.Sprint(i), ft.Must(prod(ctx)))
+			}
+			root = io.EOF
+			for i := 0; i < 100; i++ {
+				assert.NotError(t, proc(ctx, i))
+				out, err := prod(ctx)
+				assert.ErrorIs(t, err, io.EOF)
+				assert.Equal(t, fmt.Sprint(i), out)
+			}
+
+		})
+		t.Run("Parallel", func(t *testing.T) {
+			var root error
+			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
+			proc, prod := tfm.Pipe()
+			ctx := testt.Context(t)
+			wg := &WaitGroup{}
+			wg.DoTimes(ctx, 100, func(ctx context.Context) {
+				assert.NotError(t, proc(ctx, 42))
+				assert.Equal(t, fmt.Sprint(42), ft.Must(prod(ctx)))
+			})
+		})
+	})
+	t.Run("Worker", func(t *testing.T) {
+		var tfmroot error
+		var prodroot error
+		var procroot error
+		var tfmcount int
+		var prodcount int
+		var proccount int
+		reset := func() { tfmcount, prodcount, proccount = 0, 0, 0; prodroot, procroot = nil, nil }
+		prod := Producer[int](func(ctx context.Context) (int, error) { prodcount++; return 42, prodroot })
+		proc := Processor[string](func(ctx context.Context, in string) error { proccount++; check.Equal(t, in, "42"); return procroot })
+		tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
+		worker := tfm.Worker(prod, proc)
+		ctx := testt.Context(t)
+
+		t.Run("HappyPath", func(t *testing.T) {
+			defer reset()
+			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 0)
+			check.NotError(t, worker(ctx))
+			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
+		})
+
+		t.Run("ProdError", func(t *testing.T) {
+			defer reset()
+			prodroot = io.EOF
+			check.ErrorIs(t, worker(ctx), io.EOF)
+			check.True(t, proccount == tfmcount && tfmcount == 0)
+			check.Equal(t, prodcount, 1)
+			testt.Log(t, prodcount, proccount, tfmcount)
+		})
+		t.Run("ProcError", func(t *testing.T) {
+			defer reset()
+
+			procroot = io.EOF
+			check.ErrorIs(t, worker(ctx), io.EOF)
+			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
+			testt.Log(t, prodcount, proccount, tfmcount)
+		})
+		t.Run("MapFails", func(t *testing.T) {
+			defer reset()
+			tfmroot = io.EOF
+			check.ErrorIs(t, worker(ctx), io.EOF)
+			check.True(t, prodcount == tfmcount && tfmcount == 1)
+			check.Equal(t, proccount, 0)
+			testt.Log(t, prodcount, proccount, tfmcount)
+		})
+
 	})
 
 }

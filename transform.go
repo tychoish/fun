@@ -54,16 +54,6 @@ func ConverterErr[T any, O any](op func(T) (O, error)) Transform[T, O] {
 	return func(ctx context.Context, in T) (O, error) { return op(in) }
 }
 
-func MakeMaper[T any, O any](in Processor[T], out Producer[O]) Transform[T, O] {
-	var zero O
-	return func(ctx context.Context, val T) (O, error) {
-		if err := in(ctx, val); err != nil {
-			return zero, err
-		}
-		return out(ctx)
-	}
-}
-
 func (mpf Transform[T, O]) Convert(iter *Iterator[T]) *Iterator[O] {
 	return mpf.Producer(iter).Iterator()
 }
@@ -133,13 +123,8 @@ func (mpf Transform[T, O]) Producer(iter *Iterator[T]) Producer[O] {
 func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O]) {
 	pipe := Blocking(make(chan T, 1))
 	prod := pipe.Producer()
-	var zero O
 	return pipe.Processor(), func(ctx context.Context) (O, error) {
-		middle, err := prod(ctx)
-		if err != nil {
-			return zero, err
-		}
-		return mpf(ctx, middle)
+		return mpf(ctx, ft.Must(prod(ctx)))
 	}
 }
 

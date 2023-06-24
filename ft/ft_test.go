@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 )
 
 func TestWhen(t *testing.T) {
@@ -26,6 +27,13 @@ func TestWhen(t *testing.T) {
 		WhenCall(false, func() { called = true })
 		check.True(t, !called)
 	})
+}
+
+func TestMust(t *testing.T) {
+	assert.Panic(t, func() { Must("32", ers.Error("whoop")) })
+	assert.Panic(t, func() { MustBeOk("32", false) })
+	assert.NotPanic(t, func() { check.Equal(t, "32", Must("32", nil)) })
+	assert.NotPanic(t, func() { check.Equal(t, "32", MustBeOk("32", true)) })
 }
 
 func TestContains(t *testing.T) {
