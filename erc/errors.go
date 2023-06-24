@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 )
 
 // Stack represents the error type returned by an ErrorCollector
@@ -97,7 +98,7 @@ func (e *Stack) Unwrap() []error {
 	if e == nil || e.next == nil {
 		return nil
 	}
-	return fun.Must(e.Iterator().Slice(context.Background()))
+	return ft.Must(e.Iterator().Slice(context.Background()))
 }
 
 func (e *Stack) Producer() fun.Producer[error] {

@@ -15,14 +15,14 @@ import (
 
 func TestPanics(t *testing.T) {
 	t.Run("MustNoPanic", func(t *testing.T) {
-		ok := Must(func() (bool, error) {
+		ok := ft.Must(func() (bool, error) {
 			return true, nil
 		}())
 		assert.True(t, ok)
 	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
 		ok, err := ers.Safe(func() bool {
-			return Must(func() (bool, error) {
+			return ft.Must(func() (bool, error) {
 				return true, nil
 			}())
 		})
@@ -153,11 +153,11 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("MustBeOk", func(t *testing.T) {
 		assert.NotPanic(t, func() {
-			foo := MustBeOk(func() (string, bool) { return "foo", true }())
+			foo := ft.MustBeOk(func() (string, bool) { return "foo", true }())
 			assert.Equal(t, "foo", foo)
 		})
 		assert.Panic(t, func() {
-			foo := MustBeOk(func() (string, bool) { return "foo", false }())
+			foo := ft.MustBeOk(func() (string, bool) { return "foo", false }())
 			assert.Equal(t, "foo", foo)
 		})
 	})

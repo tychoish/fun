@@ -1,6 +1,10 @@
 package ft
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/tychoish/fun/ers"
+)
 
 // IsZero returns true if the input value compares "true" to the zero
 // value for the type of the argument. If the type implements an
@@ -106,3 +110,20 @@ func Contains[T comparable](item T, slice []T) bool {
 // provided. Useful for bridging interface paradigms, and for storing
 // interface-typed objects in atomics.
 func Wrapper[T any](in T) func() T { return func() T { return in } }
+
+// Must wraps a function that returns a value and an error, and
+// converts the error to a panic.
+func Must[T any](arg T, err error) T {
+	WhenCall(err != nil, func() { panic(ers.Join(err, ers.ErrInvariantViolation)) })
+	return arg
+}
+
+// MustBeOk raises an invariant violation if the ok value is false,
+// and returns the first value if the second value is ok. Useful as
+// in:
+//
+//	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
+func MustBeOk[T any](out T, ok bool) T {
+	WhenCall(!ok, func() { panic(ers.Join(ers.New("ok check failed"), ers.ErrInvariantViolation)) })
+	return out
+}

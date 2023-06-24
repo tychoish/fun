@@ -54,14 +54,3 @@ func (RuntimeInvariant) OK(cond bool, args ...any) {
 func (RuntimeInvariant) Must(err error, args ...any) {
 	Invariant.OK(err == nil, func() error { return ers.Wrap(err, args...) })
 }
-
-// Must wraps a function that returns a value and an error, and
-// converts the error to a panic.
-func Must[T any](arg T, err error) T { Invariant.Must(err); return arg }
-
-// MustBeOk raises an invariant violation if the ok value is false,
-// and returns the first value if the second value is ok. Useful as
-// in:
-//
-//	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
-func MustBeOk[T any](out T, ok bool) T { Invariant.OK(ok, "ok check failed"); return out }

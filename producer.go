@@ -162,7 +162,7 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 
 // Must runs the producer returning the constructed value and panicing
 // if the producer errors.
-func (pf Producer[T]) Must(ctx context.Context) T { return Must(pf(ctx)) }
+func (pf Producer[T]) Must(ctx context.Context) T { return ft.Must(pf(ctx)) }
 
 // Block runs the producer with a context that will ever expire.
 func (pf Producer[T]) Block() (T, error) { return pf(context.Background()) }
@@ -170,7 +170,7 @@ func (pf Producer[T]) Block() (T, error) { return pf(context.Background()) }
 // Force combines the semantics of Must and Block: runs the producer
 // with a context that never expires and panics in the case of an
 // error.
-func (pf Producer[T]) Force() T { return Must(pf.Block()) }
+func (pf Producer[T]) Force() T { return ft.Must(pf.Block()) }
 
 // Check uses the error observer to consume the error from the
 // Producer and returns a function that takes a context and returns a value.

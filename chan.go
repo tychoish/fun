@@ -12,7 +12,7 @@ import (
 // ErrNonBlockingChannelOperationSkipped is returned when sending into
 // a channel, in a non-blocking context, when the channel was full and
 // the send or receive was therefore skipped.
-const ErrNonBlockingChannelOperationSkipped = ers.Error("non-blocking channel operation skipped")
+const ErrNonBlockingChannelOperationSkipped ers.Error = ers.Error("non-blocking channel operation skipped")
 
 // blockingMode provides named constants for blocking/non-blocking
 // operations. They are fully internal, and only used indirectly.
