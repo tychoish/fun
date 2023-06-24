@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -200,8 +201,12 @@ func TestProcess(t *testing.T) {
 				return nil
 			})
 
-			future := op.Worker(42).StartGroup(ctx, 128)
-			assert.NotError(t, future(ctx))
+			wg := &WaitGroup{}
+			oe := HF.ErrorObserver(func(err error) { Invariant.Must(err) })
+			op = op.Lock()
+
+			ft.DoTimes(128, func() { op.Operation(42, oe).Add(ctx, wg) })
+			wg.Operation().Block()
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {

@@ -380,9 +380,10 @@ func TestProducer(t *testing.T) {
 			assert.Equal(t, out, 0)
 			assert.Equal(t, counter, 1)
 		})
+	})
+	t.Run("Future", func(t *testing.T) {
 
 	})
-
 }
 
 func producerContinuesOnce[T any](out T, counter *atomic.Int64) Producer[T] {

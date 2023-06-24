@@ -1063,5 +1063,86 @@ func RunIteratorStringAlgoTests(
 		check.ErrorIs(t, err, ErrIteratorSkip)
 		check.Equal(t, out, "bye")
 	})
+	t.Run("Block", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+				check.Equal(t, ctx, context.Background())
+				check.Equal(t, in, 42)
+				count++
+				return fmt.Sprint(in), nil
+			})
+
+			out, err := mpf.Block()(42)
+			check.Equal(t, "42", out)
+			check.NotError(t, err)
+			check.Equal(t, count, 1)
+		})
+		t.Run("Error", func(t *testing.T) {
+			count := 0
+			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+				check.Equal(t, ctx, context.Background())
+				check.Equal(t, in, 42)
+				count++
+				return fmt.Sprint(in), io.EOF
+			})
+
+			out, err := mpf.Block()(42)
+			check.Equal(t, "42", out)
+			check.Error(t, err)
+			check.ErrorIs(t, err, io.EOF)
+			check.Equal(t, count, 1)
+		})
+	})
+	t.Run("BlockCheck", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+				check.Equal(t, ctx, context.Background())
+				check.Equal(t, in, 42)
+				count++
+				return fmt.Sprint(in), nil
+			})
+
+			out, ok := mpf.BlockCheck()(42)
+			check.Equal(t, "42", out)
+			check.True(t, ok)
+			check.Equal(t, count, 1)
+		})
+		t.Run("Error", func(t *testing.T) {
+			count := 0
+			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+				check.Equal(t, ctx, context.Background())
+				check.Equal(t, in, 42)
+				count++
+				return fmt.Sprint(in), io.EOF
+			})
+
+			out, ok := mpf.BlockCheck()(42)
+			check.Equal(t, "", out)
+			check.True(t, !ok)
+			check.Equal(t, count, 1)
+		})
+	})
+	t.Run("Lock", func(t *testing.T) {
+		count := &atomic.Int64{}
+
+		mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+			check.Equal(t, in, 42)
+			count.Add(1)
+			return fmt.Sprint(in), nil
+		})
+		mpf = mpf.Lock()
+		// tempt the race detector
+		wg := &WaitGroup{}
+		ctx := testt.Context(t)
+		wg.DoTimes(ctx, 128, func(ctx context.Context) {
+			out, err := mpf(ctx, 42)
+			check.Equal(t, out, "42")
+			check.NotError(t, err)
+		})
+
+		check.Equal(t, count.Load(), 128)
+	})
 
 }
