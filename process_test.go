@@ -317,5 +317,63 @@ func TestProcess(t *testing.T) {
 		})
 
 	})
-
+	t.Run("PreHook", func(t *testing.T) {
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Processor[int](func(ctx context.Context, in int) error {
+				check.Equal(t, in, 42)
+				assert.Equal(t, count, 1)
+				count++
+				return nil
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
+			ctx := testt.Context(t)
+			err := pf(ctx, 42)
+			check.Error(t, err)
+			check.ErrorIs(t, err, root)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Processor[int](func(ctx context.Context, in int) error {
+				check.Equal(t, in, 42)
+				assert.Equal(t, count, 1)
+				count++
+				return nil
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			ctx := testt.Context(t)
+			err := pf(ctx, 42)
+			check.NotError(t, err)
+			check.Equal(t, 2, count)
+		})
+	})
+	t.Run("PostHook", func(t *testing.T) {
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Processor[int](func(ctx context.Context, in int) error {
+				check.Equal(t, in, 42)
+				assert.Zero(t, count)
+				count++
+				return nil
+			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
+			ctx := testt.Context(t)
+			err := pf(ctx, 42)
+			check.Error(t, err)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Processor[int](func(ctx context.Context, in int) error {
+				check.Equal(t, in, 42)
+				assert.Zero(t, count)
+				count++
+				return nil
+			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
+			ctx := testt.Context(t)
+			err := pf(ctx, 42)
+			check.NotError(t, err)
+			check.Equal(t, 2, count)
+		})
+	})
 }

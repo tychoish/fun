@@ -381,8 +381,96 @@ func TestProducer(t *testing.T) {
 			assert.Equal(t, counter, 1)
 		})
 	})
-	t.Run("Future", func(t *testing.T) {
-
+	t.Run("PreHook", func(t *testing.T) {
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Producer[int](func(ctx context.Context) (int, error) {
+				assert.Equal(t, count, 1)
+				count++
+				return 42, nil
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
+			ctx := testt.Context(t)
+			val, err := pf(ctx)
+			check.Error(t, err)
+			check.Equal(t, val, 42)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Producer[int](func(ctx context.Context) (int, error) {
+				assert.Equal(t, count, 1)
+				count++
+				return 42, nil
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			ctx := testt.Context(t)
+			val, err := pf(ctx)
+			check.NotError(t, err)
+			check.Equal(t, val, 42)
+			check.Equal(t, 2, count)
+		})
+	})
+	t.Run("PostHook", func(t *testing.T) {
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Producer[int](func(ctx context.Context) (int, error) {
+				assert.Zero(t, count)
+				count++
+				return 42, nil
+			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
+			ctx := testt.Context(t)
+			val, err := pf(ctx)
+			check.Error(t, err)
+			check.Equal(t, val, 42)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Producer[int](func(ctx context.Context) (int, error) {
+				assert.Zero(t, count)
+				count++
+				return 42, nil
+			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
+			ctx := testt.Context(t)
+			val, err := pf(ctx)
+			check.NotError(t, err)
+			check.Equal(t, val, 42)
+			check.Equal(t, 2, count)
+		})
+	})
+	t.Run("Send", func(t *testing.T) {
+		t.Run("One", func(t *testing.T) {
+			count := 0
+			wf := Producer[int](func(ctx context.Context) (int, error) {
+				assert.Zero(t, count)
+				count++
+				return 42, nil
+			}).SendOne(func(ctx context.Context, in int) error {
+				assert.Equal(t, count, 1)
+				assert.Equal(t, in, 42)
+				count++
+				return nil
+			})
+			check.NotError(t, wf(testt.Context(t)))
+			check.Equal(t, 2, count)
+		})
+		t.Run("OneError", func(t *testing.T) {
+			count := 0
+			root := ers.New("hello")
+			wf := Producer[int](func(ctx context.Context) (int, error) {
+				assert.Zero(t, count)
+				count++
+				return 42, root
+			}).SendOne(func(ctx context.Context, in int) error {
+				assert.Equal(t, "should not run", "")
+				return nil
+			})
+			err := wf(testt.Context(t))
+			check.Error(t, err)
+			check.ErrorIs(t, err, root)
+			check.Equal(t, 1, count)
+		})
 	})
 }
 

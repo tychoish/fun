@@ -306,11 +306,11 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 }
 
 func (wf Worker) PreHook(op func(context.Context)) Worker {
-	return func(ctx context.Context) error { op(ctx); return wf(ctx) }
+	return func(ctx context.Context) error { return ers.Join(ers.Check(func() { op(ctx) }), wf(ctx)) }
 }
 
 func (wf Worker) PostHook(op func()) Worker {
-	return func(ctx context.Context) (err error) { err = wf(ctx); op(); return }
+	return func(ctx context.Context) error { return ers.Join(ft.Flip(wf(ctx), ers.Check(op))) }
 }
 
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {

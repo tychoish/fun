@@ -244,6 +244,18 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
+func (pf Processor[T]) PreHook(op Operation) Processor[T] {
+	return func(ctx context.Context, in T) error {
+		return ers.Join(ers.Check(func() { op(ctx) }), pf(ctx, in))
+	}
+}
+
+func (pf Processor[T]) PostHook(op func()) Processor[T] {
+	return func(ctx context.Context, in T) error {
+		return ers.Join(ft.Flip(pf(ctx, in), ers.Check(op)))
+	}
+}
+
 func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }

@@ -650,34 +650,6 @@ func TestWorker(t *testing.T) {
 		fwf = wf.WithoutErrors(io.EOF, context.Canceled)
 		assert.NotError(t, fwf(ctx))
 	})
-	t.Run("PreHook", func(t *testing.T) {
-		count := 0
-		rctx := testt.Context(t)
-		var wf Worker = func(ctx context.Context) error {
-			testt.Log(t, count)
-			check.True(t, count == 1 || count == 4)
-			check.Equal(t, rctx, ctx)
-			count++
-			return nil
-		}
-
-		wf = wf.PreHook(func(ctx context.Context) {
-			testt.Log(t, count)
-			check.True(t, count == 0 || count == 3)
-			check.Equal(t, rctx, ctx)
-			count++
-		})
-		check.NotError(t, wf(rctx))
-		check.Equal(t, 2, count)
-		wf = wf.PreHook(func(ctx context.Context) {
-			testt.Log(t, count)
-			check.Equal(t, count, 2)
-			check.Equal(t, rctx, ctx)
-			count++
-		})
-		check.NotError(t, wf(rctx))
-		check.Equal(t, 5, count)
-	})
 	t.Run("WithCancel", func(t *testing.T) {
 		ctx := testt.Context(t)
 		wf, cancel := Worker(func(ctx context.Context) error {
@@ -713,5 +685,88 @@ func TestWorker(t *testing.T) {
 		check.NotError(t, wf(ctx))
 		check.NotError(t, wf(ctx))
 	})
+	t.Run("PreHook", func(t *testing.T) {
+		t.Run("Chain", func(t *testing.T) {
+			count := 0
+			rctx := testt.Context(t)
+			var wf Worker = func(ctx context.Context) error {
+				testt.Log(t, count)
+				check.True(t, count == 1 || count == 4)
+				check.Equal(t, rctx, ctx)
+				count++
+				return nil
+			}
 
+			wf = wf.PreHook(func(ctx context.Context) {
+				testt.Log(t, count)
+				check.True(t, count == 0 || count == 3)
+				check.Equal(t, rctx, ctx)
+				count++
+			})
+			check.NotError(t, wf(rctx))
+			check.Equal(t, 2, count)
+			wf = wf.PreHook(func(ctx context.Context) {
+				testt.Log(t, count)
+				check.Equal(t, count, 2)
+				check.Equal(t, rctx, ctx)
+				count++
+			})
+			check.NotError(t, wf(rctx))
+			check.Equal(t, 5, count)
+		})
+
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Worker(func(ctx context.Context) error {
+				assert.Equal(t, count, 1)
+				count++
+				return nil
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
+			ctx := testt.Context(t)
+			err := pf(ctx)
+			check.Error(t, err)
+			check.ErrorIs(t, err, root)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Worker(func(ctx context.Context) error {
+				assert.Equal(t, count, 1)
+				count++
+				return nil
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			ctx := testt.Context(t)
+			err := pf(ctx)
+			check.NotError(t, err)
+			check.Equal(t, 2, count)
+		})
+	})
+	t.Run("PostHook", func(t *testing.T) {
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Worker(func(ctx context.Context) error {
+				assert.Zero(t, count)
+				count++
+				return nil
+			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
+			ctx := testt.Context(t)
+			err := pf(ctx)
+			check.Error(t, err)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Worker(func(ctx context.Context) error {
+				assert.Zero(t, count)
+				count++
+				return nil
+			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
+			ctx := testt.Context(t)
+			err := pf(ctx)
+			check.NotError(t, err)
+			check.Equal(t, 2, count)
+		})
+	})
 }

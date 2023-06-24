@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -385,4 +386,79 @@ func TestOperation(t *testing.T) {
 			opwait(ctx)
 		})
 	})
+	t.Run("PreHook", func(t *testing.T) {
+		t.Run("Chain", func(t *testing.T) {
+			count := 0
+			rctx := testt.Context(t)
+			var wf Operaiton = func(ctx context.Context) error {
+				testt.Log(t, count)
+				check.True(t, count == 1 || count == 4)
+				check.Equal(t, rctx, ctx)
+				count++
+				return nil
+			}
+
+			wf = wf.PreHook(func(ctx context.Context) {
+				testt.Log(t, count)
+				check.True(t, count == 0 || count == 3)
+				check.Equal(t, rctx, ctx)
+				count++
+			})
+			check.NotError(t, wf(rctx))
+			check.Equal(t, 2, count)
+			wf = wf.PreHook(func(ctx context.Context) {
+				testt.Log(t, count)
+				check.Equal(t, count, 2)
+				check.Equal(t, rctx, ctx)
+				count++
+			})
+			check.NotError(t, wf(rctx))
+			check.Equal(t, 5, count)
+		})
+
+		t.Run("WithPanic", func(t *testing.T) {
+			count := 0
+			pf := Operation(func(ctx context.Context) {
+				assert.Equal(t, count, 1)
+				count++
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
+			ctx := testt.Context(t)
+			pf(ctx)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Operation(func(ctx context.Context) {
+				assert.Equal(t, count, 1)
+				count++
+			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			ctx := testt.Context(t)
+			err := pf(ctx)
+			check.Equal(t, 2, count)
+		})
+	})
+	t.Run("PostHook", func(t *testing.T) {
+		t.Run("WithPanic", func(t *testing.T) {
+			root := ers.Error(t.Name())
+			count := 0
+			pf := Operation(func(ctx context.Context) {
+				assert.Zero(t, count)
+				count++
+			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
+			ctx := testt.Context(t)
+			pf(ctx)
+			check.Equal(t, 2, count)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			pf := Operation(func(ctx context.Context) {
+				assert.Zero(t, count)
+				count++
+			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
+			ctx := testt.Context(t)
+			pf(ctx)
+			check.Equal(t, 2, count)
+		})
+	})
+
 }
