@@ -14,6 +14,8 @@ func ParsePanic(r any) error {
 			return Join(err, ErrRecoveredPanic)
 		case string:
 			return Join(New(err), ErrRecoveredPanic)
+		case []error:
+			return Join(err...)
 		default:
 			return Join(fmt.Errorf("[%T]: %v", err, err), ErrRecoveredPanic)
 		}
@@ -38,8 +40,10 @@ func Safe[T any](fn func() T) (out T, err error) {
 	return
 }
 
-// SafeOK runs a function and checking
+// SafeOK runs a function and returns true if there are no errors and
+// no panics the bool output value is true, otherwise it is false.
 func SafeOK[T any](fn func() (T, error)) (out T, ok bool) {
+	defer func() { ok = !IsError(ParsePanic(recover())) && ok }()
 	if value, err := fn(); OK(err) {
 		out, ok = value, true
 	}

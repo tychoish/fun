@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/assert/check"
 )
 
 func TestTimestamp(t *testing.T) {
@@ -70,6 +72,11 @@ func TestTimestamp(t *testing.T) {
 		if WithTime(nil) != nil {
 			t.Error("timestamp shouldn't zero")
 		}
+	})
+	t.Run("NewWith", func(t *testing.T) {
+		check.Error(t, NewWithTime(""))
+		check.Error(t, NewWithTime("hello"))
+		check.True(t, !GetTime(NewWithTime("hello")).IsZero())
 	})
 
 	t.Run("Formatting", func(t *testing.T) {

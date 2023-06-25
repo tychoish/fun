@@ -122,5 +122,25 @@ func TestErrors(t *testing.T) {
 		check.Equal(t, len(errs), 1)
 		check.Equal(t, len(args), 2)
 	})
+	t.Run("IsError", func(t *testing.T) {
+		check.True(t, !IsError(nil))
+		check.True(t, IsError(New("error")))
+	})
+	t.Run("IsNil", func(t *testing.T) {
+		check.True(t, !Is(nil, io.EOF))
+		check.True(t, Is(io.EOF, io.EOF))
+	})
+	t.Run("Unwrap", func(t *testing.T) {
+		werr := fmt.Errorf("hi: %w", io.EOF)
+		check.True(t, !IsError(Unwrap(New("hello"))))
+		check.True(t, IsError(Unwrap(werr)))
+	})
+	t.Run("As", func(t *testing.T) {
+		var err error = &errorTest{val: 100}
 
+		out := &errorTest{}
+
+		check.True(t, As(err, &out))
+		check.Equal(t, out.val, 100)
+	})
 }

@@ -14,7 +14,7 @@ import (
 // This, roughly mirrors the usage "github/pkg/errors.Wrap" but
 // taking advantage of newer standard library error wrapping.
 func Wrap(err error, annotation ...any) error {
-	if err == nil {
+	if OK(err) {
 		return nil
 	}
 	return fmt.Errorf("%s: %w", fmt.Sprint(annotation...), err)
@@ -27,7 +27,7 @@ func Wrap(err error, annotation ...any) error {
 // This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
 // taking advantage of newer standard library error wrapping.
 func Wrapf(err error, tmpl string, args ...any) error {
-	if err == nil {
+	if OK(err) {
 		return nil
 	}
 
@@ -44,9 +44,18 @@ func ContextExpired(err error) bool { return Is(err, context.Canceled, context.D
 // sites in bool/OK check relevant contexts.
 func OK(err error) bool { return err == nil }
 
+// IsError returns true when the error is non-nill. Provides the
+// inverse of OK().
+func IsError(err error) bool { return !OK(err) }
+
+// Cast converts an untyped/any object into an error, returning nil if
+// the value is not an error or is an error of a nil type.
+func Cast(e any) error { err, _ := e.(error); return err }
+
 // IsTerminating returns true if the error is one of the sentinel
 // errors used by fun (and other packages!) to indicate that
-// processing/iteration has terminated. (e.g. context expiration a)
+// processing/iteration has terminated. (e.g. context expiration, or
+// io.EOF.)
 func IsTerminating(err error) bool {
 	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded)
 }
@@ -54,8 +63,8 @@ func IsTerminating(err error) bool {
 // IsInvariantViolation returns true if the argument is or resolves to
 // ErrInvariantViolation.
 func IsInvariantViolation(r any) bool {
-	err, ok := r.(error)
-	if r == nil || !ok {
+	err := Cast(r)
+	if r == nil || OK(err) {
 		return false
 	}
 
@@ -67,6 +76,9 @@ func IsInvariantViolation(r any) bool {
 // errors.Is.
 func Is(err error, targets ...error) bool {
 	for _, target := range targets {
+		if err == nil && target != nil {
+			continue
+		}
 		if errors.Is(err, target) {
 			return true
 		}

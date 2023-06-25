@@ -10,6 +10,7 @@ func FilterRemove(exclusions ...error) Filter {
 	return FilterCheck(func(err error) bool { return OK(err) || len(exclusions) == 0 || Is(err, exclusions...) })
 }
 
+// FilterNoop produces a filter that always returns the original error.
 func FilterNoop() Filter { return func(err error) error { return err } }
 
 // FilterCheck is an error filter that returns nil when the check is
@@ -23,6 +24,8 @@ func FilterCheck(ep func(error) bool) Filter {
 	}
 }
 
+// FilterConvert returns the provided "output" error for all non-nil
+// errors, and returns nil otherwise.
 func FilterConvert(output error) Filter {
 	return func(err error) error {
 		if OK(err) {

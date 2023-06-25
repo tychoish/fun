@@ -5,7 +5,17 @@
 // dependencies outside of a few packages in the standard library,
 // whereas erc is more tightly integrated into fun's ecosystem and
 // programming model.
+//
+// ers has an API that is equivalent to the standard library errors
+// package, with some additional tools and minor semantic
+// differences.
 package ers
+
+import (
+	"errors"
+
+	"github.com/tychoish/fun/internal"
+)
 
 // Error is a type alias for building/declaring sentinel errors
 // as constants.
@@ -15,7 +25,23 @@ package ers
 // correctly handles unwrapping and casting Error-typed error objects.
 type Error string
 
+// New constructs an error object that uses the Error as the
+// underlying type.
 func New(str string) error { return Error(str) }
+
+// As is a wrapper around errors.As to allow ers to be a drop in
+// replacement for errors.
+func As(err error, target any) bool { return errors.As(err, target) }
+
+// Unwrap is a wrapper around errors.Unwrap to allow ers to be a drop in
+// replacement for errors.
+func Unwrap(err error) error { return errors.Unwrap(err) }
+
+// Unwind, is a special case of the fun.Unwind operation, that
+// assembles the full "unwrapped" list of all component
+// errors. Supports error implementations where the Unwrap() method
+// returns either error or []error.
+func Unwind(in error) (out []error) { return internal.Unwind(in) }
 
 // Error implements the error interface for ConstError.
 func (e Error) Error() string { return string(e) }

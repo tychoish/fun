@@ -37,6 +37,9 @@ func WithTime(err error) error {
 	return &timestamped{err: err, ts: time.Now()}
 }
 
+// NewWithTime creates a new error object with the provided string.
+func NewWithTime(e string) error { return WithTime(New(e)) }
+
 type timestamped struct {
 	err error
 	ts  time.Time

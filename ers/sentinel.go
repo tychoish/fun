@@ -12,6 +12,10 @@ const ErrRecoveredPanic Error = Error("recovered panic")
 // failed validation.
 const ErrMalformedConfiguration Error = Error("malformed configuration")
 
+// ErrLimitExceeded is a constant sentinel error that indicates that a
+// limit has been exceeded. These are generally retriable.
 const ErrLimitExceeded Error = Error("limit exceeded")
 
+// ErrInvalidInput indicates malformed input. These errors are not
+// generally retriable.
 const ErrInvalidInput Error = Error("invalid input")

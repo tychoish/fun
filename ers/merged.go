@@ -3,23 +3,21 @@ package ers
 import (
 	"errors"
 	"fmt"
-
-	"github.com/tychoish/fun/internal"
 )
 
-func merge(one, two error) error {
-	switch {
-	case one == nil && two == nil:
-		return nil
-	case one == nil && two != nil:
-		return two
-	case one != nil && two == nil:
-		return one
-	default:
-		return &mergederr{current: one, previous: two}
-	}
-}
-
+// Join is analogous to errors.Join, with a few distinctions: if there
+// are zero or only nil errors passed to Join, the returned error is
+// nil. If only one non-nil error is passed to join, it is returned
+// directly. Otherwise or one errors passed to join are aggregated
+// into a single error.
+//
+// Internally, and contrary to errors.Join, the aggregated error is
+// stored as a stack, and the string (e.g. Error()) form is:
+//
+//	"{top-most error's Error() value}  [{bottom-most error's Error() value}] <{size}>"
+//
+// Use Unwind() to get the full content of the aggregated error
+// message.
 func Join(errs ...error) error {
 	switch len(errs) {
 	case 0:
@@ -39,7 +37,18 @@ func Join(errs ...error) error {
 	}
 }
 
-func Unwind(in error) (out []error) { return internal.Unwind(in) }
+func merge(one, two error) error {
+	switch {
+	case one == nil && two == nil:
+		return nil
+	case one == nil && two != nil:
+		return two
+	case one != nil && two == nil:
+		return one
+	default:
+		return &mergederr{current: one, previous: two}
+	}
+}
 
 type mergederr struct {
 	current  error
