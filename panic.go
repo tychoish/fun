@@ -9,11 +9,11 @@ import (
 
 // ErrInvariantViolation is the root error of the error object that is
 // the content of all panics produced by the Invariant helper.
-const ErrInvariantViolation = ers.ErrInvariantViolation
+const ErrInvariantViolation ers.Error = ers.ErrInvariantViolation
 
 // ErrRecoveredPanic is at the root of any error returned by a
 // function in the fun package that recovers from a panic.
-const ErrRecoveredPanic = ers.ErrRecoveredPanic
+const ErrRecoveredPanic ers.Error = ers.ErrRecoveredPanic
 
 var Invariant RuntimeInvariant = RuntimeInvariant{}
 

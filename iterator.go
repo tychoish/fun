@@ -19,7 +19,7 @@ import (
 
 // ErrIteratorSkip instructs consumers of Iterators and related
 // processors to ignore the
-const ErrIteratorSkip = ers.Error("skip-iteration")
+const ErrIteratorSkip ers.Error = ers.Error("skip-iteration")
 
 // Iterator provides a safe, context-respecting iteration/sequence
 // paradigm, and entire tool kit for consumer functions, converters,
