@@ -10,6 +10,8 @@ func FilterRemove(exclusions ...error) Filter {
 	return FilterCheck(func(err error) bool { return OK(err) || len(exclusions) == 0 || Is(err, exclusions...) })
 }
 
+func FilterNoop() Filter { return func(err error) error { return err } }
+
 // FilterCheck is an error filter that returns nil when the check is
 // true, and false otherwise.
 func FilterCheck(ep func(error) bool) Filter {

@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -471,6 +472,272 @@ func TestProducer(t *testing.T) {
 			check.ErrorIs(t, err, root)
 			check.Equal(t, 1, count)
 		})
+	})
+	t.Run("SendAll", func(t *testing.T) {
+		// this is just and end to end test because it's
+		// essentially sugar
+		count := 0
+		const num = 42
+		worker := Producer[int](func(ctx context.Context) (int, error) {
+			count++
+			if count > num {
+				return -1, io.EOF
+			}
+			return count, nil
+		}).SendAll(func(ctx context.Context, in int) error {
+			check.NotEqual(t, in, -1)
+			check.NotEqual(t, in, 0)
+			check.Equal(t, count, in)
+			check.True(t, in <= num)
+			return nil
+		})
+		check.Equal(t, 0, count)
+		ctx := testt.Context(t)
+		check.NotError(t, worker(ctx))
+		check.Equal(t, 43, count)
+	})
+	t.Run("Future", func(t *testing.T) {
+		sig := make(chan struct{})
+		ctx := testt.Context(t)
+		count := &atomic.Int64{}
+		errSignaled := ers.New("signaled")
+		var prod Producer[int] = func(ctx context.Context) (int, error) {
+			// that it started
+			count.Add(1)
+
+			// that it finished
+			defer count.Add(1)
+
+			// do the waiting
+			select {
+			case <-sig:
+				return 400, errSignaled
+			case <-ctx.Done():
+				return -1, ctx.Err()
+			}
+		}
+		resolver := prod.Future(ctx)
+		time.Sleep(50 * time.Millisecond)
+		check.Equal(t, count.Load(), 1)
+		close(sig)
+		out, err := resolver(ctx)
+		check.Equal(t, count.Load(), 2)
+		check.Equal(t, 400, out)
+		check.ErrorIs(t, err, errSignaled)
+
+	})
+	t.Run("Limit", func(t *testing.T) {
+		t.Run("Serial", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			count := 0
+			var wf Producer[int] = func(ctx context.Context) (int, error) { count++; return 42, nil }
+			wf = wf.Limit(10)
+			for i := 0; i < 100; i++ {
+				out, err := wf(ctx)
+				check.Equal(t, 42, out)
+				check.NotError(t, err)
+			}
+			assert.Equal(t, count, 10)
+		})
+		t.Run("Parallel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(ctx context.Context) (int, error) { count.Add(1); return 42, nil }
+			wf = wf.Limit(10)
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				go func() { defer wg.Done(); out, err := wf(ctx); check.Equal(t, 42, out); check.NotError(t, err) }()
+			}
+			wg.Wait()
+			assert.Equal(t, count.Load(), 10)
+		})
+	})
+	t.Run("TTL", func(t *testing.T) {
+		t.Run("Zero", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			expected := errors.New("cat")
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			wf = wf.TTL(0)
+			for i := 0; i < 100; i++ {
+				out, err := wf(ctx)
+				check.ErrorIs(t, err, expected)
+				check.Equal(t, out, 42)
+			}
+			check.Equal(t, 100, count.Load())
+		})
+		t.Run("Serial", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			expected := errors.New("cat")
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			wf = wf.TTL(100 * time.Millisecond)
+			for i := 0; i < 100; i++ {
+				out, err := wf(ctx)
+				check.ErrorIs(t, err, expected)
+				check.Equal(t, out, 42)
+			}
+			check.Equal(t, 1, count.Load())
+			time.Sleep(100 * time.Millisecond)
+			for i := 0; i < 100; i++ {
+				out, err := wf(ctx)
+				check.ErrorIs(t, err, expected)
+				check.Equal(t, out, 42)
+			}
+			check.Equal(t, 2, count.Load())
+		})
+		t.Run("Parallel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			expected := errors.New("cat")
+			wg := &sync.WaitGroup{}
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			wf = wf.TTL(100 * time.Millisecond)
+			wg.Add(100)
+			for i := 0; i < 100; i++ {
+				go func() {
+					defer wg.Done()
+					out, err := wf(ctx)
+					check.ErrorIs(t, err, expected)
+					check.Equal(t, out, 42)
+				}()
+			}
+			wg.Wait()
+			check.Equal(t, 1, count.Load())
+			time.Sleep(100 * time.Millisecond)
+			wg.Add(100)
+			for i := 0; i < 100; i++ {
+				go func() {
+					defer wg.Done()
+					out, err := wf(ctx)
+					check.ErrorIs(t, err, expected)
+					check.Equal(t, out, 42)
+				}()
+			}
+			wg.Wait()
+			check.Equal(t, 2, count.Load())
+
+		})
+	})
+	t.Run("Delay", func(t *testing.T) {
+		expected := errors.New("cat")
+		t.Run("Basic", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			wf = wf.Delay(100 * time.Millisecond)
+			wg := &WaitGroup{}
+			wg.Add(100)
+			for i := 0; i < 100; i++ {
+				go func() {
+					defer wg.Done()
+					start := time.Now()
+					defer func() { check.True(t, time.Since(start) > 75*time.Millisecond) }()
+					out, err := wf(ctx)
+					check.ErrorIs(t, err, expected)
+					check.Equal(t, out, 42)
+				}()
+			}
+			check.Equal(t, 100, wg.Num())
+			time.Sleep(125 * time.Millisecond)
+			check.Equal(t, 0, wg.Num())
+			check.Equal(t, count.Load(), 100)
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			wf = wf.Delay(100 * time.Millisecond)
+			wg := &WaitGroup{}
+			wg.Add(100)
+			cancel()
+			for i := 0; i < 100; i++ {
+				go func() {
+					defer wg.Done()
+					out, err := wf(ctx)
+					check.ErrorIs(t, err, context.Canceled)
+					check.Equal(t, out, 0)
+				}()
+			}
+			time.Sleep(2 * time.Millisecond)
+			wg.Wait(context.Background())
+			check.Equal(t, 0, wg.Num())
+			check.Equal(t, count.Load(), 0)
+		})
+		t.Run("After", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			count := &atomic.Int64{}
+			var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			ts := time.Now().Add(100 * time.Millisecond)
+			wf = wf.After(ts)
+			wg := &WaitGroup{}
+			wg.Add(100)
+			for i := 0; i < 100; i++ {
+				go func() {
+					defer wg.Done()
+					start := time.Now()
+					defer func() { check.True(t, time.Since(start) > 75*time.Millisecond) }()
+					out, err := wf(ctx)
+					check.ErrorIs(t, err, expected)
+					check.Equal(t, out, 42)
+				}()
+			}
+			check.Equal(t, 100, wg.Num())
+			time.Sleep(120 * time.Millisecond)
+			check.Equal(t, 0, wg.Num())
+			check.Equal(t, count.Load(), 100)
+		})
+	})
+	t.Run("Jitter", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		expected := errors.New("cat")
+
+		count := &atomic.Int64{}
+		var wf Producer[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+		delay := 100 * time.Millisecond
+		wf = wf.Jitter(func() time.Duration { return delay })
+		start := time.Now()
+		out, err := wf(ctx)
+		check.ErrorIs(t, err, expected)
+		check.Equal(t, out, 42)
+		dur := time.Since(start).Truncate(time.Millisecond)
+		testt.Logf(t, "op took %s with delay %s", dur, delay)
+		assert.True(t, dur >= 100*time.Millisecond)
+		assert.True(t, dur < 200*time.Millisecond)
+
+		delay = time.Millisecond
+		start = time.Now()
+
+		out, err = wf(ctx)
+		check.ErrorIs(t, err, expected)
+		check.Equal(t, out, 42)
+
+		dur = time.Since(start).Truncate(time.Millisecond)
+		testt.Logf(t, "op took %s with delay %s", dur, delay)
+		assert.True(t, dur >= time.Millisecond)
+		assert.True(t, dur < 2*time.Millisecond)
 	})
 }
 

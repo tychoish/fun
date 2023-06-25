@@ -248,32 +248,34 @@ func TestWorker(t *testing.T) {
 		assert.NotPanic(t, func() { wf.Safe().Ignore()(ctx) })
 		assert.Equal(t, count, 5)
 	})
-	t.Run("SerialLimit", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	t.Run("Limit", func(t *testing.T) {
+		t.Run("Serial", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		count := 0
-		var wf Worker = func(context.Context) error { count++; return nil }
-		wf = wf.Limit(10)
-		for i := 0; i < 100; i++ {
-			assert.NotError(t, wf(ctx))
-		}
-		assert.Equal(t, count, 10)
-	})
-	t.Run("ParallelLimit", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+			count := 0
+			var wf Worker = func(context.Context) error { count++; return nil }
+			wf = wf.Limit(10)
+			for i := 0; i < 100; i++ {
+				assert.NotError(t, wf(ctx))
+			}
+			assert.Equal(t, count, 10)
+		})
+		t.Run("Parallel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		count := 0
-		var wf Worker = func(context.Context) error { count++; return nil }
-		wf = wf.Limit(10)
-		wg := &sync.WaitGroup{}
-		for i := 0; i < 100; i++ {
-			wg.Add(1)
-			go func() { defer wg.Done(); check.NotError(t, wf(ctx)) }()
-		}
-		wg.Wait()
-		assert.Equal(t, count, 10)
+			count := 0
+			var wf Worker = func(context.Context) error { count++; return nil }
+			wf = wf.Limit(10)
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				go func() { defer wg.Done(); check.NotError(t, wf(ctx)) }()
+			}
+			wg.Wait()
+			assert.Equal(t, count, 10)
+		})
 	})
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("WithoutErrors", func(t *testing.T) {

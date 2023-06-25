@@ -172,7 +172,6 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 // existing tools.
 func (ro ChanReceive[T]) Producer() Producer[T]  { return ro.Read }
 func (ro ChanReceive[T]) Iterator() *Iterator[T] { return ro.Producer().Iterator() }
-
 func (ro ChanReceive[T]) Consume(op Processor[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()

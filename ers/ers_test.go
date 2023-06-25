@@ -44,7 +44,9 @@ func TestErrors(t *testing.T) {
 		check.Error(t, FilterRemove(nil)(io.EOF))
 		check.NotError(t, FilterRemove(io.EOF)(nil))
 		check.NotError(t, FilterRemove(nil)(nil))
-
+		check.NotError(t, FilterNoop()(nil))
+		check.Error(t, FilterNoop()(io.EOF))
+		check.Error(t, FilterNoop()(context.Canceled))
 		err = Join(Error("beep"), io.EOF)
 		check.Error(t, err)
 		check.Error(t, FilterRemove(context.Canceled)(err))

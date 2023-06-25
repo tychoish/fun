@@ -12,45 +12,6 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// HF provides namespaced access to the Handlers/constructors provided
-// by the handler's type.
-var HF Handlers = Handlers{}
-
-// The Handlers type serves to namespace constructors of common
-// operations and specializations of generic functions provided by
-// this package.
-type Handlers struct{}
-
-// ProcessWorker constructs a Processor function for running Worker
-// functions. Use in combination with Process and ProcessParallel, and
-// to build worker pools.
-//
-// The Handlers type serves to namespace these constructors, for
-// interface clarity purposes. Use the HF variable to access this
-// method as in:
-//
-//	fun.HF.ProcessWorker()
-func (Handlers) ProcessWorker() Processor[Worker] {
-	return func(ctx context.Context, wf Worker) error { return wf(ctx) }
-}
-
-// ProcessOperation constructs a Processor function for running Worker
-// functions. Use in combination with Process and ProcessParallel, and
-// to build worker pools.
-//
-// The Handlers type serves to namespace these constructors, for
-// interface clarity purposes. Use the HF variable to access this
-// method as in:
-//
-//	fun.HF.ProcessOperation()
-func (Handlers) ProcessOperation() Processor[Operation] {
-	return func(ctx context.Context, op Operation) error { return op.Safe()(ctx) }
-}
-
-func (Handlers) ErrorObserver(of Observer[error]) Observer[error] {
-	return of.Filter(func(err error) bool { return err != nil })
-}
-
 // Processor are generic functions that take an argument (and a
 // context) and return an error. They're the type of function used by
 // the itertool.Process/itertool.ParallelForEach and useful in other
