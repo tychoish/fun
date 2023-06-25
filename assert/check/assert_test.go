@@ -17,6 +17,7 @@ func TestAssertion(t *testing.T) {
 	var err error
 
 	t.Run("Passing", func(t *testing.T) {
+		t.Parallel()
 		assert.True(t, true)
 		assert.Equal(t, 1, 1)
 		assert.NotEqual(t, 10, 1)
@@ -39,8 +40,10 @@ func TestAssertion(t *testing.T) {
 		assert.NotType[string](t, 2)
 		assert.MaxRuntime(t, time.Millisecond, func() { time.Sleep(time.Microsecond) })
 		assert.MinRuntime(t, time.Microsecond, func() { time.Sleep(time.Millisecond) })
+		assert.Runtime(t, time.Millisecond, 100*time.Millisecond, func() { time.Sleep(50 * time.Millisecond) })
 	})
 	t.Run("Failures", func(t *testing.T) {
+		t.Parallel()
 		assert.Failing(&testing.B{}, func(b *testing.B) { assert.Failing(b, func(*testing.B) {}) })
 		assert.Failing(t, func(t *testing.T) { assert.Failing(t, func(*testing.T) {}) })
 		assert.Failing(t, func(t *testing.T) { assert.True(t, false) })
@@ -72,6 +75,12 @@ func TestAssertion(t *testing.T) {
 		})
 		assert.Failing(t, func(t *testing.T) {
 			assert.MinRuntime(t, time.Second, func() { time.Sleep(time.Nanosecond) })
+		})
+		assert.Failing(t, func(t *testing.T) {
+			assert.Runtime(t, time.Millisecond, 100*time.Millisecond, func() { time.Sleep(time.Microsecond) })
+		})
+		assert.Failing(t, func(t *testing.T) {
+			assert.Runtime(t, time.Millisecond, 10*time.Millisecond, func() { time.Sleep(50 * time.Millisecond) })
 		})
 	})
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/internal"
 )
 
 // True causes a test to fail if the condition is false.
@@ -259,6 +261,24 @@ func MinRuntime(t testing.TB, dur time.Duration, op func()) {
 	if dur > ranFor {
 		t.Fatalf("operation ran for %s, less than expected %s", ranFor, dur)
 	}
+}
+
+// Runtime asserts that the function will execute for less than the
+// absolute difference of the two durations provided. The absolute
+// difference between the durations is use to max
+func Runtime(t testing.TB, min, max time.Duration, op func()) {
+	t.Helper()
+	start := time.Now()
+	op()
+	ranFor := time.Since(start)
+
+	if internal.Min(min, max) > ranFor || internal.Max(min, max) < ranFor {
+		t.Log(internal.Min(min, max) > ranFor, "||", internal.Max(min, max) < ranFor)
+		t.Fatalf("operation ran for %s which is not between %s and %s",
+			ranFor, internal.Min(min, max), internal.Max(min, max),
+		)
+	}
+
 }
 
 // Failing asserts that the specified test fails. This was required
