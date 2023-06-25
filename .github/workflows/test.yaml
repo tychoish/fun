@@ -1,4 +1,4 @@
-name: test
+name: go test
 on:
   pull_request:
   push:
@@ -6,6 +6,7 @@ on:
       - "**.go"
     branches:
       - main
+      - next
 
 jobs:
   tests:
@@ -25,7 +26,7 @@ jobs:
             "!test/"
             go.mod
             go.sum
-      - name: Run Go Tests
+      - name: go test
         if: env.GIT_DIFF
         run: |
           go test -race -timeout=2m ./...
