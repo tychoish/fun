@@ -66,15 +66,8 @@ func WaitMerge(iter *Iterator[Operation]) Operation {
 	}
 }
 
-// Run is equivalent to calling the wait function directly, except the
-// context passed to the function is always canceled when the wait
-// function returns.
-func (wf Operation) Run(ctx context.Context) {
-	wctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	wf(wctx)
-}
+// Run is equivalent to calling the operation directly
+func (wf Operation) Run(ctx context.Context) { wf(ctx) }
 
 // WithCancel creates a Operation and a cancel function which will
 // terminate the context that the root Operation is running
@@ -91,24 +84,37 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
+// Once produces an operation that will only execute the root
+// operation once, no matter how many times it's called.
 func (wf Operation) Once() Operation {
 	once := &sync.Once{}
 	return func(ctx context.Context) { once.Do(func() { wf(ctx) }) }
 }
 
+// Sginal starts the operation in a go routine, and provides a signal
+// channel which will be closed when the operation is complete.
 func (wf Operation) Signal(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})
 	go func() { defer close(out); wf(ctx) }()
 	return out
 }
 
+// Future starts the operation in a background go routine and returns
+// an operation which blocks until it's context is canceled or the
+// underlying operation returns.
 func (wf Operation) Future(ctx context.Context) Operation {
 	sig := wf.Signal(ctx)
 	return func(ctx context.Context) { WaitChannel(sig) }
 }
 
+// Go launches the operation in a go routine. There is no panic-safety
+// provided.
 func (wf Operation) Go(ctx context.Context) { go wf(ctx) }
-func (wf Operation) Launch() Operation      { return wf.Go }
+
+// Launch provides access to the Go method (e.g. starting this
+// operation in a go routine.) as a method that can be used as an
+// operation itself.
+func (wf Operation) Launch() Operation { return wf.Go }
 
 // Add starts a goroutine that waits for the Operation to return,
 // incrementing and decrementing the sync.WaitGroup as
@@ -158,10 +164,23 @@ func (wf Operation) Jitter(dur func() time.Duration) Operation {
 //
 // If the value is negative, then there is always zero delay.
 func (wf Operation) Delay(dur time.Duration) Operation { return wf.Worker().Delay(dur).Ignore() }
-func (wf Operation) After(ts time.Time) Operation      { return wf.Worker().Delay(time.Until(ts)).Ignore() }
-func (wf Operation) When(cond func() bool) Operation   { return wf.Worker().When(cond).Ignore() }
-func (wf Operation) If(cond bool) Operation            { return wf.Worker().If(cond).Ignore() }
 
+// After provides an operation that will only run if called after the
+// specified clock time. When called after this time, the operation
+// blocks until that time passes (or the context is canceled.)
+func (wf Operation) After(ts time.Time) Operation { return wf.Worker().Delay(time.Until(ts)).Ignore() }
+
+// When runs the condition function, and if it returns true,
+func (wf Operation) When(cond func() bool) Operation { return wf.Worker().When(cond).Ignore() }
+
+// If provides a static version of the When that only runs if the
+// condition is true, and is otherwise a noop.
+func (wf Operation) If(cond bool) Operation { return wf.Worker().If(cond).Ignore() }
+
+// Limit provides an operation that will, no matter how many times is
+// called, will only run once. The resulting operation is safe for
+// concurrent use. Operations are launched serially (to maintain the
+// counter,) but the operations themselves can run concurrently.
 func (wf Operation) Limit(in int) Operation {
 	Invariant.OK(in > 0, "limit must be greater than zero;", in)
 	counter := &atomic.Int64{}
@@ -176,18 +195,28 @@ func (wf Operation) Limit(in int) Operation {
 		defer mtx.Unlock()
 
 		num := counter.Load()
+		if num >= int64(in) {
+			return false
+		}
 
-		return counter.CompareAndSwap(int64(num), internal.Min(int64(in), num+1))
+		return counter.CompareAndSwap(num, internal.Min(int64(in), num+1))
 	})
 }
 
+// TTL runs an operation, and if the operation is called before the
+// specified duration, the operation is a noop.
 func (wf Operation) TTL(dur time.Duration) Operation {
 	resolver := ttlExec[bool](dur)
 	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
 }
 
+// Lock constructs a mutex that ensure that the underlying operation
+// (when called through the output operation,) only runs within the
+// scope of the lock.
 func (wf Operation) Lock() Operation { return wf.WithLock(&sync.Mutex{}) }
 
+// WithLock ensures that the underlying operation, when called through
+// the output operation, will holed the mutex while running.
 func (wf Operation) WithLock(mtx *sync.Mutex) Operation {
 	return func(ctx context.Context) {
 		mtx.Lock()
@@ -196,9 +225,22 @@ func (wf Operation) WithLock(mtx *sync.Mutex) Operation {
 	}
 }
 
+// Join runs the first operation, and then if the context has not
+// expired, runs the second operation.
 func (wf Operation) Join(op Operation) Operation {
-	return func(ctx context.Context) { wf(ctx); op.If(ctx.Err() == nil)(ctx) }
+	return func(ctx context.Context) { wf(ctx); op.If(ctx.Err() == nil).Run(ctx) }
 }
 
-func (wf Operation) PostHook(op func()) Operation   { return func(ctx context.Context) { wf(ctx); op() } }
-func (wf Operation) PreHook(op Operation) Operation { return func(c context.Context) { op(c); wf(c) } }
+// PostHook unconditionally runs the post-hook operation after the
+// operation returns. Use the hook to run cleanup operations.
+func (wf Operation) PostHook(hook func()) Operation {
+	return func(ctx context.Context) { wf(ctx); hook() }
+}
+
+// PreHook unconditionally runs the hook operation before the
+// underlying operation. Use Operaiton.Once() operations for the hook
+// to initialize resources for use by the operation, or without Once
+// to reset.
+func (wf Operation) PreHook(hook Operation) Operation {
+	return func(c context.Context) { hook(c); wf(c) }
+}

@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -37,11 +38,11 @@ type WorkerGroupConf struct {
 	// captured. All other error handling semantics
 	// (e.g. ContinueOnError) are applicable.
 	IncludeContextExpirationErrors bool
-	// ExcludededErrors is a list of that should not be included
+	// ExcludedErrors is a list of that should not be included
 	// in the collected errors of the
 	// output. fun.ErrRecoveredPanic is always included and io.EOF
 	// is never included.
-	ExcludededErrors []error
+	ExcludedErrors []error
 	// ErrorObserver is used to collect and aggregate errors in
 	// the collector. For operations with shorter runtime
 	// `erc.Collector.Add` is a good choice, though different
@@ -56,11 +57,26 @@ type WorkerGroupConf struct {
 	ErrorResolver func() error
 }
 
+// Validate ensures that the configuration is valid, and returns an
+// error if there are impossible configurations
 func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
+	// if o.ErrorObserver == nil {
+	// 	ob, prod := HF.ErrorCollector()
+	// 	o.ErrorObserver = ob.Filter(ers.FilterRemove(o.ExcludedErrors...))
+	// 	o.ErrorResolver = func() error { return ers.Join(ft.IgnoreSecond(prod.Block())...) }
+	// }
 	return nil
 }
 
+// CanContinueOnError checks an error, collecting it as needed using
+// the WorkerGroupConf, and then returning true if processing should
+// continue and false otherwise.
+//
+// Neither io.EOF nor EerrIteratorSkip errors are ever observed.
+// All panic errors are observed. Context cancellation errors are
+// observed only when configured. as well as context cancellation
+// errors when configured.
 func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	if err == nil {
 		return true
@@ -135,10 +151,9 @@ func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
 func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
 		if ers.Is(ErrRecoveredPanic, errs...) {
-
 			return fmt.Errorf("cannot exclude recovered panics: %w", ers.ErrInvalidInput)
 		}
-		opts.ExcludededErrors = append(opts.ExcludededErrors, errs...)
+		opts.ExcludedErrors = append(opts.ExcludedErrors, errs...)
 		return nil
 	}
 }
@@ -204,6 +219,15 @@ func WorkerGroupConfWithErrorCollector(
 		return ers.Join(
 			WorkerGroupConfErrorObserver(ec.Add)(opts),
 			WorkerGroupConfErrorResolver(ec.Resolve)(opts),
+		)
+	}
+}
+
+func WorkerGroupConfCollectorPair(ob Observer[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) (err error) {
+		return ers.Join(
+			WorkerGroupConfErrorObserver(ob)(opts),
+			WorkerGroupConfErrorResolver(func() error { return ers.Join(ft.IgnoreSecond(resolver.Block())...) })(opts),
 		)
 	}
 }

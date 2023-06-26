@@ -97,7 +97,6 @@ func TestPanics(t *testing.T) {
 			if !strings.Contains(err.Error(), "construct 1 == 2") {
 				t.Error(err)
 			}
-
 		})
 	})
 	t.Run("InvariantMust", func(t *testing.T) {

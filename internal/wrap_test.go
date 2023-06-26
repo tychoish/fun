@@ -5,10 +5,6 @@ import (
 	"fmt"
 	"io"
 	"testing"
-
-	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestUnwind(t *testing.T) {
@@ -16,8 +12,12 @@ func TestUnwind(t *testing.T) {
 		err := errors.New("root")
 		wrapped := fmt.Errorf("wrap: %w", err)
 		errs := Unwind(wrapped)
-		assert.True(t, len(errs) == 2)
-		assert.Equal(t, errs[1].Error(), err.Error())
+		if !(len(errs) == 2) {
+			t.Fatal("assertion failure")
+		}
+		if errs[1].Error() != err.Error() {
+			t.Fatal(errs[1], err)
+		}
 	})
 
 	t.Run("NoErrors", func(t *testing.T) {
@@ -49,34 +49,44 @@ func TestUnwind(t *testing.T) {
 		if errs[100].Error() != "base" {
 			t.Error(errs[100])
 		}
-		check.Equal(t, 101, len(Unwind(err)))
+		if l := len(Unwind(err)); l != 101 {
+			t.Error(l, "not 101")
+		}
 	})
 	t.Run("Slice", func(t *testing.T) {
 		var err error = slwrap{out: []error{io.EOF, errors.New("basebase")}}
 		errs := Unwind(err)
-		check.Equal(t, 2, len(errs))
+		if len(errs) != 2 {
+			t.Error(len(errs), 2, errs)
+		}
 	})
 	t.Run("WithNils", func(t *testing.T) {
 		var err error = slwrap{out: []error{io.EOF, nil, errors.New("basebase"), nil}}
 		errs := Unwind(err)
-		check.Equal(t, 2, len(errs))
-		testt.Log(t, errs, err)
+		if len(errs) != 2 {
+			t.Error(len(errs), 2, errs)
+		}
 	})
 	t.Run("NilUnwrap", func(t *testing.T) {
 		var err error
 		errs := Unwind(err)
-		check.True(t, errs == nil)
-		check.Equal(t, len(errs), 0)
+		if errs != nil || len(errs) != 0 {
+			t.Error(len(errs), errs)
+		}
 
 		err = &oneWrap{}
 		errs = Unwind(err)
-		check.Equal(t, len(errs), 0)
+
+		if len(errs) != 0 {
+			t.Error(len(errs), errs)
+		}
 
 		err = &oneWrap{out: &oneWrap{}}
 		errs = Unwind(err)
-		check.Equal(t, len(errs), 1)
+		if len(errs) != 1 {
+			t.Error(len(errs), errs)
+		}
 	})
-
 }
 
 type wrapTestType struct {

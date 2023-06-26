@@ -7,7 +7,10 @@ type Filter func(error) error
 // Filter takes an error and returns nil if the error is nil, or if
 // the error (or one of its wrapped errors,) is in the exclusion list.
 func FilterRemove(exclusions ...error) Filter {
-	return FilterCheck(func(err error) bool { return OK(err) || len(exclusions) == 0 || Is(err, exclusions...) })
+	if len(exclusions) == 0 {
+		return FilterNoop()
+	}
+	return FilterCheck(func(err error) bool { return OK(err) || Is(err, exclusions...) })
 }
 
 // FilterNoop produces a filter that always returns the original error.

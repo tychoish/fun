@@ -64,3 +64,19 @@ func Logf(t testing.TB, format string, args ...any) {
 		}
 	})
 }
+
+// Must is used to capture the output of a function that returns an
+// error and an arbitry value and simplify call sites in test
+// code. The function that returns makes a fatal assertion if the
+// error is non-nil, and returns the object.
+func Must[T any](out T, err error) func(t testing.TB) T {
+	var zero T
+	return func(t testing.TB) T {
+		t.Helper()
+		if err != nil {
+			out = zero // for testing
+			t.Fatal("unexpected error", err)
+		}
+		return out
+	}
+}

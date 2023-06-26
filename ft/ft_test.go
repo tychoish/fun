@@ -68,6 +68,15 @@ func TestDefault(t *testing.T) {
 	assert.Equal(t, Default("merlin", "kip"), "merlin")
 }
 
+func TestWhenHandle(t *testing.T) {
+	called := false
+	assert.True(t, !called)
+	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 100)
+	assert.True(t, !called)
+	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 42)
+	assert.True(t, called)
+}
+
 func TestWrap(t *testing.T) {
 	t.Run("Wrapper", func(t *testing.T) {
 		assert.NotError(t, Wrapper[error](nil)())

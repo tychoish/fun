@@ -117,11 +117,31 @@ func TestIterator(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Continue", func(t *testing.T) {
+		ctx := testt.Context(t)
+		count := 0
+		iter := Generator(func(ctx context.Context) (int, error) {
+			count++
+			switch {
+			case count > 128:
+				count = 128
+				return -1, io.EOF
+			case count%2 == 0:
+				return count, nil
+			default:
+				return -1, ErrIteratorSkip
+			}
+		})
+		ints, err := iter.Slice(ctx)
+		check.NotError(t, err)
+		check.Equal(t, len(ints), 64)
+		check.Equal(t, 128, count)
+	})
 	t.Run("Process", func(t *testing.T) {
 		t.Run("Process", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return nil })
+			err := iter.Process(func(ctx context.Context, i int) error { count++; return nil }).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
 		})
@@ -136,23 +156,22 @@ func TestIterator(t *testing.T) {
 		t.Run("Abort", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return io.EOF })
+			err := iter.Process(func(ctx context.Context, i int) error { count++; return io.EOF }).Run(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, 1, count)
 		})
 		t.Run("OperationError", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; return ers.ErrLimitExceeded })
+			err := iter.Process(func(ctx context.Context, i int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrLimitExceeded)
-			assert.True(t, err != ers.ErrLimitExceeded)
-			assert.Equal(t, 9, count)
+			assert.Equal(t, 1, count)
 		})
 		t.Run("Panic", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; panic(ers.ErrLimitExceeded) })
+			err := iter.Process(func(ctx context.Context, i int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, ErrRecoveredPanic)
@@ -163,7 +182,7 @@ func TestIterator(t *testing.T) {
 
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(ctx, func(ctx context.Context, i int) error { count++; cancel(); return ctx.Err() })
+			err := iter.Process(func(ctx context.Context, i int) error { count++; cancel(); return ctx.Err() }).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, context.Canceled)
@@ -172,12 +191,12 @@ func TestIterator(t *testing.T) {
 		t.Run("Parallel", func(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
-			err := iter.ProcessParallel(ctx,
+			err := iter.ProcessParallel(
 				func(ctx context.Context, i int) error { count.Add(1); return nil },
 				WorkerGroupConfNumWorkers(2),
 				WorkerGroupConfContinueOnError(),
 				WorkerGroupConfContinueOnPanic(),
-			)
+			).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count.Load())
 		})
@@ -654,7 +673,6 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-
 	t.Run("Unmarshal", func(t *testing.T) {
 		iter := SliceIterator([]string{})
 		if err := iter.UnmarshalJSON([]byte(`["foo", "arg"]`)); err != nil {

@@ -440,6 +440,8 @@ func TestCleanup(t *testing.T) {
 			check.Equal(t, 100, count.Load())
 		}()
 
+		time.Sleep(100 * time.Millisecond)
+
 		check.True(t, s.Running())
 		check.Equal(t, 0, count.Load())
 		check.NotError(t, s.Shutdown())

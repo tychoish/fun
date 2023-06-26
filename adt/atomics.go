@@ -58,11 +58,16 @@ type Once[T any] struct {
 func (o *Once[T]) Do(constr func() T) T { o.act.Do(func() { o.val = constr() }); return o.val }
 
 // Atomic is a very simple atomic Get/Set operation, providing a
-// generic type-safe implementation wrapping sync/atomic.Value.
+// generic type-safe implementation wrapping sync/atomic.Value. The
+// primary caveat is that interface types are not compatible with
+// adt.Atomic as a result of the standard library's underlying atomic
+// type. To store interface objects atomically you can wrap the
+// object in a function, using ft.Wrapper.
 type Atomic[T any] struct{ val atomic.Value }
 
 // NewAtomic creates a new Atomic Get/Set value with the initial value
-// already set.
+// already set. This is a helper for creating a new atomic with a
+// default value set.
 func NewAtomic[T any](initial T) *Atomic[T] { a := &Atomic[T]{}; a.Set(initial); return a }
 
 // Set atomically sets the value of the Atomic.

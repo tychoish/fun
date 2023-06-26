@@ -260,7 +260,6 @@ func TestParallelForEach(t *testing.T) {
 				count := &atomic.Int64{}
 
 				err := SliceIterator(elems).ProcessParallel(
-					ctx,
 					func(ctx context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
 						count.Add(1)
@@ -270,7 +269,7 @@ func TestParallelForEach(t *testing.T) {
 						seen.Add(int64(in))
 						return nil
 					},
-					WorkerGroupConfNumWorkers(int(i)))
+					WorkerGroupConfNumWorkers(int(i))).Run(ctx)
 
 				if err != nil {
 					t.Fatal(err)
@@ -290,7 +289,7 @@ func TestParallelForEach(t *testing.T) {
 		count := &atomic.Int64{}
 		errCount := &atomic.Int64{}
 		err := SliceIterator(makeIntSlice(200)).
-			ProcessParallel(ctx,
+			ProcessParallel(
 				func(ctx context.Context, in int) error {
 					count.Add(1)
 					runtime.Gosched()
@@ -303,7 +302,7 @@ func TestParallelForEach(t *testing.T) {
 				WorkerGroupConfNumWorkers(3),
 				WorkerGroupConfContinueOnPanic(),
 				WorkerGroupConfWithErrorCollector(&Collector{}),
-			)
+			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
 		}
@@ -321,7 +320,7 @@ func TestParallelForEach(t *testing.T) {
 		paned := &atomic.Bool{}
 
 		err := SliceIterator(makeIntSlice(10)).
-			ProcessParallel(ctx,
+			ProcessParallel(
 				func(ctx context.Context, in int) error {
 					if in == 8 {
 						paned.Store(true)
@@ -337,7 +336,7 @@ func TestParallelForEach(t *testing.T) {
 					return nil
 				},
 				WorkerGroupConfNumWorkers(10),
-			)
+			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
 		}
@@ -356,7 +355,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceIterator(makeIntSlice(10)).
-			ProcessParallel(ctx,
+			ProcessParallel(
 				func(ctx context.Context, in int) error {
 					if in == 4 {
 						cancel()
@@ -365,7 +364,7 @@ func TestParallelForEach(t *testing.T) {
 					return nil
 				},
 				WorkerGroupConfNumWorkers(8),
-			)
+			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
@@ -376,14 +375,14 @@ func TestParallelForEach(t *testing.T) {
 		count := &atomic.Int64{}
 
 		err := SliceIterator(makeIntSlice(10)).
-			ProcessParallel(ctx,
+			ProcessParallel(
 				func(ctx context.Context, in int) error {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
 				},
 				WorkerGroupConfNumWorkers(4),
 				WorkerGroupConfContinueOnError(),
-			)
+			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
@@ -401,12 +400,12 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceIterator(makeIntSlice(100)).
-			ProcessParallel(ctx,
+			ProcessParallel(
 				func(ctx context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
 				WorkerGroupConfNumWorkers(2),
-			)
+			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
@@ -422,12 +421,12 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := SliceIterator(makeIntSlice(100)).ProcessParallel(ctx,
+		err := SliceIterator(makeIntSlice(100)).ProcessParallel(
 			func(ctx context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
 			WorkerGroupConfWorkerPerCPU(),
-		)
+		).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
@@ -444,11 +443,11 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceIterator(makeIntSlice(2)).ProcessParallel(ctx,
+			err := SliceIterator(makeIntSlice(2)).ProcessParallel(
 				func(ctx context.Context, in int) error {
 					return context.Canceled
 				},
-			)
+			).Run(ctx)
 			check.NotError(t, err)
 			if err != nil {
 				t.Error("should have skipped all errors", err)
@@ -458,12 +457,12 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceIterator(makeIntSlice(2)).ProcessParallel(ctx,
+			err := SliceIterator(makeIntSlice(2)).ProcessParallel(
 				func(ctx context.Context, in int) error {
 					return context.Canceled
 				},
 				WorkerGroupConfIncludeContextErrors(),
-			)
+			).Run(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, context.Canceled)
 		})
@@ -943,7 +942,7 @@ func RunIteratorStringAlgoTests(
 						sum, err := iter.Reduce(func(in string, value string) (string, error) {
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
-						}, "")(ctx)
+						})(ctx)
 
 						if err != nil {
 							t.Fatal(err)
@@ -975,7 +974,6 @@ func RunIteratorStringAlgoTests(
 								count++
 								return "", nil
 							},
-							"",
 						)(ctx)
 						check.Equal(t, count, 1)
 						if err == nil {
@@ -999,7 +997,7 @@ func RunIteratorStringAlgoTests(
 								return 42, nil
 							}
 							return value, ErrIteratorSkip
-						}, 0)(testt.Context(t))
+						})(testt.Context(t))
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
@@ -1014,7 +1012,7 @@ func RunIteratorStringAlgoTests(
 								return 300, io.EOF
 							}
 							return 42, nil
-						}, 0)(testt.Context(t))
+						})(testt.Context(t))
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)

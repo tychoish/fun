@@ -52,7 +52,7 @@ func TestObserver(t *testing.T) {
 			check.Equal(t, in, 100)
 			count++
 		}
-		wob := ob.When(func() bool { return should })
+		wob := ob.Skip(func(int) bool { return should })
 		wob(100)
 		assert.Equal(t, 0, count)
 		should = true
@@ -112,7 +112,7 @@ func TestObserver(t *testing.T) {
 	t.Run("Filter", func(t *testing.T) {
 		count := 0
 		of := Observer[int](func(i int) { count++; check.Equal(t, i, 42) })
-		off := of.Filter(func(i int) bool { return i == 42 })
+		off := of.Skip(func(i int) bool { return i == 42 })
 
 		off(42)
 		off(42)

@@ -3,6 +3,7 @@ package testt
 import (
 	"fmt"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -10,9 +11,10 @@ import (
 type mockTB struct {
 	*testing.T
 
-	cleanup    []func()
-	shouldFail bool
-	logs       []string
+	cleanup     []func()
+	shouldFail  bool
+	fatalCalled bool
+	logs        []string
 }
 
 func newMock() *mockTB                    { return &mockTB{T: &testing.T{}} }
@@ -20,7 +22,7 @@ func (m *mockTB) Cleanup(fn func())       { m.cleanup = append(m.cleanup, fn) }
 func (m *mockTB) Failed() bool            { return m.shouldFail }
 func (m *mockTB) Log(args ...any)         { m.logs = append(m.logs, fmt.Sprint(args...)) }
 func (m *mockTB) Logf(s string, a ...any) { m.logs = append(m.logs, fmt.Sprintf(s, a...)) }
-
+func (m *mockTB) Fatal(args ...any)       { m.fatalCalled = true }
 func TestTools(t *testing.T) {
 	t.Run("Mock", func(t *testing.T) {
 		t.Run("Context", func(t *testing.T) {
@@ -130,4 +132,16 @@ func TestTools(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Must", func(t *testing.T) {
+		if val := Must(strconv.Atoi("100"))(t); val != 100 {
+			t.Error(val, "is not", 100)
+		}
+		mock := newMock()
+		mock.shouldFail = true
+
+		if val := Must(strconv.Atoi("zzzzz"))(mock); val != 0 {
+			t.Error(val, "is not", 0)
+		}
+	})
+
 }

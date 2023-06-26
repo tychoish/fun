@@ -102,13 +102,8 @@ func Pipe[T any](from Producer[T], to Processor[T]) Worker {
 
 }
 
-// Run is equivalent to calling the worker function directly, except
-// the context passed to it is canceled when the worker function returns.
-func (wf Worker) Run(ctx context.Context) error {
-	wctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	return wf(wctx)
-}
+// Run is equivalent to calling the worker function directly.
+func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 
 // Safe produces a worker function that converts the worker function's
 // panics to errors.

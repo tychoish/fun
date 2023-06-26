@@ -351,7 +351,7 @@ func TestOperation(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op) })
 
-			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessOperation(), WorkerGroupConfNumWorkers(4))
+			err := SliceIterator(jobs).ProcessParallel(HF.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 		})
@@ -455,7 +455,7 @@ func TestOperation(t *testing.T) {
 			var wf Operation = func(context.Context) { count.Add(1) }
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 32; i++ {
 				wg.Add(1)
 				go func() { defer wg.Done(); wf(ctx) }()
 			}

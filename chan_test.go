@@ -403,7 +403,7 @@ func TestChannel(t *testing.T) {
 				check.Equal(t, count, 1)
 				assert.NotError(t, err)
 			})
-			t.Run("ReturnWriteErrors", func(t *testing.T) {
+			t.Run("ErrorPropogationEOF", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
@@ -418,8 +418,31 @@ func TestChannel(t *testing.T) {
 				}).Run(ctx)
 
 				check.Equal(t, count, 1)
-				assert.Error(t, err)
-				assert.ErrorIs(t, err, io.EOF)
+				check.NotError(t, err)
+			})
+			t.Run("Continue", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				ch := Blocking(make(chan string, 2))
+				var count int
+				var skipped bool
+				assert.NotError(t, ch.Send().Write(ctx, "beep"))
+				assert.NotError(t, ch.Send().Write(ctx, "beep"))
+				ch.Close()
+				err := ch.Receive().Consume(func(ctx context.Context, in string) error {
+					defer func() { count++ }()
+					check.Equal(t, in, "beep")
+					if count == 1 {
+						skipped = true
+						return ErrIteratorSkip
+					}
+					return nil
+				}).Run(ctx)
+
+				check.Equal(t, count, 2)
+				check.True(t, skipped)
+				check.NotError(t, err)
 			})
 		})
 		t.Run("Ok", func(t *testing.T) {

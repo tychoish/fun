@@ -60,12 +60,17 @@ func (of Observer[T]) When(cond func() bool) Observer[T] {
 	return func(in T) { ft.WhenCall(cond(), of.Capture(in)) }
 }
 
+// Skip runs a check before passing the object to the obsever.
+func (of Observer[T]) Skip(hook func(T) bool) Observer[T] {
+	return func(in T) { ft.WhenHandle(hook, of, in) }
+}
+
 // Filter creates an observer that only executes the root observer
 // when the condition function--which can inspect the input
 // object--returns true. Use this to filter out nil inputs, or
 // unactionable inputs.
-func (of Observer[T]) Filter(cond func(T) bool) Observer[T] {
-	return func(in T) { ft.WhenCall(cond(in), of.Capture(in)) }
+func (of Observer[T]) Filter(filter func(T) T) Observer[T] {
+	return func(in T) { of(filter(in)) }
 }
 
 // Once produces an observer function that runs exactly once, and
@@ -77,8 +82,10 @@ func (of Observer[T]) Once() Observer[T] {
 
 // Lock returns an observer that is protected by a mutex. All
 // execution's of the observer are isolated.
-func (of Observer[T]) Lock() Observer[T] {
-	mtx := &sync.Mutex{}
+func (of Observer[T]) Lock() Observer[T] { return of.WithLock(&sync.Mutex{}) }
+
+// WithLock protects the action of the observer with the provied mutex.
+func (of Observer[T]) WithLock(mtx *sync.Mutex) Observer[T] {
 	return func(in T) { mtx.Lock(); defer mtx.Unlock(); of(in) }
 }
 

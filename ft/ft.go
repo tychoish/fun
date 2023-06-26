@@ -56,6 +56,22 @@ func WhenCall(cond bool, op func()) {
 	op()
 }
 
+// WhenDo calls the function when the condition is true, and returns
+// the result, or if the condition is false, the operation is a noop,
+// and returns zero-value for the type.
+func WhenDo[T any](cond bool, op func() T) (out T) {
+	if !cond {
+		return out
+	}
+	return op()
+}
+
+func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
+	if cond(in) {
+		op(in)
+	}
+}
+
 // DoTimes runs the specified option n times.
 func DoTimes(n int, op func()) {
 	for i := 0; i < n; i++ {
@@ -84,16 +100,6 @@ func IgnoreSecond[A any, B any](first A, second B) A { return first }
 // will execute at most one time, while eliding/managing the sync.Once
 // object.
 func Once(f func()) func() { o := &sync.Once{}; return func() { f = SafeWrap(f); o.Do(f) } }
-
-// WhenDo calls the function when the condition is true, and returns
-// the result, or if the condition is false, the operation is a noop,
-// and returns zero-value for the type.
-func WhenDo[T any](cond bool, op func() T) (out T) {
-	if !cond {
-		return out
-	}
-	return op()
-}
 
 // Contain returns true if an element of the slice is equal to the
 // item.

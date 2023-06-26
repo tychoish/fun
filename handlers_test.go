@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -96,5 +97,12 @@ func TestHandlers(t *testing.T) {
 			assert.NotError(t, err)
 			check.Equal(t, len(errs), 0)
 		})
+	})
+	t.Run("ErrorCollector", func(t *testing.T) {
+		ob, prod := HF.ErrorCollector()
+		ft.DoTimes(128, func() { ob(nil) })
+		check.Equal(t, 0, len(prod.Force()))
+		ft.DoTimes(128, func() { ob(ers.Error("test")) })
+		check.Equal(t, 128, len(prod.Force()))
 	})
 }

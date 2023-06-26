@@ -121,11 +121,7 @@ func (pf Processor[T]) Join(next Processor[T]) Processor[T] {
 // the processor function, merging/collecting all errors, and
 // respecting the worker's context. The processing does not begin
 // until the worker is called.
-func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker {
-	return func(ctx context.Context) error {
-		return iter.Process(ctx, pf)
-	}
-}
+func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker { return iter.Process(pf) }
 
 // Observer converts a processor into an observer, handling the error
 // with the error observer and using the provided context.

@@ -74,7 +74,7 @@ func ParallelForEach[T any](
 	fn fun.Processor[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) error {
-	return iter.ProcessParallel(ctx, fn, append(optp, fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}))...)
+	return iter.ProcessParallel(fn, append(optp, fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}))...).Run(ctx)
 }
 
 // Generate creates an iterator using a generator pattern which

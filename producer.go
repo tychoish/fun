@@ -46,13 +46,8 @@ func ValueProducer[T any](val T) Producer[T] {
 	return func(context.Context) (T, error) { return val, nil }
 }
 
-// Run executes the producer with a context hat is cacneled after the
-// producer returns. It is, itself a producer.
-func (pf Producer[T]) Run(ctx context.Context) (T, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	return pf(ctx)
-}
+// Run executes the producer.
+func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf(ctx) }
 
 // Background constructs a worker that runs the provided Producer in a
 // background thread and passes the produced value to the observe.
@@ -85,7 +80,7 @@ func (pf Producer[T]) Safe() Producer[T] {
 	}
 }
 
-func (pf Producer[T]) Ignore(ctx context.Context) { _, _ = pf(ctx) }
+func (pf Producer[T]) Ignore(ctx context.Context) T { return ft.IgnoreSecond(pf(ctx)) }
 
 // Join, on successive calls, runs the first producer until it
 // returns an io.EOF error, and then returns the results of the second

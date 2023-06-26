@@ -12,8 +12,8 @@ import (
 
 func TestOptionProvider(t *testing.T) {
 	t.Run("Set", func(t *testing.T) {
-		conf := &WorkerGroupConf{ExcludededErrors: []error{ers.ErrLimitExceeded}}
-		newc := &WorkerGroupConf{ContinueOnPanic: true, ExcludededErrors: []error{ErrRecoveredPanic, ErrInvariantViolation}}
+		conf := &WorkerGroupConf{ExcludedErrors: []error{ers.ErrLimitExceeded}}
+		newc := &WorkerGroupConf{ContinueOnPanic: true, ExcludedErrors: []error{ErrRecoveredPanic, ErrInvariantViolation}}
 		eone := errors.New("cat")
 		etwo := errors.New("3")
 
@@ -27,10 +27,10 @@ func TestOptionProvider(t *testing.T) {
 
 		testt.Log(t, "after", conf)
 		check.NotError(t, err)
-		check.Equal(t, len(conf.ExcludededErrors), 2)
+		check.Equal(t, len(conf.ExcludedErrors), 2)
 		check.True(t, conf.ContinueOnPanic)
-		check.NotContains(t, conf.ExcludededErrors, eone)
-		check.NotContains(t, conf.ExcludededErrors, etwo)
+		check.NotContains(t, conf.ExcludedErrors, eone)
+		check.NotContains(t, conf.ExcludedErrors, etwo)
 	})
 	t.Run("SkippsNil", func(t *testing.T) {
 		assert.NotError(t, WorkerGroupConfAddExcludeErrors(nil).Join(nil, nil, nil).Apply(&WorkerGroupConf{}))
@@ -38,7 +38,7 @@ func TestOptionProvider(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		of := WorkerGroupConfAddExcludeErrors(ErrRecoveredPanic)
 		opt := &WorkerGroupConf{}
-		assert.Equal(t, 0, len(opt.ExcludededErrors))
+		assert.Equal(t, 0, len(opt.ExcludedErrors))
 		err := of(opt)
 		assert.Error(t, err)
 		assert.Substring(t, err.Error(), "cannot exclude recovered panics")

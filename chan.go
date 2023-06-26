@@ -47,14 +47,30 @@ func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: blocking, ch:
 // not sent.
 func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: non_blocking, ch: ch} }
 
-func (op ChanOp[T]) Close()                  { close(op.ch) }
-func (op ChanOp[T]) Channel() chan T         { return op.ch }
-func (op ChanOp[T]) Send() ChanSend[T]       { return ChanSend[T]{mode: op.mode, ch: op.ch} }
-func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
-func (op ChanOp[T]) Iterator() *Iterator[T]  { return op.Receive().Producer().Iterator() }
+// Close closes the underlying channel.
+func (op ChanOp[T]) Close() { close(op.ch) }
 
+// Channel returns the underlying channel.
+func (op ChanOp[T]) Channel() chan T { return op.ch }
+
+// Send returns a ChanSend object that acts on the same underlying
+// channel
+func (op ChanOp[T]) Send() ChanSend[T] { return ChanSend[T]{mode: op.mode, ch: op.ch} }
+
+// Receive returns a ChanReceive object that acts on the same
+// underlying sender.
+func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
+
+// Iterator returns the "receive" aspect of the channel as an
+// iterator. This is equivalent to fun.ChannelIterator(), but may be
+// more accessible in some contexts.
+func (op ChanOp[T]) Iterator() *Iterator[T] { return op.Receive().Producer().Iterator() }
+
+// Processor exposes the "send" aspect of the channel as a Processor function.
 func (op ChanOp[T]) Processor() Processor[T] { return op.Send().Processor() }
-func (op ChanOp[T]) Producer() Producer[T]   { return op.Receive().Producer() }
+
+// Producer expoess the "receive" aspect of the channel as a Producer function.
+func (op ChanOp[T]) Producer() Producer[T] { return op.Receive().Producer() }
 
 // Pipe creates a linked pair of functions for transmitting data via
 // these interfaces.
@@ -170,22 +186,41 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 
 // Producer returns the Read method as a producer for integration into
 // existing tools.
-func (ro ChanReceive[T]) Producer() Producer[T]  { return ro.Read }
+func (ro ChanReceive[T]) Producer() Producer[T] { return ro.Read }
+
+// Iterator expoeses aspects to the contents of the channel as an
+// iterator.
 func (ro ChanReceive[T]) Iterator() *Iterator[T] { return ro.Producer().Iterator() }
+
+// Consume returns a Worker function that processes the output of data
+// from the channel with the Processor function. If the processor
+// function returns ErrIteratorSkip, the processing will continue. All
+// other Processor errors (and problems reading from the channel,)
+// abort iterator. io.EOF errors are not propagated to the caller.
 func (ro ChanReceive[T]) Consume(op Processor[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
 		var value T
+	LOOP:
 		for {
 			value, err = ro.Read(ctx)
 			if err != nil {
-				return err
+				goto HANDLE_ERROR
 			}
 			if err = op(ctx, value); err != nil {
-				if errors.Is(err, io.EOF) {
-					return nil
-				}
+				goto HANDLE_ERROR
+			}
+
+		HANDLE_ERROR:
+			switch {
+			case err == nil:
+				continue LOOP
+			case errors.Is(err, io.EOF):
+				return nil
+			case errors.Is(err, ErrIteratorSkip):
+				continue LOOP
+			default:
 				return err
 			}
 		}
@@ -269,9 +304,11 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 	}
 }
 
+// Consume returns a worker that, when executed, pushes the content
+// from the iterator into the channel.
 func (sm ChanSend[T]) Consume(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
-		return iter.Process(ctx, sm.Processor())
+		return iter.Process(sm.Processor()).Run(ctx)
 	}
 }

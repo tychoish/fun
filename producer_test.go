@@ -152,7 +152,7 @@ func TestProducer(t *testing.T) {
 				return 42, nil
 			})
 			check.Panic(t, func() {
-				v, err := op.WithLock(nil)(ctx)
+				v, err := op.WithLock(nil).Run(ctx)
 				check.Equal(t, v, 0)
 				check.Error(t, err)
 			})
@@ -211,31 +211,11 @@ func TestProducer(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op.Background(ctx, obv)) })
 
-			err := SliceIterator(jobs).ProcessParallel(ctx, HF.ProcessWorker(), WorkerGroupConfNumWorkers(4))
+			err := SliceIterator(jobs).ProcessParallel(HF.ProcessWorker(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 			check.Equal(t, obct, 128)
 		})
-	})
-	t.Run("ScopedContext", func(t *testing.T) {
-		ctx := testt.Context(t)
-		sig := make(chan struct{})
-		ops := []string{}
-
-		var pf Producer[int] = func(ctx context.Context) (int, error) {
-			go func() { defer close(sig); <-ctx.Done(); ops = append(ops, "inner") }()
-			ops = append(ops, "outer")
-			time.Sleep(10 * time.Millisecond)
-			return 42, nil
-		}
-		check.MinRuntime(t, 10*time.Millisecond, func() {
-			val, err := pf.Run(ctx)
-			check.NotError(t, err)
-			check.Equal(t, val, 42)
-
-			<-sig
-		})
-		check.EqualItems(t, ops, []string{"outer", "inner"})
 	})
 	t.Run("CheckBlock", func(t *testing.T) {
 		count := 0

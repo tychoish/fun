@@ -30,18 +30,6 @@ func TestProcess(t *testing.T) {
 		pf.Force(42)
 		check.Equal(t, called, 3)
 	})
-	t.Run("Run", func(t *testing.T) {
-		called := 0
-		pf := BlockingProcessor(func(in int) error {
-			check.Equal(t, in, 42)
-			called++
-			return nil
-		})
-
-		//nolint:staticcheck
-		check.Panic(t, func() { _ = pf.Run(nil, 42) })
-		check.NotPanic(t, func() { check.NotError(t, pf(nil, 42)) })
-	})
 	t.Run("WithCancel", func(t *testing.T) {
 		ctx := testt.Context(t)
 		wf, cancel := Processor[int](func(ctx context.Context, in int) error {
@@ -74,13 +62,13 @@ func TestProcess(t *testing.T) {
 			return nil
 		})
 
-		check.NotError(t, pf.If(false)(ctx, 42))
+		check.NotError(t, pf.If(false).Run(ctx, 42))
 		check.Zero(t, called)
-		check.NotError(t, pf.If(true)(ctx, 42))
+		check.NotError(t, pf.If(true).Run(ctx, 42))
 		check.Equal(t, 1, called)
-		check.NotError(t, pf.If(true)(ctx, 42))
+		check.NotError(t, pf.If(true).Run(ctx, 42))
 		check.Equal(t, 2, called)
-		check.NotError(t, pf.If(false)(ctx, 42))
+		check.NotError(t, pf.If(false).Run(ctx, 42))
 		check.Equal(t, 2, called)
 		check.NotError(t, pf(ctx, 42))
 		check.Equal(t, 3, called)
@@ -94,13 +82,13 @@ func TestProcess(t *testing.T) {
 			return nil
 		})
 
-		check.NotError(t, pf.When(func() bool { return false })(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return false }).Run(ctx, 42))
 		check.Zero(t, called)
-		check.NotError(t, pf.When(func() bool { return true })(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return true }).Run(ctx, 42))
 		check.Equal(t, 1, called)
-		check.NotError(t, pf.When(func() bool { return true })(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return true }).Run(ctx, 42))
 		check.Equal(t, 2, called)
-		check.NotError(t, pf.When(func() bool { return false })(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return false }).Run(ctx, 42))
 		check.Equal(t, 2, called)
 		check.NotError(t, pf(ctx, 42))
 		check.Equal(t, 3, called)

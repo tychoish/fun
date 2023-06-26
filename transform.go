@@ -95,8 +95,8 @@ func (mpf Transform[T, O]) ProcessParallel(
 
 	err := JoinOptionProviders(optp...).Apply(opts)
 	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })
-
 	outputIter.AddError(err)
+
 	ft.WhenCall(err != nil, output.Close)
 	return outputIter
 }
