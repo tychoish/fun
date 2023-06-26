@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -47,6 +48,35 @@ func TestOptionProvider(t *testing.T) {
 		opt := &WorkerGroupConf{}
 		check.Error(t, WorkerGroupConfWithErrorCollector(nil)(opt))
 		check.NotError(t, WorkerGroupConfWithErrorCollector(&Collector{})(opt))
+	})
+	t.Run("ErrorHandler", func(t *testing.T) {
+		t.Run("Configuration", func(t *testing.T) {
+			opt := &WorkerGroupConf{}
+			check.True(t, opt.ErrorObserver == nil)
+			check.True(t, opt.ErrorResolver == nil)
+			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
+			check.True(t, opt.ErrorObserver != nil)
+			check.True(t, opt.ErrorResolver != nil)
+			check.NotError(t, opt.Validate())
+		})
+		t.Run("CollectionRoundTrip", func(t *testing.T) {
+			opt := &WorkerGroupConf{}
+			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
+			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 0)
+			opt.ErrorObserver(ers.New("hello"))
+			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 1)
+		})
+		t.Run("LoadTest", func(t *testing.T) {
+			ctx := testt.Context(t)
+			opt := &WorkerGroupConf{}
+			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
+
+			wg := &WaitGroup{}
+			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+				opt.ErrorObserver(ers.New("hello"))
+			})
+			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 128)
+		})
 	})
 	t.Run("HandleErrorEdgecases", func(t *testing.T) {
 		opt := &WorkerGroupConf{}

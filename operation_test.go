@@ -19,6 +19,7 @@ import (
 func TestOperation(t *testing.T) {
 	t.Parallel()
 	t.Run("WaitGroupEndToEnd", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		wg := &WaitGroup{}
 
@@ -64,6 +65,7 @@ func TestOperation(t *testing.T) {
 		}
 	})
 	t.Run("SyncWaitGroupEndToEnd", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		wg := &sync.WaitGroup{}
 
@@ -435,6 +437,7 @@ func TestOperation(t *testing.T) {
 		check.Equal(t, 2, count)
 	})
 	t.Run("Limit", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Serial", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -448,19 +451,24 @@ func TestOperation(t *testing.T) {
 			assert.Equal(t, count, 10)
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ft.DoTimes(32, func() {
+				t.Run("Iteration", func(t *testing.T) {
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
 
-			count := &atomic.Int64{}
-			var wf Operation = func(context.Context) { count.Add(1) }
-			wf = wf.Limit(10)
-			wg := &sync.WaitGroup{}
-			for i := 0; i < 32; i++ {
-				wg.Add(1)
-				go func() { defer wg.Done(); wf(ctx) }()
-			}
-			wg.Wait()
-			assert.Equal(t, count.Load(), 10)
+					count := &atomic.Int64{}
+					var wf Operation = func(context.Context) { count.Add(1) }
+					wf = wf.Limit(10)
+					wg := &sync.WaitGroup{}
+					for i := 0; i < 32; i++ {
+						wg.Add(1)
+						go func() { defer wg.Done(); wf(ctx) }()
+					}
+					wg.Wait()
+					assert.Equal(t, count.Load(), 10)
+
+				})
+			})
 		})
 	})
 	t.Run("Jitter", func(t *testing.T) {
@@ -487,6 +495,7 @@ func TestOperation(t *testing.T) {
 		assert.True(t, dur < 2*time.Millisecond)
 	})
 	t.Run("Delay", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Basic", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -555,6 +564,7 @@ func TestOperation(t *testing.T) {
 		})
 	})
 	t.Run("TTL", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Zero", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

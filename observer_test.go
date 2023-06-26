@@ -109,7 +109,7 @@ func TestObserver(t *testing.T) {
 
 		assert.Equal(t, count, 10)
 	})
-	t.Run("Filter", func(t *testing.T) {
+	t.Run("Skip", func(t *testing.T) {
 		count := 0
 		of := Observer[int](func(i int) { count++; check.Equal(t, i, 42) })
 		off := of.Skip(func(i int) bool { return i == 42 })
@@ -125,6 +125,28 @@ func TestObserver(t *testing.T) {
 		off(420)
 		off(4200)
 
+		check.Equal(t, count, 2)
+	})
+	t.Run("Filter", func(t *testing.T) {
+		count := 0
+		of := Observer[int](func(i int) { count++; check.Equal(t, i, 42) }).
+			Skip(func(in int) bool { return in != 0 }).
+			Filter(func(in int) int {
+				switch in {
+				case 42:
+					return 0
+				case 300:
+					return 42
+				default:
+					return 0
+				}
+			})
+
+		of(42)
+		of(42)
+		check.Equal(t, count, 0)
+		of(300)
+		of(300)
 		check.Equal(t, count, 2)
 	})
 	t.Run("Error", func(t *testing.T) {

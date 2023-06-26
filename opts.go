@@ -223,7 +223,7 @@ func WorkerGroupConfWithErrorCollector(
 	}
 }
 
-func WorkerGroupConfCollectorPair(ob Observer[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfErrorCollectorPair(ob Observer[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
 			WorkerGroupConfErrorObserver(ob)(opts),

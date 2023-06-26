@@ -331,6 +331,6 @@ func (wf Worker) FilterErrors(ef ers.Filter) Worker {
 }
 
 func (wf Worker) WithoutErrors(errs ...error) Worker {
-	filter := ers.FilterRemove(errs...)
+	filter := ers.FilterExclude(errs...)
 	return func(ctx context.Context) error { return filter(wf(ctx)) }
 }

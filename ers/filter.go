@@ -4,9 +4,10 @@ package ers
 // errors, reformulate,  or annotate errors.
 type Filter func(error) error
 
-// Filter takes an error and returns nil if the error is nil, or if
-// the error (or one of its wrapped errors,) is in the exclusion list.
-func FilterRemove(exclusions ...error) Filter {
+// FilterExclude takes an error and returns nil if the error is nil,
+// or if the error (or one of its wrapped errors,) is in the exclusion
+// list.
+func FilterExclude(exclusions ...error) Filter {
 	if len(exclusions) == 0 {
 		return FilterNoop()
 	}

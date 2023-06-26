@@ -218,7 +218,7 @@ func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
 }
 
 func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
-	return pf.FilterErrors(ers.FilterRemove(errs...))
+	return pf.FilterErrors(ers.FilterExclude(errs...))
 }
 
 func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) }

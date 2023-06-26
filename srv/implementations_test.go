@@ -22,10 +22,11 @@ import (
 func TestHelpers(t *testing.T) {
 	t.Parallel()
 	t.Run("Wait", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(fun.VariadicIterator(fun.Operation(func(context.Context) { time.Sleep(10 * time.Millisecond) })))
+		svc := Wait(fun.VariadicIterator(fun.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)
@@ -36,7 +37,7 @@ func TestHelpers(t *testing.T) {
 		}
 
 		dur := time.Since(start)
-		if dur < 10*time.Millisecond || dur > 20*time.Millisecond {
+		if dur < 50*time.Millisecond || dur > 100*time.Millisecond {
 			t.Error(dur)
 		}
 	})

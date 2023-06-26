@@ -60,15 +60,18 @@ func (of Observer[T]) When(cond func() bool) Observer[T] {
 	return func(in T) { ft.WhenCall(cond(), of.Capture(in)) }
 }
 
-// Skip runs a check before passing the object to the obsever.
+// Skip runs a check before passing the object to the obsever, when
+// the condition function--which can inspect the input object--returns
+// true, the underlying Observer is called, otherwise, the observation
+// is a noop.
 func (of Observer[T]) Skip(hook func(T) bool) Observer[T] {
 	return func(in T) { ft.WhenHandle(hook, of, in) }
 }
 
-// Filter creates an observer that only executes the root observer
-// when the condition function--which can inspect the input
-// object--returns true. Use this to filter out nil inputs, or
-// unactionable inputs.
+// Filter creates an observer that only executes the root observer Use
+// this to process or transform the input before it is passed to the
+// underlying observer. Use in combination with the Skip function to
+// filter out non-actionable inputs.
 func (of Observer[T]) Filter(filter func(T) T) Observer[T] {
 	return func(in T) { of(filter(in)) }
 }

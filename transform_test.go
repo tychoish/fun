@@ -1044,10 +1044,10 @@ func RunIteratorStringAlgoTests(
 
 		err := ec.Resolve()
 		check.Error(t, err)
-		check.Error(t, ers.FilterRemove(io.EOF, context.DeadlineExceeded)(err))
-		check.NotError(t, ers.FilterRemove(context.Canceled)(err))
+		check.Error(t, ers.FilterExclude(io.EOF, context.DeadlineExceeded)(err))
+		check.NotError(t, ers.FilterExclude(context.Canceled)(err))
 
-		check.NotError(t, ers.FilterRemove(ErrCountMeOut)(err))
+		check.NotError(t, ers.FilterExclude(ErrCountMeOut)(err))
 		check.ErrorIs(t, err, ErrCountMeOut)
 	})
 	t.Run("ConverterOK", func(t *testing.T) {

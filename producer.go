@@ -361,7 +361,7 @@ func (pf Producer[T]) PostHook(op func()) Producer[T] {
 // list. The produced value in these cases is almost always the zero
 // value for the type.
 func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
-	return pf.FilterErrors(ers.FilterRemove(errs...))
+	return pf.FilterErrors(ers.FilterExclude(errs...))
 }
 
 // FilterErrors passes the error of the root Producer function

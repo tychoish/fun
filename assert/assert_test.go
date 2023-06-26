@@ -37,8 +37,8 @@ func TestAssertion(t *testing.T) {
 		assert.NotSubstring(t, "the cat", strVal)
 		assert.Type[int](t, 1)
 		assert.NotType[string](t, 2)
-		assert.MaxRuntime(t, time.Millisecond, func() { time.Sleep(time.Microsecond) })
-		assert.MinRuntime(t, time.Microsecond, func() { time.Sleep(time.Millisecond) })
+		assert.MaxRuntime(t, 10*time.Millisecond, func() { time.Sleep(time.Millisecond) })
+		assert.MinRuntime(t, time.Millisecond, func() { time.Sleep(10 * time.Millisecond) })
 		assert.Runtime(t, time.Millisecond, 100*time.Millisecond, func() { time.Sleep(50 * time.Millisecond) })
 	})
 	t.Run("Failures", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestAssertion(t *testing.T) {
 			assert.MinRuntime(t, time.Second, func() { time.Sleep(time.Nanosecond) })
 		})
 		assert.Failing(t, func(t *testing.T) {
-			assert.Runtime(t, time.Millisecond, 100*time.Millisecond, func() { time.Sleep(time.Microsecond) })
+			assert.Runtime(t, 10*time.Millisecond, 100*time.Millisecond, func() { time.Sleep(time.Millisecond) })
 		})
 		assert.Failing(t, func(t *testing.T) {
 			assert.Runtime(t, time.Millisecond, 10*time.Millisecond, func() { time.Sleep(50 * time.Millisecond) })
