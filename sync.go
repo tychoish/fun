@@ -3,8 +3,6 @@ package fun
 import (
 	"context"
 	"sync"
-
-	"github.com/tychoish/fun/ft"
 )
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
@@ -73,10 +71,12 @@ func (wg *WaitGroup) IsDone() bool {
 // Operation returns with WaitGroups Wait method as a Operation.
 func (wg *WaitGroup) Operation() Operation { return wg.Wait }
 
+// DoTimes uses the WaitGroup to launch an operation in a worker pool
+// of the specified size, and blocks until all operations return or
+// the context is canceled.
 func (wg *WaitGroup) DoTimes(ctx context.Context, n int, op Operation) {
-	wg.Add(n)
 	defer wg.Wait(ctx)
-	ft.DoTimes(n, func() { defer wg.Done(); op(ctx) })
+	op.StartGroup(ctx, wg, n)
 }
 
 // Worker returns a worker that will block on the wait group

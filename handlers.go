@@ -74,7 +74,6 @@ func (Handlers) ErrorCollector() (ob Observer[error], prod Producer[[]error]) {
 	mtx := &sync.Mutex{}
 
 	return HF.ErrorObserver(ob).WithLock(mtx), prod.WithLock(mtx)
-
 }
 
 // ErrorObserverWithoutEOF wraps an error observer and propogates all

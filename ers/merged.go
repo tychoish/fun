@@ -59,11 +59,11 @@ func (dwe *mergederr) Unwrap() (out []error) {
 	for _, err := range []error{dwe.current, dwe.previous} {
 		switch e := err.(type) {
 		case interface{ Unwrap() []error }:
-			out = append(out, e.Unwrap()...)
+			out = Append(out, e.Unwrap()...)
 		case nil:
 			continue
 		default:
-			out = append(out, e)
+			out = Append(out, e)
 		}
 	}
 	return

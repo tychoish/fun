@@ -371,7 +371,7 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
 			return nil
 		default:
 			// this is (realistically) only context
-			// cancelation errors
+			// cancelation errors. Beause the
 			return err
 		}
 	}

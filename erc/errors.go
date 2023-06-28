@@ -101,6 +101,9 @@ func (e *Stack) Unwrap() []error {
 	return ft.Must(e.Iterator().Slice(context.Background()))
 }
 
+// Producer exposes the state of the error stack as a producer
+// function, and can be used to build iterators or other operatios in
+// the fun package.
 func (e *Stack) Producer() fun.Producer[error] {
 	iter := &Stack{next: e}
 	return fun.Producer[error](func(ctx context.Context) (value error, err error) {
@@ -155,6 +158,12 @@ func (ec *Collector) Add(err error) {
 // fun.Observer[error] object for integration and use with the
 // function types.
 func (ec *Collector) Observer() fun.Observer[error] { return ec.Add }
+
+// Len reports on the total number of non-nil errors collected. The
+// count tracks a cached size of the *erc.Stack, giving Len() stable
+// performance characteristics; however, because the Collector unwrap
+// and merge Stack and other { Unwrap() []error } errors, the number
+// may not
 func (ec *Collector) Len() int {
 	defer with(lock(&ec.mu))
 	if ec.stack == nil {
@@ -185,6 +194,18 @@ func (ec *Collector) Resolve() error {
 	}
 
 	return ec.stack
+}
+
+// Producer returns a function that is generally equivalent to
+// Collector.Resolve(); however, the errors are returned as an
+// Unwound/Unwrapped slice of errors, rather than the ers.Stack
+// object. Additionally, the producer can return an error if the context
+// is canceled.
+func (ec *Collector) Producer() fun.Producer[[]error] {
+	return func(ctx context.Context) ([]error, error) {
+		defer with(lock(&ec.mu))
+		return ec.stack.Iterator().Slice(ctx)
+	}
 }
 
 // HasErrors returns true if there are any underlying errors, and

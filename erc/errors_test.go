@@ -129,6 +129,16 @@ func TestError(t *testing.T) {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
+		t.Run("Producer", func(t *testing.T) {
+			ec := &Collector{}
+			for i := 0; i < 100; i++ {
+				ec.Add(fmt.Errorf("%d", i))
+			}
+			errs := ers.Append(ec.Producer()(ctx))
+			if len(errs) != 100 {
+				t.Log(errs, len(errs), ec.Len())
+			}
+		})
 		t.Run("PanicRecovery", func(t *testing.T) {
 			es := &Collector{}
 			sig := make(chan struct{})

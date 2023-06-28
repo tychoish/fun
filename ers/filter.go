@@ -56,6 +56,18 @@ func ExtractErrors(in []any) (rest []any, errs []error) {
 	return
 }
 
+// RemoveOK removes all nil errors from a slice of errors, returning
+// the consolidated slice.
+func RemoveOK(errs []error) []error {
+	out := make([]error, 0, len(errs))
+	for idx := range errs {
+		if IsError(errs[idx]) {
+			out = append(out, errs[idx])
+		}
+	}
+	return out
+}
+
 // FilterToRoot produces a filter which always returns only the root/MOST
 // wrapped error present in an error object.
 func FilterToRoot() Filter { return findRoot }

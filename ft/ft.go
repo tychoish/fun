@@ -80,7 +80,10 @@ func DoTimes(n int, op func()) {
 }
 
 // SafeCall only calls the operation when it's non-nil.
-func SafeCall(op func())          { WhenCall(op != nil, op) }
+func SafeCall(op func()) { WhenCall(op != nil, op) }
+
+// SafeDo calls the function when the operation is non-nil, and
+// returns either the output of the function or
 func SafeDo[T any](op func() T) T { return WhenDo(op != nil, op) }
 
 // SafeWrap wraps an operation with SafeCall so that the resulting
@@ -99,7 +102,15 @@ func IgnoreSecond[A any, B any](first A, second B) A { return first }
 // Once uses a sync.Once to wrap to provide an output function that
 // will execute at most one time, while eliding/managing the sync.Once
 // object.
-func Once(f func()) func() { o := &sync.Once{}; return func() { f = SafeWrap(f); o.Do(f) } }
+func Once(f func()) func() { o := &sync.Once{}; f = SafeWrap(f); return func() { o.Do(f) } }
+
+// OnceDo runs a function, exactly once, to produce a value which is
+// then cached, and returned on any successive calls to the function.
+func OnceDo[T any](op func() T) func() T {
+	var cache T
+	opw := Once(func() { cache = op() })
+	return func() T { opw(); return cache }
+}
 
 // Contain returns true if an element of the slice is equal to the
 // item.
@@ -128,7 +139,7 @@ func Must[T any](arg T, err error) T {
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := fun.MustBeOk(func() (string ok) { return "hello world", true })
+//	out := ft.MustBeOk(func() (string ok) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T {
 	WhenCall(!ok, func() { panic(ers.Join(ers.New("ok check failed"), ers.ErrInvariantViolation)) })
 	return out

@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -61,11 +60,6 @@ type WorkerGroupConf struct {
 // error if there are impossible configurations
 func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = internal.Max(1, o.NumWorkers)
-	// if o.ErrorObserver == nil {
-	// 	ob, prod := HF.ErrorCollector()
-	// 	o.ErrorObserver = ob.Filter(ers.FilterRemove(o.ExcludedErrors...))
-	// 	o.ErrorResolver = func() error { return ers.Join(ft.IgnoreSecond(prod.Block())...) }
-	// }
 	return nil
 }
 
@@ -107,19 +101,28 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	}
 }
 
+// OptionProvider is a function type for building functional
+// arguments, and is used for the parallel iterator processing (map,
+// transform, for-each, etc.) in the fun and itertool packages, and
+// available with tooling for use in other contexts.
+//
+// The type T should always be mutable (e.g. a map, or a pointer).
 type OptionProvider[T any] func(T) error
 
+// JoinOptionProviders takes a zero or more option providers and
+// produces a single combined option provider. With zero or nil
+// arguments, the operation becomes a noop.
 func JoinOptionProviders[T any](op ...OptionProvider[T]) OptionProvider[T] {
-	switch len(op) {
-	case 0:
-		return func(T) error { return nil }
-	case 1:
-		return op[0]
-	default:
-		return op[0].Join(op[1:]...)
+	var noop OptionProvider[T] = func(T) error { return nil }
+	if len(op) == 0 {
+		return noop
 	}
+	return noop.Join(op...)
 }
 
+// Apply applies the current Operation Provider to the configuration,
+// and if the type T implements a Validate() method, calls that. All
+// errors are aggregated.
 func (op OptionProvider[T]) Apply(in T) error {
 	err := op(in)
 	switch validator := any(in).(type) {
@@ -127,8 +130,11 @@ func (op OptionProvider[T]) Apply(in T) error {
 		err = ers.Join(validator.Validate(), err)
 	}
 	return err
-
 }
+
+// Join aggregates a collection of Option Providers into a single
+// option provider. The amalgamated operation is panic safe and omits
+// all nil providers.
 func (op OptionProvider[T]) Join(opps ...OptionProvider[T]) OptionProvider[T] {
 	opps = append([]OptionProvider[T]{op}, opps...)
 	return func(option T) (err error) {
@@ -144,10 +150,14 @@ func (op OptionProvider[T]) Join(opps ...OptionProvider[T]) OptionProvider[T] {
 	}
 }
 
+// WorkerGroupConfSet overrides the option with the provided option.
 func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
 	return func(o *WorkerGroupConf) error { *o = *opt; return nil }
 }
 
+// WorkerGroupConfAddExcludeErrors appends the provided errors to the
+// ExcludedErrors value. The provider will return an error if any of
+// the input iterators is ErrRecoveredPanic.
 func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
 		if ers.Is(ErrRecoveredPanic, errs...) {
@@ -158,51 +168,61 @@ func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupC
 	}
 }
 
+// WorkerGroupConfIncludeContextErrors toggles the option that forces
+// the operation to include context errors in the output. By default
+// they are not included.
 func WorkerGroupConfIncludeContextErrors() OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.IncludeContextExpirationErrors = true; return nil }
 }
 
+// WorkerGroupConfContinueOnError toggles the option that allows the
+// operation to continue when the operation encounters an
+// error. Otherwise, any option will lead to an abort.
 func WorkerGroupConfContinueOnError() OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ContinueOnError = true; return nil }
 }
 
+// WorkerGroupConfContinueOnPanic toggles the option that allows the
+// operation to continue when encountering a panic.
 func WorkerGroupConfContinueOnPanic() OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ContinueOnPanic = true; return nil }
 }
 
+// WorkerGroupConfWorkerPerCPU sets the number of workers to the
+// number of detected CPUs by the runtime (e.g. runtime.NumCPU()).
 func WorkerGroupConfWorkerPerCPU() OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.NumWorkers = runtime.NumCPU(); return nil }
 }
 
+// WorkerGroupConfNumWorkers sets the number of workers
+// configured. It is not possible to set this value to less than 1:
+// negative values and 0 are always ignored.
 func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error {
-		if num <= 0 {
-			num = 1
-		}
-		opts.NumWorkers = num
-		return nil
-	}
+	return func(opts *WorkerGroupConf) error { opts.NumWorkers = internal.Max(1, num); return nil }
 }
 
-// WorkerGroupConfWithErrorCollector saves an error collector
+// WorkerGroupConfWithErrorCollector saves an error observer to the
+// configuration. Typically implementations will provide some default
+// error collection tool, and will only call the observer for non-nil
+// errors. ErrorObservers should be safe for concurrent use.
 func WorkerGroupConfErrorObserver(observer Observer[error]) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error {
-		opts.ErrorObserver = observer
-		return nil
-	}
+	return func(opts *WorkerGroupConf) error { opts.ErrorObserver = observer; return nil }
 }
 
+// WorkerGroupConfErrorResolver reports the errors collected by the
+// observer. If the ErrorObserver is not set the resolver may be
+// overriden. ErrorObservers should be safe for concurrent use.
 func WorkerGroupConfErrorResolver(resolver func() error) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error {
-		opts.ErrorResolver = resolver
-		return nil
-	}
+	return func(opts *WorkerGroupConf) error { opts.ErrorResolver = resolver; return nil }
 }
 
 // WorkerGroupConfWithErrorCollector sets an error collector implementation for later
 // use in the WorkerGroupOptions. The resulting function will only
 // error if the collector is nil, however, this method will override
 // an existing error collector.
+//
+// The ErrorCollector interface is typically provided by the
+// `erc.Collector` type.
 //
 // ErrorCollectors are used by some operations to collect, aggregate, and
 // distribute errors from operations to the caller.
@@ -223,11 +243,14 @@ func WorkerGroupConfWithErrorCollector(
 	}
 }
 
+// WorkerGroupConfErrorCollectorPair uses an Observer/Producer pair to
+// collect errors. A basic implementation, accessible via
+// HF.ErrorCollector() is suitable for this purpose.
 func WorkerGroupConfErrorCollectorPair(ob Observer[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
 			WorkerGroupConfErrorObserver(ob)(opts),
-			WorkerGroupConfErrorResolver(func() error { return ers.Join(ft.IgnoreSecond(resolver.Block())...) })(opts),
+			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Block())...) })(opts),
 		)
 	}
 }

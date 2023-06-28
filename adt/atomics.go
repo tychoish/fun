@@ -30,15 +30,7 @@ type AtomicValue[T any] interface {
 // concurrently, there is no provision for protecting mutable types
 // returned by the function and concurrent modification of mutable
 // returned values is a race.
-func Mnemonize[T any](in func() T) func() T {
-	once := &sync.Once{}
-	var value T
-
-	return func() T {
-		once.Do(func() { value = in() })
-		return value
-	}
-}
+func Mnemonize[T any](in func() T) func() T { return ft.OnceDo(in) }
 
 // Once provides a mnemonic form of sync.Once, caching and returning a
 // value after the Do() function is called.

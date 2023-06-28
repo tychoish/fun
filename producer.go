@@ -38,12 +38,16 @@ func ConsistentProducer[T any](fn func() T) Producer[T] {
 	return func(context.Context) (T, error) { return fn(), nil }
 }
 
+// StaticProducer returns a producer function that always returns the
+// provided values.
 func StaticProducer[T any](val T, err error) Producer[T] {
 	return func(context.Context) (T, error) { return val, err }
 }
 
+// ValueProducer returns a producer function that always returns the
+// provided value, and a nill error.
 func ValueProducer[T any](val T) Producer[T] {
-	return func(context.Context) (T, error) { return val, nil }
+	return StaticProducer(val, nil)
 }
 
 // Run executes the producer.
@@ -80,6 +84,8 @@ func (pf Producer[T]) Safe() Producer[T] {
 	}
 }
 
+// Ignore runs the producer function and returns the value, ignoring
+// the error.
 func (pf Producer[T]) Ignore(ctx context.Context) T { return ft.IgnoreSecond(pf(ctx)) }
 
 // Join, on successive calls, runs the first producer until it
@@ -213,6 +219,9 @@ func (pf Producer[T]) Iterator() *Iterator[T] {
 	return &Iterator[T]{operation: op, closer: cancel}
 }
 
+// IteratorWithHook constructs an Iterator from the producer. The
+// provided hook function will run during the Iterators Close()
+// method.
 func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
 	once := &sync.Once{}
 	op, cancel := pf.WithCancel()
@@ -268,6 +277,12 @@ func (pf Producer[T]) When(cond func() bool) Producer[T] {
 	}
 }
 
+// Lock creates a producer that runs the root mutex as per normal, but
+// under the protection of a mutex so that there's only one execution
+// of the producer at a time.
+func (pf Producer[T]) Lock() Producer[T] { return pf.WithLock(&sync.Mutex{}) }
+
+// WithLock uses the provided mutex to protect the execution of the producer.
 func (pf Producer[T]) WithLock(mtx *sync.Mutex) Producer[T] {
 	return func(ctx context.Context) (T, error) {
 		mtx.Lock()
@@ -276,13 +291,17 @@ func (pf Producer[T]) WithLock(mtx *sync.Mutex) Producer[T] {
 	}
 }
 
+// SendOne makes a Worker function that, as a future, calls the
+// producer once and then passes the output, if there are no errors,
+// to the processor function. Provides the inverse operation of
+// Processor.ReadOne.
 func (pf Producer[T]) SendOne(proc Processor[T]) Worker { return proc.ReadOne(pf) }
-func (pf Producer[T]) SendAll(proc Processor[T]) Worker { return proc.ReadAll(pf) }
 
-// Lock creates a producer that runs the root mutex as per normal, but
-// under the protection of a mutex so that there's only one execution
-// of the producer at a time.
-func (pf Producer[T]) Lock() Producer[T] { return pf.WithLock(&sync.Mutex{}) }
+// SendAll provides a form of iteration, by construction a future
+// (Worker) that consumes the values of the producer with the
+// processor until either function returns an error. SendAll respects
+// ErrIteratorSkip and io.EOF
+func (pf Producer[T]) SendAll(proc Processor[T]) Worker { return proc.ReadAll(pf) }
 
 // WithCancel creates a Producer and a cancel function which will
 // terminate the context that the root Producer is running
@@ -364,7 +383,8 @@ func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
 	return pf.FilterErrors(ers.FilterExclude(errs...))
 }
 
-// FilterErrors passes the error of the root Producer function
+// FilterErrors passes the error of the root Producer function with
+// the ers.Filter.
 func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
 }

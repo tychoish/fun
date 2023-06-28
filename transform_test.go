@@ -130,7 +130,7 @@ func TestMapReduce(t *testing.T) {
 		pipe <- t.Name()
 
 		var mf Transform[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
-		mf.Safe().Processor(Blocking(output).Send().Write, &WorkerGroupConf{}).
+		mf.Safe().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
 			ReadAll(Blocking(pipe).Receive().Producer()).
 			Ignore().
 			Add(ctx, wg)
@@ -332,10 +332,9 @@ func TestParallelForEach(t *testing.T) {
 					}
 
 					seenCount.Add(1)
-					<-ctx.Done()
 					return nil
 				},
-				WorkerGroupConfNumWorkers(10),
+				WorkerGroupConfNumWorkers(8),
 			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -1147,7 +1146,8 @@ func RunIteratorStringAlgoTests(
 		t.Run("Serial", func(t *testing.T) {
 			var root error
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod := tfm.Pipe()
+			proc, prod, close := tfm.Pipe()
+			defer close()
 			ctx := testt.Context(t)
 			for i := 0; i < 100; i++ {
 				assert.NotError(t, proc(ctx, i))
@@ -1160,12 +1160,12 @@ func RunIteratorStringAlgoTests(
 				assert.ErrorIs(t, err, io.EOF)
 				assert.Equal(t, fmt.Sprint(i), out)
 			}
-
 		})
 		t.Run("Parallel", func(t *testing.T) {
 			var root error
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod := tfm.Pipe()
+			proc, prod, close := tfm.Pipe()
+			defer close()
 			ctx := testt.Context(t)
 			wg := &WaitGroup{}
 			wg.DoTimes(ctx, 100, func(ctx context.Context) {
@@ -1181,24 +1181,43 @@ func RunIteratorStringAlgoTests(
 		var tfmcount int
 		var prodcount int
 		var proccount int
-		reset := func() { tfmcount, prodcount, proccount = 0, 0, 0; prodroot, procroot = nil, nil }
-		prod := Producer[int](func(ctx context.Context) (int, error) { prodcount++; return 42, prodroot })
-		proc := Processor[string](func(ctx context.Context, in string) error { proccount++; check.Equal(t, in, "42"); return procroot })
+		var maxIter int
+		reset := func() { tfmcount, prodcount, proccount = 0, 0, 0; prodroot, procroot = nil, nil; maxIter = 1 }
+		prod := Producer[int](func(ctx context.Context) (int, error) {
+			if prodroot == nil && prodcount >= maxIter {
+				return -1, io.EOF
+			}
+			prodcount++
+			return 42, prodroot
+
+		})
+		proc := Processor[string](func(ctx context.Context, in string) error {
+			if proccount >= maxIter && procroot == nil {
+				return io.EOF
+			}
+			proccount++
+			check.Equal(t, in, "42")
+			return procroot
+		})
 		tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
 		worker := tfm.Worker(prod, proc)
 		ctx := testt.Context(t)
+
+		reset()
 
 		t.Run("HappyPath", func(t *testing.T) {
 			defer reset()
 			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 0)
 			check.NotError(t, worker(ctx))
+			testt.Log(t, prodcount, proccount, tfmcount)
 			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
 		})
 
 		t.Run("ProdError", func(t *testing.T) {
 			defer reset()
-			prodroot = io.EOF
-			check.ErrorIs(t, worker(ctx), io.EOF)
+			maxIter = 10
+			prodroot = context.Canceled
+			check.ErrorIs(t, worker(ctx), context.Canceled)
 			check.True(t, proccount == tfmcount && tfmcount == 0)
 			check.Equal(t, prodcount, 1)
 			testt.Log(t, prodcount, proccount, tfmcount)
@@ -1206,15 +1225,15 @@ func RunIteratorStringAlgoTests(
 		t.Run("ProcError", func(t *testing.T) {
 			defer reset()
 
-			procroot = io.EOF
-			check.ErrorIs(t, worker(ctx), io.EOF)
+			procroot = context.Canceled
+			check.ErrorIs(t, worker(ctx), context.Canceled)
 			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
 			testt.Log(t, prodcount, proccount, tfmcount)
 		})
 		t.Run("MapFails", func(t *testing.T) {
 			defer reset()
-			tfmroot = io.EOF
-			check.ErrorIs(t, worker(ctx), io.EOF)
+			tfmroot = context.Canceled
+			check.ErrorIs(t, worker(ctx), context.Canceled)
 			check.True(t, prodcount == tfmcount && tfmcount == 1)
 			check.Equal(t, proccount, 0)
 			testt.Log(t, prodcount, proccount, tfmcount)

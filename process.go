@@ -3,6 +3,7 @@ package fun
 import (
 	"context"
 	"errors"
+	"io"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,10 +41,14 @@ func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(i
 func (pf Processor[T]) Block(in T) error { return pf.Worker(in).Block() }
 
 // Ignore runs the process function and discards the error.
-func (pf Processor[T]) Ignore(ctx context.Context, in T) { _ = pf(ctx, in) }
+func (pf Processor[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in)) }
 
-func (pf Processor[T]) Check(ctx context.Context, in T) bool { return pf(ctx, in) == nil }
+// Check processes the input and returns true when the error is nil,
+// and false when there was an error.
+func (pf Processor[T]) Check(ctx context.Context, in T) bool { return ers.OK(pf(ctx, in)) }
 
+// Force processes the input, but discards the error and uses a
+// context that will not expire.
 func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
 // Operation converts a processor into a worker that will process the input
@@ -157,6 +162,8 @@ func (pf Processor[T]) Once() Processor[T] {
 // Lock wraps the Processor and protects its execution with a mutex.
 func (pf Processor[T]) Lock() Processor[T] { return pf.WithLock(&sync.Mutex{}) }
 
+// WithLock wraps the Processor and ensures that the mutex is always
+// held while the root Processor is called.
 func (pf Processor[T]) WithLock(mtx *sync.Mutex) Processor[T] {
 	return func(ctx context.Context, arg T) error {
 		mtx.Lock()
@@ -165,8 +172,9 @@ func (pf Processor[T]) WithLock(mtx *sync.Mutex) Processor[T] {
 	}
 }
 
-func (pf Processor[T]) Limit(in int) Processor[T] {
-	resolver := limitExec[error](in)
+// Limit ensures that the processor is called at most n times.
+func (pf Processor[T]) Limit(n int) Processor[T] {
+	resolver := limitExec[error](n)
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })
@@ -201,41 +209,65 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
+// PreHook creates an amalgamated Processor that runs the operation
+// before the root processor. If the operation panics that panic is
+// converted to an error and merged with the processor's error. Use
+// with Operation.Once() to create an "init" function that runs once
+// before a processor is called the first time.
 func (pf Processor[T]) PreHook(op Operation) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		return ers.Join(ers.Check(func() { op(ctx) }), pf(ctx, in))
 	}
 }
 
+// PostHook produces an amalgamated processor that runs after the
+// processor completes. Panics are caught, converted to errors, and
+// aggregated with the processors error. The hook operation is
+// unconditionally called after the processor function (except in the
+// case of a processor panic.)
 func (pf Processor[T]) PostHook(op func()) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		return ers.Join(ft.Flip(pf(ctx, in), ers.Check(op)))
 	}
 }
 
+// FilterErrors uses an ers.Filter to process the error respose from
+// the processor.
 func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }
 
+// WithoutErrors returns a producer that will convert a non-nil error
+// of the provided types to a nil error.
 func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 	return pf.FilterErrors(ers.FilterExclude(errs...))
 }
 
+// ReadOne returns a future (Worker) that calls the processor function
+// on the output of the provided producer function. ReadOne uses the
+// fun.Pipe() operation for the underlying implementation.
 func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) }
 
+// ReadAll reads elements from the producer until an error is
+// encountered and passes them to a producer, until the first error is
+// encountered. The work
 func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 	return func(ctx context.Context) error {
+
+	LOOP:
 		for {
 			out, err := prod(ctx)
+			if err == nil {
+				err = pf(ctx, out)
+			}
+
 			switch {
-			case err == nil:
-				if err := pf(ctx, out); err != nil {
-					return err
-				}
-			case errors.Is(err, ErrIteratorSkip):
-				continue
-			default:
+			case err == nil || errors.Is(err, ErrIteratorSkip):
+				continue LOOP
+			case errors.Is(err, io.EOF):
 				return nil
+			default:
+				return err
 			}
 		}
 	}

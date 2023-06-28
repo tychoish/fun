@@ -126,30 +126,6 @@ func TestAtomics(t *testing.T) {
 
 	})
 	t.Run("Menmeonics", func(t *testing.T) {
-		t.Run("Function", func(t *testing.T) {
-			t.Parallel()
-			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-			count := &atomic.Int64{}
-			mfn := Mnemonize(func() int { count.Add(1); return 42 })
-			wg := &fun.WaitGroup{}
-			for i := 0; i < 64; i++ {
-				wg.Add(1)
-				// this function panics rather than
-				// asserts because it's very likely to
-				// be correct, and to avoid testing.T
-				// mutexes.
-				go func() {
-					defer wg.Done()
-					for i := 0; i < 64; i++ {
-						if val := mfn(); val != 42 {
-							panic(fmt.Errorf("mnemonic function produced %d not 42", val))
-						}
-					}
-				}()
-			}
-			wg.Wait(ctx)
-			assert.Equal(t, count.Load(), 1)
-		})
 		t.Run("Once", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)

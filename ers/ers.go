@@ -48,9 +48,23 @@ func OK(err error) bool { return err == nil }
 // inverse of OK().
 func IsError(err error) bool { return !OK(err) }
 
+// Ignore discards an error.
+func Ignore(_ error) { return }
+
 // Cast converts an untyped/any object into an error, returning nil if
 // the value is not an error or is an error of a nil type.
 func Cast(e any) error { err, _ := e.(error); return err }
+
+// Append adds one or more errors to the error slice, omitting all
+// nil errors.
+func Append(errs []error, es ...error) []error {
+	for idx := range es {
+		if IsError(es[idx]) {
+			errs = append(errs, es[idx])
+		}
+	}
+	return errs
+}
 
 // IsTerminating returns true if the error is one of the sentinel
 // errors used by fun (and other packages!) to indicate that

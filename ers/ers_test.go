@@ -146,4 +146,20 @@ func TestErrors(t *testing.T) {
 		check.True(t, As(err, &out))
 		check.Equal(t, out.val, 100)
 	})
+	t.Run("Append", func(t *testing.T) {
+		check.Equal(t, 0, len(Append([]error{}, nil, nil, nil)))
+		check.Equal(t, 1, len(Append([]error{}, nil, Error("one"), nil)))
+		check.Equal(t, 2, len(Append([]error{Error("hi")}, nil, Error("one"), nil)))
+	})
+	t.Run("RemoveOK", func(t *testing.T) {
+		check.Equal(t, 0, len(RemoveOK([]error{nil, nil, nil})))
+		check.Equal(t, 3, cap(RemoveOK([]error{nil, nil, nil})))
+		check.Equal(t, 1, len(RemoveOK([]error{nil, io.EOF, nil})))
+		check.Equal(t, 3, len(RemoveOK([]error{Error("one"), io.EOF, New("two")})))
+	})
+	t.Run("Ignore", func(t *testing.T) {
+		check.NotPanic(t, func() { Ignore(Error("new")) })
+		check.NotPanic(t, func() { Ignore(nil) })
+	})
+
 }
