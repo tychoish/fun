@@ -21,7 +21,12 @@ func IsZero[T comparable](in T) bool {
 	}
 }
 
-func IsType[T any](in any) bool         { _, ok := in.(T); return ok }
+// IsType checks if the type of the argument matches the type
+// specifier.
+func IsType[T any](in any) bool { _, ok := in.(T); return ok }
+
+// Cast is the same as doing `v, ok := in.(t)`, but with more clarity
+// at the call site,
 func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }
 
 // Ptr returns a pointer for the object. Useful for setting the value
@@ -66,6 +71,8 @@ func WhenDo[T any](cond bool, op func() T) (out T) {
 	return op()
 }
 
+// WhenHandle passes the argument "in" to the operation IF the
+// condition function (which also takes "in") returns true.
 func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
 	if cond(in) {
 		op(in)

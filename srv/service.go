@@ -2,7 +2,6 @@ package srv
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -10,12 +9,20 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
-var (
-	ErrServiceAlreadyStarted = errors.New("service already started")
-	ErrServiceReturned       = errors.New("service returned")
-	ErrServiceNotStarted     = errors.New("service not started")
+const (
+	// ErrServiceAlreadyStarted is returend by the Start() method
+	// of a service that is already running. These are safe to
+	// ignore in many contexts.
+	ErrServiceAlreadyStarted ers.Error = ers.Error("service already started")
+	// ErrServiceReturned is returned by the Start() method of a
+	// service that has already returned.
+	ErrServiceReturned ers.Error = ers.Error("service returned")
+	// ErrServiceNotStarted is returned by the Wait() method if
+	// the Start method has not yet returned.
+	ErrServiceNotStarted ers.Error = ers.Error("service not started")
 )
 
 // Service defines a background operation. The behavior of the service

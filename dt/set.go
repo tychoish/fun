@@ -11,8 +11,10 @@ import (
 
 type atomic[T comparable] struct{ val stdatomic.Value }
 
-func (a *atomic[T]) Get() T        { return a.resolve(a.val.Load()) }
-func (a *atomic[T]) Set(in T) bool { return a.val.CompareAndSwap(nil, in) }
+func (a *atomic[T]) Get() T { return a.resolve(a.val.Load()) }
+func (a *atomic[T]) Set(in T) bool {
+	return a.val.CompareAndSwap(nil, in) || a.val.CompareAndSwap(in, in)
+}
 
 func (*atomic[T]) resolve(in any) (val T) {
 	switch c := in.(type) {
@@ -20,16 +22,25 @@ func (*atomic[T]) resolve(in any) (val T) {
 		val = c
 	}
 	return val
-
 }
 
+// Set provides a flexible generic set implementation, with optional
+// safety for concurrent use (via Synchronize() and WithLock() methods,)
+// and optional order tracking (via Order().)
 type Set[T comparable] struct {
 	hash Map[T, *Element[T]]
 	list *List[T]
 	mtx  atomic[*sync.Mutex]
 }
 
+// Synchronize creates a mutex and enables its use in the Set. This
+// operation is safe to call more than once,
 func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
+
+// Order enables order tracking for the Set. The method panics if there
+// is more than one item in the map. If order tracking is enabled,
+// this operation is a noop.
+// tracking is enabled,
 func (s *Set[T]) Order() {
 	defer s.with(s.lock())
 	if s.list != nil {
@@ -39,6 +50,9 @@ func (s *Set[T]) Order() {
 	s.list = &List[T]{}
 }
 
+// WithLock configures the Set to synchronize operations with this
+// mutex. If the mutex is nil, or the Set is already synchronized with
+// a different mutex, WithLock panics with an invariant violation.
 func (s *Set[T]) WithLock(mtx *sync.Mutex) {
 	fun.Invariant.OK(mtx != nil, "mutexes must be non-nil")
 	fun.Invariant.OK(s.mtx.Set(mtx), "cannot override an existing mutex")
@@ -55,12 +69,40 @@ func (s *Set[T]) lock() *sync.Mutex {
 	return m
 }
 
-func (s *Set[T]) Add(in T)                   { _ = s.AddCheck(in) }
-func (s *Set[T]) Len() int                   { defer s.with(s.lock()); return len(s.hash) }
-func (s *Set[T]) Check(in T) bool            { defer s.with(s.lock()); return s.hash.Check(in) }
-func (s *Set[T]) Delete(in T)                { defer s.with(s.lock()); _ = s.delete(in) }
-func (s *Set[T]) DeleteCheck(in T) bool      { defer s.with(s.lock()); return s.delete(in) }
+// Add attempts to add the item to the mutex, and is a noop otherwise.
+func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
+
+// Len returns the number of items tracked in the set.
+func (s *Set[T]) Len() int { defer s.with(s.lock()); return len(s.hash) }
+
+// Check returns true if the item is in the set.
+func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(in) }
+
+// Delete attempts to remove the item from the set.
+func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
+
+// Iterator provides a way to iterate over the items in the
+// set. Provides items in iteration order if the set is ordered.
 func (s *Set[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
+
+// DeleteCheck removes the item from the set, return true when the
+// item had been in the Set, and returning false othewise
+func (s *Set[T]) DeleteCheck(in T) bool {
+	defer s.with(s.lock())
+	defer delete(s.hash, in)
+
+	e, ok := s.hash.Load(in)
+	if !ok {
+		return false
+	}
+
+	ft.WhenDo(e != nil, e.Remove)
+	return true
+}
+
+// AddCheck adds an item to the set and returns true if the item had
+// been in the set before AddCheck. In all cases when AddCheck
+// returns, the item is a member of the set.
 func (s *Set[T]) AddCheck(in T) (ok bool) {
 	defer s.with(s.lock())
 	ok = s.hash.Check(in)
@@ -80,19 +122,9 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 	return
 }
 
+// Populate adds all items encountered in the iterator to the set.
 func (s *Set[T]) Populate(iter *fun.Iterator[T]) {
 	fun.Invariant.Must(iter.Observe(context.Background(), s.Add))
-}
-
-func (s *Set[T]) delete(in T) bool {
-	e, ok := s.hash.Load(in)
-	if !ok {
-		return false
-	}
-
-	ft.WhenDo(e != nil, e.Remove)
-	delete(s.hash, in)
-	return true
 }
 
 func (s *Set[T]) unsafeIterator() *fun.Iterator[T] {
@@ -102,8 +134,13 @@ func (s *Set[T]) unsafeIterator() *fun.Iterator[T] {
 	return s.hash.Keys()
 }
 
-func (s *Set[T]) Producer() fun.Producer[T] {
+// Producer will produce each item from set on successive calls. If
+// the Set is ordered, then the producer produces items in the set's
+// order. If the Set is synchronize, then the Producer always holds
+// the Set's lock when called.
+func (s *Set[T]) Producer() (out fun.Producer[T]) {
 	defer s.with(s.lock())
+	defer func() { mu := s.mtx.Get(); ft.WhenDo(mu != nil, func() fun.Producer[T] { return out.WithLock(mu) }) }()
 
 	if s.list != nil {
 		return s.list.Producer()
@@ -145,8 +182,12 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 	return iter.Close() == nil
 }
 
+// MarshalJSON generates a JSON array of the items in the set.
 func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Iterator().MarshalJSON() }
 
+// UnmarshalJSON reads input JSON data, constructs an array in memory
+// and then adds items from the array to existing set. Items that are
+// in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	iter := Sliceify([]T{}).Iterator()
 	iter.UnmarshalJSON(in)

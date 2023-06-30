@@ -15,23 +15,29 @@ import (
 type Slice[T any] []T
 
 // Sliceify produces a slice object as a convenience constructor.
-func Sliceify[T any](in []T) Slice[T]                 { return in }
-func Variadic[T any](in ...T) Slice[T]                { return in }
-func SlicePrepend[T any](first T, rest ...T) Slice[T] { return append([]T{first}, rest...) }
+func Sliceify[T any](in []T) Slice[T] { return in }
 
-func Transform[T any, O any](in Slice[T], op func(in T) (O, error)) (Slice[O], error) {
+// Variadic constructs a slice of type T from a sequence of variadic
+// options.
+func Variadic[T any](in ...T) Slice[T] { return in }
+
+// Transform processes a slice of one type into a slice of another
+// type using the transformation function. Errors abort the
+// transformation, with the exception of fun.ErrIteratorSkip. All
+// errors are returned to the caller, except io.EOF which indicates
+// the (early) end of iteration.
+func Transform[T any, O any](in Slice[T], op func(T) (O, error)) (Slice[O], error) {
 	out := make([]O, 0, len(in))
 
-LOOP:
 	for idx := range in {
 		n, err := op(in[idx])
 		switch {
 		case err == nil:
 			out = append(out, n)
 		case errors.Is(err, fun.ErrIteratorSkip):
-			continue LOOP
+			continue
 		case errors.Is(err, io.EOF):
-			break LOOP
+			return out, nil
 		default:
 			return nil, err
 		}
@@ -51,16 +57,25 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 	sort.Slice(s, func(i, j int) bool { return cp(s[i], s[j]) })
 }
 
-// Add adds a single item to the slice.
-func (s *Slice[T]) Add(in T)                { *s = append(*s, in) }
+// Add adds a single item to the end of the slice.
+func (s *Slice[T]) Add(in T) { *s = append(*s, in) }
+
+// AddWhen embeds a conditional check in the Add, and only adds the item to the
+// slice when the condition is true.
 func (s *Slice[T]) AddWhen(cond bool, in T) { ft.WhenCall(cond, func() { s.Add(in) }) }
 
-// Append adds all of the items to the slice.
-func (s *Slice[T]) Append(in ...T)                { s.Extend(in) }
+// Append adds all of the items to the end of the slice.
+func (s *Slice[T]) Append(in ...T) { s.Extend(in) }
+
+// AppendWhen embeds a conditional check in the Append operation, and
+// only adds the items to the slice when the condition is true.
 func (s *Slice[T]) AppendWhen(cond bool, in ...T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Extend adds the items from the input slice to the root slice.
-func (s *Slice[T]) Extend(in []T)                { *s = append(*s, in...) }
+func (s *Slice[T]) Extend(in []T) { *s = append(*s, in...) }
+
+// ExtendWhen embeds a conditional check in the Extend operatio and
+// only adds the items to the slice when the condition is true.
 func (s *Slice[T]) ExtendWhen(cond bool, in []T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Copy performs a shallow copy of the Slice.
@@ -79,12 +94,16 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 // allocation.
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
 
+// Observe calls the observer function on every item in the slice.
 func (s Slice[T]) Observe(of fun.Observer[T]) {
 	for idx := range s {
 		of(s[idx])
 	}
 }
 
+// Filter returns a new slice, having passed all the items in the
+// input slice. Items that the filter function returns true for are
+// included and others are skipped.
 func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
 	s.Observe(func(in T) { o.AddWhen(p(in), in) })
 	return
@@ -129,13 +148,21 @@ func (s Slice[T]) IsEmpty() bool { return len(s) == 0 }
 // operation panics.
 func (s Slice[T]) Item(index int) T { return s[index] }
 
+// Process creates a future in the form of a work that, when called
+// iterates through all items in the slice, returning when the
+// processor errors. io.EOF errors are not returned, but do abort
+// iteration early, while fun.ErrIteratorSkip is respected.
 func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
 	return func(ctx context.Context) error {
 		for idx := range s {
-			if err := pf(ctx, s[idx]); err != nil {
-				if errors.Is(err, io.EOF) {
-					return nil
-				}
+			err := pf(ctx, s[idx])
+
+			switch {
+			case err == nil || errors.Is(err, fun.ErrIteratorSkip):
+				continue
+			case errors.Is(err, io.EOF):
+				return nil
+			default:
 				return err
 			}
 		}

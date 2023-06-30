@@ -154,6 +154,9 @@ func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
 	return pipe.Receive().Producer().PreHook(init)
 }
 
+// ProducerKeys returns a generator that generates the keys of the
+// map. The operation requires a goroutine to keep track of the state
+// of the iteration, but does not buffer or cache keys.
 func (m Map[K, V]) ProducerKeys() fun.Producer[K] {
 	pipe := fun.Blocking(make(chan K))
 
@@ -170,6 +173,9 @@ func (m Map[K, V]) ProducerKeys() fun.Producer[K] {
 	return pipe.Receive().Producer().PreHook(init)
 }
 
+// ProducerValues returns a generator that generates the values of the
+// map. The operation requires a goroutine to keep track of the state
+// of the iteration, but does not buffer or cache values.
 func (m Map[K, V]) ProducerValues() fun.Producer[V] {
 	pipe := fun.Blocking(make(chan V))
 

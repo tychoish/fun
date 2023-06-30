@@ -15,6 +15,8 @@ Packages:
 - [dt](https://pkg.go.dev/github.com/tychoish/fun/dt) (generic
   container datatypes, including ordered and unordered sets, singly
   and doubly linked list, as well as wrappers around maps and slices.)
+- [ft](https://pkg.go.dev/github.com/tychoish/fun/ft) function tools:
+  simple tools for handling function objects. 
 - [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly typed
   atomic data structures, wrappers, tools, and operations.)
 - [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
@@ -23,6 +25,13 @@ Packages:
   broker and concurrency-safe queue and deque.)
 - [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
   orchestration and management framework.)
+- [assert](https://pkg.go.dev/github.com/tychoish/fun/assert)
+  (minimal generic-based assertion library, in the tradition of
+  testify.) The assertions in `assert` abort the flow of the test while
+  [check](https://pkg.go.dev/github.com/tychoish/fun/assert/check),
+  provide non-critical assertions.
+- [testt](https://pkg.go.dev/github.com/tychoish/fun/testt) (testy)
+  are a collection of "nice to have" test helpers and utilities.
 
 For more information, see the documentation, but of general interest:
 

@@ -306,6 +306,12 @@ func (l *List[T]) Front() *Element[T] { l.lazySetup(); return l.root.next }
 //	}
 func (l *List[T]) Back() *Element[T] { l.lazySetup(); return l.root.prev }
 
+// Producer provides a producer function that iterates through the
+// contents of the list. When the producer reaches has fully iterated
+// through the list, or iterates to an item that has been removed
+// (likely due to concurrent access,) the producer returns io.EOF.
+//
+// The Producer starts at the front of the list and iterates in order.
 func (l *List[T]) Producer() fun.Producer[T] {
 	l.lazySetup()
 	current := l.root
@@ -317,6 +323,17 @@ func (l *List[T]) Producer() fun.Producer[T] {
 		return current.Value(), nil
 	}
 }
+
+// ProducerPop provides a producer function that iterates through the
+// contents of the list, removing each item from the list as it
+// encounters it. When the producer reaches has fully iterated
+// through the list, or iterates to an item that has been removed
+// (likely due to concurrent access,) the producer returns io.EOF.
+//
+// In most cases, for destructive iteration, use the pubsub.Queue,
+// pubsub.Deque, or one of the pubsub.Distributor implementations.
+//
+// The Producer starts at the front of the list and iterates in order.
 func (l *List[T]) ProducerPop() fun.Producer[T] {
 	l.lazySetup()
 	var current *Element[T]
@@ -331,6 +348,9 @@ func (l *List[T]) ProducerPop() fun.Producer[T] {
 	}
 }
 
+// ProducerReverse provides the same semantics and operation as the
+// Producer operation, but starts at the end/tail of the list and
+// works forward.
 func (l *List[T]) ProducerReverse() fun.Producer[T] {
 	l.lazySetup()
 	current := l.root
@@ -343,6 +363,9 @@ func (l *List[T]) ProducerReverse() fun.Producer[T] {
 	}
 }
 
+// ProducerReverse provides the same semantics and operation as the
+// ProducerPop operation, but starts at the end/tail of the list and
+// works forward.
 func (l *List[T]) ProducerReversePop() fun.Producer[T] {
 	l.lazySetup()
 	var current *Element[T]

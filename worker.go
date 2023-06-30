@@ -115,7 +115,7 @@ func (wf Worker) Safe() Worker {
 }
 
 // Block executes the worker function with a context that will never
-// expire and returns the error. Use with caution
+// expire and returns the error. Use with caution.
 func (wf Worker) Block() error                              { return wf.Run(context.Background()) }
 func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
@@ -302,14 +302,27 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
-func (wf Worker) PreHook(op func(context.Context)) Worker {
+// PreHook returns a Worker that runs an operatio unconditionally
+// before running the underlying worker. If the hook function panics
+// it is converted to an error and aggregated with the worker's
+// error.
+func (wf Worker) PreHook(op Operation) Worker {
 	return func(ctx context.Context) error { return ers.Join(ers.Check(func() { op(ctx) }), wf(ctx)) }
 }
 
+// PostHook runs hook operation  after the worker function
+// completes. If the hook panics it is converted to an error and
+// aggregated with workers's error.
 func (wf Worker) PostHook(op func()) Worker {
 	return func(ctx context.Context) error { return ers.Join(ft.Flip(wf(ctx), ers.Check(op))) }
 }
 
+// StartGroup starts n copies of the worker operation and returns a
+// future/worker that returns the aggregated errors from all workers
+//
+// The operation is fundamentally continue-on-error. To get
+// abort-on-error semantics, use the Filter() method on the input
+// worker, that cancels the context on when it sees an error.
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	ch := Blocking(make(chan error, internal.Max(n, runtime.NumCPU())))
 	oe := ch.Send().Processor().Force
@@ -328,10 +341,21 @@ func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 		return ers.Join(append(errs, err)...)
 	}
 }
+
+// Filter wraps the worker with a Worker that passes the output of the
+// root Worker's error and returns the output of the filter.
+//
+// The ers package provides a number of filter implementations but any
+// function in the following form works:
+//
+//	func(error) error
 func (wf Worker) FilterErrors(ef ers.Filter) Worker {
 	return func(ctx context.Context) error { return ef(wf(ctx)) }
 }
 
+// WithoutErrors returns a worker that will return nil if the error
+// returned by the worker is one of the errors passed to
+// WithoutErrors.
 func (wf Worker) WithoutErrors(errs ...error) Worker {
 	filter := ers.FilterExclude(errs...)
 	return func(ctx context.Context) error { return filter(wf(ctx)) }
