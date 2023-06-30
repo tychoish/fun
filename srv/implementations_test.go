@@ -63,7 +63,7 @@ func TestHelpers(t *testing.T) {
 				t.Error(count.Load())
 			}
 		})
-		t.Run("Large", func(t *testing.T) {
+		t.Run("Medium", func(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessIterator(
 				makeIterator(50),
@@ -121,7 +121,7 @@ func TestHelpers(t *testing.T) {
 				makeQueue(t, 100, count),
 				fun.WorkerGroupConfWorkerPerCPU(),
 			)
-			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+			ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
 
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)

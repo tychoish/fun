@@ -23,6 +23,14 @@ func randomIntSlice(size int) Slice[int] {
 	return Sliceify(out)
 }
 
+func intSlice(size int) Slice[int] {
+	out := make([]int, size)
+	for idx := range out {
+		out[idx] = idx
+	}
+	return Sliceify(out)
+}
+
 func TestSlice(t *testing.T) {
 	t.Run("Len", func(t *testing.T) {
 		s := randomIntSlice(100)
@@ -114,22 +122,23 @@ func TestSlice(t *testing.T) {
 			assert.Equal(t, s.Len(), 0)
 		})
 		t.Run("Shrink", func(t *testing.T) {
-			s := randomIntSlice(100)
+			s := intSlice(100)
 			s.Reslice(10, 90)
 			assert.Equal(t, s.Len(), 80)
 		})
 		t.Run("Front", func(t *testing.T) {
-			s := randomIntSlice(100)
+			s := intSlice(100)
 			ts := s.Copy()
 			ts.ResliceBeginning(50)
 			assert.Equal(t, ts.Len(), 50)
 			assert.NotEqual(t, ts.Item(1), s[1])
 		})
 		t.Run("Rear", func(t *testing.T) {
-			s := randomIntSlice(100)
+			s := intSlice(100)
 			ts := s.Copy()
 			ts.ResliceEnd(50)
 			assert.Equal(t, ts.Len(), 50)
+
 			assert.NotEqual(t, ts.Item(ts.Last()), s[len(s)-1])
 		})
 	})
