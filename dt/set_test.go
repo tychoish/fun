@@ -10,20 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/testt"
 )
-
-func generateIter(ctx context.Context, size int) *fun.Iterator[string] {
-	out := make([]string, size)
-	for i := 0; i < size; i++ {
-		out[i] = fmt.Sprintf("iter=%d", i)
-
-	}
-	return Sliceify(out).Iterator()
-}
 
 func TestSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

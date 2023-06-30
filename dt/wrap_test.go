@@ -10,6 +10,13 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
+type slwrap struct {
+	out []error
+}
+
+func (s slwrap) Unwrap() []error { return s.out }
+func (s slwrap) Error() string   { return fmt.Sprint("error:", len(s.out), s.out) }
+
 func TestWrap(t *testing.T) {
 	t.Run("MergedSlice", func(t *testing.T) {
 		err := ers.Join(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
@@ -38,17 +45,3 @@ func TestWrap(t *testing.T) {
 type wrapTestType struct {
 	value int
 }
-
-type oneWrap struct {
-	out error
-}
-
-func (s *oneWrap) Unwrap() error { return s.out }
-func (s *oneWrap) Error() string { return fmt.Sprint("error: isnil,", s.out) }
-
-type slwrap struct {
-	out []error
-}
-
-func (s slwrap) Unwrap() []error { return s.out }
-func (s slwrap) Error() string   { return fmt.Sprint("error:", len(s.out), s.out) }

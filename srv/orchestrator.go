@@ -135,7 +135,7 @@ func (or *Orchestrator) Service() *Service {
 				go func(ss *Service) {
 					defer wg.Done()
 
-					ec.Add(erc.Wrapf(ss.Start(ctx), "problem starting %s", ss.String()))
+					ec.Add(ers.Wrapf(ss.Start(ctx), "problem starting %s", ss.String()))
 					ec.Add(ss.Wait())
 				}(s)
 			}

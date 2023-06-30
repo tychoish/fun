@@ -159,7 +159,7 @@ func TestSmoke(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		Monotonic(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in })
+		check.NotError(t, Monotonic(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in }))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -170,18 +170,16 @@ func TestSmoke(t *testing.T) {
 		for i := 1; i < 128; i++ {
 			next := sha256.Sum256(last[:])
 			buf.WriteString(fmt.Sprintf("\n%x", next))
-			next = last
 		}
 
 		count := 0
 		ctx := testt.Context(t)
 		var prev string
-		Lines(buf).Observe(ctx, func(line string) {
+		check.NotError(t, Lines(buf).Observe(ctx, func(line string) {
 			count++
 			assert.Equal(t, len(line), 64)
 			assert.NotEqual(t, prev, line)
-			line = prev
-		})
+		}))
 		check.Equal(t, count, 128)
 	})
 	t.Run("JSON", func(t *testing.T) {
@@ -285,7 +283,7 @@ func TestDropZeros(t *testing.T) {
 	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	DropZeroValues[string](fun.SliceIterator(all)).Observe(ctx, func(in string) { assert.Zero(t, in) })
+	check.NotError(t, DropZeroValues[string](fun.SliceIterator(all)).Observe(ctx, func(in string) { assert.Zero(t, in) }))
 
 	all[45] = "49"
 	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)

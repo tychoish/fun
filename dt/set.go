@@ -190,7 +190,7 @@ func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Iterator().MarshalJSON
 // in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	iter := Sliceify([]T{}).Iterator()
-	iter.UnmarshalJSON(in)
+	iter.AddError(iter.UnmarshalJSON(in))
 	s.Populate(iter)
 	return iter.Close()
 }

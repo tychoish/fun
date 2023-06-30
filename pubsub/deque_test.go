@@ -806,7 +806,7 @@ func TestDeque(t *testing.T) {
 						t.Error("should not reach timeout")
 					}
 				case <-time.After(10 * time.Millisecond):
-					dq.PushBack("hello!")
+					check.NotError(t, dq.PushBack("hello!"))
 				}
 			}()
 

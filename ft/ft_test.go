@@ -157,7 +157,7 @@ func TestWrap(t *testing.T) {
 		num, ok := op()
 		check.True(t, ok)
 		check.Equal(t, 42, num)
-		ok, num = Flip(op())
+		ok, num = Flip(op()) //nolint
 	})
 	t.Run("Ignore", func(t *testing.T) {
 		const first int = 42

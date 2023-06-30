@@ -49,7 +49,7 @@ func OK(err error) bool { return err == nil }
 func IsError(err error) bool { return !OK(err) }
 
 // Ignore discards an error.
-func Ignore(_ error) { return }
+func Ignore(_ error) {}
 
 // Cast converts an untyped/any object into an error, returning nil if
 // the value is not an error or is an error of a nil type.

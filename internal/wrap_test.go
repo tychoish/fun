@@ -89,10 +89,6 @@ func TestUnwind(t *testing.T) {
 	})
 }
 
-type wrapTestType struct {
-	value int
-}
-
 type slwrap struct {
 	out []error
 }

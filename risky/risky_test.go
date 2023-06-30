@@ -133,7 +133,7 @@ func TestOperations(t *testing.T) {
 	})
 	t.Run("ForceOp", func(t *testing.T) {
 		assert.Zero(t, ForceOp(func() (out int, err error) {
-			out = 100
+			out = 100 //nolint
 			panic("hi")
 		}))
 		assert.Equal(t, 100, ForceOp(func() (int, error) {
@@ -145,7 +145,7 @@ func TestOperations(t *testing.T) {
 	})
 	t.Run("BlockForceOp", func(t *testing.T) {
 		assert.Zero(t, BlockForceOp(func(ctx context.Context) (out int, err error) {
-			out = 100
+			out = 100 //nolint
 			panic("hi")
 		}))
 		assert.Equal(t, 100, BlockForceOp(func(ctx context.Context) (int, error) {
