@@ -28,3 +28,41 @@ func Max[T Intish | Uintish](a, b T) T {
 	}
 	return b
 }
+
+func Sign[T Intish](in T) T {
+	if in < 0 {
+		return -1
+	}
+	return 1
+}
+
+func RoundUpToMultiple[T Intish](a, b T) T {
+	if factor := Min(Sign(a), Sign(b)); factor == -1 {
+		return -1 * RoundDownToMultiple(Abs(a), Abs(b))
+	}
+	multiple := Min(a, b)
+	out := Max(a, b)
+
+	out += multiple - (out % multiple)
+
+	return out
+}
+
+func RoundDownToMultiple[T Intish](a, b T) T {
+	if factor := Min(Sign(a), Sign(b)); factor == -1 {
+		return -1 * RoundUpToMultiple(Abs(a), Abs(b))
+	}
+
+	multiple := Min(a, b)
+	out := Max(a, b)
+
+	out -= out % multiple
+	return out
+}
+
+func RoundToSmallestMultipe[T Intish](a, b T) T {
+	return Min(RoundDownToMultiple(a, b), RoundUpToMultiple(a, b))
+}
+func RoundToLargestMultipe[T Intish](a, b T) T {
+	return Max(RoundDownToMultiple(a, b), RoundUpToMultiple(a, b))
+}
