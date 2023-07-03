@@ -35,19 +35,40 @@ func Mnemonize[T any](in func() T) func() T { return ft.OnceDo(in) }
 // Once provides a mnemonic form of sync.Once, caching and returning a
 // value after the Do() function is called.
 type Once[T any] struct {
-	act sync.Once
-	val T
+	ctor   Atomic[func() T]
+	once   sync.Once
+	called atomic.Bool
+	comp   T
 }
 
-// Do runs the function provided and returns its value. All subsequent
-// calls to Do return the value of the first function passed to do. If
-// multiple callers use Do at the same time, like sync.Once.Do none
-// will return until return until the first operation completes.
+// NewOnce creates a Once object and initializes it with the function
+// provided. This is optional and this function can be later
+// overridden by Set() or Do(). When the operation is complete, the
+// Once operation has been
+func NewOnce[T any](fn func() T) *Once[T] { o := &Once[T]{}; o.ctor.Set(fn); return o }
+
+// Do runs the function provided, and caches the results. All
+// subsequent calls to Do or Resolve() are noops. If multiple callers
+// use Do/Resolve at the same time, like sync.Once.Do none will return
+// until return until the first operation completes.
 //
 // Functions passed to Do should return values that are safe for
-// concurrent access: while the Do operation is synchronized, the
-// return value from Do is responsible for its own synchronization.
-func (o *Once[T]) Do(constr func() T) T { o.act.Do(func() { o.val = constr() }); return o.val }
+// concurrent access: while the Do/Resolve operations are synchronized,
+// the return value from Do is responsible for its own
+// synchronization.
+func (o *Once[T]) Do(ctor func() T) { o.once.Do(func() { o.ctor.Set(ctor); o.populate() }) }
+
+// Resolve runs the stored, if and only if it hasn't been run function
+// and returns its output. Once the function has run, Resolve will
+// continue to return the cached value.
+func (o *Once[T]) Resolve() T { o.once.Do(o.populate); return o.comp }
+func (o *Once[T]) populate()  { o.called.Store(true); o.comp = ft.SafeDo(o.ctor.Get()); o.ctor.Set(nil) }
+
+// Set sets the constrctor/operation for the Once object, but does not
+// execute the operation. The operation is atomic, is a noop after the
+// operation has completed, will not reset the operation or the cached
+// value.
+func (o *Once[T]) Set(constr func() T) { ft.WhenCall(!o.called.Load(), func() { o.ctor.Set(constr) }) }
 
 // Atomic is a very simple atomic Get/Set operation, providing a
 // generic type-safe implementation wrapping sync/atomic.Value. The
@@ -67,14 +88,13 @@ func (a *Atomic[T]) Set(in T) { a.val.Store(in) }
 
 // Get resolves the atomic value, returning the zero value of the type
 // T if the value is unset.
-func (a *Atomic[T]) Get() (out T) { return castOrZero[T](a.val.Load()) }
+func (a *Atomic[T]) Get() T { return ft.SafeCast[T](a.val.Load()) }
 
 // Swap does an in place exchange of the contents of a value
 // exchanging the new value for the old. Unlike sync.Atomic.Swap() if
 // new is nil, adt.Atomic.Swap() does NOT panic, and instead
 // constructs the zero value of type T.
 func (a *Atomic[T]) Swap(new T) (old T) {
-	// TODO: switch v := a.val.Swap(castOrZero[T](new)).(type) {
 	switch v := a.val.Swap(new).(type) {
 	case T:
 		return v
@@ -125,17 +145,6 @@ func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
 	default:
 		return v == nil
 	}
-}
-
-// castOrZero takes a value of any type, and if that value is nil,
-// returns the zero value of the specified type. Otherwise,
-// castOrZero coerces the value into T and returns it.
-func castOrZero[T any](val any) (out T) {
-	switch converted := val.(type) {
-	case T:
-		out = converted
-	}
-	return out
 }
 
 // SafeSet sets the atomic to the given value only if the value is not

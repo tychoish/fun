@@ -117,6 +117,16 @@ func TestWrap(t *testing.T) {
 		assert.True(t, IsZero(""))
 		assert.True(t, IsZero(time.Time{}))
 	})
+	t.Run("NotZero", func(t *testing.T) {
+		assert.True(t, NotZero(100))
+		assert.True(t, NotZero(true))
+		assert.True(t, NotZero("hello world"))
+		assert.True(t, NotZero(time.Now()))
+		assert.True(t, !NotZero(0))
+		assert.True(t, !NotZero(false))
+		assert.True(t, !NotZero(""))
+		assert.True(t, !NotZero(time.Time{}))
+	})
 	t.Run("IsOk", func(t *testing.T) {
 		assert.True(t, IsOK(100, true))
 		assert.True(t, !IsOK(100, false))
@@ -198,6 +208,35 @@ func TestWrap(t *testing.T) {
 		}
 		wg.Wait()
 		assert.Equal(t, count.Load(), 1)
+	})
+	t.Run("SafeCast", func(t *testing.T) {
+		assert.Zero(t, SafeCast[int](any(0)))
+		assert.True(t, SafeCast[bool](any(true)))
+		assert.True(t, !SafeCast[bool](any(false)))
+		assert.Equal(t, "hello world", SafeCast[string](any("hello world")))
+		assert.NotZero(t, SafeCast[time.Time](time.Now()))
+
+		var foo = "foo"
+		var tt testing.TB
+		assert.NotZero(t, SafeCast[*string](&foo))
+		assert.Zero(t, SafeCast[*testing.T](tt))
+	})
+	t.Run("Ref", func(t *testing.T) {
+		var strptr *string
+		assert.True(t, strptr == nil)
+		assert.Equal(t, "", Ref(strptr))
+		assert.True(t, !IsOK(RefOK(strptr)))
+
+		strptr = Ptr("")
+		assert.True(t, strptr != nil)
+		assert.Equal(t, "", Ref(strptr))
+		assert.True(t, IsOK(RefOK(strptr)))
+
+		strptr = Ptr("hello")
+		assert.True(t, strptr != nil)
+		assert.True(t, IsOK(RefOK(strptr)))
+		assert.Equal(t, "hello", Ref(strptr))
+
 	})
 
 }

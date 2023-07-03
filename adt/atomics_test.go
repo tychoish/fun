@@ -125,8 +125,8 @@ func TestAtomics(t *testing.T) {
 		})
 
 	})
-	t.Run("Menmeonics", func(t *testing.T) {
-		t.Run("Once", func(t *testing.T) {
+	t.Run("Once", func(t *testing.T) {
+		t.Run("Do", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			count := &atomic.Int64{}
@@ -141,10 +141,41 @@ func TestAtomics(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					for i := 0; i < 64; i++ {
-						val := actor.Do(func() int {
+						actor.Do(func() int {
 							count.Add(1)
 							return 42
 						})
+						val := actor.Resolve()
+						if val != 42 {
+							panic(fmt.Errorf("once function produced %d not 42", val))
+						}
+					}
+				}()
+			}
+
+			wg.Wait(ctx)
+			assert.Equal(t, count.Load(), 1)
+
+		})
+		t.Run("Resolve", func(t *testing.T) {
+			t.Parallel()
+			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+			count := &atomic.Int64{}
+			actor := NewOnce(func() int {
+				count.Add(1)
+				return 42
+			})
+			wg := &fun.WaitGroup{}
+			for i := 0; i < 64; i++ {
+				wg.Add(1)
+				// this function panics rather than
+				// asserts because it's very likely to
+				// be correct, and to avoid testing.T
+				// mutexes.
+				go func() {
+					defer wg.Done()
+					for i := 0; i < 64; i++ {
+						val := actor.Resolve()
 						if val != 42 {
 							panic(fmt.Errorf("once function produced %d not 42", val))
 						}
@@ -155,6 +186,26 @@ func TestAtomics(t *testing.T) {
 			wg.Wait(ctx)
 			assert.Equal(t, count.Load(), 1)
 		})
+		t.Run("Zero", func(t *testing.T) {
+			count := &atomic.Int64{}
+			actor := &Once[int]{}
+			assert.Zero(t, actor.Resolve())
+			actor.Do(func() int {
+				count.Add(1)
+				return 42
+			})
+			assert.Zero(t, actor.Resolve())
+		})
+		t.Run("SetWorflow", func(t *testing.T) {
+			count := &atomic.Int64{}
+			actor := &Once[int]{}
+			actor.Set(func() int {
+				count.Add(1)
+				return 42
+			})
+			assert.Equal(t, 42, actor.Resolve())
+		})
+
 	})
 }
 
@@ -181,21 +232,6 @@ func TestMnemonize(t *testing.T) {
 			t.Error("should call only once", counter)
 		}
 	}
-}
-
-func TestZero(t *testing.T) {
-	t.Run("OrNil", func(t *testing.T) {
-		assert.Zero(t, castOrZero[int](any(0)))
-		assert.True(t, castOrZero[bool](any(true)))
-		assert.True(t, !castOrZero[bool](any(false)))
-		assert.Equal(t, "hello world", castOrZero[string](any("hello world")))
-		assert.NotZero(t, castOrZero[time.Time](time.Now()))
-
-		var foo = "foo"
-		var tt testing.TB
-		assert.NotZero(t, castOrZero[*string](&foo))
-		assert.Zero(t, castOrZero[*testing.T](tt))
-	})
 }
 
 func IsOK[T any](t testing.TB) func(T, bool) T {

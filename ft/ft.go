@@ -21,6 +21,8 @@ func IsZero[T comparable](in T) bool {
 	}
 }
 
+func NotZero[T comparable](in T) bool { return !IsZero(in) }
+
 // IsType checks if the type of the argument matches the type
 // specifier.
 func IsType[T any](in any) bool { _, ok := in.(T); return ok }
@@ -29,6 +31,11 @@ func IsType[T any](in any) bool { _, ok := in.(T); return ok }
 // at the call site,
 func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }
 
+// SafeCast casts the input object to the specified type, and returns
+// either, the result of the cast, or a zero value for the specified
+// type.
+func SafeCast[T any](in any) T { return IgnoreSecond(Cast[T](in)) }
+
 // Ptr returns a pointer for the object. Useful for setting the value
 // in structs where you cannot easily create a reference (e.g. the
 // output of functions, and for constant literals.). If you pass a
@@ -36,6 +43,21 @@ func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }
 // **string. If the input object is a nil pointer, then Ptr returns a
 // non-nil pointer to a nil pointer.
 func Ptr[T any](in T) *T { return &in }
+
+// Ref takes a pointer to an value and dereferences it, If the input
+// value is nil, the output value is the zero value of the type.
+func Ref[T any](in *T) T { return IgnoreSecond(RefOK(in)) }
+
+// RefOK takes a pointer to an value and returns the concrete type for
+// that pointer. If the pointer is nil, RefOK returns the zero value
+// for that type. The boolean value indicates if the zero value
+// returned is because the reference.
+func RefOK[T any](in *T) (value T, ok bool) {
+	if in == nil {
+		return value, false
+	}
+	return *in, true
+}
 
 // Default takes two values. if the first value is the zero value for
 // the type T, then Default returns the second (default)

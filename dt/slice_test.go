@@ -11,14 +11,14 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/testt"
 )
 
 func randomIntSlice(size int) Slice[int] {
 	out := make([]int, size)
 	for idx := range out {
-		out[idx] = internal.Abs(rand.Intn(size) + 1)
+		out[idx] = intish.Abs(rand.Intn(size) + 1)
 	}
 	return Sliceify(out)
 }

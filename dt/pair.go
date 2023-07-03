@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -22,7 +23,7 @@ type Pair[K comparable, V any] struct {
 func MakePair[K comparable, V any](k K, v V) Pair[K, V] { return Pair[K, V]{Key: k, Value: v} }
 
 // Pairs implements a collection of key-value pairs.
-type Pairs[K comparable, V any] []Pair[K, V]
+type Pairs[K comparable, V any] struct{ ll List[Pair[K, V]] }
 
 // MakePairs constructs a Pairs object from a sequence of Pairs. This
 // is identical to using the literal constructor but may be more
@@ -30,20 +31,31 @@ type Pairs[K comparable, V any] []Pair[K, V]
 // function calls over literal constructors.
 //
 // To build Pairs objects from other types, use the Consume methods.
-func MakePairs[K comparable, V any](in ...Pair[K, V]) Pairs[K, V] { return in }
+func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
+	p := &Pairs[K, V]{}
+	p.Append(in...)
+	return p
+}
 
 // Iterator return an iterator over each key-value pairs.
-func (p Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return Sliceify(p).Iterator() }
+func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return p.ll.Iterator() }
+
+func (p *Pairs[K, V]) Slice() []Pair[K, V] {
+	return ft.Must(p.ll.Iterator().Slice(context.Background()))
+}
+
+// Len returns the number of items in the pairs object.
+func (p *Pairs[K, V]) Len() int { return p.ll.Len() }
 
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
-func (p Pairs[K, V]) Keys() *fun.Iterator[K] {
+func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
 	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Convert(p.Iterator())
 }
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
-func (p Pairs[K, V]) Values() *fun.Iterator[V] {
+func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
 	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Convert(p.Iterator())
 }
 
@@ -51,12 +63,15 @@ func (p Pairs[K, V]) Values() *fun.Iterator[V] {
 // converting it to a map and then encoding that map as JSON. The JSON
 // serialization does not necessarily preserve the order of the pairs
 // object.
-func (p Pairs[K, V]) MarshalJSON() ([]byte, error) {
+func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
 	buf := &internal.IgnoreNewLinesBuffer{}
 	enc := json.NewEncoder(buf)
 	_, _ = buf.Write([]byte("{"))
 	first := true
-	for _, item := range p {
+
+	for li := p.ll.Front(); li.Ok(); li = li.Next() {
+		item := li.Value()
+
 		if first {
 			first = false
 		} else {
@@ -91,25 +106,19 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 
 // Add adds a new value to the underlying slice. This may add a
 // duplicate key.
-func (p *Pairs[K, V]) Add(k K, v V) { *p = p.Append(Pair[K, V]{Key: k, Value: v}) }
+func (p *Pairs[K, V]) Add(k K, v V) *Pairs[K, V] { return p.AddPair(Pair[K, V]{Key: k, Value: v}) }
 
-// Pair provides a chainable version of Add() for building collections
-// of pairs inline.
-func (p *Pairs[K, V]) Pair(k K, v V) *Pairs[K, V] { p.Add(k, v); return p }
+// AddPair adds a single pair to the slice of pairs. This may add a
+// duplicate key.
+func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) *Pairs[K, V] { p.ll.PushBack(pair); return p }
 
-// AddPair adds a single pair to the slice of pairs.
-func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) { *p = p.Append(pair) }
-
-// Append, mirroring the semantics of the built in append() function
-// adds one or more Pair items to a Pairs slice, and returns the new
-// slice without changing the value of the original slice:
-//
-//	p = p.Append(pair, pare, pear)
-func (p Pairs[K, V]) Append(new ...Pair[K, V]) Pairs[K, V] { return append(p, new...) }
+// Append as a collection of pairs to the collection of key/value
+// pairs.
+func (p *Pairs[K, V]) Append(new ...Pair[K, V]) *Pairs[K, V] { p.ll.Append(new...); return p }
 
 // Extend adds the items from a Pairs object (slice of Pair) without
 // modifying the donating object.
-func (p *Pairs[K, V]) Extend(toAdd Pairs[K, V]) { *p = append(*p, toAdd...) }
+func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.ll.Extend(&toAdd.ll) }
 
 // Consume adds items from an iterator of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
@@ -123,28 +132,33 @@ func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], 
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.
-func (p *Pairs[K, V]) ConsumeMap(in map[K]V) {
+func (p *Pairs[K, V]) ConsumeMap(in map[K]V) *Pairs[K, V] {
 	fun.Invariant.Must(p.Consume(context.Background(), Mapify(in).Iterator()))
+	return p
 }
 
 // ConsumeSlice adds all the values in the input slice to the Pairs
 // object, creating the keys using the function provide.
-func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
+func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) *Pairs[K, V] {
 	Sliceify(in).Observe(func(value V) { p.Add(keyf(value), value) })
+	return p
 }
 
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.
-func (p Pairs[K, V]) Map() map[K]V {
-	out := make(map[K]V, len(p))
+func (p *Pairs[K, V]) Map() map[K]V {
+	out := make(map[K]V, p.ll.Len())
 
-	for idx := range p {
-		if _, ok := out[p[idx].Key]; ok {
+	for i := p.ll.Front(); i.Ok(); i = i.Next() {
+		pair := i.Value()
+		if _, ok := out[pair.Key]; ok {
 			continue
 		}
 
-		out[p[idx].Key] = p[idx].Value
+		out[pair.Key] = pair.Value
+
 	}
+
 	return out
 }

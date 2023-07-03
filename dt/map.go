@@ -64,7 +64,7 @@ func (m Map[K, V]) SetDefault(key K) { var vl V; m[key] = vl }
 
 // Pairs exports a map a Pairs object, which is an alias for a slice of
 // Pair objects.
-func (m Map[K, V]) Pairs() Pairs[K, V] { p := MakePairs[K, V](); p.ConsumeMap(m); return p }
+func (m Map[K, V]) Pairs() *Pairs[K, V] { p := MakePairs[K, V](); p.ConsumeMap(m); return p }
 
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }
@@ -73,17 +73,15 @@ func (m Map[K, V]) Add(k K, v V) { m[k] = v }
 func (m Map[K, V]) AddPair(p Pair[K, V]) { m.Add(p.Key, p.Value) }
 
 // Append adds a sequence of Pair objects to the map.
-func (m Map[K, V]) Append(pairs ...Pair[K, V]) { m.Extend(pairs) }
+func (m Map[K, V]) Append(pairs ...Pair[K, V]) { Sliceify(pairs).Observe(m.AddPair) }
 
 // Len returns the length. It is equivalent to len(Map), but is
 // provided for consistency.
 func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
-func (m Map[K, V]) Extend(pairs Pairs[K, V]) {
-	for _, pair := range pairs {
-		m.AddPair(pair)
-	}
+func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
+	pairs.Iterator().Observe(context.Background(), m.AddPair)
 }
 
 // ConsumeMap adds all the keys from the input map the map.

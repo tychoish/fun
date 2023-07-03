@@ -10,7 +10,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/intish"
 )
 
 // Processor are generic functions that take an argument (and a
@@ -80,7 +80,7 @@ func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(
 // If the function produces a negative duration, there is no delay.
 func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
 	return func(ctx context.Context, in T) error {
-		timer := time.NewTimer(internal.Max(0, jf()))
+		timer := time.NewTimer(intish.Max(0, jf()))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
@@ -297,7 +297,7 @@ func limitExec[T any](in int) func(func() T) T {
 
 		if num < int64(in) {
 			output = op()
-			counter.CompareAndSwap(num, internal.Min(int64(in), num+1))
+			counter.CompareAndSwap(num, intish.Min(int64(in), num+1))
 		}
 
 		return output

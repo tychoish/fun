@@ -8,7 +8,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/intish"
 )
 
 // Operation is a type of function object that will block until an
@@ -199,7 +199,7 @@ func (wf Operation) Limit(in int) Operation {
 			return false
 		}
 
-		return counter.CompareAndSwap(num, internal.Min(int64(in), num+1))
+		return counter.CompareAndSwap(num, intish.Min(int64(in), num+1))
 	})
 }
 

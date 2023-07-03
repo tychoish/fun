@@ -9,13 +9,13 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
 func makeMap(size int) Map[string, int] {
 	out := Mapify(make(map[string]int, size))
 	for i := 0; len(out) < size; i++ {
-
 		out[fmt.Sprint(rand.Intn((1+i)*100000))] = i
 	}
 	return Mapify(out)
@@ -29,7 +29,7 @@ func TestMap(t *testing.T) {
 		mp := makeMap(100)
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
-		check.Equal(t, len(mp.Pairs()), 100)
+		check.Equal(t, mp.Pairs().Len(), 100)
 		check.Equal(t, mp.Iterator().Count(ctx), 100)
 		check.Equal(t, mp.Keys().Count(ctx), 100)
 		check.Equal(t, mp.Values().Count(ctx), 100)
@@ -50,11 +50,11 @@ func TestMap(t *testing.T) {
 		mp := makeMap(100)
 
 		// noop because same keys
-		mp.Append(mp.Pairs()...)
+		mp.Append(ft.Must(mp.Pairs().Iterator().Slice(ctx))...)
 		check.Equal(t, mp.Len(), 100)
 
 		// works because different keys, probably
-		mp.Append(makeMap(100).Pairs()...)
+		mp.Append(ft.Must(makeMap(100).Iterator().Slice(ctx))...)
 		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("Merge", func(t *testing.T) {

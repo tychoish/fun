@@ -11,7 +11,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/intish"
 )
 
 // Worker represents a basic function used in worker pools and
@@ -220,7 +220,7 @@ func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrapper(d
 // If the function produces a negative duration, there is no delay.
 func (wf Worker) Jitter(jf func() time.Duration) Worker {
 	return func(ctx context.Context) error {
-		timer := time.NewTimer(internal.Max(0, jf()))
+		timer := time.NewTimer(intish.Max(0, jf()))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
@@ -324,7 +324,7 @@ func (wf Worker) PostHook(op func()) Worker {
 // abort-on-error semantics, use the Filter() method on the input
 // worker, that cancels the context on when it sees an error.
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
-	ch := Blocking(make(chan error, internal.Max(n, runtime.NumCPU())))
+	ch := Blocking(make(chan error, intish.Max(n, runtime.NumCPU())))
 	oe := ch.Send().Processor().Force
 
 	wg := &WaitGroup{}
