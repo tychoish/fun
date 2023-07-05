@@ -30,6 +30,15 @@ func TestWhen(t *testing.T) {
 		WhenCall(false, func() { called = true })
 		check.True(t, !called)
 	})
+	t.Run("Apply", func(t *testing.T) {
+		called := false
+		WhenApply(true, func(in int) { called = true; check.Equal(t, in, 42) }, 42)
+		check.True(t, called)
+
+		called = false
+		WhenApply(false, func(in int) { called = true; check.Equal(t, in, 42) }, 40)
+		check.True(t, !called)
+	})
 }
 
 func TestMust(t *testing.T) {

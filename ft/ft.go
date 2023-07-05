@@ -21,6 +21,8 @@ func IsZero[T comparable](in T) bool {
 	}
 }
 
+// NotZero returns true when the item does not have the zero value for
+// the type T.
 func NotZero[T comparable](in T) bool { return !IsZero(in) }
 
 // IsType checks if the type of the argument matches the type
@@ -93,12 +95,22 @@ func WhenDo[T any](cond bool, op func() T) (out T) {
 	return op()
 }
 
+// WhenApply runs the function with the supplied argument only when
+// the condition is true.
+func WhenApply[T any](cond bool, op func(T), arg T) {
+	if !cond {
+		return
+	}
+	op(arg)
+}
+
 // WhenHandle passes the argument "in" to the operation IF the
 // condition function (which also takes "in") returns true.
 func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
-	if cond(in) {
-		op(in)
+	if !cond(in) {
+		return
 	}
+	op(in)
 }
 
 // DoTimes runs the specified option n times.
@@ -125,7 +137,12 @@ func SafeWrap(op func()) func() { return func() { SafeCall(op) } }
 // briding APIs
 func Flip[A any, B any](first A, second B) (B, A) { return second, first }
 
-func IgnoreFirst[A any, B any](first A, second B) B  { return second }
+// IgnoreFirst takes two arguments and returns only the second, for
+// use in wrapping functions that return two values.
+func IgnoreFirst[A any, B any](first A, second B) B { return second }
+
+// IgnoreSecond takes two arguments and returns only the first, for
+// use when wrapping functions that return two values.
 func IgnoreSecond[A any, B any](first A, second B) A { return first }
 
 // Once uses a sync.Once to wrap to provide an output function that
