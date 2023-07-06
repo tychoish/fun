@@ -2,7 +2,9 @@ package fun
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/tychoish/fun/ers"
@@ -107,3 +109,20 @@ func (Handlers) ErrorUndindTransformer(filter ers.Filter) Transform[error, []err
 		return out, nil
 	}
 }
+
+func (Handlers) Sprintf(tmpl string, args ...any) Future[string] {
+	return func() string { return fmt.Sprintf(tmpl, args...) }
+}
+
+func (Handlers) Sprintln(args ...any) Future[string] {
+	return func() string { return fmt.Sprintln(args...) }
+}
+func (Handlers) Sprint(args ...any) Future[string] {
+	return func() string { return fmt.Sprint(args...) }
+}
+
+func (Handlers) Join(in []string, with string) Future[string] {
+	return func() string { return strings.Join(in, with) }
+}
+
+func (Handlers) Stringer(op fmt.Stringer) Future[string] { return op.String }
