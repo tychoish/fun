@@ -68,7 +68,11 @@ func (o *Once[T]) populate()  { o.called.Store(true); o.comp = ft.SafeDo(o.ctor.
 // execute the operation. The operation is atomic, is a noop after the
 // operation has completed, will not reset the operation or the cached
 // value.
-func (o *Once[T]) Set(constr func() T) { ft.WhenCall(!o.called.Load(), func() { o.ctor.Set(constr) }) }
+func (o *Once[T]) Set(constr func() T) { ft.WhenCall(!o.Called(), func() { o.ctor.Set(constr) }) }
+
+// Called returns true if the Once object has been called or is
+// currently running, and false otherwise.
+func (o *Once[T]) Called() bool { return o.called.Load() }
 
 // Atomic is a very simple atomic Get/Set operation, providing a
 // generic type-safe implementation wrapping sync/atomic.Value. The

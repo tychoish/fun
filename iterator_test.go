@@ -24,9 +24,6 @@ type Collector struct {
 	num int
 }
 
-func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
-func with(mtx *sync.Mutex)             { mtx.Unlock() }
-
 func (c *Collector) HasErrors() bool { defer with(lock(&c.mtx)); return c.err != nil }
 func (c *Collector) Resolve() error  { defer with(lock(&c.mtx)); return c.err }
 func (c *Collector) Len() int        { defer with(lock(&c.mtx)); return c.num }

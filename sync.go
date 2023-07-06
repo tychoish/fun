@@ -5,6 +5,9 @@ import (
 	"sync"
 )
 
+func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
+func with(mtx *sync.Mutex)             { mtx.Unlock() }
+
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.Operation). The
 // implementation is exceptionally simple. The only constraint, like
