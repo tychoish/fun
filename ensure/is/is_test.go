@@ -11,6 +11,7 @@ import (
 )
 
 func TestFundamentals(t *testing.T) {
+	t.Parallel()
 	t.Run("Assert", func(t *testing.T) {
 		check.True(t, assert(false, "hello")() != nil)
 		check.True(t, assert(true, "world")() == nil)
@@ -59,7 +60,7 @@ func TestFundamentals(t *testing.T) {
 
 func isNil(t *testing.T, fn That) {
 	t.Helper()
-	out := fn.Run()
+	out := fn()
 	if out != nil {
 		t.Error(out)
 	}
@@ -67,12 +68,13 @@ func isNil(t *testing.T, fn That) {
 
 func notNil(t *testing.T, fn That) {
 	t.Helper()
-	if fn.Run() == nil {
+	if fn() == nil {
 		t.Error("expected errors")
 	}
 }
 
 func TestAssertions(t *testing.T) {
+	t.Parallel()
 	t.Run("Passing", func(t *testing.T) {
 		isNil(t, Contained(400, []int{400, 300, 200}))
 		isNil(t, EqualTo("abc", "abc"))
@@ -142,5 +144,37 @@ func TestAssertions(t *testing.T) {
 		notNil(t, Zero(100))
 		notNil(t, Zero(t))
 		notNil(t, Zero(true))
+	})
+	t.Run("Join", func(t *testing.T) {
+		t.Run("NoError", func(t *testing.T) {
+			called := 0
+			var op That
+			op = func() []string { called++; return nil }
+			op = op.Join(op, op, op, op, op, op)
+			out := op()
+			check.Equal(t, len(out), 0)
+			check.True(t, out == nil)
+			check.Equal(t, 7, called)
+		})
+		t.Run("SingleErrors", func(t *testing.T) {
+			called := 0
+			var op That
+			op = func() []string { called++; return []string{t.Name()} }
+			op = op.Join(op, op, op, op, op, op)
+			out := op()
+			check.True(t, out != nil)
+			check.Equal(t, len(out), 7)
+			check.Equal(t, 7, called)
+		})
+		t.Run("MultiErrors", func(t *testing.T) {
+			called := 0
+			var op That
+			op = func() []string { called++; return []string{"failure", fmt.Sprint(called), t.Name()} }
+			op = op.Join(op, op, op, op, op, op)
+			out := op()
+			check.True(t, out != nil)
+			check.Equal(t, len(out), 21)
+			check.Equal(t, 7, called)
+		})
 	})
 }

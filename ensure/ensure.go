@@ -35,7 +35,7 @@ func That(that is.That) *Assertion { return (&Assertion{}).That(that) }
 // (potentially) the assertion created when the Assertion was
 // created. If the assertion has been run, this operation is always a
 // noop.
-func (a *Assertion) That(t is.That) *Assertion { a.check.Set(t.Run); return a }
+func (a *Assertion) That(t is.That) *Assertion { a.check.Set(t); return a }
 
 // Fatal, the default, means that the assertion has "abort-on-error"
 // semantics, and will cause the test to fail when the assertion
@@ -119,7 +119,7 @@ func (a *Assertion) Run(t testing.TB) {
 		t.Helper()
 		if a.alwaysLog || t.Failed() {
 			for it := a.messages.Front(); it.Ok(); it = it.Next() {
-				ft.WhenHandle(ft.NotZero[string], strlogger, ft.SafeDo(it.Value()))
+				ft.WhenHandle(ft.SafeDo(it.Value()), ft.NotZero[string], strlogger)
 			}
 		}
 	})

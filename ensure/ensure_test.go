@@ -11,6 +11,7 @@ import (
 )
 
 func TestEnsure(t *testing.T) {
+	t.Parallel()
 	t.Run("Basic", func(t *testing.T) { ensure.That(is.EqualTo(1, 1)).Verbose().Log("one").Run(t) })
 	t.Run("Failing", func(t *testing.T) { check.Failing(t, func(t *testing.T) { ensure.That(is.EqualTo(1, 2)).Run(t) }) })
 	t.Run("Error", func(t *testing.T) {
@@ -56,10 +57,10 @@ func TestEnsure(t *testing.T) {
 		t.Run("Testing", ensure.That(is.EqualTo(1, 1)).Queit().Log("one").Test())
 		t.Run("Benchmark", func(t *testing.T) {
 			assert.NotPanic(t, func() {
-				b := &testing.B{}
-				ensure.That(is.EqualTo(1, 1)).Queit().Log("one").Benchmark()(b)
+				ensure.That(is.EqualTo(1, 1)).Queit().Log("one").Benchmark()
 			})
 		})
+
 	})
 }
 

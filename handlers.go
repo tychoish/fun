@@ -92,12 +92,12 @@ func (Handlers) ErrorObserverWithoutTerminating(of Observer[error]) Observer[err
 	return of.Skip(func(err error) bool { return err != nil && !ers.IsTerminating(err) })
 }
 
-// ErrorUndindTransformer provides the ers.Unwind operation as a
+// ErrorUnwindTransformer provides the ers.Unwind operation as a
 // transform method, which consumes an error and produces a slice of
 // its component errors. All errors are processed by the provided
 // filter, and the transformer's context is not used. The error value
 // of the Transform function is always nil.
-func (Handlers) ErrorUndindTransformer(filter ers.Filter) Transform[error, []error] {
+func (Handlers) ErrorUnwindTransformer(filter ers.Filter) Transform[error, []error] {
 	return func(ctx context.Context, err error) ([]error, error) {
 		unwound := ers.Unwind(err)
 		out := make([]error, 0, len(unwound))
@@ -110,19 +110,34 @@ func (Handlers) ErrorUndindTransformer(filter ers.Filter) Transform[error, []err
 	}
 }
 
+// TODO: docstring
 func (Handlers) Sprintf(tmpl string, args ...any) Future[string] {
 	return func() string { return fmt.Sprintf(tmpl, args...) }
 }
 
+// TODO: docstring
+func (Handlers) Str(args []any) Future[string] { return HF.Sprint(args...) }
+
+// TODO: docstring
+func (Handlers) Strf(tmpl string, args []any) Future[string] { return HF.Sprintf(tmpl, args...) }
+
+// TODO: docstring
+func (Handlers) Strln(args []any) Future[string] { return HF.Sprintln(args...) }
+
+// TODO: docstring
 func (Handlers) Sprintln(args ...any) Future[string] {
 	return func() string { return fmt.Sprintln(args...) }
 }
+
+// TODO: docstring
 func (Handlers) Sprint(args ...any) Future[string] {
 	return func() string { return fmt.Sprint(args...) }
 }
 
+// TODO: docstring
 func (Handlers) Join(in []string, with string) Future[string] {
 	return func() string { return strings.Join(in, with) }
 }
 
+// TODO: docstring
 func (Handlers) Stringer(op fmt.Stringer) Future[string] { return op.String }

@@ -106,7 +106,7 @@ func WhenApply[T any](cond bool, op func(T), arg T) {
 
 // WhenHandle passes the argument "in" to the operation IF the
 // condition function (which also takes "in") returns true.
-func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
+func WhenHandle[T any](in T, cond func(T) bool, op func(T)) {
 	if !cond(in) {
 		return
 	}

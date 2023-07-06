@@ -36,7 +36,11 @@ type Map[K comparable, V any] map[K]V
 func MapIterator[K comparable, V any](in map[K]V) *fun.Iterator[Pair[K, V]] {
 	return Mapify(in).Iterator()
 }
-func MapKeys[K comparable, V any](in map[K]V) *fun.Iterator[K]   { return Mapify(in).Keys() }
+
+// TODO: docstring
+func MapKeys[K comparable, V any](in map[K]V) *fun.Iterator[K] { return Mapify(in).Keys() }
+
+// TODO: docstring
 func MapValues[K comparable, V any](in map[K]V) *fun.Iterator[V] { return Mapify(in).Values() }
 
 // Mapify provides a constructor that will produce a fun.Map without
@@ -136,6 +140,7 @@ func (m Map[K, V]) Keys() *fun.Iterator[K] { return m.ProducerKeys().Iterator() 
 // Values provides an iterator over just the values in the map.
 func (m Map[K, V]) Values() *fun.Iterator[V] { return m.ProducerValues().Iterator() }
 
+// TODO: docstring
 func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
 

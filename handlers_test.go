@@ -84,14 +84,14 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("Unwinder", func(t *testing.T) {
 		t.Run("BasicUnwind", func(t *testing.T) {
-			unwinder := HF.ErrorUndindTransformer(ers.FilterNoop())
+			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
 			ctx := testt.Context(t)
 			errs, err := unwinder(ctx, ers.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ErrInvariantViolation))
 			assert.NotError(t, err)
 			check.Equal(t, len(errs), 3)
 		})
 		t.Run("Empty", func(t *testing.T) {
-			unwinder := HF.ErrorUndindTransformer(ers.FilterNoop())
+			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
 			ctx := testt.Context(t)
 			errs, err := unwinder(ctx, nil)
 			assert.NotError(t, err)

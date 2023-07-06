@@ -109,6 +109,11 @@ func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
 	return
 }
 
+// TODO: docstring
+func (s *Slice[T]) FilterFuture(p func(T) bool) fun.Future[Slice[T]] {
+	return func() Slice[T] { return s.Filter(p) }
+}
+
 // Reslice modifies the slice to set the new start and end indexes.
 //
 // Slicing operations, can lead to panics if the indexes are out of
