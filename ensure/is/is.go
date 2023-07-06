@@ -9,6 +9,8 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
+
 type That func() []string
 
 func (t That) Run() []string { return t() }

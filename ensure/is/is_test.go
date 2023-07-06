@@ -47,7 +47,14 @@ func TestFundamentals(t *testing.T) {
 			check.True(t, ex == nil)
 		})
 	})
+	t.Run("Plist", func(t *testing.T) {
+		metadata := Plist()
+		check.True(t, metadata != nil)
+		check.Equal(t, metadata.Len(), 0)
+		metadata.Add("one", 2).Add("two", 3)
+		check.Equal(t, metadata.Len(), 2)
 
+	})
 }
 
 func isNil(t *testing.T, fn That) {
