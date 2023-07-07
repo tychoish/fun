@@ -83,9 +83,9 @@ func TestDefault(t *testing.T) {
 func TestWhenHandle(t *testing.T) {
 	called := false
 	assert.True(t, !called)
-	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 100)
+	WhenHandle(100, func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) })
 	assert.True(t, !called)
-	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 42)
+	WhenHandle(42, func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) })
 	assert.True(t, called)
 }
 

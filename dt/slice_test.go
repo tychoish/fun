@@ -291,6 +291,15 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, next[0], 40)
 		check.Equal(t, next[1], 42)
 	})
+	t.Run("FilterFuture", func(t *testing.T) {
+		sl := Slice[int]{100, 100, 40, 42}
+		check.Equal(t, sl.Len(), 4)
+		future := sl.FilterFuture(func(in int) bool { return in != 100 })
+		next := future()
+		check.Equal(t, next.Len(), 2)
+		check.Equal(t, next[0], 40)
+		check.Equal(t, next[1], 42)
+	})
 	t.Run("Transform", func(t *testing.T) {
 		t.Run("ContinueEarlEnd", func(t *testing.T) {
 			count := 0

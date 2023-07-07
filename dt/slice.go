@@ -109,7 +109,8 @@ func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
 	return
 }
 
-// TODO: docstring
+// FilterFuture returns a future that generates a new slice using the
+// filter to select items from the root slice.
 func (s *Slice[T]) FilterFuture(p func(T) bool) fun.Future[Slice[T]] {
 	return func() Slice[T] { return s.Filter(p) }
 }

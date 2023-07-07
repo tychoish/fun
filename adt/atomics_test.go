@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -165,6 +166,8 @@ func TestAtomics(t *testing.T) {
 				count.Add(1)
 				return 42
 			})
+			check.True(t, actor.Defined())
+			check.True(t, !actor.Called())
 			wg := &fun.WaitGroup{}
 			for i := 0; i < 64; i++ {
 				wg.Add(1)
@@ -176,6 +179,7 @@ func TestAtomics(t *testing.T) {
 					defer wg.Done()
 					for i := 0; i < 64; i++ {
 						val := actor.Resolve()
+						check.True(t, actor.Called())
 						if val != 42 {
 							panic(fmt.Errorf("once function produced %d not 42", val))
 						}
@@ -189,12 +193,15 @@ func TestAtomics(t *testing.T) {
 		t.Run("Zero", func(t *testing.T) {
 			count := &atomic.Int64{}
 			actor := &Once[int]{}
+			assert.True(t, !actor.Defined())
 			assert.Zero(t, actor.Resolve())
 			actor.Do(func() int {
 				count.Add(1)
 				return 42
 			})
+			assert.True(t, !actor.Defined())
 			assert.Zero(t, actor.Resolve())
+			assert.True(t, !actor.Defined())
 		})
 		t.Run("SetWorflow", func(t *testing.T) {
 			count := &atomic.Int64{}
@@ -203,6 +210,7 @@ func TestAtomics(t *testing.T) {
 				count.Add(1)
 				return 42
 			})
+			assert.True(t, actor.Defined())
 			assert.Equal(t, 42, actor.Resolve())
 		})
 
