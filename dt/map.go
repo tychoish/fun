@@ -87,7 +87,7 @@ func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
 func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
-	pairs.Iterator().Observe(context.Background(), m.AddPair)
+	fun.Invariant.Must(pairs.Iterator().Observe(context.Background(), m.AddPair))
 }
 
 // ConsumeMap adds all the keys from the input map the map.
