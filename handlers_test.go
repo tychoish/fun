@@ -105,4 +105,19 @@ func TestHandlers(t *testing.T) {
 		ft.DoTimes(128, func() { ob(ers.Error("test")) })
 		check.Equal(t, 128, len(prod.Force()))
 	})
+	t.Run("StringFuture", func(t *testing.T) {
+		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprintf("%s:%d", "hi", 42)()) })
+		t.Run("Sprintln", func(t *testing.T) { check.Equal(t, "hi : 42\n", HF.Sprintln("hi", ":", 42)()) })
+		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprint("hi:", 42)()) })
+		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprint("hi:", "42")()) })
+		t.Run("Stringer", func(t *testing.T) { check.Equal(t, "Handlers<>", HF.Stringer(HF)()) })
+		t.Run("Str", func(t *testing.T) { check.Equal(t, "hi:42", HF.Str([]any{"hi:", 42})()) })
+		t.Run("Strf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Strf("%s:%d", []any{"hi", 42})()) })
+		t.Run("Strln", func(t *testing.T) { check.Equal(t, "hi : 42\n", HF.Strln([]any{"hi", ":", 42})()) })
+		t.Run("StrJoin", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrJoin([]string{"hi", ":", "42"})()) })
+		t.Run("StrJoinWith", func(t *testing.T) { check.Equal(t, "hi : 42", HF.StrJoinWith([]string{"hi", ":", "42"}, " ")()) })
+		t.Run("StrConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrConcatinate("hi", ":", "42")()) })
+	})
 }
+
+func (Handlers) String() string { return "Handlers<>" }

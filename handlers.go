@@ -110,6 +110,18 @@ func (Handlers) ErrorUnwindTransformer(filter ers.Filter) Transform[error, []err
 	}
 }
 
+// Sprintln constructs a future that calls fmt.Sprintln over the given
+// variadic arguments.
+func (Handlers) Sprintln(args ...any) Future[string] {
+	return func() string { return fmt.Sprintln(args...) }
+}
+
+// Sprint constructs a future that calls fmt.Sprint over the given
+// variadic arguments.
+func (Handlers) Sprint(args ...any) Future[string] {
+	return func() string { return fmt.Sprint(args...) }
+}
+
 // Sprintf produces a future that calls and returns fmt.Sprintf for
 // the provided arguments when the future is called.
 func (Handlers) Sprintf(tmpl string, args ...any) Future[string] {
@@ -128,22 +140,22 @@ func (Handlers) Strf(tmpl string, args []any) Future[string] { return HF.Sprintf
 // arguments.
 func (Handlers) Strln(args []any) Future[string] { return HF.Sprintln(args...) }
 
-// Sprintln constructs a future that calls fmt.Sprintln over the given
-// variadic arguments.
-func (Handlers) Sprintln(args ...any) Future[string] {
-	return func() string { return fmt.Sprintln(args...) }
-}
-
-// Sprint constructs a future that calls fmt.Sprint over the given
-// variadic arguments.
-func (Handlers) Sprint(args ...any) Future[string] {
-	return func() string { return fmt.Sprint(args...) }
-}
-
-// StrJoin produces a future for strings.Join(), concatenating the
+// StrJoinWith produces a future for strings.Join(), concatenating the
 // elements in the input slice with the provided separator.
-func (Handlers) StrJoin(input []string, sep string) Future[string] {
+func (Handlers) StrJoinWith(input []string, sep string) Future[string] {
 	return func() string { return strings.Join(input, sep) }
+}
+
+// StrConcatinate produces a future that joins a variadic sequence of
+// strings into a single string.
+func (Handlers) StrConcatinate(strs ...string) Future[string] {
+	return func() string { return strings.Join(strs, "") }
+}
+
+// StrJoin produces a future that combines a slice of strings into a
+// single string, joined without spaces.
+func (Handlers) StrJoin(strs []string) Future[string] {
+	return func() string { return strings.Join(strs, "") }
 }
 
 // Stringer converts a fmt.Stringer object/method call into a
