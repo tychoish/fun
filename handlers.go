@@ -110,34 +110,42 @@ func (Handlers) ErrorUnwindTransformer(filter ers.Filter) Transform[error, []err
 	}
 }
 
-// TODO: docstring
+// Sprintf produces a future that calls and returns fmt.Sprintf for
+// the provided arguments when the future is called.
 func (Handlers) Sprintf(tmpl string, args ...any) Future[string] {
 	return func() string { return fmt.Sprintf(tmpl, args...) }
 }
 
-// TODO: docstring
+// Str provides a future that calls fmt.Sprint over a slice of
+// any objects. Use fun.HF.Sprint for a variadic alternative.
 func (Handlers) Str(args []any) Future[string] { return HF.Sprint(args...) }
 
-// TODO: docstring
+// Strf produces a future that calls fmt.Sprintf for the given
+// template string and arguments.
 func (Handlers) Strf(tmpl string, args []any) Future[string] { return HF.Sprintf(tmpl, args...) }
 
-// TODO: docstring
+// Strln constructs a future that calls fmt.Sprintln for the given
+// arguments.
 func (Handlers) Strln(args []any) Future[string] { return HF.Sprintln(args...) }
 
-// TODO: docstring
+// Sprintln constructs a future that calls fmt.Sprintln over the given
+// variadic arguments.
 func (Handlers) Sprintln(args ...any) Future[string] {
 	return func() string { return fmt.Sprintln(args...) }
 }
 
-// TODO: docstring
+// Sprint constructs a future that calls fmt.Sprint over the given
+// variadic arguments.
 func (Handlers) Sprint(args ...any) Future[string] {
 	return func() string { return fmt.Sprint(args...) }
 }
 
-// TODO: docstring
-func (Handlers) Join(in []string, with string) Future[string] {
-	return func() string { return strings.Join(in, with) }
+// StrJoin produces a future for strings.Join(), concatenating the
+// elements in the input slice with the provided separator.
+func (Handlers) StrJoin(input []string, sep string) Future[string] {
+	return func() string { return strings.Join(input, sep) }
 }
 
-// TODO: docstring
+// Stringer converts a fmt.Stringer object/method call into a
+// string-formatter.
 func (Handlers) Stringer(op fmt.Stringer) Future[string] { return op.String }

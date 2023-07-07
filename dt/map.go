@@ -37,10 +37,12 @@ func MapIterator[K comparable, V any](in map[K]V) *fun.Iterator[Pair[K, V]] {
 	return Mapify(in).Iterator()
 }
 
-// TODO: docstring
+// MapKeys takes an arbitrary map and produces an iterator over only
+// the keys.
 func MapKeys[K comparable, V any](in map[K]V) *fun.Iterator[K] { return Mapify(in).Keys() }
 
-// TODO: docstring
+// MapValues takes an arbitrary map and produces an iterator over only
+// the values.
 func MapValues[K comparable, V any](in map[K]V) *fun.Iterator[V] { return Mapify(in).Values() }
 
 // Mapify provides a constructor that will produce a fun.Map without
@@ -140,7 +142,9 @@ func (m Map[K, V]) Keys() *fun.Iterator[K] { return m.ProducerKeys().Iterator() 
 // Values provides an iterator over just the values in the map.
 func (m Map[K, V]) Values() *fun.Iterator[V] { return m.ProducerValues().Iterator() }
 
-// TODO: docstring
+// Producer constructs a fun.Producer function for the pairs in the
+// map. The operation starts a goroutine on the first iteration that
+// tracks the state of the iterator. Iteration order is randomized.
 func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
 
