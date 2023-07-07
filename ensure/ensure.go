@@ -11,6 +11,10 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+// Assertion, produced by the ensure.That() constructor is a chainable
+// interface for annotating rich assertions, as a complement to the
+// fun/assert and fun/assert/check libraries. Use ensure.That() forms
+// to annotate
 type Assertion struct {
 	// results collection
 	check    adt.Once[[]string]
@@ -112,7 +116,6 @@ func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
 // Run rus the test and produces the output.
 func (a *Assertion) Run(t testing.TB) {
 	fun.Invariant.IsFalse(a.constructing, "cannot execute assertion during construction")
-
 	t.Helper()
 	strlogger := func(in string) { t.Helper(); t.Log(in) }
 	t.Cleanup(func() {
@@ -124,7 +127,10 @@ func (a *Assertion) Run(t testing.TB) {
 		}
 	})
 
-	result := dt.Sliceify(a.check.Resolve())
+	result := &dt.Slice[string]{}
+	result.AddWhen(!a.check.Defined() && a.subtests.Len() == 0, "no tests defined")
+	result.Extend(a.check.Resolve())
+
 	for sub := a.subtests.Front(); sub.Ok(); sub = sub.Next() {
 		st := sub.Value()
 

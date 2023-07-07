@@ -56,11 +56,50 @@ func TestEnsure(t *testing.T) {
 	t.Run("Subtest", func(t *testing.T) {
 		t.Run("Testing", ensure.That(is.EqualTo(1, 1)).Queit().Log("one").Test())
 		t.Run("Benchmark", func(t *testing.T) {
-			assert.NotPanic(t, func() {
-				ensure.That(is.EqualTo(1, 1)).Queit().Log("one").Benchmark()
-			})
-		})
+			count := 0
+			op := func() []string { count++; return nil }
 
+			assert.NotPanic(t, func() {
+				ensure.That(op).Queit().Log("one").Benchmark()(&testing.B{})
+			})
+			check.Equal(t, 1, count)
+			assert.NotPanic(t, func() {
+				_ = testing.Benchmark(func(b *testing.B) {
+					ensure.That(op).Add(ensure.That(op)).Add(ensure.That(op)).
+						Queit().Log("one").Run(b)
+				})
+			})
+			check.Equal(t, 4, count)
+		})
+		t.Run("UnknownTestingTB", func(t *testing.T) {
+			count := 0
+			op := func() []string { count++; return nil }
+			assert.Failing(t, func(t *testing.T) {
+				ensure.That(op).Add(ensure.That(op)).Add(ensure.That(op)).
+					Queit().Log("one").Run(struct{ *testing.T }{T: t})
+			})
+			check.Equal(t, 1, count)
+		})
+		t.Run("Add", func(t *testing.T) {
+			count := 0
+			op := func() []string { count++; return nil }
+			ensure.That(op).Add(ensure.That(op)).Run(t)
+			assert.Equal(t, count, 2)
+		})
+		t.Run("With", func(t *testing.T) {
+			count := 0
+			op := func() []string { count++; return nil }
+			ensure.That(op).With("check", func(ensure *ensure.Assertion) {
+				ensure.That(op)
+			}).Run(t)
+			assert.Equal(t, count, 2)
+		})
+	})
+	t.Run("NoTests", func(t *testing.T) {
+		assert.Failing(t, func(t *testing.T) {
+			ensured := &ensure.Assertion{}
+			ensured.Run(t)
+		})
 	})
 }
 
