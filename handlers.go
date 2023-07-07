@@ -33,6 +33,23 @@ func (Handlers) ProcessWorker() Processor[Worker] {
 	return func(ctx context.Context, wf Worker) error { return wf(ctx) }
 }
 
+// RunOperations returns a Operation that, when called, processes the incoming
+// iterator of Operations, starts a go routine running each, and wait
+// function and then blocks until all operations have returned, or the
+// context passed to the output function has been canceled.
+func (Handlers) OperationPool(iter *Iterator[Operation]) Operation {
+	return func(ctx context.Context) {
+		wg := &WaitGroup{}
+		defer wg.Wait(ctx)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = iter.Observe(ctx, func(fn Operation) { wg.Launch(ctx, fn) })
+		}()
+	}
+}
+
 // ProcessOperation constructs a Processor function for running Worker
 // functions. Use in combination with Process and ProcessParallel, and
 // to build worker pools.

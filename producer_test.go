@@ -132,6 +132,19 @@ func TestProducer(t *testing.T) {
 				assert.Equal(t, v, 42)
 			}
 		})
+		t.Run("Future", func(t *testing.T) {
+			callCount := 0
+			errCount := 0
+			root := ers.Error(t.Name())
+			pf := BlockingProducer(func() (int, error) { callCount++; return 42, root })
+			ff := pf.Future(testt.Context(t), func(err error) { errCount++; assert.ErrorIs(t, err, root) })
+			for i := 0; i < 1024; i++ {
+				v := ff()
+				assert.Equal(t, v, 42)
+			}
+			check.Equal(t, callCount, 1024)
+			check.Equal(t, errCount, 1024)
+		})
 
 		t.Run("Consistent", func(t *testing.T) {
 			ctx := testt.Context(t)
@@ -496,7 +509,7 @@ func TestProducer(t *testing.T) {
 				return -1, ctx.Err()
 			}
 		}
-		resolver := prod.Future(ctx)
+		resolver := prod.LaunchFuture(ctx)
 		time.Sleep(50 * time.Millisecond)
 		check.Equal(t, count.Load(), 1)
 		close(sig)

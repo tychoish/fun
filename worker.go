@@ -333,7 +333,8 @@ func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	prod := ch.Producer()
 	op := wf.Operation(oe).WithLock(mu)
 
-	ft.DoTimes(n, func() { op.Add(ctx, wg) })
+	wg.DoTimes(ctx, n, op)
+
 	wg.Operation().PostHook(ch.Close).Go(ctx)
 
 	return func(ctx context.Context) (err error) {

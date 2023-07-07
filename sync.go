@@ -82,6 +82,10 @@ func (wg *WaitGroup) DoTimes(ctx context.Context, n int, op Operation) {
 	op.StartGroup(ctx, wg, n)
 }
 
+// Launch adds an operation to the WaitGroup and starts the operation
+// in a go routine.
+func (wg *WaitGroup) Launch(ctx context.Context, op Operation) { op.Add(ctx, wg) }
+
 // Worker returns a worker that will block on the wait group
 // returning and return the context's error if one exits.
 func (wg *WaitGroup) Worker() Worker {

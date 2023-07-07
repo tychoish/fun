@@ -222,7 +222,7 @@ func TestOperation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
-		WaitMerge(SliceIterator(wfs))(ctx)
+		HF.OperationPool(SliceIterator(wfs))(ctx)
 		dur := time.Since(start)
 		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 			t.Error(dur)

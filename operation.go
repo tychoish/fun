@@ -48,24 +48,6 @@ func WaitForGroup(wg *sync.WaitGroup) Operation {
 	return WaitChannel(sig)
 }
 
-// WaitMerge returns a Operation that, when run, processes the incoming
-// iterator of Operations, starts a go routine running each, and wait
-// function and then blocks until all operations have returned, or the
-// context passed to the output function has been canceled.
-func WaitMerge(iter *Iterator[Operation]) Operation {
-	return func(ctx context.Context) {
-		wg := &WaitGroup{}
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_ = iter.Observe(ctx, func(fn Operation) { fn.Add(ctx, wg) })
-		}()
-
-		wg.Wait(ctx)
-	}
-}
-
 // Run is equivalent to calling the operation directly
 func (wf Operation) Run(ctx context.Context) { wf(ctx) }
 
@@ -119,7 +101,7 @@ func (wf Operation) Launch() Operation { return wf.Go }
 // Add starts a goroutine that waits for the Operation to return,
 // incrementing and decrementing the sync.WaitGroup as
 // appropriate. The execution of the wait fun blocks on Add's context.
-func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wf.Background(wg)(ctx) }
+func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wf.Background(wg).Run(ctx) }
 
 // StartGroup runs n groups, incrementing the waitgroup as
 // appropriate.
@@ -132,7 +114,7 @@ func (wf Operation) StartGroup(ctx context.Context, wg *WaitGroup, n int) {
 // and returns immediately. use the wait group, or it's Operation to
 // block on the completion of the background execution.
 func (wf Operation) Background(wg *WaitGroup) Operation {
-	return func(ctx context.Context) { wg.Add(1); go func() { defer wg.Done(); wf(ctx) }() }
+	return func(ctx context.Context) { wg.Add(1); wf.PostHook(wg.Done).Go(ctx) }
 }
 
 // Block runs the Operation with a context that will never be canceled.
@@ -234,7 +216,7 @@ func (wf Operation) Join(op Operation) Operation {
 // PostHook unconditionally runs the post-hook operation after the
 // operation returns. Use the hook to run cleanup operations.
 func (wf Operation) PostHook(hook func()) Operation {
-	return func(ctx context.Context) { wf(ctx); hook() }
+	return func(ctx context.Context) { defer hook(); wf(ctx) }
 }
 
 // PreHook unconditionally runs the hook operation before the

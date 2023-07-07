@@ -178,10 +178,10 @@ func (pf Producer[T]) Force() T { return ft.Must(pf.Block()) }
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
 func (pf Producer[T]) CheckBlock() (T, bool)               { return pf.Check(context.Background()) }
 
-// Future runs the producer in the background, when function is
+// LaunchFuture runs the producer in the background, when function is
 // called, and returns a producer which, when called, blocks until the
 // original producer returns.
-func (pf Producer[T]) Future(ctx context.Context) Producer[T] {
+func (pf Producer[T]) LaunchFuture(ctx context.Context) Producer[T] {
 	out := make(chan T, 1)
 	var err error
 	go func() { defer close(out); o, e := pf.Safe()(ctx); err = e; out <- o }()
@@ -191,6 +191,12 @@ func (pf Producer[T]) Future(ctx context.Context) Producer[T] {
 		err = ers.Join(err, chErr)
 		return out, err
 	}
+}
+
+// Future creates a future function using the context provided and
+// error observer to collect the error.
+func (pf Producer[T]) Future(ctx context.Context, ob Observer[error]) Future[T] {
+	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
 // Once returns a producer that only executes ones, and caches the
