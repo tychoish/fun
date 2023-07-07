@@ -7,13 +7,17 @@ import (
 )
 
 // Future is a basic function for providing a fun-style function type
-// for a function object that will produce an object of of the
-// specified type.
+// for a function object that will produce an object of the specified
+// type.
 type Future[T any] func() T
 
 // Futureize is a simple wrapper to convert a function object to a
 // Future[T] object.
 func Futurize[T any](f func() T) Future[T] { return f }
+
+// AsFuture wraps a value and returns a future object that, when
+// called, will return the provided value.
+func AsFuture[T any](in T) Future[T] { return func() T { return in } }
 
 // Run executes the future.
 func (f Future[T]) Run() T { return f() }
