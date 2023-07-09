@@ -141,6 +141,20 @@ func TestHandlers(t *testing.T) {
 		}))
 		check.Equal(t, count, 128)
 	})
+	t.Run("Transforms", func(t *testing.T) {
+		t.Run("Itoa", func(t *testing.T) {
+			ctx := testt.Context(t)
+			out := ft.Must(ConvertIterator(HF.Counter(10), HF.Itoa()).Slice(ctx))
+			testt.Log(t, out)
+			check.EqualItems(t, out, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
+		})
+		t.Run("Atoi", func(t *testing.T) {
+			ctx := testt.Context(t)
+			out := ft.Must(ConvertIterator(SliceIterator([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}), HF.Atoi()).Slice(ctx))
+			testt.Log(t, out)
+			check.EqualItems(t, out, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+		})
+	})
 }
 
 func (Handlers) String() string { return "Handlers<>" }

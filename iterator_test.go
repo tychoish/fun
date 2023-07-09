@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -132,6 +133,21 @@ func TestIterator(t *testing.T) {
 		check.NotError(t, err)
 		check.Equal(t, len(ints), 64)
 		check.Equal(t, 128, count)
+	})
+	t.Run("Monotonic", func(t *testing.T) {
+		ctx := testt.Context(t)
+		const size = 37017
+		count := 0
+		last := -1
+		check.NotError(t, HF.Counter(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in }))
+		check.Equal(t, size, count)
+		check.Equal(t, last, count)
+	})
+	t.Run("Transform", func(t *testing.T) {
+		ctx := testt.Context(t)
+		out := ft.Must(VariadicIterator(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(Converter(func(in int) int { return in / 4 })).Slice(ctx))
+		testt.Log(t, out)
+		check.EqualItems(t, out, []int{1, 2, 4, 8, 16, 32, 64, 128, 256})
 	})
 	t.Run("Process", func(t *testing.T) {
 		t.Run("Process", func(t *testing.T) {

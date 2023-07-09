@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -191,4 +193,28 @@ func (Handlers) Lines(reader io.Reader) *Iterator[string] {
 		}
 		return strings.TrimSpace(scanner.Text()), nil
 	})
+}
+
+// Itoa produces a Transform function that converts integers into
+// strings.
+func (Handlers) Itoa() Transform[int, string] {
+	return Converter(func(in int) string { return fmt.Sprint(in) })
+}
+
+// Atoi produces a Transform function that converts strings into
+// integers.
+func (Handlers) Atoi() Transform[string, int] { return ConverterErr(strconv.Atoi) }
+
+// Counter produces an iterator that, starting at 1, yields
+// monotonically increasing integers until the maximum is reached.
+func (Handlers) Counter(max int) *Iterator[int] {
+	state := &atomic.Int64{}
+	return BlockingProducer(func() (int, error) {
+		if prev := int(state.Add(1)); prev <= max {
+			return prev, nil
+		}
+
+		return -1, io.EOF
+	}).Iterator()
+
 }

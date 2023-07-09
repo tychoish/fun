@@ -116,6 +116,11 @@ func ConvertIterator[T, O any](iter *Iterator[T], op Transform[T, O]) *Iterator[
 	return op.Convert(iter)
 }
 
+// Transform processes an iterator passing each element through a
+// transform function. The type of the iterator is the same for the
+// output. Use Convert iterator to change the type of the value.
+func (i *Iterator[T]) Transform(op Transform[T, T]) *Iterator[T] { return op.Convert(i) }
+
 // MergeIterators takes a collection of iterators of the same type of
 // objects and provides a single iterator over these items.
 //
@@ -587,5 +592,4 @@ func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
 	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorObserver().Lock()).PostHook(buf.Close).Once().Launch()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
-
 }

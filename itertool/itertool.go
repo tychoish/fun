@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"sync/atomic"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -253,16 +252,7 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 
 // Monotonic creates an iterator that produces increasing numbers
 // until a specified maximum.
-func Monotonic(max int) *fun.Iterator[int] {
-	state := &atomic.Int64{}
-	return fun.Generator(fun.BlockingProducer(func() (int, error) {
-		prev := int(state.Add(1))
-		if prev <= max {
-			return prev, nil
-		}
-		return -1, io.EOF
-	}))
-}
+func Monotonic(max int) *fun.Iterator[int] { return fun.HF.Counter(max) }
 
 // JSON takes a stream of line-oriented JSON and marshals those
 // documents into objects in the form of an iterator.
