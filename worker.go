@@ -24,7 +24,7 @@ type Worker func(context.Context) error
 // canceled. If the channel is closed, the worker will return a nil
 // error, and if the context is canceled, the worker will return a
 // context error. In all other cases the work will propagate the error
-// (or nil) recived from the channel.
+// (or nil) received from the channel.
 //
 // You can call the resulting worker function more than once: if there
 // are multiple errors produced or passed to the channel, they will be
@@ -214,7 +214,7 @@ func (wf Worker) After(ts time.Time) Worker {
 func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrapper(dur)) }
 
 // Jitter wraps a Worker that runs the jitter function (jf) once
-// before every execution of the resulting fucntion, and waits for the
+// before every execution of the resulting function, and waits for the
 // resulting duration before running the Worker.
 //
 // If the function produces a negative duration, there is no delay.

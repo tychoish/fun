@@ -17,7 +17,12 @@ func Futurize[T any](f func() T) Future[T] { return f }
 
 // AsFuture wraps a value and returns a future object that, when
 // called, will return the provided value.
-func AsFuture[T any](in T) Future[T] { return func() T { return in } }
+func AsFuture[T any](in T) Future[T] { return ft.Wrapper(in) }
+
+// Translate converts a future from one type to another.
+func Translate[T any, O any](in Future[T], tfn func(T) O) Future[O] {
+	return func() O { return tfn(in()) }
+}
 
 // Run executes the future.
 func (f Future[T]) Run() T { return f() }

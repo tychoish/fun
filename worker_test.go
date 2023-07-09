@@ -182,8 +182,7 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("WorkerFuture", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := testt.Context(t)
 		expected := errors.New("cat")
 		var ch chan error
 		t.Run("NilChannel", func(t *testing.T) {
@@ -195,10 +194,10 @@ func TestWorker(t *testing.T) {
 			assert.NotError(t, WorkerFuture(ch)(ctx))
 		})
 		t.Run("ContextCanceled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			nctx, cancel := context.WithCancel(context.Background())
 			cancel()
 			ch = make(chan error)
-			err := WorkerFuture(ch)(ctx)
+			err := WorkerFuture(ch)(nctx)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 		t.Run("Error", func(t *testing.T) {

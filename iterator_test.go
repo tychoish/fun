@@ -68,11 +68,9 @@ func GenerateRandomStringSlice(size int) []string {
 }
 
 func TestIterator(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("Observe", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{})
 			assert.NotError(t, iter.Observe(ctx, func(in int) { t.Fatal("should not be called") }))
 
@@ -80,6 +78,7 @@ func TestIterator(t *testing.T) {
 			assert.ErrorIs(t, err, io.EOF)
 		})
 		t.Run("PanicSafety", func(t *testing.T) {
+			ctx := testt.Context(t)
 			called := 0
 			err := SliceIterator([]int{1, 2, 34, 56}).Observe(ctx, func(in int) {
 				called++
@@ -136,6 +135,8 @@ func TestIterator(t *testing.T) {
 	})
 	t.Run("Process", func(t *testing.T) {
 		t.Run("Process", func(t *testing.T) {
+			ctx := testt.Context(t)
+
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(ctx context.Context, i int) error { count++; return nil }).Run(ctx)
@@ -143,6 +144,7 @@ func TestIterator(t *testing.T) {
 			check.Equal(t, 9, count)
 		})
 		t.Run("ProcessWorker", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			op := Processor[int](func(ctx context.Context, i int) error { count++; return nil }).Iterator(iter)
@@ -151,6 +153,7 @@ func TestIterator(t *testing.T) {
 			check.Equal(t, 9, count)
 		})
 		t.Run("Abort", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(ctx context.Context, i int) error { count++; return io.EOF }).Run(ctx)
@@ -158,6 +161,7 @@ func TestIterator(t *testing.T) {
 			assert.Equal(t, 1, count)
 		})
 		t.Run("OperationError", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(ctx context.Context, i int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
@@ -166,6 +170,7 @@ func TestIterator(t *testing.T) {
 			assert.Equal(t, 1, count)
 		})
 		t.Run("Panic", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(ctx context.Context, i int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
@@ -174,9 +179,7 @@ func TestIterator(t *testing.T) {
 			check.ErrorIs(t, err, ErrRecoveredPanic)
 		})
 		t.Run("ContextExpired", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
+			ctx, cancel := context.WithCancel(testt.Context(t))
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(ctx context.Context, i int) error { count++; cancel(); return ctx.Err() }).Run(ctx)
@@ -186,6 +189,7 @@ func TestIterator(t *testing.T) {
 		})
 
 		t.Run("Parallel", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
 			err := iter.ProcessParallel(
@@ -200,6 +204,7 @@ func TestIterator(t *testing.T) {
 	})
 	t.Run("Transform", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
+			ctx := testt.Context(t)
 			input := SliceIterator([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
@@ -223,6 +228,7 @@ func TestIterator(t *testing.T) {
 			assert.Equal(t, calls, 4)
 		})
 		t.Run("Skips", func(t *testing.T) {
+			ctx := testt.Context(t)
 			input := SliceIterator([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
@@ -247,6 +253,7 @@ func TestIterator(t *testing.T) {
 			assert.Equal(t, calls, 3)
 		})
 		t.Run("ErrorPropogation", func(t *testing.T) {
+			ctx := testt.Context(t)
 			input := SliceIterator([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
@@ -350,6 +357,7 @@ func TestIterator(t *testing.T) {
 		})
 	})
 	t.Run("Filter", func(t *testing.T) {
+		ctx := testt.Context(t)
 		evens := testIntIter(t, 100).Filter(func(in int) bool { return in%2 == 0 })
 		assert.Equal(t, evens.Count(ctx), 50)
 		for evens.Next(ctx) {
@@ -358,6 +366,7 @@ func TestIterator(t *testing.T) {
 		assert.NotError(t, evens.Close())
 	})
 	t.Run("Split", func(t *testing.T) {
+		ctx := testt.Context(t)
 		input := SliceIterator(GenerateRandomStringSlice(100))
 
 		splits := input.Split(0)
@@ -410,6 +419,7 @@ func TestIterator(t *testing.T) {
 	})
 	t.Run("Slice", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
+			ctx := testt.Context(t)
 			iter := SliceIterator([]int{1, 2, 3, 4})
 			seen := 0
 			for iter.Next(ctx) {

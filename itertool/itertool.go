@@ -5,12 +5,10 @@
 package itertool
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
-	"strings"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
@@ -266,24 +264,11 @@ func Monotonic(max int) *fun.Iterator[int] {
 	}))
 }
 
-// Lines provides a fun.Iterator access over the contexts of a
-// (presumably plaintext) io.Reader, using the bufio.Scanner. During
-// iteration the leading and trailing space is also trimmed.
-func Lines(in io.Reader) *fun.Iterator[string] {
-	scanner := bufio.NewScanner(in)
-	return fun.Generator(func(ctx context.Context) (string, error) {
-		if !scanner.Scan() {
-			return "", ers.Join(io.EOF, scanner.Err())
-		}
-		return strings.TrimSpace(scanner.Text()), nil
-	})
-}
-
 // JSON takes a stream of line-oriented JSON and marshals those
 // documents into objects in the form of an iterator.
 func JSON[T any](in io.Reader) *fun.Iterator[T] {
 	var zero T
-	return fun.ConvertIterator(Lines(in), fun.ConverterErr(func(in string) (out T, err error) {
+	return fun.ConvertIterator(fun.HF.Lines(in), fun.ConverterErr(func(in string) (out T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err

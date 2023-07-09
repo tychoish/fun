@@ -1,10 +1,14 @@
 package fun
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
@@ -117,6 +121,25 @@ func TestHandlers(t *testing.T) {
 		t.Run("StrJoin", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrJoin([]string{"hi", ":", "42"})()) })
 		t.Run("StrJoinWith", func(t *testing.T) { check.Equal(t, "hi : 42", HF.StrJoinWith([]string{"hi", ":", "42"}, " ")()) })
 		t.Run("StrConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrConcatinate("hi", ":", "42")()) })
+	})
+	t.Run("Lines", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		last := sha256.Sum256([]byte(fmt.Sprint(time.Now().UTC().UnixMilli())))
+		buf.WriteString(fmt.Sprintf("%x", last))
+		for i := 1; i < 128; i++ {
+			next := sha256.Sum256(last[:])
+			buf.WriteString(fmt.Sprintf("\n%x", next))
+		}
+
+		count := 0
+		ctx := testt.Context(t)
+		var prev string
+		check.NotError(t, HF.Lines(buf).Observe(ctx, func(line string) {
+			count++
+			assert.Equal(t, len(line), 64)
+			assert.NotEqual(t, prev, line)
+		}))
+		check.Equal(t, count, 128)
 	})
 }
 

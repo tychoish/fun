@@ -122,7 +122,7 @@ func TestPanics(t *testing.T) {
 			assert.ErrorIs(t, err, root)
 			assert.ErrorIs(t, err, ErrInvariantViolation)
 		})
-		t.Run("Propogate", func(t *testing.T) {
+		t.Run("Propagate", func(t *testing.T) {
 			root := errors.New("kip")
 			err := ers.Check(func() {
 				Invariant.Must(root, "annotate")
@@ -219,6 +219,12 @@ func TestPanics(t *testing.T) {
 			assert.Panic(t, func() { of.Operation("hi")(ctx) })
 			assert.True(t, called)
 		})
-
+		t.Run("Failure", func(t *testing.T) {
+			assert.Panic(t, func() { Invariant.Failure() })
+			assert.Panic(t, func() { Invariant.Failure("this") })
+			assert.Panic(t, func() { Invariant.Failure(true) })
+			assert.Panic(t, func() { Invariant.Failure(false) })
+			assert.Panic(t, func() { Invariant.Failure(nil) })
+		})
 	})
 }

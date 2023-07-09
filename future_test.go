@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -144,4 +145,15 @@ func TestFuture(t *testing.T) {
 		testFuture := testt.Must(thunk(testt.Context(t)))
 		check.Equal(t, testFuture(t), 42)
 	})
+	t.Run("Translate", func(t *testing.T) {
+		count := 0
+		thunk := Futurize(func() int { count++; return 42 })
+		think := Translate(thunk, func(in int) string { return fmt.Sprint(in) })
+		check.Equal(t, count, 0)
+		check.Equal(t, think(), "42")
+		check.Equal(t, count, 1)
+		check.Equal(t, thunk(), 42)
+		check.Equal(t, count, 2)
+	})
+
 }

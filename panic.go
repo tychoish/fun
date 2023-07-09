@@ -38,6 +38,11 @@ func (RuntimeInvariant) IsTrue(cond bool, args ...any) { Invariant.OK(cond, args
 // ErrInvariantViolation. In all other cases the operation is a noop.
 func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.OK(!cond, args...) }
 
+// Failure unconditionally raises an invariant failure error and
+// processes the arguments as with the other invariant failures:
+// extracting errors and aggregating constituent errors.
+func (RuntimeInvariant) Failure(args ...any) { Invariant.OK(false, args...) }
+
 // OK panics if the condition is false, passing an error that is
 // rooted in InvariantViolation. Otherwise the operation is a noop.
 func (RuntimeInvariant) OK(cond bool, args ...any) {

@@ -211,7 +211,7 @@ func WorkerGroupConfErrorObserver(observer Observer[error]) OptionProvider[*Work
 
 // WorkerGroupConfErrorResolver reports the errors collected by the
 // observer. If the ErrorObserver is not set the resolver may be
-// overriden. ErrorObservers should be safe for concurrent use.
+// overridden. ErrorObservers should be safe for concurrent use.
 func WorkerGroupConfErrorResolver(resolver func() error) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ErrorResolver = resolver; return nil }
 }

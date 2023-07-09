@@ -9,7 +9,7 @@ import (
 )
 
 // Observer describes a function that operates on a single object, but
-// returns no output, and is used primarly for side effects,
+// returns no output, and is used primarily for side effects,
 // particularly around handling errors or collecting metrics. The
 // Observer implementation here makes it possible to provide
 // panic-safety for these kinds of functions or easily convert to

@@ -120,7 +120,7 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 
 		RETRY:
 			for {
-				out, err := pf(ctx)
+				out, err = pf(ctx)
 				switch {
 				case err == nil:
 					return out, nil
@@ -252,7 +252,7 @@ func (pf Producer[T]) After(ts time.Time) Producer[T] { return pf.Delay(time.Unt
 func (pf Producer[T]) Delay(d time.Duration) Producer[T] { return pf.Jitter(ft.Wrapper(d)) }
 
 // Jitter wraps a Producer that runs the jitter function (jf) once
-// before every execution of the resulting fucntion, and waits for the
+// before every execution of the resulting function, and waits for the
 // resulting duration before running the Producer.
 //
 // If the function produces a negative duration, there is no delay.
@@ -371,7 +371,7 @@ func (pf Producer[T]) PreHook(op Operation) Producer[T] {
 // the error of the producer.
 //
 // Useful for calling context.CancelFunc, closers, or incrementing
-// counters as neccessary.
+// counters as necessary.
 func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
@@ -400,7 +400,7 @@ func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
 // io.EOF, or the context (passed to the first call to
 // Next()) is canceled. Parallel operation, and continue on
 // error/continue-on-panic semantics are available and share
-// configuration with the Map and Proces operations.
+// configuration with the Map and Process operations.
 func (pf Producer[T]) GenerateParallel(
 	optp ...OptionProvider[*WorkerGroupConf],
 ) *Iterator[T] {

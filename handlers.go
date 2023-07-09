@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -95,7 +96,7 @@ func (Handlers) ErrorCollector() (ob Observer[error], prod Producer[[]error]) {
 	return HF.ErrorObserver(ob).WithLock(mtx), prod.WithLock(mtx)
 }
 
-// ErrorObserverWithoutEOF wraps an error observer and propogates all
+// ErrorObserverWithoutEOF wraps an error observer and propagates all
 // non-error and non-io.EOF errors to the underlying observer.
 func (Handlers) ErrorObserverWithoutEOF(of Observer[error]) Observer[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.Is(err, io.EOF) })
@@ -178,3 +179,16 @@ func (Handlers) StrJoin(strs []string) Future[string] {
 // Stringer converts a fmt.Stringer object/method call into a
 // string-formatter.
 func (Handlers) Stringer(op fmt.Stringer) Future[string] { return op.String }
+
+// Lines provides a fun.Iterator access over the contexts of a
+// (presumably plaintext) io.Reader, using the bufio.Scanner. During
+// iteration the leading and trailing space is also trimmed.
+func (Handlers) Lines(reader io.Reader) *Iterator[string] {
+	scanner := bufio.NewScanner(reader)
+	return Generator(func(ctx context.Context) (string, error) {
+		if !scanner.Scan() {
+			return "", ers.Join(io.EOF, scanner.Err())
+		}
+		return strings.TrimSpace(scanner.Text()), nil
+	})
+}

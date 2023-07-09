@@ -50,7 +50,7 @@ const ErrIteratorSkip ers.Error = ers.Error("skip-iteration")
 //
 // However, additional methods, such as ReadOne, the Producer()
 // function (which is a wrapper around ReadOne) provide a different
-// iteraction paradim: they combine the Next() and value operations
+// iteraction paradigm: they combine the Next() and value operations
 // into a single function call. When the iterator is exhausted these
 // methods return the `io.EOF` error.
 //
@@ -241,7 +241,7 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 }
 
 // Filter passes every item in the iterator and, if the check function
-// returns true propogates it to the output iterator.  There is no
+// returns true propagates it to the output iterator.  There is no
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map()
 func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
@@ -495,7 +495,7 @@ func (i *Iterator[T]) MarshalJSON() ([]byte, error) {
 // array and then processes and returns that data iteratively.
 //
 // To handle streaming data from an io.Reader that contains a stream
-// of line-seperated json documents, use itertool.JSON.
+// of line-separated json documents, use itertool.JSON.
 func (i *Iterator[T]) UnmarshalJSON(in []byte) error {
 	rv := []json.RawMessage{}
 

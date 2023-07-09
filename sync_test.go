@@ -31,9 +31,9 @@ func TestWaitGroup(t *testing.T) {
 		secondCase := make(chan struct{})
 		go func() {
 			defer close(secondCase)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-			defer cancel()
-			wg.Wait(ctx)
+			nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			defer ncancel()
+			wg.Wait(nctx)
 		}()
 		runtime.Gosched()
 

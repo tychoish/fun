@@ -133,7 +133,7 @@ func (wf Operation) Worker() Worker {
 }
 
 // Jitter wraps a Operation that runs the jitter function (jf) once
-// before every execution of the resulting fucntion, and waits for the
+// before every execution of the resulting function, and waits for the
 // resulting duration before running the Operation operation.
 //
 // If the function produces a negative duration, there is no delay.

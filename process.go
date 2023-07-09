@@ -74,7 +74,7 @@ func (pf Processor[T]) After(ts time.Time) Processor[T] { return pf.Delay(time.U
 func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(ft.Wrapper(dur)) }
 
 // Jitter wraps a Processor that runs the jitter function (jf) once
-// before every execution of the resulting fucntion, and waits for the
+// before every execution of the resulting function, and waits for the
 // resulting duration before running the processor.
 //
 // If the function produces a negative duration, there is no delay.

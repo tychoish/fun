@@ -3,14 +3,12 @@ package itertool
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
@@ -162,25 +160,6 @@ func TestSmoke(t *testing.T) {
 		check.NotError(t, Monotonic(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in }))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
-	})
-	t.Run("Lines", func(t *testing.T) {
-		buf := &bytes.Buffer{}
-		last := sha256.Sum256([]byte(fmt.Sprint(time.Now().UTC().UnixMilli())))
-		buf.WriteString(fmt.Sprintf("%x", last))
-		for i := 1; i < 128; i++ {
-			next := sha256.Sum256(last[:])
-			buf.WriteString(fmt.Sprintf("\n%x", next))
-		}
-
-		count := 0
-		ctx := testt.Context(t)
-		var prev string
-		check.NotError(t, Lines(buf).Observe(ctx, func(line string) {
-			count++
-			assert.Equal(t, len(line), 64)
-			assert.NotEqual(t, prev, line)
-		}))
-		check.Equal(t, count, 128)
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
