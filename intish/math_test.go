@@ -52,30 +52,30 @@ func TestMath(t *testing.T) {
 	})
 	t.Run("Rounding", func(t *testing.T) {
 		t.Run("Smallest", func(t *testing.T) {
-			if v := RoundToSmallestMultipe(35, 3); v != 33 {
+			if v := RoundToSmallestMultiple(35, 3); v != 33 {
 				t.Error(v)
 			}
-			if v := RoundToSmallestMultipe(-35, 3); v != -36 {
+			if v := RoundToSmallestMultiple(-35, 3); v != -36 {
 				t.Error(v)
 			}
-			if v := RoundToSmallestMultipe(-31, 2); v != -32 {
+			if v := RoundToSmallestMultiple(-31, 2); v != -32 {
 				t.Error(v)
 			}
-			if v := RoundToSmallestMultipe(34, 5); v != 30 {
+			if v := RoundToSmallestMultiple(34, 5); v != 30 {
 				t.Error(v)
 			}
 		})
 		t.Run("Largest", func(t *testing.T) {
-			if v := RoundToLargestMultipe(35, 3); v != 36 {
+			if v := RoundToLargestMultiple(35, 3); v != 36 {
 				t.Error(v)
 			}
-			if v := RoundToLargestMultipe(-35, 3); v != -33 {
+			if v := RoundToLargestMultiple(-35, 3); v != -33 {
 				t.Error(v)
 			}
-			if v := RoundToLargestMultipe(-31, 2); v != -30 {
+			if v := RoundToLargestMultiple(-31, 2); v != -30 {
 				t.Error(v)
 			}
-			if v := RoundToLargestMultipe(34, 5); v != 35 {
+			if v := RoundToLargestMultiple(34, 5); v != 35 {
 				t.Error(v)
 			}
 		})
@@ -140,6 +140,9 @@ func TestMath(t *testing.T) {
 			if v := Millis(1.23); v != 1230 {
 				t.Error(v)
 			}
+			if v := FloatMillis(1230); v != 1.23 {
+				t.Error(v)
+			}
 			if v := Millis(1); v != 1000 {
 				t.Error(v)
 			}
@@ -152,6 +155,10 @@ func TestMath(t *testing.T) {
 			if v := Millis(0.25); v != 250 {
 				t.Error(v)
 			}
+			if v := FloatMillis(250); v != 0.25 {
+				t.Error(v)
+			}
+
 			func() {
 				defer func() {
 					if p := recover(); p == nil {

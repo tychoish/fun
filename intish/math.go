@@ -49,62 +49,62 @@ func Max[T Numbers](a, b T) T {
 	return b
 }
 
-// RoundToMultipleAwayFromZero rounds a value to the nearest multiple of
-// the other number. The argument with the smaller absolute value is
-// always the "multiple" and value with larger absolute value is
-// rounded.  The rounded always has a higher absolute value than the
-// input value.
+// RoundToMultipleAwayFromZero rounds a value to the nearest multiple
+// of the other number. The argument with the smaller absolute value
+// is always the "multiple" and value with larger absolute value is
+// rounded.
+//
+// The rounded always has a higher absolute value than the input
+// value.
 func RoundToMultipleAwayFromZero[T Signed](a, b T) T {
 	multiple := AbsMin(a, b)
 	max := AbsMax(a, b)
 
-	max += multiple - (max % multiple)
+	return (max + multiple - (max % multiple)) * roundedSign(multiple, a, b)
+}
+
+func roundedSign[T Signed](multiple, a, b T) T {
 	switch {
 	case a < 0 && b < 0:
-		max *= -1
+		return -1
 	case a < 0 && b > 0 && Abs(b) == multiple:
-		max *= -1
+		return -1
 	case a > 0 && b < 0 && Abs(a) == multiple:
-		max *= -1
+		return -1
+	default:
+		return 1
 	}
 
-	return max
 }
 
 // RoundToMultipleTowardZero rounds a value to the nearest multiple of
 // the other number. The argument with the smaller absolute value is
 // always the "multiple" and value with larger absolute value is
-// rounded.  The rounded always has a lower absolute value than the
-// input value.
+// rounded.
+//
+// The rounded always has a lower absolute value than the input value.
 func RoundToMultipleTowardZero[T Signed](a, b T) T {
 	multiple := AbsMin(a, b)
 	max := AbsMax(a, b)
 
-	max -= (max % multiple)
-	switch {
-	case a < 0 && b < 0:
-		max *= -1
-	case a < 0 && b > 0 && Abs(b) == multiple:
-		max *= -1
-	case a > 0 && b < 0 && Abs(a) == multiple:
-		max *= -1
-	}
-
-	return max
+	return (max - (max % multiple)) * roundedSign(multiple, a, b)
 
 }
 
-// The argument with the smaller absolute
-// value is always the "multiple" and the "larger" is always the value
-// that is rounded.
-func RoundToSmallestMultipe[T Signed](a, b T) T {
+// RoundToSmallestMultiple rounds to smaller numbers,
+// The argument with the smaller absolute value is always the
+// "multiple" and the "larger" is always the value that is rounded.
+//
+// The rounded value is always *smaller* than the input value.
+func RoundToSmallestMultiple[T Signed](a, b T) T {
 	return Min(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
 }
 
-// The argument with the smaller absolute
-// value is always the "multiple" and the "larger" is always the value
-// that is rounded.
-func RoundToLargestMultipe[T Signed](a, b T) T {
+// The argument with the smaller absolute value is always the
+// "multiple" and the "larger" is always the value that is rounded.
+//
+// The output value is always *larget* than the input value.
+func RoundToLargestMultiple[T Signed](a, b T) T {
 	return Max(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
 }
 
@@ -113,6 +113,10 @@ func Diff[T Numbers](a, b T) T {
 	return Max(a, b) - Min(a, b)
 }
 
+// Millis converts a float into a an integer that represents one
+// thousandth of the units of the original.
+//
+// Millis will panic in the case of an overflow (wraparound).
 func Millis(in float64) int64 {
 	milli := int64(in * 1000)
 	// check if we overflowed.
@@ -122,3 +126,7 @@ func Millis(in float64) int64 {
 
 	return milli
 }
+
+// FloatMillis reverses, though potentially (often) not without some
+// loss of fidelity
+func FloatMillis(in int64) float64 { return float64(in) / 1000 }
