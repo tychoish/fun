@@ -110,7 +110,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 		wg.Operation().PostHook(wcancel).PostHook(output.Close).Go(ctx)
 	}).Once()
 
-	outputIter := output.Producer().PreHook(init).Iterator()
+	outputIter := output.Producer().PreHook(init).IteratorWithHook(func(out *Iterator[O]) { out.AddError(iter.Close()) })
 
 	err := JoinOptionProviders(optp...).Apply(opts)
 	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })

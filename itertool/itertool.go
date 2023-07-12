@@ -195,7 +195,9 @@ func Uniq[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 			}
 		}
 		return out, io.EOF
-	}).Iterator()
+	}).IteratorWithHook(func(out *fun.Iterator[T]) {
+		out.AddError(iter.Close())
+	})
 }
 
 // DropZeroValues processes an iterator removing all zero values.
@@ -211,7 +213,9 @@ func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 				return item, nil
 			}
 		}
-	}).Iterator()
+	}).IteratorWithHook(func(iterator *fun.Iterator[T]) {
+		iterator.AddError(iter.Close())
+	})
 }
 
 // Chain, like merge, takes a sequence of iterators and produces a
@@ -219,6 +223,7 @@ func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 // sequence, where merge reads from all iterators in at once.
 func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 	pipe := fun.Blocking(make(chan T))
+	ec := &erc.Collector{}
 
 	init := fun.Operation(func(ctx context.Context) {
 		defer pipe.Close()
@@ -244,10 +249,16 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 				}
 				break
 			}
+			ec.Add(iter.Close())
 		}
 	}).Launch().Once()
 
-	return pipe.Receive().Producer().PreHook(init).Iterator()
+	return pipe.Receive().
+		Producer().
+		PreHook(init).
+		IteratorWithHook(func(iter *fun.Iterator[T]) {
+			iter.AddError(ec.Resolve())
+		})
 }
 
 // Monotonic creates an iterator that produces increasing numbers
