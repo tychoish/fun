@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/rand"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -379,9 +378,7 @@ func TestOperation(t *testing.T) {
 		ctx := testt.Context(t)
 		opwait := op.Future(ctx)
 		check.Equal(t, count.Load(), 0)
-		time.Sleep(12 * time.Millisecond)
-		runtime.Gosched()
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 		check.Equal(t, count.Load(), 1)
 		check.MaxRuntime(t, 5*time.Millisecond, func() {
 			opwait(ctx)

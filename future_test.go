@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -155,5 +157,31 @@ func TestFuture(t *testing.T) {
 		check.Equal(t, thunk(), 42)
 		check.Equal(t, count, 2)
 	})
-
+	t.Run("Limit", func(t *testing.T) {
+		count := 0
+		thunk := Futurize(func() int { count++; return 42 }).Limit(100)
+		ft.DoTimes(500, func() { check.Equal(t, 42, thunk()) })
+		check.Equal(t, count, 100)
+	})
+	t.Run("TTL", func(t *testing.T) {
+		t.Run("Under", func(t *testing.T) {
+			count := 0
+			thunk := Futurize(func() int { count++; return 42 }).TTL(time.Minute)
+			ft.DoTimes(500, func() { check.Equal(t, 42, thunk()) })
+			check.Equal(t, count, 1)
+		})
+		t.Run("Par", func(t *testing.T) {
+			count := 0
+			thunk := Futurize(func() int { count++; return 42 }).TTL(time.Nanosecond)
+			ft.DoTimes(500, func() { time.Sleep(10 * time.Nanosecond); check.Equal(t, 42, thunk()) })
+			check.Equal(t, count, 500)
+		})
+		t.Run("Over", func(t *testing.T) {
+			count := 0
+			thunk := Futurize(func() int { count++; return 42 }).TTL(100 * time.Millisecond)
+			ft.DoTimes(100, func() { time.Sleep(9 * time.Millisecond); check.Equal(t, 42, thunk()) })
+			testt.Log(t, "count value is", count)
+			check.Equal(t, count, 10)
+		})
+	})
 }

@@ -2,6 +2,7 @@ package fun
 
 import (
 	"sync"
+	"time"
 
 	"github.com/tychoish/fun/ft"
 )
@@ -89,4 +90,14 @@ func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 		}
 		return out
 	}
+}
+
+func (f Future[T]) TTL(dur time.Duration) Future[T] {
+	resolver := ttlExec[T](dur)
+	return func() T { return resolver(f) }
+}
+
+func (f Future[T]) Limit(in int) Future[T] {
+	resolver := limitExec[T](in)
+	return func() T { return resolver(f) }
 }
