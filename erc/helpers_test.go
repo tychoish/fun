@@ -196,14 +196,14 @@ func TestCollections(t *testing.T) {
 }
 
 func TestWithTime(t *testing.T) {
-	err := errors.New("ERRNO=42")
+	const err ers.Error = ers.Error("ERRNO=42")
 	t.Run("Nil", func(t *testing.T) {
 		ec := &Collector{}
 		WithTime(ec, nil)
 		if ec.HasErrors() {
 			t.Fatal(ec.Resolve())
 		}
-		if err = ec.Resolve(); err != nil {
+		if err := ec.Resolve(); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -213,7 +213,7 @@ func TestWithTime(t *testing.T) {
 		WithTime(ec, err)
 		second := time.Now()
 		if !ec.HasErrors() {
-			t.Fatal("should have error")
+			t.Fatal("should have error", ec.Resolve())
 		}
 		if err := ec.Resolve(); err == nil {
 			t.Fatal("should resolve error")
