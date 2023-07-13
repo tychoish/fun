@@ -133,7 +133,7 @@ func TestContext(t *testing.T) {
 
 			GetShutdownSignal(ctx2)()
 			if ctx3.Err() == nil {
-				t.Error("shutdown did not propogate")
+				t.Error("shutdown did not propagate")
 			}
 			if ctx.Err() == nil {
 				t.Error("shutdown acted at wrong level")

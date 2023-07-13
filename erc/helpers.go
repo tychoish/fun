@@ -34,14 +34,14 @@ func Wrap(err error, annotation string) error { return ers.Wrap(err, annotation)
 func Wrapf(err error, tmpl string, args ...any) error { return ers.Wrapf(err, tmpl, args...) }
 
 // WithTime adds the error to the collector, only if the error is
-// nil, and annotates that error object with a timestmap using the
+// nil, and annotates that error object with a timestamp using the
 // ers.WithTime helper. Access the timestamp using ers.GetTime()
 //
 // Deprecated: Use ers.WithTime instead. Non-collector helper
 // functions and types were moved to ers from erc.
 func WithTime(ec *Collector, err error) { ec.Add(ers.WithTime(err)) }
 
-// When is a helper function, typcially useful for improving the
+// When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
 func When(ec *Collector, cond bool, val any) {

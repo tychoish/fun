@@ -112,7 +112,7 @@ func TestMerge(t *testing.T) {
 		check.Equal(t, root, nil)
 		err.previous = &mergederr{}
 		_, root = err.rootSize()
-		check.Equal(t, root, error(err.current))
+		check.Equal(t, root, err.current)
 		weird := &mergederr{current: nil, previous: &mergederr{}}
 		_, root = weird.rootSize()
 		check.True(t, root == nil)

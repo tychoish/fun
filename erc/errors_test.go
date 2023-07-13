@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/testt"
 )
 
 func (e *Stack) len() int {
@@ -85,8 +86,6 @@ func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Iterator[T]
 
 func TestError(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
 	const errval = "ERRO=42"
 	t.Run("Collector", func(t *testing.T) {
 		t.Parallel()
@@ -130,6 +129,7 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("Producer", func(t *testing.T) {
+			ctx := testt.Context(t)
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
 				ec.Add(fmt.Errorf("%d", i))
@@ -209,7 +209,7 @@ func TestError(t *testing.T) {
 				panic(err)
 			}()
 			<-sig
-			if err := es.Resolve(); err == nil {
+			if err = es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
 
@@ -223,6 +223,7 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("Iterator", func(t *testing.T) {
+			ctx := testt.Context(t)
 			es := &Collector{}
 			for i := 0; i < 10; i++ {
 				es.Add(errors.New(errval))
@@ -237,6 +238,7 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("NilIterator", func(t *testing.T) {
+			ctx := testt.Context(t)
 			es := &Collector{}
 			errs := collectIter(ctx, t, es.Iterator())
 			assert.Zero(t, len(errs))
@@ -383,6 +385,7 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("ErrorsReportEmpty", func(t *testing.T) {
+			ctx := testt.Context(t)
 			es := &Stack{}
 			if l := collectIter(ctx, t, es.Iterator()); len(l) != 0 || l != nil {
 				t.Fatal("unexpected errors report", l)
@@ -392,6 +395,7 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("ErrorsReportSingle", func(t *testing.T) {
+			ctx := testt.Context(t)
 			es := &Stack{}
 			es = es.append(errors.New(errval))
 			if l := collectIter(ctx, t, es.Iterator()); len(l) != 1 || l == nil {
@@ -399,6 +403,7 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("StackErrorStack", func(t *testing.T) {
+			ctx := testt.Context(t)
 			es := &Stack{err: errors.New("outer")}
 			es = es.append(&Stack{err: errors.New("inner")})
 			if l := collectIter(ctx, t, es.Iterator()); len(l) != 2 || l == nil {

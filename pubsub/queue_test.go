@@ -140,15 +140,12 @@ func TestQueueClose(t *testing.T) {
 
 func TestQueueWait(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	q := mustQueue(t, QueueOptions{SoftQuota: 2, HardLimit: 2})
 
 	// A wait on an empty queue should time out.
 	t.Run("WaitTimeout", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
+		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		got, err := q.Wait(ctx)
 		if err == nil {
 			t.Errorf("Wait: got %v, want error", got)
@@ -159,8 +156,7 @@ func TestQueueWait(t *testing.T) {
 
 	// A wait on a non-empty queue should report an item.
 	t.Run("WaitNonEmpty", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := testt.Context(t)
 
 		const input = "figgy pudding"
 		q.mustAdd(input)
@@ -175,6 +171,7 @@ func TestQueueWait(t *testing.T) {
 
 	// Wait should block until an item arrives.
 	t.Run("WaitOnEmpty", func(t *testing.T) {
+		ctx := testt.Context(t)
 		const input = "fleet footed kittens"
 
 		done := make(chan struct{})
@@ -194,6 +191,8 @@ func TestQueueWait(t *testing.T) {
 
 	// Closing the queue unblocks a wait.
 	t.Run("UnblockOnClose", func(t *testing.T) {
+		ctx := testt.Context(t)
+
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
@@ -399,7 +398,7 @@ func TestQueueIterator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := queue.Add("one"); err != nil {
+		if err = queue.Add("one"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -425,7 +424,7 @@ func TestQueueIterator(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := queue.Add("one"); err != nil {
+		if err = queue.Add("one"); err != nil {
 			t.Fatal(err)
 		}
 		iter := queue.Iterator()

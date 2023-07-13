@@ -15,9 +15,9 @@ type Synchronized[T any] struct {
 	obj T
 }
 
-// Lock takes the lock, and then returns it.
+// Lock takes the lock, locks it, and then returns it.
 //
-// This, in combination With Lock makes it possible to have a single
+// This, in combination With() makes it possible to have a single
 // statement for managing a mutex in a defer, given the evaluation
 // time of defer arguments, as in:
 //

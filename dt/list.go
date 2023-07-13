@@ -209,7 +209,7 @@ func (e *Element[T]) Drop() {
 
 // Swap exchanges the location of two elements in a list, returning
 // true if the operation was successful, and false if the elements are
-// not eligable to be swapped. It is valid/possible to swap the root element of
+// not eligible to be swapped. It is valid/possible to swap the root element of
 // the list with another element to "move the head", causing a wrap
 // around effect. Swap will not operate if either element is nil, or
 // not a member of the same list.
@@ -385,7 +385,7 @@ func (l *List[T]) ProducerReversePop() fun.Producer[T] {
 //
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visable.
+// however, values added ahead of the iterator, will be visible.
 func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Iterator() }
 
 // Reverse returns an iterator that produces elements from the list,
@@ -395,7 +395,7 @@ func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Iterator() }
 //
 // If you add values to the list during iteration *behind* where the
 // iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visable.
+// however, values added ahead of the iterator, will be visible.
 func (l *List[T]) Reverse() *fun.Iterator[T] { return l.ProducerReverse().Iterator() }
 
 // PopIterator produces an iterator that consumes elements from the
@@ -426,7 +426,7 @@ func (l *List[T]) Extend(input *List[T]) {
 }
 
 // Copy duplicates the list. The element objects in the list are
-// distinct, though if the Values are themsevles references, the
+// distinct, though if the Values are themselves references, the
 // values of both lists would be shared.
 func (l *List[T]) Copy() *List[T] {
 	out := &List[T]{}

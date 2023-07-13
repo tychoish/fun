@@ -295,7 +295,8 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 		})
 		t.Run("Iterate", func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(ctx, time.Second)
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, time.Second)
 			defer cancel()
 
 			fix := f()
@@ -336,17 +337,16 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 
 func TestDeque(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
 	t.Run("String", func(t *testing.T) {
 		t.Parallel()
+		ctx := testt.Context(t)
 		for _, f := range generateDequeFixtures(randomStringSlice) {
 			RunDequeTests(ctx, t, f)
 		}
 	})
 	t.Run("Integer", func(t *testing.T) {
 		t.Parallel()
+		ctx := testt.Context(t)
 		for _, f := range generateDequeFixtures(randomIntSlice) {
 			RunDequeTests(ctx, t, f)
 		}
@@ -478,6 +478,7 @@ func TestDeque(t *testing.T) {
 			for _, tt := range makeWaitPushCases() {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
+					ctx := testt.Context(t)
 					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
 					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
 
@@ -498,6 +499,7 @@ func TestDeque(t *testing.T) {
 			for _, tt := range makeWaitPushCases() {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
+					ctx := testt.Context(t)
 					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
 					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
 
@@ -520,6 +522,7 @@ func TestDeque(t *testing.T) {
 			for _, tt := range makeWaitPushCases() {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
+					ctx := testt.Context(t)
 					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
 					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
 					start := time.Now()
@@ -599,6 +602,7 @@ func TestDeque(t *testing.T) {
 				dq.IteratorReverse(),
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
+					ctx := testt.Context(t)
 					if iter.Next(ctx) {
 						t.Error("should not iterate", idx)
 					}
@@ -608,8 +612,7 @@ func TestDeque(t *testing.T) {
 	})
 	t.Run("WaitingBack", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		defer cancel()
+		ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
 		dq, err := NewDeque[int](DequeOptions{Capacity: 2})
 		if err != nil {
 			t.Fatal(err)
@@ -617,7 +620,7 @@ func TestDeque(t *testing.T) {
 		startAt := time.Now()
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			if err := dq.PushBack(100); err != nil {
+			if err = dq.PushBack(100); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -635,8 +638,7 @@ func TestDeque(t *testing.T) {
 	})
 	t.Run("WaitingFront", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		defer cancel()
+		ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
 		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
 		if err != nil {
 			t.Fatal(err)
@@ -644,7 +646,7 @@ func TestDeque(t *testing.T) {
 		startAt := time.Now()
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			if err := dq.PushFront(100); err != nil {
+			if err = dq.PushFront(100); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -703,6 +705,8 @@ func TestDeque(t *testing.T) {
 		})
 
 		t.Run("Wait", func(t *testing.T) {
+			ctx := testt.Context(t)
+
 			if _, err := dq.WaitBack(ctx); !errors.Is(err, ErrQueueClosed) {
 				t.Fatal(err)
 			}
@@ -717,6 +721,7 @@ func TestDeque(t *testing.T) {
 				dq.IteratorReverse(),
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
+					ctx := testt.Context(t)
 					seen := 0
 					for iter.Next(ctx) {
 						seen++
@@ -734,6 +739,7 @@ func TestDeque(t *testing.T) {
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
 					seen := 0
+					ctx := testt.Context(t)
 					if err := iter.Close(); err != nil {
 						t.Fatal(err)
 					}
@@ -754,8 +760,7 @@ func TestDeque(t *testing.T) {
 	})
 	t.Run("IteratorHandlesEmpty", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		ctx := testt.Context(t)
 		queue := NewUnlimitedDeque[int]()
 
 		toctx, toccancel := context.WithTimeout(ctx, 4*time.Millisecond)

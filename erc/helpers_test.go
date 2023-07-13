@@ -86,15 +86,15 @@ func TestCollections(t *testing.T) {
 			}
 		})
 		t.Run("One", func(t *testing.T) {
-			const e ers.Error = "fourty-two"
+			const e ers.Error = "forty-two"
 			err := Join(e)
 			if !errors.Is(err, e) {
 				t.Error(err, e)
 			}
 		})
 		t.Run("Many", func(t *testing.T) {
-			const e0 ers.Error = "fourty-two"
-			const e1 ers.Error = "fourty-three"
+			const e0 ers.Error = "forty-two"
+			const e1 ers.Error = "forty-three"
 			err := Join(e0, e1)
 			if !errors.Is(err, e1) {
 				t.Error(err, e1)
@@ -203,7 +203,7 @@ func TestWithTime(t *testing.T) {
 		if ec.HasErrors() {
 			t.Fatal(ec.Resolve())
 		}
-		if err := ec.Resolve(); err != nil {
+		if err = ec.Resolve(); err != nil {
 			t.Fatal(err)
 		}
 	})

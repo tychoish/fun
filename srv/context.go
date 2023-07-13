@@ -122,7 +122,7 @@ func AddCleanup(ctx context.Context, cleanup fun.Worker) {
 
 // AddCleanupError adds an error to the cleanup handler which is
 // returned when that service shuts down. Useful to propagating errors
-// encountered during runtime that don't warrent a panic to process
+// encountered during runtime that don't require a panic to process
 // shutdown.
 func AddCleanupError(ctx context.Context, err error) {
 	AddCleanup(ctx, func(context.Context) error { return err })

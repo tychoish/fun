@@ -22,10 +22,8 @@ func makeMap(size int) Map[string, int] {
 }
 
 func TestMap(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("ExpectedSize", func(t *testing.T) {
+		ctx := testt.Context(t)
 		mp := makeMap(100)
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
@@ -47,6 +45,7 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("Append", func(t *testing.T) {
+		ctx := testt.Context(t)
 		mp := makeMap(100)
 
 		// noop because same keys
@@ -119,6 +118,7 @@ func TestMap(t *testing.T) {
 			check.Equal(t, mp["3"], 3)
 		})
 		t.Run("Prine", func(t *testing.T) {
+			ctx := testt.Context(t)
 			orig := Map[string, int]{
 				"1": 1,
 				"2": 2,
@@ -135,6 +135,7 @@ func TestMap(t *testing.T) {
 
 		})
 		t.Run("Values", func(t *testing.T) {
+			ctx := testt.Context(t)
 			mp := Map[string, int]{}
 			mp.ConsumeValues(ctx,
 				Sliceify([]int{1, 2, 3}).Iterator(),
@@ -147,6 +148,7 @@ func TestMap(t *testing.T) {
 		})
 	})
 	t.Run("MapConverter", func(t *testing.T) {
+		ctx := testt.Context(t)
 		in := map[string]string{
 			"hi":  "there",
 			"how": "are you doing",

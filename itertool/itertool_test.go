@@ -18,9 +18,9 @@ import (
 
 func TestSmoke(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	t.Run("Worker", func(t *testing.T) {
+		ctx := testt.Context(t)
+
 		count := &atomic.Int64{}
 		err := Worker(ctx, fun.SliceIterator([]fun.Operation{
 			func(context.Context) { count.Add(1) },
@@ -62,6 +62,7 @@ func TestSmoke(t *testing.T) {
 			}
 			return prev, nil
 		})
+		ctx := testt.Context(t)
 
 		sl, err := iter.Slice(ctx)
 		assert.NotError(t, err)
@@ -123,6 +124,8 @@ func TestSmoke(t *testing.T) {
 			}
 		})
 		t.Run("ReduceSkip", func(t *testing.T) {
+			ctx := testt.Context(t)
+
 			elems := makeIntSlice(32)
 			iter := fun.SliceIterator(elems)
 			count := 0
@@ -138,6 +141,7 @@ func TestSmoke(t *testing.T) {
 			assert.Equal(t, count, 32)
 		})
 		t.Run("ReduceEarlyExit", func(t *testing.T) {
+			ctx := testt.Context(t)
 			elems := makeIntSlice(32)
 			iter := fun.SliceIterator(elems)
 			count := 0
@@ -154,6 +158,7 @@ func TestSmoke(t *testing.T) {
 		})
 	})
 	t.Run("Monotonic", func(t *testing.T) {
+		ctx := testt.Context(t)
 		const size = 37017
 		count := 0
 		last := -1

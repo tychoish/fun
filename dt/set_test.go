@@ -16,8 +16,6 @@ import (
 )
 
 func TestSet(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	for name, builder := range map[string]func() *Set[string]{
 		"Unordered/Basic": func() *Set[string] { s := &Set[string]{}; return s },
 		"Ordered/Basic":   func() *Set[string] { s := &Set[string]{}; s.Order(); return s },
@@ -26,6 +24,7 @@ func TestSet(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("EmptyIteraton", func(t *testing.T) {
+				ctx := testt.Context(t)
 				set := builder()
 				ct := 0
 				assert.NotPanic(t, func() {
@@ -41,7 +40,7 @@ func TestSet(t *testing.T) {
 			t.Run("Initialization", func(t *testing.T) {
 				set := builder()
 				if set.Len() != 0 {
-					t.Fatal("initalized non-empty set")
+					t.Fatal("initialized non-empty set")
 				}
 
 				// safe to set order more than once
@@ -61,6 +60,7 @@ func TestSet(t *testing.T) {
 
 			})
 			t.Run("JSON", func(t *testing.T) {
+				ctx := testt.Context(t)
 				set := builder()
 				set.Add("hello")
 				set.Add("merlin")
@@ -220,6 +220,7 @@ func TestSet(t *testing.T) {
 						}
 					})
 					t.Run("InqualitySizeComplex", func(t *testing.T) {
+						ctx := testt.Context(t)
 						set := builder()
 						populator(set)
 						count := 0

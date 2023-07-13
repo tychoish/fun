@@ -99,7 +99,7 @@ func TestAtomics(t *testing.T) {
 		assert.True(t, !ft.IsZero(f))
 		// clearly true
 		assert.True(t, ft.IsZero(f.Get()))
-		f = (*Atomic[int])(NewAtomic(100))
+		f = NewAtomic(100)
 		assert.True(t, !ft.IsZero(f))
 	})
 	t.Run("CompareAndSwap", func(t *testing.T) {
