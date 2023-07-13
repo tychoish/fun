@@ -36,6 +36,9 @@ func Wrapf(err error, tmpl string, args ...any) error { return ers.Wrapf(err, tm
 // WithTime adds the error to the collector, only if the error is
 // nil, and annotates that error object with a timestmap using the
 // ers.WithTime helper. Access the timestamp using ers.GetTime()
+//
+// Deprecated: Use ers.WithTime instead. Non-collector helper
+// functions and types were moved to ers from erc.
 func WithTime(ec *Collector, err error) { ec.Add(ers.WithTime(err)) }
 
 // When is a helper function, typcially useful for improving the
@@ -66,7 +69,7 @@ func Whenf(ec *Collector, cond bool, val string, args ...any) {
 	ec.Add(fmt.Errorf(val, args...))
 }
 
-// Safe provides similar semantics fun.Safe, but creates an error from
+// Safe provides similar semantics ft.Safe, but creates an error from
 // the panic value and adds it to the error collector.
 func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() }
 
