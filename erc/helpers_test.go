@@ -43,8 +43,9 @@ func TestCollections(t *testing.T) {
 			if !errors.As(err, &cp) {
 				t.Error("should err as", err, cp)
 			}
-			if cp.val != e1.val {
-				t.Error(cp.val)
+			if cp.val != e2.val {
+				t.Error(cp.val, e1.val)
+				t.Log(cp)
 			}
 		})
 		t.Run("FirstOnly", func(t *testing.T) {

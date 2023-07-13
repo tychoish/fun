@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
@@ -103,7 +105,11 @@ func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
 // Join takes a slice of errors and converts it into an *erc.Stack
 // typed error.
-func Join(errs ...error) error { return ers.Join(errs...) }
+func Join(errs ...error) error {
+	s := &Stack{}
+	dt.Sliceify(errs).Observe(func(err error) { s = s.append(err) })
+	return ft.WhenDo(s.count != 0, func() error { return s })
+}
 
 // Stream collects all errors from an error channel, and returns the
 // aggregated error. Stream blocks until the context expires (but
