@@ -234,7 +234,7 @@ func TestOperation(t *testing.T) {
 		}
 		seen := make(map[int]struct{})
 		counter := 0
-		var of Observer[int] = func(in int) {
+		var of Handler[int] = func(in int) {
 			seen[in] = struct{}{}
 			counter++
 		}

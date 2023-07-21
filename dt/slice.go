@@ -95,7 +95,7 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
 
 // Observe calls the observer function on every item in the slice.
-func (s Slice[T]) Observe(of fun.Observer[T]) {
+func (s Slice[T]) Observe(of fun.Handler[T]) {
 	for idx := range s {
 		of(s[idx])
 	}

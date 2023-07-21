@@ -720,9 +720,9 @@ func TestJSON(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	t.Run("ErrorObserver", func(t *testing.T) {
+	t.Run("ErrorHandler", func(t *testing.T) {
 		iter := &Iterator[string]{}
-		ec := iter.ErrorObserver()
+		ec := iter.ErrorHandler()
 		ec(io.EOF)
 		ec(ers.ErrInvalidInput)
 		ec(io.ErrUnexpectedEOF)

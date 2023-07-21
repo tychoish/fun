@@ -12,7 +12,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/ft"
 )
 
 func TestStack(t *testing.T) {
@@ -295,7 +295,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Content", func(t *testing.T) {
 			stack := GenerateStack(t, 100)
-			items := risky.Force(stack.Iterator().Slice(ctx))
+			items := ft.Must(stack.Iterator().Slice(ctx))
 			if len(items) != stack.Len() {
 				t.Fatal("unexpected collection", len(items), stack.Len())
 			}

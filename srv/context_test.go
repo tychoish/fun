@@ -322,7 +322,7 @@ func TestWorkerPool(t *testing.T) {
 		ctx = WithWorkerPool(ctx, "merlin", fun.WorkerGroupConfNumWorkers(50))
 		obCt := &atomic.Int64{}
 		expected := errors.New("kip")
-		ctx = WithObserverWorkerPool(ctx, "kip", func(err error) {
+		ctx = WithHandlerWorkerPool(ctx, "kip", func(err error) {
 			check.ErrorIs(t, err, expected)
 			obCt.Add(1)
 		}, fun.WorkerGroupConfNumWorkers(50))

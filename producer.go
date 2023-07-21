@@ -58,20 +58,20 @@ func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf(ctx) }
 //
 // The worker function's return value captures the procuder's error,
 // and will block until the producer has completed.
-func (pf Producer[T]) Background(ctx context.Context, of Observer[T]) Worker {
+func (pf Producer[T]) Background(ctx context.Context, of Handler[T]) Worker {
 	return pf.Worker(of).Future(ctx)
 }
 
 // Worker passes the produced value to an observer and returns a
 // worker that runs the producer, calls the observer, and returns the
 // error.
-func (pf Producer[T]) Worker(of Observer[T]) Worker {
+func (pf Producer[T]) Worker(of Handler[T]) Worker {
 	return func(ctx context.Context) error { o, e := pf(ctx); of(o); return e }
 }
 
 // Operation produces a wait function, using two observers to handle the
 // output of the Producer.
-func (pf Producer[T]) Operation(of Observer[T], eo Observer[error]) Operation {
+func (pf Producer[T]) Operation(of Handler[T], eo Handler[error]) Operation {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 
@@ -195,7 +195,7 @@ func (pf Producer[T]) LaunchFuture(ctx context.Context) Producer[T] {
 
 // Future creates a future function using the context provided and
 // error observer to collect the error.
-func (pf Producer[T]) Future(ctx context.Context, ob Observer[error]) Future[T] {
+func (pf Producer[T]) Future(ctx context.Context, ob Handler[error]) Future[T] {
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
@@ -435,8 +435,8 @@ func (pf Producer[T]) GenerateParallel(
 
 	iter := pipe.Receive().Producer().PreHook(init).Iterator()
 	err := JoinOptionProviders(optp...).Apply(opts)
-	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = iter.ErrorObserver().Lock() })
-	opts.ErrorObserver(err)
+	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = iter.ErrorHandler().Lock() })
+	opts.ErrorHandler(err)
 	ft.WhenCall(err != nil, pipe.Close)
 
 	return iter

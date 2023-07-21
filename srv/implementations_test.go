@@ -136,12 +136,12 @@ func TestHelpers(t *testing.T) {
 		})
 	})
 
-	t.Run("ObserverWorkerPool", func(t *testing.T) {
+	t.Run("HandlerWorkerPool", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Small", func(t *testing.T) {
 			count := &atomic.Int64{}
 			errCount := &atomic.Int64{}
-			srv := ObserverWorkerPool(
+			srv := HandlerWorkerPool(
 				makeErroringQueue(t, 100, count),
 				func(err error) {
 					t.Log(err)
@@ -170,7 +170,7 @@ func TestHelpers(t *testing.T) {
 		t.Run("Large", func(t *testing.T) {
 			count := &atomic.Int64{}
 			errCount := &atomic.Int64{}
-			srv := ObserverWorkerPool(
+			srv := HandlerWorkerPool(
 				makeErroringQueue(t, 100, count),
 				func(err error) {
 					check.Error(t, err)

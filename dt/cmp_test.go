@@ -12,7 +12,8 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/testt"
 )
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
@@ -131,8 +132,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			list.SortMerge(cmp.LessThanNative[int])
 			lcopy.SortQuick(cmp.LessThanNative[int])
-			listVals := risky.Force(list.Iterator().Slice(ctx))
-			copyVals := risky.Force(lcopy.Iterator().Slice(ctx))
+			listVals := ft.Must(list.Iterator().Slice(ctx))
+			copyVals := ft.Must(lcopy.Iterator().Slice(ctx))
 			t.Log("merge", listVals)
 			t.Log("quick", copyVals)
 			assert.Equal(t, len(listVals), len(copyVals))
@@ -242,7 +243,7 @@ func TestSort(t *testing.T) {
 }
 func getSliceForList(ctx context.Context, t *testing.T, list *List[int]) []int {
 	t.Helper()
-	return risky.Force(list.Iterator().Slice(ctx))
+	return testt.Must(list.Iterator().Slice(ctx))(t)
 }
 
 func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {

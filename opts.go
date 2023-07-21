@@ -42,13 +42,13 @@ type WorkerGroupConf struct {
 	// output. fun.ErrRecoveredPanic is always included and io.EOF
 	// is never included.
 	ExcludedErrors []error
-	// ErrorObserver is used to collect and aggregate errors in
+	// ErrorHandler is used to collect and aggregate errors in
 	// the collector. For operations with shorter runtime
 	// `erc.Collector.Add` is a good choice, though different
 	// strategies may make sense in different
 	// cases. (erc.Collector has a mutex and stories collected
 	// errors in memory.)
-	ErrorObserver Observer[error]
+	ErrorHandler Handler[error]
 	// ErrorResolver should return an aggregated error collected
 	// during the execution of worker
 	// threads. `erc.Collector.Resolve` suffices when collecting
@@ -80,10 +80,10 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 
 	switch {
 	case hadPanic && !o.ContinueOnPanic:
-		o.ErrorObserver(err)
+		o.ErrorHandler(err)
 		return false
 	case hadPanic && o.ContinueOnPanic:
-		o.ErrorObserver(err)
+		o.ErrorHandler(err)
 		return true
 	case errors.Is(err, ErrIteratorSkip):
 		return true
@@ -91,12 +91,12 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 		return false
 	case ers.ContextExpired(err):
 		if o.IncludeContextExpirationErrors {
-			o.ErrorObserver(err)
+			o.ErrorHandler(err)
 		}
 
 		return false
 	default:
-		o.ErrorObserver(err)
+		o.ErrorHandler(err)
 		return o.ContinueOnError
 	}
 }
@@ -204,14 +204,14 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 // WorkerGroupConfWithErrorCollector saves an error observer to the
 // configuration. Typically implementations will provide some default
 // error collection tool, and will only call the observer for non-nil
-// errors. ErrorObservers should be safe for concurrent use.
-func WorkerGroupConfErrorObserver(observer Observer[error]) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error { opts.ErrorObserver = observer; return nil }
+// errors. ErrorHandlers should be safe for concurrent use.
+func WorkerGroupConfErrorHandler(observer Handler[error]) OptionProvider[*WorkerGroupConf] {
+	return func(opts *WorkerGroupConf) error { opts.ErrorHandler = observer; return nil }
 }
 
 // WorkerGroupConfErrorResolver reports the errors collected by the
-// observer. If the ErrorObserver is not set the resolver may be
-// overridden. ErrorObservers should be safe for concurrent use.
+// observer. If the ErrorHandler is not set the resolver may be
+// overridden. ErrorHandlers should be safe for concurrent use.
 func WorkerGroupConfErrorResolver(resolver func() error) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ErrorResolver = resolver; return nil }
 }
@@ -237,19 +237,19 @@ func WorkerGroupConfWithErrorCollector(
 			return errors.New("cannot use a nil error collector")
 		}
 		return ers.Join(
-			WorkerGroupConfErrorObserver(ec.Add)(opts),
+			WorkerGroupConfErrorHandler(ec.Add)(opts),
 			WorkerGroupConfErrorResolver(ec.Resolve)(opts),
 		)
 	}
 }
 
-// WorkerGroupConfErrorCollectorPair uses an Observer/Producer pair to
+// WorkerGroupConfErrorCollectorPair uses an Handler/Producer pair to
 // collect errors. A basic implementation, accessible via
 // HF.ErrorCollector() is suitable for this purpose.
-func WorkerGroupConfErrorCollectorPair(ob Observer[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
-			WorkerGroupConfErrorObserver(ob)(opts),
+			WorkerGroupConfErrorHandler(ob)(opts),
 			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Block())...) })(opts),
 		)
 	}

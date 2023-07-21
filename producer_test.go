@@ -219,7 +219,7 @@ func TestProducer(t *testing.T) {
 			ctx := testt.Context(t)
 
 			obct := 0
-			obv := Observer[int](func(in int) { obct++; check.Equal(t, in, 42) }).Lock()
+			obv := Handler[int](func(in int) { obct++; check.Equal(t, in, 42) }).Lock()
 			jobs := []Worker{}
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op.Background(ctx, obv)) })

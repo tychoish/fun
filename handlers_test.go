@@ -39,7 +39,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorProcessorWithoutEOF", func(t *testing.T) {
 		count := 0
-		proc := HF.ErrorObserverWithoutEOF(func(err error) {
+		proc := HF.ErrorHandlerWithoutEOF(func(err error) {
 			count++
 			if errors.Is(err, io.EOF) || err == nil {
 				t.Error("unexpected error", err)
@@ -62,7 +62,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorProcessorWithoutTerminating", func(t *testing.T) {
 		count := 0
-		proc := HF.ErrorObserverWithoutTerminating(func(err error) {
+		proc := HF.ErrorHandlerWithoutTerminating(func(err error) {
 			count++
 			if ers.IsTerminating(err) || err == nil {
 				t.Error("unexpected error", err)

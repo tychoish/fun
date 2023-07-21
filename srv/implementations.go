@@ -233,13 +233,13 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 	}
 }
 
-// ObserverWorkerPool has similar semantics and use to the WorkerPool,
+// HandlerWorkerPool has similar semantics and use to the WorkerPool,
 // but rather than aggregating errors, all errors are passed to the
 // observer function, which is responsible for ignoring or processing
 // the errors. The worker pool will respect continue/abort on error or
 // panics as expected.
 //
-// Observer pools may be more operable if your workers generate many
+// Handler pools may be more operable if your workers generate many
 // errors, and/or your process is long lived.
 //
 // The service itself may have execution or shutdown related errors,
@@ -247,9 +247,9 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 // service execution which will be propagated to the return value of
 // the service's Wait method; but all errors that occur during the
 // execution of the workload will be observed (including panics) as well.
-func ObserverWorkerPool(
+func HandlerWorkerPool(
 	workQueue *pubsub.Queue[fun.Worker],
-	observer fun.Observer[error],
+	observer fun.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{

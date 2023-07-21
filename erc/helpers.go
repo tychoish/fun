@@ -80,7 +80,7 @@ func Recover(ec *Collector) { ec.Add(ers.ParsePanic(recover())) }
 
 // Recovery catches a panic, turns it into an error and passes it to
 // the provided observer function.
-func Recovery(ob fun.Observer[error]) { ob(ers.ParsePanic(recover())) }
+func Recovery(ob fun.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
 // RecoverHook runs adds the output of recover() to the error
 // collector, and runs the specified hook if. If there was no panic,
@@ -132,7 +132,7 @@ func Stream(ctx context.Context, errCh <-chan error) error {
 // fun.Worker and fun.Operation objects as needed.
 func Consume(ctx context.Context, iter *fun.Iterator[error]) error {
 	ec := &Collector{}
-	ec.Add(iter.Observe(ctx, ec.Observer()))
+	ec.Add(iter.Observe(ctx, ec.Handler()))
 	return ec.Resolve()
 }
 
@@ -156,6 +156,6 @@ func Collect[T any](ec *Collector) func(T, error) T {
 
 // IteratorHook adds errors to an iterator from a collector when the
 // iterator closes.
-func IteratorHook[T any](ec *Collector) fun.Observer[*fun.Iterator[T]] {
+func IteratorHook[T any](ec *Collector) fun.Handler[*fun.Iterator[T]] {
 	return func(it *fun.Iterator[T]) { it.AddError(ec.Resolve()) }
 }

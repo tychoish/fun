@@ -172,9 +172,9 @@ func TestPanics(t *testing.T) {
 			assert.NotPanic(t, func() { Invariant.IsFalse(!true, "can't be false") })
 		})
 	})
-	t.Run("Observer", func(t *testing.T) {
+	t.Run("Handler", func(t *testing.T) {
 		ctx := testt.Context(t)
-		var of Observer[string]
+		var of Handler[string]
 		t.Run("Worker", func(t *testing.T) {
 			var called bool
 			of = func(string) {

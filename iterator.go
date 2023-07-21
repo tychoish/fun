@@ -146,7 +146,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 
 		send := pipe.Send()
 		for idx := range iters {
-			send.Consume(iters[idx]).Operation(HF.ErrorObserverWithoutEOF(eo)).Add(wctx, wg)
+			send.Consume(iters[idx]).Operation(HF.ErrorHandlerWithoutEOF(eo)).Add(wctx, wg)
 		}
 
 		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
@@ -175,8 +175,8 @@ func (i *Iterator[T]) Close() error { i.doClose(); return i.err }
 // AddError calls or Close).
 func (i *Iterator[T]) AddError(e error) { i.err = ers.Join(e, i.err) }
 
-// ErrorObserver provides access to the AddError method as an error observer.
-func (i *Iterator[T]) ErrorObserver() Observer[error] { return i.AddError }
+// ErrorHandler provides access to the AddError method as an error observer.
+func (i *Iterator[T]) ErrorHandler() Handler[error] { return i.AddError }
 
 // Producer provides access to the contents of the iterator as a
 // Producer function.
@@ -364,7 +364,7 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 // well as the output of the Close() operation. Observe will not add a
 // context cancelation error to its error, though the observed
 // iterator may return one in its close method.
-func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
+func (i *Iterator[T]) Observe(ctx context.Context, fn Handler[T]) (err error) {
 	defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
 	proc := i.Producer()
 	for {
@@ -541,8 +541,8 @@ func (i *Iterator[T]) ProcessParallel(
 		opts := &WorkerGroupConf{}
 		err = JoinOptionProviders(optp...).Apply(opts)
 		ft.WhenCall(err != nil, cancel)
-		if opts.ErrorObserver == nil {
-			opts.ErrorObserver = i.ErrorObserver().Lock()
+		if opts.ErrorHandler == nil {
+			opts.ErrorHandler = i.ErrorHandler().Lock()
 			opts.ErrorResolver = i.Close
 		}
 
@@ -577,7 +577,7 @@ func (i *Iterator[T]) ProcessParallel(
 // order of elements in the input iterator.
 func (i *Iterator[T]) Buffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().Consume(i).Operation(i.ErrorObserver().Lock()).PostHook(buf.Close).Once().Launch()
+	pipe := buf.Send().Consume(i).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Launch()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }
 
@@ -591,6 +591,6 @@ func (i *Iterator[T]) Buffer(n int) *Iterator[T] {
 // consumer of the iterator.
 func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorObserver().Lock()).PostHook(buf.Close).Once().Launch()
+	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Launch()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }

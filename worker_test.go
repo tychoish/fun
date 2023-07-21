@@ -156,8 +156,8 @@ func TestWorker(t *testing.T) {
 		ch := make(chan struct{}, 1)
 
 		expected := errors.New("kip")
-		var oee Observer[error] = func(err error) { check.ErrorIs(t, err, expected); Blocking(ch).Send().Signal(ctx) }
-		var oen Observer[error] = func(err error) { check.NotError(t, err); Blocking(ch).Send().Signal(ctx) }
+		var oee Handler[error] = func(err error) { check.ErrorIs(t, err, expected); Blocking(ch).Send().Signal(ctx) }
+		var oen Handler[error] = func(err error) { check.NotError(t, err); Blocking(ch).Send().Signal(ctx) }
 		var wf Worker
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}

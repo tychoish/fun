@@ -74,9 +74,9 @@ func (Handlers) ErrorProcessor(pf Processor[error]) Processor[error] {
 	}
 }
 
-// ErrorObserver constructs an error observer that only calls the
+// ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
-func (Handlers) ErrorObserver(of Observer[error]) Observer[error] {
+func (Handlers) ErrorHandler(of Handler[error]) Handler[error] {
 	return func(err error) {
 		if err != nil {
 			of(err)
@@ -88,27 +88,27 @@ func (Handlers) ErrorObserver(of Observer[error]) Observer[error] {
 // collects non-nil errors, and adds them to a slice internally, which
 // is accessible via the producer. The operation of the observer and
 // producer are protexted by a shared mutex.
-func (Handlers) ErrorCollector() (ob Observer[error], prod Producer[[]error]) {
+func (Handlers) ErrorCollector() (ob Handler[error], prod Producer[[]error]) {
 	var errs []error
 
 	ob = func(err error) { errs = append(errs, err) }
 	prod = func(_ context.Context) ([]error, error) { return errs, nil }
 	mtx := &sync.Mutex{}
 
-	return HF.ErrorObserver(ob).WithLock(mtx), prod.WithLock(mtx)
+	return HF.ErrorHandler(ob).WithLock(mtx), prod.WithLock(mtx)
 }
 
-// ErrorObserverWithoutEOF wraps an error observer and propagates all
+// ErrorHandlerWithoutEOF wraps an error observer and propagates all
 // non-error and non-io.EOF errors to the underlying observer.
-func (Handlers) ErrorObserverWithoutEOF(of Observer[error]) Observer[error] {
+func (Handlers) ErrorHandlerWithoutEOF(of Handler[error]) Handler[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.Is(err, io.EOF) })
 }
 
-// ErrorObserverWithoutTerminating wraps an error observer and only
+// ErrorHandlerWithoutTerminating wraps an error observer and only
 // calls the underlying observer if the input error is non-nil and is
 // not one of the "terminating" errors used by this package
 // (e.g. io.EOF and the context cancellation errors).
-func (Handlers) ErrorObserverWithoutTerminating(of Observer[error]) Observer[error] {
+func (Handlers) ErrorHandlerWithoutTerminating(of Handler[error]) Handler[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.IsTerminating(err) })
 }
 

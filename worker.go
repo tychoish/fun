@@ -122,7 +122,7 @@ func (wf Worker) futureOp(ctx context.Context) func() error { return func() erro
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are converted to errors for both the worker
 // function but not the observer function.
-func (wf Worker) Observe(ctx context.Context, ob Observer[error]) { ob(wf.Safe()(ctx)) }
+func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Safe()(ctx)) }
 
 // Signal runs the worker function in a background goroutine and
 // returns the error in an error channel, that returns when the
@@ -151,7 +151,7 @@ func (wf Worker) Future(ctx context.Context) Worker {
 
 // Background starts the worker function in a go routine, passing the
 // error to the provided observer function.
-func (wf Worker) Background(ctx context.Context, ob Observer[error]) {
+func (wf Worker) Background(ctx context.Context, ob Handler[error]) {
 	go func() { ob(wf.Safe()(ctx)) }()
 }
 
@@ -170,7 +170,7 @@ func (wf Worker) Once() Worker {
 // Operation converts a worker function into a wait function,
 // passing any error to the observer function. Only non-nil errors are
 // observed.
-func (wf Worker) Operation(ob Observer[error]) Operation {
+func (wf Worker) Operation(ob Handler[error]) Operation {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 

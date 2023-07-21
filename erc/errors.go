@@ -155,9 +155,9 @@ func (ec *Collector) Add(err error) {
 }
 
 // Obesrver returns the collector's Add method as a
-// fun.Observer[error] object for integration and use with the
+// fun.Handler[error] object for integration and use with the
 // function types.
-func (ec *Collector) Observer() fun.Observer[error] { return ec.Add }
+func (ec *Collector) Handler() fun.Handler[error] { return ec.Add }
 
 // Len reports on the total number of non-nil errors collected. The
 // count tracks a cached size of the *erc.Stack, giving Len() stable

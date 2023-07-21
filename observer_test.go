@@ -9,9 +9,9 @@ import (
 	"github.com/tychoish/fun/assert/check"
 )
 
-func TestObserver(t *testing.T) {
+func TestHandler(t *testing.T) {
 	t.Run("Check", func(t *testing.T) {
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			panic(io.EOF)
 
 		}
@@ -26,7 +26,7 @@ func TestObserver(t *testing.T) {
 			}
 		}
 
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			panic(io.EOF)
 
 		}
@@ -35,7 +35,7 @@ func TestObserver(t *testing.T) {
 	})
 	t.Run("If", func(t *testing.T) {
 		count := 0
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			check.Equal(t, in, 100)
 			count++
 		}
@@ -48,7 +48,7 @@ func TestObserver(t *testing.T) {
 	t.Run("When", func(t *testing.T) {
 		should := false
 		count := 0
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			check.Equal(t, in, 100)
 			count++
 		}
@@ -67,7 +67,7 @@ func TestObserver(t *testing.T) {
 	})
 	t.Run("Once", func(t *testing.T) {
 		count := 0
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			check.Equal(t, in, 100)
 			count++
 		}
@@ -79,7 +79,7 @@ func TestObserver(t *testing.T) {
 	})
 	t.Run("Chain", func(t *testing.T) {
 		count := 0
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			check.Equal(t, in, 100)
 			count++
 		}
@@ -93,7 +93,7 @@ func TestObserver(t *testing.T) {
 		// this is mostly just tempting the race detecor
 		wg := &sync.WaitGroup{}
 		count := 0
-		var ob Observer[int] = func(in int) {
+		var ob Handler[int] = func(in int) {
 			defer wg.Done()
 			count++
 			check.Equal(t, in, 100)
@@ -111,7 +111,7 @@ func TestObserver(t *testing.T) {
 	})
 	t.Run("Skip", func(t *testing.T) {
 		count := 0
-		of := Observer[int](func(i int) { count++; check.Equal(t, i, 42) })
+		of := Handler[int](func(i int) { count++; check.Equal(t, i, 42) })
 		off := of.Skip(func(i int) bool { return i == 42 })
 
 		off(42)
@@ -129,7 +129,7 @@ func TestObserver(t *testing.T) {
 	})
 	t.Run("Filter", func(t *testing.T) {
 		count := 0
-		of := Observer[int](func(i int) { count++; check.Equal(t, i, 42) }).
+		of := Handler[int](func(i int) { count++; check.Equal(t, i, 42) }).
 			Skip(func(in int) bool { return in != 0 }).
 			Filter(func(in int) int {
 				switch in {
@@ -151,7 +151,7 @@ func TestObserver(t *testing.T) {
 	})
 	t.Run("Error", func(t *testing.T) {
 		called := 0
-		oef := HF.ErrorObserver(func(err error) { called++ })
+		oef := HF.ErrorHandler(func(err error) { called++ })
 		oef(nil)
 		check.Equal(t, called, 0)
 		oef(io.EOF)

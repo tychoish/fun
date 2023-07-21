@@ -13,7 +13,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/ft"
 )
 
 type jsonMarshlerError struct{}
@@ -133,7 +133,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), risky.Force(list.Iterator().Slice(ctx)))
+			t.Log(seen, list.Len(), ft.Must(list.Iterator().Slice(ctx)))
 			t.Error(seen, len(expected), expected)
 
 		}
@@ -615,7 +615,7 @@ func TestList(t *testing.T) {
 				t.Fatal("should have swapped")
 			}
 			// expected: [42, 840, 420, 84]
-			slice := risky.Force(list.Iterator().Slice(ctx))
+			slice := ft.Must(list.Iterator().Slice(ctx))
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
@@ -672,10 +672,10 @@ func TestList(t *testing.T) {
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := dt.GetPopulatedList(t, 100)
-			itemsOne := risky.Force(lOne.Iterator().Slice(ctx))
+			itemsOne := ft.Must(lOne.Iterator().Slice(ctx))
 
 			lTwo := dt.GetPopulatedList(t, 100)
-			itemsTwo := risky.Force(lTwo.Iterator().Slice(ctx))
+			itemsTwo := ft.Must(lTwo.Iterator().Slice(ctx))
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())

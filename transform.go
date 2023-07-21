@@ -113,7 +113,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 	outputIter := output.Producer().PreHook(init).IteratorWithHook(func(out *Iterator[O]) { out.AddError(iter.Close()) })
 
 	err := JoinOptionProviders(optp...).Apply(opts)
-	ft.WhenCall(opts.ErrorObserver == nil, func() { opts.ErrorObserver = outputIter.ErrorObserver().Lock() })
+	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = outputIter.ErrorHandler().Lock() })
 	outputIter.AddError(err)
 
 	ft.WhenCall(err != nil, output.Close)

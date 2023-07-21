@@ -1,2 +1,3 @@
-- Rename fun.Observer[T] fun.Handler[T]
+- DONE: Rename fun.Observer[T] fun.Handler[T]
 - Complete documentation, partickularly in the pubsub package.
+- 

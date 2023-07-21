@@ -52,10 +52,10 @@ func TestOptionProvider(t *testing.T) {
 	t.Run("ErrorHandler", func(t *testing.T) {
 		t.Run("Configuration", func(t *testing.T) {
 			opt := &WorkerGroupConf{}
-			check.True(t, opt.ErrorObserver == nil)
+			check.True(t, opt.ErrorHandler == nil)
 			check.True(t, opt.ErrorResolver == nil)
 			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
-			check.True(t, opt.ErrorObserver != nil)
+			check.True(t, opt.ErrorHandler != nil)
 			check.True(t, opt.ErrorResolver != nil)
 			check.NotError(t, opt.Validate())
 		})
@@ -63,7 +63,7 @@ func TestOptionProvider(t *testing.T) {
 			opt := &WorkerGroupConf{}
 			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 0)
-			opt.ErrorObserver(ers.New("hello"))
+			opt.ErrorHandler(ers.New("hello"))
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 1)
 		})
 		t.Run("LoadTest", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestOptionProvider(t *testing.T) {
 
 			wg := &WaitGroup{}
 			wg.DoTimes(ctx, 128, func(ctx context.Context) {
-				opt.ErrorObserver(ers.New("hello"))
+				opt.ErrorHandler(ers.New("hello"))
 			})
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 128)
 		})
@@ -82,14 +82,14 @@ func TestOptionProvider(t *testing.T) {
 		opt := &WorkerGroupConf{}
 		t.Run("NilError", func(t *testing.T) {
 			called := 0
-			opt.ErrorObserver = func(err error) { called++ }
+			opt.ErrorHandler = func(err error) { called++ }
 
 			check.True(t, opt.CanContinueOnError(nil))
 			check.Equal(t, 0, called)
 		})
 		t.Run("Continue", func(t *testing.T) {
 			called := 0
-			opt.ErrorObserver = func(err error) { called++ }
+			opt.ErrorHandler = func(err error) { called++ }
 			check.True(t, opt.CanContinueOnError(ErrIteratorSkip))
 			check.Equal(t, 0, called)
 		})

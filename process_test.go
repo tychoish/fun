@@ -122,7 +122,7 @@ func TestProcess(t *testing.T) {
 		check.Equal(t, called, 2)
 
 	})
-	t.Run("Observer", func(t *testing.T) {
+	t.Run("Handler", func(t *testing.T) {
 		ctx := testt.Context(t)
 		called := 0
 		root := ers.New("foo")
@@ -132,7 +132,7 @@ func TestProcess(t *testing.T) {
 			return root
 		})
 		of := func(err error) { called++; check.ErrorIs(t, err, root) }
-		obv := pf.Observer(ctx, of)
+		obv := pf.Handler(ctx, of)
 		check.Equal(t, called, 0)
 		obv(42)
 		check.Equal(t, called, 2)
@@ -192,7 +192,7 @@ func TestProcess(t *testing.T) {
 			})
 
 			wg := &WaitGroup{}
-			oe := HF.ErrorObserver(func(err error) { Invariant.Must(err) })
+			oe := HF.ErrorHandler(func(err error) { Invariant.Must(err) })
 			op = op.Lock()
 
 			ft.DoTimes(128, func() { op.Operation(42, oe).Add(ctx, wg) })

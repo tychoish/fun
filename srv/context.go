@@ -236,7 +236,7 @@ func WithWorkerPool(
 	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
 
-// WithObserverWorkerPool setups a long running WorkerPool service,
+// WithHandlerWorkerPool setups a long running WorkerPool service,
 // starts it, and attaches it to the returned context. The lifecycle
 // of the WorkerPool service is managed by the orchestrator attached
 // to this context: if not orchestrator is attached to the context, a
@@ -252,19 +252,19 @@ func WithWorkerPool(
 // The default queue created by WithWorkerPool has a flexible capped
 // size that's roughly twice the number of active workers and a hard
 // limit of 4 times the number of active workers. You can use
-// SetObserverWorkerPool to create an unbounded queue or a queue with
+// SetHandlerWorkerPool to create an unbounded queue or a queue with
 // different capacity limits.
 //
 // All errors encountered during the execution of worker functions,
 // including panics, are passed to the observer function and are not
 // retained.
-func WithObserverWorkerPool(
+func WithHandlerWorkerPool(
 	ctx context.Context,
 	key string,
-	observer fun.Observer[error],
+	observer fun.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
-	return SetObserverWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
+	return SetHandlerWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
 func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Queue[fun.Worker] {
@@ -305,7 +305,7 @@ func SetWorkerPool(
 	})
 }
 
-// SetObserverWorkerPool constructs a WorkerPool based on the
+// SetHandlerWorkerPool constructs a WorkerPool based on the
 // *pubsub.Queue provided. The lifecycle of the WorkerPool service is
 // managed by the orchestrator attached to this context: if not
 // orchestrator is attached to the context, a new one is created and
@@ -324,15 +324,15 @@ func SetWorkerPool(
 //
 // Use AddToWorkerPool with the specified key to dispatch work to this
 // worker pool.
-func SetObserverWorkerPool(
+func SetHandlerWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fun.Worker],
-	observer fun.Observer[error],
+	observer fun.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.Invariant.Must(orca.Add(ObserverWorkerPool(queue, observer, optp...)))
+		fun.Invariant.Must(orca.Add(HandlerWorkerPool(queue, observer, optp...)))
 	})
 }
 

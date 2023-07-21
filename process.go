@@ -53,7 +53,7 @@ func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
 // Operation converts a processor into a worker that will process the input
 // provided when executed.
-func (pf Processor[T]) Operation(in T, of Observer[error]) Operation {
+func (pf Processor[T]) Operation(in T, of Handler[error]) Operation {
 	return pf.Worker(in).Operation(of)
 }
 
@@ -128,9 +128,9 @@ func (pf Processor[T]) Join(next Processor[T]) Processor[T] {
 // until the worker is called.
 func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker { return iter.Process(pf) }
 
-// Observer converts a processor into an observer, handling the error
+// Handler converts a processor into an observer, handling the error
 // with the error observer and using the provided context.
-func (pf Processor[T]) Observer(ctx context.Context, oe Observer[error]) Observer[T] {
+func (pf Processor[T]) Handler(ctx context.Context, oe Handler[error]) Handler[T] {
 	return func(in T) { oe(pf(ctx, in)) }
 }
 
