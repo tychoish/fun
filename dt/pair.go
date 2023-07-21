@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -40,9 +41,20 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 // Iterator return an iterator over each key-value pairs.
 func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return p.ll.Iterator() }
 
+// Slice creates a new slice of all the Pair objects.
 func (p *Pairs[K, V]) Slice() []Pair[K, V] {
 	return ft.Must(p.ll.Iterator().Slice(context.Background()))
 }
+
+// List returns the sequence of pairs as a list.
+func (p *Pairs[K, V]) List() *List[Pair[K, V]] { return p.ll.Copy() }
+
+// SortMerge performs a merge sort on the collected pairs.
+func (p *Pairs[K, V]) SortMerge(c cmp.LessThan[Pair[K, V]]) { p.ll.SortMerge(c) }
+
+// SortQuick does a quick sort using sort.Sort. Typically faster than
+// SortMerge, but potentially more memory intensive for some types.
+func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.ll.SortQuick(c) }
 
 // Len returns the number of items in the pairs object.
 func (p *Pairs[K, V]) Len() int { return p.ll.Len() }

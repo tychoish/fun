@@ -16,6 +16,9 @@ import (
 // other related types.
 type Observer[T any] func(T)
 
+// Handle produces an Observer[T] function as a helper.
+func Handle[T any](in func(T)) Observer[T] { return in }
+
 // Safe handles any panic encountered during the observer's execution
 // and converts it to an error.
 func (of Observer[T]) Safe(oe Observer[error]) Observer[T] { return func(in T) { oe(of.Check(in)) } }
