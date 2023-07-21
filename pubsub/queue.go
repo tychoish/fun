@@ -98,6 +98,8 @@ func (q *Queue[T]) Add(item T) error {
 	return q.doAdd(item)
 }
 
+// Len returns the number of items in the queue. Because the queue
+// tracks its size this is a constant time operation.
 func (q *Queue[T]) Len() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -176,7 +178,9 @@ func (q *Queue[T]) Remove() (out T, _ bool) {
 // Wait blocks until q is non-empty or closed, and then returns the frontmost
 // (oldest) item from the queue. If ctx ends before an item is available, Wait
 // returns a nil value and a context error. If the queue is closed while it is
-// still empty, Wait returns nil, ErrQueueClosed.
+// still, Wait returns nil, ErrQueueClosed.
+//
+// Wait is destructive: every item returned is removed from the queue.
 func (q *Queue[T]) Wait(ctx context.Context) (out T, _ error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -317,11 +321,15 @@ type entry[T any] struct {
 // underlying queue linked list. The iterator respects the Queue's
 // mutex and is safe for concurrent access and current queue
 // operations, without additional locking. The iterator does not
-// modify the contents of the queue, and will only terminate when the
-// queue has been closed via the Close() method.
+// modify or remove items from the queue, and will only terminate when
+// the queue has been closed via the Close() method.
 //
 // To create a "consuming" iterator, use a Distributor.
 func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().Iterator() }
+
+// Distributor creates a object used to process the items in the
+// queue: items yielded by the Distributor's iterator, are removed
+// from the queue.
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
 		push: fun.BlockingProcessor(q.Add),
@@ -337,6 +345,9 @@ func (q *Queue[T]) Distributor() Distributor[T] {
 	}
 }
 
+// Producer returns a functio nthat produces items from the
+// queue, iteratively. It's not destructive, and has the same
+// semantics as the Iterator.
 func (q *Queue[T]) Producer() fun.Producer[T] {
 	var next *entry[T]
 	return func(ctx context.Context) (o T, _ error) {
