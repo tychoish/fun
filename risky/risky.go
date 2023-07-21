@@ -37,6 +37,8 @@ func ForceOp[T any](fn func() (T, error)) (out T) {
 	return out
 }
 
+// Cast just provides as a wrapper in.(T); however, risky.Cast(in)
+// has the benefit of raising the redflag that it should!
 func Cast[T any](in any) T { return in.(T) }
 
 // BlockForce combines Block with ForceOp to run a function with a

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 )
 
 // Slice converts an iterator into a slice: this will not abort or
@@ -22,4 +23,16 @@ func Slice[T any](iter *fun.Iterator[T]) []T {
 // iterator errors or the observer function panics.
 func Observe[T any](iter *fun.Iterator[T], fn fun.Observer[T]) {
 	fun.Invariant.Must(iter.Observe(context.Background(), fn))
+}
+
+// List is converts an iterator to a linked list, in the riskiest way
+// possible.
+func List[T any](iter *fun.Iterator[T]) *dt.List[T] {
+	out := &dt.List[T]{}
+
+	iter.Process(fun.Handle(func(in T) { out.PushBack(in) }).Processor()).
+		Ignore().
+		Block()
+
+	return out
 }
