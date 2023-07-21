@@ -382,7 +382,8 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Observer[T]) (err error) {
 	}
 }
 
-// Process provides a function that, serially.
+// Process provides a function consumes all items in the iterator with
+// the provided processor function.
 //
 // All panics are converted to errors and propagated in the response
 // of the worker, and abort the processing. If the processor function
