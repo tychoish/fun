@@ -620,7 +620,7 @@ func TestDeque(t *testing.T) {
 		startAt := time.Now()
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			if err = dq.PushBack(100); err != nil {
+			if err := dq.PushBack(100); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -646,7 +646,7 @@ func TestDeque(t *testing.T) {
 		startAt := time.Now()
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			if err = dq.PushFront(100); err != nil {
+			if err := dq.PushFront(100); err != nil {
 				t.Error(err)
 			}
 		}()

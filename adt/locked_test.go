@@ -70,4 +70,21 @@ func TestLocked(t *testing.T) {
 			assert.Equal(t, item.Get(), 42)
 		})
 	})
+	t.Run("WithLockDemo", func(t *testing.T) {
+		// uncomment and run this test to watch:
+		// t.Fail()
+		with := func(mtx *sync.Mutex) { t.Log("2:before unlock"); mtx.Unlock(); t.Log("3:after unlock") }
+		lock := func(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); t.Log("1:lock"); return mtx }
+		mtx := &sync.Mutex{}
+		t.Log("before")
+		with(lock(mtx))
+		t.Log("middle")
+		a := lock(mtx)
+		with(a)
+		t.Log("end; defering")
+		defer with(lock(mtx))
+		t.Log("defered")
+
+	})
+
 }
