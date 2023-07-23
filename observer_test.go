@@ -111,7 +111,7 @@ func TestHandler(t *testing.T) {
 	})
 	t.Run("Skip", func(t *testing.T) {
 		count := 0
-		of := Handler[int](func(i int) { count++; check.Equal(t, i, 42) })
+		of := Handle(func(i int) { count++; check.Equal(t, i, 42) })
 		off := of.Skip(func(i int) bool { return i == 42 })
 
 		off(42)
@@ -129,7 +129,7 @@ func TestHandler(t *testing.T) {
 	})
 	t.Run("Filter", func(t *testing.T) {
 		count := 0
-		of := Handler[int](func(i int) { count++; check.Equal(t, i, 42) }).
+		of := Handle(func(i int) { count++; check.Equal(t, i, 42) }).
 			Skip(func(in int) bool { return in != 0 }).
 			Filter(func(in int) int {
 				switch in {

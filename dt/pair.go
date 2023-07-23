@@ -3,6 +3,7 @@ package dt
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
@@ -24,7 +25,10 @@ type Pair[K comparable, V any] struct {
 func MakePair[K comparable, V any](k K, v V) Pair[K, V] { return Pair[K, V]{Key: k, Value: v} }
 
 // Pairs implements a collection of key-value pairs.
-type Pairs[K comparable, V any] struct{ ll List[Pair[K, V]] }
+type Pairs[K comparable, V any] struct {
+	ll    *List[Pair[K, V]]
+	setup sync.Once
+}
 
 // MakePairs constructs a Pairs object from a sequence of Pairs. This
 // is identical to using the literal constructor but may be more
@@ -34,40 +38,51 @@ type Pairs[K comparable, V any] struct{ ll List[Pair[K, V]] }
 // To build Pairs objects from other types, use the Consume methods.
 func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 	p := &Pairs[K, V]{}
+	p.init()
 	p.Append(in...)
 	return p
 }
 
+func (p *Pairs[K, V]) init() { p.setup.Do(p.initalizeList) }
+func (p *Pairs[K, V]) initalizeList() {
+	if p.ll == nil {
+		p.ll = &List[Pair[K, V]]{}
+	}
+}
+
 // Iterator return an iterator over each key-value pairs.
-func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return p.ll.Iterator() }
+func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { p.init(); return p.ll.Iterator() }
 
 // Slice creates a new slice of all the Pair objects.
 func (p *Pairs[K, V]) Slice() []Pair[K, V] {
+	p.init()
 	return ft.Must(p.ll.Iterator().Slice(context.Background()))
 }
 
 // List returns the sequence of pairs as a list.
-func (p *Pairs[K, V]) List() *List[Pair[K, V]] { return p.ll.Copy() }
+func (p *Pairs[K, V]) List() *List[Pair[K, V]] { p.init(); return p.ll.Copy() }
 
 // SortMerge performs a merge sort on the collected pairs.
-func (p *Pairs[K, V]) SortMerge(c cmp.LessThan[Pair[K, V]]) { p.ll.SortMerge(c) }
+func (p *Pairs[K, V]) SortMerge(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.SortMerge(c) }
 
 // SortQuick does a quick sort using sort.Sort. Typically faster than
 // SortMerge, but potentially more memory intensive for some types.
-func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.ll.SortQuick(c) }
+func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.SortQuick(c) }
 
 // Len returns the number of items in the pairs object.
-func (p *Pairs[K, V]) Len() int { return p.ll.Len() }
+func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
 func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
+	p.init()
 	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Convert(p.Iterator())
 }
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
 func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
+	p.init()
 	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Convert(p.Iterator())
 }
 
@@ -76,6 +91,8 @@ func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
 // serialization does not necessarily preserve the order of the pairs
 // object.
 func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
+	p.init()
+
 	buf := &internal.IgnoreNewLinesBuffer{}
 	enc := json.NewEncoder(buf)
 	_, _ = buf.Write([]byte("{"))
@@ -122,15 +139,15 @@ func (p *Pairs[K, V]) Add(k K, v V) *Pairs[K, V] { return p.AddPair(Pair[K, V]{K
 
 // AddPair adds a single pair to the slice of pairs. This may add a
 // duplicate key.
-func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) *Pairs[K, V] { p.ll.PushBack(pair); return p }
+func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) *Pairs[K, V] { p.init(); p.ll.PushBack(pair); return p }
 
 // Append as a collection of pairs to the collection of key/value
 // pairs.
-func (p *Pairs[K, V]) Append(new ...Pair[K, V]) *Pairs[K, V] { p.ll.Append(new...); return p }
+func (p *Pairs[K, V]) Append(new ...Pair[K, V]) *Pairs[K, V] { p.init(); p.ll.Append(new...); return p }
 
 // Extend adds the items from a Pairs object (slice of Pair) without
 // modifying the donating object.
-func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.ll.Extend(&toAdd.ll) }
+func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
 
 // Consume adds items from an iterator of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
@@ -160,8 +177,8 @@ func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) *Pairs[K, V] {
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.
 func (p *Pairs[K, V]) Map() map[K]V {
+	p.init()
 	out := make(map[K]V, p.ll.Len())
-
 	for i := p.ll.Front(); i.Ok(); i = i.Next() {
 		pair := i.Value()
 		if _, ok := out[pair.Key]; ok {

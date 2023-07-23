@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -70,6 +72,20 @@ func TestPairs(t *testing.T) {
 				check.Equal(t, ps[idx].Key, fmt.Sprint(idx+1))
 				check.Equal(t, ps[idx].Value, idx+1)
 			}
+		})
+		t.Run("List", func(t *testing.T) {
+			p := &Pairs[string, int]{}
+			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+
+			pl := p.List()
+			check.NotEqual(t, pl, p.ll)
+			idx := 1
+			for item := pl.Front(); item.Ok(); item = item.Next() {
+				check.Equal(t, item.Value().Value, idx)
+				check.Equal(t, item.Value().Key, fmt.Sprint(idx))
+				idx++
+			}
+			check.Equal(t, 4, idx)
 		})
 		t.Run("Values", func(t *testing.T) {
 			p := Pairs[string, int]{}
@@ -135,10 +151,39 @@ func TestPairs(t *testing.T) {
 			_, err := ps.MarshalJSON()
 			assert.Error(t, err)
 		})
-
+	})
+	t.Run("Sorts", func(t *testing.T) {
+		cmp := func(a, b Pair[int, int]) bool {
+			return a.Key < b.Key // && a.Value < b.Value
+		}
+		t.Run("Quick", func(t *testing.T) {
+			list := sortFixture(t, 100)
+			ps := &Pairs[int, int]{ll: list}
+			check.True(t, ft.Not(list.IsSorted(cmp)))
+			ps.SortQuick(cmp)
+			check.True(t, list.IsSorted(cmp))
+		})
+		t.Run("Merge", func(t *testing.T) {
+			list := sortFixture(t, 100)
+			ps := &Pairs[int, int]{ll: list}
+			check.True(t, ft.Not(list.IsSorted(cmp)))
+			ps.SortMerge(cmp)
+			check.True(t, list.IsSorted(cmp))
+		})
 	})
 }
 
 type badKey string
 
 func (badKey) MarshalJSON() ([]byte, error) { return nil, errors.New("cannot marshal") }
+
+func sortFixture(t *testing.T, size int) *List[Pair[int, int]] {
+	nums := rand.Perm(size)
+
+	out := &List[Pair[int, int]]{}
+	for _, num := range nums {
+		out.PushBack(MakePair(num, num))
+	}
+	assert.Equal(t, size, out.Len())
+	return out
+}

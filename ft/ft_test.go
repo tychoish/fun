@@ -39,6 +39,10 @@ func TestWhen(t *testing.T) {
 		WhenApply(false, func(in int) { called = true; check.Equal(t, in, 42) }, 40)
 		check.True(t, !called)
 	})
+	t.Run("Not", func(t *testing.T) {
+		check.True(t, !Not(true))
+		check.True(t, Not(false))
+	})
 }
 
 func TestMust(t *testing.T) {
@@ -245,7 +249,5 @@ func TestWrap(t *testing.T) {
 		assert.True(t, strptr != nil)
 		assert.True(t, IsOK(RefOK(strptr)))
 		assert.Equal(t, "hello", Ref(strptr))
-
 	})
-
 }

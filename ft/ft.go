@@ -76,6 +76,9 @@ func Default[T comparable](input T, defaultValue T) T {
 // boolean, you can use IsOK to discard the first value.
 func IsOK[T any](_ T, ok bool) bool { return ok }
 
+// Not inverts a boolean.
+func Not(p bool) bool { return !p }
+
 // WhenCall runs a function when condition is true, and is a noop
 // otherwise.
 func WhenCall(cond bool, op func()) {

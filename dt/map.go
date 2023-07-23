@@ -70,7 +70,7 @@ func (m Map[K, V]) SetDefault(key K) { var vl V; m[key] = vl }
 
 // Pairs exports a map a Pairs object, which is an alias for a slice of
 // Pair objects.
-func (m Map[K, V]) Pairs() *Pairs[K, V] { p := MakePairs[K, V](); p.ConsumeMap(m); return p }
+func (m Map[K, V]) Pairs() *Pairs[K, V] { p := MakePairs[K, V](); return p.ConsumeMap(m) }
 
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }

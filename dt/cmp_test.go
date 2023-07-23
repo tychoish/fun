@@ -134,8 +134,8 @@ func TestSort(t *testing.T) {
 			lcopy.SortQuick(cmp.LessThanNative[int])
 			listVals := ft.Must(list.Iterator().Slice(ctx))
 			copyVals := ft.Must(lcopy.Iterator().Slice(ctx))
-			t.Log("merge", listVals)
-			t.Log("quick", copyVals)
+			testt.Log(t, "merge", listVals)
+			testt.Log(t, "quick", copyVals)
 			assert.Equal(t, len(listVals), len(copyVals))
 			assert.True(t, len(listVals) == 10)
 			for i := 0; i < 10; i++ {
