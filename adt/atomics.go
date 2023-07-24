@@ -10,13 +10,14 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 )
 
 // AtomicValue describes the public interface of the Atomic type. Use
 // this definition to compose atomic types into other interfaces.
 type AtomicValue[T any] interface {
-	Get() T
-	Set(T)
+	Load() T
+	Store(T)
 	Swap(T) T
 }
 
@@ -103,11 +104,13 @@ type Atomic[T any] struct{ val atomic.Value }
 func NewAtomic[T any](initial T) *Atomic[T] { a := &Atomic[T]{}; a.Set(initial); return a }
 
 // Set atomically sets the value of the Atomic.
-func (a *Atomic[T]) Set(in T) { a.val.Store(in) }
+func (a *Atomic[T]) Set(in T)   { a.Store(in) }
+func (a *Atomic[T]) Store(in T) { a.val.Store(in) }
 
 // Get resolves the atomic value, returning the zero value of the type
 // T if the value is unset.
-func (a *Atomic[T]) Get() T { return ft.SafeCast[T](a.val.Load()) }
+func (a *Atomic[T]) Get() T  { return a.Load() }
+func (a *Atomic[T]) Load() T { return ft.SafeCast[T](a.val.Load()) }
 
 // Swap does an in place exchange of the contents of a value
 // exchanging the new value for the old. Unlike sync.Atomic.Swap() if
@@ -127,8 +130,8 @@ func (a *Atomic[T]) Swap(new T) (old T) {
 // Synchronized types, as well as any type that implement a
 // CompareAndSwap method for old/new values of T. Panics for all other
 // types.
-func CompareAndSwap[T comparable](a AtomicValue[T], old, new T) bool {
-	switch atom := a.(type) {
+func CompareAndSwap[T comparable, A AtomicValue[T]](a A, old, new T) bool {
+	switch atom := any(a).(type) {
 	case *Atomic[T]:
 		return atom.val.CompareAndSwap(old, new)
 	case *Synchronized[T]:
@@ -145,16 +148,27 @@ func CompareAndSwap[T comparable](a AtomicValue[T], old, new T) bool {
 	}
 }
 
+func Reset[T intish.Numbers, A AtomicValue[T]](a A) T {
+	var delta T
+	for {
+		delta = a.Load()
+		if CompareAndSwap(a, delta, 0) {
+			break
+		}
+	}
+	return delta
+}
+
 // IsAtomicZero checks an atomic value for a comparable type to see if
 // it's zero. The ft.IsZero() function can't correctly check both that
 // the Atomic is zero and that it holds a zero value, and because
 // atomics need not be comparable this can't be a method on Atomic.
-func IsAtomicZero[T comparable](in AtomicValue[T]) bool {
-	return isAtomicValueNil(in) || ft.IsZero(in.Get())
+func IsAtomicZero[T comparable, A AtomicValue[T]](in A) bool {
+	return isAtomicValueNil[T, A](in) || ft.IsZero(in.Load())
 }
 
-func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
-	switch v := in.(type) {
+func isAtomicValueNil[T comparable, A AtomicValue[T]](in A) bool {
+	switch v := any(in).(type) {
 	case *Atomic[T]:
 		return v == nil
 	case *Synchronized[T]:
@@ -168,8 +182,8 @@ func isAtomicValueNil[T comparable](in AtomicValue[T]) bool {
 
 // SafeSet sets the atomic to the given value only if the value is not
 // the Zero value for that type.
-func SafeSet[T comparable](atom AtomicValue[T], value T) {
-	if !ft.IsZero(value) && !isAtomicValueNil(atom) {
-		atom.Set(value)
+func SafeSet[T comparable, A AtomicValue[T]](atom A, value T) {
+	if !ft.IsZero(value) && !isAtomicValueNil[T, A](atom) {
+		atom.Store(value)
 	}
 }

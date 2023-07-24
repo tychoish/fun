@@ -45,13 +45,15 @@ func (s *Synchronized[T]) With(in func(obj T)) { s.Using(func() { in(s.obj) }) }
 
 // Set overrides the current value of the protected object. Use with
 // caution.
-func (s *Synchronized[T]) Set(in T) { s.Using(func() { s.obj = in }) }
+func (s *Synchronized[T]) Set(in T)   { s.Set(in) }
+func (s *Synchronized[T]) Store(in T) { s.Using(func() { s.obj = in }) }
 
 // String implements fmt.Stringer using this type.
 func (s *Synchronized[T]) String() string { return fmt.Sprint(s.Get()) }
 
 // Get returns the underlying protected object. Use with caution.
-func (s *Synchronized[T]) Get() T { defer With(Lock(&s.mtx)); return s.obj }
+func (s *Synchronized[T]) Get() T  { return s.Load() }
+func (s *Synchronized[T]) Load() T { defer With(Lock(&s.mtx)); return s.obj }
 
 // Using runs the provided operation while holding the lock, but
 // without providing access to the locked value.
