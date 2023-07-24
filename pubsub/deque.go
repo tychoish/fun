@@ -315,7 +315,7 @@ func (dq *Deque[T]) Distributor() Distributor[T] {
 
 func (dq *Deque[T]) DistributorNonBlocking() Distributor[T] {
 	return Distributor[T]{
-		push: fun.BlockingProcessor(dq.ForcePushBack),
+		push: fun.MakeProcessor(dq.ForcePushBack),
 		pop:  dq.WaitFront,
 		size: dq.Len,
 	}

@@ -332,7 +332,7 @@ func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().Iterator() 
 // from the queue.
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
-		push: fun.BlockingProcessor(q.Add),
+		push: fun.MakeProcessor(q.Add),
 		pop: func(ctx context.Context) (_ T, err error) {
 			msg, ok := q.Remove()
 			if ok {

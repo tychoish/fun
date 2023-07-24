@@ -23,11 +23,15 @@ import (
 // analogues.
 type Processor[T any] func(context.Context, T) error
 
-// BlockingProcessor converts a function with the Processor signature
-// (minus the context, and adds a noop context,) for easy conversion.
-func BlockingProcessor[T any](fn func(T) error) Processor[T] {
+// MakeProcessor converts a function with the Processor signature
+// (minus the context) for easy conversion.
+func MakeProcessor[T any](fn func(T) error) Processor[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
+
+// Processify provides an easy converter/constructor for
+// Processor-type function
+func Processify[T any](fn func(context.Context, T) error) Processor[T] { return fn }
 
 // Run executes the ProcessFunc but creates a context within the
 // function (decended from the context provided in the arguments,)
