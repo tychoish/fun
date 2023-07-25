@@ -14,10 +14,6 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
-type zeroed struct{ Atomic[int] }
-
-func (*zeroed) IsZero() bool { return true }
-
 func TestAtomics(t *testing.T) {
 	t.Run("SafeSet", func(t *testing.T) {
 		t.Run("AtomicInt", func(t *testing.T) {
