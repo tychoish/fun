@@ -219,7 +219,7 @@ func TestProcess(t *testing.T) {
 
 		count := 0
 		var err error
-		var pf Processify = func(_ context.Context, in int) error { count++; assert.Equal(t, in, 42); return err }
+		var pf Processor[int] = func(_ context.Context, in int) error { count++; assert.Equal(t, in, 42); return err }
 
 		err = ers.Error("hello")
 		pf = pf.WithoutErrors(io.EOF)

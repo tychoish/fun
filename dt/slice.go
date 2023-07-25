@@ -154,6 +154,19 @@ func (s Slice[T]) IsEmpty() bool { return len(s) == 0 }
 // operation panics.
 func (s Slice[T]) Item(index int) T { return s[index] }
 
+// Ptr provides a pointer to the item at the provided index.
+func (s Slice[T]) Ptr(index int) *T { return &s[index] }
+
+// Ptrs converts a slice in to a slice of pointers to the values in
+// the original slice
+func (s Slice[T]) Ptrs() []*T {
+	out := make([]*T, len(s))
+	for idx := range s {
+		out[idx] = &s[idx]
+	}
+	return out
+}
+
 // Process creates a future in the form of a work that, when called
 // iterates through all items in the slice, returning when the
 // processor errors. io.EOF errors are not returned, but do abort

@@ -45,7 +45,7 @@ func (s *Synchronized[T]) With(in func(obj T)) { s.Using(func() { in(s.obj) }) }
 
 // Set overrides the current value of the protected object. Use with
 // caution.
-func (s *Synchronized[T]) Set(in T)   { s.Set(in) }
+func (s *Synchronized[T]) Set(in T)   { s.Store(in) }
 func (s *Synchronized[T]) Store(in T) { s.Using(func() { s.obj = in }) }
 
 // String implements fmt.Stringer using this type.

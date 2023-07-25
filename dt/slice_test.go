@@ -347,4 +347,21 @@ func TestSlice(t *testing.T) {
 			check.True(t, out == nil)
 		})
 	})
+	t.Run("Ptr", func(t *testing.T) {
+		strs := Slice[int]{100}
+		assert.Equal(t, *strs.Ptr(0), 100)
+	})
+	t.Run("Ptrs", func(t *testing.T) {
+		strs := Slice[int]{100, 400, 100}
+		ptrs := strs.Ptrs()
+
+		assert.Equal(t, len(strs), len(ptrs))
+		for idx := range strs {
+			assert.Equal(t, strs[idx], *ptrs[idx])
+		}
+		assert.NotEqual(t, *ptrs[1], 100)
+		strs[1] = 100
+		assert.Equal(t, *ptrs[1], 100)
+	})
+
 }

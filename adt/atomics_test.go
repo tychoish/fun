@@ -19,47 +19,46 @@ type zeroed struct{ Atomic[int] }
 func (*zeroed) IsZero() bool { return true }
 
 func TestAtomics(t *testing.T) {
-	t.Run("NilIsZero", func(t *testing.T) {
-		assert.True(t, IsAtomicZero[int](nil))
-	})
-	t.Run("IsZeroInterface", func(t *testing.T) {
-		atom := &zeroed{}
-		assert.True(t, IsAtomicZero[int](atom))
-	})
-
-	t.Run("IsAtomicZero", func(t *testing.T) {
-		var atom *Atomic[int]
-		assert.True(t, IsAtomicZero[int](atom))
-		atom = &Atomic[int]{}
-		assert.True(t, IsAtomicZero[int](atom))
-		atom.Set(0)
-		assert.True(t, IsAtomicZero[int](atom))
-		atom.Set(100)
-		assert.True(t, !IsAtomicZero[int](atom))
-		atom = nil
-		assert.True(t, IsAtomicZero[int](atom))
-	})
-	t.Run("IsSynchronizedZero", func(t *testing.T) {
-		var atom *Synchronized[int]
-		assert.True(t, IsAtomicZero[int](atom))
-		atom = &Synchronized[int]{}
-		assert.True(t, IsAtomicZero[int](atom))
-		atom.Set(0)
-		assert.True(t, IsAtomicZero[int](atom))
-		atom.Set(100)
-		assert.True(t, !IsAtomicZero[int](atom))
-	})
 	t.Run("SafeSet", func(t *testing.T) {
-		atom := &Atomic[int]{}
-		SafeSet[int](atom, -1)
-		assert.Equal(t, atom.Get(), -1)
-		SafeSet[int](atom, 0) // noop
-		assert.Equal(t, atom.Get(), -1)
+		t.Run("AtomicInt", func(t *testing.T) {
+			atom := &Atomic[int]{}
+			SafeSet[int](atom, -1)
+			assert.Equal(t, atom.Get(), -1)
+			SafeSet[int](atom, 0) // noop
+			assert.Equal(t, atom.Get(), -1)
+		})
+		t.Run("Int64", func(t *testing.T) {
+			atom := &atomic.Int64{}
+			SafeSet[int64](atom, -1)
+			assert.Equal(t, atom.Load(), -1)
+			SafeSet[int64](atom, 0) // noop
+			assert.Equal(t, atom.Load(), -1)
+		})
+		t.Run("AtomicInt", func(t *testing.T) {
+			atom := &Synchronized[int8]{}
+			SafeSet[int8](atom, -1)
+			assert.Equal(t, atom.Get(), -1)
+			SafeSet[int8](atom, 0) // noop
+			assert.Equal(t, atom.Get(), -1)
+		})
 	})
-
 	t.Run("Default", func(t *testing.T) {
 		at := NewAtomic(1000)
 		assert.Equal(t, at.Get(), 1000)
+	})
+	t.Run("Reset", func(t *testing.T) {
+		t.Run("Atomic", func(t *testing.T) {
+			atom := &Atomic[int]{}
+			atom.Store(100)
+			assert.Equal(t, Reset[int](atom), 100)
+			assert.Equal(t, atom.Load(), 0)
+		})
+		t.Run("Int64", func(t *testing.T) {
+			atom := &atomic.Int64{}
+			atom.Store(100)
+			assert.Equal(t, Reset[int64](atom), 100)
+			assert.Equal(t, atom.Load(), 0)
+		})
 	})
 	t.Run("Zero", func(t *testing.T) {
 		at := &Atomic[int]{}
@@ -119,7 +118,7 @@ func TestAtomics(t *testing.T) {
 		})
 		t.Run("Impossible", func(t *testing.T) {
 			atom := &Unsafe[int]{}
-			atom.Set(54)
+			atom.Store(54)
 			assert.Panic(t, func() {
 				_ = CompareAndSwap[int](atom, 54, 100)
 			})
@@ -268,10 +267,10 @@ func (s *swappable) CompareAndSwap(a, b int) bool { return CompareAndSwap[int](&
 
 type Unsafe[T any] struct{ val T }
 
-func NewUnsafe[T any](initial T) *Unsafe[T] { a := &Unsafe[T]{}; a.Set(initial); return a }
+func NewUnsafe[T any](initial T) *Unsafe[T] { a := &Unsafe[T]{}; a.Store(initial); return a }
 
-func (a *Unsafe[T]) Set(in T) { a.val = in }
-func (a *Unsafe[T]) Get() T   { return a.val }
+func (a *Unsafe[T]) Store(in T) { a.val = in }
+func (a *Unsafe[T]) Load() T    { return a.val }
 
 func (a *Unsafe[T]) Swap(new T) T {
 	out := a.val

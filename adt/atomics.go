@@ -148,6 +148,8 @@ func CompareAndSwap[T comparable, A AtomicValue[T]](a A, old, new T) bool {
 	}
 }
 
+// Reset, for an atomic value that holds a number, sets the atomic to
+// 0, and returns the previously stored value.
 func Reset[T intish.Numbers, A AtomicValue[T]](a A) T {
 	var delta T
 	for {
@@ -159,22 +161,12 @@ func Reset[T intish.Numbers, A AtomicValue[T]](a A) T {
 	return delta
 }
 
-// IsAtomicZero checks an atomic value for a comparable type to see if
-// it's zero. The ft.IsZero() function can't correctly check both that
-// the Atomic is zero and that it holds a zero value, and because
-// atomics need not be comparable this can't be a method on Atomic.
-func IsAtomicZero[T comparable, A AtomicValue[T]](in A) bool {
-	return isAtomicValueNil[T, A](in) || ft.IsZero(in.Load())
-}
-
 func isAtomicValueNil[T comparable, A AtomicValue[T]](in A) bool {
 	switch v := any(in).(type) {
 	case *Atomic[T]:
 		return v == nil
 	case *Synchronized[T]:
 		return v == nil
-	case interface{ IsZero() bool }:
-		return v.IsZero()
 	default:
 		return v == nil
 	}
@@ -183,7 +175,10 @@ func isAtomicValueNil[T comparable, A AtomicValue[T]](in A) bool {
 // SafeSet sets the atomic to the given value only if the value is not
 // the Zero value for that type.
 func SafeSet[T comparable, A AtomicValue[T]](atom A, value T) {
-	if !ft.IsZero(value) && !isAtomicValueNil[T, A](atom) {
-		atom.Store(value)
+	if ft.IsZero(value) || isAtomicValueNil[T, A](atom) {
+		return
 	}
+
+	atom.Store(value)
+
 }
