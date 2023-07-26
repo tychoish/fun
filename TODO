@@ -1,3 +1,12 @@
-- DONE: Rename fun.Observer[T] fun.Handler[T]
-- Complete documentation, partickularly in the pubsub package.
-- 
+- Audit docstrings (pubsub, audit)
+- rename handler/observer files (no api break)
+- audit api of handler constructors.
+- additional future functions
+  - ptr, slice ptr
+  - handler noop
+  - iterator wrapper with ptr
+- iterator add error theoretical race
+- make ers.Join error format less loosy
+  - use %+v for the full error list
+  - use %v %w %s for collapsed.
+- make erc.Join produce a erc.Stack.
