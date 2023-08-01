@@ -160,22 +160,22 @@ func (Handlers) Strf(tmpl string, args []any) Future[string] { return HF.Sprintf
 // arguments.
 func (Handlers) Strln(args []any) Future[string] { return HF.Sprintln(args...) }
 
-// StrJoinWith produces a future for strings.Join(), concatenating the
-// elements in the input slice with the provided separator.
-func (Handlers) StrJoinWith(input []string, sep string) Future[string] {
-	return func() string { return strings.Join(input, sep) }
-}
-
 // StrConcatinate produces a future that joins a variadic sequence of
 // strings into a single string.
 func (Handlers) StrConcatinate(strs ...string) Future[string] {
-	return func() string { return strings.Join(strs, "") }
+	return HF.StrJoin(strs, "")
 }
 
 // StrJoin produces a future that combines a slice of strings into a
-// single string, joined without spaces.
-func (Handlers) StrJoin(strs []string) Future[string] {
-	return func() string { return strings.Join(strs, "") }
+// single string, joined with the separator.
+func (Handlers) StrJoin(strs []string, sep string) Future[string] {
+	return func() string { return strings.Join(strs, sep) }
+}
+
+// StrJoinWith produces a future for strings.Join(), concatenating the
+// elements in the input slice with the provided separator.
+func (Handlers) StrSliceConcatinate(input []string) Future[string] {
+	return HF.StrJoin(input, "")
 }
 
 // Stringer converts a fmt.Stringer object/method call into a
@@ -209,7 +209,7 @@ func (Handlers) Atoi() Transform[string, int] { return ConverterErr(strconv.Atoi
 // monotonically increasing integers until the maximum is reached.
 func (Handlers) Counter(max int) *Iterator[int] {
 	state := &atomic.Int64{}
-	return BlockingProducer(func() (int, error) {
+	return MakeProducer(func() (int, error) {
 		if prev := int(state.Add(1)); prev <= max {
 			return prev, nil
 		}

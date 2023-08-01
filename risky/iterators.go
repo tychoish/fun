@@ -32,7 +32,7 @@ func List[T any](iter *fun.Iterator[T]) *dt.List[T] {
 
 	iter.Process(fun.Handle(func(in T) { out.PushBack(in) }).Processor()).
 		Ignore().
-		Block()
+		Wait()
 
 	return out
 }

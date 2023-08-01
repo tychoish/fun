@@ -104,12 +104,17 @@ type Atomic[T any] struct{ val atomic.Value }
 func NewAtomic[T any](initial T) *Atomic[T] { a := &Atomic[T]{}; a.Set(initial); return a }
 
 // Set atomically sets the value of the Atomic.
-func (a *Atomic[T]) Set(in T)   { a.Store(in) }
+func (a *Atomic[T]) Set(in T) { a.Store(in) }
+
+// Store saves the value in the atomic.
 func (a *Atomic[T]) Store(in T) { a.val.Store(in) }
 
 // Get resolves the atomic value, returning the zero value of the type
 // T if the value is unset.
-func (a *Atomic[T]) Get() T  { return a.Load() }
+func (a *Atomic[T]) Get() T { return a.Load() }
+
+// Load returns the value stored in the atomic. It mirrors the
+// standard library's interface for atomics.
 func (a *Atomic[T]) Load() T { return ft.SafeCast[T](a.val.Load()) }
 
 // Swap does an in place exchange of the contents of a value

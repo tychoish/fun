@@ -355,9 +355,9 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 	return output
 }
 
-// Observe processes an iterator calling the observer function for
+// Observe processes an iterator calling the handler function for
 // every element in the iterator and retruning when the iterator is
-// exhausted. Take care to ensure that the Observe function does not
+// exhausted. Take care to ensure that the handler function does not
 // block.
 //
 // The error returned captures any panics encountered as an error, as

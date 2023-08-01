@@ -560,6 +560,19 @@ func TestOperation(t *testing.T) {
 			check.Equal(t, count.Load(), 100)
 		})
 	})
+	t.Run("Interval", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		count := &atomic.Int64{}
+		var wf Operation = func(context.Context) { count.Add(1) }
+		wf = wf.Interval(10 * time.Millisecond)
+		check.Equal(t, 0, count.Load())
+		sig := wf.Signal(ctx)
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+		<-sig
+		check.Equal(t, 10, count.Load())
+	})
 	t.Run("TTL", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Zero", func(t *testing.T) {

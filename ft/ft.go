@@ -140,6 +140,13 @@ func SafeWrap(op func()) func() { return func() { SafeCall(op) } }
 // briding APIs
 func Flip[A any, B any](first A, second B) (B, A) { return second, first }
 
+// Ignore is a noop, but can be used to annotate operations rather
+// than assigning to the empty identifier:
+//
+//	_ = operation()
+//	ft.Ignore(operation())
+func Ignore[T any](_ T) { return } //nolint:gosimple
+
 // IgnoreFirst takes two arguments and returns only the second, for
 // use in wrapping functions that return two values.
 func IgnoreFirst[A any, B any](first A, second B) B { return second }

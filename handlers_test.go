@@ -118,8 +118,9 @@ func TestHandlers(t *testing.T) {
 		t.Run("Str", func(t *testing.T) { check.Equal(t, "hi:42", HF.Str([]any{"hi:", 42})()) })
 		t.Run("Strf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Strf("%s:%d", []any{"hi", 42})()) })
 		t.Run("Strln", func(t *testing.T) { check.Equal(t, "hi : 42\n", HF.Strln([]any{"hi", ":", 42})()) })
-		t.Run("StrJoin", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrJoin([]string{"hi", ":", "42"})()) })
-		t.Run("StrJoinWith", func(t *testing.T) { check.Equal(t, "hi : 42", HF.StrJoinWith([]string{"hi", ":", "42"}, " ")()) })
+		t.Run("StrJoin/Empty", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrJoin([]string{"hi", ":", "42"}, "")()) })
+		t.Run("StrJoin/Dots", func(t *testing.T) { check.Equal(t, "hi.:.42", HF.StrJoin([]string{"hi", ":", "42"}, ".")()) })
+		t.Run("StrSliceConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrSliceConcatinate([]string{"hi", ":", "42"})()) })
 		t.Run("StrConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrConcatinate("hi", ":", "42")()) })
 	})
 	t.Run("Lines", func(t *testing.T) {

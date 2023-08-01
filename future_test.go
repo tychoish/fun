@@ -144,8 +144,8 @@ func TestFuture(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 }).Producer()
 		check.Equal(t, count, 0)
-		testFuture := testt.Must(thunk(testt.Context(t)))
-		check.Equal(t, testFuture(t), 42)
+		testFuture := testt.Must[int](thunk(testt.Context(t)))(t)
+		check.Equal(t, testFuture, 42)
 	})
 	t.Run("Translate", func(t *testing.T) {
 		count := 0

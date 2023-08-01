@@ -116,7 +116,13 @@ func (wf Worker) Safe() Worker {
 
 // Block executes the worker function with a context that will never
 // expire and returns the error. Use with caution.
-func (wf Worker) Block() error                              { return wf.Run(context.Background()) }
+//
+// Deprecated: use Wait() instead.
+func (wf Worker) Block() error { return wf.Wait() }
+
+// Wait runs the worker with a background context and returns its
+// error.
+func (wf Worker) Wait() error                               { return wf.Run(context.Background()) }
 func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
 // Observe runs the worker function, and observes the error (or nil

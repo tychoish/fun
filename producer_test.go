@@ -114,18 +114,10 @@ func TestProducer(t *testing.T) {
 				assert.Equal(t, v, 42)
 			}
 		})
-		t.Run("Future", func(t *testing.T) {
-			ctx := testt.Context(t)
-			ch := make(chan *string, 2)
-			prod := MakeFuture(ch)
-			ch <- ft.Ptr("hi")
-			ch <- ft.Ptr("hi")
-			check.NotZero(t, prod.Must(ctx))
-		})
 		t.Run("Blocking", func(t *testing.T) {
 			ctx := testt.Context(t)
 			root := ers.Error(t.Name())
-			pf := BlockingProducer(func() (int, error) { return 42, root })
+			pf := MakeProducer(func() (int, error) { return 42, root })
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
 				assert.ErrorIs(t, err, root)
@@ -136,7 +128,7 @@ func TestProducer(t *testing.T) {
 			callCount := 0
 			errCount := 0
 			root := ers.Error(t.Name())
-			pf := BlockingProducer(func() (int, error) { callCount++; return 42, root })
+			pf := MakeProducer(func() (int, error) { callCount++; return 42, root })
 			ff := pf.Future(testt.Context(t), func(err error) { errCount++; assert.ErrorIs(t, err, root) })
 			for i := 0; i < 1024; i++ {
 				v := ff()

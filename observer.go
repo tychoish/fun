@@ -19,6 +19,15 @@ type Handler[T any] func(T)
 // Handle produces an Handler[T] function as a helper.
 func Handle[T any](in func(T)) Handler[T] { return in }
 
+// HandlePassthrough creates a bit of syntactic sugar to handle the
+// _second_ return value of a function with a provided handler
+// function while returning the first. This is often useful for
+// processing the error value of a function with a handler while
+// returning the first (potentially zero) value.
+func HandlePassthrough[T any, O any](hf Handler[O]) func(T, O) T {
+	return func(first T, second O) T { hf(second); return first }
+}
+
 // Safe handles any panic encountered during the observer's execution
 // and converts it to an error.
 func (of Handler[T]) Safe(oe Handler[error]) Handler[T] { return func(in T) { oe(of.Check(in)) } }

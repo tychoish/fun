@@ -117,8 +117,34 @@ func (wf Operation) Background(wg *WaitGroup) Operation {
 	return func(ctx context.Context) { wg.Add(1); wf.PostHook(wg.Done).Go(ctx) }
 }
 
+// Interval runs the operation with a timer that resets to the
+// provided duration. The operation runs immediately, and then the
+// time is reset to the specified interval after the base operation is
+// completed. Which is to say that the runtime of the operation itself
+// is effectively added to the interval.
+func (wf Operation) Interval(dur time.Duration) Operation {
+	return func(ctx context.Context) {
+		timer := time.NewTimer(0)
+		defer timer.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				wf(ctx)
+				timer.Reset(dur)
+			}
+		}
+	}
+}
+
 // Block runs the Operation with a context that will never be canceled.
-func (wf Operation) Block() { wf(context.Background()) }
+//
+// Deprecated: Use Wait() instead.
+func (wf Operation) Block() { wf.Wait() }
+
+// Wait runs the operation with a background context.
+func (wf Operation) Wait() { wf(context.Background()) }
 
 // Safe converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.

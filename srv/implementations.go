@@ -71,7 +71,7 @@ func Group(services *fun.Iterator[*Service]) *Service {
 				}(iter.Value())
 			}
 
-			wg.Operation().Block()
+			wg.Operation().Wait()
 			return ec.Resolve()
 		},
 	}
@@ -329,7 +329,7 @@ func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
 			return nil
 		},
 		Cleanup: func() error {
-			fun.Operation(wg.Wait).Block()
+			wg.Operation().Wait()
 			return nil
 		},
 	}

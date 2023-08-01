@@ -234,6 +234,11 @@ func TestWrap(t *testing.T) {
 		assert.NotZero(t, SafeCast[*string](&foo))
 		assert.Zero(t, SafeCast[*testing.T](tt))
 	})
+	t.Run("Ignore", func(t *testing.T) {
+		called := 0
+		Ignore(func() int { called++; return 1 }())
+		assert.Equal(t, called, 1)
+	})
 	t.Run("Ref", func(t *testing.T) {
 		var strptr *string
 		assert.True(t, strptr == nil)

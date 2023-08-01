@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -32,6 +33,13 @@ func TestHandler(t *testing.T) {
 		}
 		ob.Safe(oe)(100)
 		assert.Equal(t, 1, count)
+	})
+	t.Run("HandlePassthrough", func(t *testing.T) {
+		called := 0
+		pth := HandlePassthrough[int](func(err error) { check.Equal(t, called, 1); called++; check.Error(t, err) })
+		out := pth(func() (int, error) { called++; return 42, errors.New("exists") }())
+		check.Equal(t, called, 2)
+		check.Equal(t, out, 42)
 	})
 	t.Run("If", func(t *testing.T) {
 		count := 0

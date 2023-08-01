@@ -18,16 +18,9 @@ import (
 // generator, and functions like a Future.
 type Producer[T any] func(context.Context) (T, error)
 
-// MakeFuture constructs a producer that blocks to receive one
-// item from the specified channel. Subsequent calls to the producer
-// will block/yield additional items from the channel. The producer
-// will only return an error if the channel is closed (io.EOF) or the
-// context has expired.
-func MakeFuture[T any](ch <-chan T) Producer[T] { return BlockingReceive(ch).Read }
-
-// BlockingProducer constructs a producer that wraps a similar
+// MakeProducer constructs a producer that wraps a similar
 // function that does not take a context.
-func BlockingProducer[T any](fn func() (T, error)) Producer[T] {
+func MakeProducer[T any](fn func() (T, error)) Producer[T] {
 	return func(context.Context) (T, error) { return fn() }
 }
 

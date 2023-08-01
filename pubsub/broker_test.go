@@ -86,7 +86,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 			BufferSize: len(elems),
 		},
 		{
-			Name: "Parallel/HalfBuffered",
+			Name: "Parallel/HalfBufferedNonBlocking",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: true,
@@ -213,16 +213,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		{
 			Name: "Deque/Serial/Unbuffered/OneWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewDeque[T](DequeOptions{
-					QueueOptions: &QueueOptions{
-						HardLimit:   10,
-						SoftQuota:   5,
-						BurstCredit: 2,
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker(ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 				})
@@ -231,16 +222,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		{
 			Name: "Deque/Serial/Unbuffered/TwoWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewDeque[T](DequeOptions{
-					QueueOptions: &QueueOptions{
-						HardLimit:   100,
-						SoftQuota:   50,
-						BurstCredit: 5,
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 					WorkerPoolSize:   2,
@@ -250,35 +232,16 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		{
 			Name: "Deque/Parallel/Unbuffered/TwoWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewDeque[T](DequeOptions{
-					QueueOptions: &QueueOptions{
-						HardLimit:   100,
-						SoftQuota:   50,
-						BurstCredit: 5,
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
-					WorkerPoolSize:   2,
 				})
 			},
 		},
 		{
 			Name: "Deque/Serial/Unbuffered/EightWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewDeque[T](DequeOptions{
-					QueueOptions: &QueueOptions{
-						HardLimit:   40,
-						SoftQuota:   20,
-						BurstCredit: 5,
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
 					WorkerPoolSize:   8,
@@ -288,16 +251,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		{
 			Name: "Deque/Parallel/Unbuffered/EightWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewDeque[T](DequeOptions{
-					QueueOptions: &QueueOptions{
-						HardLimit:   40,
-						SoftQuota:   20,
-						BurstCredit: 5,
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
 					WorkerPoolSize:   8,
