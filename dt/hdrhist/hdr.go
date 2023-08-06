@@ -406,9 +406,19 @@ func (h *Histogram) sizeOfEquivalentValueRange(v int64) int64 {
 	bucketIdx := h.getBucketIndex(v)
 	subBucketIdx := h.getSubBucketIdx(v, bucketIdx)
 	adjustedBucket := bucketIdx
-	if subBucketIdx >= h.subBucketCount {
-		adjustedBucket++
-	}
+
+	// TODO: assess if this invariant should hold or if it's an
+	// implementation detail that it's unreachable in all testing.
+
+	fun.Invariant.IsTrue(subBucketIdx < h.subBucketCount,
+		"found out of range bucket")
+
+	// Previous versions of the code did this: revert if the above
+	// invariant is hit.
+	//
+	// if subBucketIdx >= h.subBucketCount {
+	// 	adjustedBucket++
+	// }
 	return int64(1) << uint(h.unitMagnitude+int64(adjustedBucket))
 }
 
@@ -478,9 +488,16 @@ func (i *iterator) next() bool {
 		i.bucketIdx++
 	}
 
-	if i.bucketIdx >= i.h.bucketCount {
-		return false
-	}
+	// TODO: evaluate if this invariant holds:
+	fun.Invariant.IsTrue(i.bucketIdx < i.h.bucketCount,
+		"iteration out of bounds, should have halted here",
+	)
+
+	// Previous versions of the code recovered thusly:
+	//
+	// if i.bucketIdx >= i.h.bucketCount {
+	// 	return false
+	// }
 
 	i.countAtIdx = i.h.getCountAtIndex(i.bucketIdx, i.subBucketIdx)
 	i.countToIdx += i.countAtIdx
@@ -525,9 +542,15 @@ func (p *pIterator) next() bool {
 		return true
 	}
 
-	if p.subBucketIdx == -1 && !p.iterator.next() {
-		return false
-	}
+	// TODO: evaluate if this invariant holds:
+	fun.Invariant.IsTrue(p.subBucketIdx != -1 || p.iterator.next(),
+		"out of bounds iteration", p.subBucketIdx)
+
+	// Previous versions of the code recovered thusly:
+	//
+	// if p.subBucketIdx == -1 && !p.iterator.next() {
+	// 	return false
+	// }
 
 	var done = false
 	for !done {
