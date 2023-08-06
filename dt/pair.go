@@ -43,6 +43,8 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 	return p
 }
 
+// ConsumePairs creates a *Pairs[K,V] object from an iterator of
+// Pair[K,V] objects.
 func ConsumePairs[K comparable, V any](
 	ctx context.Context,
 	iter *fun.Iterator[Pair[K, V]],

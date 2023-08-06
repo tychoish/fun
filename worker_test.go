@@ -263,9 +263,9 @@ func TestWorker(t *testing.T) {
 		t.Run("Parallel", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			count := &atomic.Int64{}
 
-			count := 0
-			var wf Worker = func(context.Context) error { count++; return nil }
+			var wf Worker = func(context.Context) error { count.Add(1); return nil }
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
@@ -273,7 +273,7 @@ func TestWorker(t *testing.T) {
 				go func() { defer wg.Done(); check.NotError(t, wf(ctx)) }()
 			}
 			wg.Wait()
-			assert.Equal(t, count, 10)
+			assert.Equal(t, count.Load(), 10)
 		})
 	})
 	t.Run("Chain", func(t *testing.T) {

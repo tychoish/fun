@@ -301,7 +301,7 @@ func limitExec[T any](in int) func(func() T) T {
 
 		if num < int64(in) {
 			output = op()
-			counter.CompareAndSwap(num, intish.Min(int64(in), num+1))
+			counter.Store(intish.Min(int64(in), num+1))
 		}
 
 		return output

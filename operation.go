@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 // Operation is a type of function object that will block until an
@@ -185,29 +184,24 @@ func (wf Operation) When(cond func() bool) Operation { return wf.Worker().When(c
 // condition is true, and is otherwise a noop.
 func (wf Operation) If(cond bool) Operation { return wf.Worker().If(cond).Ignore() }
 
-// Limit provides an operation that will, no matter how many times is
-// called, will only run once. The resulting operation is safe for
-// concurrent use. Operations are launched serially (to maintain the
-// counter,) but the operations themselves can run concurrently.
+// Limit returns an operation that will only run the specified number
+// of times. The resulting operation is safe for concurrent use, but
+// operations can run concurrently.
 func (wf Operation) Limit(in int) Operation {
 	Invariant.OK(in > 0, "limit must be greater than zero;", in)
 	counter := &atomic.Int64{}
-	mtx := &sync.Mutex{}
 
 	return wf.When(func() bool {
-		if counter.CompareAndSwap(int64(in), int64(in)) {
-			return false
+		for {
+			current := counter.Load()
+			if current >= int64(in) {
+				return false
+			}
+
+			if counter.CompareAndSwap(current, current+1) {
+				return true
+			}
 		}
-
-		mtx.Lock()
-		defer mtx.Unlock()
-
-		num := counter.Load()
-		if num >= int64(in) {
-			return false
-		}
-
-		return counter.CompareAndSwap(num, intish.Min(int64(in), num+1))
 	})
 }
 
