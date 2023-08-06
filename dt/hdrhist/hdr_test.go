@@ -10,8 +10,11 @@ import (
 	"github.com/tychoish/fun/dt/hdrhist"
 )
 
+const num int64 = 10000000
+
 func TestHighSigFig(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
+
 	input := []int64{
 		459876, 669187, 711612, 816326, 931423, 1033197, 1131895, 2477317,
 		3964974, 12718782,
@@ -30,10 +33,11 @@ func TestHighSigFig(t *testing.T) {
 }
 
 func TestValueAtQuantile(t *testing.T) {
-	t.Parallel()
-	h := hdrhist.New(1, 10000000, 3)
+	defer without(raceDetector())
 
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -57,24 +61,23 @@ func TestValueAtQuantile(t *testing.T) {
 			t.Errorf("P%v was %v, but expected %v", d.q, v, d.v)
 		}
 	}
-	t.Run("OverHundredCaps", func(t *testing.T) {
-		if h.ValueAtQuantile(500) != h.ValueAtQuantile(100) {
-			t.Error("cap quantiles at 100")
-		}
-	})
-	t.Run("OverHundredCaps", func(t *testing.T) {
-		hist := hdrhist.New(4, 1024, 4)
-		if n := hist.ValueAtQuantile(500); n != 0 {
-			t.Error("cap quantiles at 100")
-		}
-	})
+
+	if h.ValueAtQuantile(500) != h.ValueAtQuantile(100) {
+		t.Error("cap quantiles at 100")
+	}
+
+	hist := hdrhist.New(4, 1024, 4)
+	if n := hist.ValueAtQuantile(500); n != 0 {
+		t.Error("cap quantiles at 100")
+	}
 }
 
 func TestMean(t *testing.T) {
-	t.Parallel()
-	h := hdrhist.New(1, 10000000, 3)
+	defer without(raceDetector())
 
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -86,10 +89,11 @@ func TestMean(t *testing.T) {
 }
 
 func TestStdDev(t *testing.T) {
-	t.Parallel()
-	h := hdrhist.New(1, 10000000, 3)
+	defer without(raceDetector())
 
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -101,10 +105,11 @@ func TestStdDev(t *testing.T) {
 }
 
 func TestTotalCount(t *testing.T) {
-	t.Parallel()
-	h := hdrhist.New(1, 10000000, 3)
+	defer without(raceDetector())
 
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -115,10 +120,11 @@ func TestTotalCount(t *testing.T) {
 }
 
 func TestMax(t *testing.T) {
-	t.Parallel()
-	h := hdrhist.New(1, 10000000, 3)
+	defer without(raceDetector())
 
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -130,10 +136,11 @@ func TestMax(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	t.Parallel()
-	h := hdrhist.New(1, 10000000, 3)
+	defer without(raceDetector())
 
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -147,7 +154,7 @@ func TestReset(t *testing.T) {
 }
 
 func TestMerge(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	h1 := hdrhist.New(1, 1000, 3)
 	h2 := hdrhist.New(1, 1000, 3)
@@ -172,11 +179,11 @@ func TestMerge(t *testing.T) {
 }
 
 func TestMin(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
-	h := hdrhist.New(1, 10000000, 3)
+	h := hdrhist.New(1, num, 3)
 
-	for i := 0; i < 1000000; i++ {
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -188,7 +195,7 @@ func TestMin(t *testing.T) {
 }
 
 func TestByteSize(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	h := hdrhist.New(1, 100000, 3)
 
@@ -198,7 +205,7 @@ func TestByteSize(t *testing.T) {
 }
 
 func TestRecordCorrectedValue(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	h := hdrhist.New(1, 100000, 3)
 
@@ -212,9 +219,9 @@ func TestRecordCorrectedValue(t *testing.T) {
 }
 
 func TestRecordCorrectedValueStall(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
-	h := hdrhist.New(1, 100000, 3)
+	h := hdrhist.New(1, num/100, 3)
 
 	if err := h.RecordCorrectedValue(1000, 100); err != nil {
 		t.Fatal(err)
@@ -226,11 +233,11 @@ func TestRecordCorrectedValueStall(t *testing.T) {
 }
 
 func TestCumulativeDistribution(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
-	h := hdrhist.New(1, 100000000, 3)
+	h := hdrhist.New(1, num, 3)
 
-	for i := 0; i < 1000000; i++ {
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -262,7 +269,7 @@ func TestCumulativeDistribution(t *testing.T) {
 }
 
 func TestDistribution(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	h := hdrhist.New(8, 1024, 3)
 
@@ -277,7 +284,11 @@ func TestDistribution(t *testing.T) {
 		t.Errorf("Number of bars seen was %v, expected was 128", len(actual))
 	}
 
-	t.Log(actual[0], "=>", actual[len(actual)-1])
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log(actual[0], "=>", actual[len(actual)-1])
+		}
+	})
 
 	for _, b := range actual {
 		if b.Count != 8 {
@@ -287,7 +298,8 @@ func TestDistribution(t *testing.T) {
 }
 
 func TestNaN(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
+
 	h := hdrhist.New(1, 100000, 3)
 	if math.IsNaN(h.Mean()) {
 		t.Error("mean is NaN")
@@ -298,7 +310,7 @@ func TestNaN(t *testing.T) {
 }
 
 func TestSignificantFigures(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	const sigFigs = 4
 	h := hdrhist.New(1, 10, sigFigs)
@@ -308,7 +320,7 @@ func TestSignificantFigures(t *testing.T) {
 }
 
 func TestLowestTrackableValue(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	const minVal = 2
 	h := hdrhist.New(minVal, 10, 3)
@@ -318,7 +330,7 @@ func TestLowestTrackableValue(t *testing.T) {
 }
 
 func TestHighestTrackableValue(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	const maxVal = 11
 
@@ -329,8 +341,8 @@ func TestHighestTrackableValue(t *testing.T) {
 }
 
 func BenchmarkHistRecordValue(b *testing.B) {
-	h := hdrhist.New(1, 10000000, 3)
-	for i := 0; i < 1000000; i++ {
+	h := hdrhist.New(1, num, 3)
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			b.Fatal(err)
 		}
@@ -352,6 +364,8 @@ func BenchmarkNew(b *testing.B) {
 }
 
 func TestUnitMagnitudeOverflow(t *testing.T) {
+	defer without(raceDetector())
+
 	h := hdrhist.New(0, 200, 4)
 	if err := h.RecordValue(11); err != nil {
 		t.Fatal(err)
@@ -359,7 +373,7 @@ func TestUnitMagnitudeOverflow(t *testing.T) {
 }
 
 func TestSubBucketMaskOverflow(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	hist := hdrhist.New(2e7, 1e8, 5)
 	for _, sample := range [...]int64{1e8, 2e7, 3e7} {
@@ -381,13 +395,13 @@ func TestSubBucketMaskOverflow(t *testing.T) {
 }
 
 func TestExportImport(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
 	min := int64(1)
-	max := int64(10000000)
+	max := int64(num)
 	sigfigs := 3
 	h := hdrhist.New(min, max, sigfigs)
-	for i := 0; i < 1000000; i++ {
+	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -414,16 +428,16 @@ func TestExportImport(t *testing.T) {
 }
 
 func TestEquals(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
 
-	h1 := hdrhist.New(1, 10000000, 3)
-	for i := 0; i < 1000000; i++ {
+	h1 := hdrhist.New(1, num, 3)
+	for i := int64(0); i < num/10; i++ {
 		if err := h1.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	h2 := hdrhist.New(1, 10000000, 3)
+	h2 := hdrhist.New(1, num, 3)
 	for i := 0; i < 10000; i++ {
 		if err := h1.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
@@ -441,38 +455,39 @@ func TestEquals(t *testing.T) {
 		t.Error("Expected Histograms to be equivalent")
 	}
 
-	t.Run("EdgeCase", func(t *testing.T) {
-		first := hdrhist.New(1, 10000000, 3)
-		second := hdrhist.New(1, 10000000, 3)
-		for i := int64(0); i < 10000; i++ {
-			if err := errors.Join(
-				first.RecordValue(i),
-				second.RecordValue(i),
-			); err != nil {
-				t.Fatal(err)
-			}
-		}
+}
 
-		if !first.Equals(second) {
-			t.Fatal("should be equal")
-		}
+func TestEqualsEdgeCase(t *testing.T) {
+	defer without(raceDetector())
 
+	first := hdrhist.New(1, num, 3)
+	second := hdrhist.New(1, num, 3)
+	for i := int64(0); i < 10000; i++ {
 		if err := errors.Join(
-			first.RecordValue(4),
-			second.RecordValue(8),
+			first.RecordValue(i),
+			second.RecordValue(i),
 		); err != nil {
 			t.Fatal(err)
 		}
+	}
 
-		if first.Equals(second) {
-			t.Fatal("should not be equal")
-		}
+	if !first.Equals(second) {
+		t.Fatal("should be equal")
+	}
 
-	})
+	if err := errors.Join(
+		first.RecordValue(4),
+		second.RecordValue(8),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if first.Equals(second) {
+		t.Fatal("should not be equal")
+	}
 }
 
 func TestEdgeCases(t *testing.T) {
-	t.Parallel()
 	t.Run("LargeValues", func(t *testing.T) {
 		hist := hdrhist.New(0, 10, 2)
 		if err := errors.Join(
@@ -554,7 +569,8 @@ func TestEdgeCases(t *testing.T) {
 }
 
 func TestRand(t *testing.T) {
-	t.Parallel()
+	defer without(raceDetector())
+
 	hist := hdrhist.New(0, 100, 3)
 	for i := int64(0); i < 10000; i++ {
 		if err := hist.RecordValue(rand.Int63n(101)); err != nil {
@@ -594,5 +610,4 @@ func TestRand(t *testing.T) {
 	if exp.SignificantFigures != 3 {
 		t.Fail()
 	}
-
 }
