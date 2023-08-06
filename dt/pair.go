@@ -43,6 +43,21 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 	return p
 }
 
+func ConsumePairs[K comparable, V any](
+	ctx context.Context,
+	iter *fun.Iterator[Pair[K, V]],
+) (*Pairs[K, V], error) {
+	p := &Pairs[K, V]{}
+	p.init()
+	if err := iter.Observe(ctx, func(in Pair[K, V]) {
+		p.AddPair(in)
+	}); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
 func (p *Pairs[K, V]) init() { p.setup.Do(p.initalizeList) }
 func (p *Pairs[K, V]) initalizeList() {
 	if p.ll == nil {

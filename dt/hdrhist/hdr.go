@@ -11,6 +11,9 @@ package hdrhist
 import (
 	"fmt"
 	"math"
+
+	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/intish"
 )
 
 // A Bracket is a part of a cumulative distribution.
@@ -49,15 +52,11 @@ func New(minValue, maxValue int64, sigfigs int) *Histogram {
 	subBucketCountMagnitude := int32(math.Ceil(math.Log2(largestValueWithSingleUnitResolution)))
 
 	subBucketHalfCountMagnitude := subBucketCountMagnitude
-	if subBucketHalfCountMagnitude < 1 {
-		subBucketHalfCountMagnitude = 1
-	}
+	subBucketHalfCountMagnitude = intish.Max(subBucketHalfCountMagnitude, 1)
 	subBucketHalfCountMagnitude--
 
 	unitMagnitude := int32(math.Floor(math.Log2(float64(minValue))))
-	if unitMagnitude < 0 {
-		unitMagnitude = 0
-	}
+	unitMagnitude = intish.Max(unitMagnitude, 0)
 
 	subBucketCount := int32(math.Pow(2, float64(subBucketHalfCountMagnitude)+1))
 
@@ -202,21 +201,21 @@ func (h *Histogram) RecordValue(v int64) error {
 // at an expected interval (e.g., doing jitter analysis). Processes which are
 // recording ad-hoc values (e.g., latency for incoming requests) can't take
 // advantage of this.
-func (h *Histogram) RecordCorrectedValue(v, expectedInterval int64) error {
+func (h *Histogram) RecordCorrectedValue(v, expInterval int64) error {
 	if err := h.RecordValue(v); err != nil {
 		return err
 	}
 
-	if expectedInterval <= 0 || v <= expectedInterval {
+	if expInterval <= 0 || v <= expInterval {
 		return nil
 	}
 
-	missingValue := v - expectedInterval
-	for missingValue >= expectedInterval {
-		if err := h.RecordValue(missingValue); err != nil {
-			return err
-		}
-		missingValue -= expectedInterval
+	for missing := v - expInterval; missing >= expInterval; missing -= expInterval {
+		// RecordValue only errors if the value is out of
+		// range for the histogram (the first line in the
+		// function), and the missing values must valid by
+		// virtue of this and the second early return.
+		fun.Invariant.Must(h.RecordValue(missing))
 	}
 
 	return nil
@@ -538,7 +537,8 @@ func (p *pIterator) next() bool {
 			halfDistance := math.Trunc(math.Pow(2, math.Trunc(math.Log2(100.0/(100.0-p.percentileToIteratorTo)))+1))
 			percentileReportingTicks := float64(p.ticksPerHalfDistance) * halfDistance
 			p.percentileToIteratorTo += 100.0 / percentileReportingTicks
-			return true
+
+			break
 		}
 		done = !p.iterator.next()
 	}

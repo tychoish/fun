@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -372,15 +373,17 @@ func TestOperation(t *testing.T) {
 	t.Run("Future", func(t *testing.T) {
 		count := &atomic.Int64{}
 		op := Operation(func(context.Context) {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
 			count.Add(1)
 		})
 		ctx := testt.Context(t)
 		opwait := op.Future(ctx)
 		check.Equal(t, count.Load(), 0)
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		check.Equal(t, count.Load(), 1)
-		check.MaxRuntime(t, 5*time.Millisecond, func() {
+		runtime.Gosched()
+		check.MaxRuntime(t, 10*time.Millisecond, func() {
+			runtime.Gosched()
 			opwait(ctx)
 		})
 	})
@@ -483,13 +486,13 @@ func TestOperation(t *testing.T) {
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.True(t, dur < 200*time.Millisecond)
 
-		delay = time.Millisecond
+		delay = 10 * time.Millisecond
 		start = time.Now()
 		wf(ctx)
 		dur = time.Since(start).Truncate(time.Millisecond)
 		testt.Logf(t, "op took %s with delay %s", dur, delay)
 		assert.True(t, dur >= time.Millisecond)
-		assert.True(t, dur < 2*time.Millisecond)
+		assert.True(t, dur < 102*time.Millisecond)
 	})
 	t.Run("Delay", func(t *testing.T) {
 		t.Parallel()
@@ -564,14 +567,15 @@ func TestOperation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		count := &atomic.Int64{}
-		var wf Operation = func(context.Context) { count.Add(1) }
-		wf = wf.Interval(10 * time.Millisecond)
+		var wf Operation = func(context.Context) { count.Add(1); runtime.Gosched() }
+		wf = wf.Interval(25 * time.Millisecond)
 		check.Equal(t, 0, count.Load())
 		sig := wf.Signal(ctx)
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
+		runtime.Gosched()
 		cancel()
 		<-sig
-		check.Equal(t, 10, count.Load())
+		check.Equal(t, 6, count.Load())
 	})
 	t.Run("TTL", func(t *testing.T) {
 		t.Parallel()

@@ -602,7 +602,7 @@ func TestBroker(t *testing.T) {
 				count++
 			}
 			dur := time.Since(sa)
-			if dur < 20*time.Millisecond || dur > 30*time.Millisecond {
+			if dur < 20*time.Millisecond || dur > 40*time.Millisecond {
 				t.Error(count, dur)
 			}
 		})

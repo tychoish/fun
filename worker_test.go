@@ -472,13 +472,19 @@ func TestWorker(t *testing.T) {
 
 	})
 	t.Run("Jitter", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		delay := (100 * time.Millisecond)
+		timing := func(in *time.Duration) time.Duration {
+			return *in
+		}
+		ptr := func(in time.Duration) *time.Duration { return &in }
+
 		count := &atomic.Int64{}
 		var wf Worker = func(context.Context) error { count.Add(1); return nil }
-		delay := 100 * time.Millisecond
-		wf = wf.Jitter(func() time.Duration { return delay })
+		wf = wf.Jitter(func() time.Duration { return timing(ptr(delay)) })
 		start := time.Now()
 		check.NotError(t, wf(ctx))
 		dur := time.Since(start).Truncate(time.Millisecond)

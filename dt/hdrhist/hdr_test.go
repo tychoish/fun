@@ -1,7 +1,9 @@
 package hdrhist_test
 
 import (
+	"errors"
 	"math"
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -55,6 +57,17 @@ func TestValueAtQuantile(t *testing.T) {
 			t.Errorf("P%v was %v, but expected %v", d.q, v, d.v)
 		}
 	}
+	t.Run("OverHundredCaps", func(t *testing.T) {
+		if h.ValueAtQuantile(500) != h.ValueAtQuantile(100) {
+			t.Error("cap quantiles at 100")
+		}
+	})
+	t.Run("OverHundredCaps", func(t *testing.T) {
+		hist := hdrhist.New(4, 1024, 4)
+		if n := hist.ValueAtQuantile(500); n != 0 {
+			t.Error("cap quantiles at 100")
+		}
+	})
 }
 
 func TestMean(t *testing.T) {
@@ -263,6 +276,9 @@ func TestDistribution(t *testing.T) {
 	if len(actual) != 128 {
 		t.Errorf("Number of bars seen was %v, expected was 128", len(actual))
 	}
+
+	t.Log(actual[0], "=>", actual[len(actual)-1])
+
 	for _, b := range actual {
 		if b.Count != 8 {
 			t.Errorf("Count per bar seen was %v, expected was 8", b.Count)
@@ -424,4 +440,159 @@ func TestEquals(t *testing.T) {
 	if !h1.Equals(h2) {
 		t.Error("Expected Histograms to be equivalent")
 	}
+
+	t.Run("EdgeCase", func(t *testing.T) {
+		first := hdrhist.New(1, 10000000, 3)
+		second := hdrhist.New(1, 10000000, 3)
+		for i := int64(0); i < 10000; i++ {
+			if err := errors.Join(
+				first.RecordValue(i),
+				second.RecordValue(i),
+			); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if !first.Equals(second) {
+			t.Fatal("should be equal")
+		}
+
+		if err := errors.Join(
+			first.RecordValue(4),
+			second.RecordValue(8),
+		); err != nil {
+			t.Fatal(err)
+		}
+
+		if first.Equals(second) {
+			t.Fatal("should not be equal")
+		}
+
+	})
+}
+
+func TestEdgeCases(t *testing.T) {
+	t.Parallel()
+	t.Run("LargeValues", func(t *testing.T) {
+		hist := hdrhist.New(0, 10, 2)
+		if err := errors.Join(
+			hist.RecordValues(-2000, 1),
+			hist.RecordValues(2000, 1),
+			hist.RecordValues(500, 2),
+			hist.RecordCorrectedValue(2000, 3),
+			hist.RecordCorrectedValue(-2000, 1),
+			hist.RecordCorrectedValue(500, 2),
+			hist.RecordCorrectedValue(2, 1),
+			hist.RecordCorrectedValue(1, 1),
+		); err == nil {
+			t.Error("should have failed")
+		}
+	})
+	t.Run("MergeDifferentSizes", func(t *testing.T) {
+		histOne := hdrhist.New(0, 10, 2)
+		if err := errors.Join(
+			histOne.RecordValue(5),
+			histOne.RecordValue(3),
+			histOne.RecordValue(2),
+		); err != nil {
+			t.Error(err)
+		}
+		histTwo := hdrhist.New(100, 1000, 4)
+		if err := errors.Join(
+			histTwo.RecordValue(250),
+			histTwo.RecordValue(500),
+			histTwo.RecordValue(750),
+		); err != nil {
+			t.Error(err)
+		}
+		if n := histOne.Merge(histTwo); n == 0 {
+			t.Error("no expected merge errors")
+		}
+	})
+	t.Run("SignificantFiguresLimts", func(t *testing.T) {
+		t.Run("Zero", func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Error("expected panic")
+				}
+			}()
+			hdrhist.New(0, 100, 0)
+		})
+		t.Run("Negative", func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Error("expected panic")
+				}
+			}()
+			hdrhist.New(0, 100, -10)
+		})
+		t.Run("Over", func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Error("expected panic")
+				}
+			}()
+			hdrhist.New(0, 100, 6)
+		})
+		t.Run("Larger", func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Error("expected panic")
+				}
+			}()
+			hdrhist.New(0, 10000000000000000, 20)
+		})
+		t.Run("Valid", func(t *testing.T) {
+			// shouldn't panic
+			hdrhist.New(0, 10000, 1)
+			hdrhist.New(0, 10000, 2)
+			hdrhist.New(0, 10000, 3)
+			hdrhist.New(0, 10000, 4)
+			hdrhist.New(0, 10000, 5)
+		})
+	})
+}
+
+func TestRand(t *testing.T) {
+	t.Parallel()
+	hist := hdrhist.New(0, 100, 3)
+	for i := int64(0); i < 10000; i++ {
+		if err := hist.RecordValue(rand.Int63n(101)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := int64(0); i < 101; i++ {
+		if err := hist.RecordValue(i); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if hist.Min() != 0 {
+		t.Error(hist.Min())
+	}
+	if hist.Max() != 100 {
+		t.Error(hist.Max())
+	}
+
+	if hist.TotalCount() != 10000+101 {
+		t.Error(hist.TotalCount())
+	}
+	exp := hist.Export()
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		t.Log(exp)
+	})
+
+	if exp.HighestTrackableValue != 100 {
+		t.Fail()
+	}
+	if exp.LowestTrackableValue != 0 {
+		t.Fail()
+	}
+	if exp.SignificantFigures != 3 {
+		t.Fail()
+	}
+
 }

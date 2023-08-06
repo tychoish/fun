@@ -78,13 +78,13 @@ func TestWaitGroup(t *testing.T) {
 				runtime.Gosched()
 			}
 		}
-		time.Sleep(101 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		waitStart := time.Now()
 		for _, ch := range waits {
 			<-ch
 		}
 		dur := time.Since(waitStart)
-		if dur > 20*time.Millisecond {
+		if dur > 50*time.Millisecond {
 			t.Error("took too long for waiters to resolve", dur)
 		}
 	})

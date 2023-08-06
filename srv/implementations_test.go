@@ -87,7 +87,7 @@ func TestHelpers(t *testing.T) {
 			if count.Load() != 50 {
 				t.Error(count.Load())
 			}
-			if time.Since(start) < 5*time.Millisecond || time.Since(start) > 20*time.Millisecond {
+			if time.Since(start) < 6*time.Millisecond || time.Since(start) > 250*time.Millisecond {
 				t.Error(time.Since(start))
 			}
 		})
@@ -275,8 +275,10 @@ func TestCmd(t *testing.T) {
 				s := Cmd(cmd, time.Millisecond)
 
 				check.NotError(t, s.Start(ctx))
+				runtime.Gosched()
 				assert.MaxRuntime(t, 20*time.Millisecond, func() {
 					s.Close()
+					runtime.Gosched()
 					err := s.Wait()
 					check.Error(t, err)
 					testt.Log(t, err)

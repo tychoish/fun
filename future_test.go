@@ -178,10 +178,10 @@ func TestFuture(t *testing.T) {
 		})
 		t.Run("Over", func(t *testing.T) {
 			count := 0
-			thunk := Futurize(func() int { count++; return 42 }).TTL(100 * time.Millisecond)
-			ft.DoTimes(100, func() { time.Sleep(9 * time.Millisecond); check.Equal(t, 42, thunk()) })
+			thunk := Futurize(func() int { count++; return 42 }).TTL(50 * time.Millisecond)
+			ft.DoTimes(100, func() { time.Sleep(25 * time.Millisecond); check.Equal(t, 42, thunk()) })
 			testt.Log(t, "count value is", count)
-			check.Equal(t, count, 10)
+			check.Equal(t, count, 50)
 		})
 	})
 }
