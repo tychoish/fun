@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestWorker(t *testing.T) {
@@ -33,7 +32,8 @@ func TestWorker(t *testing.T) {
 			assert.NotError(t, err)
 		})
 		t.Run("Background", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
 			Worker(func(ctx context.Context) error { called.Add(1); panic(expected) }).
@@ -51,7 +51,8 @@ func TestWorker(t *testing.T) {
 			}
 		})
 		t.Run("Add", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			wg := &WaitGroup{}
 			count := &atomic.Int64{}
 			func() {
@@ -73,7 +74,8 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, count.Load(), 2)
 		})
 		t.Run("Observe", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			t.Run("ObserveNilErrors", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
@@ -129,19 +131,23 @@ func TestWorker(t *testing.T) {
 				// declaration shouldn't call
 				assert.NotError(t, err)
 
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				err = ers.Check(func() {
 					var wf Operation //nolint:gosimple
 					wf = Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
-					wf(testt.Context(t))
+					wf(ctx)
 				})
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, expected)
 			})
 		})
 		t.Run("Signal", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			expected := errors.New("hello")
 			wf := Worker(func(ctx context.Context) error { return expected })
 			out := wf.Signal(ctx)
@@ -182,7 +188,8 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("WorkerFuture", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		expected := errors.New("cat")
 		var ch chan error
 		t.Run("NilChannel", func(t *testing.T) {
@@ -488,7 +495,7 @@ func TestWorker(t *testing.T) {
 		start := time.Now()
 		check.NotError(t, wf(ctx))
 		dur := time.Since(start).Truncate(time.Millisecond)
-		testt.Logf(t, "op took %s with delay %s", dur, delay)
+
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.True(t, dur < 200*time.Millisecond)
 
@@ -496,14 +503,15 @@ func TestWorker(t *testing.T) {
 		start = time.Now()
 		check.NotError(t, wf(ctx))
 		dur = time.Since(start).Truncate(time.Millisecond)
-		testt.Logf(t, "op took %s with delay %s", dur, delay)
+
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
 	})
 	t.Run("While", func(t *testing.T) {
 		t.Parallel()
 		t.Run("PRoof", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			eone := errors.New("while errors")
 			etwo := errors.New("do errors")
 
@@ -522,7 +530,8 @@ func TestWorker(t *testing.T) {
 			}
 		})
 		t.Run("Ordering", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			var (
 				ts1 time.Time
@@ -550,14 +559,20 @@ func TestWorker(t *testing.T) {
 				return ft.WhenDo(time.Since(start) > 32*time.Millisecond, func() error { return io.EOF })
 			}
 			t.Run("Min", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				defer cancel()
+
 				assert.MinRuntime(t, 32*time.Millisecond, func() {
-					err := wf.While().Run(testt.ContextWithTimeout(t, 100*time.Millisecond))
+
+					err := wf.While().Run(ctx)
 					assert.ErrorIs(t, err, io.EOF)
 				})
 			})
 			t.Run("Max", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				defer cancel()
 				assert.MaxRuntime(t, 40*time.Millisecond, func() {
-					err := wf.While().Run(testt.ContextWithTimeout(t, 100*time.Millisecond))
+					err := wf.While().Run(ctx)
 					assert.ErrorIs(t, err, io.EOF)
 				})
 			})
@@ -566,7 +581,8 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("Pipe", func(t *testing.T) {
 		t.Run("EndToEnd", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			expected := errors.New("cat")
 			errCt := 0
 			nopCt := 0
@@ -622,7 +638,8 @@ func TestWorker(t *testing.T) {
 				return "", io.EOF
 			}
 			proc := func(ctx context.Context, in string) error { procCt++; return nil }
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			wk := Pipe(prod, proc).While()
 			err := wk(ctx)
@@ -633,7 +650,8 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("FilterError", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var wf Worker = func(context.Context) error {
 			return io.EOF
 		}
@@ -645,7 +663,8 @@ func TestWorker(t *testing.T) {
 		assert.ErrorIs(t, fwf(ctx), context.Canceled)
 	})
 	t.Run("WithoutError", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var wf Worker = func(context.Context) error {
 			return io.EOF
 		}
@@ -658,7 +677,8 @@ func TestWorker(t *testing.T) {
 		assert.NotError(t, fwf(ctx))
 	})
 	t.Run("WithCancel", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		wf, cancel := Worker(func(ctx context.Context) error {
 			timer := time.NewTimer(time.Hour)
 			defer timer.Stop()
@@ -680,7 +700,8 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("WorkerFuture", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		ch := make(chan error, 1)
 		wf := WorkerFuture(ch)
 		root := ers.New("will-be-cached")
@@ -695,9 +716,9 @@ func TestWorker(t *testing.T) {
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("Chain", func(t *testing.T) {
 			count := 0
-			rctx := testt.Context(t)
+			rctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			var wf Worker = func(ctx context.Context) error {
-				testt.Log(t, count)
 				check.True(t, count == 1 || count == 4)
 				check.Equal(t, rctx, ctx)
 				count++
@@ -705,7 +726,6 @@ func TestWorker(t *testing.T) {
 			}
 
 			wf = wf.PreHook(func(ctx context.Context) {
-				testt.Log(t, count)
 				check.True(t, count == 0 || count == 3)
 				check.Equal(t, rctx, ctx)
 				count++
@@ -713,7 +733,6 @@ func TestWorker(t *testing.T) {
 			check.NotError(t, wf(rctx))
 			check.Equal(t, 2, count)
 			wf = wf.PreHook(func(ctx context.Context) {
-				testt.Log(t, count)
 				check.Equal(t, count, 2)
 				check.Equal(t, rctx, ctx)
 				count++
@@ -730,7 +749,8 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			err := pf(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, root)
@@ -743,7 +763,8 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, 2, count)
@@ -758,7 +779,8 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			err := pf(ctx)
 			check.Error(t, err)
 			check.Equal(t, 2, count)
@@ -770,7 +792,8 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, 2, count)

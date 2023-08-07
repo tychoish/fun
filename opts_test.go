@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestOptionProvider(t *testing.T) {
@@ -18,7 +17,6 @@ func TestOptionProvider(t *testing.T) {
 		eone := errors.New("cat")
 		etwo := errors.New("3")
 
-		testt.Log(t, "before", conf)
 		err := WorkerGroupConfAddExcludeErrors(eone, etwo).Join(
 			func(o *WorkerGroupConf) error {
 				return nil
@@ -26,7 +24,6 @@ func TestOptionProvider(t *testing.T) {
 			WorkerGroupConfSet(newc),
 		).Apply(conf)
 
-		testt.Log(t, "after", conf)
 		check.NotError(t, err)
 		check.Equal(t, len(conf.ExcludedErrors), 2)
 		check.True(t, conf.ContinueOnPanic)
@@ -67,7 +64,9 @@ func TestOptionProvider(t *testing.T) {
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 1)
 		})
 		t.Run("LoadTest", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			opt := &WorkerGroupConf{}
 			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
 

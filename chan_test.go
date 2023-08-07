@@ -9,7 +9,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestChannel(t *testing.T) {
@@ -470,7 +469,9 @@ func TestChannel(t *testing.T) {
 		})
 	})
 	t.Run("Pipe", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		proc, prod := Blocking(make(chan string, 1)).Pipe()
 		check.NotError(t, proc(ctx, "hello world!"))
 		output, err := prod(ctx)

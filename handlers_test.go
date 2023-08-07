@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestHandlers(t *testing.T) {
@@ -22,7 +21,8 @@ func TestHandlers(t *testing.T) {
 	const root ers.Error = ers.Error("root-error")
 	t.Run("ErrorProcessor", func(t *testing.T) {
 		count := 0
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		proc := HF.ErrorProcessor(func(ctx context.Context, err error) error {
 			count++
 			return err
@@ -89,14 +89,16 @@ func TestHandlers(t *testing.T) {
 	t.Run("Unwinder", func(t *testing.T) {
 		t.Run("BasicUnwind", func(t *testing.T) {
 			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			errs, err := unwinder(ctx, ers.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ErrInvariantViolation))
 			assert.NotError(t, err)
 			check.Equal(t, len(errs), 3)
 		})
 		t.Run("Empty", func(t *testing.T) {
 			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			errs, err := unwinder(ctx, nil)
 			assert.NotError(t, err)
 			check.Equal(t, len(errs), 0)
@@ -133,7 +135,8 @@ func TestHandlers(t *testing.T) {
 		}
 
 		count := 0
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var prev string
 		check.NotError(t, HF.Lines(buf).Observe(ctx, func(line string) {
 			count++
@@ -144,15 +147,17 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("Transforms", func(t *testing.T) {
 		t.Run("Itoa", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			out := ft.Must(ConvertIterator(HF.Counter(10), HF.Itoa()).Slice(ctx))
-			testt.Log(t, out)
+
 			check.EqualItems(t, out, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
 		})
 		t.Run("Atoi", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			out := ft.Must(ConvertIterator(SliceIterator([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}), HF.Atoi()).Slice(ctx))
-			testt.Log(t, out)
+
 			check.EqualItems(t, out, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 		})
 	})

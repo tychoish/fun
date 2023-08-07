@@ -17,7 +17,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func CheckSeenMap[T comparable](t *testing.T, elems []T, seen map[T]struct{}) {
@@ -248,7 +247,8 @@ func TestIteratorAlgoInts(t *testing.T) {
 }
 
 func TestParallelForEach(t *testing.T) {
-	ctx := testt.Context(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	t.Run("Basic", func(t *testing.T) {
 		for i := int64(-1); i <= 12; i++ {
@@ -276,7 +276,6 @@ func TestParallelForEach(t *testing.T) {
 				}
 
 				check.Equal(t, int(seen.Load()), sum(elems))
-				testt.Log(t, "input", elems)
 
 				if int(count.Load()) != len(elems) {
 					t.Error("unequal length slices")
@@ -385,7 +384,7 @@ func TestParallelForEach(t *testing.T) {
 		if err == nil {
 			t.Error("should have propogated an error")
 		}
-		testt.Log(t, err)
+
 		check.Equal(t, 10, count.Load())
 
 		errs := ers.Unwind(err)
@@ -485,7 +484,8 @@ func RunIteratorImplementationTests[T comparable](
 					builder := func() *Iterator[T] { return baseBuilder(elems) }
 
 					t.Run("Single", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						seen := make(map[T]struct{}, len(elems))
 						iter := builder()
@@ -500,10 +500,10 @@ func RunIteratorImplementationTests[T comparable](
 						CheckSeenMap(t, elems, seen)
 					})
 					t.Run("Canceled", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						iter := builder()
-						ctx, cancel := context.WithCancel(ctx)
 						cancel()
 						var count int
 
@@ -517,7 +517,8 @@ func RunIteratorImplementationTests[T comparable](
 					})
 					t.Run("PanicSafety", func(t *testing.T) {
 						t.Run("Map", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							out, err := Map[T](
 								baseBuilder(elems),
@@ -531,13 +532,14 @@ func RunIteratorImplementationTests[T comparable](
 							}
 
 							check.ErrorIs(t, err, ErrRecoveredPanic)
-							testt.Log(t, len(out), ":", out)
+
 							if len(out) != 0 {
 								t.Fatal("unexpected output", out)
 							}
 						})
 						t.Run("ParallelMap", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							out, err := Map(
 								baseBuilder(elems),
@@ -583,7 +585,8 @@ func RunIteratorIntegerAlgoTests(
 
 					t.Run("Map", func(t *testing.T) {
 						t.Run("ErrorDoesNotAbort", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							out, err := Map(
 								baseBuilder(elems),
@@ -601,14 +604,15 @@ func RunIteratorIntegerAlgoTests(
 							if err.Error() != "whoop" {
 								t.Error(err)
 							}
-							testt.Log(t, err)
+
 							if len(out) != len(elems)-1 {
 								t.Fatal("unexpected output", len(out), "->", out, len(elems)-1)
 							}
 						})
 
 						t.Run("PanicDoesNotAbort", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							out, err := Map(
 								baseBuilder(elems),
@@ -622,8 +626,6 @@ func RunIteratorIntegerAlgoTests(
 								WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 
-							testt.Log(t, elems)
-
 							if err == nil {
 								t.Error("expected error", err)
 							}
@@ -633,7 +635,8 @@ func RunIteratorIntegerAlgoTests(
 							}
 						})
 						t.Run("ErrorAborts", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 							expectedErr := errors.New("whoop")
 							out, err := Map(
 								baseBuilder(elems),
@@ -657,7 +660,8 @@ func RunIteratorIntegerAlgoTests(
 							}
 						})
 						t.Run("ParallelErrorDoesNotAbort", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							expectedErr := errors.New("whoop")
 							out, err := Map(
@@ -705,7 +709,8 @@ func RunIteratorStringAlgoTests(
 
 					builder := func() *Iterator[string] { return (baseBuilder(elems)) }
 					t.Run("Channel", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						seen := make(map[string]struct{}, len(elems))
 						iter := builder()
@@ -719,7 +724,8 @@ func RunIteratorStringAlgoTests(
 						}
 					})
 					t.Run("Collect", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						iter := builder()
 						vals, err := iter.Slice(ctx)
@@ -735,7 +741,8 @@ func RunIteratorStringAlgoTests(
 						}
 					})
 					t.Run("Map", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						iter := builder()
 						out := Map[string, string](
@@ -749,14 +756,15 @@ func RunIteratorStringAlgoTests(
 						if err != nil {
 							t.Fatal(err)
 						}
-						testt.Log(t, vals)
+
 						// skip implementation with random order
 						if name != "SetIterator" {
 							check.EqualItems(t, elems, vals)
 						}
 					})
 					t.Run("ParallelMap", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						out := Map(
 							MergeIterators(builder(), builder(), builder()),
@@ -789,7 +797,8 @@ func RunIteratorStringAlgoTests(
 					})
 					t.Run("Generate", func(t *testing.T) {
 						t.Run("Basic", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							inputs := GenerateRandomStringSlice(512)
 							count := &atomic.Int32{}
@@ -814,7 +823,8 @@ func RunIteratorStringAlgoTests(
 							<-sig
 						})
 						t.Run("GenerateParallel", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							inputs := GenerateRandomStringSlice(512)
 							count := &atomic.Int32{}
@@ -840,7 +850,8 @@ func RunIteratorStringAlgoTests(
 							<-sig
 						})
 						t.Run("PanicSafety", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 							out := Producer[string](func(ctx context.Context) (string, error) {
 								panic("foo")
 							}).GenerateParallel()
@@ -854,7 +865,8 @@ func RunIteratorStringAlgoTests(
 							assert.Substring(t, err.Error(), "foo")
 						})
 						t.Run("ContinueOnPanic", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							count := 0
 							out := Producer[string](
@@ -882,7 +894,8 @@ func RunIteratorStringAlgoTests(
 							assert.ErrorIs(t, err, ErrRecoveredPanic)
 						})
 						t.Run("ArbitraryErrorAborts", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 
 							count := 0
 							out := Producer[string](func(ctx context.Context) (string, error) {
@@ -907,7 +920,8 @@ func RunIteratorStringAlgoTests(
 							}
 						})
 						t.Run("ContinueOnError", func(t *testing.T) {
-							ctx := testt.Context(t)
+							ctx, cancel := context.WithCancel(context.Background())
+							defer cancel()
 							count := 0
 							out := Producer[string](func(ctx context.Context) (string, error) {
 								count++
@@ -934,7 +948,8 @@ func RunIteratorStringAlgoTests(
 					})
 
 					t.Run("Reduce", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						iter := builder()
 						seen := make(map[string]struct{}, len(elems))
@@ -956,7 +971,8 @@ func RunIteratorStringAlgoTests(
 						}
 					})
 					t.Run("ReduceError", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
 
 						iter := builder()
 
@@ -987,6 +1003,9 @@ func RunIteratorStringAlgoTests(
 						}
 					})
 					t.Run("ReduceSkip", func(t *testing.T) {
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
+
 						elems := makeIntSlice(32)
 						iter := SliceIterator(elems)
 						count := 0
@@ -996,12 +1015,15 @@ func RunIteratorStringAlgoTests(
 								return 42, nil
 							}
 							return value, ErrIteratorSkip
-						})(testt.Context(t))
+						})(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
 					})
 					t.Run("ReduceEarlyExit", func(t *testing.T) {
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
+
 						elems := makeIntSlice(32)
 						iter := SliceIterator(elems)
 						count := 0
@@ -1011,7 +1033,7 @@ func RunIteratorStringAlgoTests(
 								return 300, io.EOF
 							}
 							return 42, nil
-						})(testt.Context(t))
+						})(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
@@ -1050,7 +1072,8 @@ func RunIteratorStringAlgoTests(
 		check.ErrorIs(t, err, ErrCountMeOut)
 	})
 	t.Run("ConverterOK", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		tfrm := ConverterOK(func(in string) (string, bool) { return in, true })
 		out, err := tfrm(ctx, "hello")
 		check.Equal(t, out, "hello")
@@ -1133,7 +1156,8 @@ func RunIteratorStringAlgoTests(
 		mpf = mpf.Lock()
 		// tempt the race detector
 		wg := &WaitGroup{}
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		wg.DoTimes(ctx, 128, func(ctx context.Context) {
 			out, err := mpf(ctx, 42)
 			check.Equal(t, out, "42")
@@ -1148,7 +1172,8 @@ func RunIteratorStringAlgoTests(
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
 			proc, prod, close := tfm.Pipe()
 			defer close()
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			for i := 0; i < 100; i++ {
 				assert.NotError(t, proc(ctx, i))
 				assert.Equal(t, fmt.Sprint(i), ft.Must(prod(ctx)))
@@ -1166,7 +1191,8 @@ func RunIteratorStringAlgoTests(
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
 			proc, prod, close := tfm.Pipe()
 			defer close()
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			wg := &WaitGroup{}
 			wg.DoTimes(ctx, 100, func(ctx context.Context) {
 				assert.NotError(t, proc(ctx, 42))
@@ -1201,7 +1227,8 @@ func RunIteratorStringAlgoTests(
 		})
 		tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
 		worker := tfm.Worker(prod, proc)
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		reset()
 
@@ -1209,7 +1236,7 @@ func RunIteratorStringAlgoTests(
 			defer reset()
 			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 0)
 			check.NotError(t, worker(ctx))
-			testt.Log(t, prodcount, proccount, tfmcount)
+
 			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
 		})
 
@@ -1220,7 +1247,6 @@ func RunIteratorStringAlgoTests(
 			check.ErrorIs(t, worker(ctx), context.Canceled)
 			check.True(t, proccount == tfmcount && tfmcount == 0)
 			check.Equal(t, prodcount, 1)
-			testt.Log(t, prodcount, proccount, tfmcount)
 		})
 		t.Run("ProcError", func(t *testing.T) {
 			defer reset()
@@ -1228,7 +1254,7 @@ func RunIteratorStringAlgoTests(
 			procroot = context.Canceled
 			check.ErrorIs(t, worker(ctx), context.Canceled)
 			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
-			testt.Log(t, prodcount, proccount, tfmcount)
+
 		})
 		t.Run("MapFails", func(t *testing.T) {
 			defer reset()
@@ -1236,9 +1262,6 @@ func RunIteratorStringAlgoTests(
 			check.ErrorIs(t, worker(ctx), context.Canceled)
 			check.True(t, prodcount == tfmcount && tfmcount == 1)
 			check.Equal(t, proccount, 0)
-			testt.Log(t, prodcount, proccount, tfmcount)
 		})
-
 	})
-
 }

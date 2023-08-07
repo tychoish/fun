@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/intish"
-	"github.com/tychoish/fun/testt"
 )
 
 func randomIntSlice(size int) Slice[int] {
@@ -148,10 +147,12 @@ func TestSlice(t *testing.T) {
 		check.EqualItems(t, one, two)
 		one[77] = 33
 		two[77] = 42
-		testt.Log(t, "one", one)
-		testt.Log(t, "two", two)
 		check.NotEqualItems(t, one, two)
 		check.NotEqual(t, one[77], two[77])
+		if t.Failed() {
+			t.Log("one", one)
+			t.Log("two", two)
+		}
 	})
 	t.Run("Sort", func(t *testing.T) {
 		one := randomIntSlice(100)
@@ -213,7 +214,9 @@ func TestSlice(t *testing.T) {
 	})
 	t.Run("Process", func(t *testing.T) {
 		const batchSize = 100
-		ctx := testt.Context(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		t.Run("Full", func(t *testing.T) {
 			s := randomIntSlice(batchSize)
 			count := 0

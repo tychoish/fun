@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
@@ -108,7 +107,7 @@ func TestSort(t *testing.T) {
 				list.PushBack(9)
 
 				if list.IsSorted(cmp.LessThanNative[int]) {
-					t.Error("list isn't sorted", getSliceForList(ctx, t, list))
+					t.Error("list isn't sorted", getSliceForList(ctx, list))
 				}
 			})
 		})
@@ -134,8 +133,6 @@ func TestSort(t *testing.T) {
 			lcopy.SortQuick(cmp.LessThanNative[int])
 			listVals := ft.Must(list.Iterator().Slice(ctx))
 			copyVals := ft.Must(lcopy.Iterator().Slice(ctx))
-			testt.Log(t, "merge", listVals)
-			testt.Log(t, "quick", copyVals)
 			assert.Equal(t, len(listVals), len(copyVals))
 			assert.True(t, len(listVals) == 10)
 			for i := 0; i < 10; i++ {
@@ -241,15 +238,14 @@ func TestSort(t *testing.T) {
 	})
 
 }
-func getSliceForList(ctx context.Context, t *testing.T, list *List[int]) []int {
-	t.Helper()
-	return testt.Must(list.Iterator().Slice(ctx))(t)
+func getSliceForList(ctx context.Context, list *List[int]) []int {
+	return ft.Must(list.Iterator().Slice(ctx))
 }
 
 func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {
 	t.Helper()
 
-	return sort.IntsAreSorted(getSliceForList(ctx, t, list))
+	return sort.IntsAreSorted(getSliceForList(ctx, list))
 }
 
 func BenchmarkSorts(b *testing.B) {

@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestOperation(t *testing.T) {
@@ -107,7 +106,9 @@ func TestOperation(t *testing.T) {
 		}
 	})
 	t.Run("Constructor", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		count := 0
 		op := BlockingOperation(func() { count++ })
 		assert.Equal(t, count, 0)
@@ -116,13 +117,13 @@ func TestOperation(t *testing.T) {
 		op(nil)
 		assert.Equal(t, count, 2)
 
-		ctx, cancel := context.WithCancel(ctx)
-		cancel()
 		op(ctx)
 		assert.Equal(t, count, 3)
 	})
 	t.Run("WithCancel", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		wf, cancel := Operation(func(ctx context.Context) {
 			timer := time.NewTimer(time.Hour)
 			defer timer.Stop()
@@ -143,7 +144,9 @@ func TestOperation(t *testing.T) {
 		})
 	})
 	t.Run("If", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		called := 0
 		wf := Operation(func(ctx context.Context) {
 			called++
@@ -161,7 +164,9 @@ func TestOperation(t *testing.T) {
 		check.Equal(t, 3, called)
 	})
 	t.Run("When", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		called := 0
 		wf := Operation(func(ctx context.Context) {
 			called++
@@ -246,7 +251,10 @@ func TestOperation(t *testing.T) {
 			t.Error("should be lazy execution", counter, seen)
 		}
 
-		if err := wf(testt.Context(t)); err != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		if err := wf(ctx); err != nil {
 			t.Error(err)
 		}
 
@@ -259,11 +267,14 @@ func TestOperation(t *testing.T) {
 	})
 	t.Run("WorkerConverter", func(t *testing.T) {
 		called := &atomic.Bool{}
-		err := Operation(func(context.Context) { called.Store(true) }).Worker()(testt.Context(t))
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := Operation(func(context.Context) { called.Store(true) }).Worker()(ctx)
 		assert.NotError(t, err)
 		assert.True(t, called.Load())
 		assert.Panic(t, func() {
-			Operation(func(context.Context) { panic("hi") }).Run(testt.Context(t))
+			Operation(func(context.Context) { panic("hi") }).Run(ctx)
 		})
 	})
 	t.Run("WorkerCancel", func(t *testing.T) {
@@ -277,9 +288,12 @@ func TestOperation(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 	t.Run("Safe", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		expected := errors.New("safer")
 		err := Operation(func(context.Context) { panic(expected) }).
-			Safe()(testt.Context(t))
+			Safe()(ctx)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})
@@ -315,7 +329,9 @@ func TestOperation(t *testing.T) {
 	})
 	t.Run("Lock", func(t *testing.T) {
 		t.Run("NilLockPanics", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			count := 0
 			op := Operation(func(context.Context) { count++ })
 			check.Panic(t, func() { op.WithLock(nil)(ctx) })
@@ -324,7 +340,9 @@ func TestOperation(t *testing.T) {
 		// the rest of the tests are really just "tempt the
 		// race detector"
 		t.Run("ManagedLock", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			count := 0
 			op := Operation(func(context.Context) { count++ })
 			wg := &WaitGroup{}
@@ -333,7 +351,9 @@ func TestOperation(t *testing.T) {
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			count := 0
 			op := Operation(func(context.Context) { count++ })
 			wg := &WaitGroup{}
@@ -347,7 +367,9 @@ func TestOperation(t *testing.T) {
 			op := Operation(func(context.Context) {
 				count++
 			}).Lock()
-			ctx := testt.Context(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			jobs := []Operation{}
 
@@ -364,7 +386,10 @@ func TestOperation(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			count.Add(1)
 		})
-		ctx := testt.Context(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		sig := op.Signal(ctx)
 		check.Equal(t, count.Load(), 0)
 		<-sig
@@ -376,7 +401,10 @@ func TestOperation(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 			count.Add(1)
 		})
-		ctx := testt.Context(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		opwait := op.Future(ctx)
 		check.Equal(t, count.Load(), 0)
 		time.Sleep(100 * time.Millisecond)
@@ -390,16 +418,17 @@ func TestOperation(t *testing.T) {
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("Chain", func(t *testing.T) {
 			count := 0
-			rctx := testt.Context(t)
+
+			rctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			var wf Operation = func(ctx context.Context) {
-				testt.Log(t, count)
 				check.True(t, count == 1 || count == 4)
 				check.Equal(t, rctx, ctx)
 				count++
 			}
 
 			wf = wf.PreHook(func(ctx context.Context) {
-				testt.Log(t, count)
 				check.True(t, count == 0 || count == 3)
 				check.Equal(t, rctx, ctx)
 				count++
@@ -407,7 +436,6 @@ func TestOperation(t *testing.T) {
 			wf(rctx)
 			check.Equal(t, 2, count)
 			wf = wf.PreHook(func(ctx context.Context) {
-				testt.Log(t, count)
 				check.Equal(t, count, 2)
 				check.Equal(t, rctx, ctx)
 				count++
@@ -421,7 +449,10 @@ func TestOperation(t *testing.T) {
 				assert.Equal(t, count, 1)
 				count++
 			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
-			ctx := testt.Context(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			pf(ctx)
 			check.Equal(t, 2, count)
 		})
@@ -432,7 +463,10 @@ func TestOperation(t *testing.T) {
 			assert.Zero(t, count)
 			count++
 		}).PostHook(func() { assert.Equal(t, count, 1); count++ })
-		ctx := testt.Context(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		pf(ctx)
 		check.Equal(t, 2, count)
 	})
@@ -482,7 +516,7 @@ func TestOperation(t *testing.T) {
 		start := time.Now()
 		wf(ctx)
 		dur := time.Since(start).Truncate(time.Millisecond)
-		testt.Logf(t, "op took %s with delay %s", dur, delay)
+
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.True(t, dur < 200*time.Millisecond)
 
@@ -490,7 +524,7 @@ func TestOperation(t *testing.T) {
 		start = time.Now()
 		wf(ctx)
 		dur = time.Since(start).Truncate(time.Millisecond)
-		testt.Logf(t, "op took %s with delay %s", dur, delay)
+
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 102*time.Millisecond)
 	})

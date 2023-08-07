@@ -12,7 +12,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestSet(t *testing.T) {
@@ -24,7 +23,9 @@ func TestSet(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Run("EmptyIteraton", func(t *testing.T) {
-				ctx := testt.Context(t)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				set := builder()
 				ct := 0
 				assert.NotPanic(t, func() {
@@ -60,7 +61,9 @@ func TestSet(t *testing.T) {
 
 			})
 			t.Run("JSON", func(t *testing.T) {
-				ctx := testt.Context(t)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				set := builder()
 				set.Add("hello")
 				set.Add("merlin")
@@ -88,8 +91,6 @@ func TestSet(t *testing.T) {
 					}
 				}
 				check.Equal(t, count, set.Len())
-				testt.Log(t, "rjson", rjson)
-				testt.Log(t, "set", set)
 				nset := builder()
 				assert.NotError(t, nset.UnmarshalJSON(data))
 				check.True(t, set.Equal(nset))
@@ -121,7 +122,6 @@ func TestSet(t *testing.T) {
 				assert.NotError(t, err)
 
 				during := runtime.NumGoroutine()
-				testt.Log(t, "before", before, "vs during", during)
 				assert.True(t, during >= before)
 
 				time.Sleep(50 * time.Millisecond)
@@ -129,7 +129,6 @@ func TestSet(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 
 				after := runtime.NumGoroutine()
-				testt.Log(t, "before", before, "vs after", after)
 				assert.True(t, before >= after)
 			})
 
@@ -181,7 +180,7 @@ func TestSet(t *testing.T) {
 					}
 				},
 				// "Populator": func(set Set[string]) {
-				// 	Populate(ctx, set, generateIter(ctx, 100))
+				//	Populate(ctx, set, generateIter(ctx, 100))
 				// },
 			} {
 				t.Run(populatorName, func(t *testing.T) {
@@ -220,7 +219,9 @@ func TestSet(t *testing.T) {
 						}
 					})
 					t.Run("InqualitySizeComplex", func(t *testing.T) {
-						ctx := testt.Context(t)
+						ctx, cancel := context.WithCancel(context.Background())
+						defer cancel()
+
 						set := builder()
 						populator(set)
 						count := 0

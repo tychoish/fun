@@ -8,11 +8,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestPairs(t *testing.T) {
@@ -26,7 +24,8 @@ func TestPairs(t *testing.T) {
 		assert.Equal(t, mp["in"], "out") // first value wins
 	})
 	t.Run("IterationOrder", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		ps := Pairs[int, int]{}
 		for i := 0; i < 128; i++ {
@@ -52,7 +51,9 @@ func TestPairs(t *testing.T) {
 	})
 	t.Run("Consume", func(t *testing.T) {
 		t.Run("Prime", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			ps := Pairs[int, int]{}
 			sp := Pairs[int, int]{}
 			for i := 0; i < 128; i++ {
@@ -89,9 +90,12 @@ func TestPairs(t *testing.T) {
 			check.Equal(t, 4, idx)
 		})
 		t.Run("Values", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			p := Pairs[string, int]{}
 			err := p.ConsumeValues(
-				testt.Context(t),
+				ctx,
 				Sliceify([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
 			)
@@ -171,32 +175,6 @@ func TestPairs(t *testing.T) {
 			ps.SortMerge(cmp)
 			check.True(t, list.IsSorted(cmp))
 		})
-	})
-	t.Run("ConsumePairs", func(t *testing.T) {
-		t.Run("Normal", func(t *testing.T) {
-			iter := Sliceify[Pair[string, int]]([]Pair[string, int]{
-				MakePair("1", 1), MakePair("2", 2),
-				MakePair("3", 3), MakePair("4", 4),
-				MakePair("5", 5), MakePair("6", 6),
-			}).Iterator()
-			ctx := testt.Context(t)
-			ps, err := ConsumePairs(ctx, iter)
-			check.NotError(t, err)
-			assert.True(t, ps != nil)
-			check.Equal(t, ps.Len(), 6)
-		})
-		t.Run("", func(t *testing.T) {
-			expected := errors.New("hi")
-			iter := fun.StaticProducer(MakePair("1", 1), expected).Iterator()
-
-			ctx := testt.Context(t)
-
-			ps, err := ConsumePairs(ctx, iter)
-			check.Error(t, err)
-			check.ErrorIs(t, err, expected)
-			assert.True(t, ps == nil)
-		})
-
 	})
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func makeMap(size int) Map[string, int] {
@@ -23,7 +22,9 @@ func makeMap(size int) Map[string, int] {
 
 func TestMap(t *testing.T) {
 	t.Run("ExpectedSize", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		mp := makeMap(100)
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
@@ -45,7 +46,9 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("Append", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		mp := makeMap(100)
 
 		// noop because same keys
@@ -118,7 +121,9 @@ func TestMap(t *testing.T) {
 			check.Equal(t, mp["3"], 3)
 		})
 		t.Run("Prine", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			orig := Map[string, int]{
 				"1": 1,
 				"2": 2,
@@ -135,7 +140,9 @@ func TestMap(t *testing.T) {
 
 		})
 		t.Run("Values", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			mp := Map[string, int]{}
 			mp.ConsumeValues(ctx,
 				Sliceify([]int{1, 2, 3}).Iterator(),
@@ -148,7 +155,9 @@ func TestMap(t *testing.T) {
 		})
 	})
 	t.Run("MapConverter", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		in := map[string]string{
 			"hi":  "there",
 			"how": "are you doing",
@@ -170,7 +179,9 @@ func TestMap(t *testing.T) {
 		assert.Equal(t, seen, len(in))
 	})
 	t.Run("Constructors", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		t.Run("MapKeys", func(t *testing.T) {
 			mp := Map[string, int]{}
 			mp.Add("big", 42)

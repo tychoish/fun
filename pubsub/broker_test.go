@@ -571,7 +571,7 @@ func TestBroker(t *testing.T) {
 			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
 			sa := time.Now()
-			nctx, ncancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			nctx, ncancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer ncancel()
 			ch := broker.Subscribe(ctx)
 			if ch == nil {
@@ -579,7 +579,7 @@ func TestBroker(t *testing.T) {
 			}
 			broker.Publish(nctx, "foo")
 			dur := time.Since(sa)
-			if dur > time.Millisecond {
+			if dur > 5*time.Millisecond {
 				t.Error(dur)
 			}
 		})

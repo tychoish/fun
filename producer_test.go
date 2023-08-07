@@ -13,13 +13,14 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestProducer(t *testing.T) {
 	t.Parallel()
 	t.Run("WithCancel", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		wf, cancel := Producer[int](func(ctx context.Context) (int, error) {
 			timer := time.NewTimer(time.Hour)
 			defer timer.Stop()
@@ -43,7 +44,9 @@ func TestProducer(t *testing.T) {
 		})
 	})
 	t.Run("Once", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		called := 0
 		pf := Producer[int](func(ctx context.Context) (int, error) {
 			called++
@@ -57,7 +60,8 @@ func TestProducer(t *testing.T) {
 		check.Equal(t, called, 1)
 	})
 	t.Run("If", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		called := 0
 		pf := Producer[int](func(ctx context.Context) (int, error) {
 			called++
@@ -76,7 +80,8 @@ func TestProducer(t *testing.T) {
 		check.Equal(t, 3, called)
 	})
 	t.Run("When", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		called := 0
 		pf := Producer[int](func(ctx context.Context) (int, error) {
 			called++
@@ -96,7 +101,9 @@ func TestProducer(t *testing.T) {
 	})
 	t.Run("Constructor", func(t *testing.T) {
 		t.Run("Value", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			pf := ValueProducer(42)
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
@@ -105,7 +112,9 @@ func TestProducer(t *testing.T) {
 			}
 		})
 		t.Run("Static", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			root := ers.Error(t.Name())
 			pf := StaticProducer(42, root)
 			for i := 0; i < 1024; i++ {
@@ -115,7 +124,9 @@ func TestProducer(t *testing.T) {
 			}
 		})
 		t.Run("Blocking", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			root := ers.Error(t.Name())
 			pf := MakeProducer(func() (int, error) { return 42, root })
 			for i := 0; i < 1024; i++ {
@@ -128,8 +139,12 @@ func TestProducer(t *testing.T) {
 			callCount := 0
 			errCount := 0
 			root := ers.Error(t.Name())
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			pf := MakeProducer(func() (int, error) { callCount++; return 42, root })
-			ff := pf.Future(testt.Context(t), func(err error) { errCount++; assert.ErrorIs(t, err, root) })
+			ff := pf.Future(ctx, func(err error) { errCount++; assert.ErrorIs(t, err, root) })
 			for i := 0; i < 1024; i++ {
 				v := ff()
 				assert.Equal(t, v, 42)
@@ -139,7 +154,8 @@ func TestProducer(t *testing.T) {
 		})
 
 		t.Run("Consistent", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			pf := ConsistentProducer(func() int { return 42 })
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
@@ -150,7 +166,8 @@ func TestProducer(t *testing.T) {
 	})
 	t.Run("Lock", func(t *testing.T) {
 		t.Run("NilLockPanics", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			count := 0
 			op := Producer[int](func(context.Context) (int, error) {
 				count++
@@ -166,7 +183,8 @@ func TestProducer(t *testing.T) {
 		// the rest of the tests are really just "tempt the
 		// race detector"
 		t.Run("ManagedLock", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			count := 0
 			op := Producer[int](func(context.Context) (int, error) {
 				count++
@@ -185,7 +203,8 @@ func TestProducer(t *testing.T) {
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			count := 0
 			op := Producer[int](func(context.Context) (int, error) {
 				count++
@@ -208,7 +227,8 @@ func TestProducer(t *testing.T) {
 				count++
 				return 42, nil
 			}).Lock()
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			obct := 0
 			obv := Handle(func(in int) { obct++; check.Equal(t, in, 42) }).Lock()
@@ -283,7 +303,8 @@ func TestProducer(t *testing.T) {
 	})
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("Exhausted", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			count := 0
 			var pf Producer[int] = func(_ context.Context) (int, error) { count++; return -1, io.EOF }
 			pf = pf.Join(pf)
@@ -300,7 +321,8 @@ func TestProducer(t *testing.T) {
 			assert.Equal(t, 0, out)
 		})
 		t.Run("FirstContinues", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			counter := &atomic.Int64{}
 
 			pf := producerContinuesOnce(42, counter)
@@ -318,7 +340,8 @@ func TestProducer(t *testing.T) {
 			check.Equal(t, counter.Load(), 4)
 		})
 		t.Run("SecondContinues", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			counter := &atomic.Int64{}
 			pf := Producer[int](func(ctx context.Context) (int, error) {
 				return -1, io.EOF
@@ -329,7 +352,8 @@ func TestProducer(t *testing.T) {
 			assert.Equal(t, counter.Load(), 2)
 		})
 		t.Run("ErrorFirstCanceled", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			count := 0
 			pf := Producer[int](func(ctx context.Context) (int, error) {
 				return -1, context.Canceled
@@ -348,7 +372,8 @@ func TestProducer(t *testing.T) {
 			assert.Zero(t, count)
 		})
 		t.Run("SecondCancled", func(t *testing.T) {
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			counter := 0
 			pf := Producer[int](func(ctx context.Context) (int, error) {
 				return -1, io.EOF
@@ -376,7 +401,8 @@ func TestProducer(t *testing.T) {
 				count++
 				return 42, nil
 			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			val, err := pf(ctx)
 			check.Error(t, err)
 			check.Equal(t, val, 42)
@@ -389,7 +415,8 @@ func TestProducer(t *testing.T) {
 				count++
 				return 42, nil
 			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			val, err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, 42)
@@ -405,7 +432,8 @@ func TestProducer(t *testing.T) {
 				count++
 				return 42, nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			val, err := pf(ctx)
 			check.Error(t, err)
 			check.Equal(t, val, 42)
@@ -418,7 +446,8 @@ func TestProducer(t *testing.T) {
 				count++
 				return 42, nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
-			ctx := testt.Context(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			val, err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, 42)
@@ -438,7 +467,11 @@ func TestProducer(t *testing.T) {
 				count++
 				return nil
 			})
-			check.NotError(t, wf(testt.Context(t)))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			check.NotError(t, wf(ctx))
 			check.Equal(t, 2, count)
 		})
 		t.Run("OneError", func(t *testing.T) {
@@ -452,7 +485,10 @@ func TestProducer(t *testing.T) {
 				assert.Equal(t, "should not run", "")
 				return nil
 			})
-			err := wf(testt.Context(t))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := wf(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, root)
 			check.Equal(t, 1, count)
@@ -477,13 +513,15 @@ func TestProducer(t *testing.T) {
 			return nil
 		})
 		check.Equal(t, 0, count)
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		check.NotError(t, worker(ctx))
 		check.Equal(t, 43, count)
 	})
 	t.Run("Future", func(t *testing.T) {
 		sig := make(chan struct{})
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		count := &atomic.Int64{}
 		errSignaled := ers.New("signaled")
 		var prod Producer[int] = func(ctx context.Context) (int, error) {
@@ -708,7 +746,7 @@ func TestProducer(t *testing.T) {
 		check.ErrorIs(t, err, expected)
 		check.Equal(t, out, 42)
 		dur := time.Since(start).Truncate(time.Millisecond)
-		testt.Logf(t, "op took %s with delay %s", dur, delay)
+
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.True(t, dur < 200*time.Millisecond)
 
@@ -720,7 +758,7 @@ func TestProducer(t *testing.T) {
 		check.Equal(t, out, 42)
 
 		dur = time.Since(start).Truncate(time.Millisecond)
-		testt.Logf(t, "op took %s with delay %s", dur, delay)
+
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
 	})

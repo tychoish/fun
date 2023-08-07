@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestFuture(t *testing.T) {
@@ -93,9 +92,12 @@ func TestFuture(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 }).Lock()
 
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		// tempt the race detector.
 		wg := &WaitGroup{}
-		wg.DoTimes(testt.Context(t), 128, func(context.Context) {
+		wg.DoTimes(ctx, 128, func(context.Context) {
 			check.Equal(t, thunk(), 42)
 		})
 
@@ -105,9 +107,12 @@ func TestFuture(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 }).WithLock(&sync.Mutex{})
 
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		// tempt the race detector.
 		wg := &WaitGroup{}
-		wg.DoTimes(testt.Context(t), 128, func(context.Context) {
+		wg.DoTimes(ctx, 128, func(context.Context) {
 			check.Equal(t, thunk(), 42)
 		})
 
@@ -144,7 +149,12 @@ func TestFuture(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 }).Producer()
 		check.Equal(t, count, 0)
-		testFuture := testt.Must[int](thunk(testt.Context(t)))(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		testFuture, err := thunk(ctx)
+		assert.NotError(t, err)
 		check.Equal(t, testFuture, 42)
 	})
 	t.Run("Translate", func(t *testing.T) {
@@ -180,7 +190,7 @@ func TestFuture(t *testing.T) {
 			count := 0
 			thunk := Futurize(func() int { count++; return 42 }).TTL(50 * time.Millisecond)
 			ft.DoTimes(100, func() { time.Sleep(25 * time.Millisecond); check.Equal(t, 42, thunk()) })
-			testt.Log(t, "count value is", count)
+
 			check.Equal(t, count, 50)
 		})
 	})

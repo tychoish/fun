@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestPanics(t *testing.T) {
@@ -173,7 +173,8 @@ func TestPanics(t *testing.T) {
 		})
 	})
 	t.Run("Handler", func(t *testing.T) {
-		ctx := testt.Context(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var of Handler[string]
 		t.Run("Worker", func(t *testing.T) {
 			var called bool

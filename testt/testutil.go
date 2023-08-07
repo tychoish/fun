@@ -5,8 +5,11 @@ package testt
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/dt"
 )
 
 // Context creates a context and attaches its cancellation function to
@@ -79,4 +82,28 @@ func Must[T any](out T, err error) func(t testing.TB) T {
 		}
 		return out
 	}
+}
+
+func WithEnv(t *testing.T, ev dt.Pair[string, string], op func()) {
+	t.Helper()
+
+	prev, wasSet := os.LookupEnv(ev.Key)
+
+	defer func() {
+		if wasSet {
+			if err := os.Setenv(ev.Key, prev); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		if err := os.Unsetenv(ev.Key); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	if err := os.Setenv(ev.Key, ev.Value); err != nil {
+		t.Fatal(err)
+	}
+
+	op()
 }
