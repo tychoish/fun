@@ -38,7 +38,7 @@ func TestValueAtQuantile(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -78,7 +78,7 @@ func TestMean(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -94,7 +94,7 @@ func TestStdDev(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -110,10 +110,10 @@ func TestTotalCount(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
-		if v, want := h.TotalCount(), int64(i+1); v != want {
+		if v, want := h.TotalCount(), i+1; v != want {
 			t.Errorf("TotalCount was %v, but expected %v", v, want)
 		}
 	}
@@ -125,7 +125,7 @@ func TestMax(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -141,7 +141,7 @@ func TestReset(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -184,7 +184,7 @@ func TestMin(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -238,7 +238,7 @@ func TestCumulativeDistribution(t *testing.T) {
 	h := hdrhist.New(1, num, 3)
 
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -343,7 +343,7 @@ func TestHighestTrackableValue(t *testing.T) {
 func BenchmarkHistRecordValue(b *testing.B) {
 	h := hdrhist.New(1, num, 3)
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -398,11 +398,11 @@ func TestExportImport(t *testing.T) {
 	defer without(raceDetector())
 
 	min := int64(1)
-	max := int64(num)
+	max := num
 	sigfigs := 3
 	h := hdrhist.New(min, max, sigfigs)
 	for i := int64(0); i < num/10; i++ {
-		if err := h.RecordValue(int64(i)); err != nil {
+		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -432,7 +432,7 @@ func TestEquals(t *testing.T) {
 
 	h1 := hdrhist.New(1, num, 3)
 	for i := int64(0); i < num/10; i++ {
-		if err := h1.RecordValue(int64(i)); err != nil {
+		if err := h1.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}

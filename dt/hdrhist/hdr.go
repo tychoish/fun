@@ -294,11 +294,6 @@ type Bar struct {
 	From, To, Count int64
 }
 
-// Pretty print as csv for easy plotting
-func (b Bar) String() string {
-	return fmt.Sprintf("%v, %v, %v\n", b.From, b.To, b.Count)
-}
-
 // Distribution returns an ordered list of bars of the
 // distribution of recorded values, counts can be normalized to a probability
 func (h *Histogram) Distribution() (result []Bar) {
