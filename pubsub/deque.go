@@ -257,21 +257,41 @@ func (dq *Deque[T]) IteratorReverse() *fun.Iterator[T] {
 	return dq.ProducerReverse().Iterator()
 }
 
+// Producer exposes the deque to a single-function interface for
+// iteration. The producer function operation will not modify the
+// contents of the Deque, but will produce elements from the deque,
+// front to back.
 func (dq *Deque[T]) Producer() fun.Producer[T] {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.confProducer(dqNext, false).WithLock(dq.mtx)
 }
 
+// ProducerBlocking exposes the deque to a single-function interface
+// for iteration. The producer function operation will not modify the
+// contents of the Deque, but will produce elements from the deque,
+// front to back, and will block for a new element if the deque is
+// empty or the producer reaches the end, the operation will block
+// until another item is added.
 func (dq *Deque[T]) ProducerBlocking() fun.Producer[T] {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.confProducer(dqNext, true).WithLock(dq.mtx)
 }
 
+// Producer exposes the deque to a single-function interface for
+// iteration. The producer function operation will not modify the
+// contents of the Deque, but will produce elements from the deque,
+// back to front.
 func (dq *Deque[T]) ProducerReverse() fun.Producer[T] {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.confProducer(dqPrev, false).WithLock(dq.mtx)
 }
 
+// ProducerReverseBlocking exposes the deque to a single-function interface
+// for iteration. The producer function operation will not modify the
+// contents of the Deque, but will produce elements from the deque,
+// back to fron, and will block for a new element if the deque is
+// empty or the producer reaches the end, the operation will block
+// until another item is added.
 func (dq *Deque[T]) ProducerReverseBlocking() fun.Producer[T] {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.confProducer(dqPrev, true).WithLock(dq.mtx)
@@ -299,12 +319,10 @@ func (dq *Deque[T]) confProducer(direction dqDirection, blocking bool) fun.Produ
 	}
 }
 
-// Distributor produces a consuming Distributor implementation that
-// always accepts new Push operations by removing the oldest element
-// in the queue, with Pop operations returning the oldest elements
-// first (FIFO).
-//
-// If the deque is full, the write operations block.
+// Distributor produces a Distributor instance with
+// Send/Receive operations that block if Deque is full or empty
+// (respectively). Receive operations always remove the element from
+// the Deque.
 func (dq *Deque[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
 		push: dq.WaitPushBack,
@@ -313,6 +331,9 @@ func (dq *Deque[T]) Distributor() Distributor[T] {
 	}
 }
 
+// DistributorNonBlocking produces a distributor instance that always
+// accepts send items: if the deque is full, it removes one element
+// from the front of the queue before adding them to the back.
 func (dq *Deque[T]) DistributorNonBlocking() Distributor[T] {
 	return Distributor[T]{
 		push: fun.MakeProcessor(dq.ForcePushBack),

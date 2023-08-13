@@ -640,7 +640,7 @@ func TestBroker(t *testing.T) {
 		popsig := make(chan struct{})
 		go func() {
 			defer close(popsig)
-			if err := Populate(ctx, iter, broker); err != nil {
+			if err := broker.Populate(iter).Run(ctx); err != nil {
 				t.Error(err)
 			}
 		}()

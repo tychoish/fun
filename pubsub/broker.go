@@ -220,6 +220,26 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Iterator[chan
 
 }
 
+// Populate creates a fun.Worker function that publishes items from
+// the input iterator to the broker, returning when its context
+// expires or the iterator is closed (propagating its error).
+//
+// Callers should avoid using an iterator that will retain input
+// items in memory.
+func (b *Broker[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
+	return func(ctx context.Context) error {
+		for {
+			val, err := iter.ReadOne(ctx)
+			if err != nil {
+				break
+			}
+			b.Publish(ctx, val)
+		}
+
+		return iter.Close()
+	}
+}
+
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	signal := make(chan BrokerStats)
