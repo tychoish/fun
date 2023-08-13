@@ -91,9 +91,7 @@ func (Handlers) ErrorHandler(of Handler[error]) Handler[error] {
 // producer are protexted by a shared mutex.
 func (Handlers) ErrorCollector() (ob Handler[error], prod Future[[]error]) {
 	var errs []error
-
 	ob = func(err error) { errs = append(errs, err) }
-
 	prod = func() []error { return errs }
 	mtx := &sync.Mutex{}
 	return HF.ErrorHandler(ob).WithLock(mtx), prod.WithLock(mtx)

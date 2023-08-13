@@ -440,8 +440,8 @@ func TestIterator(t *testing.T) {
 		input := SliceIterator(GenerateRandomStringSlice(128))
 		buf := input.Buffer(256)
 		check.Equal(t, buf.Count(ctx), 128)
-		check.True(t, buf.closed.Load())
-		check.True(t, input.closed.Load())
+		check.True(t, buf.closer.state.Load())
+		check.True(t, input.closer.state.Load())
 	})
 	t.Run("ParallelBuffer", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -449,8 +449,8 @@ func TestIterator(t *testing.T) {
 		input := SliceIterator(GenerateRandomStringSlice(128))
 		buf := input.ParallelBuffer(256)
 		check.Equal(t, buf.Count(ctx), 128)
-		check.True(t, buf.closed.Load())
-		check.True(t, input.closed.Load())
+		check.True(t, buf.closer.state.Load())
+		check.True(t, input.closer.state.Load())
 	})
 	t.Run("Slice", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
@@ -476,8 +476,8 @@ func TestIterator(t *testing.T) {
 			cancel()
 			iter := &Iterator[int]{
 				operation: func(context.Context) (int, error) { return 0, nil },
-				closer:    func() {},
 			}
+			iter.closer.op = func() {}
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -745,7 +745,8 @@ func TestJSON(t *testing.T) {
 		}
 	})
 	t.Run("ErrorHandler", func(t *testing.T) {
-		iter := &Iterator[string]{}
+		iter := SliceIterator([]string{})
+
 		ec := iter.ErrorHandler()
 		ec(io.EOF)
 		ec(ers.ErrInvalidInput)

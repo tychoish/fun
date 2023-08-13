@@ -215,7 +215,10 @@ func (pf Producer[T]) Once() Producer[T] {
 // method.
 func (pf Producer[T]) Iterator() *Iterator[T] {
 	op, cancel := pf.WithCancel()
-	return &Iterator[T]{operation: op, closer: cancel}
+	iter := &Iterator[T]{operation: op}
+	iter.closer.op = cancel
+	iter.err.handler, iter.err.future = HF.ErrorCollector()
+	return iter
 }
 
 // IteratorWithHook constructs an Iterator from the producer. The
@@ -225,7 +228,8 @@ func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
 	once := &sync.Once{}
 	op, cancel := pf.WithCancel()
 	iter := &Iterator[T]{operation: op}
-	iter.closer = func() { once.Do(func() { hook(iter) }); cancel() }
+	iter.closer.op = func() { once.Do(func() { hook(iter) }); cancel() }
+	iter.err.handler, iter.err.future = HF.ErrorCollector()
 	return iter
 }
 

@@ -68,14 +68,18 @@ const ErrIteratorSkip ers.Error = ers.Error("skip-iteration")
 // iterator.
 type Iterator[T any] struct {
 	operation Producer[T]
+	value     T
 
-	closed atomic.Bool
-	value  T
-	err    error
+	err struct {
+		handler Handler[error]
+		future  Future[[]error]
+	}
 
-	// the once protects the closer
-	closeOnce sync.Once
-	closer    context.CancelFunc
+	closer struct {
+		state atomic.Bool
+		once  sync.Once
+		op    context.CancelFunc
+	}
 }
 
 // Generator creates an iterator that produces new values, using the
@@ -155,28 +159,28 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	return pipe.Receive().
 		Producer().
 		PreHook(init).
-		IteratorWithHook(func(iter *Iterator[T]) { iter.err = ers.Join(append(ep.Run(), iter.err)...) })
+		IteratorWithHook(func(iter *Iterator[T]) { iter.AddError(ers.Join(ep()...)) })
 }
 
 func (i *Iterator[T]) doClose() {
-	i.closeOnce.Do(func() { i.closed.Store(true); ft.SafeCall(i.closer) })
+	i.closer.once.Do(func() { i.closer.state.Store(true); ft.SafeCall(i.closer.op) })
 }
 
 // Close terminates the iterator and returns any errors collected
 // during iteration. If the iterator allocates resources, this
 // will typically release them, but close may not block until all
 // resources are released.
-func (i *Iterator[T]) Close() error { i.doClose(); return i.err }
+func (i *Iterator[T]) Close() error { i.doClose(); return ers.Join(ft.SafeDo(i.err.future)...) }
 
 // AddError can be used by calling code to add errors to the
 // iterator, which are merged.
 //
 // AddError is not safe for concurrent use (with regards to other
 // AddError calls or Close).
-func (i *Iterator[T]) AddError(e error) { i.err = ers.Join(e, i.err) }
+func (i *Iterator[T]) AddError(e error) { i.err.handler(e) }
 
 // ErrorHandler provides access to the AddError method as an error observer.
-func (i *Iterator[T]) ErrorHandler() Handler[error] { return i.AddError }
+func (i *Iterator[T]) ErrorHandler() Handler[error] { return i.err.handler }
 
 // Producer provides access to the contents of the iterator as a
 // Producer function.
@@ -201,7 +205,7 @@ func (i *Iterator[T]) Value() T { return i.value }
 // directly, or use Split to create an iterator that safely draws
 // items from the parent iterator.
 func (i *Iterator[T]) Next(ctx context.Context) bool {
-	if i.operation == nil || i.closed.Load() || ctx.Err() != nil {
+	if i.operation == nil || i.closer.state.Load() || ctx.Err() != nil {
 		return false
 	}
 
@@ -221,7 +225,7 @@ func (i *Iterator[T]) Next(ctx context.Context) bool {
 // produced by the iterator. All errors produced by ReadOne are
 // terminal and indicate that no further iteration is possible.
 func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
-	if i.operation == nil || i.closed.Load() {
+	if i.operation == nil || i.closer.state.Load() {
 		return out, io.EOF
 	} else if err = ctx.Err(); err != nil {
 		return out, err
