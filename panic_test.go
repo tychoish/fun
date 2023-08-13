@@ -152,11 +152,11 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("MustBeOk", func(t *testing.T) {
 		assert.NotPanic(t, func() {
-			foo := ft.MustBeOk(func() (string, bool) { return "foo", true }())
+			foo := ft.MustBeOK(func() (string, bool) { return "foo", true }())
 			assert.Equal(t, "foo", foo)
 		})
 		assert.Panic(t, func() {
-			foo := ft.MustBeOk(func() (string, bool) { return "foo", false }())
+			foo := ft.MustBeOK(func() (string, bool) { return "foo", false }())
 			assert.Equal(t, "foo", foo)
 		})
 	})

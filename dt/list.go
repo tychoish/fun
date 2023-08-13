@@ -61,12 +61,12 @@ func (e *Element[T]) String() string { return fmt.Sprint(e.item) }
 // Value accesses the element's value.
 func (e *Element[T]) Value() T { return e.item }
 
-// Ok checks that an element is valid. Invalid elements can be
+// OK checks that an element is valid. Invalid elements can be
 // produced at the end of iterations (e.g. the list's root object,) or
 // if you attempt to Pop an element off of an empty list.
 //
 // Returns false when the element is nil.
-func (e *Element[T]) Ok() bool { return e != nil && e.ok }
+func (e *Element[T]) OK() bool { return e != nil && e.ok }
 
 // Next produces the next element. This is always non-nil, *unless*
 // the element is not a member of a list. At the ends of a list, the
@@ -126,7 +126,7 @@ func (e *Element[T]) UnmarshalJSON(in []byte) error {
 func (l *List[T]) MarshalJSON() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	_, _ = buf.Write([]byte("["))
-	for i := l.Front(); i.Ok(); i = i.Next() {
+	for i := l.Front(); i.OK(); i = i.Next() {
 		if i != l.Front() {
 			_, _ = buf.Write([]byte(","))
 		}
@@ -317,7 +317,7 @@ func (l *List[T]) Producer() fun.Producer[T] {
 	current := l.root
 	return func(ctx context.Context) (o T, _ error) {
 		current = current.Next()
-		if !current.Ok() || current == l.root {
+		if !current.OK() || current == l.root {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -340,7 +340,7 @@ func (l *List[T]) ProducerPop() fun.Producer[T] {
 	return func(ctx context.Context) (o T, _ error) {
 		current = l.PopFront()
 
-		if !current.Ok() || current == l.root {
+		if !current.OK() || current == l.root {
 			return o, io.EOF
 		}
 
@@ -356,7 +356,7 @@ func (l *List[T]) ProducerReverse() fun.Producer[T] {
 	current := l.root
 	return func(ctx context.Context) (o T, _ error) {
 		current = current.Previous()
-		if !current.Ok() || current == l.root {
+		if !current.OK() || current == l.root {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -371,7 +371,7 @@ func (l *List[T]) ProducerReversePop() fun.Producer[T] {
 	var current *Element[T]
 	return func(ctx context.Context) (o T, _ error) {
 		current = l.PopBack()
-		if !current.Ok() || current == l.root {
+		if !current.OK() || current == l.root {
 			return o, io.EOF
 		}
 		return current.item, nil
@@ -420,7 +420,7 @@ func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().
 // them to the end of the current list.
 func (l *List[T]) Extend(input *List[T]) {
 	back := l.Back()
-	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
+	for elem := input.PopFront(); elem.OK(); elem = input.PopFront() {
 		back = back.Append(elem)
 	}
 }
@@ -430,7 +430,7 @@ func (l *List[T]) Extend(input *List[T]) {
 // values of both lists would be shared.
 func (l *List[T]) Copy() *List[T] {
 	out := &List[T]{}
-	for elem := l.Front(); elem.Ok(); elem = elem.Next() {
+	for elem := l.Front(); elem.OK(); elem = elem.Next() {
 		out.PushBack(elem.Value())
 	}
 	return out

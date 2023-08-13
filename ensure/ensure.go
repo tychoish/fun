@@ -121,7 +121,7 @@ func (a *Assertion) Run(t testing.TB) {
 	t.Cleanup(func() {
 		t.Helper()
 		if a.alwaysLog || t.Failed() {
-			for it := a.messages.Front(); it.Ok(); it = it.Next() {
+			for it := a.messages.Front(); it.OK(); it = it.Next() {
 				ft.WhenHandle(ft.NotZero[string], strlogger, ft.SafeDo(it.Value()))
 			}
 		}
@@ -131,7 +131,7 @@ func (a *Assertion) Run(t testing.TB) {
 	result.AddWhen(!a.check.Defined() && a.subtests.Len() == 0, "no tests defined")
 	result.Extend(a.check.Resolve())
 
-	for sub := a.subtests.Front(); sub.Ok(); sub = sub.Next() {
+	for sub := a.subtests.Front(); sub.OK(); sub = sub.Next() {
 		st := sub.Value()
 
 		switch tt := t.(type) {

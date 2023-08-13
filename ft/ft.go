@@ -213,12 +213,12 @@ func Must[T any](arg T, err error) T {
 	return arg
 }
 
-// MustBeOk raises an invariant violation if the ok value is false,
+// MustBeOK raises an invariant violation if the ok value is false,
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := ft.MustBeOk(func() (string ok) { return "hello world", true })
-func MustBeOk[T any](out T, ok bool) T {
+//	out := ft.MustBeOK(func() (string ok) { return "hello world", true })
+func MustBeOK[T any](out T, ok bool) T {
 	WhenCall(!ok, func() { panic(ers.Join(ers.New("ok check failed"), ers.ErrInvariantViolation)) })
 	return out
 }

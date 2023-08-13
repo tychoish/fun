@@ -55,7 +55,7 @@ func TestStack(t *testing.T) {
 			t.Fatal(stack.Len())
 		}
 		v := stack.Pop()
-		if !v.Ok() {
+		if !v.OK() {
 			t.Fatal(v)
 		}
 		if v.Value() != 42 {
@@ -70,7 +70,7 @@ func TestStack(t *testing.T) {
 		if elem == nil {
 			t.Error("should have lazily initialized")
 		}
-		if elem.Ok() {
+		if elem.OK() {
 			t.Error("shouldn't be ok")
 		}
 	})
@@ -82,7 +82,7 @@ func TestStack(t *testing.T) {
 		if elem == nil {
 			t.Error("should have lazily initialized")
 		}
-		if elem.Ok() {
+		if elem.OK() {
 			t.Error("shouldn't be ok")
 		}
 	})
@@ -128,11 +128,11 @@ func TestStack(t *testing.T) {
 		t.Run("SetRoot", func(t *testing.T) {
 			stack := &dt.Stack[int]{}
 			stack.Push(100)
-			if val := stack.Pop(); !val.Ok() {
+			if val := stack.Pop(); !val.OK() {
 				t.Fatal("should have removed element")
 			}
 			root := stack.Head()
-			if root.Ok() || root.Value() != 0 {
+			if root.OK() || root.Value() != 0 {
 				t.Fatal("does not look like root", root)
 			}
 			if root.Set(200) {
@@ -234,7 +234,7 @@ func TestStack(t *testing.T) {
 		t.Run("Detach", func(t *testing.T) {
 			t.Run("UnconfiguredItem", func(t *testing.T) {
 				item := &dt.Item[string]{}
-				if item.Ok() {
+				if item.OK() {
 					t.Error("invalid item")
 				}
 				stack := item.Detach()
@@ -302,7 +302,7 @@ func TestStack(t *testing.T) {
 			idx := 0
 			seen := 0
 			t.Log(items)
-			for it := stack.Head(); it.Ok(); it = it.Next() {
+			for it := stack.Head(); it.OK(); it = it.Next() {
 				seen++
 				if it.Value() != items[idx] {
 					t.Fatal(seen, idx, items[idx], it.Value())

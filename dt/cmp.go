@@ -53,7 +53,7 @@ func (h *Heap[T]) Push(t T) {
 		return
 	}
 
-	for item := h.list.Back(); item.Ok(); item = item.Previous() {
+	for item := h.list.Back(); item.OK(); item = item.Previous() {
 		if h.LT(t, item.item) {
 			continue
 		}
@@ -77,7 +77,7 @@ func (h *Heap[T]) Len() int {
 
 // Pop removes the element from the underlying list and returns
 // it, with an OK value, which is true when the value returned is valid.
-func (h *Heap[T]) Pop() (T, bool) { h.lazySetup(); e := h.list.PopFront(); return e.Value(), e.Ok() }
+func (h *Heap[T]) Pop() (T, bool) { h.lazySetup(); e := h.list.PopFront(); return e.Value(), e.OK() }
 
 // Iterator provides an fun.Iterator interface to the heap. The
 // iterator consumes items from the heap, and will return when the
@@ -91,7 +91,7 @@ func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
 		return true
 	}
 
-	for item := l.root.Next(); item.next.Ok(); item = item.Next() {
+	for item := l.root.Next(); item.next.OK(); item = item.Next() {
 		if lt(item.Value(), item.Previous().Value()) {
 			return false
 		}

@@ -110,7 +110,7 @@ func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
 		if p.ll.Len() == 0 {
 			return nil
 		}
-		for li := p.ll.Front(); li.Ok(); li = li.Next() {
+		for li := p.ll.Front(); li.OK(); li = li.Next() {
 			if err := pf(ctx, li.Value()); err != nil {
 				return err
 			}
@@ -211,7 +211,7 @@ func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) *Pairs[K, V] {
 func (p *Pairs[K, V]) Map() map[K]V {
 	p.init()
 	out := make(map[K]V, p.ll.Len())
-	for i := p.ll.Front(); i.Ok(); i = i.Next() {
+	for i := p.ll.Front(); i.OK(); i = i.Next() {
 		pair := i.Value()
 		if _, ok := out[pair.Key]; ok {
 			continue

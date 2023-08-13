@@ -28,7 +28,7 @@ func ClearList(t testing.TB, list *List[int]) {
 		return
 	}
 
-	for list.PopFront().Ok() {
+	for list.PopFront().OK() {
 		// pass
 	}
 	if list.Len() != 0 {
@@ -257,7 +257,7 @@ func BenchmarkSorts(b *testing.B) {
 			e = NewElement(i)
 		}
 		b.StopTimer()
-		if !e.Ok() {
+		if !e.OK() {
 			b.Fatal(e)
 		}
 	})

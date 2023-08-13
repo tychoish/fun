@@ -448,21 +448,21 @@ func TestChannel(t *testing.T) {
 			t.Run("DirectReturns", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				check.True(t, NonBlockingReceive(ctx.Done()).Ok())
+				check.True(t, NonBlockingReceive(ctx.Done()).OK())
 				cancel()
-				check.True(t, !BlockingReceive(ctx.Done()).Ok())
-				check.True(t, !NonBlockingReceive(ctx.Done()).Ok())
+				check.True(t, !BlockingReceive(ctx.Done()).OK())
+				check.True(t, !NonBlockingReceive(ctx.Done()).OK())
 			})
 			t.Run("Impossible", func(t *testing.T) {
 				ch := &ChanOp[struct{}]{ch: make(chan struct{}), mode: 43}
-				assert.Panic(t, func() { ch.Receive().Ok() })
+				assert.Panic(t, func() { ch.Receive().OK() })
 			})
 			t.Run("Blocks", func(t *testing.T) {
 				assert.MaxRuntime(t, 500*time.Millisecond, func() {
 					assert.MinRuntime(t, 100*time.Millisecond, func() {
 						ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 						defer cancel()
-						BlockingReceive(ctx.Done()).Ok()
+						BlockingReceive(ctx.Done()).OK()
 					})
 				})
 			})
