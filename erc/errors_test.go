@@ -19,7 +19,7 @@ func (e *Stack) len() int {
 		return 0
 	}
 
-	var out int = 1
+	var out = 1
 	for item := e.next; item != nil; item = item.next {
 		if item.err != nil {
 			out++

@@ -88,7 +88,7 @@ func TestAtomic(t *testing.T) {
 				}
 			})
 			cur := atom.Load()
-			if 10.5*256 != cur {
+			if cur != 10.5*256 {
 				t.Error(cur)
 			}
 		})

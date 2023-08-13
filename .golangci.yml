@@ -25,6 +25,8 @@ linters-settings:
       - standard
       - default
       - Prefix(github.com/tychoish)
+  stylecheck:
+    checks: ["all", "-ST1023", "-ST1003"]
 
 linters:
   disable-all: true
@@ -36,6 +38,7 @@ linters:
     - errcheck
     - errchkjson
     - exportloopref
+    - exhaustive
     - gci
     - goimports
     - gosimple
@@ -45,5 +48,6 @@ linters:
     - noctx
     - nolintlint
     - staticcheck
+    - stylecheck
     - unconvert
     - unused

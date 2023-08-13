@@ -419,6 +419,7 @@ func (pf Producer[T]) GenerateParallel(
 				} else {
 					return value, nil
 				}
+
 			}).
 			Operation(func(err error) {
 				ft.WhenCall(errors.Is(err, io.EOF), cancel)
