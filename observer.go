@@ -56,7 +56,7 @@ func (of Handler[T]) Processor() Processor[T] {
 }
 
 // Iterator produces a worker that processes every item in the
-// iterator with the observer function.
+// iterator with the handler function function.
 func (of Handler[T]) Iterator(iter *Iterator[T]) Worker {
 	return func(ctx context.Context) error { return iter.Observe(ctx, of) }
 }
@@ -88,6 +88,20 @@ func (of Handler[T]) Filter(filter func(T) T) Handler[T] {
 	return func(in T) { of(filter(in)) }
 }
 
+// Join creates an observer function that runs both the root observer
+// and the "next" observer.
+func (of Handler[T]) Join(next Handler[T]) Handler[T] { return func(in T) { of(in); next(in) } }
+
+// Chain calls the base handler, and then calls every handler in the chain.
+func (of Handler[T]) Chain(chain ...Handler[T]) Handler[T] {
+	return func(in T) {
+		of(in)
+		for idx := range chain {
+			chain[idx](in)
+		}
+	}
+}
+
 // Once produces an observer function that runs exactly once, and
 // successive executions of the observer are noops.
 func (of Handler[T]) Once() Handler[T] {
@@ -104,6 +118,9 @@ func (of Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
 	return func(in T) { mtx.Lock(); defer mtx.Unlock(); of(in) }
 }
 
-// Join creates an observer function that runs both the root observer
-// and the "next" observer.
-func (of Handler[T]) Join(next Handler[T]) Handler[T] { return func(in T) { of(in); next(in) } }
+// All processes all inputs with the specified handler.
+func (of Handler[T]) All(in ...T) {
+	for idx := range in {
+		of(in[idx])
+	}
+}

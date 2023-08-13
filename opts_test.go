@@ -86,6 +86,7 @@ func TestOptionProvider(t *testing.T) {
 			wg.DoTimes(ctx, 128, func(ctx context.Context) {
 				opt.ErrorHandler(ers.New("hello"))
 			})
+			wg.Operation().Wait()
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 128)
 		})
 	})

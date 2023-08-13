@@ -97,19 +97,13 @@ func (wf Operation) Background(ctx context.Context) { go wf(ctx) }
 // operation itself.
 func (wf Operation) Go() Operation { return wf.Background }
 
-// Add starts a goroutine that waits for the Operation to return,
-// incrementing and decrementing the sync.WaitGroup as
-// appropriate. The execution of the wait fun blocks on Add's context.
-func (wf Operation) Add(ctx context.Context, wg *WaitGroup) {
-	wg.Add(1)
-	wf.PostHook(wg.Done).Background(ctx)
-}
+// Add starts a the operation in a goroutine incrementing and
+// decrementing the WaitGroup as appropriate.
+func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wg.Launch(ctx, wf) }
 
-// StartGroup runs n operations, incrementing the waitgroup as
-// appropriate.
-func (wf Operation) StartGroup(ctx context.Context, wg *WaitGroup, n int) {
-	ft.DoTimes(n, func() { wf.Add(ctx, wg) })
-}
+// StartGroup runs n operations, incrementing the WaitGroup to account
+// for the job. Callers must wait on the WaitGroup independently.
+func (wf Operation) StartGroup(ctx context.Context, wg *WaitGroup, n int) { wg.DoTimes(ctx, n, wf) }
 
 // Interval runs the operation with a timer that resets to the
 // provided duration. The operation runs immediately, and then the

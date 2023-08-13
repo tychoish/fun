@@ -377,8 +377,9 @@ func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	}
 }
 
-// Group is like StartGroup, except that the background workers in the
-// group do not start until the worker is resolved
+// Group makes a worker that runs n copies of the underlying worker,
+// in different go routines and aggregates their output. Work does not
+// start until the resulting worker is called
 func (wf Worker) Group(n int) Worker {
 	return func(ctx context.Context) error { return wf.StartGroup(ctx, n).Run(ctx) }
 }

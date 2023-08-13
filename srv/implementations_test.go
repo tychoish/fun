@@ -310,7 +310,7 @@ func TestDaemon(t *testing.T) {
 			check.NotError(t, ds.Start(ctx))
 			check.NotError(t, ds.Wait())
 		})
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 		assert.Equal(t, baseRunCounter.Load(), 10)
 	})
 	t.Run("WithCleanupShutdown", func(t *testing.T) {

@@ -19,6 +19,70 @@ import (
 func TestHandlers(t *testing.T) {
 	t.Parallel()
 	const root ers.Error = ers.Error("root-error")
+	t.Run("ErrorHandlerSingle", func(t *testing.T) {
+		hf, ef := HF.ErrorHandlerSingle()
+
+		t.Run("NoopsOnZero", func(t *testing.T) {
+			ft.DoTimes(100, func() {
+				hf(nil)
+				assert.NotError(t, ef())
+			})
+		})
+
+		t.Run("OnceStatic", func(t *testing.T) {
+			hf(root)
+			assert.ErrorIs(t, ef(), root)
+			ft.DoTimes(100, func() {
+				hf(nil)
+				assert.ErrorIs(t, ef(), root)
+			})
+		})
+
+		t.Run("OtherErrors", func(t *testing.T) {
+			hf(ers.Error("hello"))
+			assert.ErrorIs(t, ef(), root)
+		})
+	})
+	t.Run("ErrorHandlerAbort", func(t *testing.T) {
+		count := 0
+		eh := HF.ErrorHandlerWithAbort(func() { count++ })
+		checkNoopSemantics := func(n int) {
+			t.Run("NoopErrors", func(t *testing.T) {
+				t.Run("NotError", func(t *testing.T) {
+					eh(nil)
+					check.Equal(t, count, n)
+					var err error
+					eh(err)
+					check.Equal(t, count, n)
+				})
+				t.Run("ContextCanceled", func(t *testing.T) {
+					eh(context.Canceled)
+					check.Equal(t, count, n)
+
+					eh(context.DeadlineExceeded)
+					check.Equal(t, count, n)
+				})
+				t.Run("Wrapped", func(t *testing.T) {
+					eh(fmt.Errorf("oops: %w", context.Canceled))
+					check.Equal(t, count, n)
+
+					eh(fmt.Errorf("oops: %w", context.DeadlineExceeded))
+					check.Equal(t, count, n)
+				})
+
+			})
+		}
+		checkNoopSemantics(0)
+
+		eh(root)
+		check.Equal(t, count, 1)
+
+		checkNoopSemantics(1)
+
+		eh(root)
+
+		check.Equal(t, count, 2)
+	})
 	t.Run("ErrorProcessor", func(t *testing.T) {
 		count := 0
 		ctx, cancel := context.WithCancel(context.Background())

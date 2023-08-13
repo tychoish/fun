@@ -46,6 +46,7 @@ func (Handlers) OperationPool(iter *Iterator[Operation]) Operation {
 		defer wg.Wait(ctx)
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 			_ = iter.Observe(ctx, func(fn Operation) { wg.Launch(ctx, fn) })
@@ -127,6 +128,49 @@ func (Handlers) ErrorUnwindTransformer(filter ers.Filter) Transform[error, []err
 			}
 		}
 		return out, nil
+	}
+}
+
+// ErrorHandlerSingle creates an Handler/Future pair for errors that
+// that, with a lightweight concurrency control, captures the first
+// non-nil error it encounters.
+func (Handlers) ErrorHandlerSingle() (Handler[error], Future[error]) {
+	var latch = &atomic.Bool{}
+	var setter = &sync.Once{}
+	var cache error
+
+	return func(err error) {
+			if err == nil {
+				return
+			}
+
+			if latch.CompareAndSwap(false, true) {
+				setter.Do(func() { cache = err })
+			}
+		},
+		func() error {
+			if !latch.Load() {
+				return nil
+			}
+			// must wait for setter to resolve
+			setter.Do(func() {})
+			return cache
+		}
+}
+
+// ErrorHandlerWithAbort creates a new error handler that--ignoring
+// nil and context expiration errors--will call the provided context
+// cancellation function when it receives an error.
+//
+// Use the Chain and Join methods of handlers to further process the
+// error.
+func (Handlers) ErrorHandlerWithAbort(cancel context.CancelFunc) Handler[error] {
+	return func(err error) {
+		if err == nil || ers.ContextExpired(err) {
+			return
+		}
+
+		cancel()
 	}
 }
 

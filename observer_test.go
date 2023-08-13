@@ -86,16 +86,40 @@ func TestHandler(t *testing.T) {
 		assert.Equal(t, 1, count)
 	})
 	t.Run("Chain", func(t *testing.T) {
-		count := 0
-		var ob Handler[int] = func(in int) {
-			check.Equal(t, in, 100)
-			count++
-		}
+		t.Run("Join", func(t *testing.T) {
+			count := 0
+			var ob Handler[int] = func(in int) {
+				check.Equal(t, in, 100)
+				count++
+			}
 
-		cob := ob.Join(ob)
-		cob(100)
+			cob := ob.Join(ob)
+			cob(100)
 
-		assert.Equal(t, 2, count)
+			assert.Equal(t, 2, count)
+		})
+		t.Run("Many", func(t *testing.T) {
+			count := 0
+			var ob Handler[int] = func(in int) {
+				check.Equal(t, in, 100)
+				count++
+			}
+
+			cob := ob.Chain(ob, ob, ob)
+			cob(100)
+
+			assert.Equal(t, 4, count)
+		})
+		t.Run("All", func(t *testing.T) {
+			count := 0
+			var ob Handler[int] = func(in int) {
+				check.Equal(t, in, 100)
+				count++
+			}
+
+			ob.All(100, 100, 100, 100)
+			assert.Equal(t, 4, count)
+		})
 	})
 	t.Run("Lock", func(t *testing.T) {
 		// this is mostly just tempting the race detecor

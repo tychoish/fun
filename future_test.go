@@ -100,6 +100,7 @@ func TestFuture(t *testing.T) {
 		wg.DoTimes(ctx, 128, func(context.Context) {
 			check.Equal(t, thunk(), 42)
 		})
+		wg.Wait(ctx)
 
 		check.Equal(t, count, 128)
 	})
@@ -116,6 +117,7 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, thunk(), 42)
 		})
 
+		wg.Wait(ctx)
 		check.Equal(t, count, 128)
 	})
 	t.Run("Reduce", func(t *testing.T) {

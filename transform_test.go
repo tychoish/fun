@@ -1163,7 +1163,7 @@ func RunIteratorStringAlgoTests(
 			check.Equal(t, out, "42")
 			check.NotError(t, err)
 		})
-
+		wg.Wait(ctx)
 		check.Equal(t, count.Load(), 128)
 	})
 	t.Run("Pipe", func(t *testing.T) {
@@ -1198,6 +1198,7 @@ func RunIteratorStringAlgoTests(
 				assert.NotError(t, proc(ctx, 42))
 				assert.Equal(t, fmt.Sprint(42), ft.Must(prod(ctx)))
 			})
+			wg.Wait(ctx)
 		})
 	})
 	t.Run("Worker", func(t *testing.T) {

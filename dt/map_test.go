@@ -162,6 +162,7 @@ func TestMap(t *testing.T) {
 			"hi":  "there",
 			"how": "are you doing",
 		}
+
 		iter := Mapify(in).Iterator()
 		seen := 0
 		for iter.Next(ctx) {

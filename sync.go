@@ -3,6 +3,8 @@ package fun
 import (
 	"context"
 	"sync"
+
+	"github.com/tychoish/fun/ft"
 )
 
 func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
@@ -75,19 +77,20 @@ func (wg *WaitGroup) IsDone() bool {
 func (wg *WaitGroup) Operation() Operation { return wg.Wait }
 
 // DoTimes uses the WaitGroup to launch an operation in a worker pool
-// of the specified size, and blocks until all operations return or
-// the context is canceled.
+// of the specified size, and does not block until the operation returns.
 func (wg *WaitGroup) DoTimes(ctx context.Context, n int, op Operation) {
-	defer wg.Wait(ctx)
-	op.StartGroup(ctx, wg, n)
+	ft.DoTimes(n, func() { wg.Launch(ctx, op) })
 }
 
-// Launch adds an operation to the WaitGroup and starts the operation
-// in a go routine.
-func (wg *WaitGroup) Launch(ctx context.Context, op Operation) { op.Add(ctx, wg) }
+// Launch increments the WaitGroup and starts the operation in a go
+// routine.
+func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
+	wg.Add(1)
+	op.PostHook(wg.Done).Background(ctx)
+}
 
 // Worker returns a worker that will block on the wait group
-// returning and return the context's error if one exits.
+// returning and return the conbext's error if one exits.
 func (wg *WaitGroup) Worker() Worker {
 	return func(ctx context.Context) error { wg.Wait(ctx); return ctx.Err() }
 }
