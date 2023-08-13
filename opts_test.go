@@ -46,6 +46,18 @@ func TestOptionProvider(t *testing.T) {
 		check.Error(t, WorkerGroupConfWithErrorCollector(nil)(opt))
 		check.NotError(t, WorkerGroupConfWithErrorCollector(&Collector{})(opt))
 	})
+	t.Run("Build", func(t *testing.T) {
+		opt := &WorkerGroupConf{}
+		n, err := WorkerGroupConfNumWorkers(42).Build(opt)
+		assert.NotError(t, err)
+		assert.True(t, n != nil)
+		assert.Equal(t, n.NumWorkers, 42)
+
+		n, err = OptionProvider[*WorkerGroupConf](func(cc *WorkerGroupConf) error { return errors.New("hi") }).Build(opt)
+		assert.Error(t, err)
+		assert.True(t, n == nil)
+
+	})
 	t.Run("ErrorHandler", func(t *testing.T) {
 		t.Run("Configuration", func(t *testing.T) {
 			opt := &WorkerGroupConf{}

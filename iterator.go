@@ -149,13 +149,13 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 			send.Consume(iters[idx]).Operation(HF.ErrorHandlerWithoutEOF(eo)).Add(wctx, wg)
 		}
 
-		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
+		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Background(ctx)
 	}).Once()
 
 	return pipe.Receive().
 		Producer().
 		PreHook(init).
-		IteratorWithHook(func(iter *Iterator[T]) { iter.err = ers.Join(append(ep.Force(), iter.err)...) })
+		IteratorWithHook(func(iter *Iterator[T]) { iter.err = ers.Join(append(ep.Run(), iter.err)...) })
 }
 
 func (i *Iterator[T]) doClose() {
@@ -345,7 +345,7 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 	setup := pipe.Processor().
 		ReadAll(i.Producer()).
 		PostHook(pipe.Close).
-		Ignore().Launch().Once()
+		Ignore().Go().Once()
 
 	output := make([]*Iterator[T], num)
 	for idx := range output {
@@ -577,7 +577,7 @@ func (i *Iterator[T]) ProcessParallel(
 // order of elements in the input iterator.
 func (i *Iterator[T]) Buffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().Consume(i).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Launch()
+	pipe := buf.Send().Consume(i).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }
 
@@ -591,6 +591,6 @@ func (i *Iterator[T]) Buffer(n int) *Iterator[T] {
 // consumer of the iterator.
 func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Launch()
+	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }

@@ -107,9 +107,9 @@ func TestHandlers(t *testing.T) {
 	t.Run("ErrorCollector", func(t *testing.T) {
 		ob, prod := HF.ErrorCollector()
 		ft.DoTimes(128, func() { ob(nil) })
-		check.Equal(t, 0, len(prod.Force()))
+		check.Equal(t, 0, len(prod.Run()))
 		ft.DoTimes(128, func() { ob(ers.Error("test")) })
-		check.Equal(t, 128, len(prod.Force()))
+		check.Equal(t, 128, len(prod.Run()))
 	})
 	t.Run("StringFuture", func(t *testing.T) {
 		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprintf("%s:%d", "hi", 42)()) })

@@ -68,7 +68,7 @@ func TestHelpers(t *testing.T) {
 			srv := ProcessIterator(
 				makeIterator(50),
 				func(_ context.Context, in int) error {
-					time.Sleep(5 * time.Millisecond)
+					time.Sleep(10 * time.Millisecond)
 					count.Add(1)
 					return nil
 				},
@@ -87,7 +87,7 @@ func TestHelpers(t *testing.T) {
 			if count.Load() != 50 {
 				t.Error(count.Load())
 			}
-			if time.Since(start) < 6*time.Millisecond || time.Since(start) > 250*time.Millisecond {
+			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 250*time.Millisecond {
 				t.Error(time.Since(start))
 			}
 		})

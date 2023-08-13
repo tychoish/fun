@@ -196,7 +196,7 @@ func (ec *Collector) Resolve() error {
 	return ec.stack
 }
 
-// Producer returns a function that is generally equivalent to
+// Unwrap returns a function that is generally equivalent to
 // Collector.Resolve(); however, the errors are returned as an
 // Unwound/Unwrapped slice of errors, rather than the ers.Stack
 // object. Additionally, the producer can return an error if the context

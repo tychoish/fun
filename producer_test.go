@@ -539,7 +539,7 @@ func TestProducer(t *testing.T) {
 				return -1, ctx.Err()
 			}
 		}
-		resolver := prod.LaunchFuture(ctx)
+		resolver := prod.Launch(ctx)
 		time.Sleep(50 * time.Millisecond)
 		check.Equal(t, count.Load(), 1)
 		close(sig)
@@ -750,7 +750,7 @@ func TestProducer(t *testing.T) {
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.True(t, dur < 200*time.Millisecond)
 
-		delay = time.Millisecond
+		delay = 10 * time.Millisecond
 		start = time.Now()
 
 		out, err = wf(ctx)
@@ -759,8 +759,8 @@ func TestProducer(t *testing.T) {
 
 		dur = time.Since(start).Truncate(time.Millisecond)
 
-		assert.True(t, dur >= time.Millisecond)
-		assert.True(t, dur < 2*time.Millisecond)
+		assert.True(t, dur >= 10*time.Millisecond)
+		assert.True(t, dur < 20*time.Millisecond)
 	})
 }
 

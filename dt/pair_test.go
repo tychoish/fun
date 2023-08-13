@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
@@ -89,6 +90,20 @@ func TestPairs(t *testing.T) {
 			}
 			check.Equal(t, 4, idx)
 		})
+		t.Run("Copy", func(t *testing.T) {
+			p := &Pairs[string, int]{}
+			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+
+			pl := p.Copy()
+			check.NotEqual(t, pl, p)
+			idx := 1
+			for item := pl.ll.Front(); item.Ok(); item = item.Next() {
+				check.Equal(t, item.Value().Value, idx)
+				check.Equal(t, item.Value().Key, fmt.Sprint(idx))
+				idx++
+			}
+			check.Equal(t, 4, idx)
+		})
 		t.Run("Values", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -146,6 +161,12 @@ func TestPairs(t *testing.T) {
 			assert.Error(t, err)
 			assert.Equal(t, 0, ps.Len())
 		})
+		t.Run("Empty", func(t *testing.T) {
+			ps := Pairs[string, string]{}
+			out, err := ps.MarshalJSON()
+			assert.NotError(t, err)
+			assert.Equal(t, string(out), "{}")
+		})
 		t.Run("ImpossibleValue", func(t *testing.T) {
 			ps := MakePairs[string, context.CancelFunc](Pair[string, context.CancelFunc]{"hi", func() {}})
 			_, err := ps.MarshalJSON()
@@ -162,19 +183,65 @@ func TestPairs(t *testing.T) {
 			return a.Key < b.Key // && a.Value < b.Value
 		}
 		t.Run("Quick", func(t *testing.T) {
-			list := sortFixture(t, 100)
+			list := randNumPairListFixture(t, 100)
 			ps := &Pairs[int, int]{ll: list}
 			check.True(t, ft.Not(list.IsSorted(cmp)))
 			ps.SortQuick(cmp)
 			check.True(t, list.IsSorted(cmp))
 		})
 		t.Run("Merge", func(t *testing.T) {
-			list := sortFixture(t, 100)
+			list := randNumPairListFixture(t, 100)
 			ps := &Pairs[int, int]{ll: list}
 			check.True(t, ft.Not(list.IsSorted(cmp)))
 			ps.SortMerge(cmp)
 			check.True(t, list.IsSorted(cmp))
 		})
+	})
+	t.Run("ConsumePairs", func(t *testing.T) {
+		t.Run("Normal", func(t *testing.T) {
+			iter := Sliceify[Pair[string, int]]([]Pair[string, int]{
+				MakePair("1", 1), MakePair("2", 2),
+				MakePair("3", 3), MakePair("4", 4),
+				MakePair("5", 5), MakePair("6", 6),
+			}).Iterator()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ps, err := ConsumePairs(ctx, iter)
+			check.NotError(t, err)
+			assert.True(t, ps != nil)
+			check.Equal(t, ps.Len(), 6)
+		})
+		t.Run("", func(t *testing.T) {
+			expected := errors.New("hi")
+			iter := fun.StaticProducer(MakePair("1", 1), expected).Iterator()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ps, err := ConsumePairs(ctx, iter)
+			check.Error(t, err)
+			check.ErrorIs(t, err, expected)
+			assert.True(t, ps == nil)
+		})
+
+	})
+	t.Run("FunctionalIterators", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		num := 1000
+		seen := &Set[int]{}
+
+		ps, err := ConsumePairs(ctx, randNumPairListFixture(t, num).PopIterator())
+		assert.NotError(t, err)
+		ps.Observe(func(p Pair[int, int]) {
+			check.Equal(t, p.Key, p.Value)
+			check.True(t, ft.Not(seen.Check(p.Key)))
+			seen.Add(p.Key)
+		})
+		check.Equal(t, seen.Len(), num)
 	})
 }
 
@@ -182,7 +249,8 @@ type badKey string
 
 func (badKey) MarshalJSON() ([]byte, error) { return nil, errors.New("cannot marshal") }
 
-func sortFixture(t *testing.T, size int) *List[Pair[int, int]] {
+func randNumPairListFixture(t *testing.T, size int) *List[Pair[int, int]] {
+	t.Helper()
 	nums := rand.Perm(size)
 
 	out := &List[Pair[int, int]]{}

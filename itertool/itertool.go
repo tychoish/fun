@@ -251,7 +251,7 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 			}
 			ec.Add(iter.Close())
 		}
-	}).Launch().Once()
+	}).Go().Once()
 
 	return pipe.Receive().
 		Producer().

@@ -37,7 +37,7 @@ func TestWorker(t *testing.T) {
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
 			Worker(func(ctx context.Context) error { called.Add(1); panic(expected) }).
-				Future(ctx).
+				Launch(ctx).
 				Observe(ctx, func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
@@ -168,21 +168,21 @@ func TestWorker(t *testing.T) {
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); panic(expected) }
-			wf.Background(ctx, oee)
+			wf.Background(ctx, oee)(ctx)
 			Blocking(ch).Receive().Ignore(ctx)
 			assert.True(t, called.Load())
 		})
 		t.Run("Nil", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); return nil }
-			wf.Background(ctx, oen)
+			wf.Background(ctx, oen)(ctx)
 			Blocking(ch).Receive().Ignore(ctx)
 			assert.True(t, called.Load())
 		})
 		t.Run("Error", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); return expected }
-			wf.Background(ctx, oee)
+			wf.Background(ctx, oee).Run(ctx)
 			Blocking(ch).Receive().Ignore(ctx)
 			assert.True(t, called.Load())
 		})
@@ -282,6 +282,44 @@ func TestWorker(t *testing.T) {
 			wg.Wait()
 			assert.Equal(t, count.Load(), 10)
 		})
+	})
+	t.Run("Interval", func(t *testing.T) {
+		t.Run("NoEarlyAbort", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := &atomic.Int64{}
+			var wf Worker = func(context.Context) error { count.Add(1); runtime.Gosched(); return nil }
+			wf = wf.Interval(25 * time.Millisecond)
+			check.Equal(t, 0, count.Load())
+			sig := wf.Signal(ctx)
+			time.Sleep(150 * time.Millisecond)
+			runtime.Gosched()
+			cancel()
+			<-sig
+
+			check.True(t, count.Load() >= 6)
+		})
+		t.Run("Half", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := &atomic.Int64{}
+			var wf Worker = func(context.Context) error {
+				if count.Add(1) > 3 {
+					return errors.New(t.Name())
+				}
+				runtime.Gosched()
+				return nil
+			}
+			wf = wf.Interval(25 * time.Millisecond)
+			check.Equal(t, 0, count.Load())
+			start := time.Now()
+			sig := wf.Signal(ctx)
+			<-sig
+			dur := time.Since(start)
+			check.True(t, dur >= 100)
+			check.Equal(t, 4, count.Load())
+		})
+
 	})
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("WithoutErrors", func(t *testing.T) {

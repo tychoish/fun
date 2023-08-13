@@ -58,6 +58,18 @@ func TestProcess(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Add", func(t *testing.T) {
+		count := &atomic.Int64{}
+		pf := MakeProcessor(func(i int) error { check.Equal(t, i, 54); count.Add(1); return nil })
+		wg := &WaitGroup{}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		pf.Add(ctx, wg, func(error) {}, 54)
+		wg.Operation().Wait()
+		check.Equal(t, count.Load(), 1)
+	})
 	t.Run("If", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -126,7 +138,7 @@ func TestProcess(t *testing.T) {
 			return root
 		})
 		of := func(err error) { called++; check.ErrorIs(t, err, root) }
-		obv := pf.Operation(42, of)
+		obv := pf.Operation(of, 42)
 		check.Equal(t, called, 0)
 		obv(ctx)
 		check.Equal(t, called, 2)
@@ -176,7 +188,7 @@ func TestProcess(t *testing.T) {
 			return root
 		})
 		check.Equal(t, called, 0)
-		wf := pf.Future(ctx, 42)
+		wf := pf.Background(ctx, 42)
 		check.Equal(t, called, 0)
 		check.ErrorIs(t, wf(ctx), root)
 		check.Equal(t, called, 1)
@@ -210,7 +222,7 @@ func TestProcess(t *testing.T) {
 			oe := HF.ErrorHandler(func(err error) { Invariant.Must(err) })
 			op = op.Lock()
 
-			ft.DoTimes(128, func() { op.Operation(42, oe).Add(ctx, wg) })
+			ft.DoTimes(128, func() { op.Operation(oe, 42).Add(ctx, wg) })
 			wg.Operation().Block()
 			assert.Equal(t, count, 128)
 		})
@@ -224,7 +236,7 @@ func TestProcess(t *testing.T) {
 				return nil
 			})
 			mu := &sync.Mutex{}
-			wf := op.WithLock(mu).Worker(42).StartGroup(ctx, 128)
+			wf := op.WithLock(mu).Worker(42).Group(128)
 			assert.NotError(t, wf(ctx))
 			assert.Equal(t, count, 128)
 		})
@@ -324,7 +336,19 @@ func TestProcess(t *testing.T) {
 			check.Equal(t, twoct, 0)
 			<-sig3
 		})
+	})
+	t.Run("Group", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
+		count := &atomic.Int64{}
+		proc := MakeProcessor(func(i int) error { count.Add(1); check.Equal(t, i, 42); return nil })
+		check.Equal(t, 0, count.Load())
+		worker := proc.Group(ctx, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42)
+		check.Equal(t, 0, count.Load())
+		err := worker(ctx)
+		check.NotError(t, err)
+		check.Equal(t, 10, count.Load())
 	})
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {

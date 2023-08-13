@@ -40,6 +40,18 @@ func Processify[T any](fn func(context.Context, T) error) Processor[T] { return 
 // also be passed as a Processor func.
 func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(in).Run(ctx) }
 
+// Background processes an item in a separate goroutine and returns a
+// worker that will block until the underlying operation is complete.
+func (pf Processor[T]) Background(ctx context.Context, op T) Worker {
+	return pf.Worker(op).Launch(ctx)
+}
+
+// Add begins running the process in a different goroutine, using the
+// provided arguments to manage the operation.
+func (pf Processor[T]) Add(ctx context.Context, wg *WaitGroup, eh Handler[error], op T) {
+	pf.Operation(eh, op).Add(ctx, wg)
+}
+
 // Block runs the ProcessFunc with a context that will never be
 // canceled.
 func (pf Processor[T]) Block(in T) error { return pf.Worker(in).Block() }
@@ -57,7 +69,7 @@ func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
 // Operation converts a processor into a worker that will process the input
 // provided when executed.
-func (pf Processor[T]) Operation(in T, of Handler[error]) Operation {
+func (pf Processor[T]) Operation(of Handler[error], in T) Operation {
 	return pf.Worker(in).Operation(of)
 }
 
@@ -143,13 +155,6 @@ func (pf Processor[T]) Handler(ctx context.Context, oe Handler[error]) Handler[T
 // until the worker is called.
 func (pf Processor[T]) Worker(in T) Worker {
 	return func(ctx context.Context) error { return pf(ctx, in) }
-}
-
-// Future begins processing the input immediately and returns a worker
-// function that returns the processor's error, and will block until
-// the processor returns.
-func (pf Processor[T]) Future(ctx context.Context, in T) Worker {
-	return pf.Worker(in).Future(ctx)
 }
 
 // Once make a processor that can only run once. Subsequent calls to
@@ -275,6 +280,17 @@ func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 			}
 		}
 	}
+}
+
+// Group takes a variadic number of items and processes them,
+// concurrently. The Worker will block and return the aggregated
+// errors from all operations.
+func (pf Processor[T]) Group(ctx context.Context, ops ...T) Worker {
+	return SliceIterator(ops).ProcessParallel(pf,
+		WorkerGroupConfNumWorkers(len(ops)),
+		WorkerGroupConfContinueOnError(),
+		WorkerGroupConfContinueOnPanic(),
+	)
 }
 
 ////////////////////////////////////////////////////////////////////////

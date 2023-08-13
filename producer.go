@@ -52,7 +52,7 @@ func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf(ctx) }
 // The worker function's return value captures the procuder's error,
 // and will block until the producer has completed.
 func (pf Producer[T]) Background(ctx context.Context, of Handler[T]) Worker {
-	return pf.Worker(of).Future(ctx)
+	return pf.Worker(of).Launch(ctx)
 }
 
 // Worker passes the produced value to an observer and returns a
@@ -171,10 +171,10 @@ func (pf Producer[T]) Force() T { return ft.Must(pf.Block()) }
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
 func (pf Producer[T]) CheckBlock() (T, bool)               { return pf.Check(context.Background()) }
 
-// LaunchFuture runs the producer in the background, when function is
+// Launch runs the producer in the background, when function is
 // called, and returns a producer which, when called, blocks until the
 // original producer returns.
-func (pf Producer[T]) LaunchFuture(ctx context.Context) Producer[T] {
+func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	out := make(chan T, 1)
 	var err error
 	go func() { defer close(out); o, e := pf.Safe()(ctx); err = e; out <- o }()
@@ -391,13 +391,15 @@ func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
 // ParallelGenerate creates an iterator using a generator pattern which
 // produces items until the generator function returns
 // io.EOF, or the context (passed to the first call to
-// Next()) is canceled. Parallel operation, and continue on
+// Next()) is canceled. Parallel operation, continue on
 // error/continue-on-panic semantics are available and share
-// configuration with the Map and Process operations.
+// configuration with the ParallelProcess and Map operations.
 func (pf Producer[T]) GenerateParallel(
 	optp ...OptionProvider[*WorkerGroupConf],
 ) *Iterator[T] {
 	opts := &WorkerGroupConf{}
+	initErr := JoinOptionProviders(optp...).Apply(opts)
+
 	pipe := Blocking(make(chan T, opts.NumWorkers*2+1))
 
 	init := Operation(func(ctx context.Context) {
@@ -423,14 +425,16 @@ func (pf Producer[T]) GenerateParallel(
 			}).
 			StartGroup(wctx, wg, opts.NumWorkers)
 
-		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Go(ctx)
+		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Background(ctx)
 	}).Once()
 
 	iter := pipe.Receive().Producer().PreHook(init).Iterator()
-	err := JoinOptionProviders(optp...).Apply(opts)
+
 	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = iter.ErrorHandler().Lock() })
-	opts.ErrorHandler(err)
-	ft.WhenCall(err != nil, pipe.Close)
+
+	opts.ErrorHandler(initErr)
+
+	ft.WhenCall(initErr != nil, pipe.Close)
 
 	return iter
 }

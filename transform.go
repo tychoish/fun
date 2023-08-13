@@ -107,7 +107,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 
 		// start a background op that waits for the
 		// waitgroup and closes the channel
-		wg.Operation().PostHook(wcancel).PostHook(output.Close).Go(ctx)
+		wg.Operation().PostHook(wcancel).PostHook(output.Close).Background(ctx)
 	}).Once()
 
 	outputIter := output.Producer().PreHook(init).IteratorWithHook(func(out *Iterator[O]) { out.AddError(iter.Close()) })

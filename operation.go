@@ -80,40 +80,35 @@ func (wf Operation) Signal(ctx context.Context) <-chan struct{} {
 	return out
 }
 
-// Future starts the operation in a background go routine and returns
+// Launch starts the operation in a background go routine and returns
 // an operation which blocks until it's context is canceled or the
 // underlying operation returns.
-func (wf Operation) Future(ctx context.Context) Operation {
+func (wf Operation) Launch(ctx context.Context) Operation {
 	sig := wf.Signal(ctx)
 	return func(ctx context.Context) { WaitChannel(sig) }
 }
 
-// Go launches the operation in a go routine. There is no panic-safety
+// Background launches the operation in a go routine. There is no panic-safety
 // provided.
-func (wf Operation) Go(ctx context.Context) { go wf(ctx) }
+func (wf Operation) Background(ctx context.Context) { go wf(ctx) }
 
-// Launch provides access to the Go method (e.g. starting this
+// Go provides access to the Go method (e.g. starting this
 // operation in a go routine.) as a method that can be used as an
 // operation itself.
-func (wf Operation) Launch() Operation { return wf.Go }
+func (wf Operation) Go() Operation { return wf.Background }
 
 // Add starts a goroutine that waits for the Operation to return,
 // incrementing and decrementing the sync.WaitGroup as
 // appropriate. The execution of the wait fun blocks on Add's context.
-func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wf.Background(wg).Run(ctx) }
+func (wf Operation) Add(ctx context.Context, wg *WaitGroup) {
+	wg.Add(1)
+	wf.PostHook(wg.Done).Background(ctx)
+}
 
-// StartGroup runs n groups, incrementing the waitgroup as
+// StartGroup runs n operations, incrementing the waitgroup as
 // appropriate.
 func (wf Operation) StartGroup(ctx context.Context, wg *WaitGroup, n int) {
 	ft.DoTimes(n, func() { wf.Add(ctx, wg) })
-}
-
-// Backgrounds creates a new operation which, when the resulting
-// operation is called, starts the root operation in the background
-// and returns immediately. use the wait group, or it's Operation to
-// block on the completion of the background execution.
-func (wf Operation) Background(wg *WaitGroup) Operation {
-	return func(ctx context.Context) { wg.Add(1); wf.PostHook(wg.Done).Go(ctx) }
 }
 
 // Interval runs the operation with a timer that resets to the
@@ -132,6 +127,19 @@ func (wf Operation) Interval(dur time.Duration) Operation {
 			case <-timer.C:
 				wf(ctx)
 				timer.Reset(dur)
+			}
+		}
+	}
+}
+
+// While runs the operation in a tight loop, until the context
+// expires.
+func (wf Operation) While() Operation {
+	return func(ctx context.Context) {
+		for {
+			wf.Run(ctx)
+			if ctx.Err() != nil {
+				return
 			}
 		}
 	}

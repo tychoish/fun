@@ -132,6 +132,16 @@ func (op OptionProvider[T]) Apply(in T) error {
 	return err
 }
 
+// Build processes a configuration object, returning a modified
+// version (or a zero value, in the case of an error).
+func (op OptionProvider[T]) Build(conf T) (out T, err error) {
+	err = op.Apply(conf)
+	if err != nil {
+		return
+	}
+	return conf, nil
+}
+
 // Join aggregates a collection of Option Providers into a single
 // option provider. The amalgamated operation is panic safe and omits
 // all nil providers.
@@ -246,11 +256,11 @@ func WorkerGroupConfWithErrorCollector(
 // WorkerGroupConfErrorCollectorPair uses an Handler/Producer pair to
 // collect errors. A basic implementation, accessible via
 // HF.ErrorCollector() is suitable for this purpose.
-func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Producer[[]error]) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Future[[]error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
 			WorkerGroupConfErrorHandler(ob)(opts),
-			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Block())...) })(opts),
+			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Run())...) })(opts),
 		)
 	}
 }

@@ -156,7 +156,7 @@ func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
 				break
 			}
 		}
-	}).Launch().Once()
+	}).Go().Once()
 
 	return pipe.Receive().Producer().PreHook(init)
 }
@@ -175,7 +175,7 @@ func (m Map[K, V]) ProducerKeys() fun.Producer[K] {
 				break
 			}
 		}
-	}).Launch().Once()
+	}).Go().Once()
 
 	return pipe.Receive().Producer().PreHook(init)
 }
@@ -194,7 +194,7 @@ func (m Map[K, V]) ProducerValues() fun.Producer[V] {
 				break
 			}
 		}
-	}).Launch().Once()
+	}).Go().Once()
 
 	return pipe.Receive().Producer().PreHook(init)
 }

@@ -77,20 +77,64 @@ func TestPtr(t *testing.T) {
 }
 
 func TestDefault(t *testing.T) {
-	assert.Equal(t, Default(0, 42), 42)
-	assert.Equal(t, Default(77, 42), 77)
+	t.Run("Static", func(t *testing.T) {
+		assert.Equal(t, Default(0, 42), 42)
+		assert.Equal(t, Default(77, 42), 77)
 
-	assert.Equal(t, Default("", "kip"), "kip")
-	assert.Equal(t, Default("merlin", "kip"), "merlin")
+		assert.Equal(t, Default("", "kip"), "kip")
+		assert.Equal(t, Default("merlin", "kip"), "merlin")
+	})
+	t.Run("Dynamic", func(t *testing.T) {
+		count := 0
+		assert.Equal(t, WhenDefault(0, func() int { count++; return 42 }), 42)
+		check.Equal(t, count, 1)
+		assert.Equal(t, WhenDefault(77, func() int { count++; return 42 }), 77)
+		check.Equal(t, count, 1)
+
+		assert.Equal(t, WhenDefault("", func() string { count++; return "kip" }), "kip")
+		check.Equal(t, count, 2)
+
+		assert.Equal(t, WhenDefault("merlin", func() string { count++; return "kip" }), "merlin")
+		check.Equal(t, count, 2)
+	})
+}
+
+func TestUnless(t *testing.T) {
+	t.Run("Do", func(t *testing.T) {
+		count := 0
+		check.Equal(t, 0, UnlessDo(true, func() int { count++; return count }))
+		check.Equal(t, 1, UnlessDo(false, func() int { count++; return count }))
+		check.Equal(t, 2, UnlessDo(false, func() int { count++; return count }))
+		check.Equal(t, 0, UnlessDo(true, func() int { count++; return count }))
+	})
+	t.Run("Call", func(t *testing.T) {
+		count := 0
+		UnlessCall(true, func() { count++ })
+		check.Equal(t, 0, count)
+		UnlessCall(false, func() { count++ })
+		check.Equal(t, 1, count)
+		UnlessCall(false, func() { count++ })
+		check.Equal(t, 2, count)
+		UnlessCall(true, func() { count++ })
+		check.Equal(t, 2, count)
+	})
 }
 
 func TestWhenHandle(t *testing.T) {
 	called := false
 	assert.True(t, !called)
-	WhenHandle(100, func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) })
+	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 100)
 	assert.True(t, !called)
-	WhenHandle(42, func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) })
+	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 42)
 	assert.True(t, called)
+}
+
+func TestApply(t *testing.T) {
+	called := 0
+	out := Apply(func(n int) { called++; check.Equal(t, 42, n) }, 42)
+	check.Equal(t, 0, called)
+	out()
+	check.Equal(t, 1, called)
 }
 
 func TestWrap(t *testing.T) {

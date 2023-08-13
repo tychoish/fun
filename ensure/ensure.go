@@ -122,7 +122,7 @@ func (a *Assertion) Run(t testing.TB) {
 		t.Helper()
 		if a.alwaysLog || t.Failed() {
 			for it := a.messages.Front(); it.Ok(); it = it.Next() {
-				ft.WhenHandle(ft.SafeDo(it.Value()), ft.NotZero[string], strlogger)
+				ft.WhenHandle(ft.NotZero[string], strlogger, ft.SafeDo(it.Value()))
 			}
 		}
 	})

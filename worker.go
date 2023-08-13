@@ -144,21 +144,21 @@ func (wf Worker) Signal(ctx context.Context) <-chan error {
 	return out.Channel()
 }
 
-// Future runs the worker function in a go routine and returns a
-// new fun.Worker which will block for the context to expire or the
-// background worker to complete, which returns the error from the
-// background request.
+// Launch runs the worker function in a go routine and returns a new
+// fun.Worker which will block for the context to expire or the
+// background worker to completes, which returns the error
+// from the background request.
 //
 // The underlying worker begins executing before future returns.
-func (wf Worker) Future(ctx context.Context) Worker {
+func (wf Worker) Launch(ctx context.Context) Worker {
 	out := wf.Signal(ctx)
 	return WorkerFuture(out)
 }
 
 // Background starts the worker function in a go routine, passing the
 // error to the provided observer function.
-func (wf Worker) Background(ctx context.Context, ob Handler[error]) {
-	go func() { ob(wf.Safe()(ctx)) }()
+func (wf Worker) Background(ctx context.Context, ob Handler[error]) Operation {
+	return wf.Launch(ctx).Operation(ob)
 }
 
 // Once wraps the Worker in a function that will execute only
@@ -271,11 +271,40 @@ func (wf Worker) WithLock(mtx *sync.Mutex) Worker {
 // and false otherwise.
 func (wf Worker) Check(ctx context.Context) bool { return wf(ctx) == nil }
 
+// While runs the Worker in a continuous while loop, returning only if
+// the underlying worker returns an error or if the context is
+// cancled.
 func (wf Worker) While() Worker {
 	return func(ctx context.Context) error {
 		for {
 			if err, cerr := wf(ctx), ctx.Err(); err != nil || cerr != nil {
 				return ft.Default(err, cerr)
+			}
+		}
+	}
+}
+
+// Interval runs the worker with a timer that resets to the provided
+// duration. The worker runs immediately, and then the time is reset
+// to the specified interval after the base worker has. Which is to
+// say that the runtime of the worker's operation is effectively added
+// to the interval.
+//
+// The interval worker will run until the context is canceled or the
+// worker returns an error.
+func (wf Worker) Interval(dur time.Duration) Worker {
+	return func(ctx context.Context) error {
+		timer := time.NewTimer(0)
+		defer timer.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				if err := wf(ctx); err != nil {
+					return err
+				}
+				timer.Reset(dur)
 			}
 		}
 	}
@@ -334,19 +363,24 @@ func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	oe := ch.Send().Processor().Force
 
 	wg := &WaitGroup{}
-	mu := &sync.Mutex{}
 
 	prod := ch.Producer()
-	op := wf.Operation(oe).WithLock(mu)
+	op := wf.Operation(oe)
 
 	wg.DoTimes(ctx, n, op)
 
-	wg.Operation().PostHook(ch.Close).Go(ctx)
+	wg.Operation().PostHook(ch.Close).Background(ctx)
 
 	return func(ctx context.Context) (err error) {
 		errs, err := prod.Iterator().Slice(ctx)
 		return ers.Join(append(errs, err)...)
 	}
+}
+
+// Group is like StartGroup, except that the background workers in the
+// group do not start until the worker is resolved
+func (wf Worker) Group(n int) Worker {
+	return func(ctx context.Context) error { return wf.StartGroup(ctx, n).Run(ctx) }
 }
 
 // Filter wraps the worker with a Worker that passes the output of the

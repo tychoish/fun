@@ -71,6 +71,16 @@ func Default[T comparable](input T, defaultValue T) T {
 	return input
 }
 
+// WhenDefault combines Default() and WhenDo: if the input value is
+// the zero value for the comparable type T it is returned directly;
+// otherwise WhenDefault calls the provided function and returns it.
+func WhenDefault[T comparable](input T, fn func() T) T {
+	if IsZero(input) {
+		return fn()
+	}
+	return input
+}
+
 // IsOK returns only the second argument passed to it, given a
 // function that returns two values where the second value is a
 // boolean, you can use IsOK to discard the first value.
@@ -98,6 +108,14 @@ func WhenDo[T any](cond bool, op func() T) (out T) {
 	return op()
 }
 
+// UnlessCall is inverse form of WhenCall, calling the provided
+// function only when the conditional is false.
+func UnlessCall(cond bool, op func()) { WhenCall(Not(cond), op) }
+
+// UnlessDo is the inverse form of WhenDo, calling the function only
+// when the condition is false.
+func UnlessDo[T any](cond bool, op func() T) T { return WhenDo(Not(cond), op) }
+
 // WhenApply runs the function with the supplied argument only when
 // the condition is true.
 func WhenApply[T any](cond bool, op func(T), arg T) {
@@ -109,7 +127,7 @@ func WhenApply[T any](cond bool, op func(T), arg T) {
 
 // WhenHandle passes the argument "in" to the operation IF the
 // condition function (which also takes "in") returns true.
-func WhenHandle[T any](in T, cond func(T) bool, op func(T)) {
+func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
 	if !cond(in) {
 		return
 	}
@@ -183,6 +201,10 @@ func Contains[T comparable](item T, slice []T) bool {
 // provided. Useful for bridging interface paradigms, and for storing
 // interface-typed objects in atomics.
 func Wrapper[T any](in T) func() T { return func() T { return in } }
+
+// Apply returns a function object that, when called calls the input
+// function with the provided argument.
+func Apply[T any](fn func(T), arg T) func() { return func() { fn(arg) } }
 
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.

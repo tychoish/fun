@@ -180,4 +180,8 @@ func TestApply(t *testing.T) {
 		assert.NotEqual(t, magnitutde[idx], primes[idx])
 		assert.Equal(t, magnitutde[idx]/10, primes[idx])
 	}
+	t.Run("Lazy", func(t *testing.T) {
+
+	})
+
 }

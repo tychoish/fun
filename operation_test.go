@@ -401,11 +401,11 @@ func TestOperation(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 			count.Add(1)
 		})
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		opwait := op.Future(ctx)
+		opwait := op.Launch(ctx)
+
 		check.Equal(t, count.Load(), 0)
 		time.Sleep(100 * time.Millisecond)
 		check.Equal(t, count.Load(), 1)
@@ -610,6 +610,16 @@ func TestOperation(t *testing.T) {
 		cancel()
 		<-sig
 		check.Equal(t, 6, count.Load())
+	})
+	t.Run("While", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		count := &atomic.Int64{}
+		var wf Operation = func(context.Context) { count.Add(1); time.Sleep(time.Millisecond) }
+		wf.While().Background(ctx)
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+		check.True(t, count.Load() >= 6)
 	})
 	t.Run("TTL", func(t *testing.T) {
 		t.Parallel()

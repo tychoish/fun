@@ -77,7 +77,7 @@ func (of Handler[T]) When(cond func() bool) Handler[T] {
 // true, the underlying Handler is called, otherwise, the observation
 // is a noop.
 func (of Handler[T]) Skip(hook func(T) bool) Handler[T] {
-	return func(in T) { ft.WhenHandle(in, hook, of) }
+	return func(in T) { ft.WhenHandle(hook, of, in) }
 }
 
 // Filter creates an observer that only executes the root observer Use

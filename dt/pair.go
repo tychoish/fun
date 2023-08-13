@@ -62,22 +62,20 @@ func ConsumePairs[K comparable, V any](
 
 func (p *Pairs[K, V]) init() { p.setup.Do(p.initalizeList) }
 func (p *Pairs[K, V]) initalizeList() {
-	if p.ll == nil {
-		p.ll = &List[Pair[K, V]]{}
-	}
+	ft.WhenCall(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} })
 }
 
 // Iterator return an iterator over each key-value pairs.
 func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { p.init(); return p.ll.Iterator() }
 
 // Slice creates a new slice of all the Pair objects.
-func (p *Pairs[K, V]) Slice() []Pair[K, V] {
-	p.init()
-	return ft.Must(p.ll.Iterator().Slice(context.Background()))
-}
+func (p *Pairs[K, V]) Slice() []Pair[K, V] { return ft.Must(p.Iterator().Slice(context.Background())) }
 
 // List returns the sequence of pairs as a list.
 func (p *Pairs[K, V]) List() *List[Pair[K, V]] { p.init(); return p.ll.Copy() }
+
+// Copy produces a new Pairs object with the same values.
+func (p *Pairs[K, V]) Copy() *Pairs[K, V] { return &Pairs[K, V]{ll: p.List()} }
 
 // SortMerge performs a merge sort on the collected pairs.
 func (p *Pairs[K, V]) SortMerge(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.SortMerge(c) }
@@ -92,15 +90,33 @@ func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
 func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
-	p.init()
 	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Convert(p.Iterator())
 }
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
 func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
-	p.init()
 	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Convert(p.Iterator())
+}
+
+// Observe calls the handler function for every pair in the container.
+func (p *Pairs[K, V]) Observe(hf fun.Handler[Pair[K, V]]) { p.Process(hf.Processor()).Ignore().Wait() }
+
+// Process returns a worker, that when executed calls the processor
+// function for every pair in the container.
+func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
+	return func(ctx context.Context) error {
+		p.init()
+		if p.ll.Len() == 0 {
+			return nil
+		}
+		for li := p.ll.Front(); li.Ok(); li = li.Next() {
+			if err := pf(ctx, li.Value()); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
@@ -108,31 +124,30 @@ func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
 // serialization does not necessarily preserve the order of the pairs
 // object.
 func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
-	p.init()
-
 	buf := &internal.IgnoreNewLinesBuffer{}
 	enc := json.NewEncoder(buf)
-	_, _ = buf.Write([]byte("{"))
+	buf.WriteByte('{')
+
 	first := true
-
-	for li := p.ll.Front(); li.Ok(); li = li.Next() {
-		item := li.Value()
-
+	if err := p.Process(fun.MakeProcessor(func(item Pair[K, V]) error {
 		if first {
 			first = false
 		} else {
-			_, _ = buf.Write([]byte(","))
+			buf.WriteByte(',')
 		}
 		if err := enc.Encode(item.Key); err != nil {
-			return nil, err
+			return err
 		}
-		_, _ = buf.Write([]byte(":"))
+		_ = buf.WriteByte(':')
 		if err := enc.Encode(item.Value); err != nil {
-			return nil, err
+			return err
 		}
+		return nil
+	})).Wait(); err != nil {
+		return nil, err
 	}
-	_, _ = buf.Write([]byte("}"))
 
+	buf.WriteByte('}')
 	return buf.Bytes(), nil
 }
 
