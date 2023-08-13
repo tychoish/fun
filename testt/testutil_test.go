@@ -2,10 +2,15 @@ package testt
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ft"
 )
 
 type mockTB struct {
@@ -142,6 +147,46 @@ func TestTools(t *testing.T) {
 		if val := Must(strconv.Atoi("zzzzz"))(mock); val != 0 {
 			t.Error(val, "is not", 0)
 		}
+	})
+	t.Run("WithEnv", func(t *testing.T) {
+		t.Run("PreviouslyUnset", func(t *testing.T) {
+			assert.Zero(t, os.Getenv(t.Name()))
+			_, isSet := os.LookupEnv(t.Name())
+			assert.True(t, ft.Not(isSet))
+			WithEnv(t, dt.MakePair(t.Name(), "beep!!beep"), func() {
+				assert.Equal(t, os.Getenv(t.Name()), "beep!!beep")
+				_, isSetNow := os.LookupEnv(t.Name())
+				assert.True(t, isSetNow)
+			})
+
+			_, isSet = os.LookupEnv(t.Name())
+			assert.True(t, ft.Not(isSet))
+		})
+		t.Run("PreviouslySet", func(t *testing.T) {
+			assert.Zero(t, os.Getenv(t.Name()))
+			_, isSet := os.LookupEnv(t.Name())
+			assert.True(t, ft.Not(isSet))
+
+			WithEnv(t, dt.MakePair(t.Name(), "boop!!boop"), func() {
+				assert.Equal(t, os.Getenv(t.Name()), "boop!!boop")
+				_, isSetHere := os.LookupEnv(t.Name())
+				assert.True(t, isSetHere)
+				WithEnv(t, dt.MakePair(t.Name(), "beep!!beep"), func() {
+
+					assert.Equal(t, os.Getenv(t.Name()), "beep!!beep")
+					_, isSetNow := os.LookupEnv(t.Name())
+					assert.True(t, isSetNow)
+				})
+
+				_, isSetHere = os.LookupEnv(t.Name())
+				assert.True(t, isSetHere)
+
+				assert.Equal(t, os.Getenv(t.Name()), "boop!!boop")
+			})
+
+			_, isSet = os.LookupEnv(t.Name())
+			assert.True(t, ft.Not(isSet))
+		})
 	})
 
 }

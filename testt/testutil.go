@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/dt"
 )
 
@@ -84,26 +85,31 @@ func Must[T any](out T, err error) func(t testing.TB) T {
 	}
 }
 
+// WithEnv sets an environment variable according to the key-value
+// pair, and then and runs a function with that environment variable
+// set. When WithEnv returns the state of the current process's
+// environment.
+//
+// WithEnv will assert if there are any problems setting
+// environment variables. Callers are responsible for managing
+// concurrency between multiple
 func WithEnv(t *testing.T, ev dt.Pair[string, string], op func()) {
 	t.Helper()
+	Logf(t, "key=%q value %q", ev.Key, ev.Value)
 
 	prev, wasSet := os.LookupEnv(ev.Key)
 
 	defer func() {
+
 		if wasSet {
-			if err := os.Setenv(ev.Key, prev); err != nil {
-				t.Fatal(err)
-			}
+			assert.NotError(t, os.Setenv(ev.Key, prev))
 			return
 		}
-		if err := os.Unsetenv(ev.Key); err != nil {
-			t.Fatal(err)
-		}
+
+		assert.NotError(t, os.Unsetenv(ev.Key))
 	}()
 
-	if err := os.Setenv(ev.Key, ev.Value); err != nil {
-		t.Fatal(err)
-	}
+	assert.NotError(t, os.Setenv(ev.Key, ev.Value))
 
 	op()
 }

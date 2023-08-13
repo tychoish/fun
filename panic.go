@@ -33,7 +33,7 @@ type RuntimeInvariant struct{}
 // ErrInvariantViolation. In all other cases the operation is a noop.
 func (RuntimeInvariant) IsTrue(cond bool, args ...any) { Invariant.OK(cond, args...) }
 
-// IsTrue provides a runtime assertion that the condition is false,
+// IsFalse provides a runtime assertion that the condition is false,
 // and annotates panic object, which is an error rooted in the
 // ErrInvariantViolation. In all other cases the operation is a noop.
 func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.OK(!cond, args...) }

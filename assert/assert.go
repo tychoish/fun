@@ -44,12 +44,12 @@ func NotEqual[T comparable](t testing.TB, valOne, valTwo T) {
 	}
 }
 
-func zeroOf[T any]() (out T) { return }
-
 // Zero fails a test if the value is not the zero-value for its type.
 func Zero[T comparable](t testing.TB, val T) {
 	t.Helper()
-	if zeroOf[T]() != val {
+
+	var zero T
+	if zero != val {
 		t.Fatalf("expected zero for value of type %T <%v>", val, val)
 	}
 }
@@ -57,7 +57,8 @@ func Zero[T comparable](t testing.TB, val T) {
 // NotZero fails a test if the value is the zero for its type.
 func NotZero[T comparable](t testing.TB, val T) {
 	t.Helper()
-	if zeroOf[T]() == val {
+	var zero T
+	if zero == val {
 		t.Fatalf("expected non-zero for value of type %T", val)
 	}
 }
@@ -154,7 +155,7 @@ func PanicValue[T comparable](t testing.TB, fn func(), value T) {
 		}
 		pval, ok := r.(T)
 		if !ok {
-			t.Fatalf("panic [%v], not of expected type %T", r, zeroOf[T]())
+			t.Fatalf("panic [%v], not of expected type %T", r, value)
 		}
 		Equal(t, pval, value)
 	}()
