@@ -33,6 +33,11 @@ func MakeProcessor[T any](fn func(T) error) Processor[T] {
 // Processor-type function
 func Processify[T any](fn func(context.Context, T) error) Processor[T] { return fn }
 
+// ProcessifyHandler converts a handler-type function to a processor.
+func ProcessifyHandler[T any](fn Handler[T]) Processor[T] {
+	return func(_ context.Context, in T) error { fn(in); return nil }
+}
+
 // Run executes the ProcessFunc but creates a context within the
 // function (decended from the context provided in the arguments,)
 // that is canceled when Run() returns to avoid leaking well behaved

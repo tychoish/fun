@@ -45,15 +45,13 @@ func (of Handler[T]) Worker(in T) Worker { return func(context.Context) error { 
 // function that observes the value when the Operation runs.
 func (of Handler[T]) Operation(in T) Operation { return func(context.Context) { of(in) } }
 
-// Caputre returns a function that observes the specified variable,
+// Capture returns a function that handles the specified value,
 // but only when executed later.
 func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
 
-// Processor converts the observer to an observer function. The
+// Processor converts the observer to an handler function. The
 // Processor will always return nil, and the context is ignored.
-func (of Handler[T]) Processor() Processor[T] {
-	return func(_ context.Context, in T) error { return of.Check(in) }
-}
+func (of Handler[T]) Processor() Processor[T] { return ProcessifyHandler(of) }
 
 // Iterator produces a worker that processes every item in the
 // iterator with the handler function function.
