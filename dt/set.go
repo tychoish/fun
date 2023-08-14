@@ -145,6 +145,9 @@ func (s *Set[T]) Populate(iter *fun.Iterator[T]) {
 	fun.Invariant.Must(iter.Observe(context.Background(), s.Add))
 }
 
+// Extend adds the items of one set to this set.
+func (s *Set[T]) Extend(extra *Set[T]) { s.Populate(extra.Iterator()) }
+
 func (s *Set[T]) unsafeIterator() *fun.Iterator[T] {
 	if s.list != nil {
 		return s.list.Iterator()

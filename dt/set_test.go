@@ -309,7 +309,18 @@ func TestSet(t *testing.T) {
 			}
 			t.Fatal("test could not pass")
 		})
+	})
+	t.Run("Extend", func(t *testing.T) {
+		mp := makeMap(100)
+		set := NewSetFromMap(mp)
+		check.Equal(t, 100, set.Len())
+		set2 := NewSetFromMap(mp)
+		check.Equal(t, 100, set2.Len())
 
+		set.Extend(set2)
+		check.Equal(t, 100, set.Len())
+		set.Extend(NewSetFromMap(makeMap(100)))
+		check.Equal(t, 200, set.Len())
 	})
 }
 
