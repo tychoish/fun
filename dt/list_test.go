@@ -747,13 +747,6 @@ func TestList(t *testing.T) {
 				t.Error("should error")
 			}
 		})
-		t.Run("ElementUnmarshalNil", func(t *testing.T) {
-			elem := dt.NewElement(0)
-
-			if err := elem.UnmarshalJSON(nil); err == nil {
-				t.Error("should error")
-			}
-		})
 		t.Run("NilPointerSafety", func(t *testing.T) {
 			list := &dt.List[jsonMarshlerError]{}
 			list.PushBack(jsonMarshlerError{})

@@ -366,5 +366,18 @@ func TestSlice(t *testing.T) {
 		strs[1] = 100
 		assert.Equal(t, *ptrs[1], 100)
 	})
+	t.Run("List", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
+		sl := randomIntSlice(128)
+		ls, err := NewListFromIterator(ctx, sl.Iterator())
+
+		assert.NotError(t, err)
+
+		exp := ls.Slice()
+
+		check.Equal(t, sl.Len(), ls.Len())
+		check.EqualItems(t, sl, exp)
+	})
 }

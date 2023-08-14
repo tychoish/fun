@@ -473,7 +473,7 @@ func (i *Iterator[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 func (i *Iterator[T]) MarshalJSON() ([]byte, error) {
 	buf := &internal.IgnoreNewLinesBuffer{}
 	enc := json.NewEncoder(buf)
-	_, _ = buf.Write([]byte("["))
+	_ = buf.WriteByte('[')
 	first := true
 
 	// decide to capture a context in the
@@ -488,7 +488,7 @@ func (i *Iterator[T]) MarshalJSON() ([]byte, error) {
 		if first {
 			first = false
 		} else {
-			_, _ = buf.Write([]byte(","))
+			_ = buf.WriteByte(',')
 		}
 
 		if err := enc.Encode(val); err != nil {
@@ -496,7 +496,7 @@ func (i *Iterator[T]) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	_, _ = buf.Write([]byte("]"))
+	_ = buf.WriteByte(']')
 
 	return buf.Bytes(), nil
 }

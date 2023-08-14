@@ -249,12 +249,12 @@ func TestProducer(t *testing.T) {
 			count++
 			return 42, err
 		}
-		val, ok := pf.CheckBlock()
+		val, ok := pf.CheckForce()
 		check.True(t, ok)
 		check.Equal(t, 42, val)
 		err = ers.New("check should fail")
 
-		val, ok = pf.CheckBlock()
+		val, ok = pf.CheckForce()
 		check.True(t, !ok)
 		check.Equal(t, 42, val)
 

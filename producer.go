@@ -169,7 +169,7 @@ func (pf Producer[T]) Force() T { return ft.Must(pf.Block()) }
 // Check uses the error observer to consume the error from the
 // Producer and returns a function that takes a context and returns a value.
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
-func (pf Producer[T]) CheckBlock() (T, bool)               { return pf.Check(context.Background()) }
+func (pf Producer[T]) CheckForce() (T, bool)               { return pf.Check(context.Background()) }
 
 // Launch runs the producer in the background, when function is
 // called, and returns a producer which, when called, blocks until the

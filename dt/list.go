@@ -1,13 +1,13 @@
 package dt
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/internal"
 )
 
 // List provides a doubly linked list. Callers are responsible for
@@ -99,12 +99,6 @@ func (e *Element[T]) Set(v T) bool {
 	return true
 }
 
-// MarshalJSON returns the result of json.Marshal on the value of the
-// element. By supporting json.Marshaler and json.Unmarshaler,
-// Elements and lists can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (e *Element[T]) MarshalJSON() ([]byte, error) { return json.Marshal(e.Value()) }
-
 // UnmarshalJSON reads the json value, and sets the value of the
 // element to the value in the json, potentially overriding an
 // existing value. By supporting json.Marshaler and json.Unmarshaler,
@@ -124,20 +118,23 @@ func (e *Element[T]) UnmarshalJSON(in []byte) error {
 // and lists can behave as arrays in larger json objects, and
 // can be as the output/input of json.Marshal and json.Unmarshal.
 func (l *List[T]) MarshalJSON() ([]byte, error) {
-	buf := &bytes.Buffer{}
-	_, _ = buf.Write([]byte("["))
-	for i := l.Front(); i.OK(); i = i.Next() {
-		if i != l.Front() {
-			_, _ = buf.Write([]byte(","))
+	buf := &internal.IgnoreNewLinesBuffer{}
+	enc := json.NewEncoder(buf)
+
+	_ = buf.WriteByte('[')
+
+	if l.Len() > 0 {
+		for i := l.Front(); i.OK(); i = i.Next() {
+			if i != l.Front() {
+				_ = buf.WriteByte(',')
+			}
+			if err := enc.Encode(i.Value()); err != nil {
+				return nil, err
+			}
 		}
-		e, err := i.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		_, _ = buf.Write(e)
 	}
 
-	_, _ = buf.Write([]byte("]"))
+	_ = buf.WriteByte(']')
 
 	return buf.Bytes(), nil
 }
@@ -418,7 +415,12 @@ func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().
 
 // Extend removes items from the front of the input list, and appends
 // them to the end of the current list.
+
 func (l *List[T]) Extend(input *List[T]) {
+	if input.Len() == 0 {
+		return
+	}
+
 	back := l.Back()
 	for elem := input.PopFront(); elem.OK(); elem = input.PopFront() {
 		back = back.Append(elem)
@@ -430,9 +432,18 @@ func (l *List[T]) Extend(input *List[T]) {
 // values of both lists would be shared.
 func (l *List[T]) Copy() *List[T] {
 	out := &List[T]{}
-	for elem := l.Front(); elem.OK(); elem = elem.Next() {
-		out.PushBack(elem.Value())
+	if l.Len() > 0 {
+		for elem := l.Front(); elem.OK(); elem = elem.Next() {
+			out.PushBack(elem.Value())
+		}
 	}
+	return out
+}
+
+// Slice exports the contents of the list to a slice.
+func (l *List[T]) Slice() Slice[T] {
+	out := Sliceify(make([]T, 0, l.Len()))
+	out.Populate(l.Iterator()).Wait()
 	return out
 }
 

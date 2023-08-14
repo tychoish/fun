@@ -188,3 +188,18 @@ func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
 		return nil
 	}
 }
+
+// Populate constructs an operation that adds all items from the
+// iterator to the slice.
+func (s *Slice[T]) Populate(iter *fun.Iterator[T]) fun.Operation {
+	return func(ctx context.Context) {
+		prod := iter.Producer()
+		for {
+			it, ok := prod.Check(ctx)
+			if !ok {
+				return
+			}
+			s.Append(it)
+		}
+	}
+}
