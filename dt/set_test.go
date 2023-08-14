@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"runtime"
 	"strings"
 	"sync"
@@ -271,7 +272,45 @@ func TestSet(t *testing.T) {
 		check.NotError(t, err)
 		check.Equal(t, 3, set.Len())
 	})
+	t.Run("Constructors", func(t *testing.T) {
+		t.Run("Map", func(t *testing.T) {
+			mp := makeMap(100)
+			set := NewSetFromMap(mp)
+			check.Equal(t, 100, set.Len())
+			set2 := NewSetFromMap(mp)
+			check.Equal(t, 100, set2.Len())
+			check.True(t, set.Equal(set2))
 
+		})
+		t.Run("Slice", func(t *testing.T) {
+			var passed bool
+			for attempt := 0; attempt < 10; attempt++ {
+				func() {
+					ls := make([]uint64, 0, 100)
+					for i := 0; i < 100; i++ {
+						ls = append(ls, rand.Uint64())
+					}
+					set := NewSetFromSlice(ls)
+					if set.Len() != 100 {
+						return
+					}
+					set2 := NewSetFromSlice(ls)
+					if set2.Len() != 100 {
+						return
+					}
+					if !set.Equal(set2) {
+						return
+					}
+					passed = true
+				}()
+				if passed {
+					return
+				}
+			}
+			t.Fatal("test could not pass")
+		})
+
+	})
 }
 
 func BenchmarkSet(b *testing.B) {

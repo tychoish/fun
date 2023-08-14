@@ -33,6 +33,24 @@ type Set[T comparable] struct {
 	mtx  atomic[*sync.Mutex]
 }
 
+// NewSetFromSlice constructs a map and adds all items from the input
+// slice to the new set.
+func NewSetFromSlice[T comparable](in []T) *Set[T] {
+	out := &Set[T]{}
+	out.Populate(fun.SliceIterator(in))
+	return out
+}
+
+// NewSetFromMap constructs a Set of pairs derived from the input
+// map. The resulting set is constrained by both the keys and the
+// values, and so would permit duplicate "keys" from the perspective
+// of the map, and may not therefore roundtrip.
+func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
+	out := &Set[Pair[K, V]]{}
+	out.Populate(MapIterator(in))
+	return out
+}
+
 // Synchronize creates a mutex and enables its use in the Set. This
 // operation is safe to call more than once,
 func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
