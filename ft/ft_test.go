@@ -1,6 +1,7 @@
 package ft
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -298,5 +299,35 @@ func TestWrap(t *testing.T) {
 		assert.True(t, strptr != nil)
 		assert.True(t, IsOK(RefOK(strptr)))
 		assert.Equal(t, "hello", Ref(strptr))
+	})
+}
+
+func TestContexts(t *testing.T) {
+	t.Run("Timeout", func(t *testing.T) {
+		var cc context.Context
+		WithTimeout(10*time.Millisecond, func(ctx context.Context) {
+			assert.NotError(t, ctx.Err())
+			cc = ctx
+			time.Sleep(11 * time.Millisecond)
+			assert.Error(t, ctx.Err())
+			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+		})
+		assert.ErrorIs(t, cc.Err(), context.DeadlineExceeded)
+	})
+	t.Run("ScopeTimeout", func(t *testing.T) {
+		var cc context.Context
+		WithTimeout(10*time.Millisecond, func(ctx context.Context) {
+			cc = ctx
+			assert.NotError(t, ctx.Err())
+		})
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+	t.Run("Scope", func(t *testing.T) {
+		var cc context.Context
+		WithContext(func(ctx context.Context) {
+			cc = ctx
+			assert.NotError(t, ctx.Err())
+		})
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
 	})
 }

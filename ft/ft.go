@@ -1,7 +1,9 @@
 package ft
 
 import (
+	"context"
 	"sync"
+	"time"
 
 	"github.com/tychoish/fun/ers"
 )
@@ -211,6 +213,23 @@ func Apply[T any](fn func(T), arg T) func() { return func() { fn(arg) } }
 func Must[T any](arg T, err error) T {
 	WhenCall(err != nil, func() { panic(ers.Join(err, ers.ErrInvariantViolation)) })
 	return arg
+}
+
+// WithTimeout runs the function, which is the same type as
+// fun.Operation, with a new context that expires after the specified duration.
+func WithTimeout(dur time.Duration, op func(context.Context)) {
+	ctx, cancel := context.WithTimeout(context.Background(), dur)
+	defer cancel()
+	op(ctx)
+}
+
+// WithContext runs the function, which is the same type as a
+// fun.Operation, with a new context that is canceled after the
+// function exits.
+func WithContext(op func(context.Context)) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	op(ctx)
 }
 
 // MustBeOK raises an invariant violation if the ok value is false,
