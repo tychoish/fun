@@ -169,11 +169,11 @@ func Ignore[T any](_ T) { return } //nolint:gosimple
 
 // IgnoreFirst takes two arguments and returns only the second, for
 // use in wrapping functions that return two values.
-func IgnoreFirst[A any, B any](first A, second B) B { return second }
+func IgnoreFirst[A any, B any](_ A, b B) B { return b }
 
 // IgnoreSecond takes two arguments and returns only the first, for
 // use when wrapping functions that return two values.
-func IgnoreSecond[A any, B any](first A, second B) A { return first }
+func IgnoreSecond[A any, B any](a A, _ B) A { return a }
 
 // Once uses a sync.Once to wrap to provide an output function that
 // will execute at most one time, while eliding/managing the sync.Once

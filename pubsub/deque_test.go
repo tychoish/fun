@@ -59,9 +59,9 @@ type fixture[T any] struct {
 }
 
 func randomStringSlice(size int) []string {
-	elems := make([]string, 50)
+	elems := make([]string, size)
 
-	for i := 0; i < 50; i++ {
+	for i := 0; i < size; i++ {
 		elems[i] = fmt.Sprintf("value=%d", i)
 	}
 	return elems

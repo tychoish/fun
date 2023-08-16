@@ -283,7 +283,7 @@ func TestProducer(t *testing.T) {
 	})
 	t.Run("Force", func(t *testing.T) {
 		count := 0
-		var err error = io.EOF
+		var err = io.EOF
 		var pf Producer[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 

@@ -97,9 +97,9 @@ func TestIterator(t *testing.T) {
 				if err != nil {
 					assert.Equal(t, val, 0)
 					break
-				} else {
-					assert.True(t, val >= 1 && val < 65)
 				}
+
+				assert.True(t, val >= 1 && val < 65)
 			}
 			assert.True(t, counter.Load() > 2)
 		})
@@ -125,9 +125,9 @@ func TestIterator(t *testing.T) {
 				if err != nil {
 					assert.Equal(t, val, 0)
 					break
-				} else {
-					assert.True(t, val >= 1 && val < 65)
 				}
+
+				assert.True(t, val >= 1 && val < 65)
 			}
 			assert.True(t, counter.Load() == 0)
 

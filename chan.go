@@ -19,8 +19,8 @@ const ErrNonBlockingChannelOperationSkipped ers.Error = ers.Error("non-blocking 
 type blockingMode int8
 
 const (
-	blocking     blockingMode = 1
-	non_blocking blockingMode = 2
+	modeBlocking    blockingMode = 1
+	modeNonBlocking blockingMode = 2
 )
 
 // ChanOp is a wrapper around a channel, to make it easier to write
@@ -37,7 +37,7 @@ type ChanOp[T any] struct {
 // Blocking produces a blocking Send instance. All Send/Check/Ignore
 // operations will block until the context is canceled, the channel is
 // canceled, or the send succeeds.
-func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: blocking, ch: ch} }
+func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeBlocking, ch: ch} }
 
 // NonBlocking produces a send instance that performs a non-blocking
 // send.
@@ -45,7 +45,7 @@ func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: blocking, ch:
 // The Send() method, for non-blocking sends, will return
 // ErrSkipedNonBlockingSend if the channel was full and the object was
 // not sent.
-func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: non_blocking, ch: ch} }
+func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlocking, ch: ch} }
 
 // Close closes the underlying channel.
 func (op ChanOp[T]) Close() { close(op.ch) }
@@ -90,13 +90,13 @@ type ChanReceive[T any] struct {
 // BlockingReceive is the equivalent of Blocking(ch).Receive(), except
 // that it accepts a receive-only channel.
 func BlockingReceive[T any](ch <-chan T) ChanReceive[T] {
-	return ChanReceive[T]{mode: blocking, ch: ch}
+	return ChanReceive[T]{mode: modeBlocking, ch: ch}
 }
 
 // NonBlockingReceive is the equivalent of NonBlocking(ch).Receive(),
 // except that it accepts a receive-only channel.
 func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
-	return ChanReceive[T]{mode: non_blocking, ch: ch}
+	return ChanReceive[T]{mode: modeNonBlocking, ch: ch}
 }
 
 // Drop performs a read operation and drops the response. If an item
@@ -124,10 +124,10 @@ func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ro.Produc
 // when the channel has been closed.
 func (ro ChanReceive[T]) OK() bool {
 	switch ro.mode {
-	case blocking:
+	case modeBlocking:
 		_, ok := <-ro.ch
 		return ok
-	case non_blocking:
+	case modeNonBlocking:
 		select {
 		case _, ok := <-ro.ch:
 			return ok
@@ -153,7 +153,7 @@ func (ro ChanReceive[T]) OK() bool {
 func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 	var zero T
 	switch ro.mode {
-	case blocking:
+	case modeBlocking:
 		select {
 		case <-ctx.Done():
 			return zero, ctx.Err()
@@ -164,7 +164,7 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 
 			return obj, nil
 		}
-	case non_blocking:
+	case modeNonBlocking:
 		select {
 		case <-ctx.Done():
 			return zero, ctx.Err()
@@ -237,11 +237,13 @@ type ChanSend[T any] struct {
 
 // BlockingSend is equivalent to Blocking(ch).Send() except that
 // it accepts a send-only channel.
-func BlockingSend[T any](ch chan<- T) ChanSend[T] { return ChanSend[T]{mode: blocking, ch: ch} }
+func BlockingSend[T any](ch chan<- T) ChanSend[T] { return ChanSend[T]{mode: modeBlocking, ch: ch} }
 
 // NonBlockingSend is equivalent to NonBlocking(ch).Send() except that
 // it accepts a send-only channel.
-func NonBlockingSend[T any](ch chan<- T) ChanSend[T] { return ChanSend[T]{mode: non_blocking, ch: ch} }
+func NonBlockingSend[T any](ch chan<- T) ChanSend[T] {
+	return ChanSend[T]{mode: modeNonBlocking, ch: ch}
+}
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
@@ -280,14 +282,14 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 	}()
 
 	switch sm.mode {
-	case blocking:
+	case modeBlocking:
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case sm.ch <- it:
 			return nil
 		}
-	case non_blocking:
+	case modeNonBlocking:
 		select {
 		case <-ctx.Done():
 			return ctx.Err()

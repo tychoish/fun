@@ -198,13 +198,11 @@ func EqualItems[T comparable](t testing.TB, one, two []T) {
 	t.Helper()
 	if len(one) != len(two) {
 		t.Fatalf("slices are of different lengths [%d vs %d]", len(one), len(two))
-		return
 	}
 
 	for idx := range one {
 		if one[idx] != two[idx] {
 			t.Fatalf("items at index %d [%v vs %v] are not equal", idx, one[idx], two[idx])
-			break
 		}
 	}
 }

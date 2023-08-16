@@ -277,7 +277,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 	}
 }
 
-func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T, fixtures []BrokerFixture[T]) {
+func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T) {
 	t.Parallel()
 	for _, fix := range GenerateFixtures(elems) {
 		t.Run(fix.Name, func(t *testing.T) {
@@ -496,7 +496,7 @@ func TestBroker(t *testing.T) {
 			},
 		} {
 			t.Run(scope.Name, func(t *testing.T) {
-				RunBrokerTests(ctx, t, scope.Elems, GenerateFixtures(scope.Elems))
+				RunBrokerTests(ctx, t, scope.Elems)
 			})
 		}
 	})
@@ -516,7 +516,7 @@ func TestBroker(t *testing.T) {
 			},
 		} {
 			t.Run(scope.Name, func(t *testing.T) {
-				RunBrokerTests(ctx, t, scope.Elems, GenerateFixtures(scope.Elems))
+				RunBrokerTests(ctx, t, scope.Elems)
 			})
 		}
 	})

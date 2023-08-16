@@ -51,3 +51,4 @@ linters:
     - stylecheck
     - unconvert
     - unused
+    - revive

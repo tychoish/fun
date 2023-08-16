@@ -20,7 +20,7 @@ const ErrRecoveredPanic ers.Error = ers.ErrRecoveredPanic
 // panic, which can be more easily handled. These helpers are
 // syntactic sugar around Invariant.OK, and the invariant is violated
 // the ErrInvariantViolation.
-var Invariant RuntimeInvariant = RuntimeInvariant{}
+var Invariant = RuntimeInvariant{}
 
 // RuntimeInvariant is a type defined to create a namespace, callable
 // (typically) via the Invariant symbol. Access these functions as in:

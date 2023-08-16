@@ -102,7 +102,7 @@ func ChannelIterator[T any](ch <-chan T) *Iterator[T] { return BlockingReceive(c
 // SliceIterator provides Iterator access to the elements in a slice.
 func SliceIterator[T any](in []T) *Iterator[T] {
 	s := in
-	var idx int = -1
+	var idx = -1
 	return Producer[T](func(ctx context.Context) (out T, _ error) {
 		if len(s) <= idx+1 {
 			return out, io.EOF

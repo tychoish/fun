@@ -414,16 +414,15 @@ func (pf Producer[T]) GenerateParallel(
 		var zero T
 		pipe.Processor().
 			ReadAll(func(ctx context.Context) (T, error) {
-				if value, err := pf(ctx); err != nil {
+				value, err := pf(ctx)
+				if err != nil {
 					if opts.CanContinueOnError(err) {
 						return zero, ErrIteratorSkip
 					}
 
 					return zero, io.EOF
-				} else {
-					return value, nil
 				}
-
+				return value, nil
 			}).
 			Operation(func(err error) {
 				ft.WhenCall(errors.Is(err, io.EOF), cancel)

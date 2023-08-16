@@ -11,7 +11,7 @@ import (
 )
 
 func TestAssertion(t *testing.T) {
-	var strVal string = "merlin"
+	var strVal = "merlin"
 
 	var err error
 

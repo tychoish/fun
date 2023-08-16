@@ -139,10 +139,8 @@ func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
 			return err
 		}
 		_ = buf.WriteByte(':')
-		if err := enc.Encode(item.Value); err != nil {
-			return err
-		}
-		return nil
+
+		return enc.Encode(item.Value)
 	})).Wait(); err != nil {
 		return nil, err
 	}

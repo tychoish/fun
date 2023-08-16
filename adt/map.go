@@ -69,10 +69,10 @@ func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 // is not present in the map a default value is created and added to
 // the map.
 func (mp *Map[K, V]) Get(key K) V {
-	new := mp.Default.Get()
-	out, loaded := mp.mp.LoadOrStore(key, new)
+	defaultValue := mp.Default.Get()
+	out, loaded := mp.mp.LoadOrStore(key, defaultValue)
 	if !loaded {
-		mp.Default.Put(new)
+		mp.Default.Put(defaultValue)
 	}
 	return out.(V)
 }

@@ -27,7 +27,7 @@ func (m *mockTB) Cleanup(fn func())       { m.cleanup = append(m.cleanup, fn) }
 func (m *mockTB) Failed() bool            { return m.shouldFail }
 func (m *mockTB) Log(args ...any)         { m.logs = append(m.logs, fmt.Sprint(args...)) }
 func (m *mockTB) Logf(s string, a ...any) { m.logs = append(m.logs, fmt.Sprintf(s, a...)) }
-func (m *mockTB) Fatal(args ...any)       { m.fatalCalled = true }
+func (m *mockTB) Fatal(_ ...any)          { m.fatalCalled = true }
 func TestTools(t *testing.T) {
 	t.Run("Mock", func(t *testing.T) {
 		t.Run("Context", func(t *testing.T) {

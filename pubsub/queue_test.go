@@ -115,8 +115,8 @@ func TestQueueBurstCredit(t *testing.T) {
 	q.mustRemove("bar")
 	q.mustAdd("baz")
 	q.mustRemove("baz")
-	if cap := float64(getTracker().hardLimit - getTracker().softQuota); getTracker().credit > cap {
-		t.Errorf("Wrong credit: got %f, want ≤ %f", getTracker().credit, cap)
+	if lenCap := float64(getTracker().hardLimit - getTracker().softQuota); getTracker().credit > lenCap {
+		t.Errorf("Wrong credit: got %f, want ≤ %f", getTracker().credit, lenCap)
 	}
 }
 

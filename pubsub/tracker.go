@@ -98,8 +98,8 @@ func (q *queueLimitTrackerImpl) remove() {
 		// Give credit for being below the soft quota. Note we do this after
 		// adjusting the quota so the credit reflects the item we just removed.
 		q.credit += float64(q.softQuota-q.length) / float64(q.softQuota)
-		if cap := float64(q.hardLimit - q.softQuota); q.credit > cap {
-			q.credit = cap
+		if lenCap := float64(q.hardLimit - q.softQuota); q.credit > lenCap {
+			q.credit = lenCap
 		}
 	}
 

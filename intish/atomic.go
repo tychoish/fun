@@ -44,10 +44,10 @@ func (a *AtomicFloat64) CompareAndSwap(old, new float64) bool {
 
 func (a *AtomicFloat64) Add(delta float64) float64 {
 	for {
-		old := a.n.Load()
-		new := toFloat(old) + delta
-		if a.n.CompareAndSwap(old, toInt64(new)) {
-			return new
+		oldf := a.n.Load()
+		newf := toFloat(oldf) + delta
+		if a.n.CompareAndSwap(oldf, toInt64(newf)) {
+			return newf
 		}
 	}
 }

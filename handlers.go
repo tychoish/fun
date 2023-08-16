@@ -16,7 +16,7 @@ import (
 
 // HF provides namespaced access to the Handlers/constructors provided
 // by the handler's type.
-var HF Handlers = Handlers{}
+var HF = Handlers{}
 
 // The Handlers type serves to namespace constructors of common
 // operations and specializations of generic functions provided by

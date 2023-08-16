@@ -158,7 +158,7 @@ func TestMapReduce(t *testing.T) {
 	})
 }
 
-func getConstructors[T comparable](t *testing.T) []FixtureIteratorConstuctors[T] {
+func getConstructors[T comparable]() []FixtureIteratorConstuctors[T] {
 	return []FixtureIteratorConstuctors[T]{
 		{
 			Name: "SlicifyIterator",
@@ -207,11 +207,11 @@ func TestIteratorImplementations(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(t, elems, getConstructors[string](t))
+		RunIteratorImplementationTests(t, elems, getConstructors[string]())
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorStringAlgoTests(t, elems, getConstructors[string](t))
+		RunIteratorStringAlgoTests(t, elems, getConstructors[string]())
 	})
 }
 
@@ -238,11 +238,11 @@ func TestIteratorAlgoInts(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(t, elems, getConstructors[int](t))
+		RunIteratorImplementationTests(t, elems, getConstructors[int]())
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int](t))
+		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int]())
 	})
 }
 
@@ -1170,8 +1170,8 @@ func RunIteratorStringAlgoTests(
 		t.Run("Serial", func(t *testing.T) {
 			var root error
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod, close := tfm.Pipe()
-			defer close()
+			proc, prod, closep := tfm.Pipe()
+			defer closep()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			for i := 0; i < 100; i++ {
@@ -1189,8 +1189,8 @@ func RunIteratorStringAlgoTests(
 		t.Run("Parallel", func(t *testing.T) {
 			var root error
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod, close := tfm.Pipe()
-			defer close()
+			proc, prod, closep := tfm.Pipe()
+			defer closep()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			wg := &WaitGroup{}

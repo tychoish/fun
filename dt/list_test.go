@@ -611,8 +611,8 @@ func TestList(t *testing.T) {
 			// [ 42, 84, 420, 840 ]
 
 			if !list.Back().Swap(list.Front().Next()) {
+				t.Log("should have swapped")
 				t.Fatal(list.Iterator().Slice(ctx))
-				t.Fatal("should have swapped")
 			}
 			// expected: [42, 840, 420, 84]
 			slice := ft.Must(list.Iterator().Slice(ctx))
@@ -909,7 +909,7 @@ func BenchmarkList(b *testing.B) {
 
 				b.ResetTimer()
 				iter := list.Iterator()
-				var value int = -1
+				var value = -1
 				for j := 0; j < b.N; j++ {
 					idx := 0
 					for iter.Next(ctx) {
