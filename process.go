@@ -295,7 +295,7 @@ func (pf Processor[T]) Group(ctx context.Context, ops ...T) Worker {
 		WorkerGroupConfNumWorkers(len(ops)),
 		WorkerGroupConfContinueOnError(),
 		WorkerGroupConfContinueOnPanic(),
-	)
+	).Launch(ctx)
 }
 
 ////////////////////////////////////////////////////////////////////////
