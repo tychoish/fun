@@ -29,7 +29,7 @@ func ClearList(t testing.TB, list *List[int]) {
 	}
 
 	for list.PopFront().OK() {
-		// pass
+		continue
 	}
 	if list.Len() != 0 {
 		t.Fatal("should have cleared list", list.Len())
