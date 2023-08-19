@@ -41,7 +41,7 @@ func TestMerge(t *testing.T) {
 		if !strings.Contains(err.Error(), "100") {
 			t.Error(err)
 		}
-		if !strings.Contains(err.Error(), "[error: 200]") {
+		if !strings.Contains(err.Error(), "error: 200") {
 			t.Error(err)
 		}
 	})
@@ -106,23 +106,27 @@ func TestMerge(t *testing.T) {
 		assert.Equal(t, err.Error(), root.Error())
 	})
 
-	t.Run("FindRoot", func(t *testing.T) {
-		err := &mergederr{current: Error("hi")}
-		_, root := err.rootSize()
-		check.Equal(t, root, nil)
-		err.previous = &mergederr{}
-		_, root = err.rootSize()
-		check.Equal(t, root, err.current)
-		weird := &mergederr{current: nil, previous: &mergederr{}}
-		_, root = weird.rootSize()
-		check.True(t, root == nil)
-	})
 	t.Run("ErrStringEdges", func(t *testing.T) {
 		err := &mergederr{}
 		check.Equal(t, err.Error(), "<nil>")
 		err = &mergederr{current: Error("hi")}
 		check.Equal(t, err.Error(), "hi")
 	})
+	t.Run("Many", func(t *testing.T) {
+		t.Run("Formatting", func(t *testing.T) {
+			jerr := Join(Error("one"), Error("two"), Error("three"), Error("four"), Error("five"), Error("six"), Error("seven"), Error("eight"))
+			errs := unwind(jerr)
+			check.Equal(t, len(errs), 8)
+			check.Equal(t, jerr.Error(), "one <n=8> eight")
+		})
+		t.Run("ChainUnwrapping", func(t *testing.T) {
+			jerr := fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w",
+				fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w", errors.New("error")))))))))
+			errs := unwind(jerr)
+			check.Equal(t, len(errs), 9)
+		})
+	})
+
 }
 
 func unwind[T any](in T) (out []T) {

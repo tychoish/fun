@@ -161,5 +161,29 @@ func TestErrors(t *testing.T) {
 		check.NotPanic(t, func() { Ignore(Error("new")) })
 		check.NotPanic(t, func() { Ignore(nil) })
 	})
+	t.Run("When", func(t *testing.T) {
+		t.Run("Bypass", func(t *testing.T) {
+			check.NotError(t, When(false, "hello"))
+			check.True(t, When(false, "hello") == nil)
+		})
+		t.Run("True", func(t *testing.T) {
+			check.Error(t, When(true, "hello"))
+			check.ErrorIs(t, When(true, "hello"), Error("hello"))
 
+			_, ok := When(true, "hello").(Error)
+			check.True(t, ok)
+		})
+	})
+	t.Run("Whenf", func(t *testing.T) {
+		t.Run("Bypass", func(t *testing.T) {
+			check.NotError(t, Whenf(false, "hello: %d", 1))
+			check.True(t, Whenf(false, "hello %d", 1) == nil)
+		})
+		t.Run("True", func(t *testing.T) {
+			inner := Error("inner error; error")
+			check.Error(t, Whenf(true, "hello: %w", inner))
+			check.ErrorIs(t, Whenf(true, "hello: %w", inner), inner)
+			check.NotEqual(t, Whenf(true, "hello: %w", inner).Error(), inner.Error())
+		})
+	})
 }

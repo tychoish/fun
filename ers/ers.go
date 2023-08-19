@@ -7,6 +7,25 @@ import (
 	"io"
 )
 
+// When constructs an ers.Error-typed error value IF the conditional
+// is true, and returns nil otherwise.
+func When(cond bool, e string) error {
+	if !cond {
+		return nil
+	}
+	return Error(e)
+}
+
+// Whenf constructs an error (using fmt.Errorf) IF the conditional is
+// true, and returns nil otherwise.
+func Whenf(cond bool, tmpl string, args ...any) error {
+	if !cond {
+		return nil
+	}
+
+	return fmt.Errorf(tmpl, args...)
+}
+
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
 // error with the provided annotation. When the error is nil, Wrap
 // returns nil.
@@ -31,7 +50,7 @@ func Wrapf(err error, tmpl string, args ...any) error {
 		return nil
 	}
 
-	return fmt.Errorf("%s: %w", fmt.Sprintf(tmpl, args...), err)
+	return fmt.Errorf(fmt.Sprint(tmpl, ": %w"), append(args, err)...)
 }
 
 // ContextExpired checks an error to see if it, or any of it's parent

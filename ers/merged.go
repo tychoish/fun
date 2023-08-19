@@ -3,21 +3,18 @@ package ers
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
-// Join is analogous to errors.Join, with a few distinctions: if there
-// are zero or only nil errors passed to Join, the returned error is
-// nil. If only one non-nil error is passed to join, it is returned
-// directly. Otherwise or one errors passed to join are aggregated
-// into a single error.
+// Join is analogous to errors.Join, with a few distinctions: Errors
+// are stored as a stack; in string form, errors are joined with ": "
+// rather than a new line; if there are more than 4 errors, the error
+// takes the following form:
 //
-// Internally, and contrary to errors.Join, the aggregated error is
-// stored as a stack, and the string (e.g. Error()) form is:
-//
-//	"{top-most error's Error() value}  [{bottom-most error's Error() value}] <{size}>"
+//	"{top-most error's Error() value} <n={size}> [{bottom-most error's Error() value}]"
 //
 // Use Unwind() to get the full content of the aggregated error
-// message.
+// message, which are unwinded recursively.
 func Join(errs ...error) error {
 	switch len(errs) {
 	case 0:
@@ -69,32 +66,21 @@ func (dwe *mergederr) Unwrap() (out []error) {
 	return
 }
 
-func (dwe *mergederr) rootSize() (size int, err error) {
-	if dwe.previous == nil {
-		if !OK(dwe.current) {
-			return 1, nil
-		}
-		return 0, nil
+func (dwe *mergederr) Error() string {
+	if dwe == nil || (dwe.current == nil && dwe.previous == nil) {
+		return "<nil>"
 	}
 
 	errs := dwe.Unwrap()
-	l := len(errs)
-
-	if l == 0 {
-		return 0, nil
+	if len(errs) == 1 {
+		return errs[0].Error()
 	}
 
-	return l, errs[l-1]
-}
+	if len(errs) <= 4 {
+		return strings.Join(Strings(errs), ": ")
+	}
 
-func (dwe *mergederr) Error() string {
-	if size, root := dwe.rootSize(); root != nil {
-		return fmt.Sprintf("%v [%v] <%d>", dwe.current, root, size)
-	}
-	if dwe.current == nil {
-		return "<nil>"
-	}
-	return dwe.current.Error()
+	return fmt.Sprintf("%v <n=%d> %v", errs[0], len(errs), errs[len(errs)-1])
 }
 
 func (dwe *mergederr) Is(target error) bool {
@@ -103,4 +89,15 @@ func (dwe *mergederr) Is(target error) bool {
 
 func (dwe *mergederr) As(target any) bool {
 	return errors.As(dwe.current, target) || errors.As(dwe.previous, target)
+}
+
+func Strings(errs []error) []string {
+	out := make([]string, 0, len(errs))
+	for idx := range errs {
+		if !OK(errs[idx]) {
+			out = append(out, errs[idx].Error())
+		}
+	}
+
+	return out
 }
