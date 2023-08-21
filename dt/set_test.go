@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt/cmp"
 )
 
 func TestSet(t *testing.T) {
@@ -168,6 +169,116 @@ func TestSet(t *testing.T) {
 				if !set.AddCheck("abc") {
 					t.Error("set item should have been present")
 				}
+			})
+			t.Run("Sort", func(t *testing.T) {
+				t.Run("Quick", func(t *testing.T) {
+					t.Parallel()
+					t.Run("UnorderedToStart", func(t *testing.T) {
+						set := builder()
+						set.Add("xyz")
+						set.Add("lmn")
+						set.Add("abc")
+						set.Add("opq")
+						set.Add("def")
+						set.Add("ghi")
+
+						getNextValue := set.Iterator().Producer().Force
+
+						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
+							t.Fatal("should not be ordred by default")
+						}
+						set.SortQuick(cmp.LessThanNative[string])
+
+						getNextValue = set.Iterator().Producer().Force
+
+						check.Equal(t, "abc", getNextValue())
+						check.Equal(t, "def", getNextValue())
+						check.Equal(t, "ghi", getNextValue())
+						check.Equal(t, "lmn", getNextValue())
+						check.Equal(t, "opq", getNextValue())
+						check.Equal(t, "xyz", getNextValue())
+					})
+					t.Run("OrderedStart", func(t *testing.T) {
+						set := builder()
+						set.Order()
+						set.Add("xyz")
+						set.Add("lmn")
+						set.Add("abc")
+						set.Add("opq")
+						set.Add("def")
+						set.Add("ghi")
+
+						getNextValue := set.Iterator().Producer().Force
+
+						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
+							t.Fatal("should not be ordred by default")
+						}
+						set.SortQuick(cmp.LessThanNative[string])
+
+						getNextValue = set.Iterator().Producer().Force
+
+						check.Equal(t, "abc", getNextValue())
+						check.Equal(t, "def", getNextValue())
+						check.Equal(t, "ghi", getNextValue())
+						check.Equal(t, "lmn", getNextValue())
+						check.Equal(t, "opq", getNextValue())
+						check.Equal(t, "xyz", getNextValue())
+					})
+				})
+				t.Run("Merge", func(t *testing.T) {
+					t.Parallel()
+					t.Run("UnorderedToStart", func(t *testing.T) {
+						set := builder()
+						set.Add("xyz")
+						set.Add("lmn")
+						set.Add("abc")
+						set.Add("opq")
+						set.Add("def")
+						set.Add("ghi")
+
+						getNextValue := set.Iterator().Producer().Force
+
+						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
+							t.Fatal("should not be ordred by default")
+						}
+						set.SortMerge(cmp.LessThanNative[string])
+
+						getNextValue = set.Iterator().Producer().Force
+
+						check.Equal(t, "abc", getNextValue())
+						check.Equal(t, "def", getNextValue())
+						check.Equal(t, "ghi", getNextValue())
+						check.Equal(t, "lmn", getNextValue())
+						check.Equal(t, "opq", getNextValue())
+						check.Equal(t, "xyz", getNextValue())
+					})
+					t.Run("OrderedStart", func(t *testing.T) {
+						set := builder()
+						set.Order()
+						set.Add("xyz")
+						set.Add("lmn")
+						set.Add("abc")
+						set.Add("opq")
+						set.Add("def")
+						set.Add("ghi")
+
+						getNextValue := set.Iterator().Producer().Force
+
+						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
+							t.Fatal("should not be ordred by default")
+						}
+						set.SortMerge(cmp.LessThanNative[string])
+
+						getNextValue = set.Iterator().Producer().Force
+
+						check.Equal(t, "abc", getNextValue())
+						check.Equal(t, "def", getNextValue())
+						check.Equal(t, "ghi", getNextValue())
+						check.Equal(t, "lmn", getNextValue())
+						check.Equal(t, "opq", getNextValue())
+						check.Equal(t, "xyz", getNextValue())
+					})
+				})
 			})
 			for populatorName, populator := range map[string]func(*Set[string]){
 				"Three": func(set *Set[string]) {

@@ -6,6 +6,7 @@ import (
 	stdatomic "sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -58,7 +59,6 @@ func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
 // Order enables order tracking for the Set. The method panics if there
 // is more than one item in the map. If order tracking is enabled,
 // this operation is a noop.
-// tracking is enabled,
 func (s *Set[T]) Order() {
 	defer s.with(s.lock())
 	if s.list != nil {
@@ -66,6 +66,35 @@ func (s *Set[T]) Order() {
 	}
 	fun.Invariant.OK(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
 	s.list = &List[T]{}
+}
+
+// SortQuick sorts the elements in the set using
+// sort.StableSort. Typically faster than SortMerge, but potentially
+// more memory intensive for some types. If the set is not ordered, it
+// will become ordered. Unlike the Order() method, you can use this
+// method on a populated but unordered set.
+func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
+	defer s.with(s.lock())
+	ft.WhenCall(s.list == nil, s.forceSetupOrdered)
+	s.list.SortQuick(lt)
+}
+
+// SortMerge sorts the elements in an ordered set using a merge sort
+// algorithm. If the set is not ordered, it will become
+// ordered. Unlike the Order() method, you can use this method on a
+// populated but unordered set.
+func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
+	defer s.with(s.lock())
+	ft.WhenCall(s.list == nil, s.forceSetupOrdered)
+	s.list.SortMerge(lt)
+}
+
+func (s *Set[T]) forceSetupOrdered() {
+	fun.Invariant.OK(s.list == nil)
+	s.list = &List[T]{}
+	for item := range s.hash {
+		s.list.PushBack(item)
+	}
 }
 
 // WithLock configures the Set to synchronize operations with this
