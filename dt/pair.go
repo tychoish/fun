@@ -80,7 +80,7 @@ func (p *Pairs[K, V]) Copy() *Pairs[K, V] { return &Pairs[K, V]{ll: p.List()} }
 // SortMerge performs a merge sort on the collected pairs.
 func (p *Pairs[K, V]) SortMerge(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.SortMerge(c) }
 
-// SortQuick does a quick sort using sort.Sort. Typically faster than
+// SortQuick does a quick sort using sort.StableSort. Typically faster than
 // SortMerge, but potentially more memory intensive for some types.
 func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.SortQuick(c) }
 

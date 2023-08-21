@@ -17,9 +17,8 @@ import (
 // The Deque implementation in the pubsub package provides a similar
 // implementation with locking and a notification system.
 type List[T any] struct {
-	root           *Element[T]
-	length         int
-	elementCreator func(val T) *Element[T]
+	root   *Element[T]
+	length int
 }
 
 // NewListFromIterator builds a list from the elements in the
@@ -42,12 +41,11 @@ func (l *List[T]) Append(items ...T) {
 // list. You can use the methods on this objects to iterate through
 // the list, and the Ok() method for validating zero-valued items.
 type Element[T any] struct {
-	ok      bool
-	deleted bool
-	next    *Element[T]
-	prev    *Element[T]
-	list    *List[T]
-	item    T
+	next *Element[T]
+	prev *Element[T]
+	list *List[T]
+	ok   bool
+	item T
 }
 
 // NewElement produces an unattached Element that you can use with
@@ -82,7 +80,7 @@ func (e *Element[T]) Previous() *Element[T] { return e.prev }
 // elements hold a pointer to their list, this is an O(1) operation.
 //
 // Returns false when the element is nil.
-func (e *Element[T]) In(l *List[T]) bool { return !e.deleted && e.list != nil && e.list == l }
+func (e *Element[T]) In(l *List[T]) bool { return e.list != nil && e.list == l }
 
 // Set allows you to change set the value of an item in place. Returns
 // true if the operation is successful. The operation fails if the Element is the
@@ -235,18 +233,16 @@ func (e *Element[T]) uncheckedAppend(new *Element[T]) {
 	new.next = e.next
 	new.prev.next = new
 	new.next.prev = new
-	new.deleted = false
 }
 
 func (e *Element[T]) uncheckedRemove() {
 	e.list.length--
 	e.prev.next = e.next
 	e.next.prev = e.prev
-	e.deleted = true
+	e.list = nil
 	// avoid removing references so iteration and deletes can
 	// interleve (ish)
 	//
-	// e.list = nil
 	// e.next = nil
 	// e.prev = nil
 }
@@ -257,11 +253,11 @@ func (l *List[T]) Len() int { return l.length }
 
 // PushFront creates an element and prepends it to the list. The
 // performance of PushFront and PushBack are the same.
-func (l *List[T]) PushFront(it T) { l.lazySetup(); l.root.Append(l.elementCreator(it)) }
+func (l *List[T]) PushFront(it T) { l.lazySetup(); l.root.Append(makeElem(it)) }
 
 // PushBack creates an element and appends it to the list. The
 // performance of PushFront and PushBack are the same.
-func (l *List[T]) PushBack(it T) { l.lazySetup(); l.root.prev.Append(l.elementCreator(it)) }
+func (l *List[T]) PushBack(it T) { l.lazySetup(); l.root.prev.Append(makeElem(it)) }
 
 // PopFront removes the first element from the list. If the list is
 // empty, this returns a nil value, that will report an Ok() false
@@ -454,14 +450,15 @@ func (l *List[T]) lazySetup() {
 
 	if l.root == nil {
 		var val T
-		l.elementCreator = func(val T) *Element[T] { return &Element[T]{item: val, ok: true} }
-		l.root = l.elementCreator(val)
+		l.root = makeElem(val)
 		l.root.next = l.root
 		l.root.prev = l.root
 		l.root.list = l
 		l.root.ok = false
 	}
 }
+
+func makeElem[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 
 func (l *List[T]) pop(it *Element[T]) *Element[T] {
 	if !it.removable() || it.list != l {
