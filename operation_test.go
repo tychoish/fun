@@ -293,7 +293,7 @@ func TestOperation(t *testing.T) {
 
 		expected := errors.New("safer")
 		err := Operation(func(context.Context) { panic(expected) }).
-			Safe()(ctx)
+			WithRecover()(ctx)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})

@@ -36,13 +36,14 @@ func TestWorker(t *testing.T) {
 			defer cancel()
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
-			Worker(func(ctx context.Context) error { called.Add(1); panic(expected) }).
+			Worker(func(ctx context.Context) error { called.Add(1); panic(expected) }).WithRecover().
 				Launch(ctx).
 				Observe(ctx, func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
 					called.Add(1)
 				})
+
 			for {
 				if called.Load() == 2 {
 					return
@@ -168,7 +169,7 @@ func TestWorker(t *testing.T) {
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); panic(expected) }
-			wf.Background(ctx, oee)(ctx)
+			wf.WithRecover().Background(ctx, oee)(ctx)
 			Blocking(ch).Receive().Ignore(ctx)
 			assert.True(t, called.Load())
 		})
@@ -243,15 +244,15 @@ func TestWorker(t *testing.T) {
 		expected := errors.New("cat")
 		count := 0
 		var wf Worker = func(context.Context) error { count++; panic(expected) }
-		assert.Error(t, wf.Safe()(ctx))
+		assert.Error(t, wf.WithRecover()(ctx))
 		assert.Equal(t, count, 1)
-		assert.ErrorIs(t, wf.Safe()(ctx), expected)
+		assert.ErrorIs(t, wf.WithRecover()(ctx), expected)
 		assert.Equal(t, count, 2)
 		assert.Panic(t, func() { _ = wf(ctx) })
 		assert.Equal(t, count, 3)
 		assert.Panic(t, func() { wf.Ignore()(ctx) })
 		assert.Equal(t, count, 4)
-		assert.NotPanic(t, func() { wf.Safe().Ignore()(ctx) })
+		assert.NotPanic(t, func() { wf.WithRecover().Ignore()(ctx) })
 		assert.Equal(t, count, 5)
 	})
 	t.Run("Limit", func(t *testing.T) {

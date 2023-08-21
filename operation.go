@@ -147,9 +147,9 @@ func (wf Operation) Block() { wf.Wait() }
 // Wait runs the operation with a background context.
 func (wf Operation) Wait() { wf(context.Background()) }
 
-// Safe converts the Operation into a Worker function that catchers
+// WithRecover converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.
-func (wf Operation) Safe() Worker {
+func (wf Operation) WithRecover() Worker {
 	return func(ctx context.Context) error { return ers.Check(func() { wf(ctx) }) }
 }
 

@@ -81,7 +81,7 @@ func (pf Processor[T]) Operation(of Handler[error], in T) Operation {
 // Safe runs the producer, converted all panics into errors. Safe is
 // itself a processor.
 func (pf Processor[T]) Safe() Processor[T] {
-	return func(ctx context.Context, in T) error { return pf.Worker(in).Safe()(ctx) }
+	return func(ctx context.Context, in T) error { return pf.Worker(in).WithRecover()(ctx) }
 }
 
 // After produces a Processor that will execute after the provided

@@ -60,7 +60,14 @@ type WorkerGroupConf struct {
 // error if there are impossible configurations
 func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = intish.Max(1, o.NumWorkers)
-	return nil
+	ehIsNotNil := o.ErrorHandler != nil
+	erIsNotNil := o.ErrorResolver != nil
+
+	return errors.Join(
+		ers.Whenf(ehIsNotNil != erIsNotNil,
+			"must configure error handler and resolver, or neither, eh=%t er=%t",
+			ehIsNotNil, erIsNotNil),
+	)
 }
 
 // CanContinueOnError checks an error, collecting it as needed using

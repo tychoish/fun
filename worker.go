@@ -105,9 +105,9 @@ func Pipe[T any](from Producer[T], to Processor[T]) Worker {
 // Run is equivalent to calling the worker function directly.
 func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 
-// Safe produces a worker function that converts the worker function's
+// WithRecover produces a worker function that converts the worker function's
 // panics to errors.
-func (wf Worker) Safe() Worker {
+func (wf Worker) WithRecover() Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return wf(ctx)
@@ -126,21 +126,19 @@ func (wf Worker) Wait() error                               { return wf.Run(cont
 func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
 // Observe runs the worker function, and observes the error (or nil
-// response). Panics are converted to errors for both the worker
-// function but not the observer function.
-func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Safe()(ctx)) }
+// response). Panics are not caught.
+func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Run(ctx)) }
 
 // Signal runs the worker function in a background goroutine and
 // returns the error in an error channel, that returns when the
 // worker function returns. If Signal is called with a canceled
 // context the worker is still executed (with that context.)
 //
-// A value, possibly nil, is always sent through the channel, though
-// the fun.Worker runs in a different go routine, a panic handler will
-// convert panics to errors.
+// A value, possibly nil, is always sent through the channel. Panics
+// are not caught or handled.
 func (wf Worker) Signal(ctx context.Context) <-chan error {
 	out := Blocking(make(chan error))
-	go func() { defer out.Close(); out.Send().Ignore(ctx, wf.Safe()(ctx)) }()
+	go func() { defer out.Close(); out.Send().Ignore(ctx, wf.Run(ctx)) }()
 	return out.Channel()
 }
 

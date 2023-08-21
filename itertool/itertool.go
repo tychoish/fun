@@ -30,8 +30,8 @@ func Process[T any](
 
 // compile-time assertions that both worker types support the "safe"
 // interface needed for the Worker() tool.
-var _ interface{ Safe() fun.Worker } = new(fun.Worker)
-var _ interface{ Safe() fun.Worker } = new(fun.Operation)
+var _ interface{ WithRecover() fun.Worker } = new(fun.Worker)
+var _ interface{ WithRecover() fun.Worker } = new(fun.Operation)
 
 // Worker takes iterators of fun.Worker or fun.Operation lambdas
 // and processes them in according to the configuration.
@@ -54,7 +54,7 @@ func Worker[OP fun.Worker | fun.Operation](
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
-		return any(op).(interface{ Safe() fun.Worker }).Safe()(ctx)
+		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover()(ctx)
 	}, optp...)
 }
 
