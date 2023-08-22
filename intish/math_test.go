@@ -137,22 +137,22 @@ func TestMath(t *testing.T) {
 			})
 		})
 		t.Run("Millis", func(t *testing.T) {
-			if v := Millis(1.23); v != 1230 {
+			if v := Millis[int](1.23); v != 1230 {
 				t.Error(v)
 			}
 			if v := FloatMillis(1230); v != 1.23 {
 				t.Error(v)
 			}
-			if v := Millis(1); v != 1000 {
+			if v := Millis[int64](1); v != 1000 {
 				t.Error(v)
 			}
-			if v := Millis(300); v != 300_000 {
+			if v := Millis[int32](300); v != 300_000 {
 				t.Error(v)
 			}
-			if v := Millis(0.1234567); v != 123 {
+			if v := Millis[int16](0.1234567); v != 123 {
 				t.Error(v)
 			}
-			if v := Millis(0.25); v != 250 {
+			if v := Millis[int](0.25); v != 250 {
 				t.Error(v)
 			}
 			if v := FloatMillis(250); v != 0.25 {
@@ -167,7 +167,7 @@ func TestMath(t *testing.T) {
 
 				}()
 
-				Millis(math.MaxInt64)
+				Millis[int64](math.MaxInt64)
 			}()
 		})
 		t.Run("AwayFromZero", func(t *testing.T) {

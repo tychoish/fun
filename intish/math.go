@@ -117,8 +117,8 @@ func Diff[T Numbers](a, b T) T {
 // thousandth of the units of the original.
 //
 // Millis will panic in the case of an overflow (wraparound).
-func Millis(in float64) int64 {
-	milli := int64(in * 1000)
+func Millis[T Signed](in float64) T {
+	milli := T(in * 1000)
 	// check if we overflowed.
 	if (in < 0) != (milli < 0) {
 		panic(fmt.Sprintf("%.2f cannot be converted to millis, avoiding overflow", in))
@@ -129,4 +129,4 @@ func Millis(in float64) int64 {
 
 // FloatMillis reverses, though potentially (often) not without some
 // loss of fidelity
-func FloatMillis(in int64) float64 { return float64(in) / 1000 }
+func FloatMillis[T Signed](in T) float64 { return float64(in) / 1000 }
