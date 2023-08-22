@@ -124,6 +124,19 @@ func TestHandlers(t *testing.T) {
 		proc(nil)
 		check.Equal(t, count, 2)
 	})
+	t.Run("Recover", func(t *testing.T) {
+		var called bool
+		ob := func(err error) {
+			check.Error(t, err)
+			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
+			called = true
+		}
+		assert.NotPanic(t, func() {
+			defer HF.Recover(ob)
+			panic("hi")
+		})
+		check.True(t, called)
+	})
 	t.Run("ErrorProcessorWithoutTerminating", func(t *testing.T) {
 		count := 0
 		proc := HF.ErrorHandlerWithoutTerminating(func(err error) {

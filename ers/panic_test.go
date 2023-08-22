@@ -17,6 +17,19 @@ func TestPanics(t *testing.T) {
 		assert.Error(t, err)
 		check.True(t, !ok)
 	})
+	t.Run("Recover", func(t *testing.T) {
+		var called bool
+		ob := func(err error) {
+			check.Error(t, err)
+			check.ErrorIs(t, err, ErrRecoveredPanic)
+			called = true
+		}
+		assert.NotPanic(t, func() {
+			defer Recover(ob)
+			panic("hi")
+		})
+		assert.True(t, called)
+	})
 	t.Run("Check", func(t *testing.T) {
 		t.Run("NoError", func(t *testing.T) {
 			err := Check(func() { t.Log("function runs") })

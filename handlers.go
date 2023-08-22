@@ -75,6 +75,10 @@ func (Handlers) ErrorProcessor(pf Processor[error]) Processor[error] {
 	}
 }
 
+// Recovery catches a panic, turns it into an error and passes it to
+// the provided observer function.
+func (Handlers) Recover(ob Handler[error]) { ob(ers.ParsePanic(recover())) }
+
 // ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
 func (Handlers) ErrorHandler(of Handler[error]) Handler[error] {

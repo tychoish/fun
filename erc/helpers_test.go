@@ -138,16 +138,16 @@ func TestCollections(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
 				ch := make(chan error)
 				close(ch)
-				err := Stream(ctx, ch)
-				if err != nil {
-					t.Error("nil expected", err)
-				}
+				ec := New()
+				Stream(ctx, ec, ch)
+				assert.NotError(t, ec.Resolve())
 			})
-
 			t.Run("One", func(t *testing.T) {
 				ch := getPopulatedErrChan(1)
 				close(ch)
-				err := Stream(ctx, ch)
+				ec := New()
+				Stream(ctx, ec, ch)
+				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
 					t.Error("nil expected", err)
@@ -161,7 +161,9 @@ func TestCollections(t *testing.T) {
 				ch := getPopulatedErrChan(10)
 				close(ch)
 				fun.Invariant.IsTrue(len(ch) == 10)
-				err := Stream(ctx, ch)
+				ec := New()
+				Stream(ctx, ec, ch)
+				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
 					t.Error("nil expected", err)
@@ -173,17 +175,6 @@ func TestCollections(t *testing.T) {
 			})
 		})
 	})
-	t.Run("Recovery", func(t *testing.T) {
-		ob := func(err error) {
-			check.Error(t, err)
-			check.ErrorIs(t, err, fun.ErrRecoveredPanic)
-		}
-		assert.NotPanic(t, func() {
-			defer Recovery(ob)
-			panic("hi")
-		})
-	})
-
 	t.Run("Collect", func(t *testing.T) {
 		ec := &Collector{}
 		collect := Collect[int](ec)

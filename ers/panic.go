@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+// Recovery catches a panic, turns it into an error and passes it to
+// the provided observer function.
+func Recover(ob func(error)) { ob(ParsePanic(recover())) }
+
 // ParsePanic converts a panic to an error, if it is not, and attaching
 // the ErrRecoveredPanic error to that error. If no panic is
 // detected, ParsePanic returns nil.

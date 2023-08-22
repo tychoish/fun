@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -25,6 +26,14 @@ type Stack struct {
 	err   error
 	next  *Stack
 	count int
+}
+
+// Join takes a slice of errors and converts it into an *erc.Stack
+// typed error.
+func Join(errs ...error) error {
+	s := &Stack{}
+	dt.Sliceify(errs).Observe(func(err error) { s = s.append(err) })
+	return ft.WhenDo(s.count != 0, func() error { return s })
 }
 
 func (e *Stack) append(err error) *Stack {
@@ -74,7 +83,7 @@ func (e *Stack) append(err error) *Stack {
 // the error at the current layer is nil.
 func (e *Stack) Error() string {
 	if e.err == nil && e.next == nil {
-		return "empty error"
+		return "<nil>"
 	}
 
 	if e.next != nil && e.next.err != nil {
@@ -138,6 +147,10 @@ type Collector struct {
 	stack *Stack
 }
 
+// New constructs an empty Collector. Collectors can be used without
+// any special construction, but this function is shorter.
+func New() *Collector { return &Collector{} }
+
 func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
 func with(mtx *sync.Mutex)             { mtx.Unlock() }
 
@@ -147,11 +160,7 @@ func (ec *Collector) Add(err error) {
 		return
 	}
 	defer with(lock(&ec.mu))
-	if ec.stack == nil {
-		ec.stack = &Stack{}
-	}
-
-	ec.stack = ec.stack.append(err)
+	ec.stack = ft.DefaultNew(ec.stack).append(err)
 }
 
 // Obesrver returns the collector's Add method as a

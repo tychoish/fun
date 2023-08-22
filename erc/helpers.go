@@ -6,9 +6,7 @@ import (
 	"fmt"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 )
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
@@ -78,10 +76,6 @@ func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() 
 // statements.
 func Recover(ec *Collector) { ec.Add(ers.ParsePanic(recover())) }
 
-// Recovery catches a panic, turns it into an error and passes it to
-// the provided observer function.
-func Recovery(ob fun.Handler[error]) { ob(ers.ParsePanic(recover())) }
-
 // RecoverHook runs adds the output of recover() to the error
 // collector, and runs the specified hook if. If there was no panic,
 // this function is a noop. Run RecoverHook in defer statements.
@@ -106,14 +100,6 @@ func RecoverHook(ec *Collector, hook func()) {
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
-// Join takes a slice of errors and converts it into an *erc.Stack
-// typed error.
-func Join(errs ...error) error {
-	s := &Stack{}
-	dt.Sliceify(errs).Observe(func(err error) { s = s.append(err) })
-	return ft.WhenDo(s.count != 0, func() error { return s })
-}
-
 // Stream collects all errors from an error channel, and returns the
 // aggregated error. Stream blocks until the context expires (but
 // does not add a context cancellation error) or the error channel is
@@ -121,8 +107,8 @@ func Join(errs ...error) error {
 //
 // Because Stream() is a fun.ProcessFunc you can convert this into
 // fun.Worker and fun.Operation objects as needed.
-func Stream(ctx context.Context, errCh <-chan error) error {
-	return Consume(ctx, fun.ChannelIterator(errCh))
+func Stream(ctx context.Context, ec *Collector, errCh <-chan error) {
+	Consume(ctx, ec, fun.ChannelIterator(errCh))
 }
 
 // Consume iterates through all errors in the fun.Iterator and
@@ -130,10 +116,8 @@ func Stream(ctx context.Context, errCh <-chan error) error {
 //
 // Because Consume() is a fun.ProcessFunc you can convert this into
 // fun.Worker and fun.Operation objects as needed.
-func Consume(ctx context.Context, iter *fun.Iterator[error]) error {
-	ec := &Collector{}
+func Consume(ctx context.Context, ec *Collector, iter *fun.Iterator[error]) {
 	ec.Add(iter.Observe(ctx, ec.Handler()))
-	return ec.Resolve()
 }
 
 // Collect produces a function that will collect the error from a
