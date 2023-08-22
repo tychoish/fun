@@ -100,7 +100,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 			mf.mapPullProcess(output.Send().Write, opts).
 				ReadAll(splits[idx].Producer()).
 				Operation(func(err error) {
-					ft.WhenCall(errors.Is(err, io.EOF), wcancel)
+					ft.WhenCall(ers.Is(err, io.EOF, ers.ErrAbortCurrentOp), wcancel)
 				}).
 				Add(wctx, wg)
 		}
@@ -236,7 +236,7 @@ func (mpf Transform[T, O]) Worker(in Producer[T], out Processor[O]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrIteratorSkip):
 				continue
-			case errors.Is(err, io.EOF):
+			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
 				return nil
 			default:
 				return err

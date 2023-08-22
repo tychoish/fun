@@ -90,7 +90,7 @@ func Append(errs []error, es ...error) []error {
 // processing/iteration has terminated. (e.g. context expiration, or
 // io.EOF.)
 func IsTerminating(err error) bool {
-	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded)
+	return Is(err, io.EOF, context.Canceled, context.DeadlineExceeded, ErrAbortCurrentOp)
 }
 
 // IsInvariantViolation returns true if the argument is or resolves to

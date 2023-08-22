@@ -19,3 +19,7 @@ const ErrLimitExceeded Error = Error("limit exceeded")
 // ErrInvalidInput indicates malformed input. These errors are not
 // generally retriable.
 const ErrInvalidInput Error = Error("invalid input")
+
+// ErrAbortCurrentOp is used to signal that a retry function or other
+// loop should be aborted.
+const ErrAbortCurrentOp Error = Error("abort current operation")

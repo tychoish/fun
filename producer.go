@@ -425,7 +425,7 @@ func (pf Producer[T]) GenerateParallel(
 				return value, nil
 			}).
 			Operation(func(err error) {
-				ft.WhenCall(errors.Is(err, io.EOF), cancel)
+				ft.WhenCall(ers.Is(err, io.EOF, ers.ErrAbortCurrentOp), cancel)
 			}).
 			StartGroup(wctx, wg, opts.NumWorkers)
 

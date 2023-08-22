@@ -240,7 +240,7 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 			return out, nil
 		case errors.Is(err, ErrIteratorSkip):
 			continue
-		case ers.Is(err, io.EOF, context.Canceled, context.DeadlineExceeded):
+		case ers.Is(err, io.EOF, context.Canceled, context.DeadlineExceeded, ers.ErrAbortCurrentOp):
 			return out, err
 		default:
 			i.AddError(err)
@@ -305,7 +305,7 @@ func (i *Iterator[T]) Reduce(
 				continue
 			case errors.Is(err, ErrIteratorSkip):
 				continue
-			case errors.Is(err, io.EOF):
+			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
 				return value, nil
 			default:
 				return value, err
@@ -376,7 +376,9 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Handler[T]) (err error) {
 		switch {
 		case err == nil:
 			fn(item)
-		case errors.Is(err, io.EOF):
+		case error.Is(err, ErrIteratorSkip):
+			continue
+		case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
 			return nil
 		default:
 			// this is (realistically) only context
@@ -413,7 +415,7 @@ func (i *Iterator[T]) Process(fn Processor[T]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrIteratorSkip):
 				continue LOOP
-			case errors.Is(err, io.EOF):
+			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
 				return nil
 			default:
 				return err
@@ -562,7 +564,7 @@ func (i *Iterator[T]) ProcessParallel(
 		splits := i.Split(opts.NumWorkers)
 		for idx := range splits {
 			operation.ReadAll(splits[idx].Producer()).
-				Operation(func(err error) { ft.WhenCall(errors.Is(err, io.EOF), cancel) }).
+				Operation(func(err error) { ft.WhenCall(ers.Is(err, io.EOF, ers.ErrAbortCurrentOp), cancel) }).
 				Add(ctx, wg)
 		}
 

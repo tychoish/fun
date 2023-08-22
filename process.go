@@ -278,7 +278,7 @@ func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrIteratorSkip):
 				continue LOOP
-			case errors.Is(err, io.EOF):
+			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
 				return nil
 			default:
 				return err
