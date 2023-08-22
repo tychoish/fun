@@ -45,8 +45,8 @@ func Converter[T any, O any](op func(T) O) Transform[T, O] {
 
 // ConverterOK builds a Transform function from a function that
 // converts between types T and O, but that returns a boolean/check
-// value. When false the transform function returns a ErrIteratorSkip
-// error.
+// value. When the converter function returns false the
+// transform function returns a ErrIteratorSkip error.
 func ConverterOK[T any, O any](op func(T) (O, bool)) Transform[T, O] {
 	return func(ctx context.Context, in T) (out O, err error) {
 		var ok bool
@@ -92,7 +92,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 	init := Operation(func(ctx context.Context) {
 		wctx, wcancel := context.WithCancel(ctx)
 		wg := &WaitGroup{}
-		mf := mpf.Safe()
+		mf := mpf.WithRecover()
 		splits := iter.Split(opts.NumWorkers)
 		for idx := range splits {
 			// for each split, run a mapWorker
@@ -100,7 +100,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 			mf.mapPullProcess(output.Send().Write, opts).
 				ReadAll(splits[idx].Producer()).
 				Operation(func(err error) {
-					ft.WhenCall(ers.Is(err, io.EOF, ers.ErrAbortCurrentOp), wcancel)
+					ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), wcancel)
 				}).
 				Add(wctx, wg)
 		}
@@ -168,16 +168,16 @@ func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O], closer func
 	return in, out, closer
 }
 
-// Block calls the transform function passing a context that cannot expire.
-func (mpf Transform[T, O]) Block() func(T) (O, error) {
+// Wait calls the transform function passing a context that cannot expire.
+func (mpf Transform[T, O]) Wait() func(T) (O, error) {
 	return func(in T) (O, error) { return mpf(context.Background(), in) }
 }
 
-// BlockCheck calls the function with a context that cannot be
+// CheckWait calls the function with a context that cannot be
 // canceled. The second value is true as long as the transform
 // function returns a nil error and false in all other cases
-func (mpf Transform[T, O]) BlockCheck() func(T) (O, bool) {
-	mpfb := mpf.Block()
+func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
+	mpfb := mpf.Wait()
 	return func(in T) (O, bool) {
 		return ers.SafeOK(func() (O, error) { return mpfb(in) })
 	}
@@ -200,10 +200,10 @@ func (mpf Transform[T, O]) WithLock(mu *sync.Mutex) Transform[T, O] {
 	}
 }
 
-// Safe returns a Transform function that catches a panic, converts
+// WithRecover returns a Transform function that catches a panic, converts
 // the panic object to an error if needed, and aggregates that with
 // the Transform function's error.
-func (mpf Transform[T, O]) Safe() Transform[T, O] {
+func (mpf Transform[T, O]) WithRecover() Transform[T, O] {
 	return func(ctx context.Context, val T) (_ O, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return mpf(ctx, val)
@@ -236,7 +236,7 @@ func (mpf Transform[T, O]) Worker(in Producer[T], out Processor[O]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrIteratorSkip):
 				continue
-			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
+			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 				return nil
 			default:
 				return err

@@ -1094,7 +1094,7 @@ func RunIteratorStringAlgoTests(
 				return fmt.Sprint(in), nil
 			})
 
-			out, err := mpf.Block()(42)
+			out, err := mpf.Wait()(42)
 			check.Equal(t, "42", out)
 			check.NotError(t, err)
 			check.Equal(t, count, 1)
@@ -1108,7 +1108,7 @@ func RunIteratorStringAlgoTests(
 				return fmt.Sprint(in), io.EOF
 			})
 
-			out, err := mpf.Block()(42)
+			out, err := mpf.Wait()(42)
 			check.Equal(t, "42", out)
 			check.Error(t, err)
 			check.ErrorIs(t, err, io.EOF)
@@ -1125,7 +1125,7 @@ func RunIteratorStringAlgoTests(
 				return fmt.Sprint(in), nil
 			})
 
-			out, ok := mpf.BlockCheck()(42)
+			out, ok := mpf.CheckWait()(42)
 			check.Equal(t, "42", out)
 			check.True(t, ok)
 			check.Equal(t, count, 1)
@@ -1139,7 +1139,7 @@ func RunIteratorStringAlgoTests(
 				return fmt.Sprint(in), io.EOF
 			})
 
-			out, ok := mpf.BlockCheck()(42)
+			out, ok := mpf.CheckWait()(42)
 			check.Equal(t, "", out)
 			check.True(t, !ok)
 			check.Equal(t, count, 1)
