@@ -376,7 +376,7 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Handler[T]) (err error) {
 		switch {
 		case err == nil:
 			fn(item)
-		case error.Is(err, ErrIteratorSkip):
+		case errors.Is(err, ErrIteratorSkip):
 			continue
 		case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
 			return nil

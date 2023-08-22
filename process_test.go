@@ -344,7 +344,7 @@ func TestProcess(t *testing.T) {
 		count := &atomic.Int64{}
 		proc := MakeProcessor(func(i int) error { count.Add(1); check.Equal(t, i, 42); return nil })
 		check.Equal(t, 0, count.Load())
-		worker := proc.Group(ctx, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42)
+		worker := proc.Parallel(42, 42, 42, 42, 42, 42, 42, 42, 42, 42)
 		check.Equal(t, 0, count.Load())
 		err := worker(ctx)
 		check.NotError(t, err)

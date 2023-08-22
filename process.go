@@ -287,16 +287,26 @@ func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 	}
 }
 
-// Group takes a variadic number of items and processes them,
-// concurrently. The Worker will block and return the aggregated
-// errors from all operations.
-func (pf Processor[T]) Group(ctx context.Context, ops ...T) Worker {
+// Parallel takes a variadic number of items and returns a worker that
+// processes them concurrently. All panics are converted to errors and
+// all errors are aggregated.
+func (pf Processor[T]) Parallel(ops ...T) Worker {
 	return SliceIterator(ops).ProcessParallel(pf,
 		WorkerGroupConfNumWorkers(len(ops)),
 		WorkerGroupConfContinueOnError(),
 		WorkerGroupConfContinueOnPanic(),
-	).Launch(ctx)
+	)
 }
+
+// Retry makes a worker function that takes runs the processor
+// function with the provied input until the return value is nil, or
+// it encounters a terminating error (io.EOF, ers.ErrAbortCurrentOp,
+// or context cancellation.) Context cancellation errors are returned
+// to the caller, other terminating errors are not. All errors are
+// discarded if the retry operation succeeds in the provided number of
+// retries. Other errors are aggregated and returned to the caller
+// only if the retry fails
+func (pf Processor[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
 
 ////////////////////////////////////////////////////////////////////////
 

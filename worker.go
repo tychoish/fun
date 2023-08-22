@@ -400,3 +400,30 @@ func (wf Worker) WithoutErrors(errs ...error) Worker {
 	filter := ers.FilterExclude(errs...)
 	return func(ctx context.Context) error { return filter(wf(ctx)) }
 }
+
+// Retry constructs a worker function that takes runs the underlying
+// worker until the return value is nil, or it encounters a
+// terminating error (io.EOF, ers.ErrAbortCurrentOp, or context
+// cancellation.) Context cancellation errors are returned to the
+// caller, other terminating errors are not. All errors are discarded
+// if the retry operation succeeds in the provided number of
+// retries. Other errors are aggregated and returned to the caller
+// only if the retry fails.
+func (wf Worker) Retry(n int) Worker {
+	return func(ctx context.Context) (err error) {
+		for i := 0; i < n; i++ {
+			attemptErr := wf(ctx)
+			switch {
+			case attemptErr == nil:
+				return nil
+			case ers.ContextExpired(attemptErr):
+				return ers.Join(attemptErr, err)
+			case ers.IsTerminating(attemptErr):
+				return nil
+			default:
+				err = ers.Join(attemptErr, err)
+			}
+		}
+		return err
+	}
+}
