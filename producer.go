@@ -337,6 +337,43 @@ func (pf Producer[T]) Limit(in int) Producer[T] {
 	}
 }
 
+// Retry constructs a worker function that takes runs the underlying
+// producer until the error value is nil, or it encounters a
+// terminating error (io.EOF, ers.ErrAbortCurrentOp, or context
+// cancellation.) In all cases, unless the error value is nil
+// (e.g. the retry succeeds)
+//
+// Context cancellation errors are returned to the caller, other
+// terminating errors are not, with any other errors encountered
+// during retries. ErrIteratorSkip is always ignored and not
+// aggregated. All errors are discarded if the retry operation
+// succeeds in the provided number of retries.
+//
+// Except for ErrIteratorSkip, which is ignored, all other errors are
+// aggregated and returned to the caller only if the retry fails. It's
+// possible to return a nil error and a zero value, if the producer
+// only returned ErrIteratorSkip values.
+func (pf Producer[T]) Retry(n int) Producer[T] {
+	var zero T
+	return func(ctx context.Context) (_ T, err error) {
+		for i := 0; i < n; i++ {
+			value, attemptErr := pf(ctx)
+			switch {
+			case attemptErr == nil:
+				return value, nil
+			case ers.IsTerminating(attemptErr):
+				return zero, ers.Join(attemptErr, err)
+			case errors.Is(err, ErrIteratorSkip):
+				continue
+			default:
+				err = ers.Join(attemptErr, err)
+			}
+
+		}
+		return zero, err
+	}
+}
+
 // TTL runs the producer only one time per specified interval. The
 // interval must me greater than 0.
 func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
@@ -425,7 +462,7 @@ func (pf Producer[T]) GenerateParallel(
 				return value, nil
 			}).
 			Operation(func(err error) {
-				ft.WhenCall(ers.Is(err, io.EOF, ers.ErrAbortCurrentOp), cancel)
+				ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), cancel)
 			}).
 			StartGroup(wctx, wg, opts.NumWorkers)
 

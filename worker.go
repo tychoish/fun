@@ -405,10 +405,12 @@ func (wf Worker) WithoutErrors(errs ...error) Worker {
 // worker until the return value is nil, or it encounters a
 // terminating error (io.EOF, ers.ErrAbortCurrentOp, or context
 // cancellation.) Context cancellation errors are returned to the
-// caller, other terminating errors are not. All errors are discarded
-// if the retry operation succeeds in the provided number of
-// retries. Other errors are aggregated and returned to the caller
-// only if the retry fails.
+// caller with any other errors encountered in previous retries, other
+// terminating errors are not. All errors are discarded if the retry
+// operation succeeds in the provided number of retries.
+//
+// Except for ErrIteratorSkip, which is ignored, all other errors are
+// aggregated and returned to the caller only if the retry fails.
 func (wf Worker) Retry(n int) Worker {
 	return func(ctx context.Context) (err error) {
 		for i := 0; i < n; i++ {
@@ -418,6 +420,8 @@ func (wf Worker) Retry(n int) Worker {
 				return nil
 			case ers.ContextExpired(attemptErr):
 				return ers.Join(attemptErr, err)
+			case errors.Is(err, ErrIteratorSkip):
+				continue
 			case ers.IsTerminating(attemptErr):
 				return nil
 			default:

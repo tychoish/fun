@@ -278,7 +278,7 @@ func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrIteratorSkip):
 				continue LOOP
-			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
+			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 				return nil
 			default:
 				return err
@@ -301,11 +301,19 @@ func (pf Processor[T]) Parallel(ops ...T) Worker {
 // Retry makes a worker function that takes runs the processor
 // function with the provied input until the return value is nil, or
 // it encounters a terminating error (io.EOF, ers.ErrAbortCurrentOp,
-// or context cancellation.) Context cancellation errors are returned
-// to the caller, other terminating errors are not. All errors are
-// discarded if the retry operation succeeds in the provided number of
-// retries. Other errors are aggregated and returned to the caller
-// only if the retry fails
+// or context cancellation.)
+//
+// Context cancellation errors are returned to the caller, other
+// terminating errors are not, with any other errors encountered
+// during retries. ErrIteratorSkip is always ignored and not
+// aggregated. All errors are discarded if the retry operation
+// succeeds in the provided number of retries.
+//
+// Except for ErrIteratorSkip, which is ignored, all other errors are
+// aggregated and returned to the caller only if the retry fails. It's
+// possible to return a nil error without successfully completing the
+// underlying operation, if the processor only returned
+// ErrIteratorSkip values.
 func (pf Processor[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
 
 ////////////////////////////////////////////////////////////////////////

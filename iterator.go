@@ -20,7 +20,7 @@ import (
 // ErrIteratorSkip instructs consumers of Iterators and related
 // processors that run groups. Equivalent to the "continue" keyword in
 // other contexts.
-const ErrIteratorSkip ers.Error = ers.Error("skip-iteration")
+const ErrIteratorSkip ers.Error = ers.ErrCurrentOpSkip
 
 // Iterator provides a safe, context-respecting iteration/sequence
 // paradigm, and entire tool kit for consumer functions, converters,
@@ -240,7 +240,7 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 			return out, nil
 		case errors.Is(err, ErrIteratorSkip):
 			continue
-		case ers.Is(err, io.EOF, context.Canceled, context.DeadlineExceeded, ers.ErrAbortCurrentOp):
+		case ers.Is(err, io.EOF, context.Canceled, context.DeadlineExceeded, ers.ErrCurrentOpAbort):
 			return out, err
 		default:
 			i.AddError(err)
@@ -305,7 +305,7 @@ func (i *Iterator[T]) Reduce(
 				continue
 			case errors.Is(err, ErrIteratorSkip):
 				continue
-			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
+			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 				return value, nil
 			default:
 				return value, err
@@ -378,7 +378,7 @@ func (i *Iterator[T]) Observe(ctx context.Context, fn Handler[T]) (err error) {
 			fn(item)
 		case errors.Is(err, ErrIteratorSkip):
 			continue
-		case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
+		case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 			return nil
 		default:
 			// this is (realistically) only context
@@ -415,7 +415,7 @@ func (i *Iterator[T]) Process(fn Processor[T]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrIteratorSkip):
 				continue LOOP
-			case ers.Is(err, io.EOF, ers.ErrAbortCurrentOp):
+			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 				return nil
 			default:
 				return err
@@ -564,7 +564,7 @@ func (i *Iterator[T]) ProcessParallel(
 		splits := i.Split(opts.NumWorkers)
 		for idx := range splits {
 			operation.ReadAll(splits[idx].Producer()).
-				Operation(func(err error) { ft.WhenCall(ers.Is(err, io.EOF, ers.ErrAbortCurrentOp), cancel) }).
+				Operation(func(err error) { ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), cancel) }).
 				Add(ctx, wg)
 		}
 

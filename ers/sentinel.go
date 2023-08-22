@@ -20,6 +20,13 @@ const ErrLimitExceeded Error = Error("limit exceeded")
 // generally retriable.
 const ErrInvalidInput Error = Error("invalid input")
 
-// ErrAbortCurrentOp is used to signal that a retry function or other
-// loop should be aborted.
-const ErrAbortCurrentOp Error = Error("abort current operation")
+// ErrCurrentOpAbort is used to signal that a retry function or other
+// looping operation that the loop should exit. ErrCurrentOpAbort
+// should be handled like "break", and should not be returned to
+// callers or aggregated with other errors.
+const ErrCurrentOpAbort Error = Error("abort current operation")
+
+// ErrCurrentOpSkip is used to signal that a retry function or other
+// looping loop should continue. In most cases, this error should not
+// be returned to callers or aggregated with other errors.
+const ErrCurrentOpSkip Error = Error("skip current operation")
