@@ -129,7 +129,7 @@ func TestMapReduce(t *testing.T) {
 		pipe <- t.Name()
 
 		var mf Transform[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
-		mf.Safe().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
+		mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
 			ReadAll(Blocking(pipe).Receive().Producer()).
 			Ignore().
 			Add(ctx, wg)

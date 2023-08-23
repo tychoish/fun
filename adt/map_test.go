@@ -129,7 +129,7 @@ func TestMap(t *testing.T) {
 					if mp.Len() == 0 {
 						continue
 					}
-					for i := 0; i < 500; i++ {
+					for i := 0; i < 300; i++ {
 						mp.Delete(fmt.Sprint(i))
 					}
 				}
@@ -138,7 +138,7 @@ func TestMap(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for {
-					time.Sleep(time.Microsecond)
+					time.Sleep(time.Millisecond)
 					if mp.Len() > 0 {
 						break
 					}

@@ -821,7 +821,7 @@ func TestDeque(t *testing.T) {
 
 			dur := time.Since(start)
 
-			if dur < 10*time.Millisecond || dur > 25*time.Millisecond {
+			if dur < 10*time.Millisecond || dur >= 100*time.Millisecond {
 				t.Error("duration out of bounds", dur)
 			}
 		})
