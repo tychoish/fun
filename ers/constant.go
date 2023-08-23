@@ -13,8 +13,6 @@ package ers
 
 import (
 	"errors"
-
-	"github.com/tychoish/fun/internal"
 )
 
 // Error is a type alias for building/declaring sentinel errors
@@ -37,14 +35,12 @@ func As(err error, target any) bool { return errors.As(err, target) }
 // replacement for errors.
 func Unwrap(err error) error { return errors.Unwrap(err) }
 
-// Unwind, is a special case of the fun.Unwind operation, that
-// assembles the full "unwrapped" list of all component
-// errors. Supports error implementations where the Unwrap() method
-// returns either error or []error.
-func Unwind(in error) (out []error) { return internal.Unwind(in) }
-
 // Error implements the error interface for ConstError.
 func (e Error) Error() string { return string(e) }
+
+// Err returns the Error object as an error object (e.g. that
+// implements the error interface.) Provided for more ergonomic conversions.
+func (e Error) Err() error { return e }
 
 // Satisfies the Is() interface without using reflection.
 func (e Error) Is(err error) bool {

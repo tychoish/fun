@@ -43,6 +43,17 @@ func ValueProducer[T any](val T) Producer[T] {
 	return StaticProducer(val, nil)
 }
 
+func CheckProducer[T any](op func() (T, bool)) Producer[T] {
+	var zero T
+	return func(ctx context.Context) (_ T, err error) {
+		out, ok := op()
+		if !ok {
+			return zero, ft.Default(ctx.Err(), io.EOF)
+		}
+		return out, nil
+	}
+}
+
 // Run executes the producer.
 func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf(ctx) }
 

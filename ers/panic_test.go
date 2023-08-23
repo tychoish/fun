@@ -42,7 +42,7 @@ func TestPanics(t *testing.T) {
 			if err == nil {
 				t.Fatal(err)
 			}
-			if err.Error() != "function runs: recovered panic" {
+			if err.Error() != "recovered panic: function runs" {
 				t.Error(err)
 			}
 		})
@@ -96,7 +96,7 @@ func TestPanics(t *testing.T) {
 			if !errors.Is(err, ErrRecoveredPanic) {
 				t.Error("not wrapped", err)
 			}
-			if err.Error() != "EOF: recovered panic" {
+			if err.Error() != "recovered panic: EOF" {
 				t.Error(err)
 			}
 		})

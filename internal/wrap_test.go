@@ -77,16 +77,82 @@ func TestUnwind(t *testing.T) {
 		err = &oneWrap{}
 		errs = Unwind(err)
 
-		if len(errs) != 0 {
+		if len(errs) != 1 {
 			t.Error(len(errs), errs)
 		}
 
 		err = &oneWrap{out: &oneWrap{}}
 		errs = Unwind(err)
-		if len(errs) != 1 {
+		if len(errs) != 2 {
 			t.Error(len(errs), errs)
 		}
 	})
+	t.Run("Buffer", func(t *testing.T) {
+		t.Run("Grow", func(t *testing.T) {
+			buf := make([]error, 0, 12)
+			if len(buf) != 0 {
+				t.Error("starting", len(buf))
+			}
+
+			buf = grow(buf, 6)
+			if len(buf) != 6 {
+				t.Error("after half grow", len(buf))
+			}
+
+			if cap(buf) != 12 {
+				t.Error(cap(buf))
+			}
+
+			buf = grow(buf, 12)
+			if len(buf) != 12 {
+				t.Error("after full grow", len(buf))
+			}
+			if cap(buf) != 12 {
+				t.Error(cap(buf))
+			}
+
+			buf = grow(buf, 24)
+			if len(buf) != 24 {
+				t.Error("after complete grow", len(buf))
+			}
+			if cap(buf) != 24 {
+				t.Error(cap(buf))
+			}
+		})
+		t.Run("Setup", func(t *testing.T) {
+			buf := grow([]error{}, 16)
+			if cap(buf) != 16 {
+				t.Error(cap(buf))
+			}
+			if len(buf) != 16 {
+				t.Error(len(buf))
+			}
+
+			buf, sl := buffer(buf, make([]error, 8))
+			if len(sl) != 8 {
+				t.Error(len(sl))
+			}
+			if len(buf) != 0 {
+				t.Error(len(buf))
+			}
+			if cap(buf) != 16 {
+				t.Error(cap(buf))
+			}
+
+			buf, sl = buffer(buf, make([]error, 32))
+			if len(sl) != 32 {
+				t.Error(len(sl))
+			}
+			if len(buf) != 0 {
+				t.Error(len(buf))
+			}
+			if cap(buf) != 32 {
+				t.Error(cap(buf))
+			}
+		})
+
+	})
+
 }
 
 type slwrap struct {

@@ -14,21 +14,6 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
-func (e *Stack) len() int {
-	if e == nil || e.err == nil {
-		return 0
-	}
-
-	var out = 1
-	for item := e.next; item != nil; item = item.next {
-		if item.err != nil {
-			out++
-		}
-	}
-
-	return out
-}
-
 func catcherIsEmpty(t *testing.T, catcher *Collector) {
 	t.Helper()
 
@@ -52,7 +37,7 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
 		t.Fatal("test issue", catcher, expectedNum)
 	}
 
-	if actual := catcher.stack.len(); actual != expectedNum {
+	if actual := catcher.stack.Len(); actual != expectedNum {
 		t.Error("should have expected number of errors", expectedNum, actual)
 		t.Log(catcher.Resolve())
 	}
@@ -63,6 +48,19 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
 		t.Error("should produce an error")
 	}
 	check.Equal(t, expectedNum, catcher.Len())
+}
+
+func collect[T any](t testing.TB, prod func() (T, bool)) []T {
+	t.Helper()
+
+	assert.True(t, prod != nil)
+
+	var out []T
+
+	for v, ok := prod(); ok; v, ok = prod() {
+		out = append(out, v)
+	}
+	return out
 }
 
 func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Iterator[T]) []T {
@@ -129,12 +127,11 @@ func TestError(t *testing.T) {
 			}
 		})
 		t.Run("Producer", func(t *testing.T) {
-			ctx := testt.Context(t)
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
 				ec.Add(fmt.Errorf("%d", i))
 			}
-			errs := ers.Append(ec.Producer()(ctx))
+			errs := ec.Future().Resolve()
 			if len(errs) != 100 {
 				t.Log(errs, len(errs), ec.Len())
 			}
@@ -151,7 +148,7 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			err := es.stack
+			err := &es.stack
 			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "boop")
 		})
@@ -191,7 +188,7 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "boop: recovered panic" {
+			if e := es.stack.Error(); e != "recovered panic: boop" {
 				t.Error(e)
 			}
 			if counter != 1 {
@@ -248,15 +245,22 @@ func TestError(t *testing.T) {
 			es.Add(errors.New("hello"))
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			_, err := es.stack.Producer()(ctx)
-			assert.ErrorIs(t, err, context.Canceled)
+			prod := fun.CheckProducer(es.stack.CheckProducer())
+
+			err, err2 := prod(ctx)
+			assert.Error(t, err)
+			assert.NotError(t, err2)
+
+			err, err2 = prod(ctx)
+			assert.NotError(t, err)
+			assert.Error(t, err2)
+
+			assert.ErrorIs(t, err2, context.Canceled)
 		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, "no error")
-			if ec.stack != nil {
-				t.Error("should not error")
-			}
+			assert.True(t, !ec.HasErrors())
 			assert.NotError(t, ec.Resolve())
 			When(ec, true, errval)
 			check.NotZero(t, ec.stack) // nil is zero
@@ -269,9 +273,7 @@ func TestError(t *testing.T) {
 		t.Run("WhenBasicError", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, "no error")
-			if ec.stack != nil {
-				t.Error("should not error")
-			}
+			assert.True(t, !ec.HasErrors())
 			assert.NotError(t, ec.Resolve())
 			ex := errors.New(errval)
 			When(ec, true, ex)
@@ -286,9 +288,7 @@ func TestError(t *testing.T) {
 		t.Run("WhenBasicWeirdType", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, 54)
-			if ec.stack != nil {
-				t.Error("should not error")
-			}
+			assert.True(t, !ec.HasErrors())
 			assert.NotError(t, ec.Resolve())
 			When(ec, true, 50000)
 			check.NotZero(t, ec.stack) // nil is zero
@@ -304,17 +304,14 @@ func TestError(t *testing.T) {
 			serr := errors.New(errval)
 			ec := &Collector{}
 			Whenf(ec, false, "no error %w", serr)
-			if ec.stack != nil {
-				t.Error("should not error")
-			}
+			assert.True(t, !ec.HasErrors())
 			if err := ec.Resolve(); err != nil {
 				t.Fatal(err)
 			}
 
 			Whenf(ec, true, "no error: %w", serr)
-			if ec.stack == nil {
-				t.Error("should not error")
-			}
+			assert.True(t, ec.HasErrors())
+
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
 			} else if !errors.Is(err, serr) {
@@ -363,122 +360,6 @@ func TestError(t *testing.T) {
 			}
 		})
 	})
-	t.Run("Stack", func(t *testing.T) {
-		t.Parallel()
-		t.Run("Nil", func(t *testing.T) {
-			var es *Stack
-			if es.len() != 0 {
-				t.Fatal("defensive nil for length")
-			}
-			if es.append(nil) != nil {
-				t.Fatal("append nil errors should always be safe")
-			}
-			if err := es.append(&Stack{}); err == nil {
-				t.Error("nil should append to something")
-			}
-
-		})
-		t.Run("UnwrapNil", func(t *testing.T) {
-			es := &Stack{}
-			if err := es.Unwrap(); err != nil {
-				t.Fatal("unexpected unwrap empty", err)
-			}
-		})
-		t.Run("ErrorsReportEmpty", func(t *testing.T) {
-			ctx := testt.Context(t)
-			es := &Stack{}
-			if l := collectIter(ctx, t, es.Iterator()); len(l) != 0 || l != nil {
-				t.Fatal("unexpected errors report", l)
-			}
-			if es.len() != 0 {
-				t.Fatal("unexpected empty length", es.len())
-			}
-		})
-		t.Run("ErrorsReportSingle", func(t *testing.T) {
-			ctx := testt.Context(t)
-			es := &Stack{}
-			es = es.append(errors.New(errval))
-			if l := collectIter(ctx, t, es.Iterator()); len(l) != 1 || l == nil {
-				t.Fatal("unexpected errors report", l)
-			}
-		})
-		t.Run("StackErrorStack", func(t *testing.T) {
-			ctx := testt.Context(t)
-			es := &Stack{err: errors.New("outer")}
-			es = es.append(&Stack{err: errors.New("inner")})
-			if l := collectIter(ctx, t, es.Iterator()); len(l) != 2 || l == nil {
-				t.Fatal("unexpected errors report", l)
-			}
-		})
-		t.Run("NilErrorStillErrors", func(t *testing.T) {
-			es := &Stack{}
-			if e := es.Error(); e == "" {
-				t.Error("every non-nil error stack should have an error")
-			}
-		})
-		t.Run("CacheCorrectness", func(t *testing.T) {
-			es := &Stack{}
-			es = es.append(errors.New(errval))
-			er1 := es.Error()
-			es = es.append(errors.New(errval))
-			er2 := es.Error()
-			if er1 == er2 {
-				t.Error("errors should be different", er1, er2)
-			}
-		})
-		t.Run("Merge", func(t *testing.T) {
-			es1 := &Stack{}
-			es1 = es1.append(errors.New(errval))
-			es1 = es1.append(errors.New(errval))
-			if l := es1.len(); l != 2 {
-				t.Fatal("es1 unexpected length", l)
-			}
-
-			es2 := &Stack{}
-			es2 = es2.append(errors.New(errval))
-			es2 = es2.append(errors.New(errval))
-
-			if l := es2.len(); l != 2 {
-				t.Fatal("es2 unexpected length", l)
-			}
-
-			es1 = es1.append(es2)
-			if l := es1.len(); l != 4 {
-				t.Fatal("merged unexpected length", l)
-			}
-		})
-		t.Run("ConventionalWrap", func(t *testing.T) {
-			err := fmt.Errorf("foo: %w", errors.New("bar"))
-			es := &Stack{}
-			es = es.append(err)
-			if l := es.len(); l != 1 {
-				t.Fatalf("%d, %+v", l, es)
-			}
-		})
-		t.Run("Is", func(t *testing.T) {
-			err1 := errors.New("foo")
-			err2 := errors.New("bar")
-
-			es := &Stack{}
-			es = es.append(err1)
-			es = es.append(err2)
-			if !errors.Is(es, err1) {
-				t.Fatal("expected is to find wrapped err")
-			}
-		})
-		t.Run("OutputOrderedLogically", func(t *testing.T) {
-			es := &Stack{}
-			es = es.append(errors.New("one"))
-			es = es.append(errors.New("two"))
-			es = es.append(errors.New("three"))
-
-			output := es.Error()
-			const expected = "one: two: three"
-			if output != expected {
-				t.Error(output, "!=", expected)
-			}
-		})
-	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {
 		t.Parallel()
 		startAt := time.Now()
@@ -524,7 +405,7 @@ func TestError(t *testing.T) {
 							if count > 10 {
 								t.Error("should have one by now")
 							}
-						} else if _, ok := err.(*Stack); !ok {
+						} else if _, ok := err.(*ers.Stack); !ok {
 							t.Error("should be an error stack")
 						}
 					}
@@ -580,15 +461,13 @@ func TestError(t *testing.T) {
 }
 
 func BenchmarkErrorStack(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	const count int = 8
 
 	b.Run("Reporting", func(b *testing.B) {
 		b.Run("StackError", func(b *testing.B) {
-			es := &Stack{}
+			es := &ers.Stack{}
 			for i := 0; i < count; i++ {
-				es = es.append(errors.New("foo"))
+				es.Push(errors.New("foo"))
 			}
 			err := es.Error()
 			if err == "" {
@@ -604,18 +483,18 @@ func BenchmarkErrorStack(b *testing.B) {
 			}
 		})
 		b.Run("StackIterator", func(b *testing.B) {
-			es := &Stack{}
+			es := &ers.Stack{}
 			for i := 0; i < count; i++ {
-				es = es.append(errors.New("foo"))
+				es.Push(errors.New("foo"))
 			}
-			errs := collectIter(ctx, b, es.Iterator())
+			errs := collect(b, es.CheckProducer())
 			if len(errs) != count {
 				b.Fatal(len(errs))
 			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
-				errs = collectIter(ctx, b, es.Iterator())
+				errs = collect(b, es.CheckProducer())
 				if len(errs) == 0 {
 					b.Fatal()
 				}

@@ -73,20 +73,10 @@ func RemoveOK(errs []error) []error {
 func FilterToRoot() Filter { return findRoot }
 
 func findRoot(err error) error {
-	for {
-		switch wi := any(err).(type) {
-		case nil:
-			return nil
-		case interface{ Unwrap() error }:
-			err = wi.Unwrap()
-		case interface{ Unwrap() []error }:
-			sl := wi.Unwrap()
-			if len(sl) == 0 {
-				return err
-			}
-			return sl[len(sl)-1]
-		default:
-			return err
-		}
+	errs := Unwind(err)
+	if len(errs) == 0 {
+		return nil
 	}
+
+	return errs[len(errs)-1]
 }

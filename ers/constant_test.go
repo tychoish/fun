@@ -17,6 +17,7 @@ func TestConstant(t *testing.T) {
 		err := Wrap(expected, "hello")
 		assert.Equal(t, err.Error(), "hello: hello")
 		assert.ErrorIs(t, err, expected)
+		assert.ErrorIs(t, err, expected.Err())
 
 		err = Wrapf(expected, "hello %s", "world")
 		assert.Equal(t, err.Error(), "hello world: hello")

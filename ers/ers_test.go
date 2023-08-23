@@ -68,14 +68,15 @@ func TestErrors(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
 			assert.Zero(t, filter(nil))
 		})
-		t.Run("SliceEdge", func(t *testing.T) {
-			err := &mergederr{}
-			assert.Equal(t, filter(err), error(err))
-		})
-		t.Run("Spliced", func(t *testing.T) {
-			list := Join(Error("hello"), Error("this"), io.EOF)
-			root := filter(list)
-			assert.Equal(t, io.EOF, root)
+		t.Run("WrappingDirection", func(t *testing.T) {
+			t.Run("Vector", func(t *testing.T) {
+				root := filter(errors.Join(Error("hello"), Error("this"), io.EOF))
+				assert.Equal(t, io.EOF, root)
+			})
+			t.Run("Stack", func(t *testing.T) {
+				root := filter(Join(io.EOF, Error("this"), Error("hello")))
+				assert.Equal(t, io.EOF, root)
+			})
 		})
 		t.Run("EmptyWrap", func(t *testing.T) {
 			list := Join()
@@ -85,11 +86,6 @@ func TestErrors(t *testing.T) {
 		})
 		t.Run("Stdlib", func(t *testing.T) {
 			err := fmt.Errorf("hello: %w", io.EOF)
-			root := filter(err)
-			assert.Equal(t, io.EOF, root)
-		})
-		t.Run("Merged", func(t *testing.T) {
-			err := Join(errors.New("hello"), io.EOF)
 			root := filter(err)
 			assert.Equal(t, io.EOF, root)
 		})
