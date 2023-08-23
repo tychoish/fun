@@ -300,6 +300,21 @@ func TestWrap(t *testing.T) {
 		assert.True(t, IsOK(RefOK(strptr)))
 		assert.Equal(t, "hello", Ref(strptr))
 	})
+	t.Run("DefaultNew", func(t *testing.T) {
+		t.Run("Passthrough", func(t *testing.T) {
+			val := Ptr("string value")
+			newVal := DefaultNew(val)
+			check.Equal(t, val, newVal)
+			check.Equal(t, *val, *newVal)
+		})
+		t.Run("Constructor", func(t *testing.T) {
+			var ts *time.Time
+			check.Panic(t, func() { ts.IsZero() })
+			ts = DefaultNew(ts)
+			check.True(t, ts != nil)
+			check.True(t, ts.IsZero())
+		})
+	})
 }
 
 func TestContexts(t *testing.T) {
