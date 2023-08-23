@@ -22,8 +22,11 @@ type Stack[T any] struct {
 // iterators's close method.
 func NewStackFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*Stack[T], error) {
 	out := &Stack[T]{}
+	if err := out.Populate(iter).Run(ctx); err != nil {
+		return nil, err
+	}
 
-	return out, iter.Observe(ctx, func(in T) { out.Push(in) })
+	return out, nil
 }
 
 // Append adds a variadic sequence of items to the list.

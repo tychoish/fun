@@ -27,7 +27,7 @@ func SlicePtrs[T any](in []T) Slice[*T] { return Sliceify(in).Ptrs() }
 func SliceSparseRefs[T any](in []*T) Slice[T] {
 	out := make([]T, 0, len(in))
 	for idx := range in {
-		if out == nil {
+		if in[idx] == nil {
 			continue
 		}
 		out = append(out, *in[idx])
@@ -41,7 +41,7 @@ func SliceRefs[T any](in []*T) Slice[T] {
 	var zero T
 	out := make([]T, 0, len(in))
 	for idx := range in {
-		if out == nil {
+		if in[idx] == nil {
 			out = append(out, zero)
 			continue
 		}

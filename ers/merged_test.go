@@ -1,6 +1,7 @@
 package ers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -239,7 +240,38 @@ func TestMergeLegacy(t *testing.T) {
 			check.Equal(t, len(errs), 9)
 		})
 	})
+	t.Run("UnwindingPush", func(t *testing.T) {
+		err := slwind{out: []error{io.EOF, context.Canceled, ErrLimitExceeded}}
+		s := &Stack{}
+		s.Push(err)
+		check.Equal(t, s.Len(), 3)
+	})
+	t.Run("UnwrappingPush", func(t *testing.T) {
+		err := slwrap{out: []error{io.EOF, context.Canceled, ErrLimitExceeded}}
+		s := &Stack{}
+		s.Push(err)
+		check.Equal(t, s.Len(), 3)
+	})
+	t.Run("Strings", func(t *testing.T) {
+		sl := []error{io.EOF, context.Canceled, ErrLimitExceeded}
+		strs := Strings(sl)
+		merged := strings.Join(strs, ": ")
+		check.Substring(t, merged, "EOF")
+		check.Substring(t, merged, "context canceled")
+		check.Substring(t, merged, "limit exceeded")
+	})
+
 }
+
+type slwind struct{ out []error }
+
+func (s slwind) Unwind() []error { return s.out }
+func (s slwind) Error() string   { return fmt.Sprint("wind error:", len(s.out), s.out) }
+
+type slwrap struct{ out []error }
+
+func (s slwrap) Unwrap() []error { return s.out }
+func (s slwrap) Error() string   { return fmt.Sprint("wrap error:", len(s.out), s.out) }
 
 func unwind[T any](in T) (out []T) {
 	if us, ok := any(in).(interface{ Unwrap() []T }); ok {

@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
 
@@ -450,4 +451,44 @@ func TestSlice(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Constructors", func(t *testing.T) {
+		sl := []int8{0, 1, 2, 3, 4, 5, 6, 7}
+		t.Run("Ptrs", func(t *testing.T) {
+			psl := SlicePtrs(sl)
+			for idx := range psl {
+				assert.True(t, psl[idx] != nil)
+				check.Equal(t, *psl[idx], int8(idx))
+				check.Equal(t, sl[idx], *psl[idx])
+			}
+		})
+		t.Run("Ref", func(t *testing.T) {
+			t.Run("RoundTrip", func(t *testing.T) {
+				rsl := SliceRefs(Sliceify(sl).Ptrs())
+				for idx := range rsl {
+					check.Equal(t, rsl[idx], sl[idx])
+					check.Equal(t, rsl[idx], int8(idx))
+				}
+			})
+			t.Run("NilHandling", func(t *testing.T) {
+				pstrs := []*string{nil, nil, nil, ft.Ptr("one"), ft.Ptr("two"), ft.Ptr("three")}
+				sl := SliceRefs(pstrs)
+				check.Equal(t, len(sl), 6)
+				check.Equal(t, sl[0], "")
+				check.Equal(t, sl[1], "")
+				check.Equal(t, sl[2], "")
+				check.Equal(t, sl[3], "one")
+				check.Equal(t, sl[4], "two")
+				check.Equal(t, sl[5], "three")
+			})
+		})
+		t.Run("Sparse", func(t *testing.T) {
+			pstrs := []*string{nil, nil, nil, ft.Ptr("one"), ft.Ptr("two"), ft.Ptr("three")}
+			sl := SliceSparseRefs(pstrs)
+			check.Equal(t, len(sl), 3)
+			check.Equal(t, sl[0], "one")
+			check.Equal(t, sl[1], "two")
+			check.Equal(t, sl[2], "three")
+		})
+	})
+
 }
