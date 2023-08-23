@@ -763,7 +763,16 @@ func TestProducer(t *testing.T) {
 		assert.True(t, dur >= 10*time.Millisecond)
 		assert.True(t, dur < 20*time.Millisecond)
 	})
+	t.Run("CheckProducer", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
+		err := ers.Join(ErrInvariantViolation, ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
+		stack := &ers.Stack{}
+		assert.True(t, errors.As(err, &stack))
+		errs := ft.Must(CheckProducer(stack.CheckProducer()).Iterator().Slice(ctx))
+		assert.Equal(t, 5, len(errs))
+	})
 	t.Run("Retry", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

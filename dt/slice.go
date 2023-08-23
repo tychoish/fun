@@ -18,6 +18,38 @@ type Slice[T any] []T
 // Sliceify produces a slice object as a convenience constructor.
 func Sliceify[T any](in []T) Slice[T] { return in }
 
+// SlicePtrs converts a slice of values to a slice of
+// values. This is a helper for Sliceify(in).Ptrs().
+func SlicePtrs[T any](in []T) Slice[*T] { return Sliceify(in).Ptrs() }
+
+// SliceRefs converts a slice of pointers to a slice of objects,
+// dropping nil values. from the output slice.
+func SliceSparseRefs[T any](in []*T) Slice[T] {
+	out := make([]T, 0, len(in))
+	for idx := range in {
+		if out == nil {
+			continue
+		}
+		out = append(out, *in[idx])
+	}
+	return out
+}
+
+// SliceRefs converts a slice of pointers to a slice of values,
+// replacing all nil pointers with the zero type for that value.
+func SliceRefs[T any](in []*T) Slice[T] {
+	var zero T
+	out := make([]T, 0, len(in))
+	for idx := range in {
+		if out == nil {
+			out = append(out, zero)
+			continue
+		}
+		out = append(out, *in[idx])
+	}
+	return out
+}
+
 // Variadic constructs a slice of type T from a sequence of variadic
 // options.
 func Variadic[T any](in ...T) Slice[T] { return in }

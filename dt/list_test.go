@@ -755,6 +755,17 @@ func TestList(t *testing.T) {
 			}
 		})
 	})
+	t.Run("NewPopulateError", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		iter := fun.VariadicIterator(10, 100, 1000, 10000)
+
+		out, err := dt.NewListFromIterator[int](ctx, iter)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.True(t, out == nil)
+	})
+
 }
 
 func BenchmarkList(b *testing.B) {

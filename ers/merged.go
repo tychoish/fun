@@ -13,9 +13,9 @@ import (
 // method which returns a slice of the constituent errors for
 // additional use.
 type Stack struct {
-	err   error
-	next  *Stack
 	count int
+	next  *Stack
+	err   error
 }
 
 // Join takes a slice of errors and converts it into an *erc.Stack
@@ -34,32 +34,62 @@ func Join(errs ...error) error {
 	}
 }
 
+// Len returns the depth of the stack beneath the current level. This
+// value isn't updated as additional errors are pushed onto the stack.
 func (e *Stack) Len() int {
 	if e == nil {
 		return 0
 	}
 	return e.count
 }
+
+// Push adds an error to the current stack. If one stack is pushed
+// onto another, the first stack's errors are unwound and pushed
+// individually to the stack. If the error object implements the
+// {Unwind() []error}, or {Unwrap() []error} interfaces, then these
+// are also pushed individually to the stack, all other errors are
+// added individually to the stack. The Stack.Is() and Stack.As
+// implementations support identfying all errors included in the stack
+// even if one of the individual errors is itself wrapped (e.g. one
+// wrapped using fmt.Errorf and %w.)
+//
+// The stack object is not safe for concurrent access (use the error
+// collector in the `erc` package for a higher level interface to the
+// Stack object that includes a mutex,) but, Stack objects are
+// implemented as a linked list and not modified after use, which
+// may make them easier to reason about.
 func (e *Stack) Push(err error) {
 	switch werr := err.(type) {
 	case nil:
 		return
-	case interface{ Unwrap() []error }:
-		for _, err := range werr.Unwrap() {
-			e.Push(err)
-		}
 	case *Stack:
+		// do stack separately, so we don't build the list and
+		// can merge more effectively (we do throw away the
+		// Stack wrapper objects for consistency with counts.)
 		for werr != nil {
 			e.Push(werr.err)
 			werr = werr.next
 		}
+	case interface{ Unwind() []error }:
+		// unwind over unwrap, to avoid
+		for _, err := range werr.Unwind() {
+			e.Push(err)
+		}
+	case interface{ Unwrap() []error }:
+		for _, err := range werr.Unwrap() {
+			e.Push(err)
+		}
 	default:
+		// everything else includes normal unwrapped errors
+		// and singly wrapped errors (e.g. with fmt.Errorf and
+		// %w).
 		e.next = &Stack{next: e.next, err: e.err}
 		e.err = err
 		e.count++
 	}
 
 }
+
 func (e *Stack) append(errs ...error) {
 	for _, err := range errs {
 		e.Push(err)
@@ -73,6 +103,7 @@ func (e *Stack) Error() string {
 		return "<nil>"
 	}
 
+	// TODO: pool buffers.
 	buf := &bytes.Buffer{}
 
 	prod := e.CheckProducer()
@@ -97,7 +128,8 @@ func (e *Stack) Is(err error) bool { return errors.Is(e.err, err) }
 func (e *Stack) As(target any) bool { return errors.As(e.err, target) }
 
 // Unwrap returns the next iterator in the stack, and is compatible
-// with errors.Unwrap.
+// with errors.Unwrap. The error objects returned by unwrap are all
+// Stack objects. When the
 func (e *Stack) Unwrap() error {
 	if e.next == nil || e.next.err == nil {
 		return nil
@@ -105,6 +137,10 @@ func (e *Stack) Unwrap() error {
 	return e.next
 }
 
+// Unwind returns a slice of the errors included in the Stack directly
+// without wrapping them as Stacks. The ers.Unwind function *does*
+// take advantage of this interface, although, in practice special
+// cases the Stack type.
 func (e *Stack) Unwind() []error {
 	out := make([]error, 0, e.count)
 	iter := &Stack{next: e}
@@ -120,6 +156,8 @@ func (e *Stack) Unwind() []error {
 	return out
 }
 
+// CheckProducer provides a pull-based iterator function for iterating
+// through the errors (without Stack object wrappers,)
 func (e *Stack) CheckProducer() func() (error, bool) {
 	iter := &Stack{next: e}
 	return func() (error, bool) {
@@ -143,6 +181,8 @@ func (e *Stack) CheckProducer() func() (error, bool) {
 // nested within the unwrapped error objects.
 func Unwind(in error) []error { return internal.Unwind(in) }
 
+// Strings renders (using the Error() method) a slice of errors into a
+// slice of their string values.
 func Strings(errs []error) []string {
 	out := make([]string, 0, len(errs))
 	for idx := range errs {

@@ -54,11 +54,20 @@ func TestUnwind(t *testing.T) {
 		}
 	})
 	t.Run("Slice", func(t *testing.T) {
-		var err error = slwrap{out: []error{io.EOF, errors.New("basebase")}}
-		errs := Unwind(err)
-		if len(errs) != 2 {
-			t.Error(len(errs), 2, errs)
-		}
+		t.Run("Wrap", func(t *testing.T) {
+			var err error = slwrap{out: []error{io.EOF, errors.New("basebase")}}
+			errs := Unwind(err)
+			if len(errs) != 2 {
+				t.Error(len(errs), 2, errs)
+			}
+		})
+		t.Run("Wind", func(t *testing.T) {
+			var err error = slwind{out: []error{io.EOF, errors.New("basebase")}}
+			errs := Unwind(err)
+			if len(errs) != 2 {
+				t.Error(len(errs), 2, errs)
+			}
+		})
 	})
 	t.Run("WithNils", func(t *testing.T) {
 		var err error = slwrap{out: []error{io.EOF, nil, errors.New("basebase"), nil}}
@@ -150,21 +159,20 @@ func TestUnwind(t *testing.T) {
 				t.Error(cap(buf))
 			}
 		})
-
 	})
-
 }
 
-type slwrap struct {
-	out []error
-}
+type slwrap struct{ out []error }
 
 func (s slwrap) Unwrap() []error { return s.out }
-func (s slwrap) Error() string   { return fmt.Sprint("error:", len(s.out), s.out) }
+func (s slwrap) Error() string   { return fmt.Sprint("wrap error:", len(s.out), s.out) }
 
-type oneWrap struct {
-	out error
-}
+type slwind struct{ out []error }
+
+func (s slwind) Unwind() []error { return s.out }
+func (s slwind) Error() string   { return fmt.Sprint("wind error:", len(s.out), s.out) }
+
+type oneWrap struct{ out error }
 
 func (s *oneWrap) Unwrap() error { return s.out }
 func (s *oneWrap) Error() string { return fmt.Sprint("error: isnil,", s.out) }

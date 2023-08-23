@@ -31,7 +31,9 @@ func buffer[T any](buf []T, slice []T) ([]T, []T) {
 
 func grow[T any](buf []T, size int) []T {
 	var zero T
-	if cap(buf) < len(buf) {
+	if size < cap(buf) {
+		buf = buf[:size]
+	} else if cap(buf) > len(buf) {
 		buf = buf[:cap(buf)]
 	}
 
