@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 )
 
 func TestWorker(t *testing.T) {
@@ -838,4 +839,90 @@ func TestWorker(t *testing.T) {
 			check.Equal(t, 2, count)
 		})
 	})
+	t.Run("Retry", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		t.Run("Skip", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			err := MakeWorker(func() error {
+				defer count.Add(1)
+				if count.Get() == 0 {
+					return ers.ErrCurrentOpSkip
+				}
+				return nil
+			}).Retry(5).Run(ctx)
+			assert.Equal(t, count.Get(), 2)
+			assert.NotError(t, err)
+		})
+		t.Run("FirstTry", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			err := MakeWorker(func() error {
+				defer count.Add(1)
+				return nil
+			}).Retry(10).Run(ctx)
+			assert.Equal(t, count.Get(), 1)
+			assert.NotError(t, err)
+		})
+		t.Run("ArbitraryError", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			err := MakeWorker(func() error {
+				defer count.Add(1)
+				if count.Get() < 3 {
+					return errors.New("why not")
+				}
+				return nil
+			}).Retry(10).Run(ctx)
+			assert.Equal(t, count.Get(), 4)
+			assert.NotError(t, err)
+		})
+		t.Run("DoesFail", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			exp := errors.New("why not")
+			err := MakeWorker(func() error {
+				defer count.Add(1)
+				return exp
+			}).Retry(16).Run(ctx)
+			assert.Equal(t, count.Get(), 16)
+			assert.Error(t, err)
+			errs := ers.Unwind(err)
+			assert.Equal(t, len(errs), 16)
+			for _, err := range errs {
+				assert.Equal(t, err, exp)
+				assert.ErrorIs(t, err, exp)
+			}
+		})
+		t.Run("Terminating", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			exp := errors.New("why not")
+			err := MakeWorker(func() error {
+				defer count.Add(1)
+				if count.Load() == 11 {
+					return ers.Join(exp, ers.ErrCurrentOpAbort)
+				}
+				return exp
+			}).Retry(16).Run(ctx)
+			assert.Equal(t, count.Get(), 12)
+			assert.NotError(t, err)
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			exp := errors.New("why not")
+			err := MakeWorker(func() error {
+				defer count.Add(1)
+				if count.Load() == 11 {
+					return ers.Join(exp, context.Canceled)
+				}
+				return exp
+			}).Retry(16).Run(ctx)
+			assert.Equal(t, count.Get(), 12)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.ErrorIs(t, err, exp)
+			errs := ers.Unwind(err)
+			assert.Equal(t, len(errs), 13)
+
+		})
+	})
+
 }

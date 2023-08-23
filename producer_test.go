@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 )
 
 func TestProducer(t *testing.T) {
@@ -761,6 +762,105 @@ func TestProducer(t *testing.T) {
 
 		assert.True(t, dur >= 10*time.Millisecond)
 		assert.True(t, dur < 20*time.Millisecond)
+	})
+
+	t.Run("Retry", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		t.Run("Skip", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			val, err := MakeProducer(func() (int, error) {
+				defer count.Add(1)
+				if count.Get() == 0 {
+					return 100, ers.ErrCurrentOpSkip
+				}
+				return 42, nil
+			}).Retry(5).Run(ctx)
+			assert.Equal(t, count.Get(), 2)
+			assert.NotError(t, err)
+			assert.Equal(t, val, 42)
+			assert.NotEqual(t, val, 100)
+		})
+		t.Run("FirstTry", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			val, err := MakeProducer(func() (int, error) {
+				defer count.Add(1)
+				return 42, nil
+			}).Retry(10).Run(ctx)
+			assert.Equal(t, count.Get(), 1)
+			assert.NotError(t, err)
+			assert.Equal(t, val, 42)
+			assert.NotEqual(t, val, 100)
+		})
+		t.Run("ArbitraryError", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			val, err := MakeProducer(func() (int, error) {
+				defer count.Add(1)
+				if count.Get() < 3 {
+					return 100, errors.New("why not")
+				}
+				return 42, nil
+			}).Retry(10).Run(ctx)
+			assert.Equal(t, count.Get(), 4)
+			assert.NotError(t, err)
+			assert.Equal(t, val, 42)
+			assert.NotEqual(t, val, 100)
+		})
+		t.Run("DoesFail", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			exp := errors.New("why not")
+			val, err := MakeProducer(func() (int, error) {
+				defer count.Add(1)
+				return 100, exp
+			}).Retry(16).Run(ctx)
+			assert.Equal(t, count.Get(), 16)
+			assert.Error(t, err)
+			assert.Equal(t, val, 0)
+			errs := ers.Unwind(err)
+			assert.Equal(t, len(errs), 16)
+			for _, err := range errs {
+				assert.Equal(t, err, exp)
+				assert.ErrorIs(t, err, exp)
+			}
+			assert.NotEqual(t, val, 100)
+
+		})
+		t.Run("Terminating", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			exp := errors.New("why not")
+			val, err := MakeProducer(func() (int, error) {
+				defer count.Add(1)
+				if count.Load() == 11 {
+					return 100, ers.Join(exp, ers.ErrCurrentOpAbort)
+				}
+				return 100, exp
+			}).Retry(16).Run(ctx)
+			assert.Equal(t, count.Get(), 12)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, exp)
+			assert.ErrorIs(t, err, ers.ErrCurrentOpAbort)
+			assert.Equal(t, val, 0)
+			assert.NotEqual(t, val, 100)
+		})
+		t.Run("Canceled", func(t *testing.T) {
+			count := &intish.Atomic[int]{}
+			exp := errors.New("why not")
+			val, err := MakeProducer(func() (int, error) {
+				defer count.Add(1)
+				if count.Load() == 11 {
+					return 100, ers.Join(exp, context.Canceled)
+				}
+				return 100, exp
+			}).Retry(16).Run(ctx)
+			assert.Equal(t, count.Get(), 12)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, exp)
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.Equal(t, val, 0)
+			assert.NotEqual(t, val, 100)
+		})
+
 	})
 }
 

@@ -309,7 +309,7 @@ func TestWrap(t *testing.T) {
 		})
 		t.Run("Constructor", func(t *testing.T) {
 			var ts *time.Time
-			check.Panic(t, func() { ts.IsZero() })
+			check.Panic(t, func() { _ = ts.IsZero() })
 			ts = DefaultNew(ts)
 			check.True(t, ts != nil)
 			check.True(t, ts.IsZero())

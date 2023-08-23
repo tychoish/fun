@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 )
 
 func TestProcess(t *testing.T) {
@@ -592,5 +593,21 @@ func TestProcess(t *testing.T) {
 
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
+	})
+	t.Run("Retry", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		count := &intish.Atomic[int]{}
+		err := MakeProcessor(func(in int) error {
+			defer count.Add(1)
+			assert.Equal(t, in, 42)
+			if count.Get() < 8 {
+				return ers.ErrCurrentOpSkip
+			}
+
+			return nil
+		}).Retry(32, 42).Run(ctx)
+		assert.NotError(t, err)
 	})
 }

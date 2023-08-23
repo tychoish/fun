@@ -424,7 +424,7 @@ func (wf Worker) Retry(n int) Worker {
 				return nil
 			case ers.ContextExpired(attemptErr):
 				return ers.Join(attemptErr, err)
-			case errors.Is(err, ErrIteratorSkip):
+			case errors.Is(attemptErr, ErrIteratorSkip):
 				continue
 			case ers.IsTerminating(attemptErr):
 				return nil

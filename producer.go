@@ -363,7 +363,7 @@ func (pf Producer[T]) Retry(n int) Producer[T] {
 				return value, nil
 			case ers.IsTerminating(attemptErr):
 				return zero, ers.Join(attemptErr, err)
-			case errors.Is(err, ErrIteratorSkip):
+			case errors.Is(attemptErr, ErrIteratorSkip):
 				continue
 			default:
 				err = ers.Join(attemptErr, err)

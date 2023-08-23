@@ -345,34 +345,43 @@ func (q *Queue[T]) Distributor() Distributor[T] {
 	}
 }
 
-// Producer returns a functio nthat produces items from the
+// Producer returns a function that produces items from the
 // queue, iteratively. It's not destructive, and has the same
 // semantics as the Iterator.
 func (q *Queue[T]) Producer() fun.Producer[T] {
 	var next *entry[T]
 	return func(ctx context.Context) (o T, _ error) {
 		if next == nil {
+			q.mu.Lock()
 			next = q.front
+			q.mu.Unlock()
 		}
 
+		q.mu.Lock()
 		if next.link == q.front {
+			q.mu.Unlock()
 			return o, io.EOF
 		}
 
 		if next.link != nil {
 			next = next.link
+			q.mu.Unlock()
 		} else if next.link == nil {
 			if q.closed {
+				q.mu.Unlock()
 				return o, io.EOF
 			}
 
+			q.mu.Unlock()
 			if err := q.waitForNew(ctx); err != nil {
 				return o, err
 			}
 
+			q.mu.Lock()
 			if next.link != q.front {
 				next = next.link
 			}
+			q.mu.Unlock()
 		}
 
 		return next.item, nil
