@@ -177,15 +177,6 @@ func (s Slice[T]) Item(index int) T { return s[index] }
 // Ptr provides a pointer to the item at the provided index.
 func (s Slice[T]) Ptr(index int) *T { return &s[index] }
 
-// Ref takes a mutable Slice (pointer to a Slice) and returns the
-// slice. In many contexts Ref and Mutable are handled transparently
-// by the dispatcher.
-func (s *Slice[T]) Ref() Slice[T] { return *s }
-
-// Mutable returns a pointer to the slice object. In many contexts Ref
-// and Mutable are handled transparently by the dispatcher.
-func (s Slice[T]) Mutable() *Slice[T] { return &s }
-
 // Grow adds zero items to the slice until it reaches the desired
 // size.
 func (s *Slice[T]) Grow(size int) {
