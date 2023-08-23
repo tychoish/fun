@@ -231,5 +231,46 @@ func TestMap(t *testing.T) {
 			assert.NotError(t, err)
 		})
 	})
+	t.Run("Default", func(t *testing.T) {
+		t.Run("EndToEnd", func(t *testing.T) {
 
+			var nmp map[string]int
+			mp := map[string]int{"one": 1}
+
+			check.True(t, (nmp == nil) != (mp == nil))
+			check.True(t, nmp == nil)
+			check.True(t, mp != nil)
+
+			check.Equal(t, len(mp), 1)
+			check.Equal(t, len(nmp), 0)
+
+			nvone := DefaultMap(nmp, 12)
+			check.True(t, nvone != nil)
+			check.Equal(t, len(nvone), 0)
+
+			nmp = DefaultMap(mp, 12)
+			check.Equal(t, nmp["one"], mp["one"])
+
+		})
+		t.Run("Passthrough", func(t *testing.T) {
+			sl := DefaultMap[string, int](map[string]int{"one": 1}, 32)
+			check.Equal(t, len(sl), 1)
+			check.Equal(t, sl["one"], 1)
+		})
+
+		t.Run("ZeroLength", func(t *testing.T) {
+			sl := DefaultMap[string, int](nil)
+			check.Equal(t, len(sl), 0)
+		})
+		t.Run("LengthOnly", func(t *testing.T) {
+			sl := DefaultMap[string, int](nil, 32)
+			check.Equal(t, len(sl), 0)
+
+		})
+		t.Run("ExtraPanic", func(t *testing.T) {
+			check.Panic(t, func() {
+				_ = DefaultMap[string, int](nil, 16, -1)
+			})
+		})
+	})
 }

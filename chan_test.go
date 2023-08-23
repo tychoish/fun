@@ -331,7 +331,7 @@ func TestChannel(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				ch := Blocking(make(chan string))
+				ch := Chan[string]().Blocking()
 				var count int
 				sig := ch.Receive().Consume(func(ctx context.Context, in string) error {
 					defer func() { count++ }()
@@ -360,7 +360,7 @@ func TestChannel(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				ch := Blocking(make(chan string, 4))
+				ch := Chan[string](4).Blocking()
 				var count int
 				assert.NotError(t, ch.Send().Write(ctx, "hello world"))
 				assert.NotError(t, ch.Send().Zero(ctx))
@@ -477,5 +477,38 @@ func TestChannel(t *testing.T) {
 		output, err := prod(ctx)
 		check.NotError(t, err)
 		check.Equal(t, output, "hello world!")
+	})
+	t.Run("Default", func(t *testing.T) {
+		t.Run("EndToEnd", func(t *testing.T) {
+			ch := make(chan int)
+			check.True(t, ch != nil)
+			chCp := ch
+			check.Equal(t, ch, chCp)
+			ch = DefaultChan[int](ch, 12).Channel()
+			check.True(t, ch != nil)
+			check.Equal(t, cap(ch), 0)
+			check.Equal(t, ch, chCp)
+			ch = DefaultChan[int](nil, 12).Channel()
+			check.NotEqual(t, ch, chCp)
+			check.Equal(t, cap(ch), 12)
+		})
+		t.Run("Passthrough", func(t *testing.T) {
+			ch := make(chan string, 1)
+			ch <- "hello"
+			pipe := DefaultChan(ch, 100)
+			check.Equal(t, pipe.Channel(), ch)
+			check.Equal(t, cap(ch), 1)
+			check.Equal(t, cap(pipe.Channel()), 1)
+		})
+		t.Run("Create", func(t *testing.T) {
+			pipe := DefaultChan[string](nil, 100)
+			check.True(t, pipe.Channel() != nil)
+			check.Equal(t, cap(pipe.Channel()), 100)
+		})
+		t.Run("Panic", func(t *testing.T) {
+			check.Panic(t, func() {
+				_ = DefaultChan[string](nil, 100, 2)
+			})
+		})
 	})
 }

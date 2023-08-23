@@ -21,6 +21,23 @@ const ErrUninitializedContainer ers.Error = ers.Error("uninitialized container")
 // call sites, where default map access may be awkward.
 type Map[K comparable, V any] map[K]V
 
+// DefaultMap takes a map value and returns it if it's non-nil. If the
+// map is nil, it constructs and returns a new map, with the
+// (optionally specified length.
+func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
+	if input != nil {
+		return input
+	}
+	switch len(args) {
+	case 0:
+		return map[K]V{}
+	case 1:
+		return make(map[K]V, args[0])
+	default:
+		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a map"))
+	}
+}
+
 // MapIterator converts a map into an iterator of dt.Pair objects. The
 // iterator is panic-safe, and uses one go routine to track the
 // progress through the map. As a result you should always, either

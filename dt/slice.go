@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -20,6 +21,25 @@ func Sliceify[T any](in []T) Slice[T] { return in }
 // Variadic constructs a slice of type T from a sequence of variadic
 // options.
 func Variadic[T any](in ...T) Slice[T] { return in }
+
+// DefaultSlice takes a slice value and returns it if it's non-nil. If
+// the slice is nil, it returns a slice of the specified length (and
+// capacity,) as specified.
+func DefaultSlice[T any](input []T, args ...int) Slice[T] {
+	if input != nil {
+		return input
+	}
+	switch len(args) {
+	case 0:
+		return Slice[T]{}
+	case 1:
+		return make([]T, args[0])
+	case 2:
+		return make([]T, args[0], args[1])
+	default:
+		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
+	}
+}
 
 // Transform processes a slice of one type into a slice of another
 // type using the transformation function. Errors abort the
@@ -156,6 +176,31 @@ func (s Slice[T]) Item(index int) T { return s[index] }
 
 // Ptr provides a pointer to the item at the provided index.
 func (s Slice[T]) Ptr(index int) *T { return &s[index] }
+
+// Ref takes a mutable Slice (pointer to a Slice) and returns the
+// slice. In many contexts Ref and Mutable are handled transparently
+// by the dispatcher.
+func (s *Slice[T]) Ref() Slice[T] { return *s }
+
+// Mutable returns a pointer to the slice object. In many contexts Ref
+// and Mutable are handled transparently by the dispatcher.
+func (s Slice[T]) Mutable() *Slice[T] { return &s }
+
+// Grow adds zero items to the slice until it reaches the desired
+// size.
+func (s *Slice[T]) Grow(size int) {
+	*s = s.FillToLen(size)
+}
+
+// FillToLen appends zero values to the slice until it reaches the
+// specified length.
+func (s Slice[T]) FillToLen(size int) Slice[T] {
+	for len(s) < size {
+		var val T
+		s = append(s, val)
+	}
+	return s
+}
 
 // Ptrs converts a slice in to a slice of pointers to the values in
 // the original slice

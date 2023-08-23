@@ -28,10 +28,40 @@ const (
 // channels. From a high level an operation might look like:
 //
 //	ch := make(chan string)
-//	err := fun.Blocking().Send()
+//	err := fun.Blocking().Send("hello world")
+//
+// Methods on ChanOp and related structures are not pointer receivers,
+// ensure that the output values are recorded as needed. Typically
+// it's reasonable to avoid creating ChanOp objects in a loop as well.
 type ChanOp[T any] struct {
 	mode blockingMode
 	ch   chan T
+}
+
+// Chan constructs a channel op, like "make(chan T)", with the
+// optionally specified length. The underlying channel is blocking by
+// default. Uses the Blocking() and NonBlocking methods on the channel
+// operation to access versions
+func Chan[T any](args ...int) ChanOp[T] {
+	switch len(args) {
+	case 0:
+		return Blocking(make(chan T))
+	case 1:
+		return Blocking(make(chan T, args[0]))
+	default:
+		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
+	}
+}
+
+// DefaultChan takes a channel value and if it is non-nil, returns it;
+// otherwise it constructs a new ChanOp of the specified type with the
+// optionally provided length and returns it.
+func DefaultChan[T any](input chan T, args ...int) ChanOp[T] {
+	if input != nil {
+		return ChanOp[T]{ch: input}
+	}
+
+	return Chan[T](args...)
 }
 
 // Blocking produces a blocking Send instance. All Send/Check/Ignore
@@ -49,6 +79,12 @@ func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlo
 
 // Close closes the underlying channel.
 func (op ChanOp[T]) Close() { close(op.ch) }
+
+// Blocking returns a version of the ChanOp in blocking mode.
+func (op ChanOp[T]) Blocking() ChanOp[T] { op.mode = modeBlocking; return op }
+
+// NonBlocking returns a version of the ChanOp in non-blocking mode.
+func (op ChanOp[T]) NonBlocking() ChanOp[T] { op.mode = modeNonBlocking; return op }
 
 // Channel returns the underlying channel.
 func (op ChanOp[T]) Channel() chan T { return op.ch }

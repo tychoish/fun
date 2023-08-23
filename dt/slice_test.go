@@ -44,6 +44,29 @@ func TestSlice(t *testing.T) {
 		s := Variadic(randomIntSlice(100)...)
 		assert.Equal(t, s[25], s.Item(25))
 	})
+	t.Run("Grow", func(t *testing.T) {
+		t.Run("Expanded", func(t *testing.T) {
+			sl := Slice[int]{1, 2, 3}
+			check.Equal(t, len(sl), 3)
+			sl.Grow(5)
+			assert.Equal(t, len(sl), 5)
+			check.Equal(t, sl[3], 0)
+			check.Equal(t, sl[4], 0)
+		})
+		t.Run("Negative", func(t *testing.T) {
+			sl := Slice[int]{1, 2, 3}
+			check.Equal(t, len(sl), 3)
+			sl.Grow(-1)
+			check.Equal(t, len(sl), 3)
+
+		})
+		t.Run("Noop", func(t *testing.T) {
+			sl := Slice[int]{1, 2, 3}
+			check.Equal(t, len(sl), 3)
+			sl.Grow(2)
+			check.Equal(t, len(sl), 3)
+		})
+	})
 	t.Run("AddItems", func(t *testing.T) {
 		t.Run("Add", func(t *testing.T) {
 			s := Slice[int]{}
@@ -379,5 +402,52 @@ func TestSlice(t *testing.T) {
 
 		check.Equal(t, sl.Len(), ls.Len())
 		check.EqualItems(t, sl, exp)
+	})
+	t.Run("Default", func(t *testing.T) {
+		t.Run("EndToEnd", func(t *testing.T) {
+			sl := make([]int, 0)
+			check.True(t, sl != nil)
+			slCp := sl
+			check.EqualItems(t, sl, slCp)
+			sl = DefaultSlice[int](sl, 12)
+			check.True(t, sl != nil)
+			check.Equal(t, cap(sl), 0)
+			check.EqualItems(t, sl, slCp)
+			sl = DefaultSlice[int](nil, 12)
+
+			check.NotEqual(t, cap(sl), cap(slCp))
+			check.Equal(t, cap(sl), 12)
+		})
+		t.Run("Passthrough", func(t *testing.T) {
+			sl := DefaultSlice[string]([]string{"hello"}, 11)
+			assert.Equal(t, len(sl), 1)
+			check.Equal(t, sl[0], "hello")
+		})
+
+		t.Run("ZeroLength", func(t *testing.T) {
+			sl := DefaultSlice[string](nil)
+			check.Equal(t, len(sl), 0)
+			check.Equal(t, cap(sl), 0)
+		})
+		t.Run("LengthOnly", func(t *testing.T) {
+			sl := DefaultSlice[string](nil, 32)
+			check.Equal(t, len(sl), 32)
+			check.Equal(t, cap(sl), 32)
+		})
+		t.Run("CapOnly", func(t *testing.T) {
+			sl := DefaultSlice[string](nil, 0, 32)
+			check.Equal(t, len(sl), 0)
+			check.Equal(t, cap(sl), 32)
+		})
+		t.Run("CapAndLen", func(t *testing.T) {
+			sl := DefaultSlice[string](nil, 16, 32)
+			check.Equal(t, len(sl), 16)
+			check.Equal(t, cap(sl), 32)
+		})
+		t.Run("WeirdIgnored", func(t *testing.T) {
+			check.Panic(t, func() {
+				_ = DefaultSlice[string](nil, 16, 32, -1)
+			})
+		})
 	})
 }
