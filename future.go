@@ -25,8 +25,8 @@ func Translate[T any, O any](in Future[T], tfn func(T) O) Future[O] {
 	return func() O { return tfn(in()) }
 }
 
-// Run executes the future.
-func (f Future[T]) Run() T { return f() }
+// Resolve executes the future and returns its value.
+func (f Future[T]) Resolve() T { return f() }
 
 // Once returns a future that will only run the underlying future
 // exactly once.

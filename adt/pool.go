@@ -26,12 +26,12 @@ type Pool[T any] struct {
 	pool        *sync.Pool
 }
 
-func (p *Pool[T]) init() {
-	p.once.Do(func() {
-		p.hook = NewAtomic(func(in T) T { return in })
-		p.constructor = NewAtomic(func() (out T) { return out })
-		p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
-	})
+func (p *Pool[T]) init() { p.once.Do(p.doInit) }
+
+func (p *Pool[T]) doInit() {
+	p.hook = NewAtomic(func(in T) T { return in })
+	p.constructor = NewAtomic(func() (out T) { return out })
+	p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
 }
 
 // SetCleanupHook sets a function to be called on every object

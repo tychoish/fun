@@ -18,18 +18,18 @@ func TestFuture(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 })
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.Run(), 42)
+		check.Equal(t, thunk.Resolve(), 42)
 		check.Equal(t, count, 1)
-		check.Equal(t, thunk.Run(), 42)
+		check.Equal(t, thunk.Resolve(), 42)
 		check.Equal(t, count, 2)
 	})
 	t.Run("Once", func(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 }).Once()
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.Run(), 42)
+		check.Equal(t, thunk.Resolve(), 42)
 		check.Equal(t, count, 1)
-		check.Equal(t, thunk.Run(), 42)
+		check.Equal(t, thunk.Resolve(), 42)
 		check.Equal(t, count, 1)
 	})
 	t.Run("Ignore", func(t *testing.T) {

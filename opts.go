@@ -267,7 +267,7 @@ func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Future[[]erro
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
 			WorkerGroupConfErrorHandler(ob)(opts),
-			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Run())...) })(opts),
+			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Resolve())...) })(opts),
 		)
 	}
 }

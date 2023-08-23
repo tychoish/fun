@@ -1,38 +1,32 @@
 package risky
 
 import (
-	"context"
-
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 )
 
 // Slice converts an iterator into a slice: this will not abort or
-// timeout if the iterator is blocking, and errors returned by the
-// iterator's close method become panics.
+// timeout if the iterator is blocking. The iterator's close method is
+// not processed.
 func Slice[T any](iter *fun.Iterator[T]) []T {
-	out := []T{}
-
-	Observe(iter, func(in T) { out = append(out, in) })
+	out := dt.Sliceify([]T{})
+	out.Populate(iter).Wait()
 	return out
 }
 
 // Observe is a fun.Observe wrapper that uses a background context,
 // and converts the possible error returned by fun.Observe into a
 // panic. In general fun.Observe only returns an error if the input
-// iterator errors or the observer function panics.
+// iterator errors (or panics) or the handler function panics.
 func Observe[T any](iter *fun.Iterator[T], fn fun.Handler[T]) {
-	fun.Invariant.Must(iter.Observe(context.Background(), fn))
+	iter.Process(fn.Processor()).Must().Wait()
 }
 
-// List is converts an iterator to a linked list, in the riskiest way
-// possible.
+// List converts an iterator to a linked list, without passing .
 func List[T any](iter *fun.Iterator[T]) *dt.List[T] {
 	out := &dt.List[T]{}
 
-	iter.Process(fun.Handle(func(in T) { out.PushBack(in) }).Processor()).
-		Ignore().
-		Wait()
+	Observe(iter, out.PushBack)
 
 	return out
 }

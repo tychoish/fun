@@ -22,11 +22,16 @@ type List[T any] struct {
 }
 
 // NewListFromIterator builds a list from the elements in the
-// iterator. In general, any error would be the result of the input
-// iterators's close method
+// iterator. Any error returned is either a context cancellation error
+// or the result of a panic in the input iterator. The close method on
+// the input iterator is not called.
 func NewListFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*List[T], error) {
 	out := &List[T]{}
-	return out, iter.Observe(ctx, func(in T) { out.PushBack(in) })
+	if err := out.Populate(iter).Run(ctx); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // Append adds a variadic sequence of items to the end of the list.
@@ -34,6 +39,14 @@ func (l *List[T]) Append(items ...T) {
 	for idx := range items {
 		l.PushBack(items[idx])
 	}
+}
+
+// Populate returns a worker that adds items from the iterator to the
+// list. Any error returned is either a context cancellation error or
+// the result of a panic in the input iterator. The close method on
+// the input iterator is not called.
+func (l *List[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
+	return iter.Process(fun.Handle(l.PushBack).Processor())
 }
 
 // Element is the underlying component of a list, provided by

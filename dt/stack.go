@@ -13,9 +13,8 @@ import (
 // Stack provides a generic singly linked list, with an interface that
 // is broadly similar to dt.List.
 type Stack[T any] struct {
-	head            *Item[T]
-	length          int
-	itemConstructor func(val T) *Item[T]
+	head   *Item[T]
+	length int
 }
 
 // NewListFromIterator builds a stack from the elements in the
@@ -23,6 +22,7 @@ type Stack[T any] struct {
 // iterators's close method.
 func NewStackFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*Stack[T], error) {
 	out := &Stack[T]{}
+
 	return out, iter.Observe(ctx, func(in T) { out.Push(in) })
 }
 
@@ -31,6 +31,14 @@ func (s *Stack[T]) Append(items ...T) {
 	for idx := range items {
 		s.Push(items[idx])
 	}
+}
+
+// Populate returns a worker that adds items from the iterator to the
+// stack. Any error returned is either a context cancellation error or
+// the result of a panic in the input iterator. The close method on
+// the input iterator is not called.
+func (s *Stack[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
+	return iter.Process(fun.Handle(s.Push).Processor())
 }
 
 // Item is a common wrapper for the elements in a stack.
@@ -256,20 +264,21 @@ func (s *Stack[T]) lazyInit() {
 
 	if s.head == nil {
 		var val T
-		s.itemConstructor = func(val T) *Item[T] { return &Item[T]{value: val, ok: true} }
 		s.length = 0
-		s.head = s.itemConstructor(val)
+		s.head = makeItem(val)
 		s.head.ok = false
 		s.head.stack = s
 	}
 }
+
+func makeItem[T any](val T) *Item[T] { return &Item[T]{value: val, ok: true} }
 
 // Len returns the length of the stack. Because stack's track their
 // own size, this is an O(1) operation.
 func (s *Stack[T]) Len() int { return s.length }
 
 // Push appends an item to the stack.
-func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(s.itemConstructor(it)) }
+func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(makeItem(it)) }
 
 // Head returns the item at the top of this stack. This is a non
 // destructive operation.
