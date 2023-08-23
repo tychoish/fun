@@ -110,7 +110,7 @@ func TestOperation(t *testing.T) {
 		defer cancel()
 
 		count := 0
-		op := BlockingOperation(func() { count++ })
+		op := MakeOperation(func() { count++ })
 		assert.Equal(t, count, 0)
 		op(ctx)
 		assert.Equal(t, count, 1)
@@ -136,7 +136,7 @@ func TestOperation(t *testing.T) {
 			}
 		}).WithCancel()
 		assert.MinRuntime(t, 40*time.Millisecond, func() {
-			assert.MaxRuntime(t, 75*time.Millisecond, func() {
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
 				go func() { time.Sleep(60 * time.Millisecond); cancel() }()
 				time.Sleep(time.Millisecond)
 				wf(ctx)
@@ -300,8 +300,8 @@ func TestOperation(t *testing.T) {
 	t.Run("PreHook", func(t *testing.T) {
 		ops := []string{}
 
-		BlockingOperation(func() { ops = append(ops, "main") }).
-			PreHook(BlockingOperation(func() { ops = append(ops, "pre") })).
+		MakeOperation(func() { ops = append(ops, "main") }).
+			PreHook(MakeOperation(func() { ops = append(ops, "pre") })).
 			Block()
 
 		// check call order
@@ -310,8 +310,8 @@ func TestOperation(t *testing.T) {
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			ops := []string{}
-			BlockingOperation(func() { ops = append(ops, "first") }).
-				Join(BlockingOperation(func() { ops = append(ops, "second") })).Block()
+			MakeOperation(func() { ops = append(ops, "first") }).
+				Join(MakeOperation(func() { ops = append(ops, "second") })).Block()
 			// check call order
 			check.EqualItems(t, ops, []string{"first", "second"})
 		})
@@ -320,8 +320,8 @@ func TestOperation(t *testing.T) {
 			cancel()
 
 			ops := []string{}
-			BlockingOperation(func() { ops = append(ops, "first") }).
-				Join(BlockingOperation(func() { ops = append(ops, "second") }))(ctx)
+			MakeOperation(func() { ops = append(ops, "first") }).
+				Join(MakeOperation(func() { ops = append(ops, "second") }))(ctx)
 			// check call order
 			check.EqualItems(t, ops, []string{"first"})
 

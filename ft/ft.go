@@ -25,7 +25,7 @@ func IsZero[T comparable](in T) bool {
 
 // NotZero returns true when the item does not have the zero value for
 // the type T.
-func NotZero[T comparable](in T) bool { return !IsZero(in) }
+func NotZero[T comparable](in T) bool { return Not(IsZero(in)) }
 
 // IsType checks if the type of the argument matches the type
 // specifier.
@@ -125,31 +125,21 @@ func IfDo[T any](cond bool, doIf func() T, doElse func() T) T {
 
 // WhenCall runs a function when condition is true, and is a noop
 // otherwise. Panics if the function is nil.
-func WhenCall(cond bool, op func()) {
-	if !cond {
-		return
-	}
-	op()
-}
+func WhenCall(cond bool, op func()) { IfCall(cond, op, nil) }
 
 // WhenDo calls the function when the condition is true, and returns
 // the result, or if the condition is false, the operation is a noop,
 // and returns zero-value for the type. Panics if the function is nil.
-func WhenDo[T any](cond bool, op func() T) (out T) {
-	if !cond {
-		return out
-	}
-	return op()
-}
+func WhenDo[T any](cond bool, op func() T) (out T) { return IfDo(cond, op, nil) }
 
 // UnlessCall is inverse form of WhenCall, calling the provided
 // function only when the conditional is false. Panics if the function
 // is nil.
-func UnlessCall(cond bool, op func()) { WhenCall(Not(cond), op) }
+func UnlessCall(cond bool, op func()) { IfCall(cond, nil, op) }
 
 // UnlessDo is the inverse form of WhenDo, calling the function only
 // when the condition is false. Panics if the function is nil.
-func UnlessDo[T any](cond bool, op func() T) T { return WhenDo(Not(cond), op) }
+func UnlessDo[T any](cond bool, op func() T) T { return IfDo(cond, nil, op) }
 
 // WhenApply runs the function with the supplied argument only when
 // the condition is true. Panics if the function is nil.
@@ -178,11 +168,21 @@ func DoTimes(n int, op func()) {
 }
 
 // SafeCall only calls the operation when it's non-nil.
-func SafeCall(op func()) { WhenCall(op != nil, op) }
+func SafeCall(op func()) {
+	if op != nil {
+		op()
+	}
+}
 
 // SafeDo calls the function when the operation is non-nil, and
 // returns either the output of the function or
-func SafeDo[T any](op func() T) T { return WhenDo(op != nil, op) }
+func SafeDo[T any](op func() T) (out T) {
+	if op != nil {
+		out = op()
+	}
+
+	return out
+}
 
 // SafeWrap wraps an operation with SafeCall so that the resulting
 // operation is never nil, and will never panic if the input operation

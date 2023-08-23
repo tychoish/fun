@@ -576,8 +576,7 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ch := make(chan string)
-			out, err := NonBlocking(ch).Receive().Read(ctx)
+			out, err := Chan[string]().NonBlocking().Receive().Read(ctx)
 			assert.Zero(t, out)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)

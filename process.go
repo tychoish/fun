@@ -38,7 +38,7 @@ func ProcessifyHandler[T any](fn Handler[T]) Processor[T] {
 	return func(_ context.Context, in T) error { fn(in); return nil }
 }
 
-// Run executes the ProcessFunc but creates a context within the
+// Run executes the Processors but creates a context within the
 // function (decended from the context provided in the arguments,)
 // that is canceled when Run() returns to avoid leaking well behaved
 // resources outside of the scope of the function execution. Run can

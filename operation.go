@@ -14,9 +14,9 @@ import (
 // operation returns or the context is canceled.
 type Operation func(context.Context)
 
-// BlockingOperation converts a function that takes no arguments into
+// MakeOperation converts a function that takes no arguments into
 // an Operation.
-func BlockingOperation(in func()) Operation { return func(context.Context) { in() } }
+func MakeOperation(in func()) Operation { return func(context.Context) { in() } }
 
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a
 // Operation. The Operation blocks till it's context is canceled or the

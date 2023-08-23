@@ -240,7 +240,7 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 			return out, nil
 		case errors.Is(err, ErrIteratorSkip):
 			continue
-		case ers.Is(err, io.EOF, context.Canceled, context.DeadlineExceeded, ers.ErrCurrentOpAbort):
+		case ers.IsTerminating(err):
 			return out, err
 		default:
 			i.AddError(err)
@@ -370,19 +370,22 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 // iterator may return one in its close method.
 func (i *Iterator[T]) Observe(ctx context.Context, fn Handler[T]) (err error) {
 	defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
-	proc := i.Producer()
 	for {
-		item, err := proc(ctx)
+		item, err := i.ReadOne(ctx)
 		switch {
 		case err == nil:
 			fn(item)
-		case errors.Is(err, ErrIteratorSkip):
-			continue
 		case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 			return nil
 		default:
+			// It seems like we should try and process
+			// ErrIteratorSkip here but ReadOne handles
+			// that case for us.
+			//
 			// this is (realistically) only context
-			// cancelation errors. Beause the
+			// cancellation errors, because ReadOne puts
+			// all errors into the iterator's
+			// Close()method.
 			return err
 		}
 	}

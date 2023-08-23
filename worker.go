@@ -18,6 +18,10 @@ import (
 // other similar situations
 type Worker func(context.Context) error
 
+// MakeWorker converts a non-context worker function into a worker for
+// compatibility with tooling.
+func MakeWorker(fn func() error) Worker { return func(context.Context) error { return fn() } }
+
 // WorkerFuture constructs a worker from an error channel. The
 // resulting worker blocks until an error is produced in the error
 // channel, the error channel is closed, or the worker's context is

@@ -150,7 +150,7 @@ func TestWorker(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			expected := errors.New("hello")
-			wf := Worker(func(ctx context.Context) error { return expected })
+			wf := MakeWorker(func() error { return expected })
 			out := wf.Signal(ctx)
 			err := <-out
 			assert.Error(t, err)

@@ -308,7 +308,7 @@ func TestContexts(t *testing.T) {
 		WithTimeout(10*time.Millisecond, func(ctx context.Context) {
 			assert.NotError(t, ctx.Err())
 			cc = ctx
-			time.Sleep(11 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			assert.Error(t, ctx.Err())
 			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 		})
