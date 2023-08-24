@@ -110,13 +110,13 @@ func TestOperation(t *testing.T) {
 			called++
 		})
 
-		wf.If(false)(ctx)
+		wf.If(false).Run(ctx)
 		check.Zero(t, called)
-		wf.If(true)(ctx)
+		wf.If(true).Run(ctx)
 		check.Equal(t, 1, called)
-		wf.If(true)(ctx)
+		wf.If(true).Run(ctx)
 		check.Equal(t, 2, called)
-		wf.If(false)(ctx)
+		wf.If(false).Run(ctx)
 		check.Equal(t, 2, called)
 		wf(ctx)
 		check.Equal(t, 3, called)
@@ -130,13 +130,13 @@ func TestOperation(t *testing.T) {
 			called++
 		})
 
-		wf.When(func() bool { return false })(ctx)
+		wf.When(func() bool { return false }).Run(ctx)
 		check.Zero(t, called)
-		wf.When(func() bool { return true })(ctx)
+		wf.When(func() bool { return true }).Run(ctx)
 		check.Equal(t, 1, called)
-		wf.When(func() bool { return true })(ctx)
+		wf.When(func() bool { return true }).Run(ctx)
 		check.Equal(t, 2, called)
-		wf.When(func() bool { return false })(ctx)
+		wf.When(func() bool { return false }).Run(ctx)
 		check.Equal(t, 2, called)
 		wf(ctx)
 		check.Equal(t, 3, called)
@@ -148,7 +148,7 @@ func TestOperation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 			start := time.Now()
-			WaitContext(bctx)(ctx)
+			WaitContext(bctx).Run(ctx)
 			if time.Since(start) > time.Millisecond {
 				t.Error("waited too long")
 			}
@@ -158,7 +158,7 @@ func TestOperation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 			start := time.Now()
-			WaitContext(ctx)(wctx)
+			WaitContext(ctx).Run(wctx)
 			if time.Since(start) > time.Millisecond {
 				t.Error("waited too long")
 			}
@@ -185,7 +185,7 @@ func TestOperation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
-		HF.OperationPool(SliceIterator(wfs))(ctx)
+		HF.OperationPool(SliceIterator(wfs)).Run(ctx)
 		dur := time.Since(start)
 		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 			t.Error(dur)
@@ -228,7 +228,7 @@ func TestOperation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := Operation(func(context.Context) { called.Store(true) }).Worker()(ctx)
+		err := Operation(func(context.Context) { called.Store(true) }).Worker().Run(ctx)
 		assert.NotError(t, err)
 		assert.True(t, called.Load())
 		assert.Panic(t, func() {
@@ -240,7 +240,7 @@ func TestOperation(t *testing.T) {
 		cancel()
 
 		called := &atomic.Bool{}
-		err := Operation(func(context.Context) { called.Store(true) }).Worker()(ctx)
+		err := Operation(func(context.Context) { called.Store(true) }).Worker().Run(ctx)
 		assert.Error(t, err)
 		assert.True(t, called.Load())
 		assert.ErrorIs(t, err, context.Canceled)
@@ -251,7 +251,7 @@ func TestOperation(t *testing.T) {
 
 		expected := errors.New("safer")
 		err := Operation(func(context.Context) { panic(expected) }).
-			WithRecover()(ctx)
+			WithRecover().Run(ctx)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, expected)
 	})
@@ -279,7 +279,7 @@ func TestOperation(t *testing.T) {
 
 			ops := []string{}
 			MakeOperation(func() { ops = append(ops, "first") }).
-				Join(MakeOperation(func() { ops = append(ops, "second") }))(ctx)
+				Join(MakeOperation(func() { ops = append(ops, "second") })).Run(ctx)
 			// check call order
 			check.EqualItems(t, ops, []string{"first"})
 
@@ -292,7 +292,7 @@ func TestOperation(t *testing.T) {
 
 			count := 0
 			op := Operation(func(context.Context) { count++ })
-			check.Panic(t, func() { op.WithLock(nil)(ctx) })
+			check.Panic(t, func() { op.WithLock(nil).Run(ctx) })
 			check.Equal(t, 0, count)
 		})
 		// the rest of the tests are really just "tempt the

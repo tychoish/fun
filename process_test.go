@@ -204,7 +204,7 @@ func TestProcess(t *testing.T) {
 				check.Equal(t, in, 42)
 				return nil
 			})
-			check.Panic(t, func() { assert.NotError(t, op.WithLock(nil)(ctx, 42)) })
+			check.Panic(t, func() { assert.NotError(t, op.WithLock(nil).Run(ctx, 42)) })
 			check.Equal(t, count, 0)
 		})
 		// the rest of the tests are really just "tempt the

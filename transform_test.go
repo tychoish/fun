@@ -956,7 +956,7 @@ func RunIteratorStringAlgoTests(
 						sum, err := iter.Reduce(func(in string, value string) (string, error) {
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
-						})(ctx)
+						}).Run(ctx)
 
 						if err != nil {
 							t.Fatal(err)
@@ -989,7 +989,7 @@ func RunIteratorStringAlgoTests(
 								count++
 								return "", nil
 							},
-						)(ctx)
+						).Run(ctx)
 						check.Equal(t, count, 1)
 						if err == nil {
 							t.Fatal("expected error")
@@ -1015,7 +1015,7 @@ func RunIteratorStringAlgoTests(
 								return 42, nil
 							}
 							return value, ErrIteratorSkip
-						})(ctx)
+						}).Run(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
@@ -1033,7 +1033,7 @@ func RunIteratorStringAlgoTests(
 								return 300, io.EOF
 							}
 							return 42, nil
-						})(ctx)
+						}).Run(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
@@ -1065,10 +1065,10 @@ func RunIteratorStringAlgoTests(
 
 		err := ec.Resolve()
 		check.Error(t, err)
-		check.Error(t, ers.FilterExclude(io.EOF, context.DeadlineExceeded)(err))
-		check.NotError(t, ers.FilterExclude(context.Canceled)(err))
+		check.Error(t, ers.FilterExclude(io.EOF, context.DeadlineExceeded).Run(err))
+		check.NotError(t, ers.FilterExclude(context.Canceled).Run(err))
 
-		check.NotError(t, ers.FilterExclude(ErrCountMeOut)(err))
+		check.NotError(t, ers.FilterExclude(ErrCountMeOut).Run(err))
 		check.ErrorIs(t, err, ErrCountMeOut)
 	})
 	t.Run("ConverterOK", func(t *testing.T) {

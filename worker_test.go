@@ -170,14 +170,14 @@ func TestWorker(t *testing.T) {
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); panic(expected) }
-			wf.WithRecover().Background(ctx, oee)(ctx)
+			wf.WithRecover().Background(ctx, oee).Run(ctx)
 			Blocking(ch).Receive().Ignore(ctx)
 			assert.True(t, called.Load())
 		})
 		t.Run("Nil", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); return nil }
-			wf.Background(ctx, oen)(ctx)
+			wf.Background(ctx, oen).Run(ctx)
 			Blocking(ch).Receive().Ignore(ctx)
 			assert.True(t, called.Load())
 		})
@@ -195,30 +195,30 @@ func TestWorker(t *testing.T) {
 		expected := errors.New("cat")
 		var ch chan error
 		t.Run("NilChannel", func(t *testing.T) {
-			assert.NotError(t, WorkerFuture(ch)(ctx))
+			assert.NotError(t, WorkerFuture(ch).Run(ctx))
 		})
 		t.Run("ClosedChannel", func(t *testing.T) {
 			ch = make(chan error)
 			close(ch)
-			assert.NotError(t, WorkerFuture(ch)(ctx))
+			assert.NotError(t, WorkerFuture(ch).Run(ctx))
 		})
 		t.Run("ContextCanceled", func(t *testing.T) {
 			nctx, cancel := context.WithCancel(context.Background())
 			cancel()
 			ch = make(chan error)
-			err := WorkerFuture(ch)(nctx)
+			err := WorkerFuture(ch).Run(nctx)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 		t.Run("Error", func(t *testing.T) {
 			ch = make(chan error, 1)
 			ch <- expected
-			err := WorkerFuture(ch)(ctx)
+			err := WorkerFuture(ch).Run(ctx)
 			assert.ErrorIs(t, err, expected)
 		})
 		t.Run("NilError", func(t *testing.T) {
 			ch = make(chan error, 1)
 			ch <- nil
-			err := WorkerFuture(ch)(ctx)
+			err := WorkerFuture(ch).Run(ctx)
 			assert.NotError(t, err)
 		})
 	})
@@ -245,15 +245,15 @@ func TestWorker(t *testing.T) {
 		expected := errors.New("cat")
 		count := 0
 		var wf Worker = func(context.Context) error { count++; panic(expected) }
-		assert.Error(t, wf.WithRecover()(ctx))
+		assert.Error(t, wf.WithRecover().Run(ctx))
 		assert.Equal(t, count, 1)
-		assert.ErrorIs(t, wf.WithRecover()(ctx), expected)
+		assert.ErrorIs(t, wf.WithRecover().Run(ctx), expected)
 		assert.Equal(t, count, 2)
 		assert.Panic(t, func() { _ = wf(ctx) })
 		assert.Equal(t, count, 3)
-		assert.Panic(t, func() { wf.Ignore()(ctx) })
+		assert.Panic(t, func() { wf.Ignore().Run(ctx) })
 		assert.Equal(t, count, 4)
-		assert.NotPanic(t, func() { wf.WithRecover().Ignore()(ctx) })
+		assert.NotPanic(t, func() { wf.WithRecover().Ignore().Run(ctx) })
 		assert.Equal(t, count, 5)
 	})
 	t.Run("Limit", func(t *testing.T) {

@@ -319,7 +319,7 @@ func (wf Worker) Join(next Worker) Worker {
 		if err := wf(ctx); err != nil {
 			return err
 		}
-		return next.If(ctx.Err() == nil)(ctx)
+		return next.If(ctx.Err() == nil).Run(ctx)
 	}
 }
 

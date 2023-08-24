@@ -216,7 +216,7 @@ func TestHelpers(t *testing.T) {
 		}()
 
 		broker.Publish(ctx, 42)
-		fun.WaitChannel(sig)(ctx)
+		fun.WaitChannel(sig).Run(ctx)
 	})
 }
 

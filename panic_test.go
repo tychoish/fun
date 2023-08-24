@@ -184,7 +184,7 @@ func TestPanics(t *testing.T) {
 			}
 
 			assert.NotPanic(t, func() {
-				err := of.Worker("hi")(ctx)
+				err := of.Worker("hi").Run(ctx)
 				assert.ErrorIs(t, err, io.EOF)
 				assert.ErrorIs(t, err, ErrRecoveredPanic)
 			})
@@ -198,7 +198,7 @@ func TestPanics(t *testing.T) {
 				seen = in
 			}
 
-			err := of.Processor()(ctx, "hello")
+			err := of.Processor().Run(ctx, "hello")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -217,7 +217,7 @@ func TestPanics(t *testing.T) {
 				panic("hi")
 			}
 
-			assert.Panic(t, func() { of.Operation("hi")(ctx) })
+			assert.Panic(t, func() { of.Operation("hi").Run(ctx) })
 			assert.True(t, called)
 		})
 		t.Run("Failure", func(t *testing.T) {

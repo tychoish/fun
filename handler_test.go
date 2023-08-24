@@ -31,7 +31,7 @@ func TestHandler(t *testing.T) {
 			panic(io.EOF)
 
 		}
-		ob.Safe(oe)(100)
+		ob.Safe(oe).Handle(100)
 		assert.Equal(t, 1, count)
 	})
 	t.Run("HandlePassthrough", func(t *testing.T) {
@@ -48,9 +48,9 @@ func TestHandler(t *testing.T) {
 			count++
 		}
 
-		ob.If(false)(100)
+		ob.If(false).Handle(100)
 		assert.Equal(t, 0, count)
-		ob.If(true)(100)
+		ob.If(true).Handle(100)
 		assert.Equal(t, 1, count)
 	})
 	t.Run("When", func(t *testing.T) {

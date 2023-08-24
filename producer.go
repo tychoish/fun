@@ -188,7 +188,7 @@ func (pf Producer[T]) CheckForce() (T, bool)               { return pf.Check(con
 func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	out := make(chan T, 1)
 	var err error
-	go func() { defer close(out); o, e := pf.Safe()(ctx); err = e; out <- o }()
+	go func() { defer close(out); o, e := pf.Safe().Run(ctx); err = e; out <- o }()
 
 	return func(ctx context.Context) (T, error) {
 		out, chErr := Blocking(out).Receive().Read(ctx)

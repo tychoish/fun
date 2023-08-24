@@ -28,6 +28,10 @@ func HandlePassthrough[T any, O any](hf Handler[O]) func(T, O) T {
 	return func(first T, second O) T { hf(second); return first }
 }
 
+// Handler provides a more expository operation to call a handler
+// function.
+func (of Handler[T]) Handle(in T) { of(in) }
+
 // Safe handles any panic encountered during the observer's execution
 // and converts it to an error.
 func (of Handler[T]) Safe(oe Handler[error]) Handler[T] { return func(in T) { oe(of.Check(in)) } }

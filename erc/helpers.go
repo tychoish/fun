@@ -132,7 +132,8 @@ func Consume(ctx context.Context, ec *Collector, iter *fun.Iterator[error]) {
 //
 //	func main() {
 //	    ec := &erc.Collector{}
-//	    size := erc.Collect[int](ec)(actor(Configuration{}))
+//	    resolveSize := erc.Collect[int](ec)
+//	    size := resolveSize(actor(Configuration{}))
 //	}
 func Collect[T any](ec *Collector) func(T, error) T {
 	return func(out T, err error) T { ec.Add(err); return out }

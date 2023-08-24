@@ -45,29 +45,29 @@ func TestFuture(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 })
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.If(false)(), 0)
+		check.Equal(t, thunk.If(false).Resolve(), 0)
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.If(true)(), 42)
+		check.Equal(t, thunk.If(true).Resolve(), 42)
 		check.Equal(t, count, 1)
 	})
 	t.Run("Not", func(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 })
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.Not(true)(), 0)
+		check.Equal(t, thunk.Not(true).Resolve(), 0)
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.Not(false)(), 42)
+		check.Equal(t, thunk.Not(false).Resolve(), 42)
 		check.Equal(t, count, 1)
 	})
 	t.Run("When", func(t *testing.T) {
 		count := 0
 		thunk := Futurize(func() int { count++; return 42 })
 		check.Equal(t, count, 0)
-		check.Equal(t, thunk.When(AsFuture(true))(), 42)
+		check.Equal(t, thunk.When(AsFuture(true)).Resolve(), 42)
 		check.Equal(t, count, 1)
-		check.Equal(t, thunk.When(AsFuture(true))(), 42)
+		check.Equal(t, thunk.When(AsFuture(true)).Resolve(), 42)
 		check.Equal(t, count, 2)
-		check.Equal(t, thunk.When(AsFuture(false))(), 0)
+		check.Equal(t, thunk.When(AsFuture(false)).Resolve(), 0)
 		check.Equal(t, count, 2)
 	})
 	t.Run("PreHook", func(t *testing.T) {

@@ -4,6 +4,10 @@ package ers
 // errors, reformulate,  or annotate errors.
 type Filter func(error) error
 
+// Run runs the filter on the provided error to provide the option of
+// improving readability at callsites
+func (f Filter) Run(err error) error { return f(err) }
+
 // FilterExclude takes an error and returns nil if the error is nil,
 // or if the error (or one of its wrapped errors,) is in the exclusion
 // list.

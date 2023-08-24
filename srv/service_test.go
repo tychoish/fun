@@ -408,7 +408,7 @@ func TestService(t *testing.T) {
 			ctx := testt.ContextWithTimeout(t, 10*time.Millisecond)
 			var err error
 			assert.MaxRuntime(t, 20*time.Millisecond, func() {
-				err = s.Worker()(ctx)
+				err = s.Worker().Run(ctx)
 			})
 			assert.Error(t, err)
 			assert.True(t, ers.ContextExpired(err))
@@ -422,7 +422,7 @@ func TestService(t *testing.T) {
 			}
 
 			ctx := testt.Context(t)
-			err := s.Worker()(ctx)
+			err := s.Worker().Run(ctx)
 			assert.ErrorIs(t, err, expected)
 		})
 	})

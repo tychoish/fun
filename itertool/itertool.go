@@ -54,7 +54,7 @@ func Worker[OP fun.Worker | fun.Operation](
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) error {
 	return Process(ctx, iter, func(ctx context.Context, op OP) error {
-		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover()(ctx)
+		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover().Run(ctx)
 	}, optp...)
 }
 

@@ -60,7 +60,7 @@ func (Handlers) OperationPool(iter *Iterator[Operation]) Operation {
 //
 //	fun.HF.ProcessOperation()
 func (Handlers) ProcessOperation() Processor[Operation] {
-	return func(ctx context.Context, op Operation) error { return op.WithRecover()(ctx) }
+	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
 }
 
 // ErrorProcessor produces an error Processor function for errors that
