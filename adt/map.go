@@ -185,19 +185,11 @@ func makeMapIterator[K comparable, V any, O any](
 	mp *Map[K, V],
 	rf func(K, V) O,
 ) *fun.Iterator[O] {
-	pipe := make(chan O)
-
-	init := fun.Operation(func(ctx context.Context) {
-		defer close(pipe)
+	pipe := fun.Blocking(make(chan O))
+	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
+		send := pipe.Send()
 		mp.Range(func(key K, value V) bool {
-			select {
-			case <-ctx.Done():
-				return false
-			case pipe <- rf(key, value):
-				return true
-			}
+			return send.Check(ctx, rf(key, value))
 		})
-	}).Go().Once()
-
-	return fun.BlockingReceive(pipe).Producer().PreHook(init).Iterator()
+	}).PostHook(pipe.Close).Go().Once()).Iterator()
 }
