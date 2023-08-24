@@ -36,17 +36,6 @@ func WaitChannel[T any](ch <-chan T) Operation {
 // context to be cacneled with a timeout, for instance.
 func WaitContext(ctx context.Context) Operation { return WaitChannel(ctx.Done()) }
 
-// WaitForGroup converts a sync.WaitGroup into a fun.Operation.
-//
-// This operation will leak a go routine if the WaitGroup
-// never returns and the context is canceled. To avoid a leaked
-// goroutine, use the fun.WaitGroup type.
-func WaitForGroup(wg *sync.WaitGroup) Operation {
-	sig := make(chan struct{})
-	go func() { defer close(sig); wg.Wait() }()
-	return WaitChannel(sig)
-}
-
 // Run is equivalent to calling the operation directly
 func (wf Operation) Run(ctx context.Context) { wf(ctx) }
 
