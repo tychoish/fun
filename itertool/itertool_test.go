@@ -281,7 +281,8 @@ func TestIndexed(t *testing.T) {
 
 	iter := Indexed(fun.VariadicIterator(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 	count := 0
-	iter.Observe(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
+	err := iter.Observe(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
+	check.NotError(t, err)
 	assert.Equal(t, count, 10)
 }
 
