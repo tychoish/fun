@@ -2,6 +2,7 @@ package adt
 
 import (
 	"context"
+	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -165,4 +167,114 @@ func TestPool(t *testing.T) {
 		<-ctx.Done()
 		assert.True(t, seen.Load())
 	})
+	t.Run("Finalize", func(t *testing.T) {
+		p := &Pool[int]{}
+
+		ft.DoTimes(100, func() { p.SetConstructor(rand.Int) })
+		p.SetConstructor(nil)
+		assert.NotNil(t, p.constructor.Load())
+		p.SetCleanupHook(nil)
+		assert.NotNil(t, p.hook.Load())
+
+		ft.DoTimes(100, p.FinalizeSetup)
+		check.Panic(t, func() { p.SetConstructor(rand.Int) })
+		check.Panic(t, func() { p.SetCleanupHook(func(int) int { return 0 }) })
+		check.Panic(t, func() { p.SetConstructor(nil) })
+		check.Panic(t, func() { p.SetCleanupHook(nil) })
+	})
+	t.Run("MakeBytesBufferPool", func(t *testing.T) {
+		bp := MakeBytesBufferPool(1024)
+		buf := bp.Get()
+		check.Equal(t, buf.Cap(), 1024)
+
+		var passed bool
+		var count int64
+		for start := time.Now(); time.Since(start) < 2*time.Second; {
+			count++
+			ft.DoTimes(2048, func() { buf.WriteByte('!') })
+			bp.Put(buf)
+			buf = bp.Get()
+			check.Equal(t, buf.Len(), 0)
+			if buf.Cap() >= 2048 {
+				passed = true
+				break
+			}
+		}
+		testt.Log(t, "attempts:", count)
+		check.True(t, passed)
+
+	})
+	t.Run("BytesBuffer", func(t *testing.T) {
+		t.Run("Resizes", func(t *testing.T) {
+			for name, bufpool := range map[string]*Pool[[]byte]{
+				"Small":   MakeBufferPool(0, 32),
+				"Default": DefaultBufferPool(),
+			} {
+				t.Run(name, func(t *testing.T) {
+					buf := bufpool.Get()
+					check.Equal(t, cap(buf), 0)
+					check.Equal(t, len(buf), 0)
+					bufpool.Put(buf)
+
+					var passed bool
+					var count int64
+					for start := time.Now(); time.Since(start) < 2*time.Second; {
+						count++
+						buf = bufpool.Get()
+						assert.True(t, cap(buf) <= 32)
+						assert.Zero(t, len(buf))
+
+						if cap(buf) >= 16 {
+							passed = true
+							break
+						}
+
+						for len(buf) < 32 {
+							buf = append(buf, '~')
+						}
+						bufpool.Put(buf)
+					}
+
+					testt.Log(t, "attempts:", count)
+					check.True(t, passed)
+				})
+			}
+
+		})
+		t.Run("OversizeSafely", func(t *testing.T) {
+			// hard to introspect if they're actually in
+			// the pool. Not panicing is good.
+			check.NotPanic(t, func() {
+				p := MakeBufferPool(0, 4)
+				buf := p.Get()
+				for len(buf) < 32 {
+					buf = append(buf, '~')
+				}
+				p.Put(buf)
+			})
+		})
+		t.Run("PanicsForZeroMax", func(t *testing.T) {
+			check.Panic(t, func() { MakeBufferPool(0, 0) })
+			check.Panic(t, func() { MakeBufferPool(-100, -2) })
+		})
+		t.Run("BoundsAreFlooredAtZero", func(t *testing.T) {
+			check.NotPanic(t, func() { MakeBufferPool(-100, 100) })
+			check.NotPanic(t, func() { MakeBufferPool(100, -100) })
+		})
+		t.Run("FlipsIfNeeded", func(t *testing.T) {
+			for name, bufpool := range map[string]*Pool[[]byte]{
+				"MinMax": MakeBufferPool(32, 64),
+				"MaxMin": MakeBufferPool(64, 32),
+			} {
+				t.Run(name, func(t *testing.T) {
+					buf := bufpool.Get()
+					check.Equal(t, cap(buf), 32)
+					check.Equal(t, len(buf), 0)
+				})
+			}
+
+		})
+
+	})
+
 }

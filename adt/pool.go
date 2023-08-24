@@ -52,7 +52,8 @@ func (p *Pool[T]) doInit() {
 func (p *Pool[T]) FinalizeSetup() { p.init(); p.locked.Store(true) }
 
 // SetCleanupHook sets a function to be called on every object
-// renetering the pool. By default, the cleanup function is a noop.
+// renetering the pool. By default, the cleanup function is a noop,
+// and if the input function is nil, it is not set.
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
 	fun.Invariant.IsFalse(p.locked.Load(), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
@@ -76,6 +77,7 @@ func (p *Pool[T]) Get() T { p.init(); return p.pool.Get().(T) }
 // cleanuphook or returning it to the pool.
 func (p *Pool[T]) Put(in T) {
 	p.init()
+
 	if any(in) != nil {
 		p.pool.Put(p.hook.Get()(in))
 	}
