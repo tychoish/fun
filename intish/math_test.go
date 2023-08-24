@@ -1,7 +1,10 @@
 package intish
 
 import (
+	"fmt"
 	"math"
+	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -252,6 +255,204 @@ func TestMath(t *testing.T) {
 		}
 		if v := Diff(90, -10); v != 100 {
 			t.Error(v)
+		}
+	})
+	t.Run("Ranges", func(t *testing.T) {
+		for _, tt := range []struct {
+			Name        string
+			One         int
+			Two         int
+			ExpectedMin int
+			ExpectedMax int
+			Operation   func(a, b int) (int, int)
+		}{
+			////////////////////////////////
+			//
+			// BOUNDS
+			//
+			{
+				Name:        "ZeroNormal",
+				One:         0,
+				Two:         2,
+				ExpectedMin: 0,
+				ExpectedMax: 2,
+				Operation:   Bounds[int],
+			},
+			{
+				Name:        "ZeroFlip",
+				One:         2,
+				Two:         0,
+				ExpectedMin: 0,
+				ExpectedMax: 2,
+				Operation:   Bounds[int],
+			},
+			{
+				Name:        "NegativeNormal",
+				One:         -64,
+				Two:         128,
+				ExpectedMin: 0,
+				ExpectedMax: 128,
+				Operation:   Bounds[int],
+			},
+			{
+				Name:        "NegativeFlip",
+				One:         128,
+				Two:         -128,
+				ExpectedMin: 0,
+				ExpectedMax: 128,
+				Operation:   Bounds[int],
+			},
+			{
+				Name:        "PositiveNormal",
+				One:         512,
+				Two:         1024,
+				ExpectedMin: 512,
+				ExpectedMax: 1024,
+				Operation:   Bounds[int],
+			},
+			{
+				Name:        "PositiveFlip",
+				One:         512,
+				Two:         1024,
+				ExpectedMin: 512,
+				ExpectedMax: 1024,
+				Operation:   Bounds[int],
+			},
+			////////////////////////////////
+			//
+			// RANGE
+			//
+			{
+				Name:        "ZeroNormal",
+				One:         0,
+				Two:         2,
+				ExpectedMin: 0,
+				ExpectedMax: 2,
+				Operation:   Range[int],
+			},
+			{
+				Name:        "ZeroFlip",
+				One:         2,
+				Two:         0,
+				ExpectedMin: 0,
+				ExpectedMax: 2,
+				Operation:   Range[int],
+			},
+			{
+				Name:        "NegativeNormal",
+				One:         -64,
+				Two:         128,
+				ExpectedMin: -64,
+				ExpectedMax: 128,
+				Operation:   Range[int],
+			},
+			{
+				Name:        "NegativeFlip",
+				One:         128,
+				Two:         -128,
+				ExpectedMin: -128,
+				ExpectedMax: 128,
+				Operation:   Range[int],
+			},
+			{
+				Name:        "PositiveNormal",
+				One:         512,
+				Two:         1024,
+				ExpectedMin: 512,
+				ExpectedMax: 1024,
+				Operation:   Range[int],
+			},
+			{
+				Name:        "PositiveFlip",
+				One:         512,
+				Two:         1024,
+				ExpectedMin: 512,
+				ExpectedMax: 1024,
+				Operation:   Range[int],
+			},
+			////////////////////////////////
+			//
+			// ABSBOUNDS
+			//
+			{
+				Name:        "ZeroNormal",
+				One:         0,
+				Two:         2,
+				ExpectedMin: 0,
+				ExpectedMax: 2,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "ZeroFlip",
+				One:         2,
+				Two:         0,
+				ExpectedMin: 0,
+				ExpectedMax: 2,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "NegativeNormal",
+				One:         -64,
+				Two:         128,
+				ExpectedMin: 64,
+				ExpectedMax: 128,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "BothNegative",
+				One:         -256,
+				Two:         -128,
+				ExpectedMin: 128,
+				ExpectedMax: 256,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "BothNegativeFlip",
+				One:         -32,
+				Two:         -64,
+				ExpectedMin: 32,
+				ExpectedMax: 64,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "NegativeFlip",
+				One:         128,
+				Two:         -128,
+				ExpectedMin: 128,
+				ExpectedMax: 128,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "PositiveNormal",
+				One:         512,
+				Two:         1024,
+				ExpectedMin: 512,
+				ExpectedMax: 1024,
+				Operation:   AbsBounds[int],
+			},
+			{
+				Name:        "PositiveFlip",
+				One:         512,
+				Two:         1024,
+				ExpectedMin: 512,
+				ExpectedMax: 1024,
+				Operation:   AbsBounds[int],
+			},
+		} {
+
+			id := fmt.Sprintf("%s/%s/From/%d_%d/To/%d_%d",
+				runtime.FuncForPC(reflect.ValueOf(tt.Operation).Pointer()).Name(),
+				tt.Name, tt.One, tt.Two, tt.ExpectedMin, tt.ExpectedMax,
+			)
+			t.Run(id, func(t *testing.T) {
+				outMin, outMax := tt.Operation(tt.One, tt.Two)
+				if outMin != tt.ExpectedMin {
+					t.Errorf("got %d rather than %d", outMin, tt.ExpectedMin)
+				}
+				if outMax != tt.ExpectedMax {
+					t.Errorf("got %d rather than %d", outMin, tt.ExpectedMax)
+				}
+			})
 		}
 	})
 }
