@@ -104,7 +104,7 @@ func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
 func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
-	fun.Invariant.Must(pairs.Iterator().Observe(context.Background(), m.AddPair))
+	fun.Invariant.Must(pairs.Iterator().Observe(m.AddPair).Wait())
 }
 
 // ConsumeMap adds all the keys from the input map the map.
@@ -127,7 +127,7 @@ func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 // Consume adds items to the map from an iterator of Pair
 // objects. Existing values for K are always overwritten.
 func (m Map[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) {
-	fun.Invariant.Must(iter.Observe(ctx, func(in Pair[K, V]) { m.AddPair(in) }))
+	fun.Invariant.Must(iter.Observe(func(in Pair[K, V]) { m.AddPair(in) }).Run(ctx))
 }
 
 // ConsumeValues adds items to the map, using the function to generate
@@ -136,7 +136,7 @@ func (m Map[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) 
 // This operation will panic (with an ErrInvariantValidation) if the
 // keyf panics.
 func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) {
-	fun.Invariant.Must(iter.Observe(ctx, func(in V) { m[keyf(in)] = in }))
+	fun.Invariant.Must(iter.Observe(func(in V) { m[keyf(in)] = in }).Run(ctx))
 }
 
 // Iterator converts a map into an iterator of dt.Pair objects. The

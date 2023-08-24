@@ -55,9 +55,7 @@ func (of Handler[T]) Processor() Processor[T] { return ProcessifyHandler(of) }
 
 // Iterator produces a worker that processes every item in the
 // iterator with the handler function function.
-func (of Handler[T]) Iterator(iter *Iterator[T]) Worker {
-	return func(ctx context.Context) error { return iter.Observe(ctx, of) }
-}
+func (of Handler[T]) Iterator(iter *Iterator[T]) Worker { return iter.Observe(of) }
 
 // If returns an observer that only executes the root observer if the
 // condition is true.

@@ -74,7 +74,7 @@ func TestDistributor(t *testing.T) {
 				time.Sleep(100 * time.Millisecond)
 				queue.Close()
 			}()
-			if err := iter.Observe(ctx, func(in string) { set.Add(in); seen++ }); err != nil {
+			if err := iter.Observe(func(in string) { set.Add(in); seen++ }).Run(ctx); err != nil {
 				t.Fatal(seen, err)
 			}
 			if iter.Next(ctx) {

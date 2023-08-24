@@ -191,7 +191,7 @@ func TestMap(t *testing.T) {
 			keys := MapKeys(mp)
 
 			count := 0
-			err := keys.Observe(ctx, func(in string) {
+			err := keys.Observe(func(in string) {
 				switch in {
 				case "big":
 					count++
@@ -202,7 +202,7 @@ func TestMap(t *testing.T) {
 				default:
 					t.Error("unexpected", in)
 				}
-			})
+			}).Run(ctx)
 			assert.Equal(t, 3, count)
 			assert.NotError(t, err)
 		})
@@ -215,7 +215,7 @@ func TestMap(t *testing.T) {
 			keys := MapValues(mp)
 
 			count := 0
-			err := keys.Observe(ctx, func(in int) {
+			err := keys.Observe(func(in int) {
 				switch in {
 				case 42:
 					count++
@@ -226,7 +226,7 @@ func TestMap(t *testing.T) {
 				default:
 					t.Error("unexpected", in)
 				}
-			})
+			}).Run(ctx)
 			assert.Equal(t, 3, count)
 			assert.NotError(t, err)
 		})

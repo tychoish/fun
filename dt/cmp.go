@@ -31,7 +31,7 @@ type Heap[T any] struct {
 func NewHeapFromIterator[T any](ctx context.Context, cmp cmp.LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
 	out := &Heap[T]{LT: cmp}
 	out.lazySetup()
-	return out, iter.Observe(ctx, func(in T) { out.Push(in) })
+	return out, iter.Observe(func(in T) { out.Push(in) }).Run(ctx)
 }
 
 func (h *Heap[T]) lazySetup() {

@@ -163,7 +163,7 @@ func TestSmoke(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, Monotonic(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in }))
+		check.NotError(t, Monotonic(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -268,7 +268,7 @@ func TestDropZeros(t *testing.T) {
 	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	check.NotError(t, DropZeroValues[string](fun.SliceIterator(all)).Observe(ctx, func(in string) { assert.Zero(t, in) }))
+	check.NotError(t, DropZeroValues[string](fun.SliceIterator(all)).Observe(func(in string) { assert.Zero(t, in) }).Run(ctx))
 
 	all[45] = "49"
 	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
@@ -281,7 +281,7 @@ func TestIndexed(t *testing.T) {
 
 	iter := Indexed(fun.VariadicIterator(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 	count := 0
-	iter.Observe(ctx, func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) })
+	iter.Observe(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
 	assert.Equal(t, count, 10)
 }
 

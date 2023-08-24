@@ -171,7 +171,7 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 
 // Populate adds all items encountered in the iterator to the set.
 func (s *Set[T]) Populate(iter *fun.Iterator[T]) {
-	fun.Invariant.Must(iter.Observe(context.Background(), s.Add))
+	fun.Invariant.Must(iter.Observe(s.Add).Wait())
 }
 
 // Extend adds the items of one set to this set.

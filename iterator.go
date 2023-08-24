@@ -368,25 +368,27 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 // well as the output of the Close() operation. Observe will not add a
 // context cancelation error to its error, though the observed
 // iterator may return one in its close method.
-func (i *Iterator[T]) Observe(ctx context.Context, fn Handler[T]) (err error) {
-	defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
-	for {
-		item, err := i.ReadOne(ctx)
-		switch {
-		case err == nil:
-			fn(item)
-		case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
-			return nil
-		default:
-			// It seems like we should try and process
-			// ErrIteratorSkip here but ReadOne handles
-			// that case for us.
-			//
-			// this is (realistically) only context
-			// cancellation errors, because ReadOne puts
-			// all errors into the iterator's
-			// Close()method.
-			return err
+func (i *Iterator[T]) Observe(fn Handler[T]) Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
+		for {
+			item, err := i.ReadOne(ctx)
+			switch {
+			case err == nil:
+				fn(item)
+			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
+				return nil
+			default:
+				// It seems like we should try and process
+				// ErrIteratorSkip here but ReadOne handles
+				// that case for us.
+				//
+				// this is (realistically) only context
+				// cancellation errors, because ReadOne puts
+				// all errors into the iterator's
+				// Close()method.
+				return err
+			}
 		}
 	}
 }
@@ -445,7 +447,7 @@ func (i *Iterator[T]) Join(iters ...*Iterator[T]) *Iterator[T] {
 // In the case of an error in the underlying iterator the output slice
 // will have the values encountered before the error.
 func (i *Iterator[T]) Slice(ctx context.Context) (out []T, _ error) {
-	return out, i.Observe(ctx, func(in T) { out = append(out, in) })
+	return out, i.Observe(func(in T) { out = append(out, in) }).Run(ctx)
 }
 
 // Channel proides access to the contents of the iterator as a

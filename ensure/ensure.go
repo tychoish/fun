@@ -1,7 +1,6 @@
 package ensure
 
 import (
-	"context"
 	"testing"
 
 	"github.com/tychoish/fun"
@@ -107,9 +106,9 @@ func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
 //
 // Each pair is logged as it's own Log statement.
 func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
-	fun.Invariant.Must(md.Iterator().Observe(context.Background(), func(p dt.Pair[string, any]) {
+	fun.Invariant.Must(md.Iterator().Observe(func(p dt.Pair[string, any]) {
 		a.messages.PushBack(fun.HF.Sprintf(`%s: "%v"`, p.Key, p.Value))
-	}))
+	}).Wait())
 	return a
 }
 

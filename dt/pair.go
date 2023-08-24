@@ -51,9 +51,9 @@ func ConsumePairs[K comparable, V any](
 ) (*Pairs[K, V], error) {
 	p := &Pairs[K, V]{}
 	p.init()
-	if err := iter.Observe(ctx, func(in Pair[K, V]) {
+	if err := iter.Observe(func(in Pair[K, V]) {
 		p.AddPair(in)
-	}); err != nil {
+	}).Run(ctx); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +181,7 @@ func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.l
 
 // Consume adds items from an iterator of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
-	return iter.Observe(ctx, func(item Pair[K, V]) { p.AddPair(item) })
+	return iter.Observe(func(item Pair[K, V]) { p.AddPair(item) }).Run(ctx)
 }
 
 // ConsumeValues adds all of the values in the input iterator,

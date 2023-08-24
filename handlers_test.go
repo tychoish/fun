@@ -215,11 +215,11 @@ func TestHandlers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		var prev string
-		check.NotError(t, HF.Lines(buf).Observe(ctx, func(line string) {
+		check.NotError(t, HF.Lines(buf).Observe(func(line string) {
 			count++
 			assert.Equal(t, len(line), 64)
 			assert.NotEqual(t, prev, line)
-		}))
+		}).Run(ctx))
 		check.Equal(t, count, 128)
 	})
 	t.Run("Transforms", func(t *testing.T) {

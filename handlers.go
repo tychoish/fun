@@ -44,13 +44,9 @@ func (Handlers) OperationPool(iter *Iterator[Operation]) Operation {
 	return func(ctx context.Context) {
 		wg := &WaitGroup{}
 		defer wg.Wait(ctx)
-
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			_ = iter.Observe(ctx, func(fn Operation) { wg.Launch(ctx, fn) })
-		}()
+		wg.Launch(ctx, iter.Observe(func(fn Operation) {
+			wg.Launch(ctx, fn)
+		}).Ignore())
 	}
 }
 

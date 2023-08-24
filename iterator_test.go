@@ -73,7 +73,7 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			iter := SliceIterator([]int{})
-			assert.NotError(t, iter.Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+			assert.NotError(t, iter.Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
 
 			_, err := iter.ReadOne(ctx)
 			assert.ErrorIs(t, err, io.EOF)
@@ -82,12 +82,12 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			called := 0
-			err := SliceIterator([]int{1, 2, 34, 56}).Observe(ctx, func(in int) {
+			err := SliceIterator([]int{1, 2, 34, 56}).Observe(func(in int) {
 				called++
 				if in > 3 {
 					panic("eep!")
 				}
-			})
+			}).Run(ctx)
 			if err == nil {
 				t.Fatal("should error")
 			}
@@ -103,9 +103,9 @@ func TestIterator(t *testing.T) {
 			cancel()
 			count := 0
 			assert.Error(t, ctx.Err())
-			err := SliceIterator([]int{1, 2, 34, 56}).Observe(ctx, func(int) {
+			err := SliceIterator([]int{1, 2, 34, 56}).Observe(func(int) {
 				count++
-			})
+			}).Run(ctx)
 			t.Log(err)
 			if !errors.Is(err, context.Canceled) {
 				t.Error(err, ctx.Err())
@@ -142,7 +142,7 @@ func TestIterator(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, HF.Counter(size).Observe(ctx, func(in int) { count++; check.True(t, last < in); last = in }))
+		check.NotError(t, HF.Counter(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -653,11 +653,11 @@ func TestAny(t *testing.T) {
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
 	count := 0
-	err := SliceIterator(sl).Any().Observe(ctx, func(in any) {
+	err := SliceIterator(sl).Any().Observe(func(in any) {
 		count++
 		_, ok := in.(int)
 		check.True(t, ok)
-	})
+	}).Run(ctx)
 	assert.NotError(t, err)
 	assert.Equal(t, count, 8)
 }
@@ -670,9 +670,9 @@ func TestEmptyIteration(t *testing.T) {
 	close(ch)
 
 	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, SliceIterator([]int{}).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
-		assert.NotError(t, VariadicIterator[int]().Observe(ctx, func(in int) { t.Fatal("should not be called") }))
-		assert.NotError(t, ChannelIterator(ch).Observe(ctx, func(in int) { t.Fatal("should not be called") }))
+		assert.NotError(t, SliceIterator([]int{}).Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, VariadicIterator[int]().Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, ChannelIterator(ch).Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
 	})
 
 }

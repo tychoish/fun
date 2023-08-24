@@ -117,7 +117,7 @@ func Stream(ctx context.Context, ec *Collector, errCh <-chan error) {
 // Because Consume() is a fun.ProcessFunc you can convert this into
 // fun.Worker and fun.Operation objects as needed.
 func Consume(ctx context.Context, ec *Collector, iter *fun.Iterator[error]) {
-	ec.Add(iter.Observe(ctx, ec.Handler()))
+	ec.Add(iter.Observe(ec.Handler()).Run(ctx))
 }
 
 // Collect produces a function that will collect the error from a
