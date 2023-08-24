@@ -121,12 +121,12 @@ func (mpf Transform[T, O]) ProcessParallel(
 	return outputIter
 }
 
-// Producer processes an input iterator with the Transform
-// function. Each call to the producer returns one value from the
-// input producer after processing the item with the transform
-// function. The Producer returns any error encountered during these
-// operations (input, transform, output) to its caller *except*
-// ErrIteratorSkip, which is respected.
+// Producer processes an input producer function with the Transform
+// function. Each call to the output producer returns one value from
+// the input producer after processing the item with the transform
+// function applied. The output producer returns any error encountered
+// during these operations (input, transform, output) to its caller
+// *except* ErrIteratorSkip, which is respected.
 func (mpf Transform[T, O]) Producer(prod Producer[T]) Producer[O] {
 	var zero O
 	return Producer[O](func(ctx context.Context) (out O, _ error) {
@@ -177,8 +177,8 @@ func (mpf Transform[T, O]) Wait() func(T) (O, error) {
 // canceled. The second value is true as long as the transform
 // function returns a nil error and false in all other cases
 func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
-	mpfb := mpf.Wait()
 	return func(in T) (O, bool) {
+		mpfb := mpf.Wait()
 		return ers.SafeOK(func() (O, error) { return mpfb(in) })
 	}
 }
