@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/intish"
 )
 
@@ -26,7 +27,7 @@ func True(t testing.TB, cond bool) {
 func Equal[T comparable](t testing.TB, valOne, valTwo T) {
 	t.Helper()
 	if valOne != valTwo {
-		t.Errorf("values unequal: <%v> != <%v>", valOne, valTwo)
+		t.Errorf("unequal: <%v> != <%v>", valOne, valTwo)
 	}
 }
 
@@ -37,16 +38,56 @@ func Equal[T comparable](t testing.TB, valOne, valTwo T) {
 func NotEqual[T comparable](t testing.TB, valOne, valTwo T) {
 	t.Helper()
 	if valOne == valTwo {
-		t.Errorf("values equal: <%v>", valOne)
+		t.Errorf("equal: <%v>", valOne)
 	}
 }
 
-func zeroOf[T any]() (out T) { return }
+// Nil causes a test to fail if the value is not nil. This operation
+// uses reflection, (unlike many in this package,) and correctly
+// handles nil values assigned to interfaces (e.g. that they are nil.)
+func Nil(t testing.TB, val any) {
+	t.Helper()
+
+	if _, ok := val.(error); ok {
+		t.Error("use assert.NotError() for checking errors")
+	}
+
+	if !internal.IsNil(val) {
+		t.Errorf("value (type=%T), %v was expected to be nil", val, val)
+	}
+}
+
+// NotNil causes a test to fail if the value is nil. This operation
+// uses reflection, (unlike many in this package,) and correctly
+// handles nil values assigned to interfaces (e.g. that they are nil.)
+func NotNil(t testing.TB, val any) {
+	t.Helper()
+
+	if _, ok := val.(error); ok {
+		t.Error("use assert.Error() for checking errors")
+	}
+
+	if internal.IsNil(val) {
+		t.Errorf("value (type=%T), was nil", val)
+	}
+}
+
+// NilPtr asserts that the pointer value is nil. Use Nil (which uses
+// reflection) for these pointer values as well maps, channels,
+// slices, and interfaces.
+func NilPtr[T any](t testing.TB, val *T) { Equal(t, val, nil) }
+
+// NotNilPtr asserts that the pointer value is not equal to nil. Use
+// Nil (which uses reflection) for these pointer values as well maps,
+// channels, slices, and interfaces.
+func NotNilPtr[T any](t testing.TB, val *T) { NotEqual(t, val, nil) }
 
 // Zero fails a test if the value is not the zero-value for its type.
 func Zero[T comparable](t testing.TB, val T) {
 	t.Helper()
-	if zeroOf[T]() != val {
+
+	var zero T
+	if zero != val {
 		t.Errorf("expected zero for value of type %T <%v>", val, val)
 	}
 }
@@ -54,7 +95,8 @@ func Zero[T comparable](t testing.TB, val T) {
 // NotZero fails a test if the value is the zero for its type.
 func NotZero[T comparable](t testing.TB, val T) {
 	t.Helper()
-	if zeroOf[T]() == val {
+	var zero T
+	if zero == val {
 		t.Errorf("expected non-zero for value of type %T", val)
 	}
 }
@@ -151,7 +193,7 @@ func PanicValue[T comparable](t testing.TB, fn func(), value T) {
 		}
 		pval, ok := r.(T)
 		if !ok {
-			t.Errorf("panic [%v], not of expected type %T", r, zeroOf[T]())
+			t.Errorf("panic [%v], not of expected type %T", r, value)
 		}
 		Equal(t, pval, value)
 	}()
@@ -194,13 +236,11 @@ func EqualItems[T comparable](t testing.TB, one, two []T) {
 	t.Helper()
 	if len(one) != len(two) {
 		t.Errorf("slices are of different lengths [%d vs %d]", len(one), len(two))
-		return
 	}
 
 	for idx := range one {
 		if one[idx] != two[idx] {
 			t.Errorf("items at index %d [%v vs %v] are not equal", idx, one[idx], two[idx])
-			break
 		}
 	}
 }

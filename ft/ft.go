@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/internal"
 )
 
 // IsZero returns true if the input value compares "true" to the zero
@@ -30,9 +31,6 @@ func NotZero[T comparable](in T) bool { return Not(IsZero(in)) }
 // IsType checks if the type of the argument matches the type
 // specifier.
 func IsType[T any](in any) bool { _, ok := in.(T); return ok }
-
-// IsNil returns true when the value is nil, and false otherwise.
-func IsNil(in any) bool { return in == nil }
 
 // Cast is the same as doing `v, ok := in.(t)`, but with more clarity
 // at the call site,
@@ -65,6 +63,12 @@ func RefOK[T any](in *T) (value T, ok bool) {
 	}
 	return *in, true
 }
+
+// IsPtr uses reflection to determine if an object is a pointer.
+func IsPtr(in any) bool { return internal.IsPtr(in) }
+
+// IsNil uses reflection to determine if an object is nil. ()
+func IsNil(in any) bool { return internal.IsNil(in) }
 
 // Default takes two values. if the first value is the zero value for
 // the type T, then Default returns the second (default)

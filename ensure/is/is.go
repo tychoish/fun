@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Plist is a simple constructor for making metadata pairs for the
@@ -27,16 +28,38 @@ func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
 // error messages for failing assertions..
 type That fun.Future[[]string]
 
-// Join aggregates multiple That assertions into a single
-// assertion. These That functions are continue-on-error, and contain
-// the summed output of all functions that run.
-func (t That) Join(ops ...That) That {
+// And combines a collection of That expression. All constituent
+// expressions are run in order until one fails, at which point the
+// operation aborts.
+func And(ops ...That) That {
 	return func() []string {
 		out := dt.Sliceify(make([]string, 0, len(ops)+1))
-		out.Extend(ft.SafeDo(t))
+		dt.Sliceify(ops).Process(fun.MakeProcessor(func(that That) error {
+			if that == nil {
+				out.Add("encountered nil is.That operation")
+				return ers.ErrCurrentOpAbort
+			}
+			if results := that(); len(results) > 0 {
+				out.Extend(results)
+				return ers.ErrCurrentOpAbort
+			}
+			return nil
 
-		dt.Sliceify(ops).Observe(func(op That) { out.Extend(ft.SafeDo(op)) })
+		})).Ignore().Wait()
+		return ft.WhenDo(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
+	}
+}
 
+// All combines a collection of that expressions. All expressions are
+// run in order, and the error are aggregated. Nil is.That expressions
+// are reported as errors
+func All(ops ...That) That {
+	return func() []string {
+		out := dt.Sliceify(make([]string, 0, len(ops)+1))
+		dt.Sliceify(ops).Observe(func(op That) {
+			out.AppendWhen(op == nil, "encountered nil is.That operation")
+			out.Extend(ft.SafeDo(op))
+		})
 		return ft.WhenDo(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}
 }
@@ -75,11 +98,28 @@ func ErrorIs(er, tr error) That { return assertf(ers.Is(er, tr), "%v is not %v [
 // to, the target (tr) error.
 func NotErrorIs(er, tr error) That { return assertf(!ers.Is(er, tr), "%v is not %v [%T]", er, tr, er) }
 
-// Nil asserts that the pointer is nil.
-func Nil[T any](val *T) That { return EqualTo(val, nil) }
+// NilPtr asserts that the pointer is nil.
+func NilPtr[T any](val *T) That { return EqualTo(val, nil) }
 
-// NotNil asserts that the pointer is not nil.
-func NotNil[T any](val *T) That { return NotEqualTo(val, nil) }
+// NotNilPtr asserts that the pointer is not nil.
+func NotNilPtr[T any](val *T) That { return NotEqualTo(val, nil) }
+
+// Nil asserts that the value is nil. Uses reflection unlike the other
+// assertions.
+func Nil(val any) That {
+	return All(
+		assertf(!ft.IsType[error](val), "use is.Error() rather than is.Nil() for errors"),
+		assertf(internal.IsNil(val), "value (type=%T), was nil", val),
+	)
+}
+
+// NotNil asserts that the value is not nil.
+func NotNil(val any) That {
+	return All(
+		assertf(!ft.IsType[error](val), "use is.Error() rather than is.Nil() for errors"),
+		assertf(!internal.IsNil(val), "value (type=%T), was nil", val),
+	)
+}
 
 // Zero asserts that the comparable value is equal to the zero value
 // for the type T.

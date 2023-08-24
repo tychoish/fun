@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/intish"
 )
 
@@ -29,7 +30,7 @@ func True(t testing.TB, cond bool) {
 func Equal[T comparable](t testing.TB, valOne, valTwo T) {
 	t.Helper()
 	if valOne != valTwo {
-		t.Fatalf("values unequal: <%v> != <%v>", valOne, valTwo)
+		t.Fatalf("unequal: <%v> != <%v>", valOne, valTwo)
 	}
 }
 
@@ -40,9 +41,49 @@ func Equal[T comparable](t testing.TB, valOne, valTwo T) {
 func NotEqual[T comparable](t testing.TB, valOne, valTwo T) {
 	t.Helper()
 	if valOne == valTwo {
-		t.Fatalf("values equal: <%v>", valOne)
+		t.Fatalf("equal: <%v>", valOne)
 	}
 }
+
+// Nil causes a test to fail if the value is not nil. This operation
+// uses reflection, (unlike many in this package,) and correctly
+// handles nil values assigned to interfaces (e.g. that they are nil.)
+func Nil(t testing.TB, val any) {
+	t.Helper()
+
+	if _, ok := val.(error); ok {
+		t.Error("use assert.NotError() for checking errors")
+	}
+
+	if !internal.IsNil(val) {
+		t.Fatalf("value (type=%T), %v was expected to be nil", val, val)
+	}
+}
+
+// NotNil causes a test to fail if the value is nil. This operation
+// uses reflection, (unlike many in this package,) and correctly
+// handles nil values assigned to interfaces (e.g. that they are nil.)
+func NotNil(t testing.TB, val any) {
+	t.Helper()
+
+	if _, ok := val.(error); ok {
+		t.Error("use assert.Error() for checking errors")
+	}
+
+	if internal.IsNil(val) {
+		t.Fatalf("value (type=%T), was nil", val)
+	}
+}
+
+// NilPtr asserts that the pointer value is nil. Use Nil (which uses
+// reflection) for these pointer values as well maps, channels,
+// slices, and interfaces.
+func NilPtr[T any](t testing.TB, val *T) { Equal(t, val, nil) }
+
+// NotNilPtr asserts that the pointer value is not equal to nil. Use
+// Nil (which uses reflection) for these pointer values as well maps,
+// channels, slices, and interfaces.
+func NotNilPtr[T any](t testing.TB, val *T) { NotEqual(t, val, nil) }
 
 // Zero fails a test if the value is not the zero-value for its type.
 func Zero[T comparable](t testing.TB, val T) {

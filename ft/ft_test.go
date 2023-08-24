@@ -67,14 +67,36 @@ func TestPtr(t *testing.T) {
 	assert.True(t, out != nil)
 	check.Equal(t, *out, 123)
 
+	var nptr *string
+	var err error
+
+	check.True(t, IsNil(nptr))
+	check.True(t, IsNil(err))
+	check.True(t, Not(IsNil(4)))
+	check.True(t, Not(IsNil(t)))
+
+	var anyif any
+	check.True(t, IsNil(anyif))
+	check.True(t, anyif == nil)
+	anyif = nptr
+
+	// interfaces holding nil values are not nil
+	check.True(t, anyif != nil) //nolint:staticcheck
+	// however...
+	check.True(t, IsNil(anyif))
+
 	// this is gross, but we have a pointer (non-nil) to an object
 	// that is a pointer, which is nil.
-
 	var dptr *string
 	st := Ptr(dptr)
 	assert.True(t, st != nil)
 	assert.True(t, *st == nil)
 	assert.Type[**string](t, st)
+
+	check.True(t, IsPtr(dptr))
+	check.True(t, IsPtr(t))
+	check.True(t, Not(IsPtr(Ref(dptr))))
+	check.True(t, Not(IsPtr(3)))
 }
 
 func TestDefault(t *testing.T) {

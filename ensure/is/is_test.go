@@ -83,14 +83,16 @@ func TestAssertions(t *testing.T) {
 		isNil(t, Error(io.EOF))
 		isNil(t, ErrorIs(fmt.Errorf("hi: %w", io.EOF), io.EOF))
 		isNil(t, False(false))
-		isNil(t, Nil[*testing.T](nil))
+		isNil(t, NilPtr[*testing.T](nil))
+		isNil(t, Nil(nil))
+		isNil(t, NotNil(t))
 		isNil(t, NotContained(42, []int{400, 300, 200}))
 		isNil(t, NotEqualTo("abc", "def"))
 		isNil(t, NotEqualTo(100, 1000))
 		isNil(t, NotError(nil))
 		isNil(t, NotError(zeroOf[error]()))
 		isNil(t, NotErrorIs(errors.New("hi"), io.EOF))
-		isNil(t, NotNil(t))
+		isNil(t, NotNilPtr(t))
 		isNil(t, NotPanic(func() {}))
 		isNil(t, NotSubstring("beeps", "honk"))
 		isNil(t, NotType[int]("hi"))
@@ -117,7 +119,10 @@ func TestAssertions(t *testing.T) {
 		notNil(t, Error(zeroOf[error]()))
 		notNil(t, ErrorIs(errors.New("hi"), io.EOF))
 		notNil(t, False(true))
-		notNil(t, Nil(t))
+		notNil(t, NilPtr(t))
+		notNil(t, NilPtr(t))
+		notNil(t, NotNil(nil))
+		notNil(t, NotNil(io.EOF)) // because error
 		notNil(t, Nil(t))
 		notNil(t, NotContained(400, []int{400, 300, 200}))
 		notNil(t, NotEqualTo("abc", "abc"))
@@ -144,22 +149,44 @@ func TestAssertions(t *testing.T) {
 		notNil(t, Zero(t))
 		notNil(t, Zero(true))
 	})
-	t.Run("Join", func(t *testing.T) {
+	t.Run("And", func(t *testing.T) {
+		t.Run("NilSafe", func(t *testing.T) {
+			op := And(nil, nil)
+			out := op()
+			check.Equal(t, len(out), 1)
+		})
 		t.Run("NoError", func(t *testing.T) {
 			called := 0
 			var op That
 			op = func() []string { called++; return nil }
-			op = op.Join(op, op, op, op, op, op)
+			op = And(op, op, op, op, op, op, op)
 			out := op()
 			check.Equal(t, len(out), 0)
 			check.True(t, out == nil)
 			check.Equal(t, 7, called)
 		})
+		t.Run("EarlyError", func(t *testing.T) {
+			called := 0
+			var op That
+			op = func() []string { called++; return []string{"hello"} }
+			op = And(op, op, op, op, op, op, op)
+			out := op()
+			check.Equal(t, len(out), 1)
+			check.True(t, out != nil)
+			check.Equal(t, 1, called)
+		})
+	})
+	t.Run("All", func(t *testing.T) {
+		t.Run("NilSafe", func(t *testing.T) {
+			op := All(nil, nil)
+			out := op()
+			check.Equal(t, len(out), 2)
+		})
 		t.Run("SingleErrors", func(t *testing.T) {
 			called := 0
 			var op That
 			op = func() []string { called++; return []string{t.Name()} }
-			op = op.Join(op, op, op, op, op, op)
+			op = All(op, op, op, op, op, op, op)
 			out := op()
 			check.True(t, out != nil)
 			check.Equal(t, len(out), 7)
@@ -169,7 +196,7 @@ func TestAssertions(t *testing.T) {
 			called := 0
 			var op That
 			op = func() []string { called++; return []string{"failure", fmt.Sprint(called), t.Name()} }
-			op = op.Join(op, op, op, op, op, op)
+			op = All(op, op, op, op, op, op, op)
 			out := op()
 			check.True(t, out != nil)
 			check.Equal(t, len(out), 21)

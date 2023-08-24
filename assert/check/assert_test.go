@@ -13,6 +13,10 @@ import (
 
 func TestAssertion(t *testing.T) {
 	var strVal = "merlin"
+	var zeroStr string
+	var zeroStrPtr *string
+	var emptyIface any
+	var emptyIfaceWithZeroStrPtr any = zeroStrPtr
 
 	var err error
 
@@ -23,6 +27,18 @@ func TestAssertion(t *testing.T) {
 		assert.NotEqual(t, 10, 1)
 		assert.Zero(t, "")
 		assert.NotZero(t, strVal)
+		assert.Nil(t, nil)
+		assert.Nil(t, err)
+		assert.Nil(t, zeroStrPtr)
+		assert.Nil(t, emptyIfaceWithZeroStrPtr)
+		assert.Nil(t, emptyIface)
+		assert.NotNil(t, strVal)
+		assert.NotNil(t, zeroStr)
+		assert.NotNil(t, t)
+		assert.NotNil(t, 42)
+		assert.NotNil(t, time.Time{})
+		assert.NilPtr(t, zeroStrPtr)
+		assert.NotNil(t, t)
 		assert.Error(t, errors.New(strVal))
 		assert.NotError(t, err)
 		assert.ErrorIs(t, fmt.Errorf("end: %w", io.EOF), io.EOF)
@@ -38,8 +54,8 @@ func TestAssertion(t *testing.T) {
 		assert.NotSubstring(t, "the cat", strVal)
 		assert.Type[int](t, 1)
 		assert.NotType[string](t, 2)
-		assert.MaxRuntime(t, time.Millisecond, func() { time.Sleep(time.Microsecond) })
-		assert.MinRuntime(t, time.Microsecond, func() { time.Sleep(time.Millisecond) })
+		assert.MaxRuntime(t, 10*time.Millisecond, func() { time.Sleep(time.Millisecond) })
+		assert.MinRuntime(t, time.Millisecond, func() { time.Sleep(10 * time.Millisecond) })
 		assert.Runtime(t, time.Millisecond, 100*time.Millisecond, func() { time.Sleep(50 * time.Millisecond) })
 	})
 	t.Run("Failures", func(t *testing.T) {
@@ -51,6 +67,20 @@ func TestAssertion(t *testing.T) {
 		assert.Failing(t, func(t *testing.T) { assert.NotEqual(t, 1, 1) })
 		assert.Failing(t, func(t *testing.T) { assert.Zero(t, "0") })
 		assert.Failing(t, func(t *testing.T) { assert.NotZero(t, 0) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, &strVal) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, t) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, strVal) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, zeroStr) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, 42) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, time.Time{}) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, io.EOF) })
+		assert.Failing(t, func(t *testing.T) { assert.Nil(t, io.EOF) })
+		assert.Failing(t, func(t *testing.T) { assert.NotNil(t, nil) })
+		assert.Failing(t, func(t *testing.T) { assert.NotNil(t, emptyIfaceWithZeroStrPtr) })
+		assert.Failing(t, func(t *testing.T) { assert.NotNil(t, err) })
+		assert.Failing(t, func(t *testing.T) { assert.NotNil(t, io.EOF) })
+		assert.Failing(t, func(t *testing.T) { assert.NilPtr(t, t) })
+		assert.Failing(t, func(t *testing.T) { assert.NotNilPtr(t, zeroStrPtr) })
 		assert.Failing(t, func(t *testing.T) { assert.Error(t, nil) })
 		assert.Failing(t, func(t *testing.T) { assert.NotError(t, errors.New(strVal)) })
 		assert.Failing(t, func(t *testing.T) { assert.ErrorIs(t, errors.New(strVal), io.EOF) })
@@ -77,7 +107,7 @@ func TestAssertion(t *testing.T) {
 			assert.MinRuntime(t, time.Second, func() { time.Sleep(time.Nanosecond) })
 		})
 		assert.Failing(t, func(t *testing.T) {
-			assert.Runtime(t, time.Millisecond, 100*time.Millisecond, func() { time.Sleep(time.Microsecond) })
+			assert.Runtime(t, 10*time.Millisecond, 100*time.Millisecond, func() { time.Sleep(time.Millisecond) })
 		})
 		assert.Failing(t, func(t *testing.T) {
 			assert.Runtime(t, time.Millisecond, 10*time.Millisecond, func() { time.Sleep(50 * time.Millisecond) })
