@@ -277,3 +277,10 @@ func JSON[T any](in io.Reader) *fun.Iterator[T] {
 		return out, err
 	}))
 }
+
+// Indexed produces an iterator that keeps track of and reports the
+// sequence/index id of the item in the iteration sequence.
+func Indexed[T any](iter *fun.Iterator[T]) *fun.Iterator[dt.Pair[int, T]] {
+	idx := -1
+	return fun.ConvertIterator(iter, fun.Converter(func(in T) dt.Pair[int, T] { idx++; return dt.MakePair(idx, in) }))
+}
