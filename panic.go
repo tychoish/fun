@@ -59,7 +59,7 @@ func (RuntimeInvariant) OK(cond bool, args ...any) {
 			case func() error:
 				panic(ers.Join(ei(), ErrInvariantViolation))
 			default:
-				panic(fmt.Errorf("%v: %w", args[0], ErrInvariantViolation))
+				panic(ers.Join(fmt.Errorf("%v", args[0]), ErrInvariantViolation))
 			}
 		default:
 			var errs []error

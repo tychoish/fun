@@ -14,9 +14,7 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
-type poolTestType struct {
-	value int
-}
+type poolTestType struct{ value int }
 
 func TestPool(t *testing.T) {
 	t.Parallel()

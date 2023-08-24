@@ -2,12 +2,12 @@ package adt
 
 import (
 	"bytes"
-	"reflect"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -28,6 +28,7 @@ import (
 type Pool[T any] struct {
 	once        sync.Once
 	locked      atomic.Bool
+	typeIsPtr   bool
 	hook        *Atomic[func(T) T]
 	constructor *Atomic[func() T]
 	pool        *sync.Pool
@@ -39,31 +40,31 @@ func (p *Pool[T]) doInit() {
 	p.hook = NewAtomic(func(in T) T { return in })
 	p.constructor = NewAtomic(func() (out T) { return out })
 	p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
+	var zero T
+	p.typeIsPtr = ft.IsPtr(zero)
 }
 
-// Lock sets the pool to locked. Once set it cannot be unset: future
-// attempts to set the constructor or cleanup hook result in a panic
-// and invariant violation.
-func (p *Pool[T]) Lock() { p.locked.Store(true) }
+// FinalizeSetup prevents future calls from setting the constructor or
+// cleanup hooks. Once a pool's setup has been finalized it cannot be
+// unset: future attempts to set the constructor or cleanup hook
+// result in a panic and invariant violation. FinalizeSetup is safe to
+// cull multiple times and from different go routines.
+func (p *Pool[T]) FinalizeSetup() { p.init(); p.locked.Store(true) }
 
 // SetCleanupHook sets a function to be called on every object
 // renetering the pool. By default, the cleanup function is a noop.
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
-	fun.Invariant.IsFalse(p.locked.Load(), "cannot modify hook of locked pool")
-	if in != nil {
-		p.hook.Set(in)
-	}
+	fun.Invariant.IsFalse(p.locked.Load(), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	ft.WhenApply(in != nil, p.hook.Set, in)
 }
 
 // SetConstructor overrides the default constructor (which makes an
 // object with a Zero value by default) for Get/Make operations.
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
-	fun.Invariant.IsFalse(p.locked.Load(), "cannot modify constructor of locked pool")
-	if in != nil {
-		p.constructor.Set(in)
-	}
+	fun.Invariant.IsFalse(p.locked.Load(), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	ft.WhenApply(in != nil, p.constructor.Set, in)
 }
 
 // Get returns an object from the pool or constructs a default object
@@ -75,10 +76,9 @@ func (p *Pool[T]) Get() T { p.init(); return p.pool.Get().(T) }
 // cleanuphook or returning it to the pool.
 func (p *Pool[T]) Put(in T) {
 	p.init()
-	if ft.IsNil(in) {
-		return
+	if any(in) != nil {
+		p.pool.Put(p.hook.Get()(in))
 	}
-	p.pool.Put(p.hook.Get()(in))
 }
 
 // Make gets an object out of the sync.Pool, and attaches a finalizer
@@ -91,7 +91,8 @@ func (p *Pool[T]) Put(in T) {
 func (p *Pool[T]) Make() T {
 	p.init()
 	o := p.pool.Get().(T)
-	if reflect.ValueOf(o).Kind() == reflect.Pointer {
+
+	if p.typeIsPtr {
 		runtime.SetFinalizer(o, p.Put)
 	} else {
 		runtime.SetFinalizer(&o, func(in *T) { p.Put(*in) })
@@ -108,7 +109,7 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 	bufpool := &Pool[*bytes.Buffer]{}
 	bufpool.SetCleanupHook(func(buf *bytes.Buffer) *bytes.Buffer { buf.Reset(); return buf })
 	bufpool.SetConstructor(func() *bytes.Buffer { return bytes.NewBuffer(make([]byte, 0, intish.Max(0, capacity))) })
-	bufpool.Lock()
+	bufpool.FinalizeSetup()
 	return bufpool
 }
 
@@ -123,7 +124,7 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // max capacity value is zero.
 func MakeBufferPool(min, max int) *Pool[[]byte] {
 	min, max = intish.Bounds(min, max)
-	fun.Invariant.OK(max > 0, "buffer pool capacity max cannot be zero")
+	fun.Invariant.OK(max > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
 	bufpool := &Pool[[]byte]{}
 	bufpool.SetCleanupHook(func(buf []byte) []byte {
 		if cap(buf) > max {
@@ -132,7 +133,7 @@ func MakeBufferPool(min, max int) *Pool[[]byte] {
 		return buf[:0]
 	})
 	bufpool.SetConstructor(func() []byte { return make([]byte, 0, min) })
-	bufpool.Lock()
+	bufpool.FinalizeSetup()
 
 	return bufpool
 }

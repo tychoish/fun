@@ -4,6 +4,11 @@ package ers
 // the content of all panics produced by the Invariant helper.
 const ErrInvariantViolation Error = Error("invariant violation")
 
+// ErrImmutabilityViolation is an returned by some operations or
+// invariant violations when an operation attempts to modify logically
+// immutable value.
+const ErrImmutabilityViolation Error = Error("immutability violation")
+
 // ErrRecoveredPanic is at the root of any error returned by a
 // function in the fun package that recovers from a panic.
 const ErrRecoveredPanic Error = Error("recovered panic")
