@@ -119,6 +119,9 @@ func (s *Slice[T]) AddWhen(cond bool, in T) { ft.WhenCall(cond, func() { s.Add(i
 // Append adds all of the items to the end of the slice.
 func (s *Slice[T]) Append(in ...T) { s.Extend(in) }
 
+// Prepend adds the items to beginning of the slice.
+func (s *Slice[T]) Prepend(in ...T) { *s = append(in, *s...) }
+
 // AppendWhen embeds a conditional check in the Append operation, and
 // only adds the items to the slice when the condition is true.
 func (s *Slice[T]) AppendWhen(cond bool, in ...T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
@@ -200,11 +203,11 @@ func (s Slice[T]) Last() int { return len(s) - 1 }
 // nil.
 func (s Slice[T]) IsEmpty() bool { return len(s) == 0 }
 
-// Item returns the item at the specified index.
+// Index returns the item at the specified index.
 //
 // If the provided index is not within the bounds of the slice the
 // operation panics.
-func (s Slice[T]) Item(index int) T { return s[index] }
+func (s Slice[T]) Index(index int) T { return s[index] }
 
 // Ptr provides a pointer to the item at the provided index.
 func (s Slice[T]) Ptr(index int) *T { return &s[index] }

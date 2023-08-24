@@ -39,11 +39,11 @@ func TestSlice(t *testing.T) {
 	})
 	t.Run("ItemByIndex", func(t *testing.T) {
 		s := randomIntSlice(100)
-		assert.Equal(t, s[25], s.Item(25))
+		assert.Equal(t, s[25], s.Index(25))
 	})
 	t.Run("Variadic", func(t *testing.T) {
 		s := Variadic(randomIntSlice(100)...)
-		assert.Equal(t, s[25], s.Item(25))
+		assert.Equal(t, s[25], s.Index(25))
 	})
 	t.Run("Grow", func(t *testing.T) {
 		t.Run("Expanded", func(t *testing.T) {
@@ -74,23 +74,23 @@ func TestSlice(t *testing.T) {
 			assert.True(t, s.IsEmpty())
 
 			s.Add(42)
-			assert.Equal(t, 42, s.Item(0))
+			assert.Equal(t, 42, s.Index(0))
 			assert.Equal(t, 1, s.Len())
 		})
 		t.Run("Append", func(t *testing.T) {
 			s := Slice[int]{}
 			s.Append(42, 300, 64)
-			assert.Equal(t, 42, s.Item(0))
-			assert.Equal(t, 300, s.Item(1))
-			assert.Equal(t, 64, s.Item(2))
+			assert.Equal(t, 42, s.Index(0))
+			assert.Equal(t, 300, s.Index(1))
+			assert.Equal(t, 64, s.Index(2))
 			assert.Equal(t, 3, s.Len())
 		})
 		t.Run("Extend", func(t *testing.T) {
 			s := Slice[int]{}
 			s.Extend([]int{42, 300, 64})
-			assert.Equal(t, 42, s.Item(0))
-			assert.Equal(t, 300, s.Item(1))
-			assert.Equal(t, 64, s.Item(2))
+			assert.Equal(t, 42, s.Index(0))
+			assert.Equal(t, 300, s.Index(1))
+			assert.Equal(t, 64, s.Index(2))
 			assert.Equal(t, 3, s.Len())
 		})
 	})
@@ -154,7 +154,7 @@ func TestSlice(t *testing.T) {
 			ts := s.Copy()
 			ts.ResliceBeginning(50)
 			assert.Equal(t, ts.Len(), 50)
-			assert.NotEqual(t, ts.Item(1), s[1])
+			assert.NotEqual(t, ts.Index(1), s[1])
 		})
 		t.Run("Rear", func(t *testing.T) {
 			s := intSlice(100)
@@ -162,7 +162,7 @@ func TestSlice(t *testing.T) {
 			ts.ResliceEnd(50)
 			assert.Equal(t, ts.Len(), 50)
 
-			assert.NotEqual(t, ts.Item(ts.Last()), s[len(s)-1])
+			assert.NotEqual(t, ts.Index(ts.Last()), s[len(s)-1])
 		})
 	})
 	t.Run("Copy", func(t *testing.T) {
@@ -209,7 +209,7 @@ func TestSlice(t *testing.T) {
 			func(val int) {
 				defer func() { count++ }()
 				check.Equal(t, val, s[count])
-				check.Equal(t, val, s.Item(count))
+				check.Equal(t, val, s.Index(count))
 				if t.Failed() {
 					t.Log("index", count)
 					t.Fail()
@@ -490,5 +490,11 @@ func TestSlice(t *testing.T) {
 			check.Equal(t, sl[2], "three")
 		})
 	})
-
+	t.Run("Prepend", func(t *testing.T) {
+		powers := Variadic(100, 1000, 10000)
+		powers.Prepend(10)
+		check.Equal(t, powers.Len(), 4)
+		check.Equal(t, powers.Index(0), 10)
+		check.Equal(t, powers.Index(1), 100)
+	})
 }
