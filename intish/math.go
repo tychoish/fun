@@ -38,7 +38,24 @@ func Min[T Numbers](a, b T) T {
 	return b
 }
 
+// Range orders two numbers and returns the pair as (lower, higher).
+func Range[T Numbers](a, b T) (start T, end T) { return Min(a, b), Max(a, b) }
+
+// Bounds returns the two arguments as a (min,max): values less than
+// zero become zero.
+func Bounds[T Numbers](a, b T) (min T, max T) { return Max(0, Min(a, b)), Max(0, Max(a, b)) }
+
+// AbsBounds resolves the absolute values of two numbers and then
+// return the lower (absolute) value followed by the higher absolute
+// value.
+func AbsBounds[T Signed](a, b T) (min T, max T) { return AbsMin(a, b), AbsMax(a, b) }
+
+// AbsMax resolves the absolute value of both arguments and returns
+// the larger value.
 func AbsMax[T Signed](a, b T) T { return Max(Abs(a), Abs(b)) }
+
+// AbsMin resolves the absolute value of both arguments and returns
+// the smaller value.
 func AbsMin[T Signed](a, b T) T { return Min(Abs(a), Abs(b)) }
 
 // Max returns the highest value.
@@ -47,6 +64,27 @@ func Max[T Numbers](a, b T) T {
 		return a
 	}
 	return b
+}
+
+// Diff returns the absolute value of the difference between two values.
+func Diff[T Numbers](a, b T) T { return Max(a, b) - Min(a, b) }
+
+// FloatMillis reverses, though potentially (often) not without some
+// loss of fidelity
+func FloatMillis[T Signed](in T) float64 { return float64(in) / 1000 }
+
+// Millis converts a float into a an integer that represents one
+// thousandth of the units of the original.
+//
+// Millis will panic in the case of an overflow (wraparound).
+func Millis[T Signed](in float64) T {
+	milli := T(in * 1000)
+	// check if we overflowed.
+	if (in < 0) != (milli < 0) {
+		panic(fmt.Sprintf("%.2f cannot be converted to millis, avoiding overflow", in))
+	}
+
+	return milli
 }
 
 // RoundToMultipleAwayFromZero rounds a value to the nearest multiple
@@ -88,45 +126,22 @@ func RoundToMultipleTowardZero[T Signed](a, b T) T {
 	max := AbsMax(a, b)
 
 	return (max - (max % multiple)) * roundedSign(multiple, a, b)
-
 }
 
-// RoundToSmallestMultiple rounds to smaller numbers,
-// The argument with the smaller absolute value is always the
-// "multiple" and the "larger" is always the value that is rounded.
+// RoundToSmallestMultiple rounds to smaller numbers: The argument
+// with the smaller absolute value is always the "multiple" and the
+// "larger" is always the value that is rounded.
 //
 // The rounded value is always *smaller* than the input value.
 func RoundToSmallestMultiple[T Signed](a, b T) T {
 	return Min(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
 }
 
-// The argument with the smaller absolute value is always the
-// "multiple" and the "larger" is always the value that is rounded.
+// RoundToLargestMultiple rounds up to a larger value: The argument
+// with the smaller absolute value is always the "multiple" and the
+// "larger" is always the value that is rounded.
 //
 // The output value is always *larget* than the input value.
 func RoundToLargestMultiple[T Signed](a, b T) T {
 	return Max(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
 }
-
-// Diff returns the absolute value of the difference between two values.
-func Diff[T Numbers](a, b T) T {
-	return Max(a, b) - Min(a, b)
-}
-
-// Millis converts a float into a an integer that represents one
-// thousandth of the units of the original.
-//
-// Millis will panic in the case of an overflow (wraparound).
-func Millis[T Signed](in float64) T {
-	milli := T(in * 1000)
-	// check if we overflowed.
-	if (in < 0) != (milli < 0) {
-		panic(fmt.Sprintf("%.2f cannot be converted to millis, avoiding overflow", in))
-	}
-
-	return milli
-}
-
-// FloatMillis reverses, though potentially (often) not without some
-// loss of fidelity
-func FloatMillis[T Signed](in T) float64 { return float64(in) / 1000 }

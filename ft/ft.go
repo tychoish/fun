@@ -31,6 +31,9 @@ func NotZero[T comparable](in T) bool { return Not(IsZero(in)) }
 // specifier.
 func IsType[T any](in any) bool { _, ok := in.(T); return ok }
 
+// IsNil returns true when the value is nil, and false otherwise.
+func IsNil(in any) bool { return in == nil }
+
 // Cast is the same as doing `v, ok := in.(t)`, but with more clarity
 // at the call site,
 func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }
