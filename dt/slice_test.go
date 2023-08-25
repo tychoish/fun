@@ -92,12 +92,24 @@ func TestSlice(t *testing.T) {
 		})
 	})
 	t.Run("GrowCapacity", func(t *testing.T) {
-		s := Slice[int]{}
-		check.Equal(t, cap(s), 0)
-		check.Equal(t, len(s), 0)
-		s.GrowCapacity(32)
-		check.Equal(t, cap(s), 32)
-		check.Equal(t, len(s), 0)
+		t.Run("Zero", func(t *testing.T) {
+			s := Slice[int]{}
+			check.Equal(t, cap(s), 0)
+			check.Equal(t, len(s), 0)
+			s.GrowCapacity(32)
+			check.Equal(t, cap(s), 32)
+			check.Equal(t, len(s), 0)
+		})
+		t.Run("Big", func(t *testing.T) {
+			s := Slice[int]{1, 2, 3}
+			check.Equal(t, cap(s), 3)
+			check.Equal(t, len(s), 3)
+			s.GrowCapacity(32)
+			check.Equal(t, cap(s), 32)
+			check.Equal(t, len(s), 3)
+
+		})
+
 	})
 	t.Run("Sparse", func(t *testing.T) {
 		s := Slice[*int]{ft.Ptr(1), ft.Ptr(42), nil, nil}

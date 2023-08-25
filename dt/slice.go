@@ -261,21 +261,14 @@ func (s Slice[T]) FillTo(length int) Slice[T] {
 		"fill", length, "<=, current", len(s))
 
 	return append(s, make([]T, length-len(s))...)
-
-	// // we could see what the current capacity and extend to that,
-	// // but that would
-	// for len(s) < length {
-	// 	var val T
-	// 	s = append(s, val)
-	// }
-	// return s
 }
 
 // GrowCapacity extends the capacity of the slice (by adding zero
 // items and the )
 func (s *Slice[T]) GrowCapacity(size int) {
-	defer s.Truncate(s.Len() - 1)
+	origEnd := len(*s)
 	s.Grow(size)
+	*s = (*s)[:origEnd]
 }
 
 // Ptrs converts a slice in to a slice of pointers to the values in
