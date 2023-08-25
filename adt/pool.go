@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
@@ -108,9 +109,10 @@ func (p *Pool[T]) Make() T {
 // with the specified capacity. Negative initial capcity values are
 // ignored.
 func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
+	_buf := MakeBufferPool(capacity, 64*1024)
 	bufpool := &Pool[*bytes.Buffer]{}
 	bufpool.SetCleanupHook(func(buf *bytes.Buffer) *bytes.Buffer { buf.Reset(); return buf })
-	bufpool.SetConstructor(func() *bytes.Buffer { return bytes.NewBuffer(make([]byte, 0, intish.Max(0, capacity))) })
+	bufpool.SetConstructor(func() *bytes.Buffer { return bytes.NewBuffer(_buf.Make()) })
 	bufpool.FinalizeSetup()
 	return bufpool
 }
@@ -124,17 +126,22 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // always used as the max the lowest as the min, regardless of
 // position. MakeBufferPool panics with an invariant violation if the
 // max capacity value is zero.
-func MakeBufferPool(min, max int) *Pool[[]byte] {
+//
+// The type of the pooled object is dt.Slice[byte], a simple type
+// alias for Go's slice type with convenience methods for common slice
+// operations. You can use these values interchangeably with vanilla
+// byte slices, as you need and wish.
+func MakeBufferPool(min, max int) *Pool[dt.Slice[byte]] {
 	min, max = intish.Bounds(min, max)
 	fun.Invariant.OK(max > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
-	bufpool := &Pool[[]byte]{}
-	bufpool.SetCleanupHook(func(buf []byte) []byte {
+	bufpool := &Pool[dt.Slice[byte]]{}
+	bufpool.SetCleanupHook(func(buf dt.Slice[byte]) dt.Slice[byte] {
 		if cap(buf) > max {
 			return nil
 		}
 		return buf[:0]
 	})
-	bufpool.SetConstructor(func() []byte { return make([]byte, 0, min) })
+	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.Sliceify(make([]byte, 0, min)) })
 	bufpool.FinalizeSetup()
 
 	return bufpool
@@ -143,4 +150,9 @@ func MakeBufferPool(min, max int) *Pool[[]byte] {
 // DefaultBufferPool creates a pool of byte slices with a maximum size
 // of 64kb. All other slices are discarded. These are the same
 // settings as used by the fmt package's buffer pool.
-func DefaultBufferPool() *Pool[[]byte] { return MakeBufferPool(0, 64*1024) }
+//
+// The type of the pooled object is dt.Slice[byte], a simple type
+// alias for Go's slice type with convenience methods for common slice
+// operations. You can use these values interchangeably with vanilla
+// byte slices, as you need and wish.
+func DefaultBufferPool() *Pool[dt.Slice[byte]] { return MakeBufferPool(0, 64*1024) }

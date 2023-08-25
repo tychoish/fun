@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -206,7 +207,7 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("BytesBuffer", func(t *testing.T) {
 		t.Run("Resizes", func(t *testing.T) {
-			for name, bufpool := range map[string]*Pool[[]byte]{
+			for name, bufpool := range map[string]*Pool[dt.Slice[byte]]{
 				"Small":   MakeBufferPool(0, 32),
 				"Default": DefaultBufferPool(),
 			} {
@@ -262,7 +263,7 @@ func TestPool(t *testing.T) {
 			check.NotPanic(t, func() { MakeBufferPool(100, -100) })
 		})
 		t.Run("FlipsIfNeeded", func(t *testing.T) {
-			for name, bufpool := range map[string]*Pool[[]byte]{
+			for name, bufpool := range map[string]*Pool[dt.Slice[byte]]{
 				"MinMax": MakeBufferPool(32, 64),
 				"MaxMin": MakeBufferPool(64, 32),
 			} {
