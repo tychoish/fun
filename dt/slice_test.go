@@ -510,4 +510,16 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, s[0]+s[1]+s[2], 0)
 		check.Equal(t, s[3]+s[4]+s[5], 300)
 	})
+	t.Run("Merge", func(t *testing.T) {
+		sl := MergeSlices(
+			Variadic(100, 1000, 10000),
+			Sliceify([]int{400, 4000, 40000}),
+			Variadic(800, 8000, 80000),
+		)
+		check.Equal(t, sl.Len(), 9)
+		check.Equal(t, sl.Index(0), 100)
+		check.Equal(t, sl.Index(3), 400)
+		check.Equal(t, sl.Index(6), 800)
+	})
+
 }

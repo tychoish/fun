@@ -50,6 +50,21 @@ func SliceRefs[T any](in []*T) Slice[T] {
 	return out
 }
 
+// MergeSlices takes a variadic set of arguments which are all slices,
+// and returns a single slice, that contains all items in the input
+// slice.
+func MergeSlices[T any](sls ...[]T) Slice[T] {
+	var size int
+	for _, s := range sls {
+		size += len(s)
+	}
+	out := make([]T, 0, size)
+	for idx := range sls {
+		out = append(out, sls[idx]...)
+	}
+	return out
+}
+
 // Variadic constructs a slice of type T from a sequence of variadic
 // options.
 func Variadic[T any](in ...T) Slice[T] { return in }
