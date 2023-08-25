@@ -130,6 +130,15 @@ func IfDo[T any](cond bool, doIf func() T, doElse func() T) T {
 	return SafeDo(doElse)
 }
 
+// IfValue provides a ternary-like operation as a complement to IfDo
+// and IfCall for values.
+func IfValue[T any](cond bool, ifVal T, elseVal T) T {
+	if cond {
+		return ifVal
+	}
+	return elseVal
+}
+
 // WhenCall runs a function when condition is true, and is a noop
 // otherwise. Panics if the function is nil.
 func WhenCall(cond bool, op func()) { IfCall(cond, op, nil) }

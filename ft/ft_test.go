@@ -44,6 +44,10 @@ func TestWhen(t *testing.T) {
 		check.True(t, !Not(true))
 		check.True(t, Not(false))
 	})
+	t.Run("Ternary", func(t *testing.T) {
+		check.Equal(t, 100, IfValue(true, 100, 900))
+		check.Equal(t, 900, IfValue(false, 100, 900))
+	})
 }
 
 func TestMust(t *testing.T) {
