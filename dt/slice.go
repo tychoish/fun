@@ -240,7 +240,10 @@ func (s Slice[T]) Zero() {
 	}
 }
 
-// ZeroRange replaces the type
+// ZeroRange replaces values between the specified indexes (inclusive)
+// with the zero value of the type. If the indexes provided are
+// outside of the bounds of the slice, an invariant violation panic is
+// raised.
 func (s Slice[T]) ZeroRange(start, end int) {
 	fun.Invariant.OK(start >= 0 && end > start && end < len(s)-1,
 		"start = ", start, "end = ", end, "are not valid bounds")
@@ -248,17 +251,31 @@ func (s Slice[T]) ZeroRange(start, end int) {
 		var zero T
 		s[i] = zero
 	}
-
 }
 
 // FillTo appends zero values to the slice until it reaches the
-// specified length.
+// specified length, and returns the resulting slice.
 func (s Slice[T]) FillTo(length int) Slice[T] {
-	for len(s) < length {
-		var val T
-		s = append(s, val)
-	}
-	return s
+	fun.Invariant.OK(length > len(s), ers.ErrInvalidInput,
+		"cannot grow a slice to a length that is less than the current length:",
+		"fill", length, "<=, current", len(s))
+
+	return append(s, make([]T, length-len(s))...)
+
+	// // we could see what the current capacity and extend to that,
+	// // but that would
+	// for len(s) < length {
+	// 	var val T
+	// 	s = append(s, val)
+	// }
+	// return s
+}
+
+// GrowCapacity extends the capacity of the slice (by adding zero
+// items and the )
+func (s *Slice[T]) GrowCapacity(size int) {
+	defer s.Truncate(s.Len() - 1)
+	s.Grow(size)
 }
 
 // Ptrs converts a slice in to a slice of pointers to the values in
@@ -268,6 +285,24 @@ func (s Slice[T]) Ptrs() []*T {
 	for idx := range s {
 		out[idx] = &s[idx]
 	}
+	return out
+}
+
+// Sparse always returns a new slice. It iterates through the elements
+// in the source slice and checks, using ft.IsNil() (which uses
+// reflection), if the value is nil, and only adds the item when it is
+// not-nil.
+func (s Slice[T]) Sparse() Slice[T] {
+	// use a List to avoid pre-allocating
+	buf := &List[T]{}
+	for idx := range s {
+		if !ft.IsNil(s[idx]) {
+			buf.PushBack(s[idx])
+		}
+	}
+
+	out := Sliceify(make([]T, 0, buf.Len()))
+	out.Populate(buf.PopIterator()).Wait()
 	return out
 }
 

@@ -98,7 +98,7 @@ func Generate[T any](
 // of the resulting iterator. The mapping operation respects the
 // fun.ErrIterationSkip error, If there are more than one error (as is
 // the case with a panic or with ContinueOnError semantics,) the error
-// can be unwrapped or converted to a slice with the fun.Unwind
+// can be unwrapped or converted to a slice with the ers.Unwind
 // function. Panics in the map function are converted to errors and
 // always collected but may abort the operation if ContinueOnPanic is
 // not set.

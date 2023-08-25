@@ -54,18 +54,15 @@ func TestSlice(t *testing.T) {
 			check.Equal(t, sl[3], 0)
 			check.Equal(t, sl[4], 0)
 		})
-		t.Run("Negative", func(t *testing.T) {
-			sl := Slice[int]{1, 2, 3}
-			check.Equal(t, len(sl), 3)
-			sl.Grow(-1)
-			check.Equal(t, len(sl), 3)
-
-		})
-		t.Run("Noop", func(t *testing.T) {
-			sl := Slice[int]{1, 2, 3}
-			check.Equal(t, len(sl), 3)
-			sl.Grow(2)
-			check.Equal(t, len(sl), 3)
+		t.Run("Invalid", func(t *testing.T) {
+			check.Panic(t, func() {
+				sl := Slice[int]{1, 2, 3}
+				sl.Grow(-1)
+			})
+			check.Panic(t, func() {
+				sl := Slice[int]{1, 2, 3}
+				sl.Grow(2)
+			})
 		})
 	})
 	t.Run("AddItems", func(t *testing.T) {
@@ -93,6 +90,23 @@ func TestSlice(t *testing.T) {
 			assert.Equal(t, 64, s.Index(2))
 			assert.Equal(t, 3, s.Len())
 		})
+	})
+	t.Run("GrowCapacity", func(t *testing.T) {
+		s := Slice[int]{}
+		check.Equal(t, cap(s), 0)
+		check.Equal(t, len(s), 0)
+		s.GrowCapacity(32)
+		check.Equal(t, cap(s), 32)
+		check.Equal(t, len(s), 0)
+	})
+	t.Run("Sparse", func(t *testing.T) {
+		s := Slice[*int]{ft.Ptr(1), ft.Ptr(42), nil, nil}
+		check.Equal(t, len(s), 4)
+		sp := s.Sparse()
+		check.Equal(t, len(sp), 2)
+		check.NotNil(t, sp[0])
+		check.NotNil(t, sp[1])
+		check.Equal(t, ft.Ref(sp[1]), 42)
 	})
 	t.Run("Last", func(t *testing.T) {
 		t.Run("Populated", func(t *testing.T) {
