@@ -66,8 +66,9 @@ func (ec *Collector) Future() fun.Future[[]error] {
 // Len reports on the total number of non-nil errors collected. The
 // count tracks a cached size of the *erc.Stack, giving Len() stable
 // performance characteristics; however, because the Collector unwrap
-// and merge Stack and other { Unwrap() []error } errors, the number
-// may not
+// and merge Stack and other { Unwrap() []error } errors, Len is not
+// updated beyond the current level. In this way Len really reports
+// "height," but this is the same for the top level.
 func (ec *Collector) Len() int { defer with(lock(&ec.mu)); return ec.stack.Len() }
 
 // Iterator produces an iterator for all errors present in the
@@ -82,7 +83,7 @@ func (ec *Collector) Iterator() *fun.Iterator[error] {
 // Resolve returns an error of type *erc.Stack, or nil if there have
 // been no errors added. The error stack respects errors.Is and
 // errors.As, and can be iterated or used in combination with
-// fun.Unwind() to introspect the available errors.
+// ers.Unwind() to introspect the available errors.
 func (ec *Collector) Resolve() error {
 	defer with(lock(&ec.mu))
 
@@ -96,3 +97,7 @@ func (ec *Collector) Resolve() error {
 // HasErrors returns true if there are any underlying errors, and
 // false otherwise.
 func (ec *Collector) HasErrors() bool { return ec.Len() != 0 }
+
+// OK returns true if there are any underlying errors, and
+// false otherwise.
+func (ec *Collector) OK() bool { return ec.Len() == 0 }
