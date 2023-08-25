@@ -1,5 +1,10 @@
 package ers
 
+import (
+	"errors"
+	"fmt"
+)
+
 // Filter provides a way to process error messages, either to remove
 // errors, reformulate,  or annotate errors.
 type Filter func(error) error
@@ -53,11 +58,29 @@ func ExtractErrors(in []any) (rest []any, errs []error) {
 			continue
 		case error:
 			errs = append(errs, val)
+		case func() error:
+			if e := val(); e != nil {
+				errs = append(errs, e)
+			}
+		case string:
+			if val == "" {
+				continue
+			}
+			rest = append(rest, val)
 		default:
 			rest = append(rest, val)
 		}
 	}
 	return
+}
+
+func extractAndJoin(in []any, withErrs ...error) error {
+	args, errs := ExtractErrors(in)
+	out := append(make([]error, 0, len(errs)+1+len(withErrs)), withErrs...)
+	if len(args) > 0 {
+		out = append(out, errors.New(fmt.Sprintln(args...)))
+	}
+	return Join(append(out, errs...)...)
 }
 
 // RemoveOK removes all nil errors from a slice of errors, returning

@@ -18,13 +18,47 @@ type Stack struct {
 	err   error
 }
 
+// AsStack takes an error and converts it to a stack if possible, if
+// the error is an ers.Stack then this is a passthrough, and errors
+// that implement {Unwind() []error} or {Unwrap() []error}, though
+// preferring Unwind, are added individually to the stack.
+//
+// For errors that provide the Unwind/Unwrap method, if these methods
+// return empty slices of errors, then AsStack will return nil.
+func AsStack(err error) *Stack {
+	switch et := err.(type) {
+	case nil:
+		break
+	case *Stack:
+		return et
+	case interface{ Unwind() []error }:
+		if errs := et.Unwind(); len(errs) > 0 {
+			st := &Stack{}
+			return st.Add(errs...)
+		}
+	case interface{ Unwrap() []error }:
+		if errs := et.Unwrap(); len(errs) > 0 {
+			st := &Stack{}
+			return st.Add(errs...)
+		}
+	default:
+		st := &Stack{}
+		st.Push(err)
+		return st
+	}
+
+	// there's a nil error if
+	return nil
+}
+
 // Join takes a slice of errors and converts it into an *erc.Stack
-// typed error.
+// typed error. This operation has several advantages relative to
+// using errors.Join(): if you call ers.Join repeatedly on the same
+// error set of errors the resulting error is convertable
 func Join(errs ...error) error {
 	s := &Stack{}
-	s.append(errs...)
 
-	switch s.count {
+	switch s.Add(errs...).Len() {
 	case 0:
 		return nil
 	case 1:
@@ -71,7 +105,9 @@ func (e *Stack) Push(err error) {
 			werr = werr.next
 		}
 	case interface{ Unwind() []error }:
-		// unwind over unwrap, to avoid
+		// unwind over unwrap, given that Unwind is our
+		// interface and unwrap is the stdlib and some folks
+		// may implement both with different semantics.
 		for _, err := range werr.Unwind() {
 			e.Push(err)
 		}
@@ -90,16 +126,39 @@ func (e *Stack) Push(err error) {
 
 }
 
-func (e *Stack) append(errs ...error) {
+// Handler provides a fun.Handler[error] typed function (though
+// because ers is upstream of the root-fun package, it is not
+// explicitly typed as such.) which will Add errors to the stack.
+func (e *Stack) Handler() func(err error) { return e.Push }
+
+// OK returns true if the Stack object contains no errors and false
+// otherwise.
+func (e *Stack) OK() bool { return e == nil || (e.err == nil && e.next == nil) }
+
+// Add is a thin wrapper around Push, that adds each error supplied as
+// an argument individually to the stack, and returns the stack (so it
+// can be chained.) Unlike the builtin append(), if you discard or
+// ignore the return value of Add, the stack itself is modified.
+//
+// This leads to a curios, semantic: using the Unwrap() method (and
+// casting; but not the unwind method!), the values returned for each
+// layer are also *ers.Stack values: if you were to call Add any of
+// these objects, you would end up with sort of tree-like assortment
+// of objects which may yield surprising result. At the same time, if
+// you have a reference to one of these stack objects, future calls to
+// Add() on the "outer" stack will have no bearing on "inner" Stack
+// objects.
+func (e *Stack) Add(errs ...error) *Stack {
 	for _, err := range errs {
 		e.Push(err)
 	}
+	return e
 }
 
 // Error produces the aggregated error strings from this method. If
 // the error at the current layer is nil.
 func (e *Stack) Error() string {
-	if e.err == nil && e.next == nil {
+	if e.OK() {
 		return "<nil>"
 	}
 

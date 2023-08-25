@@ -36,7 +36,7 @@ func Wrap(err error, annotation ...any) error {
 	if OK(err) {
 		return nil
 	}
-	return fmt.Errorf("%s: %w", fmt.Sprint(annotation...), err)
+	return Join(err, errors.New(fmt.Sprint(annotation...)))
 }
 
 // Wrapf produces a wrapped error, if the error is non-nil, with a
@@ -50,7 +50,7 @@ func Wrapf(err error, tmpl string, args ...any) error {
 		return nil
 	}
 
-	return fmt.Errorf(fmt.Sprint(tmpl, ": %w"), append(args, err)...)
+	return Join(err, fmt.Errorf(tmpl, args...))
 }
 
 // ContextExpired checks an error to see if it, or any of it's parent

@@ -85,16 +85,22 @@ func (Handlers) ErrorHandler(of Handler[error]) Handler[error] {
 	}
 }
 
-// ErrorCollector provides a basic error aggregation facility that
-// collects non-nil errors, and adds them to a slice internally, which
-// is accessible via the producer. The operation of the observer and
-// producer are protexted by a shared mutex.
-func (Handlers) ErrorCollector() (ob Handler[error], prod Future[[]error]) {
-	var errs []error
-	ob = func(err error) { errs = append(errs, err) }
-	prod = func() []error { return errs }
+// ErrorCollectorStac returns an ers.ErrorStack, and a
+// fun.Handler[error] function that will add an error to the
+// stack. This collector is not safe for concurrent use.
+func (Handlers) ErrorStackHandler() (*ers.Stack, Handler[error]) {
+	s := &ers.Stack{}
+	return s, s.Handler()
+}
+
+// ErrorCollector provides a basic error aggregation facility around
+// ers.Stack (as with ErrorStackHandler, though this is an
+// implementation detail.) ErrorCollector does use a mutex to guard
+// access to this. operation.
+func (Handlers) ErrorCollector() (Handler[error], Future[[]error]) {
+	s, hf := HF.ErrorStackHandler()
 	mtx := &sync.Mutex{}
-	return HF.ErrorHandler(ob).WithLock(mtx), prod.WithLock(mtx)
+	return hf.WithLock(mtx), Futurize(s.Unwind).WithLock(mtx)
 }
 
 // ErrorHandlerWithoutEOF wraps an error observer and propagates all

@@ -27,6 +27,28 @@ func ParsePanic(r any) error {
 	return nil
 }
 
+// NewInvariantViolation creates a new error object, which always
+// includes
+func NewInvariantViolation(args ...any) error {
+	switch len(args) {
+	case 0:
+		return ErrInvariantViolation
+	case 1:
+		switch ei := args[0].(type) {
+		case error:
+			return Join(ei, ErrInvariantViolation)
+		case string:
+			return Join(New(ei), ErrInvariantViolation)
+		case func() error:
+			return Join(ei(), ErrInvariantViolation)
+		default:
+			return Join(fmt.Errorf("%v", args[0]), ErrInvariantViolation)
+		}
+	default:
+		return extractAndJoin(args, ErrInvariantViolation)
+	}
+}
+
 // Check, like Safe, runs a function without arguments that does not
 // produce an error, and, if the function panics, converts it into an
 // error.

@@ -53,19 +53,31 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("ErrorsReportSingle", func(t *testing.T) {
 		es := &Stack{}
-		es.append(errors.New(errval))
+		es.Push(errors.New(errval))
 		if l := collect(t, es.CheckProducer()); len(l) != 1 || l == nil {
 			t.Fatal("unexpected errors report", l)
 		}
 	})
 	t.Run("StackErrorStack", func(t *testing.T) {
 		es := &Stack{err: errors.New("outer")}
-		es.append(&Stack{err: errors.New("inner")})
+		es.Push(&Stack{err: errors.New("inner")})
 		if l := collect(t, es.CheckProducer()); len(l) != 2 || l == nil {
 			t.Log(es.count, es)
 			t.Log(es.Error())
 			t.Fatal("unexpected errors report", l)
 		}
+	})
+	t.Run("Handler", func(t *testing.T) {
+		es := &Stack{}
+		check.Equal(t, es.Len(), 0)
+		hf := es.Handler()
+		check.Equal(t, es.Len(), 0)
+		hf(nil)
+		check.Equal(t, es.Len(), 0)
+		hf(ErrInvalidInput)
+		check.Equal(t, es.Len(), 1)
+		check.True(t, !es.OK())
+		check.ErrorIs(t, es, ErrInvalidInput)
 	})
 	t.Run("NilErrorStillErrors", func(t *testing.T) {
 		es := &Stack{}
@@ -75,31 +87,29 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("CacheCorrectness", func(t *testing.T) {
 		es := &Stack{}
-		es.append(errors.New(errval))
-		er1 := es.Error()
-		es.append(errors.New(errval))
-		er2 := es.Error()
+		er1 := es.Add(errors.New(errval)).Error()
+		er2 := es.Add(errors.New(errval)).Error()
 		if er1 == er2 {
 			t.Error("errors should be different", er1, er2)
 		}
 	})
 	t.Run("Merge", func(t *testing.T) {
 		es1 := &Stack{}
-		es1.append(errors.New(errval))
-		es1.append(errors.New(errval))
+		_ = es1.Add(errors.New(errval))
+		_ = es1.Add(errors.New(errval))
 		if l := es1.Len(); l != 2 {
 			t.Fatal("es1 unexpected length", l)
 		}
 
 		es2 := &Stack{}
-		es2.append(errors.New(errval))
-		es2.append(errors.New(errval))
+		_ = es2.Add(errors.New(errval))
+		_ = es2.Add(errors.New(errval))
 
 		if l := es2.Len(); l != 2 {
 			t.Fatal("es2 unexpected length", l)
 		}
 
-		es1.append(es2)
+		es1 = es1.Add(es2)
 		if l := es1.Len(); l != 4 {
 			t.Fatal("merged unexpected length", l)
 		}
@@ -107,7 +117,7 @@ func TestStack(t *testing.T) {
 	t.Run("ConventionalWrap", func(t *testing.T) {
 		err := fmt.Errorf("foo: %w", errors.New("bar"))
 		es := &Stack{}
-		es.append(err)
+		es.Push(err)
 		if l := es.Len(); l != 1 {
 			t.Fatalf("%d, %+v", l, es)
 		}
@@ -117,23 +127,74 @@ func TestStack(t *testing.T) {
 		err2 := errors.New("bar")
 
 		es := &Stack{}
-		es.append(err1)
-		es.append(err2)
+		es.Push(err1)
+		es.Push(err2)
 		if !errors.Is(es, err1) {
 			t.Fatal("expected is to find wrapped err")
 		}
 	})
 	t.Run("OutputOrderedLogically", func(t *testing.T) {
 		es := &Stack{}
-		es.append(errors.New("one"))
-		es.append(errors.New("two"))
-		es.append(errors.New("three"))
+		es.Push(errors.New("one"))
+		es.Push(errors.New("two"))
+		es.Push(errors.New("three"))
 
 		output := es.Error()
 		const expected = "three: two: one"
 		if output != expected {
 			t.Error(output, "!=", expected)
 		}
+	})
+	t.Run("AsStack", func(t *testing.T) {
+		t.Run("Nil", func(t *testing.T) {
+			es := AsStack(nil)
+			check.NilPtr(t, es)
+		})
+		t.Run("ZeroValues", func(t *testing.T) {
+			var err error
+			es := AsStack(err)
+			check.NilPtr(t, es)
+			es = AsStack(es)
+			check.NilPtr(t, es)
+		})
+		t.Run("Error", func(t *testing.T) {
+			es := AsStack(ErrInvalidInput)
+			assert.NotNilPtr(t, es)
+			check.Equal(t, es.Len(), 1)
+			check.ErrorIs(t, es, ErrInvalidInput)
+		})
+		t.Run("Stack", func(t *testing.T) {
+			err := Join(ErrInvalidInput, ErrImmutabilityViolation, ErrInvariantViolation)
+			es := AsStack(err)
+			assert.NotNilPtr(t, es)
+			check.Equal(t, es.Len(), 3)
+			check.ErrorIs(t, es, ErrInvalidInput)
+			check.ErrorIs(t, es, ErrInvariantViolation)
+		})
+		t.Run("Unwinder", func(t *testing.T) {
+			t.Run("Empty", func(t *testing.T) {
+				es := AsStack(&slwind{})
+				check.NilPtr(t, es)
+
+			})
+			t.Run("Populated", func(t *testing.T) {
+				es := AsStack(&slwind{out: []error{ErrInvalidInput}})
+				assert.NotNilPtr(t, es)
+				check.Equal(t, es.Len(), 1)
+			})
+		})
+		t.Run("Unwrapper", func(t *testing.T) {
+			t.Run("Empty", func(t *testing.T) {
+				es := AsStack(&slwrap{})
+				check.NilPtr(t, es)
+
+			})
+			t.Run("Populated", func(t *testing.T) {
+				es := AsStack(&slwrap{out: []error{ErrInvalidInput}})
+				assert.NotNilPtr(t, es)
+				check.Equal(t, es.Len(), 1)
+			})
+		})
 	})
 }
 

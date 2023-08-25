@@ -1,9 +1,6 @@
 package fun
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/tychoish/fun/ers"
 )
 
@@ -47,25 +44,7 @@ func (RuntimeInvariant) Failure(args ...any) { Invariant.OK(false, args...) }
 // rooted in InvariantViolation. Otherwise the operation is a noop.
 func (RuntimeInvariant) OK(cond bool, args ...any) {
 	if !cond {
-		switch len(args) {
-		case 0:
-			panic(ErrInvariantViolation)
-		case 1:
-			switch ei := args[0].(type) {
-			case error:
-				panic(ers.Join(ei, ErrInvariantViolation))
-			case string:
-				panic(ers.Join(ers.New(ei), ErrInvariantViolation))
-			case func() error:
-				panic(ers.Join(ei(), ErrInvariantViolation))
-			default:
-				panic(ers.Join(fmt.Errorf("%v", args[0]), ErrInvariantViolation))
-			}
-		default:
-			var errs []error
-			args, errs = ers.ExtractErrors(args)
-			panic(ers.Join(errors.New(fmt.Sprintln(args...)), ers.Join(append(errs, ErrInvariantViolation)...)))
-		}
+		panic(ers.NewInvariantViolation(args...))
 	}
 }
 
