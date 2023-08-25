@@ -497,4 +497,17 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, powers.Index(0), 10)
 		check.Equal(t, powers.Index(1), 100)
 	})
+	t.Run("Zero", func(t *testing.T) {
+		s := Sliceify([]int{100, 100, 100, 100, 100, 100})
+		s.Zero()
+		for i := range s {
+			check.Zero(t, s[i])
+		}
+	})
+	t.Run("ZeroRange", func(t *testing.T) {
+		s := Sliceify([]int{100, 100, 100, 100, 100, 100})
+		s.ZeroRange(0, 2)
+		check.Equal(t, s[0]+s[1]+s[2], 0)
+		check.Equal(t, s[3]+s[4]+s[5], 300)
+	})
 }

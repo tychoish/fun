@@ -214,14 +214,32 @@ func (s Slice[T]) Ptr(index int) *T { return &s[index] }
 
 // Grow adds zero items to the slice until it reaches the desired
 // size.
-func (s *Slice[T]) Grow(size int) {
-	*s = s.FillToLen(size)
+func (s *Slice[T]) Grow(size int) { *s = s.FillTo(size) }
+
+// Zero replaces all items in the slice with the zero value for the
+// type T.
+func (s Slice[T]) Zero() {
+	for idx := range s {
+		var zero T
+		s[idx] = zero
+	}
 }
 
-// FillToLen appends zero values to the slice until it reaches the
+// ZeroRange replaces the type
+func (s Slice[T]) ZeroRange(start, end int) {
+	fun.Invariant.OK(start >= 0 && end > start && end < len(s)-1,
+		"start = ", start, "end = ", end, "are not valid bounds")
+	for i := start; i <= end; i++ {
+		var zero T
+		s[i] = zero
+	}
+
+}
+
+// FillTo appends zero values to the slice until it reaches the
 // specified length.
-func (s Slice[T]) FillToLen(size int) Slice[T] {
-	for len(s) < size {
+func (s Slice[T]) FillTo(length int) Slice[T] {
+	for len(s) < length {
 		var val T
 		s = append(s, val)
 	}
