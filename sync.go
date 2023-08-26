@@ -7,8 +7,8 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
-func with(mtx *sync.Mutex)             { mtx.Unlock() }
+func lock(mtx sync.Locker) sync.Locker { mtx.Lock(); return mtx }
+func with(mtx sync.Locker)             { mtx.Unlock() }
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.Operation). The

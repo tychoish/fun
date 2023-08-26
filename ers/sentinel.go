@@ -25,6 +25,11 @@ const ErrLimitExceeded Error = Error("limit exceeded")
 // generally retriable.
 const ErrInvalidInput Error = Error("invalid input")
 
+// ErrInvalidRuntimeType signals a type error encountered at
+// runtime. Typically included as a component in an aggregate
+// invariant violation error.
+const ErrInvalidRuntimeType Error = Error("invalid type at runtime")
+
 // ErrCurrentOpAbort is used to signal that a retry function or other
 // looping operation that the loop should exit. ErrCurrentOpAbort
 // should be handled like "break", and should not be returned to

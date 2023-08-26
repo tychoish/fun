@@ -265,7 +265,7 @@ func (wf Worker) Lock() Worker { return wf.WithLock(&sync.Mutex{}) }
 
 // Lock produces a Worker that will be executed within the scope of
 // the provided mutex.
-func (wf Worker) WithLock(mtx *sync.Mutex) Worker {
+func (wf Worker) WithLock(mtx sync.Locker) Worker {
 	return func(ctx context.Context) error { mtx.Lock(); defer mtx.Unlock(); return wf(ctx) }
 }
 

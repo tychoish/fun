@@ -299,7 +299,7 @@ func (pf Producer[T]) When(cond func() bool) Producer[T] {
 func (pf Producer[T]) Lock() Producer[T] { return pf.WithLock(&sync.Mutex{}) }
 
 // WithLock uses the provided mutex to protect the execution of the producer.
-func (pf Producer[T]) WithLock(mtx *sync.Mutex) Producer[T] {
+func (pf Producer[T]) WithLock(mtx sync.Locker) Producer[T] {
 	return func(ctx context.Context) (T, error) {
 		mtx.Lock()
 		defer mtx.Unlock()

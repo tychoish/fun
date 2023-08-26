@@ -178,7 +178,7 @@ func (pf Processor[T]) Lock() Processor[T] { return pf.WithLock(&sync.Mutex{}) }
 
 // WithLock wraps the Processor and ensures that the mutex is always
 // held while the root Processor is called.
-func (pf Processor[T]) WithLock(mtx *sync.Mutex) Processor[T] {
+func (pf Processor[T]) WithLock(mtx sync.Locker) Processor[T] {
 	return func(ctx context.Context, arg T) error {
 		mtx.Lock()
 		defer mtx.Unlock()

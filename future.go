@@ -58,6 +58,11 @@ func (f Future[T]) When(c func() bool) Future[T] { return func() T { return ft.W
 // future are protected by a mutex.
 func (f Future[T]) Lock() Future[T] { return f.WithLock(&sync.Mutex{}) }
 
+// WithLock return a future that is protected with the provided mutex.
+func (f Future[T]) WithLock(m sync.Locker) Future[T] {
+	return func() T { defer with(lock(m)); return f() }
+}
+
 // PreHook unconditionally runs the provided function before running
 // and returning the function.
 func (f Future[T]) PreHook(fn func()) Future[T] { return func() T { fn(); return f() } }
@@ -69,11 +74,6 @@ func (f Future[T]) PostHook(fn func()) Future[T] { return func() T { defer fn();
 // Slice returns a future-like function that wraps the output of the
 // future as the first element in a slice.
 func (f Future[T]) Slice() func() []T { return func() []T { return []T{f()} } }
-
-// WithLock return a future that is protected with the provided mutex.
-func (f Future[T]) WithLock(m *sync.Mutex) Future[T] {
-	return func() T { defer with(lock(m)); return f() }
-}
 
 // Reduce takes the input future, the next future, and merges the
 // results using the merge function.

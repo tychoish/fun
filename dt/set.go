@@ -10,14 +10,34 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-type atomic[T comparable] struct{ val stdatomic.Value }
+type atomicLocker[T any] struct{ val stdatomic.Value }
 
-func (a *atomic[T]) Get() T { return a.resolve(a.val.Load()) }
-func (a *atomic[T]) Set(in T) bool {
-	return a.val.CompareAndSwap(nil, in) || a.val.CompareAndSwap(in, in)
+func (a *atomicLocker[T]) Get() T { return a.resolve(a.val.Load()) }
+func (a *atomicLocker[T]) Set(in T) bool {
+	if a.val.CompareAndSwap(nil, in) {
+		return true
+	}
+
+	for {
+		cur := a.Get()
+		if (!ft.IsType[*sync.Mutex](in) && !ft.IsType[*sync.RWMutex](in)) ||
+			!(!ft.IsType[*sync.Mutex](cur) && !ft.IsType[*sync.RWMutex](cur)) ||
+			ft.IsType[*sync.Mutex](in) != ft.IsType[*sync.Mutex](cur) {
+
+			return false
+		}
+
+		if any(cur) != any(in) {
+			return false
+		}
+
+		if a.val.CompareAndSwap(cur, in) {
+			return true
+		}
+	}
 }
 
-func (*atomic[T]) resolve(in any) (val T) {
+func (*atomicLocker[T]) resolve(in any) (val T) {
 	switch c := in.(type) {
 	case T:
 		val = c
@@ -31,7 +51,7 @@ func (*atomic[T]) resolve(in any) (val T) {
 type Set[T comparable] struct {
 	hash Map[T, *Element[T]]
 	list *List[T]
-	mtx  atomic[*sync.Mutex]
+	mtx  atomicLocker[sync.Locker]
 }
 
 // NewSetFromSlice constructs a map and adds all items from the input
@@ -55,6 +75,14 @@ func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 // Synchronize creates a mutex and enables its use in the Set. This
 // operation is safe to call more than once,
 func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
+
+// WithLock configures the Set to synchronize operations with this
+// mutex. If the mutex is nil, or the Set is already synchronized with
+// a different mutex, WithLock panics with an invariant violation.
+func (s *Set[T]) WithLock(mtx sync.Locker) {
+	fun.Invariant.OK(!ft.IsNil(mtx), "locks must be non-nil")
+	fun.Invariant.OK(s.mtx.Set(mtx), "cannot override an existing lock or change locker type")
+}
 
 // Order enables order tracking for the Set. The method panics if there
 // is more than one item in the map. If order tracking is enabled,
@@ -95,14 +123,6 @@ func (s *Set[T]) forceSetupOrdered() {
 	for item := range s.hash {
 		s.list.PushBack(item)
 	}
-}
-
-// WithLock configures the Set to synchronize operations with this
-// mutex. If the mutex is nil, or the Set is already synchronized with
-// a different mutex, WithLock panics with an invariant violation.
-func (s *Set[T]) WithLock(mtx *sync.Mutex) {
-	fun.Invariant.OK(mtx != nil, "mutexes must be non-nil")
-	fun.Invariant.OK(s.mtx.Set(mtx), "cannot override an existing mutex")
 }
 
 func (s *Set[T]) isOrdered() bool { return s.list != nil }

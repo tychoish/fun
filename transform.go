@@ -226,7 +226,7 @@ func (mpf Transform[T, O]) Lock() Transform[T, O] {
 
 // WithLock returns a Transform function inside of the scope of the
 // provided mutex.
-func (mpf Transform[T, O]) WithLock(mu *sync.Mutex) Transform[T, O] {
+func (mpf Transform[T, O]) WithLock(mu sync.Locker) Transform[T, O] {
 	return func(ctx context.Context, val T) (O, error) {
 		mu.Lock()
 		defer mu.Unlock()

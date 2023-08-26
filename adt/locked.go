@@ -3,7 +3,13 @@ package adt
 import (
 	"fmt"
 	"sync"
+
+	"github.com/tychoish/fun"
 )
+
+func SynchronizeAccessors[T any](setter fun.Handler[T], getter fun.Future[T]) (fun.Handler[T], fun.Future[T]) {
+
+}
 
 // Synchronized wraps an arbitrary type with a lock, and provides a
 // functional interface for interacting with that type. In general
