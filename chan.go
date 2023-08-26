@@ -141,7 +141,7 @@ func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
 func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOK(ro.Producer().Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
-func (ro ChanReceive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx) }
+func (ro ChanReceive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx).Resolve() }
 
 // Force ignores the error returning only the value from Read. This is
 // either the value sent through the channel, or the zero value for

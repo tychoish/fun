@@ -79,9 +79,9 @@ func (pf Producer[T]) Operation(of Handler[T], eo Handler[error]) Operation {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 
-// Safe returns a wrapped producer with a panic handler that converts
+// WithRecover returns a wrapped producer with a panic handler that converts
 // any panic to an error.
-func (pf Producer[T]) Safe() Producer[T] {
+func (pf Producer[T]) WithRecover() Producer[T] {
 	return func(ctx context.Context) (_ T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return pf(ctx)
@@ -90,7 +90,9 @@ func (pf Producer[T]) Safe() Producer[T] {
 
 // Ignore runs the producer function and returns the value, ignoring
 // the error.
-func (pf Producer[T]) Ignore(ctx context.Context) T { return ft.IgnoreSecond(pf(ctx)) }
+func (pf Producer[T]) Ignore(ctx context.Context) Future[T] {
+	return func() T { return ft.IgnoreSecond(pf(ctx)) }
+}
 
 // Join, on successive calls, runs the first producer until it
 // returns an io.EOF error, and then returns the results of the second
@@ -188,7 +190,7 @@ func (pf Producer[T]) CheckForce() (T, bool)               { return pf.Check(con
 func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	out := make(chan T, 1)
 	var err error
-	go func() { defer close(out); o, e := pf.Safe().Run(ctx); err = e; out <- o }()
+	go func() { defer close(out); o, e := pf.WithRecover().Run(ctx); err = e; out <- o }()
 
 	return func(ctx context.Context) (T, error) {
 		out, chErr := Blocking(out).Receive().Read(ctx)
@@ -458,7 +460,7 @@ func (pf Producer[T]) GenerateParallel(
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &WaitGroup{}
 
-		pf = pf.Safe()
+		pf = pf.WithRecover()
 		var zero T
 		pipe.Processor().
 			ReadAll(func(ctx context.Context) (T, error) {

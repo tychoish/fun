@@ -90,13 +90,13 @@ func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 // Keys returns an iterator over only the keys in a sequence of
 // iterator items.
 func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
-	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Convert(p.Iterator())
+	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Process(p.Iterator())
 }
 
 // Values returns an iterator over only the values in a sequence of
 // iterator pairs.
 func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
-	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Convert(p.Iterator())
+	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Process(p.Iterator())
 }
 
 // Observe calls the handler function for every pair in the container.
@@ -187,7 +187,7 @@ func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]
 // ConsumeValues adds all of the values in the input iterator,
 // generating the keys using the function provided.
 func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) error {
-	return p.Consume(ctx, fun.Converter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Convert(iter))
+	return p.Consume(ctx, fun.Converter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Process(iter))
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.

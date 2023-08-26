@@ -117,13 +117,13 @@ func SliceIterator[T any](in []T) *Iterator[T] {
 // will continue producing values as long as the input iterator
 // produces values, the context isn't canceled, or exhausted.
 func ConvertIterator[T, O any](iter *Iterator[T], op Transform[T, O]) *Iterator[O] {
-	return op.Convert(iter)
+	return op.Process(iter)
 }
 
 // Transform processes an iterator passing each element through a
 // transform function. The type of the iterator is the same for the
 // output. Use Convert iterator to change the type of the value.
-func (i *Iterator[T]) Transform(op Transform[T, T]) *Iterator[T] { return op.Convert(i) }
+func (i *Iterator[T]) Transform(op Transform[T, T]) *Iterator[T] { return op.Process(i) }
 
 // MergeIterators takes a collection of iterators of the same type of
 // objects and provides a single iterator over these items.
@@ -272,7 +272,7 @@ func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
 // type and converts it to an iterator of any (e.g. interface{})
 // values.
 func (i *Iterator[T]) Any() *Iterator[any] {
-	return Converter(func(in T) any { return any(in) }).Convert(i)
+	return Converter(func(in T) any { return any(in) }).Process(i)
 }
 
 // Reduce processes an iterator with a reducer function. The output
