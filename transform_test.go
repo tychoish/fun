@@ -1170,8 +1170,7 @@ func RunIteratorStringAlgoTests(
 		t.Run("Serial", func(t *testing.T) {
 			var root error
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod, closep := tfm.Pipe()
-			defer closep()
+			proc, prod := tfm.Pipe()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			for i := 0; i < 100; i++ {
@@ -1183,14 +1182,13 @@ func RunIteratorStringAlgoTests(
 				assert.NotError(t, proc(ctx, i))
 				out, err := prod(ctx)
 				assert.ErrorIs(t, err, io.EOF)
-				assert.Equal(t, fmt.Sprint(i), out)
+				assert.Zero(t, out)
 			}
 		})
 		t.Run("Parallel", func(t *testing.T) {
 			var root error
 			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod, closep := tfm.Pipe()
-			defer closep()
+			proc, prod := tfm.Pipe()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			wg := &WaitGroup{}
@@ -1227,7 +1225,7 @@ func RunIteratorStringAlgoTests(
 			return procroot
 		})
 		tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
-		worker := tfm.Worker(prod, proc)
+		worker := tfm.ProcessPipe(prod, proc)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -1265,4 +1263,101 @@ func RunIteratorStringAlgoTests(
 			check.Equal(t, proccount, 0)
 		})
 	})
+}
+
+func TestTransformFunctions(t *testing.T) {
+	t.Run("SignleHelpers", func(t *testing.T) {
+		t.Run("Convert", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := 0
+			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
+			assert.Equal(t, count, 0)
+			prod := mpf.Convert(42)
+			assert.Equal(t, count, 0)
+			out := prod.Ignore(ctx)
+			assert.Equal(t, count, 0)
+			assert.Equal(t, "42", out())
+			assert.Equal(t, count, 1)
+		})
+		t.Run("ConvertFuture", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := 0
+			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
+			assert.Equal(t, count, 0)
+			prod := mpf.ConvertFuture(AsFuture(42))
+			assert.Equal(t, count, 0)
+			out := prod.Ignore(ctx)
+			assert.Equal(t, count, 0)
+			assert.Equal(t, "42", out())
+			assert.Equal(t, count, 1)
+		})
+		t.Run("ConvertProducer", func(t *testing.T) {
+			t.Run("Passes", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				count := 0
+				mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
+				check.Equal(t, count, 0)
+				prod := mpf.ConvertProducer(AsFuture(42).Producer())
+				check.Equal(t, count, 0)
+				out := prod.Ignore(ctx)
+				check.Equal(t, count, 0)
+				check.Equal(t, "42", out())
+				check.Equal(t, count, 1)
+			})
+			t.Run("Fails", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				mcount := 0
+				pcount := 0
+				mpf := Converter(func(in int) string { mcount++; return fmt.Sprint(in) })
+				check.Equal(t, mcount, 0)
+				check.Equal(t, pcount, 0)
+				prod := mpf.ConvertProducer(MakeProducer(func() (int, error) { pcount++; return 42, ers.ErrInvalidInput }))
+				check.Equal(t, mcount, 0)
+				check.Equal(t, pcount, 0)
+				out, err := prod.Run(ctx)
+				check.Equal(t, mcount, 0)
+				check.Equal(t, pcount, 1)
+				check.Error(t, err)
+				check.ErrorIs(t, err, ers.ErrInvalidInput)
+				check.Equal(t, "", out)
+			})
+		})
+		t.Run("Worker", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := 0
+			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
+			assert.Equal(t, count, 0)
+			hcount := 0
+			wf := mpf.Worker(42, func(in string) { hcount++; assert.Equal(t, in, "42") })
+			assert.Equal(t, count, 0)
+			assert.Equal(t, hcount, 0)
+			assert.NotError(t, wf(ctx))
+			assert.Equal(t, count, 1)
+			assert.Equal(t, hcount, 1)
+		})
+		t.Run("WorkerFuture", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := 0
+			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
+			assert.Equal(t, count, 0)
+			hcount := 0
+			wf := mpf.WorkerFuture(
+				func() int { return 42 },
+				func(in string) { hcount++; assert.Equal(t, in, "42") },
+			)
+			assert.Equal(t, count, 0)
+			assert.Equal(t, hcount, 0)
+			assert.NotError(t, wf(ctx))
+			assert.Equal(t, count, 1)
+			assert.Equal(t, hcount, 1)
+		})
+
+	})
+
 }

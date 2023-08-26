@@ -65,10 +65,10 @@ func ConverterErr[T any, O any](op func(T) (O, error)) Transform[T, O] {
 	return func(_ context.Context, in T) (O, error) { return op(in) }
 }
 
-// Convert takes an iterator and runs the transformer over every item,
-// producing a new iterator with the output values. The processing
-// operation respects ErrIteratorSkip.
-func (mpf Transform[T, O]) Convert(iter *Iterator[T]) *Iterator[O] {
+// Process takes an iterator and runs the transformer over every item,
+// producing a new iterator with the output values. The processing is
+// performed serially and lazily and respects ErrIteratorSkip.
+func (mpf Transform[T, O]) Process(iter *Iterator[T]) *Iterator[O] {
 	return mpf.Producer(iter.ReadOne).Iterator()
 }
 
@@ -133,14 +133,14 @@ func (mpf Transform[T, O]) Producer(prod Producer[T]) Producer[O] {
 		for {
 			item, err := prod(ctx)
 			if err == nil {
-				out, err = mpf(ctx, item)
+				out, err = mpf.Run(ctx, item)
 				if err == nil {
 					return out, nil
 				}
 			}
 
 			switch {
-			case err == nil || errors.Is(err, ErrIteratorSkip):
+			case errors.Is(err, ErrIteratorSkip):
 				continue
 			default:
 				return zero, err
@@ -154,23 +154,14 @@ func (mpf Transform[T, O]) Producer(prod Producer[T]) Producer[O] {
 // one item and is never closed, and both input and output operations
 // are blocking. The closer function will abort the connection and
 // cause all successive operations to return io.EOF.
-func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O], closer func()) {
-	// components
-	ch := make(chan T, 1)
-	pipe := Blocking(ch)
-	prod := pipe.Producer()
-
-	// definitions
-	closer = ft.Once(pipe.Close)
-	in = pipe.Processor()
-	out = func(ctx context.Context) (O, error) { return mpf(ctx, ft.Must(prod(ctx))) }
-
-	return in, out, closer
+func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O]) {
+	pipe := Blocking(make(chan T, 1))
+	return pipe.Processor(), mpf.Producer(pipe.Producer())
 }
 
 // Wait calls the transform function passing a context that cannot expire.
 func (mpf Transform[T, O]) Wait() func(T) (O, error) {
-	return func(in T) (O, error) { return mpf(context.Background(), in) }
+	return func(in T) (O, error) { return mpf.Run(context.Background(), in) }
 }
 
 // CheckWait calls the function with a context that cannot be
@@ -181,6 +172,49 @@ func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
 		mpfb := mpf.Wait()
 		return ers.SafeOK(func() (O, error) { return mpfb(in) })
 	}
+}
+
+// Run executes the transform function with the provided output.
+func (mpf Transform[T, O]) Run(ctx context.Context, in T) (O, error) { return mpf(ctx, in) }
+
+// Convert returns a Producer function which will translate the input
+// value. The execution is lazy, to provide a future-like interface.
+func (mpf Transform[T, O]) Convert(in T) Producer[O] {
+	return func(ctx context.Context) (O, error) { return mpf.Run(ctx, in) }
+}
+
+// Convert returns a Producer function which will translate value of
+// the input future as the input value of the translation
+// operation. The execution is lazy, to provide a future-like
+// interface and neither the resolution of the future or the
+// transformation itself is done until the Producer is executed.
+func (mpf Transform[T, O]) ConvertFuture(fn Future[T]) Producer[O] {
+	return func(ctx context.Context) (O, error) { return mpf.Run(ctx, fn.Resolve()) }
+}
+
+// ConvertProducer takes an input-typed producer function and converts
+// it to an output-typed producer function.
+func (mpf Transform[T, O]) ConvertProducer(fn Producer[T]) Producer[O] {
+	var zero O
+	return func(ctx context.Context) (O, error) {
+		val, err := fn(ctx)
+		if err != nil {
+			return zero, err
+		}
+		return mpf.Run(ctx, val)
+	}
+}
+
+// Worker transforms the input value passing the output of the
+// translation to the handler function. The transform operation only
+// executes when the worker function runs.
+func (mpf Transform[T, O]) Worker(in T, hf Handler[O]) Worker { return mpf.Convert(in).Worker(hf) }
+
+// WorkerFuture transforms the future and passes the transformed value
+// to the handler function. The operation is executed only after the
+// worker function is called.
+func (mpf Transform[T, O]) WorkerFuture(fn Future[T], hf Handler[O]) Worker {
+	return mpf.ConvertFuture(fn).Worker(hf)
 }
 
 // Lock returns a Transform function that's executed the root function
@@ -196,7 +230,7 @@ func (mpf Transform[T, O]) WithLock(mu *sync.Mutex) Transform[T, O] {
 	return func(ctx context.Context, val T) (O, error) {
 		mu.Lock()
 		defer mu.Unlock()
-		return mpf(ctx, val)
+		return mpf.Run(ctx, val)
 	}
 }
 
@@ -210,13 +244,14 @@ func (mpf Transform[T, O]) WithRecover() Transform[T, O] {
 	}
 }
 
-// Worker collects a Produer and Processor pair, and returns a worker
-// that processes the input collected by the  Processorand returns it
-// to the Producer. This operation runs until the producer,
-// transformer, or processor returns an error. ErrIteratorSkip errors
-// are respected, while io.EOF errors cause the Worker to abort but
-// are not propogated to the caller.
-func (mpf Transform[T, O]) Worker(in Producer[T], out Processor[O]) Worker {
+// ProcessPipe collects a Produer and Processor pair, and returns a
+// worker that, when run processes the input collected by the
+// Processorand returns it to the Producer. This operation runs until
+// the producer, transformer, or processor returns an
+// error. ErrIteratorSkip errors are respected, while io.EOF errors
+// cause the ProcessPipe to abort but are not propogated to the
+// caller.
+func (mpf Transform[T, O]) ProcessPipe(in Producer[T], out Processor[O]) Worker {
 	return func(ctx context.Context) error {
 		var (
 			input  T
