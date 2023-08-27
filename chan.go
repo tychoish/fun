@@ -12,7 +12,7 @@ import (
 // ErrNonBlockingChannelOperationSkipped is returned when sending into
 // a channel, in a non-blocking context, when the channel was full and
 // the send or receive was therefore skipped.
-const ErrNonBlockingChannelOperationSkipped ers.Error = ers.Error("non-blocking channel operation skipped")
+const ErrNonBlockingChannelOperationSkipped ers.Error = ers.ErrCurrentOpSkip
 
 // blockingMode provides named constants for blocking/non-blocking
 // operations. They are fully internal, and only used indirectly.
@@ -121,6 +121,19 @@ func (op ChanOp[T]) Pipe() (Processor[T], Producer[T]) {
 type ChanReceive[T any] struct {
 	mode blockingMode
 	ch   <-chan T
+}
+
+// Filter returns a channel that consumes the output of a channel and
+// returns a NEW channel that only contains elements that have
+// elements that the filter function returns true for.
+func (ro ChanReceive[T]) Filter(ctx context.Context, eh Handler[error], filter func(T) bool) ChanReceive[T] {
+	out := ChanOp[T]{ch: make(chan T), mode: ro.mode}
+
+	ro.Producer().Filter(filter).SendAll(out.Processor()).
+		PreHook(Operation(func(ctx context.Context) { <-ctx.Done(); out.Close() }).Once().Launch(ctx)).
+		Background(ctx, eh)
+
+	return out.Receive()
 }
 
 // BlockingReceive is the equivalent of Blocking(ch).Receive(), except

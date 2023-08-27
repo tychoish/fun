@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 func TestHandlers(t *testing.T) {
@@ -184,9 +185,9 @@ func TestHandlers(t *testing.T) {
 	t.Run("ErrorCollector", func(t *testing.T) {
 		ob, prod := HF.ErrorCollector()
 		ft.DoTimes(128, func() { ob(nil) })
-		check.Equal(t, 0, len(prod.Resolve()))
+		check.Equal(t, 0, len(internal.Unwind(prod.Resolve())))
 		ft.DoTimes(128, func() { ob(ers.Error("test")) })
-		check.Equal(t, 128, len(prod.Resolve()))
+		check.Equal(t, 128, len(internal.Unwind(prod.Resolve())))
 	})
 	t.Run("StringFuture", func(t *testing.T) {
 		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprintf("%s:%d", "hi", 42)()) })

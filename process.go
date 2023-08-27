@@ -131,6 +131,18 @@ func (pf Processor[T]) When(c func() bool) Processor[T] {
 	}
 }
 
+// Filter returns a wrapping processor that takes a function a
+// function that only calls the processor when the filter function
+// returns true, and returns ers.ErrCurrentOpSkip otherwise.
+func (pf Processor[T]) Filter(fl func(T) bool) Processor[T] {
+	return func(ctx context.Context, in T) error {
+		if !fl(in) {
+			return ers.ErrCurrentOpSkip
+		}
+		return pf.Run(ctx, in)
+	}
+}
+
 // Join wraps the processor and executes both the root processor and
 // then the next processor, assuming the root processor is not
 // canceled and the context has not expired.
@@ -245,16 +257,16 @@ func (pf Processor[T]) PostHook(op func()) Processor[T] {
 	}
 }
 
-// FilterErrors uses an ers.Filter to process the error respose from
+// WithErrorFilter uses an ers.Filter to process the error respose from
 // the processor.
-func (pf Processor[T]) FilterErrors(ef ers.Filter) Processor[T] {
+func (pf Processor[T]) WithErrorFilter(ef ers.Filter) Processor[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }
 
 // WithoutErrors returns a producer that will convert a non-nil error
 // of the provided types to a nil error.
 func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
-	return pf.FilterErrors(ers.FilterExclude(errs...))
+	return pf.WithErrorFilter(ers.FilterExclude(errs...))
 }
 
 // ReadOne returns a future (Worker) that calls the processor function

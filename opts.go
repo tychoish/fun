@@ -263,11 +263,11 @@ func WorkerGroupConfWithErrorCollector(
 // WorkerGroupConfErrorCollectorPair uses an Handler/Producer pair to
 // collect errors. A basic implementation, accessible via
 // HF.ErrorCollector() is suitable for this purpose.
-func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Future[[]error]) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Future[error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
 			WorkerGroupConfErrorHandler(ob)(opts),
-			WorkerGroupConfErrorResolver(func() error { return ers.Join(ers.Append(resolver.Resolve())...) })(opts),
+			WorkerGroupConfErrorResolver(resolver)(opts),
 		)
 	}
 }

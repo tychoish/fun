@@ -393,7 +393,7 @@ func (wf Worker) Group(n int) Worker {
 // function in the following form works:
 //
 //	func(error) error
-func (wf Worker) FilterErrors(ef ers.Filter) Worker {
+func (wf Worker) WithErrorFilter(ef ers.Filter) Worker {
 	return func(ctx context.Context) error { return ef(wf(ctx)) }
 }
 

@@ -696,10 +696,10 @@ func TestWorker(t *testing.T) {
 			return io.EOF
 		}
 		assert.ErrorIs(t, wf(ctx), io.EOF)
-		fwf := wf.FilterErrors(func(error) error { return nil })
+		fwf := wf.WithErrorFilter(func(error) error { return nil })
 		assert.NotError(t, fwf(ctx))
 		assert.ErrorIs(t, wf(ctx), io.EOF)
-		fwf = wf.FilterErrors(func(error) error { return context.Canceled })
+		fwf = wf.WithErrorFilter(func(error) error { return context.Canceled })
 		assert.ErrorIs(t, fwf(ctx), context.Canceled)
 	})
 	t.Run("WithoutError", func(t *testing.T) {

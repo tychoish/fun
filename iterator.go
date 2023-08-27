@@ -72,7 +72,7 @@ type Iterator[T any] struct {
 
 	err struct {
 		handler Handler[error]
-		future  Future[[]error]
+		future  Future[error]
 	}
 
 	closer struct {
@@ -139,7 +139,11 @@ func (i *Iterator[T]) Transform(op Transform[T, T]) *Iterator[T] { return op.Pro
 // returned an error.
 func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
-	eo, ep := HF.ErrorCollector()
+
+	es := &ers.Stack{}
+	mu := &sync.Mutex{}
+	eh := HF.ErrorHandlerWithoutEOF(es.Handler()).WithLock(mu)
+	ep := Futurize(es.Future()).WithLock(mu)
 
 	init := Operation(func(ctx context.Context) {
 		wg := &WaitGroup{}
@@ -150,7 +154,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 
 		send := pipe.Send()
 		for idx := range iters {
-			send.Consume(iters[idx]).Operation(HF.ErrorHandlerWithoutEOF(eo)).Add(wctx, wg)
+			send.Consume(iters[idx]).Operation(eh).Add(wctx, wg)
 		}
 
 		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Background(ctx)
@@ -159,7 +163,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 	return pipe.Receive().
 		Producer().
 		PreHook(init).
-		IteratorWithHook(func(iter *Iterator[T]) { iter.AddError(ers.Join(ep()...)) })
+		IteratorWithErrorCollector(eh, ep)
 }
 
 func (i *Iterator[T]) doClose() {
@@ -170,7 +174,7 @@ func (i *Iterator[T]) doClose() {
 // during iteration. If the iterator allocates resources, this
 // will typically release them, but close may not block until all
 // resources are released.
-func (i *Iterator[T]) Close() error { i.doClose(); return ers.Join(ft.SafeDo(i.err.future)...) }
+func (i *Iterator[T]) Close() error { i.doClose(); return ft.SafeDo(i.err.future) }
 
 // AddError can be used by calling code to add errors to the
 // iterator, which are merged.
@@ -559,7 +563,7 @@ func (i *Iterator[T]) ProcessParallel(
 
 		wg := &WaitGroup{}
 
-		operation := fn.WithRecover().FilterErrors(func(err error) error {
+		operation := fn.WithRecover().WithErrorFilter(func(err error) error {
 			return ft.WhenDo(
 				!opts.CanContinueOnError(err),
 				ft.Wrapper(io.EOF),

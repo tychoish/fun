@@ -227,10 +227,15 @@ func (pf Producer[T]) Once() Producer[T] {
 // cancellation errors or io.EOF are propgated to the iterators Close
 // method.
 func (pf Producer[T]) Iterator() *Iterator[T] {
+	return pf.IteratorWithErrorCollector(HF.ErrorCollector())
+}
+
+func (pf Producer[T]) IteratorWithErrorCollector(ec Handler[error], er Future[error]) *Iterator[T] {
 	op, cancel := pf.WithCancel()
 	iter := &Iterator[T]{operation: op}
 	iter.closer.op = cancel
-	iter.err.handler, iter.err.future = HF.ErrorCollector()
+	iter.err.handler = ec
+	iter.err.future = er
 	return iter
 }
 
@@ -238,11 +243,9 @@ func (pf Producer[T]) Iterator() *Iterator[T] {
 // provided hook function will run during the Iterators Close()
 // method.
 func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
-	once := &sync.Once{}
-	op, cancel := pf.WithCancel()
-	iter := &Iterator[T]{operation: op}
-	iter.closer.op = func() { once.Do(func() { hook(iter) }); cancel() }
-	iter.err.handler, iter.err.future = HF.ErrorCollector()
+	iter := pf.Iterator()
+	closer := iter.closer.op
+	iter.closer.op = ft.Once(func() { hook(iter); closer() })
 	return iter
 }
 
@@ -433,13 +436,32 @@ func (pf Producer[T]) PostHook(op func()) Producer[T] {
 // list. The produced value in these cases is almost always the zero
 // value for the type.
 func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
-	return pf.FilterErrors(ers.FilterExclude(errs...))
+	return pf.WithErrorFilter(ers.FilterExclude(errs...))
 }
 
-// FilterErrors passes the error of the root Producer function with
+// WithErrorFilter passes the error of the root Producer function with
 // the ers.Filter.
-func (pf Producer[T]) FilterErrors(ef ers.Filter) Producer[T] {
+func (pf Producer[T]) WithErrorFilter(ef ers.Filter) Producer[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
+}
+
+// Filter creates a function that passes the output of the producer to
+// the filter function, which, if it returns true. is returned to the
+// caller, otherwise the Producer returns the zero value of type T and
+// ers.ErrCurrentOpSkip error (e.g. continue), which iterators and
+// other producer-consuming functions can respect.
+func (pf Producer[T]) Filter(fl func(T) bool) Producer[T] {
+	var zero T
+	return func(ctx context.Context) (T, error) {
+		val, err := pf(ctx)
+		if err != nil {
+			return zero, err
+		}
+		if !fl(val) {
+			return zero, ers.ErrCurrentOpSkip
+		}
+		return val, nil
+	}
 }
 
 // ParallelGenerate creates an iterator using a generator pattern which

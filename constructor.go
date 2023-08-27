@@ -97,10 +97,10 @@ func (Handlers) ErrorStackHandler() (*ers.Stack, Handler[error]) {
 // ers.Stack (as with ErrorStackHandler, though this is an
 // implementation detail.) ErrorCollector does use a mutex to guard
 // access to this. operation.
-func (Handlers) ErrorCollector() (Handler[error], Future[[]error]) {
+func (Handlers) ErrorCollector() (Handler[error], Future[error]) {
 	s, hf := HF.ErrorStackHandler()
 	mtx := &sync.Mutex{}
-	return hf.WithLock(mtx), Futurize(s.Unwind).WithLock(mtx)
+	return hf.WithLock(mtx), Futurize(s.Future()).WithLock(mtx)
 }
 
 // ErrorHandlerWithoutEOF wraps an error observer and propagates all

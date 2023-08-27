@@ -119,7 +119,11 @@ func (of Handler[T]) Lock() Handler[T] { return of.WithLock(&sync.Mutex{}) }
 
 // WithLock protects the action of the handler with the provied mutex.
 func (of Handler[T]) WithLock(mtx sync.Locker) Handler[T] {
-	return func(in T) { mtx.Lock(); defer mtx.Unlock(); of(in) }
+	return func(in T) {
+		mtx.Lock()
+		defer mtx.Unlock()
+		of(in)
+	}
 }
 
 // All processes all inputs with the specified handler.

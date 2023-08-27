@@ -131,6 +131,18 @@ func (e *Stack) Push(err error) {
 // explicitly typed as such.) which will Add errors to the stack.
 func (e *Stack) Handler() func(err error) { return e.Push }
 
+// Future provides a fun.Future[error] typed function (though
+// because ers is upstream of the root-fun package, it is not
+// explicitly typed as such.) which will resolve the stack.
+func (e *Stack) Future() func() error {
+	return func() error {
+		if e.count == 0 {
+			return nil
+		}
+		return e
+	}
+}
+
 // OK returns true if the Stack object contains no errors and false
 // otherwise.
 func (e *Stack) OK() bool { return e == nil || (e.err == nil && e.next == nil) }
