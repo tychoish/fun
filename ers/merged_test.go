@@ -85,6 +85,17 @@ func TestStack(t *testing.T) {
 			t.Error("every non-nil error stack should have an error")
 		}
 	})
+	t.Run("Future", func(t *testing.T) {
+		es := &Stack{}
+		future := es.Future()
+		check.NotError(t, future())
+		es.Push(ErrInvalidInput)
+		check.Error(t, future())
+		check.ErrorIs(t, future(), ErrInvalidInput)
+		st := AsStack(future())
+		check.Equal(t, st, es)
+	})
+
 	t.Run("CacheCorrectness", func(t *testing.T) {
 		es := &Stack{}
 		er1 := es.Add(errors.New(errval)).Error()

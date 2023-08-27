@@ -33,13 +33,6 @@ func MakeDistributor[T any](
 	}
 }
 
-func (d Distributor[T]) Filtered(filter func(T) bool) Distributor[T] {
-	out := d
-	out.push = out.push.Filter(filter)
-	out.pop = out.pop.Filter(filter)
-	return out
-}
-
 func (d Distributor[T]) WithInputFilter(filter func(T) bool) Distributor[T] {
 	out := d
 	out.push = out.push.Filter(filter)
