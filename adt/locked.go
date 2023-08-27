@@ -7,8 +7,20 @@ import (
 	"github.com/tychoish/fun"
 )
 
-func SynchronizeAccessors[T any](setter fun.Handler[T], getter fun.Future[T]) (fun.Handler[T], fun.Future[T]) {
+// AccessorsWithLock takes a getter/setter pair and configures both
+// with a shared mutex: all read/write operations are fully
+// synchronized with regards to eachother.
+func AccessorsWithLock[T any](getter fun.Future[T], setter fun.Handler[T]) (fun.Future[T], fun.Handler[T]) {
+	lock := &sync.Mutex{}
+	return getter.WithLock(lock), setter.WithLock(lock)
+}
 
+// AccessorsWithReadLock takes a getter/setter pair and configures
+// them with a rw-mutex: the getter (Future) uses the read lock, while
+// the setter is write-locked.
+func AccessorsWithReadLock[T any](getter fun.Future[T], setter fun.Handler[T]) (fun.Future[T], fun.Handler[T]) {
+	lock := &sync.RWMutex{}
+	return getter.WithLock(lock.RLocker()), setter.WithLock(lock)
 }
 
 // Synchronized wraps an arbitrary type with a lock, and provides a

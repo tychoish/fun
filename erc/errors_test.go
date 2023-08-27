@@ -370,7 +370,6 @@ func TestError(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "foo")
-
 		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {
