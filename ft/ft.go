@@ -89,10 +89,11 @@ func DefaultNew[T any](input *T) *T {
 	return new(T)
 }
 
-// WhenDefault combines Default() and WhenDo: if the input value is
-// the zero value for the comparable type T it is returned directly;
-// otherwise WhenDefault calls the provided function and returns it.
-func WhenDefault[T comparable](input T, fn func() T) T {
+// DefaultFuture combines Default() and WhenDo: if the input value is
+// NOT the zero value for the comparable type T it is returned directly;
+// otherwise DefaultFuture calls the provided function and returns its
+// output.
+func DefaultFuture[T comparable](input T, fn func() T) T {
 	if IsZero(input) {
 		return fn()
 	}

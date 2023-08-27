@@ -127,15 +127,15 @@ func TestDefault(t *testing.T) {
 	})
 	t.Run("Dynamic", func(t *testing.T) {
 		count := 0
-		assert.Equal(t, WhenDefault(0, func() int { count++; return 42 }), 42)
+		assert.Equal(t, DefaultFuture(0, func() int { count++; return 42 }), 42)
 		check.Equal(t, count, 1)
-		assert.Equal(t, WhenDefault(77, func() int { count++; return 42 }), 77)
+		assert.Equal(t, DefaultFuture(77, func() int { count++; return 42 }), 77)
 		check.Equal(t, count, 1)
 
-		assert.Equal(t, WhenDefault("", func() string { count++; return "kip" }), "kip")
+		assert.Equal(t, DefaultFuture("", func() string { count++; return "kip" }), "kip")
 		check.Equal(t, count, 2)
 
-		assert.Equal(t, WhenDefault("merlin", func() string { count++; return "kip" }), "merlin")
+		assert.Equal(t, DefaultFuture("merlin", func() string { count++; return "kip" }), "merlin")
 		check.Equal(t, count, 2)
 	})
 }
