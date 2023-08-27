@@ -23,14 +23,14 @@ import (
 //
 // Marshal/Unmarshal methods are provided to support using optional in
 // primary structs and to avoid the need to duplicate structs.
-type Optional[T int] struct {
+type Optional[T any] struct {
 	v       T
 	defined bool
 }
 
 // NewOptional is simple constructor that constructs a new populated
 // Optional value.
-func NewOptional[T int](in T) Optional[T] { return Optional[T]{v: in, defined: true} }
+func NewOptional[T any](in T) Optional[T] { return Optional[T]{v: in, defined: true} }
 
 // Default sets value of the optional to the provided value if it is
 // not already been defined.
@@ -65,7 +65,7 @@ func (o *Optional[T]) Swap(next T) (prev T) { prev = o.v; o.Set(next); return }
 
 // Get returns the current value of the optional and the ok value. Use
 // this to disambiguate zero values.
-func (o *Optional[T]) Get(in T) (T, bool) { return o.v, o.defined }
+func (o *Optional[T]) Get() (T, bool) { return o.v, o.defined }
 
 // Future provides access to the value of the optional as a Future
 // function. This does not disambiguate zero values. Use in
@@ -81,10 +81,6 @@ func (o *Optional[T]) Handler() fun.Handler[T] { return o.Set }
 
 // OK returns true when the optional
 func (o Optional[T]) OK() bool { return o.defined }
-
-// IsZero returns true when the Optional is not nil, defined, and the
-// value is non-zero.
-func (o *Optional[T]) IsZero() bool { return o != nil && (!o.defined || ft.IsZero(o.v)) }
 
 // Scan implements the sql Scanner interface. This is invalid if the
 // type of the optional value is not a primitive value type.
