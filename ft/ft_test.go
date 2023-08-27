@@ -40,6 +40,20 @@ func TestWhen(t *testing.T) {
 		WhenApply(false, func(in int) { called = true; check.Equal(t, in, 42) }, 40)
 		check.True(t, !called)
 	})
+	t.Run("ApplyFuture", func(t *testing.T) {
+		called := false
+		futureCalled := false
+		WhenApplyFuture(true, func(in int) { called = true; check.Equal(t, in, 42) }, func() int { futureCalled = true; return 42 })
+		check.True(t, called)
+		check.True(t, futureCalled)
+
+		called = false
+		futureCalled = false
+		WhenApplyFuture(false, func(in int) { called = true; check.Equal(t, in, 42) }, func() int { futureCalled = true; return 42 })
+		check.True(t, Not(called))
+		check.True(t, Not(futureCalled))
+	})
+
 	t.Run("Not", func(t *testing.T) {
 		check.True(t, !Not(true))
 		check.True(t, Not(false))

@@ -559,7 +559,7 @@ func (i *Iterator[T]) ProcessParallel(
 
 		wg := &WaitGroup{}
 
-		operation := fn.Safe().FilterErrors(func(err error) error {
+		operation := fn.WithRecover().FilterErrors(func(err error) error {
 			return ft.WhenDo(
 				!opts.CanContinueOnError(err),
 				ft.Wrapper(io.EOF),

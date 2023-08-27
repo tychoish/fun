@@ -160,20 +160,26 @@ func UnlessDo[T any](cond bool, op func() T) T { return IfDo(cond, nil, op) }
 // WhenApply runs the function with the supplied argument only when
 // the condition is true. Panics if the function is nil.
 func WhenApply[T any](cond bool, op func(T), arg T) {
-	if !cond {
-		return
+	if cond {
+		op(arg)
 	}
-	op(arg)
+}
+
+// WhenApplyFuture resolves the future and calls the operation
+// function only when the conditional is true.
+func WhenApplyFuture[T any](cond bool, op func(T), arg func() T) {
+	if cond {
+		op(arg())
+	}
 }
 
 // WhenHandle passes the argument "in" to the operation IF the
 // condition function (which also takes "in") returns true. Panics if
 // the function is nil.
 func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
-	if !cond(in) {
-		return
+	if cond(in) {
+		op(in)
 	}
-	op(in)
 }
 
 // DoTimes runs the specified option n times.

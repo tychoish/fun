@@ -78,9 +78,9 @@ func (pf Processor[T]) Operation(of Handler[error], in T) Operation {
 	return pf.Worker(in).Operation(of)
 }
 
-// Safe runs the producer, converted all panics into errors. Safe is
+// WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.
-func (pf Processor[T]) Safe() Processor[T] {
+func (pf Processor[T]) WithRecover() Processor[T] {
 	return func(ctx context.Context, in T) error { return pf.Worker(in).WithRecover().Run(ctx) }
 }
 

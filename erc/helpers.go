@@ -67,9 +67,15 @@ func Whenf(ec *Collector, cond bool, val string, args ...any) {
 	ec.Add(fmt.Errorf(val, args...))
 }
 
-// Safe provides similar semantics ft.Safe, but creates an error from
-// the panic value and adds it to the error collector.
-func Safe[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() }
+// WithRecoverDo runs the provided function, and catches a panic, if
+// if necessary and adds that panic to the collector. If there is no
+// panic, The return value is the return value of the provided
+// function.
+func WithRecoverDo[T any](ec *Collector, fn func() T) T { defer Recover(ec); return fn() }
+
+// WithRecoverCall calls the provided function and returns its output
+// to the caller.
+func WithRecoverCall(ec *Collector, fn func()) { defer Recover(ec); fn() }
 
 // Recover calls the builtin recover() function and converts it to an
 // error that is populated in the collector. Run RecoverHook in defer

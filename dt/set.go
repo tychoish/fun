@@ -128,8 +128,8 @@ func (s *Set[T]) forceSetupOrdered() {
 func (s *Set[T]) isOrdered() bool { return s.list != nil }
 
 func (s *Set[T]) init()            { s.hash = Map[T, *Element[T]]{} }
-func (*Set[T]) with(m *sync.Mutex) { ft.WhenCall(m != nil, m.Unlock) }
-func (s *Set[T]) lock() *sync.Mutex {
+func (*Set[T]) with(m sync.Locker) { ft.WhenCall(m != nil, m.Unlock) }
+func (s *Set[T]) lock() sync.Locker {
 	m := s.mtx.Get()
 	ft.WhenCall(m != nil, m.Lock)
 	ft.WhenCall(s.hash == nil, s.init)

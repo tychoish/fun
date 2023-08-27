@@ -343,10 +343,10 @@ func TestError(t *testing.T) {
 			}
 		})
 
-		t.Run("Safe", func(t *testing.T) {
+		t.Run("RecoverDo", func(t *testing.T) {
 			ec := &Collector{}
 
-			out := Safe(ec, func() string { panic("foo") })
+			out := WithRecoverDo(ec, func() string { panic("foo") })
 			if !ec.HasErrors() {
 				t.Fatal("empty collector")
 			}
@@ -358,6 +358,19 @@ func TestError(t *testing.T) {
 			if out != "" {
 				t.Fatal("output:", out)
 			}
+		})
+		t.Run("RecoverCall", func(t *testing.T) {
+			ec := &Collector{}
+
+			WithRecoverCall(ec, func() { panic("foo") })
+			if !ec.HasErrors() {
+				t.Fatal("empty collector")
+			}
+			err := ec.Resolve()
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.Substring(t, err.Error(), "foo")
+
 		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {

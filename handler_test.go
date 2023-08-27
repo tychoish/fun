@@ -16,7 +16,7 @@ func TestHandler(t *testing.T) {
 			panic(io.EOF)
 
 		}
-		assert.ErrorIs(t, ob.Check(100), io.EOF)
+		assert.ErrorIs(t, ob.RecoverPanic(100), io.EOF)
 	})
 	t.Run("Safe", func(t *testing.T) {
 		count := 0
@@ -31,7 +31,7 @@ func TestHandler(t *testing.T) {
 			panic(io.EOF)
 
 		}
-		ob.Safe(oe).Handle(100)
+		ob.WithRecover(oe).Handle(100)
 		assert.Equal(t, 1, count)
 	})
 	t.Run("HandlePassthrough", func(t *testing.T) {
