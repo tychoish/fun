@@ -103,7 +103,7 @@ func (o *Optional[T]) Scan(src any) (err error) {
 	case string:
 		return o.UnmarshalText([]byte(val))
 	case []byte:
-		return o.UnmarshalBinary([]byte(val))
+		return o.UnmarshalBinary(val)
 	default:
 		return ers.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
 			fmt.Errorf("%T can not be the value for Optional[%T]", src, o.v))
@@ -177,7 +177,7 @@ func (o *Optional[T]) UnmarshalText(in []byte) (err error) {
 		o.v = any(string(in)).(T)
 		return nil
 	case []byte:
-		o.v = any([]byte(in)).(T)
+		o.v = any(in).(T)
 		return nil
 	default:
 		return json.Unmarshal(in, &o.v)

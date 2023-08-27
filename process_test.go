@@ -569,6 +569,7 @@ func TestProcess(t *testing.T) {
 			time.Sleep(120 * time.Millisecond)
 			check.Equal(t, 0, wg.Num())
 			check.Equal(t, count.Load(), 100)
+			wg.Operation().Wait()
 		})
 	})
 	t.Run("Jitter", func(t *testing.T) {

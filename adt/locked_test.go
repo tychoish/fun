@@ -1,11 +1,15 @@
 package adt
 
 import (
+	"context"
 	"math/rand"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 )
@@ -84,7 +88,74 @@ func TestLocked(t *testing.T) {
 		t.Log("end; defering")
 		defer with(lock(mtx))
 		t.Log("defered")
+	})
+	t.Run("Accessors", func(t *testing.T) {
+		t.Run("Mutex", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
+			var getter fun.Future[int]
+			var setter fun.Handler[int]
+			getCalled := &atomic.Bool{}
+			setCalled := &atomic.Bool{}
+
+			getter = func() int { getCalled.Store(true); return 42 }
+			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
+			mget, mset := AccessorsWithLock(getter, setter)
+			start := time.Now()
+			sw := mset.Worker(267).Launch(ctx)
+			runtime.Gosched()
+			sig := make(chan struct{})
+			go func() {
+				defer close(sig)
+				check.MinRuntime(t, 100*time.Millisecond, func() { check.Equal(t, 42, mget()) })
+				check.NotError(t, sw(ctx))
+				if time.Since(start) < 100*time.Millisecond {
+					t.Log(time.Since(start))
+				}
+			}()
+
+			<-sig
+			check.True(t, getCalled.Load())
+			check.True(t, setCalled.Load())
+		})
+		t.Run("RWMutex", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			var getter fun.Future[int]
+			var setter fun.Handler[int]
+			getCalled := &atomic.Bool{}
+			setCalled := &atomic.Bool{}
+
+			getter = func() int { getCalled.Store(true); return 42 }
+			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
+			mget, mset := AccessorsWithReadLock(getter, setter)
+			start := time.Now()
+			sw := mset.Worker(267).Launch(ctx)
+			runtime.Gosched()
+			wg := &sync.WaitGroup{}
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				check.NotError(t, sw(ctx))
+				if time.Since(start) < 100*time.Millisecond {
+					t.Log(time.Since(start))
+				}
+			}()
+			go func() {
+				defer wg.Done()
+				check.Equal(t, mget(), 42)
+				if time.Since(start) < 100*time.Millisecond {
+					t.Log(time.Since(start))
+				}
+			}()
+
+			wg.Wait()
+			check.True(t, getCalled.Load())
+			check.True(t, setCalled.Load())
+
+		})
 	})
 
 }

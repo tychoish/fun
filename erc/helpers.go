@@ -67,7 +67,7 @@ func Whenf(ec *Collector, cond bool, val string, args ...any) {
 	ec.Add(fmt.Errorf(val, args...))
 }
 
-// WithRecoverDo runs the provided function, and catches a panic, if
+// WithRecoverDo runs the provided function, and catches a panic,
 // if necessary and adds that panic to the collector. If there is no
 // panic, The return value is the return value of the provided
 // function.
