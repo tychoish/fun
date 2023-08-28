@@ -520,32 +520,22 @@ func TestChannel(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			ch.Send().Write(ctx, i)
 		}
+		ch.Close()
 		count := 0
-		ro := ch.Receive().
+		err := ch.Receive().
 			Filter(ctx,
 				func(err error) { check.NotError(t, err) },
 				func(in int) bool { return in%2 == 0 && in != 0 },
-			) // .
-		// Iterator().
-		// Observe(func(in int) {
-		// 	count++
-		// 	check.True(t, ft.Not(in == 0))
-		// 	check.True(t, ft.Not(in%2 != 2))
-		// }).
-		// Run(ctx)
+			).
+			Iterator().
+			Observe(func(in int) {
+				count++
+				check.True(t, ft.Not(in == 0))
+				check.True(t, ft.Not(in%2 != 0))
+			}).
+			Run(ctx)
 
-		for in := range ro.ch {
-			check.True(t, ft.Not(in == 0))
-			check.True(t, ft.Not(in%2 != 0))
-			count++
-			if in == 98 {
-				break
-			}
-		}
-
-		// check.NotError(t, err)
+		check.NotError(t, err)
 		check.Equal(t, count, 49)
-
 	})
-
 }

@@ -129,7 +129,11 @@ type ChanReceive[T any] struct {
 func (ro ChanReceive[T]) Filter(ctx context.Context, eh Handler[error], filter func(T) bool) ChanReceive[T] {
 	out := ChanOp[T]{ch: make(chan T, 200), mode: ro.mode}
 
-	ro.Producer().Filter(filter).SendAll(out.Processor()).Background(ctx, eh)
+	ro.Producer().
+		WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).
+		Filter(filter).
+		SendAll(out.Processor()).
+		Background(ctx, eh)
 
 	return out.Receive()
 }

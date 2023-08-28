@@ -573,9 +573,9 @@ func TestOperation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		count := &atomic.Int64{}
-		var wf Operation = func(context.Context) { count.Add(1); time.Sleep(time.Millisecond) }
+		var wf Operation = func(context.Context) { count.Add(1); time.Sleep(10 * time.Millisecond) }
 		wf.While().Background(ctx)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		cancel()
 		check.True(t, count.Load() >= 6)
 	})
