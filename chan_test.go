@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 )
 
 func TestChannel(t *testing.T) {
@@ -511,4 +512,40 @@ func TestChannel(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Filter", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ch := Blocking(make(chan int, 100))
+		for i := 0; i < 100; i++ {
+			ch.Send().Write(ctx, i)
+		}
+		count := 0
+		ro := ch.Receive().
+			Filter(ctx,
+				func(err error) { check.NotError(t, err) },
+				func(in int) bool { return in%2 == 0 && in != 0 },
+			) // .
+		// Iterator().
+		// Observe(func(in int) {
+		// 	count++
+		// 	check.True(t, ft.Not(in == 0))
+		// 	check.True(t, ft.Not(in%2 != 2))
+		// }).
+		// Run(ctx)
+
+		for in := range ro.ch {
+			check.True(t, ft.Not(in == 0))
+			check.True(t, ft.Not(in%2 != 0))
+			count++
+			if in == 98 {
+				break
+			}
+		}
+
+		// check.NotError(t, err)
+		check.Equal(t, count, 49)
+
+	})
+
 }

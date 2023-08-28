@@ -127,11 +127,9 @@ type ChanReceive[T any] struct {
 // returns a NEW channel that only contains elements that have
 // elements that the filter function returns true for.
 func (ro ChanReceive[T]) Filter(ctx context.Context, eh Handler[error], filter func(T) bool) ChanReceive[T] {
-	out := ChanOp[T]{ch: make(chan T), mode: ro.mode}
+	out := ChanOp[T]{ch: make(chan T, 200), mode: ro.mode}
 
-	ro.Producer().Filter(filter).SendAll(out.Processor()).
-		PreHook(Operation(func(ctx context.Context) { <-ctx.Done(); out.Close() }).Once().Launch(ctx)).
-		Background(ctx, eh)
+	ro.Producer().Filter(filter).SendAll(out.Processor()).Background(ctx, eh)
 
 	return out.Receive()
 }
