@@ -2,13 +2,11 @@ package dt
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
 )
 
 // Pair represents a key-value pair. Used by the adt synchronized map
@@ -50,13 +48,9 @@ func ConsumePairs[K comparable, V any](
 	iter *fun.Iterator[Pair[K, V]],
 ) (*Pairs[K, V], error) {
 	p := &Pairs[K, V]{}
-	p.init()
-	if err := iter.Observe(func(in Pair[K, V]) {
-		p.AddPair(in)
-	}).Run(ctx); err != nil {
+	if err := p.Consume(ctx, iter); err != nil {
 		return nil, err
 	}
-
 	return p, nil
 }
 
@@ -65,8 +59,25 @@ func (p *Pairs[K, V]) initalizeList() {
 	ft.WhenCall(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} })
 }
 
+// Consume adds items from an iterator of pairs to the current Pairs slice.
+func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
+	return iter.Observe(func(item Pair[K, V]) { p.Push(item) }).Run(ctx)
+}
+
 // Iterator return an iterator over each key-value pairs.
 func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { p.init(); return p.ll.Iterator() }
+
+// Keys returns an iterator over only the keys in a sequence of
+// iterator items.
+func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
+	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Process(p.Iterator())
+}
+
+// Values returns an iterator over only the values in a sequence of
+// iterator pairs.
+func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
+	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Process(p.Iterator())
+}
 
 // Slice creates a new slice of all the Pair objects.
 func (p *Pairs[K, V]) Slice() []Pair[K, V] { return ft.Must(p.Iterator().Slice(context.Background())) }
@@ -87,18 +98,6 @@ func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.Sor
 // Len returns the number of items in the pairs object.
 func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 
-// Keys returns an iterator over only the keys in a sequence of
-// iterator items.
-func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
-	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Process(p.Iterator())
-}
-
-// Values returns an iterator over only the values in a sequence of
-// iterator pairs.
-func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
-	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Process(p.Iterator())
-}
-
 // Observe calls the handler function for every pair in the container.
 func (p *Pairs[K, V]) Observe(hf fun.Handler[Pair[K, V]]) { p.Process(hf.Processor()).Ignore().Wait() }
 
@@ -110,8 +109,8 @@ func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
 		if p.ll.Len() == 0 {
 			return nil
 		}
-		for li := p.ll.Front(); li.OK(); li = li.Next() {
-			if err := pf(ctx, li.Value()); err != nil {
+		for l := p.ll.Front(); l.OK(); l = l.Next() {
+			if err := pf(ctx, l.Value()); err != nil {
 				return err
 			}
 		}
@@ -119,105 +118,19 @@ func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
 	}
 }
 
-// MarshalJSON produces a JSON encoding for the Pairs object by first
-// converting it to a map and then encoding that map as JSON. The JSON
-// serialization does not necessarily preserve the order of the pairs
-// object.
-func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
-	buf := &internal.IgnoreNewLinesBuffer{}
-	enc := json.NewEncoder(buf)
-	buf.WriteByte('{')
-
-	first := true
-	if err := p.Process(fun.MakeProcessor(func(item Pair[K, V]) error {
-		if first {
-			first = false
-		} else {
-			buf.WriteByte(',')
-		}
-		if err := enc.Encode(item.Key); err != nil {
-			return err
-		}
-		_ = buf.WriteByte(':')
-
-		return enc.Encode(item.Value)
-	})).Wait(); err != nil {
-		return nil, err
-	}
-
-	buf.WriteByte('}')
-	return buf.Bytes(), nil
-}
-
-// UnmarshalJSON provides consistent JSON decoding for Pairs
-// objects. It reads a JSON document into a map and converts it to
-// pairs, and appends it to the existing Pairs objects without
-// removing or resetting the current object.
-func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
-	t := make(map[K]V)
-	if err := json.Unmarshal(in, &t); err != nil {
-		return err
-	}
-
-	p.ConsumeMap(t)
-	return nil
-}
-
 // Add adds a new value to the underlying slice. This may add a
-// duplicate key.
-func (p *Pairs[K, V]) Add(k K, v V) *Pairs[K, V] { return p.AddPair(Pair[K, V]{Key: k, Value: v}) }
+// duplicate key. The return value is provided to support chaining
+// Add() operations
+func (p *Pairs[K, V]) Add(k K, v V) *Pairs[K, V] { p.Push(Pair[K, V]{Key: k, Value: v}); return p }
 
-// AddPair adds a single pair to the slice of pairs. This may add a
+// Push adds a single pair to the slice of pairs. This may add a
 // duplicate key.
-func (p *Pairs[K, V]) AddPair(pair Pair[K, V]) *Pairs[K, V] { p.init(); p.ll.PushBack(pair); return p }
+func (p *Pairs[K, V]) Push(pair Pair[K, V]) { p.init(); p.ll.PushBack(pair) }
 
 // Append as a collection of pairs to the collection of key/value
 // pairs.
-func (p *Pairs[K, V]) Append(new ...Pair[K, V]) *Pairs[K, V] { p.init(); p.ll.Append(new...); return p }
+func (p *Pairs[K, V]) Append(new ...Pair[K, V]) { p.init(); p.ll.Append(new...) }
 
 // Extend adds the items from a Pairs object (slice of Pair) without
 // modifying the donating object.
 func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
-
-// Consume adds items from an iterator of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
-	return iter.Observe(func(item Pair[K, V]) { p.AddPair(item) }).Run(ctx)
-}
-
-// ConsumeValues adds all of the values in the input iterator,
-// generating the keys using the function provided.
-func (p *Pairs[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) error {
-	return p.Consume(ctx, fun.Converter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Process(iter))
-}
-
-// ConsumeMap adds all of the items in a map to the Pairs object.
-func (p *Pairs[K, V]) ConsumeMap(in map[K]V) *Pairs[K, V] {
-	fun.Invariant.Must(p.Consume(context.Background(), Mapify(in).Iterator()))
-	return p
-}
-
-// ConsumeSlice adds all the values in the input slice to the Pairs
-// object, creating the keys using the function provide.
-func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) *Pairs[K, V] {
-	Sliceify(in).Observe(func(value V) { p.Add(keyf(value), value) })
-	return p
-}
-
-// Map converts a list of pairs to the equivalent map. If there are
-// duplicate keys in the Pairs list, only the first occurrence of the
-// key is retained.
-func (p *Pairs[K, V]) Map() map[K]V {
-	p.init()
-	out := make(map[K]V, p.ll.Len())
-	for i := p.ll.Front(); i.OK(); i = i.Next() {
-		pair := i.Value()
-		if _, ok := out[pair.Key]; ok {
-			continue
-		}
-
-		out[pair.Key] = pair.Value
-
-	}
-
-	return out
-}

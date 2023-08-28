@@ -51,7 +51,8 @@ func TestFundamentals(t *testing.T) {
 		metadata := Plist()
 		check.True(t, metadata != nil)
 		check.Equal(t, metadata.Len(), 0)
-		metadata.Add("one", 2).Add("two", 3)
+		metadata.Add("one", 2)
+		metadata.Add("two", 3)
 		check.Equal(t, metadata.Len(), 2)
 
 	})

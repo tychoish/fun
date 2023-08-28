@@ -19,8 +19,8 @@ import (
 // as in:
 //
 //	ensure.That(is.True(os.IsNotExists(err))).Metadata(
-//	          is.Plist().Add("name", name).
-//	                     Add("path", path)).Run(t)
+//	          is.Plist().Pair("name", name).
+//	                     Pair("path", path)).Run(t)
 func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
 
 // That is the root type for the assertion helpers in this

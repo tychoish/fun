@@ -134,7 +134,7 @@ func TestOptioal(t *testing.T) {
 				check.True(t, opt.OK())
 			})
 			t.Run("Scanner", func(t *testing.T) {
-				opt := &Optional[*mockSqlCell]{}
+				opt := &Optional[*mockSQLcell]{}
 				now := time.Now()
 				assert.NotError(t, opt.Scan(now))
 				assert.Equal(t, now, opt.v.src.(time.Time))
@@ -184,7 +184,7 @@ func TestOptioal(t *testing.T) {
 			})
 			t.Run("Valuer", func(t *testing.T) {
 				now := time.Now()
-				opt := NewOptional(&mockSqlCell{src: now})
+				opt := NewOptional(&mockSQLcell{src: now})
 				val, err := opt.Value()
 				assert.NotError(t, err)
 				check.Equal(t, val.(time.Time), now)
@@ -215,8 +215,8 @@ func TestOptioal(t *testing.T) {
 	t.Run("Text", func(t *testing.T) {
 		t.Run("Marshal", func(t *testing.T) {
 			t.Run("JSON", func(t *testing.T) {
-				opt := &Optional[*mockJsonCodec]{}
-				opt.Set(&mockJsonCodec{output: []byte("helloJSON")})
+				opt := &Optional[*mockJSONcodec]{}
+				opt.Set(&mockJSONcodec{output: []byte("helloJSON")})
 				val, err := opt.MarshalText()
 				assert.NotError(t, err)
 				assert.Equal(t, string(val), "helloJSON")
@@ -274,7 +274,7 @@ func TestOptioal(t *testing.T) {
 		})
 		t.Run("Unmarshal", func(t *testing.T) {
 			t.Run("JSON", func(t *testing.T) {
-				opt := &Optional[*mockJsonCodec]{}
+				opt := &Optional[*mockJSONcodec]{}
 				check.NotError(t, opt.UnmarshalText([]byte("hello jason")))
 				check.Equal(t, opt.v.count, 1)
 				check.Equal(t, string(opt.v.input), "hello jason")
@@ -389,14 +389,14 @@ func TestOptioal(t *testing.T) {
 
 }
 
-type mockSqlCell struct {
+type mockSQLcell struct {
 	src   any
 	err   error
 	count int
 }
 
-func (s *mockSqlCell) Scan(src any) error           { s.count++; s.src = src; return s.err }
-func (s *mockSqlCell) Value() (driver.Value, error) { s.count++; return s.src, s.err }
+func (s *mockSQLcell) Scan(src any) error           { s.count++; s.src = src; return s.err }
+func (s *mockSQLcell) Value() (driver.Value, error) { s.count++; return s.src, s.err }
 
 type mockBinaryCodec struct {
 	input  []byte
@@ -436,15 +436,15 @@ type mockGenericCodec struct {
 func (mtc *mockGenericCodec) Marshal() ([]byte, error)  { mtc.count++; return mtc.output, mtc.err }
 func (mtc *mockGenericCodec) Unmarshal(in []byte) error { mtc.count++; mtc.input = in; return mtc.err }
 
-type mockJsonCodec struct {
+type mockJSONcodec struct {
 	input  []byte
 	output []byte
 	err    error
 	count  int
 }
 
-func (mtc *mockJsonCodec) MarshalJSON() ([]byte, error)  { mtc.count++; return mtc.output, mtc.err }
-func (mtc *mockJsonCodec) UnmarshalJSON(in []byte) error { mtc.count++; mtc.input = in; return mtc.err }
+func (mtc *mockJSONcodec) MarshalJSON() ([]byte, error)  { mtc.count++; return mtc.output, mtc.err }
+func (mtc *mockJSONcodec) UnmarshalJSON(in []byte) error { mtc.count++; mtc.input = in; return mtc.err }
 
 type mockYamlCodec struct {
 	input  []byte

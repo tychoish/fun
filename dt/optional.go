@@ -109,7 +109,7 @@ func (o *Optional[T]) Scan(src any) (err error) {
 		return any(o.v).(sql.Scanner).Scan(src)
 	}
 
-	switch val := any(src).(type) {
+	switch val := src.(type) {
 	case string:
 		return o.UnmarshalText([]byte(val))
 	case []byte:

@@ -15,7 +15,7 @@ import (
 func makeMap(size int) Map[string, int] {
 	out := Mapify(make(map[string]int, size))
 	for i := 0; len(out) < size; i++ {
-		out[fmt.Sprint(rand.Intn((1+i)*100000))] = i
+		out[fmt.Sprint(rand.Intn((1+i)*1000000))] = i
 	}
 	return Mapify(out)
 }
@@ -121,19 +121,15 @@ func TestMap(t *testing.T) {
 			check.Equal(t, mp["3"], 3)
 		})
 		t.Run("Prine", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
 			orig := Map[string, int]{
 				"1": 1,
 				"2": 2,
 				"3": 3,
 			}
 			mp := Map[string, int]{}
-			iter := orig.Iterator()
 			assert.Equal(t, len(orig), 3)
 			assert.Equal(t, len(mp), 0)
-			mp.Consume(ctx, iter)
+			mp.ConsumePairs(orig.Pairs())
 			check.Equal(t, mp["1"], 1)
 			check.Equal(t, mp["2"], 2)
 			check.Equal(t, mp["3"], 3)

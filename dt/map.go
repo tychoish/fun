@@ -85,15 +85,30 @@ func (m Map[K, V]) Load(key K) (V, bool) { v, ok := m[key]; return v, ok }
 // for the value type.
 func (m Map[K, V]) SetDefault(key K) { var vl V; m[key] = vl }
 
-// Pairs exports a map a Pairs object, which is an alias for a slice of
-// Pair objects.
-func (m Map[K, V]) Pairs() *Pairs[K, V] { p := MakePairs[K, V](); return p.ConsumeMap(m) }
+// Pairs exports a Pairs object, containing the contents of the map.
+func (m Map[K, V]) Pairs() *Pairs[K, V] {
+	p := MakePairs[K, V]()
+	for k, v := range m {
+		p.Add(k, v)
+	}
+	return p
+}
+
+// Tupes exports a map a Pairs object, containing the contents of the map.
+func (m Map[K, V]) Tuples() *Tuples[K, V] {
+	tp := MakeTuples[K, V]()
+	for k, v := range m {
+		tp.Add(k, v)
+	}
+	return tp
+}
 
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }
 
 // AddPair adds a Pair object to the map.
-func (m Map[K, V]) AddPair(p Pair[K, V]) { m.Add(p.Key, p.Value) }
+func (m Map[K, V]) AddPair(p Pair[K, V])   { m.Add(p.Key, p.Value) }
+func (m Map[K, V]) AddTuple(p Tuple[K, V]) { m.Add(p.One, p.Two) }
 
 // Append adds a sequence of Pair objects to the map.
 func (m Map[K, V]) Append(pairs ...Pair[K, V]) { Sliceify(pairs).Observe(m.AddPair) }
@@ -124,10 +139,16 @@ func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 	}
 }
 
-// Consume adds items to the map from an iterator of Pair
-// objects. Existing values for K are always overwritten.
-func (m Map[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) {
-	fun.Invariant.Must(iter.Observe(func(in Pair[K, V]) { m.AddPair(in) }).Run(ctx))
+// ConsumePairs adds items to the map from a Pairs object. Existing
+// values for K are always overwritten.
+func (m Map[K, V]) ConsumePairs(pairs *Pairs[K, V]) {
+	pairs.Iterator().Observe(m.AddPair).Ignore().Wait()
+}
+
+// ConsumeTuples adds items to the map from a Tuples object. Existing
+// values for K are always overwritten.
+func (m Map[K, V]) ConsumeTuples(tuples *Tuples[K, V]) {
+	tuples.Iterator().Observe(m.AddTuple).Ignore().Wait()
 }
 
 // ConsumeValues adds items to the map, using the function to generate
