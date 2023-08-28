@@ -6,6 +6,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/tychoish/fun"
@@ -91,15 +92,24 @@ func (o *Optional[T]) Scan(src any) (err error) {
 		o.v = zero
 		return nil
 	}
+	o.init()
 
 	defer func() { o.defined = (err == nil && ft.Not(ft.IsNil(o.v))) }()
 
-	switch val := src.(type) {
-	case T:
+	if ft.IsType[int](src) && ft.IsType[int64](o.v) {
+		o.v = any(int64(src.(int))).(T)
+		return nil
+	}
+	if val, ok := ft.Cast[T](src); ok {
 		o.v = val
 		return nil
-	case sql.Scanner:
-		return val.Scan(src)
+	}
+	if ft.IsType[sql.Scanner](o.v) {
+		o.init()
+		return any(o.v).(sql.Scanner).Scan(src)
+	}
+
+	switch val := any(src).(type) {
 	case string:
 		return o.UnmarshalText([]byte(val))
 	case []byte:
@@ -107,6 +117,12 @@ func (o *Optional[T]) Scan(src any) (err error) {
 	default:
 		return ers.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
 			fmt.Errorf("%T can not be the value for Optional[%T]", src, o.v))
+	}
+}
+
+func (o *Optional[T]) init() {
+	if ft.IsNil(o.v) && ft.IsPtr(o.v) {
+		o.v = reflect.New(reflect.ValueOf(any(o.v)).Type().Elem()).Interface().(T)
 	}
 }
 
@@ -121,6 +137,8 @@ func (o Optional[T]) Value() (driver.Value, error) {
 	switch val := any(o.v).(type) {
 	case int64, float64, bool, time.Time, string, []byte:
 		return val, nil
+	case int:
+		return int64(val), nil
 	case driver.Valuer:
 		return val.Value()
 	case encoding.TextMarshaler:
@@ -128,7 +146,8 @@ func (o Optional[T]) Value() (driver.Value, error) {
 	case encoding.BinaryMarshaler:
 		return val.MarshalBinary()
 	default:
-		return o.v, nil
+		return nil, ers.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
+			fmt.Errorf("%T cannot be cast to driver.Value", val))
 	}
 }
 
@@ -142,12 +161,12 @@ func (o Optional[T]) MarshalText() ([]byte, error) {
 	switch vt := any(o.v).(type) {
 	case encoding.TextMarshaler:
 		return vt.MarshalText()
-	case json.Marshaler:
-		return vt.MarshalJSON()
 	case interface{ MarshalYAML() ([]byte, error) }:
 		return vt.MarshalYAML()
 	case interface{ Marshal() ([]byte, error) }:
 		return vt.Marshal()
+	case json.Marshaler:
+		return vt.MarshalJSON()
 	case string:
 		return []byte(vt), nil
 	case []byte:
@@ -163,7 +182,9 @@ func (o Optional[T]) MarshalText() ([]byte, error) {
 // interface. Strings and bytes slices pass through directly, and
 // json.Unmarshal() is used in all other situations.
 func (o *Optional[T]) UnmarshalText(in []byte) (err error) {
-	defer func() { o.defined = (err == nil) }()
+	defer func() { o.defined = (err == nil && ft.Not(ft.IsNil(o.v))) }()
+	o.init()
+
 	switch vt := any(o.v).(type) {
 	case encoding.TextUnmarshaler:
 		return vt.UnmarshalText(in)
@@ -191,33 +212,33 @@ func (o *Optional[T]) UnmarshalText(in []byte) (err error) {
 // passed through.
 func (o Optional[T]) MarshalBinary() ([]byte, error) {
 	switch vt := any(o.v).(type) {
-	case encoding.BinaryMarshaler:
-		return vt.MarshalBinary()
 	case interface{ MarshalBSON() ([]byte, error) }:
 		return vt.MarshalBSON()
 	case interface{ Marshal() ([]byte, error) }:
 		return vt.Marshal()
+	case encoding.BinaryMarshaler:
+		return vt.MarshalBinary()
 	case []byte:
 		return vt, nil
-	case string:
-		return []byte(vt), nil
 	default:
 		return nil, fmt.Errorf("could not marshal %T, implement econding.BinaryMarshaler", o.v)
-
 	}
 }
 
 // UnmarshalBinary provides a compliment to MarshalBinary, and serves
 // as a passthrough for encoding.BinaryUnmarshaler, bson.Unmarshaler
 // and the generic Unmarshal interface.
-func (o *Optional[T]) UnmarshalBinary(in []byte) error {
+func (o *Optional[T]) UnmarshalBinary(in []byte) (err error) {
+	defer func() { o.defined = (err == nil && ft.Not(ft.IsNil(o.v))) }()
+
+	o.init()
 	switch vt := any(o.v).(type) {
-	case encoding.BinaryUnmarshaler:
-		return vt.UnmarshalBinary(in)
 	case interface{ UnmarshalBSON([]byte) error }:
 		return vt.UnmarshalBSON(in)
 	case interface{ Unmarshal([]byte) error }:
 		return vt.Unmarshal(in)
+	case encoding.BinaryUnmarshaler:
+		return vt.UnmarshalBinary(in)
 	case []byte:
 		o.v = any(in).(T)
 		return nil

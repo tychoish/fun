@@ -611,4 +611,25 @@ func TestProcess(t *testing.T) {
 		}).Retry(32, 42).Run(ctx)
 		assert.NotError(t, err)
 	})
+	t.Run("Filter", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		proc := MakeProcessor(func(in int) error {
+			check.Equal(t, in, 42)
+			return nil
+		}).Filter(func(in int) bool { return in == 42 })
+
+		for i := 0; i < 100; i++ {
+			err := proc(ctx, i)
+			switch {
+			case err == nil:
+				return
+			case errors.Is(err, ers.ErrCurrentOpSkip):
+				continue
+			default:
+				assert.Error(t, err)
+			}
+		}
+	})
 }

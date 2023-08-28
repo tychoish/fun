@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 )
 
 // Distributor provides a layer of indirection above queue-like
@@ -38,7 +39,7 @@ func MakeDistributor[T any](
 // filter returns true items are propagated and are skipped otherwise.
 func (d Distributor[T]) WithInputFilter(filter func(T) bool) Distributor[T] {
 	out := d
-	out.push = out.push.Filter(filter)
+	out.push = out.push.Filter(filter).WithoutErrors(ers.ErrCurrentOpSkip)
 	return out
 }
 

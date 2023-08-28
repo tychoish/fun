@@ -538,4 +538,15 @@ func TestChannel(t *testing.T) {
 		check.NotError(t, err)
 		check.Equal(t, count, 49)
 	})
+	t.Run("SizeReporters", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ch := Blocking(make(chan int, 100))
+		check.Equal(t, 100, ch.Cap())
+		check.Equal(t, 0, ch.Len())
+		ch.Send().Write(ctx, 42)
+		check.Equal(t, 100, ch.Cap())
+		check.Equal(t, 1, ch.Len())
+	})
 }
