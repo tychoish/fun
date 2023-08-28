@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -93,6 +94,58 @@ func TestDistributor(t *testing.T) {
 				t.Error(iter.Value())
 			}
 		})
+	})
+	t.Run("Filter", func(t *testing.T) {
+		t.Run("Input", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ch := fun.Blocking(make(chan int, 100))
+			dist := DistributorChanOp(ch).
+				WithInputFilter(func(in int) bool { fmt.Println(in); return in%2 == 0 && in != 0 })
+
+			for i := 0; i < 100; i++ {
+				assert.NotError(t, dist.Send(ctx, i))
+			}
+
+			ch.Close()
+
+			count := 0
+			err := dist.Iterator().
+				Observe(func(in int) {
+					count++
+					check.True(t, ft.Not(in == 0))
+					check.True(t, ft.Not(in%2 != 0))
+				}).
+				Run(ctx)
+
+			check.NotError(t, err)
+			check.Equal(t, count, 49)
+		})
+		t.Run("Output", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := fun.Blocking(make(chan int, 100))
+			for i := 0; i < 100; i++ {
+				check.NotError(t, ch.Send().Write(ctx, i))
+			}
+
+			ch.Close()
+			count := 0
+			err := DistributorChanOp(ch).
+				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 }).
+				Iterator().
+				Observe(func(in int) {
+					count++
+					check.True(t, ft.Not(in == 0))
+					check.True(t, ft.Not(in%2 != 0))
+				}).
+				Run(ctx)
+
+			check.NotError(t, err)
+			check.Equal(t, count, 49)
+		})
+
 	})
 
 	t.Run("Table", func(t *testing.T) {

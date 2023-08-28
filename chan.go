@@ -80,6 +80,12 @@ func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlo
 // Close closes the underlying channel.
 func (op ChanOp[T]) Close() { close(op.ch) }
 
+// Len returns the current length of the channel.
+func (op ChanOp[T]) Len() int { return len(op.ch) }
+
+// Cap returns the current capacity of the channel.
+func (op ChanOp[T]) Cap() int { return cap(op.ch) }
+
 // Blocking returns a version of the ChanOp in blocking mode.
 func (op ChanOp[T]) Blocking() ChanOp[T] { op.mode = modeBlocking; return op }
 
@@ -110,9 +116,7 @@ func (op ChanOp[T]) Producer() Producer[T] { return op.Receive().Producer() }
 
 // Pipe creates a linked pair of functions for transmitting data via
 // these interfaces.
-func (op ChanOp[T]) Pipe() (Processor[T], Producer[T]) {
-	return op.Processor(), op.Producer()
-}
+func (op ChanOp[T]) Pipe() (Processor[T], Producer[T]) { return op.Processor(), op.Producer() }
 
 // ChanReceive, wraps a channel fore <-chan T operations. It is the type
 // returned by the ChanReceive() method on ChannelOp. The primary method

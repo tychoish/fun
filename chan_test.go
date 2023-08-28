@@ -518,7 +518,7 @@ func TestChannel(t *testing.T) {
 
 		ch := Blocking(make(chan int, 100))
 		for i := 0; i < 100; i++ {
-			ch.Send().Write(ctx, i)
+			assert.NotError(t, ch.Send().Write(ctx, i))
 		}
 		ch.Close()
 		count := 0

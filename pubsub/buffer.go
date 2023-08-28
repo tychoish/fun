@@ -11,8 +11,8 @@ import (
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
 //
-// Distributors redturned by the pubsub package provide iterators that
-// are destructive:
+// Distributors returned by the pubsub package provide iterators that
+// are destructive, and
 type Distributor[T any] struct {
 	push fun.Processor[T]
 	pop  fun.Producer[T]
@@ -33,15 +33,22 @@ func MakeDistributor[T any](
 	}
 }
 
+// WithInputFilter returns a copy of the distributor where all items
+// pass through a filter before being written/passed to Send. When the
+// filter returns true items are propagated and are skipped otherwise.
 func (d Distributor[T]) WithInputFilter(filter func(T) bool) Distributor[T] {
 	out := d
 	out.push = out.push.Filter(filter)
 	return out
 }
 
+// WithOutputFilter returns a copy of the distributor where all items
+// pass through the provided filter before being delivered to
+// readers/Receive. When the filter returns true items are propagated
+// and are skipped otherwise.
 func (d Distributor[T]) WithOutputFilter(filter func(T) bool) Distributor[T] {
 	out := d
-	out.push = out.push.Filter(filter)
+	out.pop = out.pop.Filter(filter)
 	return out
 }
 
@@ -71,17 +78,11 @@ func (d Distributor[T]) Iterator() *fun.Iterator[T] { return d.Producer().Iterat
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
-func DistributorChannel[T any](ch chan T) Distributor[T] {
-	return DistributorChanOp(fun.Blocking(ch))
-}
+func DistributorChannel[T any](ch chan T) Distributor[T] { return DistributorChanOp(fun.Blocking(ch)) }
 
 // DistributorChanOp constructs a Distributor from the channel
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions
-func DistributorChanOp[T any](chop fun.ChanOp[T]) Distributor[T] {
-	return MakeDistributor(
-		chop.Send().Processor(),
-		chop.Receive().Producer(),
-		func() int { return len(chop.Channel()) },
-	)
+func DistributorChanOp[T any](ch fun.ChanOp[T]) Distributor[T] {
+	return MakeDistributor(ch.Send().Processor(), ch.Receive().Producer(), ch.Len)
 }
