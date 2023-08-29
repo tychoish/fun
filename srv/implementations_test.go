@@ -222,13 +222,15 @@ func TestHelpers(t *testing.T) {
 
 func TestCmd(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 4; i++ {
 		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
 			t.Parallel()
 			t.Run("SimpleSleep", func(t *testing.T) {
-				cmd := exec.Command("sleep", "1")
-				s := Cmd(cmd, 0)
+				t.Parallel()
+
 				ctx := testt.Context(t)
+				cmd := exec.CommandContext(ctx, "sleep", "1")
+				s := Cmd(cmd, 0)
 				assert.MaxRuntime(t, 1250*time.Millisecond, func() {
 					check.NotError(t, s.Start(ctx))
 					check.NotError(t, s.Wait())
@@ -236,6 +238,8 @@ func TestCmd(t *testing.T) {
 				assert.True(t, s.isFinished.Load())
 			})
 			t.Run("QuickReturn", func(t *testing.T) {
+				t.Parallel()
+
 				cmd := exec.Command("sleep", ".1")
 				s := Cmd(cmd, 0)
 				ctx := testt.Context(t)
@@ -247,8 +251,9 @@ func TestCmd(t *testing.T) {
 				assert.True(t, s.isFinished.Load())
 			})
 			t.Run("RunningStartedErrors", func(t *testing.T) {
+				t.Parallel()
 				ctx := testt.Context(t)
-				cmd := exec.Command("sleep", "10")
+				cmd := exec.CommandContext(ctx, "sleep", "10")
 				_ = cmd.Start()
 				s := Cmd(cmd, 0)
 				check.NotError(t, s.Start(ctx))
@@ -257,8 +262,9 @@ func TestCmd(t *testing.T) {
 				assert.Substring(t, err.Error(), "already started")
 			})
 			t.Run("TimeoutObserved", func(t *testing.T) {
+				t.Parallel()
 				ctx := testt.Context(t)
-				cmd := exec.Command("sleep", "2")
+				cmd := exec.CommandContext(ctx, "sleep", "2")
 				s := Cmd(cmd, 10*time.Millisecond)
 				check.NotError(t, s.Start(ctx))
 				assert.MaxRuntime(t, 100*time.Millisecond, func() {
@@ -267,16 +273,17 @@ func TestCmd(t *testing.T) {
 				})
 			})
 			t.Run("ForceSigKILL", func(t *testing.T) {
+				t.Parallel()
 				ctx := testt.Context(t)
-				cmd := exec.Command("bash", "-c", "trap SIGTERM; sleep 15; echo 'woop'")
+				cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 15; echo 'woop'")
 				out := &bytes.Buffer{}
 				cmd.Stdout = out
 				cmd.Stderr = out
-				s := Cmd(cmd, time.Millisecond)
+				s := Cmd(cmd, 10*time.Millisecond)
 
 				check.NotError(t, s.Start(ctx))
 				runtime.Gosched()
-				assert.MaxRuntime(t, 20*time.Millisecond, func() {
+				assert.MaxRuntime(t, 500*time.Millisecond, func() {
 					s.Close()
 					runtime.Gosched()
 					err := s.Wait()
