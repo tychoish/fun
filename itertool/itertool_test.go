@@ -286,6 +286,20 @@ func TestIndexed(t *testing.T) {
 	assert.Equal(t, count, 10)
 }
 
+func TestChainSlices(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	iter := ChainSliceIterators(fun.VariadicIterator(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
+	count := 0
+	err := iter.Observe(func(in int) {
+		count++
+		check.True(t, in >= 0 && in < 64)
+	}).Run(ctx)
+	check.NotError(t, err)
+	assert.Equal(t, count, 256)
+}
+
 func makeIntSlice(size int) []int {
 	out := make([]int, size)
 	for i := 0; i < size; i++ {
