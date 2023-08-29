@@ -58,10 +58,9 @@ func TestPairExtra(t *testing.T) {
 
 			p := Pairs[string, int]{}
 			err := p.ConsumeValues(
-				ctx,
 				Sliceify([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
-			)
+			).Run(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, p.Len(), 3)
 			ps := p.Slice()
@@ -153,7 +152,7 @@ func TestPairExtra(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(ctx, sp.Iterator()))
+		assert.NotError(t, ps.Consume(sp.Iterator()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := ps.Map()
 		assert.Equal(t, len(mp), 128)

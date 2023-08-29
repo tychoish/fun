@@ -48,7 +48,7 @@ func ConsumePairs[K comparable, V any](
 	iter *fun.Iterator[Pair[K, V]],
 ) (*Pairs[K, V], error) {
 	p := &Pairs[K, V]{}
-	if err := p.Consume(ctx, iter); err != nil {
+	if err := p.Consume(iter).Run(ctx); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -60,8 +60,8 @@ func (p *Pairs[K, V]) initalizeList() {
 }
 
 // Consume adds items from an iterator of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Pair[K, V]]) error {
-	return iter.Observe(func(item Pair[K, V]) { p.Push(item) }).Run(ctx)
+func (p *Pairs[K, V]) Consume(iter *fun.Iterator[Pair[K, V]]) fun.Worker {
+	return iter.Observe(func(item Pair[K, V]) { p.Push(item) })
 }
 
 // Iterator return an iterator over each key-value pairs.

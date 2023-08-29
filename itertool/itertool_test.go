@@ -286,18 +286,29 @@ func TestIndexed(t *testing.T) {
 	assert.Equal(t, count, 10)
 }
 
-func TestChainSlices(t *testing.T) {
+func TestMergeSlices(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	iter := ChainSliceIterators(fun.VariadicIterator(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
-	count := 0
-	err := iter.Observe(func(in int) {
-		count++
-		check.True(t, in >= 0 && in < 64)
-	}).Run(ctx)
-	check.NotError(t, err)
-	assert.Equal(t, count, 256)
+	t.Run("Iterators", func(t *testing.T) {
+		iter := MergeSliceIterators(fun.VariadicIterator(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
+		count := 0
+		err := iter.Observe(func(in int) {
+			count++
+			check.True(t, in >= 0 && in < 64)
+		}).Run(ctx)
+		check.NotError(t, err)
+		assert.Equal(t, count, 256)
+	})
+	t.Run("Slice", func(t *testing.T) {
+		iter := MergeSlices(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64))
+		count := 0
+		err := iter.Observe(func(in int) {
+			count++
+			check.True(t, in >= 0 && in < 64)
+		}).Run(ctx)
+		check.NotError(t, err)
+		assert.Equal(t, count, 256)
+	})
 }
 
 func makeIntSlice(size int) []int {

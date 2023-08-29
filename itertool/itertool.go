@@ -256,19 +256,37 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 	return pipe.Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 
-// ChainSliceIterators converts an iterator of slices to an flattened
+// MergeSliceIterators converts an iterator of slices to an flattened
 // iterator of their elements.
-func ChainSliceIterators[T any](iter *fun.Iterator[[]T]) *fun.Iterator[T] {
+func MergeSliceIterators[T any](iter *fun.Iterator[[]T]) *fun.Iterator[T] {
 	pipe := fun.Blocking(make(chan T))
 	send := pipe.Processor()
 	ec := &erc.Collector{}
 	closepipe := ft.Once(pipe.Close)
 
 	errHandler := ec.Handler().PreHook(func(err error) { ft.WhenCall(ers.IsTerminating(err), closepipe) })
+
 	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
 		iter.Observe(func(in []T) {
 			dt.Sliceify(in).Process(send).Observe(ctx, errHandler)
 		}).Observe(ctx, errHandler)
+	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
+}
+
+// MergeSlices converts an arbitrary number of slices and returns a
+// single iterator for their items.
+func MergeSlices[T any](sls ...[]T) *fun.Iterator[T] {
+	pipe := fun.Blocking(make(chan T))
+	send := pipe.Processor()
+	ec := &erc.Collector{}
+	closepipe := ft.Once(pipe.Close)
+
+	errHandler := ec.Handler().PreHook(func(err error) { ft.WhenCall(ers.IsTerminating(err), closepipe) })
+
+	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
+		dt.Sliceify(sls).Process(fun.MakeProcessor(func(sl []T) error {
+			return dt.Sliceify(sl).Process(send).Run(ctx)
+		})).Observe(ctx, errHandler)
 	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
 }
 

@@ -156,8 +156,8 @@ func (m Map[K, V]) ConsumeTuples(tuples *Tuples[K, V]) {
 //
 // This operation will panic (with an ErrInvariantValidation) if the
 // keyf panics.
-func (m Map[K, V]) ConsumeValues(ctx context.Context, iter *fun.Iterator[V], keyf func(V) K) {
-	fun.Invariant.Must(iter.Observe(func(in V) { m[keyf(in)] = in }).Run(ctx))
+func (m Map[K, V]) ConsumeValues(iter *fun.Iterator[V], keyf func(V) K) fun.Worker {
+	return iter.Observe(func(in V) { m[keyf(in)] = in })
 }
 
 // Iterator converts a map into an iterator of dt.Pair objects. The

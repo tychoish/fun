@@ -3,7 +3,6 @@ package dt
 import (
 	"context"
 	"errors"
-	"io"
 	"sort"
 
 	"github.com/tychoish/fun"
@@ -101,9 +100,11 @@ func Transform[T any, O any](in Slice[T], op func(T) (O, error)) (Slice[O], erro
 		switch {
 		case err == nil:
 			out = append(out, n)
-		case errors.Is(err, fun.ErrIteratorSkip):
+		case errors.Is(err, ers.ErrCurrentOpSkip):
 			continue
-		case errors.Is(err, io.EOF):
+		case ers.ContextExpired(err):
+			return nil, err
+		case ers.IsTerminating(err):
 			return out, nil
 		default:
 			return nil, err
@@ -309,12 +310,12 @@ func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
 			err := pf(ctx, s[idx])
 
 			switch {
-			case err == nil || errors.Is(err, fun.ErrIteratorSkip):
+			case err == nil || errors.Is(err, ers.ErrCurrentOpSkip):
 				continue
-			case errors.Is(err, io.EOF):
-				return nil
-			default:
+			case ers.ContextExpired(err):
 				return err
+			case ers.IsTerminating(err):
+				return nil
 			}
 		}
 		return nil
@@ -323,15 +324,21 @@ func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
 
 // Populate constructs an operation that adds all items from the
 // iterator to the slice.
-func (s *Slice[T]) Populate(iter *fun.Iterator[T]) fun.Operation {
-	return func(ctx context.Context) {
+func (s *Slice[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
+	return func(ctx context.Context) error {
 		prod := iter.Producer()
 		for {
-			it, ok := prod.Check(ctx)
-			if !ok {
-				return
+			it, err := prod.Run(ctx)
+			switch {
+			case err == nil:
+				s.Append(it)
+			case errors.Is(err, ers.ErrCurrentOpSkip):
+				continue
+			case ers.ContextExpired(err):
+				return err
+			case ers.IsTerminating(err):
+				return nil
 			}
-			s.Append(it)
 		}
 	}
 }

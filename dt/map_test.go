@@ -140,10 +140,10 @@ func TestMap(t *testing.T) {
 			defer cancel()
 
 			mp := Map[string, int]{}
-			mp.ConsumeValues(ctx,
+			mp.ConsumeValues(
 				Sliceify([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
-			)
+			).Run(ctx)
 			check.Equal(t, mp["1"], 1)
 			check.Equal(t, mp["2"], 2)
 			check.Equal(t, mp["3"], 3)

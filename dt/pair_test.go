@@ -62,7 +62,7 @@ func TestPairs(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(ctx, sp.Iterator()))
+		assert.NotError(t, ps.Consume(sp.Iterator()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
 		mp.ConsumePairs(&ps)
