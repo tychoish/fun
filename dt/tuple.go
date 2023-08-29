@@ -81,9 +81,7 @@ func (p *Tuples[K, V]) Twos() *fun.Iterator[V] {
 }
 
 // Slice creates a new slice of all the Tuple objects.
-func (p *Tuples[K, V]) Slice() []Tuple[K, V] {
-	return ft.Must(p.Iterator().Slice(context.Background()))
-}
+func (p *Tuples[K, V]) Slice() []Tuple[K, V] { return p.ll.Slice() }
 
 // List returns the sequence of tuples as a list.
 func (p *Tuples[K, V]) List() *List[Tuple[K, V]] { p.init(); return p.ll.Copy() }

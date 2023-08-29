@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -20,19 +21,18 @@ func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
 	enc := json.NewEncoder(buf)
 	buf.WriteByte('{')
 
-	first := true
+	idx := 0
 	if err := p.Process(fun.MakeProcessor(func(item Pair[K, V]) error {
-		if first {
-			first = false
-		} else {
+		if idx != 0 {
 			buf.WriteByte(',')
 		}
+		idx++
 		if err := enc.Encode(item.Key); err != nil {
-			return err
+			return ers.Wrapf(err, "key at %d", idx)
 		}
-		_ = buf.WriteByte(':')
+		buf.WriteByte(':')
 
-		return enc.Encode(item.Value)
+		return ers.Wrapf(enc.Encode(item.Value), "key at %d", idx)
 	})).Wait(); err != nil {
 		return nil, err
 	}

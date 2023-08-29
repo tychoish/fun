@@ -80,7 +80,7 @@ func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
 }
 
 // Slice creates a new slice of all the Pair objects.
-func (p *Pairs[K, V]) Slice() []Pair[K, V] { return ft.Must(p.Iterator().Slice(context.Background())) }
+func (p *Pairs[K, V]) Slice() []Pair[K, V] { return p.ll.Slice() }
 
 // List returns the sequence of pairs as a list.
 func (p *Pairs[K, V]) List() *List[Pair[K, V]] { p.init(); return p.ll.Copy() }
