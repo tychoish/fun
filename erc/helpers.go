@@ -2,7 +2,6 @@ package erc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/tychoish/fun"
@@ -42,30 +41,12 @@ func WithTime(ec *Collector, err error) { ec.Add(ers.WithTime(err)) }
 // When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
-func When(ec *Collector, cond bool, val any) {
-	if !cond {
-		return
-	}
-	switch e := val.(type) {
-	case error:
-		ec.Add(e)
-	case string:
-		ec.Add(errors.New(e))
-	default:
-		ec.Add(fmt.Errorf("error=%T: %v", val, e))
-	}
-}
+func When(ec *Collector, cond bool, val any) { ec.Add(ers.When(cond, val)) }
 
 // Whenf conditionally creates and adds an error to the collector, as
 // When, and with a similar use case, but permits Sprintf/Errorf
 // formating.
-func Whenf(ec *Collector, cond bool, val string, args ...any) {
-	if !cond {
-		return
-	}
-
-	ec.Add(fmt.Errorf(val, args...))
-}
+func Whenf(ec *Collector, cond bool, val string, args ...any) { ec.Add(ers.Whenf(cond, val, args...)) }
 
 // WithRecoverDo runs the provided function, and catches a panic,
 // if necessary and adds that panic to the collector. If there is no

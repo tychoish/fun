@@ -53,8 +53,9 @@ func TestPanics(t *testing.T) {
 		t.Run("ZeroFilterCases", func(t *testing.T) {
 			err := ers.NewInvariantViolation("", nil, nil, "")
 			check.Error(t, err)
-			assert.Type[ers.Error](t, err)
-			check.Equal(t, ers.ErrInvariantViolation, err.(ers.Error))
+			check.ErrorIs(t, err, ers.ErrInvariantViolation)
+			es := ers.AsStack(err)
+			check.Equal(t, es.Len(), 1)
 		})
 		t.Run("Future", func(t *testing.T) {
 			t.Run("Single", func(t *testing.T) {

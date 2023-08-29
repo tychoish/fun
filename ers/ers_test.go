@@ -169,6 +169,34 @@ func TestErrors(t *testing.T) {
 			_, ok := When(true, "hello").(Error)
 			check.True(t, ok)
 		})
+
+		const errval Error = "ERRO=42"
+
+		t.Run("BasicString", func(t *testing.T) {
+			err := When(false, errval)
+			assert.NotError(t, err)
+			err = When(true, errval)
+			check.Error(t, err)
+		})
+		t.Run("WhenBasicWeirdType", func(t *testing.T) {
+			err := When(false, 54)
+			assert.NotError(t, err)
+			err = When(true, 50000)
+			check.Error(t, err)
+
+			check.Substring(t, err.Error(), "50000")
+			check.Substring(t, err.Error(), "int")
+		})
+
+		t.Run("Wrapping", func(t *testing.T) {
+			err := Whenf(false, "no error %w", errval)
+			assert.True(t, OK(err))
+
+			err = Whenf(true, "no error: %w", errval)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, errval)
+			assert.True(t, err != errval)
+		})
 	})
 	t.Run("Whenf", func(t *testing.T) {
 		t.Run("Bypass", func(t *testing.T) {

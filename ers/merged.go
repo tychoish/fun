@@ -55,18 +55,7 @@ func AsStack(err error) *Stack {
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call ers.Join repeatedly on the same
 // error set of errors the resulting error is convertable
-func Join(errs ...error) error {
-	s := &Stack{}
-
-	switch s.Add(errs...).Len() {
-	case 0:
-		return nil
-	case 1:
-		return s.err
-	default:
-		return s
-	}
-}
+func Join(errs ...error) error { return (&Stack{}).Add(errs...).Resolve() }
 
 // Len returns the depth of the stack beneath the current level. This
 // value isn't updated as additional errors are pushed onto the stack.
@@ -134,11 +123,18 @@ func (e *Stack) Handler() func(err error) { return e.Push }
 // Future provides a fun.Future[error] typed function (though
 // because ers is upstream of the root-fun package, it is not
 // explicitly typed as such.) which will resolve the stack.
-func (e *Stack) Future() func() error {
-	return func() error {
-		if e.count == 0 {
-			return nil
-		}
+func (e *Stack) Future() func() error { return e.Resolve }
+
+// Resolve, mirroring the interface of erc.Collector, returns the
+// error (always a Stack object containing the aggregate errors,) in
+// the case that stack object contains errors, and nil otherwise.
+func (e *Stack) Resolve() error {
+	switch {
+	case e == nil || e.count == 0:
+		return nil
+	case e.count == 1:
+		return e.err
+	default:
 		return e
 	}
 }

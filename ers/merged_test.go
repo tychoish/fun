@@ -26,6 +26,7 @@ func TestStack(t *testing.T) {
 		if es.Len() != 0 {
 			t.Fatal("defensive nil for length")
 		}
+		check.True(t, es.OK())
 		// if es.append(nil) != nil {
 		// 	t.Fatal("append nil errors should always be safe")
 		// }
@@ -90,12 +91,13 @@ func TestStack(t *testing.T) {
 		future := es.Future()
 		check.NotError(t, future())
 		es.Push(ErrInvalidInput)
+		es.Push(ErrImmutabilityViolation)
 		check.Error(t, future())
 		check.ErrorIs(t, future(), ErrInvalidInput)
+		check.ErrorIs(t, future(), ErrImmutabilityViolation)
 		st := AsStack(future())
 		check.Equal(t, st, es)
 	})
-
 	t.Run("CacheCorrectness", func(t *testing.T) {
 		es := &Stack{}
 		er1 := es.Add(errors.New(errval)).Error()

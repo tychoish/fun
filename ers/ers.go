@@ -9,11 +9,18 @@ import (
 
 // When constructs an ers.Error-typed error value IF the conditional
 // is true, and returns nil otherwise.
-func When(cond bool, e string) error {
+func When(cond bool, val any) error {
 	if !cond {
 		return nil
 	}
-	return Error(e)
+	switch e := val.(type) {
+	case error:
+		return e
+	case string:
+		return Error(e)
+	default:
+		return fmt.Errorf("error=%T: %v", val, e)
+	}
 }
 
 // Whenf constructs an error (using fmt.Errorf) IF the conditional is
