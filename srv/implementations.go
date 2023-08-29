@@ -395,7 +395,7 @@ func Daemon(s *Service, minInterval time.Duration) *Service {
 					defer tcancel()
 					return baseRun(tctx)
 				}()
-				if ers.ContextExpired(err) || ctx.Err() != nil {
+				if ers.IsExpiredContext(err) || ctx.Err() != nil {
 					return nil
 				}
 				ec.Add(err)

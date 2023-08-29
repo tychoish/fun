@@ -170,7 +170,7 @@ func (Handlers) ErrorHandlerSingle() (Handler[error], Future[error]) {
 // error.
 func (Handlers) ErrorHandlerWithAbort(cancel context.CancelFunc) Handler[error] {
 	return func(err error) {
-		if err == nil || ers.ContextExpired(err) {
+		if err == nil || ers.IsExpiredContext(err) {
 			return
 		}
 

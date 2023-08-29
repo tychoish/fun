@@ -300,6 +300,9 @@ func TestWorker(t *testing.T) {
 			<-sig
 
 			check.True(t, count.Load() >= 6)
+			if t.Failed() {
+				t.Log("iters", count.Load())
+			}
 		})
 		t.Run("Half", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

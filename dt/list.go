@@ -452,7 +452,7 @@ func (l *List[T]) Copy() *List[T] {
 // Slice exports the contents of the list to a slice.
 func (l *List[T]) Slice() Slice[T] {
 	out := Sliceify(make([]T, 0, l.Len()))
-	out.Populate(l.Iterator()).Wait()
+	out.Populate(l.Iterator()).Ignore().Wait()
 	return out
 }
 

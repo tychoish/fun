@@ -422,7 +422,7 @@ func (wf Worker) Retry(n int) Worker {
 			switch {
 			case attemptErr == nil:
 				return nil
-			case ers.ContextExpired(attemptErr):
+			case ers.IsExpiredContext(attemptErr):
 				return ers.Join(attemptErr, err)
 			case errors.Is(attemptErr, ErrIteratorSkip):
 				continue

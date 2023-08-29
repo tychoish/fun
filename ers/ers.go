@@ -53,20 +53,6 @@ func Wrapf(err error, tmpl string, args ...any) error {
 	return Join(err, fmt.Errorf(tmpl, args...))
 }
 
-// ContextExpired checks an error to see if it, or any of it's parent
-// contexts signal that a context has expired. This covers both
-// canceled contexts and ones which have exceeded their deadlines.
-func ContextExpired(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
-
-// OK returns true when the error is nil, and false otherwise. It
-// should always be inlined, and mostly exists for clarity at call
-// sites in bool/OK check relevant contexts.
-func OK(err error) bool { return err == nil }
-
-// IsError returns true when the error is non-nill. Provides the
-// inverse of OK().
-func IsError(err error) bool { return !OK(err) }
-
 // Ignore discards an error.
 func Ignore(_ error) { return } //nolint
 
@@ -85,6 +71,35 @@ func Append(errs []error, es ...error) []error {
 	return errs
 }
 
+// OK returns true when the error is nil, and false otherwise. It
+// should always be inlined, and mostly exists for clarity at call
+// sites in bool/OK check relevant contexts.
+func OK(err error) bool { return err == nil }
+
+// IsError returns true when the error is non-nill. Provides the
+// inverse of OK().
+func IsError(err error) bool { return !OK(err) }
+
+// Is returns true if the error is one of the target errors, (or one
+// of it's constituent (wrapped) errors is a target error. ers.Is uses
+// errors.Is.
+func Is(err error, targets ...error) bool {
+	for _, target := range targets {
+		if err == nil && target != nil {
+			continue
+		}
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsExpiredContext checks an error to see if it, or any of it's parent
+// contexts signal that a context has expired. This covers both
+// canceled contexts and ones which have exceeded their deadlines.
+func IsExpiredContext(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
+
 // IsTerminating returns true if the error is one of the sentinel
 // errors used by fun (and other packages!) to indicate that
 // processing/iteration has terminated. (e.g. context expiration, or
@@ -102,19 +117,4 @@ func IsInvariantViolation(r any) bool {
 	}
 
 	return errors.Is(err, ErrInvariantViolation)
-}
-
-// Is returns true if the error is one of the target errors, (or one
-// of it's constituent (wrapped) errors is a target error. ers.Is uses
-// errors.Is.
-func Is(err error, targets ...error) bool {
-	for _, target := range targets {
-		if err == nil && target != nil {
-			continue
-		}
-		if errors.Is(err, target) {
-			return true
-		}
-	}
-	return false
 }

@@ -9,8 +9,8 @@ import (
 // timeout if the iterator is blocking. The iterator's close method is
 // not processed.
 func Slice[T any](iter *fun.Iterator[T]) []T {
-	out := dt.Sliceify([]T{})
-	out.Populate(iter).Wait()
+	out := dt.Slice[T]{}
+	out.Populate(iter).Ignore().Wait()
 	return out
 }
 

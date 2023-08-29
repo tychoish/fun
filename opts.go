@@ -96,7 +96,7 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 		return true
 	case errors.Is(err, io.EOF):
 		return false
-	case ers.ContextExpired(err):
+	case ers.IsExpiredContext(err):
 		if o.IncludeContextExpirationErrors {
 			o.ErrorHandler(err)
 		}

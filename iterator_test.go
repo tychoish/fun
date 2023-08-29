@@ -757,7 +757,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, len(ers.Unwind(err)), 4)
 
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-		assert.True(t, ers.ContextExpired(err))
+		assert.True(t, ers.IsExpiredContext(err))
 		assert.True(t, ers.IsTerminating(err))
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
 	})

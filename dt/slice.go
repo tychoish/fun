@@ -2,7 +2,6 @@ package dt
 
 import (
 	"context"
-	"errors"
 	"sort"
 
 	"github.com/tychoish/fun"
@@ -92,26 +91,15 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 // transformation, with the exception of fun.ErrIteratorSkip. All
 // errors are returned to the caller, except io.EOF which indicates
 // the (early) end of iteration.
-func Transform[T any, O any](in Slice[T], op func(T) (O, error)) (Slice[O], error) {
-	out := make([]O, 0, len(in))
+func Transform[T any, O any](in Slice[T], op fun.Transform[T, O]) fun.Producer[Slice[O]] {
+	out := Sliceify(make([]O, 0, len(in)))
 
-	for idx := range in {
-		n, err := op(in[idx])
-		switch {
-		case err == nil:
-			out = append(out, n)
-		case errors.Is(err, ers.ErrCurrentOpSkip):
-			continue
-		case ers.ContextExpired(err):
-			return nil, err
-		case ers.IsTerminating(err):
-			return out, nil
-		default:
+	return func(ctx context.Context) (Slice[O], error) {
+		if err := op.Process(in.Iterator()).Observe(out.Add).Run(ctx); err != nil {
 			return nil, err
 		}
+		return out, nil
 	}
-
-	return out, nil
 }
 
 // Iterator returns an iterator to the items of the slice the range
@@ -296,7 +284,7 @@ func (s Slice[T]) Sparse() Slice[T] {
 	}
 
 	out := Sliceify(make([]T, 0, buf.Len()))
-	out.Populate(buf.PopIterator()).Wait()
+	out.Populate(buf.PopIterator()).Ignore().Wait()
 	return out
 }
 
@@ -305,40 +293,11 @@ func (s Slice[T]) Sparse() Slice[T] {
 // processor errors. io.EOF errors are not returned, but do abort
 // iteration early, while fun.ErrIteratorSkip is respected.
 func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
-	return func(ctx context.Context) error {
-		for idx := range s {
-			err := pf(ctx, s[idx])
-
-			switch {
-			case err == nil || errors.Is(err, ers.ErrCurrentOpSkip):
-				continue
-			case ers.ContextExpired(err):
-				return err
-			case ers.IsTerminating(err):
-				return nil
-			}
-		}
-		return nil
-	}
+	return s.Iterator().Process(pf)
 }
 
 // Populate constructs an operation that adds all items from the
 // iterator to the slice.
 func (s *Slice[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
-	return func(ctx context.Context) error {
-		prod := iter.Producer()
-		for {
-			it, err := prod.Run(ctx)
-			switch {
-			case err == nil:
-				s.Append(it)
-			case errors.Is(err, ers.ErrCurrentOpSkip):
-				continue
-			case ers.ContextExpired(err):
-				return err
-			case ers.IsTerminating(err):
-				return nil
-			}
-		}
-	}
+	return iter.Observe(s.Add)
 }

@@ -21,13 +21,13 @@ func TestErrors(t *testing.T) {
 		check.True(t, IsTerminating(Join(Error("beep"), context.Canceled)))
 		check.True(t, IsTerminating(Join(Error("beep"), context.DeadlineExceeded)))
 
-		check.True(t, !ContextExpired(io.EOF))
-		check.True(t, !ContextExpired(Join(Error("beep"), io.EOF)))
+		check.True(t, !IsExpiredContext(io.EOF))
+		check.True(t, !IsExpiredContext(Join(Error("beep"), io.EOF)))
 
-		check.True(t, ContextExpired(context.Canceled))
-		check.True(t, ContextExpired(context.DeadlineExceeded))
-		check.True(t, ContextExpired(Join(Error("beep"), context.DeadlineExceeded)))
-		check.True(t, ContextExpired(Join(Error("beep"), context.Canceled)))
+		check.True(t, IsExpiredContext(context.Canceled))
+		check.True(t, IsExpiredContext(context.DeadlineExceeded))
+		check.True(t, IsExpiredContext(Join(Error("beep"), context.DeadlineExceeded)))
+		check.True(t, IsExpiredContext(Join(Error("beep"), context.Canceled)))
 	})
 	t.Run("Ok", func(t *testing.T) {
 		var err error

@@ -411,7 +411,7 @@ func TestService(t *testing.T) {
 				err = s.Worker().Run(ctx)
 			})
 			assert.Error(t, err)
-			assert.True(t, ers.ContextExpired(err))
+			assert.True(t, ers.IsExpiredContext(err))
 			assert.True(t, s.isStarted.Load())
 		})
 		t.Run("ErrorPropogate", func(t *testing.T) {

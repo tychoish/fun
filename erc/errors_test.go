@@ -321,24 +321,24 @@ func TestError(t *testing.T) {
 		t.Run("ContextHelper", func(t *testing.T) {
 			ec := &Collector{}
 			ec.Add(errors.New("foo"))
-			if ers.ContextExpired(ec.Resolve()) {
+			if ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
 			ec.Add(errors.New("foo"))
 			ec.Add(context.Canceled)
-			if !ers.ContextExpired(ec.Resolve()) {
+			if !ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 			ec = &Collector{}
 			ec.Add(errors.New("foo"))
-			if ers.ContextExpired(ec.Resolve()) {
+			if ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
 			ec.Add(context.DeadlineExceeded)
 			ec.Add(errors.New("foo"))
-			if !ers.ContextExpired(ec.Resolve()) {
+			if !ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 		})

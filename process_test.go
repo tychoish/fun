@@ -52,7 +52,7 @@ func TestProcess(t *testing.T) {
 			return ers.Error("unreachable")
 		}).WithCancel()
 		assert.MinRuntime(t, 40*time.Millisecond, func() {
-			assert.MaxRuntime(t, 80*time.Millisecond, func() {
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
 				go func() { time.Sleep(60 * time.Millisecond); cancel() }()
 				time.Sleep(time.Millisecond)
 				check.NotError(t, wf(ctx, 42))

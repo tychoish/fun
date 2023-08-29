@@ -354,10 +354,13 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, next[1], 42)
 	})
 	t.Run("Transform", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		t.Run("ContinueEarlEnd", func(t *testing.T) {
 			count := 0
 			out, err := Transform(randomIntSlice(100),
-				func(in int) (string, error) {
+				fun.ConverterErr(func(in int) (string, error) {
 					count++
 					if count >= 50 {
 						return "", io.EOF
@@ -366,7 +369,7 @@ func TestSlice(t *testing.T) {
 						return "", fun.ErrIteratorSkip
 					}
 					return fmt.Sprint(in), nil
-				})
+				})).Run(ctx)
 			check.NotError(t, err)
 			check.Equal(t, count, 50)
 			check.Equal(t, len(out), 25)
@@ -375,10 +378,10 @@ func TestSlice(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
 			out, err := Transform(randomIntSlice(100),
-				func(in int) (string, error) {
+				fun.ConverterErr(func(in int) (string, error) {
 					count++
 					return fmt.Sprint(in), nil
-				})
+				})).Run(ctx)
 			check.NotError(t, err)
 			check.Equal(t, count, 100)
 			check.Equal(t, len(out), 100)
@@ -387,13 +390,13 @@ func TestSlice(t *testing.T) {
 		t.Run("EarlyError", func(t *testing.T) {
 			count := 0
 			out, err := Transform(randomIntSlice(100),
-				func(in int) (string, error) {
+				fun.ConverterErr(func(in int) (string, error) {
 					if count < 10 {
 						count++
 						return fmt.Sprint(in), nil
 					}
 					return "", ers.ErrInvalidInput
-				})
+				})).Run(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, ers.ErrInvalidInput)
 			check.Equal(t, count, 10)
