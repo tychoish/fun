@@ -369,7 +369,7 @@ func TestSlice(t *testing.T) {
 						return "", fun.ErrIteratorSkip
 					}
 					return fmt.Sprint(in), nil
-				})).Run(ctx)
+				})).Resolve(ctx)
 			check.NotError(t, err)
 			check.Equal(t, count, 50)
 			check.Equal(t, len(out), 25)
@@ -381,7 +381,7 @@ func TestSlice(t *testing.T) {
 				fun.ConverterErr(func(in int) (string, error) {
 					count++
 					return fmt.Sprint(in), nil
-				})).Run(ctx)
+				})).Resolve(ctx)
 			check.NotError(t, err)
 			check.Equal(t, count, 100)
 			check.Equal(t, len(out), 100)
@@ -396,7 +396,7 @@ func TestSlice(t *testing.T) {
 						return fmt.Sprint(in), nil
 					}
 					return "", ers.ErrInvalidInput
-				})).Run(ctx)
+				})).Resolve(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, ers.ErrInvalidInput)
 			check.Equal(t, count, 10)

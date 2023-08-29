@@ -118,9 +118,9 @@ func TestSet(t *testing.T) {
 
 				ctx, cancel := context.WithCancel(context.Background())
 				before := runtime.NumGoroutine()
-				_, err := set.hash.ProducerKeys().Run(ctx)
+				_, err := set.hash.ProducerKeys().Resolve(ctx)
 				assert.NotError(t, err)
-				_, err = set.hash.ProducerValues().Run(ctx)
+				_, err = set.hash.ProducerValues().Resolve(ctx)
 				assert.NotError(t, err)
 
 				during := runtime.NumGoroutine()

@@ -101,7 +101,7 @@ func TestDistributor(t *testing.T) {
 			defer cancel()
 			ch := fun.Blocking(make(chan int, 100))
 			dist := DistributorChanOp(ch).
-				WithInputFilter(func(in int) bool { fmt.Println(in); return in%2 == 0 && in != 0 })
+				WithInputFilter(func(in int) bool { t.Log(in); return in%2 == 0 && in != 0 })
 
 			for i := 0; i < 100; i++ {
 				assert.NotError(t, dist.Send(ctx, i))

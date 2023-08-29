@@ -44,15 +44,14 @@ func MakeTuples[K any, V any](in ...Tuple[K, V]) *Tuples[K, V] {
 
 // ConsumeTuples creates a *Tuples[K,V] object from an iterator of
 // Tuple[K,V] objects.
-func ConsumeTuples[K any, V any](
-	ctx context.Context,
-	iter *fun.Iterator[Tuple[K, V]],
-) (*Tuples[K, V], error) {
-	p := &Tuples[K, V]{}
-	if err := p.Consume(ctx, iter); err != nil {
-		return nil, err
+func ConsumeTuples[K any, V any](iter *fun.Iterator[Tuple[K, V]]) fun.Producer[*Tuples[K, V]] {
+	return func(ctx context.Context) (*Tuples[K, V], error) {
+		p := &Tuples[K, V]{}
+		if err := p.Consume(iter).Run(ctx); err != nil {
+			return nil, err
+		}
+		return p, nil
 	}
-	return p, nil
 }
 
 func (p *Tuples[K, V]) init() { p.setup.Do(p.initalizeList) }
@@ -61,8 +60,8 @@ func (p *Tuples[K, V]) initalizeList() {
 }
 
 // Consume adds items from an iterator of tuples to the current Tuples slice.
-func (p *Tuples[K, V]) Consume(ctx context.Context, iter *fun.Iterator[Tuple[K, V]]) error {
-	return iter.Observe(func(item Tuple[K, V]) { p.Push(item) }).Run(ctx)
+func (p *Tuples[K, V]) Consume(iter *fun.Iterator[Tuple[K, V]]) fun.Worker {
+	return iter.Observe(func(item Tuple[K, V]) { p.Push(item) })
 }
 
 // Iterator return an iterator over each key-value tuples.

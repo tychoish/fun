@@ -43,15 +43,14 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 
 // ConsumePairs creates a *Pairs[K,V] object from an iterator of
 // Pair[K,V] objects.
-func ConsumePairs[K comparable, V any](
-	ctx context.Context,
-	iter *fun.Iterator[Pair[K, V]],
-) (*Pairs[K, V], error) {
-	p := &Pairs[K, V]{}
-	if err := p.Consume(iter).Run(ctx); err != nil {
-		return nil, err
+func ConsumePairs[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) fun.Producer[*Pairs[K, V]] {
+	return func(ctx context.Context) (*Pairs[K, V], error) {
+		p := &Pairs[K, V]{}
+		if err := p.Consume(iter).Run(ctx); err != nil {
+			return nil, err
+		}
+		return p, nil
 	}
-	return p, nil
 }
 
 func (p *Pairs[K, V]) init() { p.setup.Do(p.initalizeList) }

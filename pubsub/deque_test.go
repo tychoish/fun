@@ -787,7 +787,7 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.ProducerBlocking().Run(ctx)
+			_, err := dq.ProducerBlocking().Resolve(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
@@ -795,7 +795,7 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.ProducerReverseBlocking().Run(ctx)
+			_, err := dq.ProducerReverseBlocking().Resolve(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
@@ -815,7 +815,7 @@ func TestDeque(t *testing.T) {
 				}
 			}()
 
-			val, err := dq.ProducerBlocking().Run(ctx)
+			val, err := dq.ProducerBlocking().Resolve(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, "hello!")
 

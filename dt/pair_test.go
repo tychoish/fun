@@ -76,7 +76,7 @@ func TestPairs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumePairs(ctx, iter)
+			ps, err := ConsumePairs(iter).Resolve(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, expected)
 			assert.True(t, ps == nil)
@@ -91,7 +91,7 @@ func TestPairs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumePairs(ctx, iter)
+			ps, err := ConsumePairs(iter).Resolve(ctx)
 			check.NotError(t, err)
 			assert.True(t, ps != nil)
 			check.Equal(t, ps.Len(), 6)

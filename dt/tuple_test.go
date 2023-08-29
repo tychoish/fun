@@ -63,7 +63,7 @@ func TestTuples(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(ctx, sp.Iterator()))
+		assert.NotError(t, ps.Consume(sp.Iterator()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
 		mp.ConsumeTuples(&ps)
@@ -77,7 +77,7 @@ func TestTuples(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumeTuples(ctx, iter)
+			ps, err := ConsumeTuples(iter).Resolve(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, expected)
 			assert.True(t, ps == nil)
@@ -92,7 +92,7 @@ func TestTuples(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumeTuples(ctx, iter)
+			ps, err := ConsumeTuples(iter).Resolve(ctx)
 			check.NotError(t, err)
 			assert.True(t, ps != nil)
 			check.Equal(t, ps.Len(), 6)
