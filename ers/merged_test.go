@@ -100,29 +100,31 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("CacheCorrectness", func(t *testing.T) {
 		es := &Stack{}
-		er1 := es.Add(errors.New(errval)).Error()
-		er2 := es.Add(errors.New(errval)).Error()
+		es.Add(errors.New(errval))
+		er1 := es.Error()
+		es.Add(errors.New(errval))
+		er2 := es.Error()
 		if er1 == er2 {
 			t.Error("errors should be different", er1, er2)
 		}
 	})
 	t.Run("Merge", func(t *testing.T) {
 		es1 := &Stack{}
-		_ = es1.Add(errors.New(errval))
-		_ = es1.Add(errors.New(errval))
+		es1.Add(errors.New(errval))
+		es1.Add(errors.New(errval))
 		if l := es1.Len(); l != 2 {
 			t.Fatal("es1 unexpected length", l)
 		}
 
 		es2 := &Stack{}
-		_ = es2.Add(errors.New(errval))
-		_ = es2.Add(errors.New(errval))
+		es2.Add(errors.New(errval))
+		es2.Add(errors.New(errval))
 
 		if l := es2.Len(); l != 2 {
 			t.Fatal("es2 unexpected length", l)
 		}
 
-		es1 = es1.Add(es2)
+		es1.Add(es2)
 		if l := es1.Len(); l != 4 {
 			t.Fatal("merged unexpected length", l)
 		}

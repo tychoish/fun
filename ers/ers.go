@@ -81,7 +81,16 @@ func Append(errs []error, es ...error) []error {
 // OK returns true when the error is nil, and false otherwise. It
 // should always be inlined, and mostly exists for clarity at call
 // sites in bool/OK check relevant contexts.
-func OK(err error) bool { return err == nil }
+func OK(err error) bool {
+	switch e := err.(type) {
+	case nil:
+		return true
+	case interface{ OK() bool }:
+		return e.OK()
+	default:
+		return false
+	}
+}
 
 // IsError returns true when the error is non-nill. Provides the
 // inverse of OK().

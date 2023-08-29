@@ -34,12 +34,14 @@ func AsStack(err error) *Stack {
 	case interface{ Unwind() []error }:
 		if errs := et.Unwind(); len(errs) > 0 {
 			st := &Stack{}
-			return st.Add(errs...)
+			st.Add(errs...)
+			return st
 		}
 	case interface{ Unwrap() []error }:
 		if errs := et.Unwrap(); len(errs) > 0 {
 			st := &Stack{}
-			return st.Add(errs...)
+			st.Add(errs...)
+			return st
 		}
 	default:
 		st := &Stack{}
@@ -55,7 +57,7 @@ func AsStack(err error) *Stack {
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call ers.Join repeatedly on the same
 // error set of errors the resulting error is convertable
-func Join(errs ...error) error { return (&Stack{}).Add(errs...).Resolve() }
+func Join(errs ...error) error { st := Stack{}; st.Add(errs...); return st.Resolve() }
 
 // Len returns the depth of the stack beneath the current level. This
 // value isn't updated as additional errors are pushed onto the stack.
@@ -144,9 +146,7 @@ func (e *Stack) Resolve() error {
 func (e *Stack) OK() bool { return e == nil || (e.err == nil && e.next == nil) }
 
 // Add is a thin wrapper around Push, that adds each error supplied as
-// an argument individually to the stack, and returns the stack (so it
-// can be chained.) Unlike the builtin append(), if you discard or
-// ignore the return value of Add, the stack itself is modified.
+// an argument individually to the stack.
 //
 // This leads to a curios, semantic: using the Unwrap() method (and
 // casting; but not the unwind method!), the values returned for each
@@ -156,11 +156,10 @@ func (e *Stack) OK() bool { return e == nil || (e.err == nil && e.next == nil) }
 // you have a reference to one of these stack objects, future calls to
 // Add() on the "outer" stack will have no bearing on "inner" Stack
 // objects.
-func (e *Stack) Add(errs ...error) *Stack {
+func (e *Stack) Add(errs ...error) {
 	for _, err := range errs {
 		e.Push(err)
 	}
-	return e
 }
 
 // Error produces the aggregated error strings from this method. If
@@ -224,7 +223,8 @@ func (e *Stack) Unwind() []error {
 }
 
 // CheckProducer provides a pull-based iterator function for iterating
-// through the errors (without Stack object wrappers,)
+// through the errors (without Stack object wrappers.)  The output
+// function yields errors: the boolean return
 func (e *Stack) CheckProducer() func() (error, bool) {
 	iter := &Stack{next: e}
 	return func() (error, bool) {
