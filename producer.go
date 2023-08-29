@@ -54,8 +54,13 @@ func CheckProducer[T any](op func() (T, bool)) Producer[T] {
 	}
 }
 
-// Run executes the producer.
-func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf(ctx) }
+// Run executes the producer and returns the result
+//
+// Deprecated: Use the Resolve() helper.
+func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf.Resolve(ctx) }
+
+// Run executes the producer and returns the result
+func (pf Producer[T]) Resolve(ctx context.Context) (T, error) { return pf(ctx) }
 
 // Background constructs a worker that runs the provided Producer in a
 // background thread and passes the produced value to the observe.
