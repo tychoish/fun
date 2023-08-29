@@ -595,15 +595,14 @@ func TestWorker(t *testing.T) {
 		t.Run("Loop", func(t *testing.T) {
 			start := time.Now()
 			var wf Worker = func(ctx context.Context) error {
-				time.Sleep(time.Millisecond)
-				return ft.WhenDo(time.Since(start) > 32*time.Millisecond, func() error { return io.EOF })
+				time.Sleep(5 * time.Millisecond)
+				return ft.WhenDo(time.Since(start) > 50*time.Millisecond, func() error { return io.EOF })
 			}
 			t.Run("Min", func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 				defer cancel()
 
-				assert.MinRuntime(t, 32*time.Millisecond, func() {
-
+				assert.MinRuntime(t, 50*time.Millisecond, func() {
 					err := wf.While().Run(ctx)
 					assert.ErrorIs(t, err, io.EOF)
 				})

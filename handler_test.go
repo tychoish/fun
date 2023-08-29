@@ -90,10 +90,24 @@ func TestHandler(t *testing.T) {
 			count := 0
 			var ob Handler[int] = func(in int) {
 				check.Equal(t, in, 100)
+				check.Equal(t, count, 0)
 				count++
 			}
 
-			cob := ob.Join(ob)
+			cob := ob.Join(func(in int) { check.Equal(t, count, 1); count++; check.Equal(t, in, 100) })
+			cob(100)
+
+			assert.Equal(t, 2, count)
+		})
+		t.Run("PreHook", func(t *testing.T) {
+			count := 0
+			var ob Handler[int] = func(in int) {
+				check.Equal(t, in, 100)
+				check.Equal(t, count, 1)
+				count++
+			}
+
+			cob := ob.PreHook(func(in int) { check.Equal(t, count, 0); count++; check.Equal(t, in, 100) })
 			cob(100)
 
 			assert.Equal(t, 2, count)

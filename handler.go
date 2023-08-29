@@ -96,6 +96,10 @@ func (of Handler[T]) Filter(filter func(T) T) Handler[T] {
 // and the "next" handler.
 func (of Handler[T]) Join(next Handler[T]) Handler[T] { return func(in T) { of(in); next(in) } }
 
+// PreHook provides the inverse operation to Join, running "prev"
+// handler before the base handler.
+func (of Handler[T]) PreHook(prev Handler[T]) Handler[T] { return prev.Join(of) }
+
 // Chain calls the base handler, and then calls every handler in the chain.
 func (of Handler[T]) Chain(chain ...Handler[T]) Handler[T] {
 	return func(in T) {
