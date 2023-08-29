@@ -78,12 +78,12 @@ func NotNil(t testing.TB, val any) {
 // NilPtr asserts that the pointer value is nil. Use Nil (which uses
 // reflection) for these pointer values as well maps, channels,
 // slices, and interfaces.
-func NilPtr[T any](t testing.TB, val *T) { Equal(t, val, nil) }
+func NilPtr[T any](t testing.TB, val *T) { t.Helper(); Equal(t, val, nil) }
 
 // NotNilPtr asserts that the pointer value is not equal to nil. Use
 // Nil (which uses reflection) for these pointer values as well maps,
 // channels, slices, and interfaces.
-func NotNilPtr[T any](t testing.TB, val *T) { NotEqual(t, val, nil) }
+func NotNilPtr[T any](t testing.TB, val *T) { t.Helper(); NotEqual(t, val, nil) }
 
 // Zero fails a test if the value is not the zero-value for its type.
 func Zero[T comparable](t testing.TB, val T) {
@@ -123,6 +123,7 @@ func NotError(t testing.TB, err error) {
 // Type fails the test if the type of the object doesn't match the
 // specifier type provided.
 func Type[T any](t testing.TB, obj any) {
+	t.Helper()
 	_, ok := obj.(T)
 	if !ok {
 		var tn T
@@ -133,6 +134,7 @@ func Type[T any](t testing.TB, obj any) {
 // NotType fails the test when the type of the specifier matches the
 // type of the object.
 func NotType[T any](t testing.TB, obj any) {
+	t.Helper()
 	_, ok := obj.(T)
 	if ok {
 		var tn T
