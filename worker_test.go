@@ -327,34 +327,51 @@ func TestWorker(t *testing.T) {
 
 	})
 	t.Run("Chain", func(t *testing.T) {
-		t.Run("WithoutErrors", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+		t.Run("Join", func(t *testing.T) {
+			t.Run("WithoutErrors", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
 
-			count := 0
-			var wf Worker = func(context.Context) error { count++; return nil }
-			wf = wf.Join(wf)
-			check.NotError(t, wf(ctx))
-			assert.Equal(t, count, 2)
+				count := 0
+				var wf Worker = func(context.Context) error { count++; return nil }
+				wf = wf.Join(wf)
+				check.NotError(t, wf(ctx))
+				assert.Equal(t, count, 2)
 
-			cancel()
-			check.NotError(t, wf(ctx))
-			// first function always runs and this example doesn't
-			// respect the context. second one doesn't
-			assert.Equal(t, count, 3)
-		})
-		t.Run("Error", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			expected := errors.New("cat")
+				cancel()
+				check.NotError(t, wf(ctx))
+				// first function always runs and this example doesn't
+				// respect the context. second one doesn't
+				assert.Equal(t, count, 3)
+			})
+			t.Run("Error", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				expected := errors.New("cat")
 
-			count := 0
-			var wf Worker = func(context.Context) error { count++; return expected }
-			wf = wf.Join(func(context.Context) error { count++; return nil })
-			err := wf(ctx)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, expected)
-			assert.Equal(t, count, 1)
+				count := 0
+				var wf Worker = func(context.Context) error { count++; return expected }
+				wf = wf.Join(func(context.Context) error { count++; return nil })
+				err := wf(ctx)
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, expected)
+				assert.Equal(t, count, 1)
+			})
+			t.Run("Expired", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				count := 0
+				var wf Worker = func(context.Context) error { count++; return nil }
+				wf = wf.Join(
+					func(context.Context) error { count++; cancel(); return nil },
+					func(context.Context) error { count++; return nil },
+					func(context.Context) error { count++; return nil },
+				)
+				err := wf(ctx)
+				check.NotError(t, err)
+				assert.Equal(t, count, 2)
+			})
 		})
 	})
 	t.Run("Check", func(t *testing.T) {

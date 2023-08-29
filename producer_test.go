@@ -69,15 +69,15 @@ func TestProducer(t *testing.T) {
 			return 42, nil
 		})
 
-		check.Equal(t, 0, pf.If(false).Must(ctx))
+		check.Equal(t, 0, pf.If(false).Must(ctx).Resolve())
 		check.Equal(t, 0, called)
-		check.Equal(t, 42, pf.If(true).Must(ctx))
+		check.Equal(t, 42, pf.If(true).Must(ctx).Resolve())
 		check.Equal(t, 1, called)
-		check.Equal(t, 42, pf.If(true).Must(ctx))
+		check.Equal(t, 42, pf.If(true).Must(ctx).Resolve())
 		check.Equal(t, 2, called)
-		check.Equal(t, 0, pf.If(false).Must(ctx))
+		check.Equal(t, 0, pf.If(false).Must(ctx).Resolve())
 		check.Equal(t, 2, called)
-		check.Equal(t, 42, pf.Must(ctx))
+		check.Equal(t, 42, pf.Must(ctx).Resolve())
 		check.Equal(t, 3, called)
 	})
 	t.Run("When", func(t *testing.T) {
@@ -89,15 +89,15 @@ func TestProducer(t *testing.T) {
 			return 42, nil
 		})
 
-		check.Equal(t, 0, pf.When(func() bool { return false }).Must(ctx))
+		check.Equal(t, 0, pf.When(func() bool { return false }).Must(ctx).Resolve())
 		check.Equal(t, 0, called)
-		check.Equal(t, 42, pf.When(func() bool { return true }).Must(ctx))
+		check.Equal(t, 42, pf.When(func() bool { return true }).Must(ctx).Resolve())
 		check.Equal(t, 1, called)
-		check.Equal(t, 42, pf.When(func() bool { return true }).Must(ctx))
+		check.Equal(t, 42, pf.When(func() bool { return true }).Must(ctx).Resolve())
 		check.Equal(t, 2, called)
-		check.Equal(t, 0, pf.When(func() bool { return false }).Must(ctx))
+		check.Equal(t, 0, pf.When(func() bool { return false }).Must(ctx).Resolve())
 		check.Equal(t, 2, called)
-		check.Equal(t, 42, pf.Must(ctx))
+		check.Equal(t, 42, pf.Must(ctx).Resolve())
 		check.Equal(t, 3, called)
 	})
 	t.Run("Constructor", func(t *testing.T) {
@@ -288,11 +288,41 @@ func TestProducer(t *testing.T) {
 		var pf Producer[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
-		assert.Panic(t, func() { out = pf.Force() })
+		assert.NotPanic(t, func() { out = pf.Force().Resolve() })
+		assert.Equal(t, out, 42)
+		assert.Equal(t, count, 1)
+		err = nil
+		assert.Equal(t, 42, pf.Force().Resolve())
+	})
+	t.Run("Ignore", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		count := 0
+		var err = io.EOF
+		var pf Producer[int] = func(_ context.Context) (int, error) { count++; return 42, err }
+		var out int
+
+		assert.NotPanic(t, func() { out = pf.Ignore(ctx).Resolve() })
+		assert.Equal(t, out, 42)
+		assert.Equal(t, count, 1)
+		err = nil
+		assert.Equal(t, 42, pf.Force().Resolve())
+	})
+	t.Run("Must", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		count := 0
+		var err = io.EOF
+		var pf Producer[int] = func(_ context.Context) (int, error) { count++; return 42, err }
+		var out int
+
+		assert.Panic(t, func() { out = pf.Must(ctx).Resolve() })
 		assert.Equal(t, out, 0)
 		assert.Equal(t, count, 1)
 		err = nil
-		assert.Equal(t, 42, pf.Force())
+		assert.Equal(t, 42, pf.Force().Resolve())
 	})
 	t.Run("Block", func(t *testing.T) {
 		count := 0

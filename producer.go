@@ -93,12 +93,6 @@ func (pf Producer[T]) WithRecover() Producer[T] {
 	}
 }
 
-// Ignore runs the producer function and returns the value, ignoring
-// the error.
-func (pf Producer[T]) Ignore(ctx context.Context) Future[T] {
-	return func() T { return ft.IgnoreSecond(pf(ctx)) }
-}
-
 // Join, on successive calls, runs the first producer until it
 // returns an io.EOF error, and then returns the results of the second
 // producer. If either producer returns another error (context
@@ -172,20 +166,39 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 	}
 }
 
-// Must runs the producer returning the constructed value and panicing
-// if the producer errors.
-func (pf Producer[T]) Must(ctx context.Context) T { return ft.Must(pf(ctx)) }
+// Future creates a future function using the context provided and
+// error observer to collect the error.
+func (pf Producer[T]) Future(ctx context.Context, ob Handler[error]) Future[T] {
+	return func() T { out, err := pf(ctx); ob(err); return out }
+}
+
+// Ignore creates a future that runs the producer and returns
+// the value, ignoring the error.
+func (pf Producer[T]) Ignore(ctx context.Context) Future[T] {
+	return func() T { return ft.IgnoreSecond(pf(ctx)) }
+}
+
+// Must returns a future that resolves the producer returning the
+// constructed value and panicing if the producer errors.
+func (pf Producer[T]) Must(ctx context.Context) Future[T] {
+	return func() T { return ft.Must(pf.Resolve(ctx)) }
+}
+
+// Force combines the semantics of Must and Wait as a future: when the
+// future is resolved, the producer executes with a context that never
+// expires and panics in the case of an error.
+func (pf Producer[T]) Force() Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
 
 // Block runs the producer with a context that will ever expire.
-func (pf Producer[T]) Block() (T, error) { return pf(context.Background()) }
+//
+// Deprecated: Use Wait() rather than block.
+func (pf Producer[T]) Block() (T, error) { return pf.Wait() }
 
-// Force combines the semantics of Must and Block: runs the producer
-// with a context that never expires and panics in the case of an
-// error.
-func (pf Producer[T]) Force() T { return ft.Must(pf.Block()) }
+// Wait runs the producer with a context that will ever expire.
+func (pf Producer[T]) Wait() (T, error) { return pf(context.Background()) }
 
-// Check uses the error observer to consume the error from the
-// Producer and returns a function that takes a context and returns a value.
+// Check converts the error into a boolean, with true indicating
+// success and false indicating (but not propagating it.).
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
 func (pf Producer[T]) CheckForce() (T, bool)               { return pf.Check(context.Background()) }
 
@@ -202,12 +215,6 @@ func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 		err = ers.Join(err, chErr)
 		return out, err
 	}
-}
-
-// Future creates a future function using the context provided and
-// error observer to collect the error.
-func (pf Producer[T]) Future(ctx context.Context, ob Handler[error]) Future[T] {
-	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
 // Once returns a producer that only executes ones, and caches the

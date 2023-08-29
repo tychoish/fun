@@ -143,10 +143,18 @@ func (pf Processor[T]) Filter(fl func(T) bool) Processor[T] {
 	}
 }
 
-// Join wraps the processor and executes both the root processor and
-// then the next processor, assuming the root processor is not
-// canceled and the context has not expired.
-func (pf Processor[T]) Join(next Processor[T]) Processor[T] {
+// Join combines a sequence of processors on the same input, calling
+// each function in order, as long as there is no error and the
+// context does not expire. Context expiration errors are not
+// propagated.
+func (pf Processor[T]) Join(pfs ...Processor[T]) Processor[T] {
+	for idx := range pfs {
+		pf = pf.merge(pfs[idx])
+	}
+	return pf
+}
+
+func (pf Processor[T]) merge(next Processor[T]) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		if err := pf(ctx, in); err != nil {
 			return err

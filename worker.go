@@ -118,17 +118,6 @@ func (wf Worker) WithRecover() Worker {
 	}
 }
 
-// Block executes the worker function with a context that will never
-// expire and returns the error. Use with caution.
-//
-// Deprecated: use Wait() instead.
-func (wf Worker) Block() error { return wf.Wait() }
-
-// Wait runs the worker with a background context and returns its
-// error.
-func (wf Worker) Wait() error                               { return wf.Run(context.Background()) }
-func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
-
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are not caught.
 func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Run(ctx)) }
@@ -182,6 +171,16 @@ func (wf Worker) Operation(ob Handler[error]) Operation {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
+// Block executes the worker function with a context that will never
+// expire and returns the error. Use with caution.
+//
+// Deprecated: use Wait() instead.
+func (wf Worker) Block() error { return wf.Wait() }
+
+// Wait runs the worker with a background context and returns its
+// error.
+func (wf Worker) Wait() error { return wf.Run(context.Background()) }
+
 // Must converts a Worker function into a wait function; however,
 // if the worker produces an error Must converts the error into a
 // panic.
@@ -189,7 +188,7 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
-func (wf Worker) Ignore() Operation { return func(ctx context.Context) { _ = wf(ctx) } }
+func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ers.Ignore(wf(ctx)) } }
 
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed
@@ -202,10 +201,11 @@ func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrapper(cond)) }
 // not execute. The condition function is called in between every operation.
 //
 // When worker functions may be called more than once, and will run
-// multiple times potentiall.
+// multiple times potentially.
 func (wf Worker) When(cond func() bool) Worker {
 	return func(ctx context.Context) error { return ft.WhenDo(cond(), wf.futureOp(ctx)) }
 }
+func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
 // After returns a Worker that blocks until the timestamp provided is
 // in the past. Additional calls to this worker will run
@@ -312,9 +312,18 @@ func (wf Worker) Interval(dur time.Duration) Worker {
 	}
 }
 
-// Join melds two workers, calling the second worker if the first
-// succeeds and the context hasn't been canceled.
-func (wf Worker) Join(next Worker) Worker {
+// Join combines a sequence of workers, calling the workers in order,
+// as long as there is no error and the context does not
+// expire. Context expiration errors are not propagated.
+func (wf Worker) Join(wfs ...Worker) Worker {
+	for idx := range wfs {
+		wf = wf.merge(wfs[idx])
+	}
+
+	return wf
+}
+
+func (wf Worker) merge(next Worker) Worker {
 	return func(ctx context.Context) error {
 		if err := wf(ctx); err != nil {
 			return err

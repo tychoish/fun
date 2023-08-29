@@ -182,14 +182,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force
+						getNextValue := set.Iterator().Producer().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force
+						getNextValue = set.Iterator().Producer().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -208,14 +208,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force
+						getNextValue := set.Iterator().Producer().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force
+						getNextValue = set.Iterator().Producer().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -236,14 +236,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force
+						getNextValue := set.Iterator().Producer().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force
+						getNextValue = set.Iterator().Producer().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -262,14 +262,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force
+						getNextValue := set.Iterator().Producer().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force
+						getNextValue = set.Iterator().Producer().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())

@@ -218,10 +218,18 @@ func (wf Operation) WithLock(mtx *sync.Mutex) Operation {
 	}
 }
 
-// Join runs the first operation, and then if the context has not
-// expired, runs the second operation.
-func (wf Operation) Join(op Operation) Operation {
-	return func(ctx context.Context) { wf(ctx); op.If(ctx.Err() == nil).Run(ctx) }
+// Join combines a sequence of operations, calling the Operations in
+// order as long as the context does not expire. If the context
+// expires, the combined operation aborts early.
+func (wf Operation) Join(ops ...Operation) Operation {
+	for idx := range ops {
+		wf = wf.merge(ops[idx])
+	}
+	return wf
+}
+
+func (wf Operation) merge(next Operation) Operation {
+	return func(ctx context.Context) { wf(ctx); next.If(ctx.Err() == nil).Run(ctx) }
 }
 
 // PostHook unconditionally runs the post-hook operation after the
