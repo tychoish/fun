@@ -59,9 +59,7 @@ func (ec *Collector) Handler() fun.Handler[error] { return ec.Add }
 // Future returns a function that is generally equivalent to
 // Collector.Resolve(); however, the errors are returned as an unwound
 // slice of errors, rather than the ers.Stack object.
-func (ec *Collector) Future() fun.Future[[]error] {
-	return func() []error { defer with(lock(&ec.mu)); return ec.stack.Unwind() }
-}
+func (ec *Collector) Future() fun.Future[error] { return ec.Resolve }
 
 // Len reports on the total number of non-nil errors collected. The
 // count tracks a cached size of the *erc.Stack, giving Len() stable

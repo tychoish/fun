@@ -131,9 +131,11 @@ func TestError(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				ec.Add(fmt.Errorf("%d", i))
 			}
-			errs := ec.Future().Resolve()
+			err := ec.Future().Resolve()
+			assert.Error(t, err)
+			errs := ers.Unwind(err)
 			if len(errs) != 100 {
-				t.Log(errs, len(errs), ec.Len())
+				t.Log(len(errs), ec.Len(), errs)
 			}
 		})
 		t.Run("PanicRecovery", func(t *testing.T) {
