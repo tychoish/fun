@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -363,6 +362,21 @@ func (wf Worker) PostHook(op func()) Worker {
 	return func(ctx context.Context) error { return ers.Join(ft.Flip(wf(ctx), ers.Check(op))) }
 }
 
+// WithErrorCheck takes an error future, and checks it before
+// executing the producer function. If the error future returns an
+// error (any error), the producer propagates that error, rather than
+// running the underying producer. Useful for injecting an abort into
+// an existing pipleine or chain
+func (wf Worker) WithErrorCheck(ef Future[error]) Worker {
+	return func(ctx context.Context) error {
+		if err := ef(); err != nil {
+			return err
+		}
+		return wf.Run(ctx)
+	}
+
+}
+
 // StartGroup starts n copies of the worker operation and returns a
 // future/worker that returns the aggregated errors from all workers
 //
@@ -370,22 +384,13 @@ func (wf Worker) PostHook(op func()) Worker {
 // abort-on-error semantics, use the Filter() method on the input
 // worker, that cancels the context on when it sees an error.
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
-	ch := Blocking(make(chan error, intish.Max(n, runtime.NumCPU())))
-	oe := ch.Send().Processor().Force
-
 	wg := &WaitGroup{}
 
-	prod := ch.Producer()
-	op := wf.Operation(oe)
+	eh, ep := HF.ErrorCollector()
 
-	wg.DoTimes(ctx, n, op)
+	wf.Operation(eh).StartGroup(ctx, wg, n)
 
-	wg.Operation().PostHook(ch.Close).Background(ctx)
-
-	return func(ctx context.Context) (err error) {
-		errs, err := prod.Iterator().Slice(ctx)
-		return ers.Join(append(errs, err)...)
-	}
+	return func(ctx context.Context) (err error) { wg.Wait(ctx); return ep() }
 }
 
 // Group makes a worker that runs n copies of the underlying worker,

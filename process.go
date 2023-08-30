@@ -30,7 +30,7 @@ func MakeProcessor[T any](fn func(T) error) Processor[T] {
 }
 
 // Processify provides an easy converter/constructor for
-// Processor-type function
+// Processor-type function.
 func Processify[T any](fn func(context.Context, T) error) Processor[T] { return fn }
 
 // ProcessifyHandler converts a handler-type function to a processor.
@@ -44,12 +44,6 @@ func ProcessifyHandler[T any](fn Handler[T]) Processor[T] {
 // resources outside of the scope of the function execution. Run can
 // also be passed as a Processor func.
 func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(in).Run(ctx) }
-
-// Background processes an item in a separate goroutine and returns a
-// worker that will block until the underlying operation is complete.
-func (pf Processor[T]) Background(ctx context.Context, op T) Worker {
-	return pf.Worker(op).Launch(ctx)
-}
 
 // Add begins running the process in a different goroutine, using the
 // provided arguments to manage the operation.
@@ -71,12 +65,6 @@ func (pf Processor[T]) Check(ctx context.Context, in T) bool { return ers.OK(pf(
 // Force processes the input, but discards the error and uses a
 // context that will not expire.
 func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
-
-// Operation converts a processor into a worker that will process the input
-// provided when executed.
-func (pf Processor[T]) Operation(of Handler[error], in T) Operation {
-	return pf.Worker(in).Operation(of)
-}
 
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.
@@ -168,6 +156,22 @@ func (pf Processor[T]) merge(next Processor[T]) Processor[T] {
 // respecting the worker's context. The processing does not begin
 // until the worker is called.
 func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker { return iter.Process(pf) }
+
+// Background processes an item in a separate goroutine and returns a
+// worker that will block until the underlying operation is complete.
+func (pf Processor[T]) Background(ctx context.Context, op T) Worker {
+	return pf.Worker(op).Launch(ctx)
+}
+
+// Capture creates a handler function that like, Processor.Force,
+// passes a background context and ignores the processors error.
+func (pf Processor[T]) Capture() Handler[T] { return pf.Force }
+
+// Operation converts a processor into a worker that will process the input
+// provided when executed.
+func (pf Processor[T]) Operation(of Handler[error], in T) Operation {
+	return pf.Worker(in).Operation(of)
+}
 
 // Handler converts a processor into an observer, handling the error
 // with the error observer and using the provided context.

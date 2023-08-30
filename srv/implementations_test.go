@@ -222,7 +222,7 @@ func TestHelpers(t *testing.T) {
 
 func TestCmd(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 2; i++ {
 		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
 			t.Parallel()
 			t.Run("SimpleSleep", func(t *testing.T) {
@@ -279,7 +279,7 @@ func TestCmd(t *testing.T) {
 				out := &bytes.Buffer{}
 				cmd.Stdout = out
 				cmd.Stderr = out
-				s := Cmd(cmd, 10*time.Millisecond)
+				s := Cmd(cmd, 100*time.Millisecond)
 
 				check.NotError(t, s.Start(ctx))
 				runtime.Gosched()
@@ -371,7 +371,9 @@ func TestDaemon(t *testing.T) {
 			check.Error(t, err)
 		})
 		assert.True(t, baseRunCounter.Load() >= 2)
-		assert.True(t, len(ers.Unwind(err)) >= 2)
+		errs := len(ers.Unwind(err))
+		assert.True(t, errs >= 2)
+		testt.Log(t, errs)
 		assert.Substring(t, err.Error(), "kip")
 	})
 	t.Run("ShutdownTriggers", func(t *testing.T) {

@@ -468,6 +468,29 @@ func TestWorker(t *testing.T) {
 
 		})
 	})
+	t.Run("ErrorCheck", func(t *testing.T) {
+		t.Run("ShortCircut", func(t *testing.T) {
+			err := errors.New("test error")
+			var hf Future[error] = func() error { return err }
+			called := 0
+			wf := Worker(func(ctx context.Context) error { called++; return nil })
+			ecpf := wf.WithErrorCheck(hf)
+			e := ecpf.Wait()
+			check.Error(t, e)
+			check.ErrorIs(t, e, err)
+			check.Equal(t, 0, called)
+
+		})
+		t.Run("Noop", func(t *testing.T) {
+			var hf Future[error] = func() error { return nil }
+			called := 0
+			wf := Worker(func(ctx context.Context) error { called++; return nil })
+			ecpf := wf.WithErrorCheck(hf)
+			e := ecpf.Wait()
+			check.NotError(t, e)
+			check.Equal(t, 1, called)
+		})
+	})
 	t.Run("Delay", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

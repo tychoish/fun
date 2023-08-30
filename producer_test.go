@@ -565,7 +565,7 @@ func TestProducer(t *testing.T) {
 			// do the waiting
 			select {
 			case <-sig:
-				return 400, errSignaled
+				return 0, errSignaled
 			case <-ctx.Done():
 				return -1, ctx.Err()
 			}
@@ -573,13 +573,39 @@ func TestProducer(t *testing.T) {
 		resolver := prod.Launch(ctx)
 		time.Sleep(50 * time.Millisecond)
 		check.Equal(t, count.Load(), 1)
+
 		close(sig)
 		out, err := resolver(ctx)
 		check.Equal(t, count.Load(), 2)
-		check.Equal(t, 400, out)
-		check.ErrorIs(t, err, errSignaled)
-
+		check.Zero(t, out)
+		check.Error(t, err)
 	})
+	t.Run("ErrorCheck", func(t *testing.T) {
+		t.Run("ShortCircut", func(t *testing.T) {
+			err := errors.New("test error")
+			var hf Future[error] = func() error { return err }
+			called := 0
+			pf := MakeProducer(func() (int, error) { called++; return 42, nil })
+			ecpf := pf.WithErrorCheck(hf)
+			out, e := ecpf.Wait()
+			check.Error(t, e)
+			check.ErrorIs(t, e, err)
+			check.Zero(t, out)
+			check.Equal(t, 0, called)
+
+		})
+		t.Run("Noop", func(t *testing.T) {
+			var hf Future[error] = func() error { return nil }
+			called := 0
+			pf := MakeProducer(func() (int, error) { called++; return 42, nil })
+			ecpf := pf.WithErrorCheck(hf)
+			out, e := ecpf.Wait()
+			check.NotError(t, e)
+			check.Equal(t, 42, out)
+			check.Equal(t, 1, called)
+		})
+	})
+
 	t.Run("Limit", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

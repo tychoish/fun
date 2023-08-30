@@ -200,21 +200,36 @@ func (pf Producer[T]) Wait() (T, error) { return pf(context.Background()) }
 // Check converts the error into a boolean, with true indicating
 // success and false indicating (but not propagating it.).
 func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
-func (pf Producer[T]) CheckForce() (T, bool)               { return pf.Check(context.Background()) }
+func (pf Producer[T]) CheckForce() (T, bool)               { o, e := pf.Wait(); return o, e == nil }
 
-// Launch runs the producer in the background, when function is
-// called, and returns a producer which, when called, blocks until the
+// Launch runs the producer in the background, and returns a producer
+// that and returns a producer which, when called, blocks until the
 // original producer returns.
 func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
-	out := make(chan T, 1)
-	var err error
-	go func() { defer close(out); o, e := pf.WithRecover().Run(ctx); err = e; out <- o }()
+	eh, ef := HF.ErrorCollector()
+	pipe := Blocking(make(chan T, 2))
+	pipe.Send().Processor().
+		ReadAll(pf).
+		Operation(eh).
+		PostHook(pipe.Close).
+		Background(ctx)
+	return pipe.Producer().WithErrorCheck(ef)
+}
 
+// WithErrorCheck takes an error future, and checks it before
+// executing the producer function. If the error future returns an
+// error (any error), the producer propagates that error, rather than
+// running the underying producer. Useful for injecting an abort into
+// an existing pipleine or chain.
+func (pf Producer[T]) WithErrorCheck(ef Future[error]) Producer[T] {
+	var zero T
 	return func(ctx context.Context) (T, error) {
-		out, chErr := Blocking(out).Receive().Read(ctx)
-		err = ers.Join(err, chErr)
-		return out, err
+		if err := ef(); err != nil {
+			return zero, err
+		}
+		return pf.Resolve(ctx)
 	}
+
 }
 
 // Once returns a producer that only executes ones, and caches the

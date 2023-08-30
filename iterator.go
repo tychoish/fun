@@ -157,7 +157,7 @@ func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
 			send.Consume(iters[idx]).Operation(eh).Add(wctx, wg)
 		}
 
-		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Background(ctx)
+		wg.Operation().PostHook(cancel).PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
 	return pipe.Receive().
@@ -463,15 +463,13 @@ func (i *Iterator[T]) Channel(ctx context.Context) <-chan T { return i.BufferedC
 // exhausted.
 func (i *Iterator[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
-	go func() {
-		defer out.Close()
-		pipe := Pipe(i.Producer(), out.Send().Processor())
-		for {
-			if !pipe.Check(ctx) {
-				return
-			}
-		}
-	}()
+
+	out.Processor().
+		ReadAll(i.Producer()).
+		PostHook(out.Close).
+		Operation(i.AddError).
+		Launch(ctx)
+
 	return out.Channel()
 }
 

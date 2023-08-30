@@ -161,6 +161,20 @@ func TestProcess(t *testing.T) {
 		obv(42)
 		check.Equal(t, called, 2)
 	})
+	t.Run("Capture", func(t *testing.T) {
+		called := 0
+		pf := Processify(func(ctx context.Context, n int) error {
+			check.NotNil(t, ctx)
+			check.Equal(t, 42, n)
+			called++
+			return nil
+		})
+		obv := pf.Capture()
+		check.Equal(t, called, 0)
+		obv(42)
+		check.Equal(t, called, 1)
+	})
+
 	t.Run("Worker", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
