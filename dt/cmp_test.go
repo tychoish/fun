@@ -163,7 +163,7 @@ func TestSort(t *testing.T) {
 			assert.ErrorIs(t, err, ErrUninitializedContainer)
 		})
 		t.Run("IteratorConstructor", func(t *testing.T) {
-			iter := Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
+			iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
 			heap, err := NewHeapFromIterator(ctx, cmp.LessThanNative[int], iter)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)

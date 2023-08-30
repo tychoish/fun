@@ -34,7 +34,7 @@ func TestFundamentals(t *testing.T) {
 		})
 		t.Run("Sliceify", func(t *testing.T) {
 			var base []string
-			ex := dt.Sliceify(base)
+			ex := dt.NewSlice(base)
 			check.True(t, ex == nil)
 
 			ex.Extend(base)

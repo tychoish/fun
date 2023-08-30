@@ -22,7 +22,7 @@ func TestProducer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		wf, cancel := Producer[int](func(ctx context.Context) (int, error) {
+		wf, cancel := NewProducer(func(ctx context.Context) (int, error) {
 			timer := time.NewTimer(time.Hour)
 			defer timer.Stop()
 			select {

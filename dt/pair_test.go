@@ -14,7 +14,7 @@ import (
 
 func TestPairs(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
-		ps := Mapify(map[string]string{"in": "out"}).Pairs()
+		ps := NewMap(map[string]string{"in": "out"}).Pairs()
 		ps.Add("in", "in")
 		ps.Add("in", "what")
 		ps.Add("in", "out")
@@ -82,7 +82,7 @@ func TestPairs(t *testing.T) {
 			assert.True(t, ps == nil)
 		})
 		t.Run("Happy", func(t *testing.T) {
-			iter := Sliceify[Pair[string, int]]([]Pair[string, int]{
+			iter := NewSlice[Pair[string, int]]([]Pair[string, int]{
 				MakePair("1", 1), MakePair("2", 2),
 				MakePair("3", 3), MakePair("4", 4),
 				MakePair("5", 5), MakePair("6", 6),

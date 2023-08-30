@@ -58,7 +58,7 @@ func TestPairExtra(t *testing.T) {
 
 			p := Pairs[string, int]{}
 			err := p.ConsumeValues(
-				Sliceify([]int{1, 2, 3}).Iterator(),
+				NewSlice([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
 			).Run(ctx)
 			assert.NotError(t, err)
@@ -82,7 +82,7 @@ func TestPairExtra(t *testing.T) {
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Encode", func(t *testing.T) {
-			ps := Mapify(map[string]string{"in": "out"}).Pairs()
+			ps := NewMap(map[string]string{"in": "out"}).Pairs()
 			out, err := json.Marshal(ps)
 			assert.NotError(t, err)
 			assert.Equal(t, string(out), `{"in":"out"}`)

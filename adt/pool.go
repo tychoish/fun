@@ -141,7 +141,7 @@ func MakeBufferPool(min, max int) *Pool[dt.Slice[byte]] {
 		}
 		return buf[:0]
 	})
-	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.Sliceify(make([]byte, 0, min)) })
+	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.NewSlice(make([]byte, 0, min)) })
 	bufpool.FinalizeSetup()
 
 	return bufpool

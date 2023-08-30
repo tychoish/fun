@@ -24,6 +24,10 @@ func MakeProducer[T any](fn func() (T, error)) Producer[T] {
 	return func(context.Context) (T, error) { return fn() }
 }
 
+// NewProducer returns a producer as a convenience function to avoid
+// the extra cast when creating new function objects.
+func NewProducer[T any](fn func(ctx context.Context) (T, error)) Producer[T] { return fn }
+
 // ConsistentProducer constructs a wrapper around a similar function
 // type that does not return an error or take a context. The resulting
 // function will never error.
@@ -43,6 +47,10 @@ func ValueProducer[T any](val T) Producer[T] {
 	return StaticProducer(val, nil)
 }
 
+// CheckProducer wraps a function object that uses the second ("OK")
+// value to indicate that no more values will be produced. Errors
+// returned from the resulting produce are always either the context
+// cancellation error or io.EOF.
 func CheckProducer[T any](op func() (T, bool)) Producer[T] {
 	var zero T
 	return func(ctx context.Context) (_ T, err error) {

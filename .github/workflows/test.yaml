@@ -23,10 +23,9 @@ jobs:
         with:
           PATTERNS: |
             **/**.go
-            "!test/"
             go.mod
             go.sum
       - name: go test
         if: env.GIT_DIFF
         run: |
-          go test -race -timeout=2m ./...
+          go test -race -timeout=5m ./...

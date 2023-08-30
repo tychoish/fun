@@ -51,20 +51,26 @@ func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
 func MapIterator[K comparable, V any](in map[K]V) *fun.Iterator[Pair[K, V]] {
-	return Mapify(in).Iterator()
+	return NewMap(in).Iterator()
 }
 
 // MapKeys takes an arbitrary map and produces an iterator over only
 // the keys.
-func MapKeys[K comparable, V any](in map[K]V) *fun.Iterator[K] { return Mapify(in).Keys() }
+func MapKeys[K comparable, V any](in map[K]V) *fun.Iterator[K] { return NewMap(in).Keys() }
 
 // MapValues takes an arbitrary map and produces an iterator over only
 // the values.
-func MapValues[K comparable, V any](in map[K]V) *fun.Iterator[V] { return Mapify(in).Values() }
+func MapValues[K comparable, V any](in map[K]V) *fun.Iterator[V] { return NewMap(in).Values() }
+
+// NewMap provides a constructor that will produce a fun.Map without
+// specifying types.
+func NewMap[K comparable, V any](in map[K]V) Map[K, V] { return in }
 
 // Mapify provides a constructor that will produce a fun.Map without
 // specifying types.
-func Mapify[K comparable, V any](in map[K]V) Map[K, V] { return in }
+//
+// Deprecated: use NewMap() for this case.
+func Mapify[K comparable, V any](in map[K]V) Map[K, V] { return NewMap(in) }
 
 // Check returns true if the value K is in the map.
 func (m Map[K, V]) Check(key K) bool { _, ok := m[key]; return ok }
@@ -111,7 +117,7 @@ func (m Map[K, V]) AddPair(p Pair[K, V])   { m.Add(p.Key, p.Value) }
 func (m Map[K, V]) AddTuple(p Tuple[K, V]) { m.Add(p.One, p.Two) }
 
 // Append adds a sequence of Pair objects to the map.
-func (m Map[K, V]) Append(pairs ...Pair[K, V]) { Sliceify(pairs).Observe(m.AddPair) }
+func (m Map[K, V]) Append(pairs ...Pair[K, V]) { NewSlice(pairs).Observe(m.AddPair) }
 
 // Len returns the length. It is equivalent to len(Map), but is
 // provided for consistency.

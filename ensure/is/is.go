@@ -19,8 +19,8 @@ import (
 // as in:
 //
 //	ensure.That(is.True(os.IsNotExists(err))).Metadata(
-//	          is.Plist().Pair("name", name).
-//	                     Pair("path", path)).Run(t)
+//		  is.Plist().Pair("name", name).
+//			     Pair("path", path)).Run(t)
 func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
 
 // That is the root type for the assertion helpers in this
@@ -33,8 +33,8 @@ type That fun.Future[[]string]
 // operation aborts.
 func And(ops ...That) That {
 	return func() []string {
-		out := dt.Sliceify(make([]string, 0, len(ops)+1))
-		dt.Sliceify(ops).Process(fun.MakeProcessor(func(that That) error {
+		out := dt.NewSlice(make([]string, 0, len(ops)+1))
+		dt.NewSlice(ops).Process(fun.MakeProcessor(func(that That) error {
 			if that == nil {
 				out.Add("encountered nil is.That operation")
 				return ers.ErrCurrentOpAbort
@@ -55,8 +55,8 @@ func And(ops ...That) That {
 // are reported as errors
 func All(ops ...That) That {
 	return func() []string {
-		out := dt.Sliceify(make([]string, 0, len(ops)+1))
-		dt.Sliceify(ops).Observe(func(op That) {
+		out := dt.NewSlice(make([]string, 0, len(ops)+1))
+		dt.NewSlice(ops).Observe(func(op That) {
 			out.AppendWhen(op == nil, "encountered nil is.That operation")
 			out.Extend(ft.SafeDo(op))
 		})

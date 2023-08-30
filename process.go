@@ -29,14 +29,25 @@ func MakeProcessor[T any](fn func(T) error) Processor[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
 
-// Processify provides an easy converter/constructor for
-// Processor-type function.
-func Processify[T any](fn func(context.Context, T) error) Processor[T] { return fn }
-
-// ProcessifyHandler converts a handler-type function to a processor.
-func ProcessifyHandler[T any](fn Handler[T]) Processor[T] {
+// MakeHandlerProcessor converts a handler-type function to a processor.
+func MakeHandlerProcessor[T any](fn func(T)) Processor[T] {
 	return func(_ context.Context, in T) error { fn(in); return nil }
 }
+
+// NewProcessors returns a processor as a convenience function to
+// avoid the extra cast when creating new function objects.
+func NewProcessor[T any](fn func(context.Context, T) error) Processor[T] { return fn }
+
+// Processify provides an easy converter/constructor for
+// Processor-type function.
+//
+// Deprecated: use NewProcessor for this case.
+func Processify[T any](fn func(context.Context, T) error) Processor[T] { return NewProcessor(fn) }
+
+// ProcessifyHandler converts a handler-type function to a processor.
+//
+// Deprecated: use MakeHandlerProcessor for this case.
+func ProcessifyHandler[T any](fn Handler[T]) Processor[T] { return MakeHandlerProcessor(fn) }
 
 // Run executes the Processors but creates a context within the
 // function (decended from the context provided in the arguments,)

@@ -20,7 +20,7 @@ func randomIntSlice(size int) Slice[int] {
 	for idx := range out {
 		out[idx] = intish.Abs(rand.Intn(size) + 1)
 	}
-	return Sliceify(out)
+	return NewSlice(out)
 }
 
 func intSlice(size int) Slice[int] {
@@ -28,7 +28,7 @@ func intSlice(size int) Slice[int] {
 	for idx := range out {
 		out[idx] = idx
 	}
-	return Sliceify(out)
+	return NewSlice(out)
 }
 
 func TestSlice(t *testing.T) {
@@ -492,7 +492,7 @@ func TestSlice(t *testing.T) {
 		})
 		t.Run("Ref", func(t *testing.T) {
 			t.Run("RoundTrip", func(t *testing.T) {
-				rsl := SliceRefs(Sliceify(sl).Ptrs())
+				rsl := SliceRefs(NewSlice(sl).Ptrs())
 				for idx := range rsl {
 					check.Equal(t, rsl[idx], sl[idx])
 					check.Equal(t, rsl[idx], int8(idx))
@@ -527,14 +527,14 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, powers.Index(1), 100)
 	})
 	t.Run("Zero", func(t *testing.T) {
-		s := Sliceify([]int{100, 100, 100, 100, 100, 100})
+		s := NewSlice([]int{100, 100, 100, 100, 100, 100})
 		s.Zero()
 		for i := range s {
 			check.Zero(t, s[i])
 		}
 	})
 	t.Run("ZeroRange", func(t *testing.T) {
-		s := Sliceify([]int{100, 100, 100, 100, 100, 100})
+		s := NewSlice([]int{100, 100, 100, 100, 100, 100})
 		s.ZeroRange(0, 2)
 		check.Equal(t, s[0]+s[1]+s[2], 0)
 		check.Equal(t, s[3]+s[4]+s[5], 300)
@@ -542,7 +542,7 @@ func TestSlice(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
 		sl := MergeSlices(
 			Variadic(100, 1000, 10000),
-			Sliceify([]int{400, 4000, 40000}),
+			NewSlice([]int{400, 4000, 40000}),
 			Variadic(800, 8000, 80000),
 		)
 		check.Equal(t, sl.Len(), 9)

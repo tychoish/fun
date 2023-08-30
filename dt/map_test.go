@@ -13,11 +13,11 @@ import (
 )
 
 func makeMap(size int) Map[string, int] {
-	out := Mapify(make(map[string]int, size))
+	out := NewMap(make(map[string]int, size))
 	for i := 0; len(out) < size; i++ {
 		out[fmt.Sprint(rand.Intn((1+i)*1000000))] = i
 	}
-	return Mapify(out)
+	return NewMap(out)
 }
 
 func TestMap(t *testing.T) {
@@ -141,14 +141,13 @@ func TestMap(t *testing.T) {
 
 			mp := Map[string, int]{}
 			err := mp.ConsumeValues(
-				Sliceify([]int{1, 2, 3}).Iterator(),
+				NewSlice([]int{1, 2, 3}).Iterator(),
 				func(in int) string { return fmt.Sprint(in) },
 			).Run(ctx)
 			check.NotError(t, err)
 			check.Equal(t, mp["1"], 1)
 			check.Equal(t, mp["2"], 2)
 			check.Equal(t, mp["3"], 3)
-
 		})
 	})
 	t.Run("MapConverter", func(t *testing.T) {
@@ -160,7 +159,7 @@ func TestMap(t *testing.T) {
 			"how": "are you doing",
 		}
 
-		iter := Mapify(in).Iterator()
+		iter := NewMap(in).Iterator()
 		seen := 0
 		for iter.Next(ctx) {
 			item := iter.Value()
@@ -176,6 +175,11 @@ func TestMap(t *testing.T) {
 		}
 		assert.Equal(t, seen, len(in))
 	})
+	t.Run("Helpers", func(t *testing.T) {
+		assert.NotPanic(t, func() { Sliceify([]int{1, 2, 3}) })
+		assert.NotPanic(t, func() { Mapify(map[string]int{"a": 1, "b": 2, "c": 3}) })
+	})
+
 	t.Run("Constructors", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

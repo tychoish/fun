@@ -14,7 +14,7 @@ import (
 func TestTupleExtra(t *testing.T) {
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Encode", func(t *testing.T) {
-			ps := Mapify(map[string]string{"in": "out"}).Tuples()
+			ps := NewMap(map[string]string{"in": "out"}).Tuples()
 			out, err := json.Marshal(ps)
 			check.NotError(t, err)
 			check.Equal(t, string(out), `[["in","out"]]`)

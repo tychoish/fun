@@ -15,7 +15,7 @@ func TestIterator(t *testing.T) {
 		for idx := range out {
 			out[idx] = idx + rand.Intn(10*idx+1)
 		}
-		iter := dt.Sliceify(out).Iterator()
+		iter := dt.NewSlice(out).Iterator()
 		cpy := Slice(iter)
 		assert.EqualItems(t, out, cpy)
 	})
@@ -24,7 +24,7 @@ func TestIterator(t *testing.T) {
 		for idx := range out {
 			out[idx] = idx + rand.Intn(10*idx+1)
 		}
-		iter := dt.Sliceify(out).Iterator()
+		iter := dt.NewSlice(out).Iterator()
 		cpy := List(iter)
 		testt.Log(t, len(out), cpy.Len())
 

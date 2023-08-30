@@ -13,12 +13,19 @@ import (
 // expressive interface to the Map and Pair types in the fun package.
 type Slice[T any] []T
 
-// Sliceify produces a slice object as a convenience constructor.
-func Sliceify[T any](in []T) Slice[T] { return in }
+// NewSlice produces a slice object as a convenience constructor to
+// avoid needing to specify types.
+func NewSlice[T any](in []T) Slice[T] { return in }
+
+// Sliceify produces a slice object as a convenience constructor to
+// avoid needing to specify types.
+//
+// Deprecated: use NewSlice for this case.
+func Sliceify[T any](in []T) Slice[T] { return NewSlice(in) }
 
 // SlicePtrs converts a slice of values to a slice of
 // values. This is a helper for Sliceify(in).Ptrs().
-func SlicePtrs[T any](in []T) Slice[*T] { return Sliceify(in).Ptrs() }
+func SlicePtrs[T any](in []T) Slice[*T] { return NewSlice(in).Ptrs() }
 
 // SliceRefs converts a slice of pointers to a slice of objects,
 // dropping nil values. from the output slice.
@@ -92,7 +99,7 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 // errors are returned to the caller, except io.EOF which indicates
 // the (early) end of iteration.
 func Transform[T any, O any](in Slice[T], op fun.Transform[T, O]) fun.Producer[Slice[O]] {
-	out := Sliceify(make([]O, 0, len(in)))
+	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
 		if err := op.Process(in.Iterator()).Observe(out.Add).Run(ctx); err != nil {
@@ -283,7 +290,7 @@ func (s Slice[T]) Sparse() Slice[T] {
 		}
 	}
 
-	out := Sliceify(make([]T, 0, buf.Len()))
+	out := NewSlice(make([]T, 0, buf.Len()))
 	out.Populate(buf.PopIterator()).Ignore().Wait()
 	return out
 }

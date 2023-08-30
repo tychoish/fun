@@ -15,7 +15,7 @@ import (
 
 func TestTuples(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
-		ps := Mapify(map[string]string{"in": "out"}).Tuples()
+		ps := NewMap(map[string]string{"in": "out"}).Tuples()
 		ps.Add("in", "in")
 		ps.Add("in", "what")
 		ps.Add("in", "out")
@@ -83,7 +83,7 @@ func TestTuples(t *testing.T) {
 			assert.True(t, ps == nil)
 		})
 		t.Run("Happy", func(t *testing.T) {
-			iter := Sliceify[Tuple[string, int]]([]Tuple[string, int]{
+			iter := NewSlice[Tuple[string, int]]([]Tuple[string, int]{
 				MakeTuple("1", 1), MakeTuple("2", 2),
 				MakeTuple("3", 3), MakeTuple("4", 4),
 				MakeTuple("5", 5), MakeTuple("6", 6),

@@ -185,7 +185,7 @@ func Contains[T comparable](ctx context.Context, item T, iter *fun.Iterator[T]) 
 // in a map, returning the first instance of each equivalent object,
 // and skipping subsequent items
 func Uniq[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
-	set := dt.Mapify(map[T]struct{}{})
+	set := dt.NewMap(map[T]struct{}{})
 
 	return fun.Producer[T](func(ctx context.Context) (out T, _ error) {
 		for iter.Next(ctx) {
@@ -227,7 +227,7 @@ func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
 
 	init := fun.Operation(func(ctx context.Context) {
 		defer pipe.Close()
-		iteriter := dt.Sliceify(iters).Iterator()
+		iteriter := dt.NewSlice(iters).Iterator()
 
 		// use direct iteration because this function has full
 		// ownership of the iterator and this is the easiest
@@ -268,7 +268,7 @@ func MergeSliceIterators[T any](iter *fun.Iterator[[]T]) *fun.Iterator[T] {
 
 	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
 		iter.Observe(func(in []T) {
-			dt.Sliceify(in).Process(send).Observe(ctx, errHandler)
+			dt.NewSlice(in).Process(send).Observe(ctx, errHandler)
 		}).Observe(ctx, errHandler)
 	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
 }
@@ -284,8 +284,8 @@ func MergeSlices[T any](sls ...[]T) *fun.Iterator[T] {
 	errHandler := ec.Handler().PreHook(func(err error) { ft.WhenCall(ers.IsTerminating(err), closepipe) })
 
 	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
-		dt.Sliceify(sls).Process(fun.MakeProcessor(func(sl []T) error {
-			return dt.Sliceify(sl).Process(send).Run(ctx)
+		dt.NewSlice(sls).Process(fun.MakeProcessor(func(sl []T) error {
+			return dt.NewSlice(sl).Process(send).Run(ctx)
 		})).Observe(ctx, errHandler)
 	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
 }

@@ -37,7 +37,7 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("NewFromIterator", func(t *testing.T) {
-		iter := Sliceify([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
+		iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
 		list, err := NewListFromIterator(ctx, iter)
 		assert.NotError(t, err)
 		assert.Equal(t, list.Len(), 10)
