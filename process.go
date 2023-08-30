@@ -51,9 +51,15 @@ func (pf Processor[T]) Add(ctx context.Context, wg *WaitGroup, eh Handler[error]
 	pf.Operation(eh, op).Add(ctx, wg)
 }
 
-// Block runs the ProcessFunc with a context that will never be
+// Block runs the Processor with a context that will never be
 // canceled.
-func (pf Processor[T]) Block(in T) error { return pf.Worker(in).Block() }
+//
+// Deprecated: use Wait() instead.
+func (pf Processor[T]) Block(in T) error { return pf.Wait(in) }
+
+// Wait runs the Processor with a context that will never be
+// canceled.
+func (pf Processor[T]) Wait(in T) error { return pf.Worker(in).Wait() }
 
 // Ignore runs the process function and discards the error.
 func (pf Processor[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in)) }
@@ -279,6 +285,20 @@ func (pf Processor[T]) WithErrorFilter(ef ers.Filter) Processor[T] {
 // of the provided types to a nil error.
 func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 	return pf.WithErrorFilter(ers.FilterExclude(errs...))
+}
+
+// WithErrorCheck takes an error future, and checks it before
+// executing the processor operation. If the error future returns an
+// error (any error), the processor propagates that error, rather than
+// running the underying processor. Useful for injecting an abort into
+// an existing pipleine or chain.
+func (pf Processor[T]) WithErrorCheck(ef Future[error]) Processor[T] {
+	return func(ctx context.Context, in T) error {
+		if err := ef(); err != nil {
+			return err
+		}
+		return pf(ctx, in)
+	}
 }
 
 // ReadOne returns a future (Worker) that calls the processor function

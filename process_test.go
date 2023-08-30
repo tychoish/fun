@@ -174,7 +174,31 @@ func TestProcess(t *testing.T) {
 		obv(42)
 		check.Equal(t, called, 1)
 	})
+	t.Run("ErrorCheck", func(t *testing.T) {
+		t.Run("ShortCircut", func(t *testing.T) {
+			err := errors.New("test error")
+			var hf Future[error] = func() error { return err }
+			called := 0
 
+			pf := MakeProcessor(func(in int) error { called++; check.Equal(t, in, 42); return nil })
+			ecpf := pf.WithErrorCheck(hf)
+			e := ecpf.Wait(42)
+
+			check.Error(t, e)
+			check.ErrorIs(t, e, err)
+			check.Equal(t, 0, called)
+
+		})
+		t.Run("Noop", func(t *testing.T) {
+			var hf Future[error] = func() error { return nil }
+			called := 0
+			pf := MakeProcessor(func(in int) error { called++; check.Equal(t, in, 42); return nil })
+			ecpf := pf.WithErrorCheck(hf)
+			e := ecpf.Wait(42)
+			check.NotError(t, e)
+			check.Equal(t, 1, called)
+		})
+	})
 	t.Run("Worker", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

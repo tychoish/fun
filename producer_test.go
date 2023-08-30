@@ -605,7 +605,6 @@ func TestProducer(t *testing.T) {
 			check.Equal(t, 1, called)
 		})
 	})
-
 	t.Run("Limit", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
