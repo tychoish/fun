@@ -274,10 +274,8 @@ func TestCmd(t *testing.T) {
 				assert.Substring(t, err.Error(), "already started")
 			})
 			t.Run("ForceSigKILL", func(t *testing.T) {
-				t.Parallel()
-
 				ctx := testt.Context(t)
-				cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 15; echo 'woop'")
+				cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
 				out := &bytes.Buffer{}
 				cmd.Stdout = out
 				cmd.Stderr = out
