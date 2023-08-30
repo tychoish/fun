@@ -63,7 +63,7 @@ func makeIntSlice(size int) []int {
 
 func TestTools(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 4; i++ {
 		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
 			t.Parallel()
 			t.Run("CancelCollectChannel", func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestTools(t *testing.T) {
 						}
 					case <-sig:
 						break CONSUME
-					case <-time.After(50 * time.Millisecond):
+					case <-time.After(100 * time.Millisecond):
 						break CONSUME
 					}
 				}

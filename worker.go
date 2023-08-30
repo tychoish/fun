@@ -363,10 +363,10 @@ func (wf Worker) PostHook(op func()) Worker {
 }
 
 // WithErrorCheck takes an error future, and checks it before
-// executing the producer function. If the error future returns an
-// error (any error), the producer propagates that error, rather than
+// executing the worker function. If the error future returns an
+// error (any error), the worker propagates that error, rather than
 // running the underying producer. Useful for injecting an abort into
-// an existing pipleine or chain
+// an existing pipleine or chain.
 func (wf Worker) WithErrorCheck(ef Future[error]) Worker {
 	return func(ctx context.Context) error {
 		if err := ef(); err != nil {
@@ -374,7 +374,6 @@ func (wf Worker) WithErrorCheck(ef Future[error]) Worker {
 		}
 		return wf.Run(ctx)
 	}
-
 }
 
 // StartGroup starts n copies of the worker operation and returns a
