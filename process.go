@@ -303,12 +303,17 @@ func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 // error (any error), the processor propagates that error, rather than
 // running the underying processor. Useful for injecting an abort into
 // an existing pipleine or chain.
+//
+// The error future is called before running the underlying processor,
+// to short circuit the operation, and also a second time when
+// processor has returned in case an error has occurred during the
+// operation of the processor.
 func (pf Processor[T]) WithErrorCheck(ef Future[error]) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		if err := ef(); err != nil {
 			return err
 		}
-		return pf(ctx, in)
+		return ers.Join(pf(ctx, in), ef())
 	}
 }
 

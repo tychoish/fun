@@ -215,7 +215,7 @@ func (pf Producer[T]) CheckForce() (T, bool)               { o, e := pf.Wait(); 
 // original producer returns.
 func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	eh, ef := HF.ErrorCollector()
-	pipe := Blocking(make(chan T, 2))
+	pipe := Blocking(make(chan T, 1))
 	pipe.Send().Processor().
 		ReadAll(pf).
 		Operation(eh).
@@ -235,9 +235,12 @@ func (pf Producer[T]) WithErrorCheck(ef Future[error]) Producer[T] {
 		if err := ef(); err != nil {
 			return zero, err
 		}
-		return pf.Resolve(ctx)
+		out, err := pf.Resolve(ctx)
+		if err = ers.Join(err, ef()); err != nil {
+			return zero, err
+		}
+		return out, nil
 	}
-
 }
 
 // Once returns a producer that only executes ones, and caches the

@@ -367,12 +367,17 @@ func (wf Worker) PostHook(op func()) Worker {
 // error (any error), the worker propagates that error, rather than
 // running the underying producer. Useful for injecting an abort into
 // an existing pipleine or chain.
+//
+// The error future is called before running the underlying worker,
+// to short circuit the operation, and also a second time when
+// worker has returned in case an error has occurred during the
+// operation of the worker.
 func (wf Worker) WithErrorCheck(ef Future[error]) Worker {
 	return func(ctx context.Context) error {
 		if err := ef(); err != nil {
 			return err
 		}
-		return wf.Run(ctx)
+		return ers.Join(wf.Run(ctx), ef())
 	}
 }
 
