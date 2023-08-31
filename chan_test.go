@@ -50,6 +50,12 @@ func TestChannel(t *testing.T) {
 				err := Blocking(ch).Send().Write(ctx, 43)
 				assert.ErrorIs(t, err, io.EOF)
 			})
+			t.Run("MultiClose", func(t *testing.T) {
+				ch := NonBlocking(make(chan int))
+				for i := 0; i < 10; i++ {
+					check.NotPanic(t, ch.Close)
+				}
+			})
 			t.Run("Ignore", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()

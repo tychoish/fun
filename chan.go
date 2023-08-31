@@ -78,7 +78,15 @@ func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeBlocking,
 func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlocking, ch: ch} }
 
 // Close closes the underlying channel.
-func (op ChanOp[T]) Close() { close(op.ch) }
+//
+// This swallows any panic encountered when calling close() on the
+// underlying channel, which makes it safe to call on nil or
+// already-closed channels: the result in all cases (that the channel
+// is closed when Close() returns, is the same in all cases.)
+func (op ChanOp[T]) Close() {
+	defer func() { _ = recover() }()
+	close(op.ch)
+}
 
 // Len returns the current length of the channel.
 func (op ChanOp[T]) Len() int { return len(op.ch) }
