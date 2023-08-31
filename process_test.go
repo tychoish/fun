@@ -198,6 +198,47 @@ func TestProcess(t *testing.T) {
 			check.NotError(t, e)
 			check.Equal(t, 1, called)
 		})
+		t.Run("Multi", func(t *testing.T) {
+			called := 0
+			hfcall := 0
+			var hf Future[error] = func() error {
+				hfcall++
+				switch hfcall {
+				case 1, 2, 3:
+					return nil
+				case 4, 5:
+					return ers.ErrCurrentOpAbort
+				}
+				return errors.New("unexpected error")
+			}
+			wf := MakeProcessor(func(in int) error {
+				called++
+				check.Equal(t, in, 42)
+				if hfcall == 3 {
+					return io.EOF
+				}
+				return nil
+			})
+			ecpf := wf.WithErrorCheck(hf)
+			e := ecpf.Wait(42)
+			check.NotError(t, e)
+			check.Equal(t, 1, called)
+			check.Equal(t, 2, hfcall)
+
+			e = ecpf.Wait(42)
+			check.Error(t, e)
+			check.Equal(t, 2, called)
+			check.Equal(t, 4, hfcall)
+			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
+			check.ErrorIs(t, e, io.EOF)
+
+			e = ecpf.Wait(42)
+			check.Error(t, e)
+			check.Equal(t, 2, called)
+			check.Equal(t, 5, hfcall)
+			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
+			check.NotErrorIs(t, e, io.EOF)
+		})
 	})
 	t.Run("Worker", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

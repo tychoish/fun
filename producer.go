@@ -215,7 +215,7 @@ func (pf Producer[T]) CheckForce() (T, bool)               { o, e := pf.Wait(); 
 // original producer returns.
 func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	eh, ef := HF.ErrorCollector()
-	pipe := Blocking(make(chan T, 1))
+	pipe := Blocking(make(chan T))
 	pipe.Send().Processor().
 		ReadAll(pf).
 		Operation(eh).

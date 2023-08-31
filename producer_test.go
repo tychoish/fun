@@ -604,6 +604,50 @@ func TestProducer(t *testing.T) {
 			check.Equal(t, 42, out)
 			check.Equal(t, 1, called)
 		})
+		t.Run("Multi", func(t *testing.T) {
+			called := 0
+			hfcall := 0
+			var hf Future[error] = func() error {
+				hfcall++
+				switch hfcall {
+				case 1, 2, 3:
+					return nil
+				case 4, 5:
+					return ers.ErrCurrentOpAbort
+				}
+				return errors.New("unexpected error")
+			}
+			wf := MakeProducer(func() (int, error) {
+				called++
+				if hfcall == 3 {
+					return 0, io.EOF
+				}
+				return 42, nil
+			})
+			ecpf := wf.WithErrorCheck(hf)
+			out, e := ecpf.Wait()
+			check.NotError(t, e)
+			check.Equal(t, out, 42)
+			check.Equal(t, 1, called)
+			check.Equal(t, 2, hfcall)
+
+			out, e = ecpf.Wait()
+			check.Equal(t, out, 0)
+			check.Error(t, e)
+			check.Equal(t, 2, called)
+			check.Equal(t, 4, hfcall)
+			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
+			check.ErrorIs(t, e, io.EOF)
+
+			out, e = ecpf.Wait()
+			check.Error(t, e)
+			check.Equal(t, out, 0)
+			check.Equal(t, 2, called)
+			check.Equal(t, 5, hfcall)
+			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
+			check.NotErrorIs(t, e, io.EOF)
+		})
+
 	})
 	t.Run("Limit", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
