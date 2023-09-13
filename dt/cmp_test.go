@@ -144,7 +144,7 @@ func TestSort(t *testing.T) {
 	})
 	t.Run("Heap", func(t *testing.T) {
 		t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-			ok, err := ers.Safe(func() bool {
+			ok, err := ers.WithRecoverDo(func() bool {
 				var list *Heap[string]
 				list.Push("hi")
 				return true

@@ -40,7 +40,7 @@ func (of Handler[T]) WithRecover(oe Handler[error]) Handler[T] {
 
 // RecoverPanic runs the handler function with a panic handler and converts
 // a possible panic to an error.
-func (of Handler[T]) RecoverPanic(in T) error { return ers.Check(of.Capture(in)) }
+func (of Handler[T]) RecoverPanic(in T) error { return ers.WithRecoverCall(of.Capture(in)) }
 
 // Worker captures a variable and returns a worker function which
 // will, when executed, observe the input value. These worker

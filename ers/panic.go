@@ -49,26 +49,36 @@ func NewInvariantViolation(args ...any) error {
 	}
 }
 
-// Check, like Safe, runs a function without arguments that does not
+// WithRecoverCall runs a function without arguments that does not
 // produce an error, and, if the function panics, converts it into an
 // error.
-func Check(fn func()) (err error) {
+func WithRecoverCall(fn func()) (err error) {
 	defer func() { err = ParsePanic(recover()) }()
 	fn()
 	return
 }
 
-// Safe runs a function with a panic handler that converts the panic
+func WrapWithRecoverCall(fn func()) func() error {
+	return func() error { return WithRecoverCall(fn) }
+}
+func WrapRecoverDo[T any](fn func() T) func() (T, error) {
+	return func() (T, error) { return WithRecoverDo(fn) }
+}
+func WrapRecoverOK[T any](fn func() (T, error)) func() (T, bool) {
+	return func() (T, bool) { return WithRecoverOK(fn) }
+}
+
+// WithRecoverDo runs a function with a panic handler that converts the panic
 // to an error.
-func Safe[T any](fn func() T) (out T, err error) {
+func WithRecoverDo[T any](fn func() T) (out T, err error) {
 	defer func() { err = ParsePanic(recover()) }()
 	out = fn()
 	return
 }
 
-// SafeOK runs a function and returns true if there are no errors and
+// WithRecoverOK runs a function and returns true if there are no errors and
 // no panics the bool output value is true, otherwise it is false.
-func SafeOK[T any](fn func() (T, error)) (out T, ok bool) {
+func WithRecoverOK[T any](fn func() (T, error)) (out T, ok bool) {
 	defer func() { ok = !IsError(ParsePanic(recover())) && ok }()
 	if value, err := fn(); OK(err) {
 		out, ok = value, true

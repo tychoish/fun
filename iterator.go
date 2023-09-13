@@ -607,3 +607,10 @@ func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }
+
+func (i *Iterator[T]) Tee(n int,
+	opts ...OptionProvider[*WorkerGroupConf],
+) []*Iterator[T] {
+
+	return nil
+}

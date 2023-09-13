@@ -261,7 +261,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		{
 			Name: "Lifo/Parallel/Unbuffered/EightWorker",
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				broker, err := ers.Safe(func() *Broker[T] {
+				broker, err := ers.WithRecoverDo(func() *Broker[T] {
 					return NewLIFOBroker[T](ctx, BrokerOptions{
 						ParallelDispatch: true,
 						WorkerPoolSize:   8,
@@ -531,7 +531,7 @@ func TestBroker(t *testing.T) {
 		}
 	})
 	t.Run("NewLifoBrokerRejectsNegativeCapacity", func(t *testing.T) {
-		_, err := ers.Safe(func() *Broker[string] {
+		_, err := ers.WithRecoverDo(func() *Broker[string] {
 			return NewLIFOBroker[string](ctx, BrokerOptions{}, -42)
 		})
 		if err != nil {

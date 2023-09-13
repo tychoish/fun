@@ -224,6 +224,10 @@ func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	return pipe.Producer().WithErrorCheck(ef)
 }
 
+func (pf Producer[T]) WithWaitGroup(wg *WaitGroup) Producer[T] {
+	return pf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
+}
+
 // WithErrorCheck takes an error future, and checks it before
 // executing the producer function. If the error future returns an
 // error (any error), the producer propagates that error, rather than
@@ -448,7 +452,7 @@ func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 // returned with the producer's output.
 func (pf Producer[T]) PreHook(op Operation) Producer[T] {
 	return func(ctx context.Context) (out T, err error) {
-		e := ers.Check(func() { op(ctx) })
+		e := ers.WithRecoverCall(func() { op(ctx) })
 		out, err = pf(ctx)
 		return out, ers.Join(err, e)
 	}
@@ -463,7 +467,7 @@ func (pf Producer[T]) PreHook(op Operation) Producer[T] {
 func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
-		e = ers.Join(ers.Check(op), e)
+		e = ers.Join(ers.WithRecoverCall(op), e)
 		return
 	}
 }

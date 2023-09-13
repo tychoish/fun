@@ -36,17 +36,51 @@ func (Handlers) ProcessWorker() Processor[Worker] {
 	return func(ctx context.Context, wf Worker) error { return wf(ctx) }
 }
 
-// RunOperations returns a Operation that, when called, processes the incoming
-// iterator of Operations, starts a go routine running each, and wait
-// function and then blocks until all operations have returned, or the
-// context passed to the output function has been canceled.
+// RunOperations returns a Operation that, when called, processes the
+// incoming iterator of Operations, starts a go routine for running
+// each element in the iterator, (without any throttling or rate
+// limiting) and then blocks until all operations have returned, or
+// the context passed to the output function has been canceled.
+//
+// For more configuraable options, use the itertool.Worker() function
+// which provides more configurability and supports both Operation and
+// Worker functions.
 func (Handlers) OperationPool(iter *Iterator[Operation]) Operation {
 	return func(ctx context.Context) {
 		wg := &WaitGroup{}
-		defer wg.Wait(ctx)
+
 		wg.Launch(ctx, iter.Observe(func(fn Operation) {
 			wg.Launch(ctx, fn)
 		}).Ignore())
+
+		wg.Wait(ctx)
+	}
+}
+
+// WorkerPool, creates a work that processes an iterator of worker
+// functions, for simple and short total-duration operations. Every
+// worker in the pool runs in it's own go routine, and there are no
+// limits or throttling on the number of go routines. All errors are
+// aggregated and in a single collector (ers.Stack) which is returned
+// by the worker when the operation ends (if many Worker's error this
+// may create memory pressure) and there's no special handling of panics.
+//
+// For more configuraable options, use the itertool.Worker() function
+// which provides more configurability and supports both Operation and
+// Worker functions.
+func (Handlers) WorkerPool(iter *Iterator[Worker]) Worker {
+	return func(ctx context.Context) (err error) {
+		ec, ef := HF.ErrorCollector()
+		wg := &WaitGroup{}
+
+		wg.Launch(ctx, iter.Observe(func(fn Worker) {
+			wg.Launch(ctx, fn.Operation(ec))
+		}).Operation(ec))
+
+		wg.Wait(ctx)
+		ec(ctx.Err())
+
+		return ef()
 	}
 }
 
@@ -85,7 +119,7 @@ func (Handlers) ErrorHandler(of Handler[error]) Handler[error] {
 	}
 }
 
-// ErrorCollectorStac returns an ers.ErrorStack, and a
+// ErrorStackHandler returns an ers.ErrorStack, and a
 // fun.Handler[error] function that will add an error to the
 // stack. This collector is not safe for concurrent use.
 func (Handlers) ErrorStackHandler() (*ers.Stack, Handler[error]) {

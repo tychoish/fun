@@ -245,7 +245,7 @@ func TestIterator(t *testing.T) {
 			out := ConvertIterator(input,
 				ConverterOK(func(in string) (int, bool) {
 					calls++
-					return ers.SafeOK(func() (int, error) { return strconv.Atoi(in) })
+					return ers.WithRecoverOK(func() (int, error) { return strconv.Atoi(in) })
 				}),
 			)
 			sum := 0

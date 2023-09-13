@@ -261,6 +261,14 @@ func Contains[T comparable](item T, slice []T) bool {
 // interface-typed objects in atomics.
 func Wrapper[T any](in T) func() T { return func() T { return in } }
 
+func Join(fns ...func()) func() {
+	return func() {
+		for _, f := range fns {
+			SafeCall(f)
+		}
+	}
+}
+
 // Apply returns a function object that, when called calls the input
 // function with the provided argument.
 func Apply[T any](fn func(T), arg T) func() { return func() { fn(arg) } }

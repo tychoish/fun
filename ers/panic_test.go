@@ -11,7 +11,7 @@ import (
 
 func TestPanics(t *testing.T) {
 	t.Run("SafeWithPanic", func(t *testing.T) {
-		ok, err := Safe(func() bool {
+		ok, err := WithRecoverDo(func() bool {
 			panic(errors.New("error"))
 		})
 		assert.Error(t, err)
@@ -32,13 +32,13 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("Check", func(t *testing.T) {
 		t.Run("NoError", func(t *testing.T) {
-			err := Check(func() { t.Log("function runs") })
+			err := WithRecoverCall(func() { t.Log("function runs") })
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 		t.Run("WithPanic", func(t *testing.T) {
-			err := Check(func() { panic("function runs") })
+			err := WithRecoverCall(func() { panic("function runs") })
 			if err == nil {
 				t.Fatal(err)
 			}
@@ -103,12 +103,12 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("SafeOK", func(t *testing.T) {
 		t.Run("Not", func(t *testing.T) {
-			num, ok := SafeOK(func() (int, error) { return 42, io.EOF })
+			num, ok := WithRecoverOK(func() (int, error) { return 42, io.EOF })
 			assert.True(t, !ok)
 			assert.Zero(t, num)
 		})
 		t.Run("Passes", func(t *testing.T) {
-			num, ok := SafeOK(func() (int, error) { return 42, nil })
+			num, ok := WithRecoverOK(func() (int, error) { return 42, nil })
 			assert.True(t, ok)
 			assert.Equal(t, 42, num)
 		})

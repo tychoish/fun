@@ -170,7 +170,7 @@ func (mpf Transform[T, O]) Wait() func(T) (O, error) {
 func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
 	return func(in T) (O, bool) {
 		mpfb := mpf.Wait()
-		return ers.SafeOK(func() (O, error) { return mpfb(in) })
+		return ers.WithRecoverOK(func() (O, error) { return mpfb(in) })
 	}
 }
 

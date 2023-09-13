@@ -49,6 +49,21 @@ func Processify[T any](fn func(context.Context, T) error) Processor[T] { return 
 // Deprecated: use MakeHandlerProcessor for this case.
 func ProcessifyHandler[T any](fn Handler[T]) Processor[T] { return MakeHandlerProcessor(fn) }
 
+func ProcessorGroup[T any](pfs ...Processor[T]) Processor[T] {
+	var pf Processor[T]
+	for _, fn := range pfs {
+		switch {
+		case fn == nil:
+			continue
+		case pf == nil:
+			pf = fn
+		default:
+			pf = pf.merge(fn)
+		}
+	}
+	return pf
+}
+
 // Run executes the Processors but creates a context within the
 // function (decended from the context provided in the arguments,)
 // that is canceled when Run() returns to avoid leaking well behaved
@@ -271,7 +286,7 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 // before a processor is called the first time.
 func (pf Processor[T]) PreHook(op Operation) Processor[T] {
 	return func(ctx context.Context, in T) error {
-		return ers.Join(ers.Check(func() { op(ctx) }), pf(ctx, in))
+		return ers.Join(ers.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
 	}
 }
 
@@ -282,7 +297,7 @@ func (pf Processor[T]) PreHook(op Operation) Processor[T] {
 // case of a processor panic.)
 func (pf Processor[T]) PostHook(op func()) Processor[T] {
 	return func(ctx context.Context, in T) error {
-		return ers.Join(ft.Flip(pf(ctx, in), ers.Check(op)))
+		return ers.Join(ft.Flip(pf(ctx, in), ers.WithRecoverCall(op)))
 	}
 }
 
@@ -315,6 +330,10 @@ func (pf Processor[T]) WithErrorCheck(ef Future[error]) Processor[T] {
 		}
 		return ers.Join(pf(ctx, in), ef())
 	}
+}
+
+func (pf Processor[T]) WithWaitGroup(wg *WaitGroup) Processor[T] {
+	return pf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
 }
 
 // ReadOne returns a future (Worker) that calls the processor function

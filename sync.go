@@ -57,6 +57,9 @@ func (wg *WaitGroup) Add(num int) {
 // Done marks a single operation as done.
 func (wg *WaitGroup) Done() { wg.Add(-1) }
 
+// Inc adds one item to the wait group.
+func (wg *WaitGroup) Inc() { wg.Add(1) }
+
 // Num returns the number of pending workers.
 func (wg *WaitGroup) Num() int {
 	wg.mu.Lock()
@@ -85,8 +88,7 @@ func (wg *WaitGroup) DoTimes(ctx context.Context, n int, op Operation) {
 // Launch increments the WaitGroup and starts the operation in a go
 // routine.
 func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
-	wg.Add(1)
-	op.PostHook(wg.Done).Background(ctx)
+	op.WithWaitGroup(wg).Background(ctx)
 }
 
 // Worker returns a worker that will block on the wait group

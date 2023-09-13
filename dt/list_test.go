@@ -45,7 +45,7 @@ func TestList(t *testing.T) {
 		assert.Equal(t, list.Front().Value(), 1)
 	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-		ok, err := ers.Safe(func() bool {
+		ok, err := ers.WithRecoverDo(func() bool {
 			var list *List[string]
 			list.PushBack("hi")
 			return true

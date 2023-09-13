@@ -117,6 +117,10 @@ func (wf Worker) WithRecover() Worker {
 	}
 }
 
+func (wf Worker) WithWaitGroup(wg *WaitGroup) Worker {
+	return wf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
+}
+
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are not caught.
 func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Run(ctx)) }
@@ -352,14 +356,14 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 // it is converted to an error and aggregated with the worker's
 // error.
 func (wf Worker) PreHook(op Operation) Worker {
-	return func(ctx context.Context) error { return ers.Join(ers.Check(func() { op(ctx) }), wf(ctx)) }
+	return func(ctx context.Context) error { return ers.Join(ers.WithRecoverCall(func() { op(ctx) }), wf(ctx)) }
 }
 
 // PostHook runs hook operation  after the worker function
 // completes. If the hook panics it is converted to an error and
 // aggregated with workers's error.
 func (wf Worker) PostHook(op func()) Worker {
-	return func(ctx context.Context) error { return ers.Join(ft.Flip(wf(ctx), ers.Check(op))) }
+	return func(ctx context.Context) error { return ers.Join(ft.Flip(wf(ctx), ers.WithRecoverCall(op))) }
 }
 
 // WithErrorCheck takes an error future, and checks it before

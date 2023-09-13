@@ -19,7 +19,7 @@ func TestStack(t *testing.T) {
 	defer cancel()
 
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-		ok, err := ers.Safe(func() bool {
+		ok, err := ers.WithRecoverDo(func() bool {
 			var list *Stack[string]
 			list.Push("hi")
 			return true
