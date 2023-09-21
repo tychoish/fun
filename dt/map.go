@@ -111,6 +111,7 @@ func (m Map[K, V]) Tuples() *Tuples[K, V] {
 
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }
+func (m Map[K, V]) Delete(k K)   { delete(m, k) }
 
 // AddPair adds a Pair object to the map.
 func (m Map[K, V]) AddPair(p Pair[K, V])   { m.Add(p.Key, p.Value) }
