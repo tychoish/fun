@@ -117,10 +117,6 @@ func (wf Worker) WithRecover() Worker {
 	}
 }
 
-func (wf Worker) WithWaitGroup(wg *WaitGroup) Worker {
-	return wf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
-}
-
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are not caught.
 func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Run(ctx)) }

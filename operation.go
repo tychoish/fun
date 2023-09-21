@@ -142,10 +142,6 @@ func (wf Operation) WithRecover() Worker {
 	return func(ctx context.Context) error { return ers.WithRecoverCall(func() { wf(ctx) }) }
 }
 
-func (wf Operation) WithWaitGroup(wg *WaitGroup) Operation {
-	return wf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
-}
-
 // Worker converts a wait function into a fun.Worker. If the context
 // is canceled, the worker function returns the context's error.
 func (wf Operation) Worker() Worker {

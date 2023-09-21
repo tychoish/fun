@@ -332,10 +332,6 @@ func (pf Processor[T]) WithErrorCheck(ef Future[error]) Processor[T] {
 	}
 }
 
-func (pf Processor[T]) WithWaitGroup(wg *WaitGroup) Processor[T] {
-	return pf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
-}
-
 // ReadOne returns a future (Worker) that calls the processor function
 // on the output of the provided producer function. ReadOne uses the
 // fun.Pipe() operation for the underlying implementation.

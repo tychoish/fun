@@ -224,10 +224,6 @@ func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
 	return pipe.Producer().WithErrorCheck(ef)
 }
 
-func (pf Producer[T]) WithWaitGroup(wg *WaitGroup) Producer[T] {
-	return pf.PreHook(MakeOperation(wg.Inc)).PostHook(wg.Done)
-}
-
 // WithErrorCheck takes an error future, and checks it before
 // executing the producer function. If the error future returns an
 // error (any error), the producer propagates that error, rather than
