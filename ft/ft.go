@@ -261,6 +261,8 @@ func Contains[T comparable](item T, slice []T) bool {
 // interface-typed objects in atomics.
 func Wrapper[T any](in T) func() T { return func() T { return in } }
 
+// Join creates a function that iterates over all of the input
+// functions and calls all non-nil functions. Nil inputs are ignored..
 func Join(fns ...func()) func() {
 	return func() {
 		for _, f := range fns {

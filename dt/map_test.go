@@ -274,4 +274,14 @@ func TestMap(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Delete", func(t *testing.T) {
+		mp := Map[string, int]{}
+		mp.Add("hi", 1)
+		assert.Equal(t, mp.Len(), 1)
+		mp.Delete("boo")
+		assert.Equal(t, mp.Len(), 1)
+		mp.Delete("hi")
+		assert.Equal(t, mp.Len(), 0)
+	})
+
 }

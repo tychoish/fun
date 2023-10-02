@@ -49,6 +49,8 @@ func Processify[T any](fn func(context.Context, T) error) Processor[T] { return 
 // Deprecated: use MakeHandlerProcessor for this case.
 func ProcessifyHandler[T any](fn Handler[T]) Processor[T] { return MakeHandlerProcessor(fn) }
 
+// ProcessorGroup takes a collection of Processor functions and merges
+// them into a single chain, eliding any nil processors.
 func ProcessorGroup[T any](pfs ...Processor[T]) Processor[T] {
 	var pf Processor[T]
 	for _, fn := range pfs {

@@ -1006,5 +1006,58 @@ func TestWorker(t *testing.T) {
 
 		})
 	})
+	t.Run("WorkerPool", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			counter := &atomic.Int64{}
+			wfs := make([]Worker, 100)
+			for i := 0; i < 100; i++ {
+				wfs[i] = func(context.Context) error {
+					counter.Add(1)
+					time.Sleep(10 * time.Millisecond)
+					counter.Add(1)
+					return nil
+				}
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			start := time.Now()
+			assert.Equal(t, counter.Load(), 0)
+			err := HF.WorkerPool(SliceIterator(wfs)).Run(ctx)
+			dur := time.Since(start)
+			if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
+				t.Error(dur)
+			}
+			assert.NotError(t, err)
+			assert.Equal(t, counter.Load(), 200)
+		})
+		t.Run("Errors", func(t *testing.T) {
+			const experr ers.Error = "expected error"
 
+			counter := &atomic.Int64{}
+			wfs := make([]Worker, 100)
+			for i := 0; i < 100; i++ {
+				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(10 * time.Millisecond); return experr }
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			start := time.Now()
+			assert.Equal(t, counter.Load(), 0)
+
+			err := HF.WorkerPool(SliceIterator(wfs)).Run(ctx)
+			dur := time.Since(start)
+			if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
+				t.Error(dur)
+			}
+
+			assert.Error(t, err)
+			errs := ers.Unwind(err)
+
+			assert.Equal(t, len(errs), 100)
+			assert.Equal(t, counter.Load(), 100)
+
+			for _, e := range errs {
+				assert.ErrorIs(t, e, experr)
+			}
+		})
+	})
 }

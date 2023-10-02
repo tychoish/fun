@@ -50,7 +50,7 @@ func NewInvariantViolation(args ...any) error {
 }
 
 // WithRecoverCall runs a function without arguments that does not
-// produce an error, and, if the function panics, converts it into an
+// produce an error and, if the function panics, converts it into an
 // error.
 func WithRecoverCall(fn func()) (err error) {
 	defer func() { err = ParsePanic(recover()) }()
@@ -58,22 +58,27 @@ func WithRecoverCall(fn func()) (err error) {
 	return
 }
 
-func WrapWithRecoverCall(fn func()) func() error {
+// WrapRecoverCall wraps a function without arguments that does not
+// produce an error with one that does produce an error. When called,
+// the new function will never panic but returns an error if the input
+// function panics.
+func WrapRecoverCall(fn func()) func() error {
 	return func() error { return WithRecoverCall(fn) }
 }
-func WrapRecoverDo[T any](fn func() T) func() (T, error) {
-	return func() (T, error) { return WithRecoverDo(fn) }
-}
-func WrapRecoverOK[T any](fn func() (T, error)) func() (T, bool) {
-	return func() (T, bool) { return WithRecoverOK(fn) }
-}
 
-// WithRecoverDo runs a function with a panic handler that converts the panic
-// to an error.
+// WithRecoverDo runs a function with a panic handler that converts
+// the panic to an error.
 func WithRecoverDo[T any](fn func() T) (out T, err error) {
 	defer func() { err = ParsePanic(recover()) }()
 	out = fn()
 	return
+}
+
+// WrapRecoverDo wraps a function that returns a single value, with
+// one that returns that argument and an error if the underlying
+// function panics.
+func WrapRecoverDo[T any](fn func() T) func() (T, error) {
+	return func() (T, error) { return WithRecoverDo(fn) }
 }
 
 // WithRecoverOK runs a function and returns true if there are no errors and
@@ -84,4 +89,12 @@ func WithRecoverOK[T any](fn func() (T, error)) (out T, ok bool) {
 		out, ok = value, true
 	}
 	return
+}
+
+// WrapRecoverOK takes a function that returns an error and a value,
+// and returns a wrapped function that also catches any panics in the
+// input function, and returns the value and a boolean that is true if
+// the input function does not return an error or panic.
+func WrapRecoverOK[T any](fn func() (T, error)) func() (T, bool) {
+	return func() (T, bool) { return WithRecoverOK(fn) }
 }

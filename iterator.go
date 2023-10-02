@@ -608,6 +608,7 @@ func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }
 
+// Tee, like the eponymous UNIX utility, produces a s
 func (i *Iterator[T]) Tee(
 	n int,
 	opts ...OptionProvider[*WorkerGroupConf],

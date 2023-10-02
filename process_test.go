@@ -368,7 +368,6 @@ func TestProcess(t *testing.T) {
 			check.Equal(t, onect, 1)
 			check.Equal(t, twoct, 1)
 			reset()
-
 		})
 		t.Run("Canceled", func(t *testing.T) {
 			var one Processor[string] = func(ctx context.Context, in string) error { onect++; check.Equal(t, in, t.Name()); return ctx.Err() }
@@ -385,7 +384,6 @@ func TestProcess(t *testing.T) {
 			check.Equal(t, onect, 1)
 			check.Equal(t, twoct, 0)
 			reset()
-
 		})
 		t.Run("CancelBetweenShouldNoopSecond", func(t *testing.T) {
 			sig1 := make(chan struct{})
@@ -415,6 +413,27 @@ func TestProcess(t *testing.T) {
 			check.Equal(t, onect, 1)
 			check.Equal(t, twoct, 0)
 			<-sig3
+		})
+	})
+	t.Run("JoinedConstructor", func(t *testing.T) {
+		counter := 0
+		reset := func() { counter = 0 }
+		pf := MakeProcessor(func(in int) error { counter++; assert.Equal(t, in, 42); return nil })
+		t.Run("All", func(t *testing.T) {
+			defer reset()
+			pg := ProcessorGroup(pf, pf, pf, pf, pf, pf, pf, pf)
+			assert.NotError(t, pg.Block(42))
+			assert.Equal(t, counter, 8)
+		})
+		t.Run("WithNils", func(t *testing.T) {
+			defer reset()
+			pg := ProcessorGroup(pf, nil, pf, pf, nil, pf, pf, pf, pf, pf, nil)
+			assert.NotError(t, pg.Block(42))
+			assert.Equal(t, counter, 8)
+		})
+		t.Run("Empty", func(t *testing.T) {
+			pg := ProcessorGroup[int]()
+			assert.Nil(t, pg)
 		})
 	})
 	t.Run("Group", func(t *testing.T) {
@@ -711,4 +730,30 @@ func TestProcess(t *testing.T) {
 			}
 		}
 	})
+	t.Run("Group", func(t *testing.T) {
+		t.Run("Noop", func(t *testing.T) {
+			check.Nil(t, ProcessorGroup[int](nil, nil))
+			check.Nil(t, ProcessorGroup[int]())
+
+		})
+		t.Run("Single", func(t *testing.T) {
+			var count int
+			pf := MakeProcessor(func(in int) error { count++; check.Equal(t, in, 42); return nil })
+			op := ProcessorGroup(pf)
+			check.Equal(t, 0, count)
+			assert.NotError(t, op.Block(42))
+			check.Equal(t, 1, count)
+		})
+		t.Run("Multi", func(t *testing.T) {
+			var count int
+			pf := MakeProcessor(func(in int) error { count++; check.Equal(t, in, 42); return nil })
+			op := ProcessorGroup(pf, pf, pf, pf)
+
+			check.Equal(t, 0, count)
+			assert.NotError(t, op.Block(42))
+			check.Equal(t, 4, count)
+		})
+
+	})
+
 }

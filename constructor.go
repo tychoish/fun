@@ -69,7 +69,7 @@ func (Handlers) OperationPool(iter *Iterator[Operation]) Operation {
 // which provides more configurability and supports both Operation and
 // Worker functions.
 func (Handlers) WorkerPool(iter *Iterator[Worker]) Worker {
-	return func(ctx context.Context) (err error) {
+	return func(ctx context.Context) error {
 		ec, ef := HF.ErrorCollector()
 		wg := &WaitGroup{}
 
