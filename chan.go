@@ -139,7 +139,7 @@ type ChanReceive[T any] struct {
 // returns a NEW channel that only contains elements that have
 // elements that the filter function returns true for.
 func (ro ChanReceive[T]) Filter(ctx context.Context, eh Handler[error], filter func(T) bool) ChanReceive[T] {
-	out := ChanOp[T]{ch: make(chan T, 200), mode: ro.mode}
+	out := ChanOp[T]{ch: make(chan T), mode: ro.mode}
 
 	ro.Producer().
 		WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).

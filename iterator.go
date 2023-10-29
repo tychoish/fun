@@ -607,36 +607,3 @@ func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
 }
-
-// Tee, like the eponymous UNIX utility, produces a s
-func (i *Iterator[T]) Tee(
-	n int,
-	opts ...OptionProvider[*WorkerGroupConf],
-) []*Iterator[T] {
-	if n == 0 {
-		return nil
-	}
-
-	out := make([]*Iterator[T], n)
-	pipes := make([]ChanSend[T], n)
-	for idx := range out {
-		p := Blocking(make(chan T))
-		pipes[idx] = p.Send()
-		if idx == 0 {
-			out[idx] = p.Receive().Producer().PreHook(func(ctx context.Context) {
-				i.ProcessParallel(func(ctx context.Context, item T) error {
-					for _, pipe := range pipes {
-						if err := pipe.Write(ctx, item); err != nil {
-							return err
-						}
-					}
-					return nil
-				}, opts...)
-			}).Iterator()
-		} else {
-			out[idx] = p.Iterator()
-		}
-	}
-
-	return out
-}
