@@ -111,10 +111,14 @@ func (m Map[K, V]) Tuples() *Tuples[K, V] {
 
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }
-func (m Map[K, V]) Delete(k K)   { delete(m, k) }
 
-// AddPair adds a Pair object to the map.
-func (m Map[K, V]) AddPair(p Pair[K, V])   { m.Add(p.Key, p.Value) }
+// Delete removes a key from the map.
+func (m Map[K, V]) Delete(k K) { delete(m, k) }
+
+// AddPair adds a Pair holding K and V objects to the map.
+func (m Map[K, V]) AddPair(p Pair[K, V]) { m.Add(p.Key, p.Value) }
+
+// AddTuple adds a Tuple of K and V objects to the map.
 func (m Map[K, V]) AddTuple(p Tuple[K, V]) { m.Add(p.One, p.Two) }
 
 // Append adds a sequence of Pair objects to the map.
