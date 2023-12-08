@@ -385,8 +385,7 @@ func TestRateLimit(t *testing.T) {
 		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
 
 		assert.Equal(t, 10, count.Get())
-		assert.True(t, dur <= 200*time.Millisecond)
-		assert.True(t, dur > 100*time.Millisecond)
+		assert.True(t, dur >= time.Second)
 	})
 
 }
