@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -312,4 +313,44 @@ func JSON[T any](in io.Reader) *fun.Iterator[T] {
 func Indexed[T any](iter *fun.Iterator[T]) *fun.Iterator[dt.Pair[int, T]] {
 	idx := -1
 	return fun.ConvertIterator(iter, fun.Converter(func(in T) dt.Pair[int, T] { idx++; return dt.MakePair(idx, in) }))
+}
+
+// RateLimit wraps an iterator with a rate-limiter to ensure that the
+// output iterator will produce no more than <num> items in any given
+// <window>. Does not garuntee
+func RateLimit[T any](iter *fun.Iterator[T], num int, window time.Duration) *fun.Iterator[T] {
+	queue := &dt.List[time.Time]{}
+	timer := time.NewTimer(0)
+	var zero T
+
+	fun.Invariant.IsTrue(num > 0, "rate must be greater than zero")
+
+	return fun.NewProducer(func(ctx context.Context) (T, error) {
+
+	START:
+		now := time.Now()
+		if queue.Len() < num {
+			queue.PushBack(now)
+			return iter.ReadOne(ctx)
+		}
+		for queue.Len() > 0 && now.After(queue.Front().Value().Add(window)) {
+			queue.Front().Drop()
+		}
+		if queue.Len() < num {
+			queue.PushBack(now)
+			return iter.ReadOne(ctx)
+		}
+
+		sleepUntil := time.Until(queue.Front().Value().Add(window))
+		fun.Invariant.IsTrue(sleepUntil >= 0, "the next sleep must be in the future")
+
+		timer.Reset(sleepUntil)
+		select {
+		case <-timer.C:
+			goto START
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		}
+
+	}).Lock().Iterator()
 }
