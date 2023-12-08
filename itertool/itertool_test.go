@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/testt"
 )
@@ -360,6 +361,32 @@ func TestRateLimit(t *testing.T) {
 
 		assert.True(t, dur >= 100*time.Millisecond)
 		assert.Equal(t, 100, count.Get())
+	})
+	t.Run("Cancelation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		start := time.Now()
+		go func() { time.Sleep(time.Second); cancel() }()
+		count := &intish.Atomic[int]{}
+		err := RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Second).
+			Process(func(ctx context.Context, in int) error {
+				check.True(t, in >= 0)
+				check.True(t, in <= 100)
+				count.Add(1)
+				testt.Log(t, count.Get(), "-->", time.Now())
+				return nil
+			}).Run(ctx)
+		end := time.Now()
+		dur := end.Sub(start)
+
+		assert.Error(t, err)
+		assert.True(t, ers.IsExpiredContext(err))
+		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
+
+		assert.Equal(t, 10, count.Get())
+		assert.True(t, dur <= 200*time.Millisecond)
+		assert.True(t, dur > 100*time.Millisecond)
 	})
 
 }
