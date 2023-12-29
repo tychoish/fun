@@ -9,11 +9,14 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -317,4 +320,72 @@ func makeIntSlice(size int) []int {
 		out[i] = i
 	}
 	return out
+}
+
+func TestRateLimit(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Serial", func(t *testing.T) {
+		start := time.Now()
+		count := &intish.Atomic[int]{}
+		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).Process(func(ctx context.Context, in int) error {
+			check.True(t, in >= 0)
+			check.True(t, in <= 100)
+			count.Add(1)
+			testt.Log(t, count.Get(), "-->", time.Now())
+			return nil
+		}).Run(testt.Context(t)))
+		end := time.Now()
+		dur := end.Sub(start)
+
+		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
+
+		assert.True(t, dur >= 100*time.Millisecond)
+		assert.Equal(t, 100, count.Get())
+	})
+	t.Run("Parallel", func(t *testing.T) {
+		start := time.Now()
+		count := &intish.Atomic[int]{}
+		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).
+			ProcessParallel(func(ctx context.Context, in int) error {
+				check.True(t, in >= 0)
+				check.True(t, in <= 100)
+				count.Add(1)
+				testt.Log(t, count.Get(), "-->", time.Now())
+				return nil
+			}, fun.WorkerGroupConfNumWorkers(4)).Run(testt.Context(t)))
+		end := time.Now()
+		dur := end.Sub(start)
+
+		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
+
+		assert.True(t, dur >= 100*time.Millisecond)
+		assert.Equal(t, 100, count.Get())
+	})
+	t.Run("Cancelation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		start := time.Now()
+		go func() { time.Sleep(time.Second); cancel() }()
+		count := &intish.Atomic[int]{}
+		err := RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Second).
+			Process(func(ctx context.Context, in int) error {
+				check.True(t, in >= 0)
+				check.True(t, in <= 100)
+				count.Add(1)
+				testt.Log(t, count.Get(), "-->", time.Now())
+				return nil
+			}).Run(ctx)
+		end := time.Now()
+		dur := end.Sub(start)
+
+		assert.Error(t, err)
+		assert.True(t, ers.IsExpiredContext(err))
+		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
+
+		assert.Equal(t, 10, count.Get())
+		assert.True(t, dur >= time.Second)
+	})
+
 }
