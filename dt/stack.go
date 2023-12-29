@@ -63,11 +63,11 @@ func (it *Item[T]) String() string { return fmt.Sprint(it.value) }
 // check the validity of the zero values.
 func (it *Item[T]) Value() T { return it.value }
 
-// OK return true if the Value() has been set. Returns false for
+// Ok return true if the Value() has been set. Returns false for
 // incompletely initialized values.
 //
 // Returns false when the item is nil.
-func (it *Item[T]) OK() bool { return it != nil && it.ok }
+func (it *Item[T]) Ok() bool { return it != nil && it.ok }
 
 // Next returns the following item in the stack.
 func (it *Item[T]) Next() *Item[T] { return it.next }
@@ -112,7 +112,7 @@ func (it *Item[T]) Remove() bool {
 	}
 
 	// ok, go looking for the detach point in the stack.
-	for next := it.stack.head; next.OK(); next = next.next {
+	for next := it.stack.head; next.Ok(); next = next.next {
 		// the next item is going to be the head of the new stack
 		if next == it {
 			it.stack.length--
@@ -180,7 +180,7 @@ func (it *Item[T]) Attach(stack *Stack[T]) bool {
 		return false
 	}
 
-	for n := stack.Pop(); n.OK(); n = stack.Pop() {
+	for n := stack.Pop(); n.Ok(); n = stack.Pop() {
 		it = it.Append(n)
 	}
 
@@ -215,7 +215,7 @@ func (s *Stack[T]) MarshalJSON() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	_, _ = buf.Write([]byte("["))
 
-	for i := s.Head(); i.OK(); i = i.Next() {
+	for i := s.Head(); i.Ok(); i = i.Next() {
 		if i != s.Head() {
 			_, _ = buf.Write([]byte(","))
 		}
@@ -254,7 +254,7 @@ func (s *Stack[T]) UnmarshalJSON(in []byte) error {
 		head = head.Append(elem)
 	}
 	head = s.Head()
-	for it := ns.Pop(); it.OK(); it = ns.Pop() {
+	for it := ns.Pop(); it.Ok(); it = ns.Pop() {
 		head.Append(it)
 	}
 	return nil
@@ -309,7 +309,7 @@ func (s *Stack[T]) Producer() fun.Producer[T] {
 	item := &Item[T]{next: s.head}
 	return func(ctx context.Context) (o T, _ error) {
 		item = item.Next()
-		if !item.OK() {
+		if !item.Ok() {
 			return o, io.EOF
 		}
 		return item.Value(), nil

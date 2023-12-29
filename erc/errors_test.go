@@ -41,7 +41,7 @@ func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
 		t.Error("should have expected number of errors", expectedNum, actual)
 		t.Log(catcher.Resolve())
 	}
-	if catcher.OK() {
+	if catcher.Ok() {
 		t.Error("should have errors")
 	}
 	if catcher.Resolve() == nil {
@@ -262,7 +262,7 @@ func TestError(t *testing.T) {
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, "no error")
-			assert.True(t, ec.OK())
+			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
 			When(ec, true, errval)
 			check.NotZero(t, ec.stack) // nil is zero
@@ -275,7 +275,7 @@ func TestError(t *testing.T) {
 		t.Run("WhenBasicError", func(t *testing.T) {
 			ec := &Collector{}
 			When(ec, false, "no error")
-			assert.True(t, ec.OK())
+			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
 			ex := errors.New(errval)
 			When(ec, true, ex)

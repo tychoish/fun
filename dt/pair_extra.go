@@ -75,7 +75,7 @@ func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Iterator().Observe(p.P
 func (p *Pairs[K, V]) Map() map[K]V {
 	p.init()
 	out := make(map[K]V, p.ll.Len())
-	for i := p.ll.Front(); i.OK(); i = i.Next() {
+	for i := p.ll.Front(); i.Ok(); i = i.Next() {
 		pair := i.Value()
 		if _, ok := out[pair.Key]; ok {
 			continue

@@ -31,9 +31,9 @@ func TestErrors(t *testing.T) {
 	})
 	t.Run("Ok", func(t *testing.T) {
 		var err error
-		check.True(t, OK(err))
+		check.True(t, Ok(err))
 		err = errors.New("hi")
-		check.True(t, !OK(err))
+		check.True(t, !Ok(err))
 	})
 	t.Run("Filter", func(t *testing.T) {
 		err := Join(Error("beep"), context.Canceled)
@@ -148,10 +148,10 @@ func TestErrors(t *testing.T) {
 		check.Equal(t, 2, len(Append([]error{Error("hi")}, nil, Error("one"), nil)))
 	})
 	t.Run("RemoveOK", func(t *testing.T) {
-		check.Equal(t, 0, len(RemoveOK([]error{nil, nil, nil})))
-		check.Equal(t, 3, cap(RemoveOK([]error{nil, nil, nil})))
-		check.Equal(t, 1, len(RemoveOK([]error{nil, io.EOF, nil})))
-		check.Equal(t, 3, len(RemoveOK([]error{Error("one"), io.EOF, New("two")})))
+		check.Equal(t, 0, len(RemoveOk([]error{nil, nil, nil})))
+		check.Equal(t, 3, cap(RemoveOk([]error{nil, nil, nil})))
+		check.Equal(t, 1, len(RemoveOk([]error{nil, io.EOF, nil})))
+		check.Equal(t, 3, len(RemoveOk([]error{Error("one"), io.EOF, New("two")})))
 	})
 	t.Run("Ignore", func(t *testing.T) {
 		check.NotPanic(t, func() { Ignore(Error("new")) })
@@ -190,7 +190,7 @@ func TestErrors(t *testing.T) {
 
 		t.Run("Wrapping", func(t *testing.T) {
 			err := Whenf(false, "no error %w", errval)
-			assert.True(t, OK(err))
+			assert.True(t, Ok(err))
 
 			err = Whenf(true, "no error: %w", errval)
 			assert.Error(t, err)

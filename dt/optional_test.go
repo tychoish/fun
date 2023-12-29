@@ -15,7 +15,7 @@ import (
 func TestOptioal(t *testing.T) {
 	t.Run("Zero", func(t *testing.T) {
 		var opt Optional[string]
-		check.True(t, ft.Not(opt.OK()))
+		check.True(t, ft.Not(opt.Ok()))
 		check.Equal(t, opt.Resolve(), "")
 		out, ok := opt.Get()
 		check.True(t, ft.Not(ok))
@@ -45,17 +45,17 @@ func TestOptioal(t *testing.T) {
 		future := func() int { count++; return 42 }
 		opt.SetWhenFuture(false, future)
 		check.Equal(t, count, 0)
-		check.True(t, ft.Not(opt.OK()))
+		check.True(t, ft.Not(opt.Ok()))
 		check.Equal(t, opt.Resolve(), 0)
 
 		opt.SetWhenFuture(true, future)
 		check.Equal(t, count, 1)
-		check.True(t, opt.OK())
+		check.True(t, opt.Ok())
 		check.Equal(t, opt.Resolve(), 42)
 	})
 	t.Run("Constructor", func(t *testing.T) {
 		opt := NewOptional("hello")
-		check.True(t, opt.OK())
+		check.True(t, opt.Ok())
 		check.Equal(t, opt.Resolve(), "hello")
 		out, ok := opt.Get()
 		check.True(t, ok)
@@ -67,7 +67,7 @@ func TestOptioal(t *testing.T) {
 		check.Equal(t, opt.Resolve(), "hello")
 
 		opt.Reset()
-		assert.True(t, ft.Not(opt.OK()))
+		assert.True(t, ft.Not(opt.Ok()))
 
 		opt.Default("world")
 		check.Equal(t, opt.Resolve(), "world")
@@ -85,7 +85,7 @@ func TestOptioal(t *testing.T) {
 		check.Equal(t, count, 0)
 
 		opt.Reset()
-		assert.True(t, ft.Not(opt.OK()))
+		assert.True(t, ft.Not(opt.Ok()))
 
 		opt.DefaultFuture(helloFuture)
 		check.Equal(t, opt.Resolve(), "hello")
@@ -108,13 +108,13 @@ func TestOptioal(t *testing.T) {
 			t.Run("String", func(t *testing.T) {
 				opt := &Optional[int]{}
 				check.NotError(t, opt.Scan("100"))
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 				check.Equal(t, 100, opt.Resolve())
 			})
 			t.Run("Bytes", func(t *testing.T) {
 				opt := &Optional[[]byte]{}
 				check.NotError(t, opt.Scan([]byte("100")))
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 				check.Equal(t, "100", string(opt.Resolve()))
 			})
 			t.Run("TextMarshaler", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestOptioal(t *testing.T) {
 				check.Equal(t, string(opt.v.input), t.Name())
 				check.Equal(t, string(opt.v.output), "")
 				check.Equal(t, opt.v.count, 1)
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("TextBinary", func(t *testing.T) {
 				opt := &Optional[*mockBinaryCodec]{}
@@ -131,7 +131,7 @@ func TestOptioal(t *testing.T) {
 				check.Equal(t, string(opt.v.input), t.Name())
 				check.Equal(t, string(opt.v.output), "")
 				check.Equal(t, opt.v.count, 1)
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("Scanner", func(t *testing.T) {
 				opt := &Optional[*mockSQLcell]{}
@@ -139,7 +139,7 @@ func TestOptioal(t *testing.T) {
 				assert.NotError(t, opt.Scan(now))
 				assert.Equal(t, now, opt.v.src.(time.Time))
 				check.Equal(t, opt.v.count, 1)
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("UnknownTypeMismatch", func(t *testing.T) {
 				opt := &Optional[uint]{}
@@ -152,7 +152,7 @@ func TestOptioal(t *testing.T) {
 				opt := &Optional[int64]{}
 				err := opt.Scan(int(100))
 				assert.NotError(t, err)
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 				assert.Equal(t, int64(100), opt.v)
 			})
 		})
@@ -278,20 +278,20 @@ func TestOptioal(t *testing.T) {
 				check.NotError(t, opt.UnmarshalText([]byte("hello jason")))
 				check.Equal(t, opt.v.count, 1)
 				check.Equal(t, string(opt.v.input), "hello jason")
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("YAML", func(t *testing.T) {
 				opt := &Optional[*mockYamlCodec]{}
 				check.NotError(t, opt.UnmarshalText([]byte("hello yaml")))
 				check.Equal(t, opt.v.count, 1)
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 				check.Equal(t, string(opt.v.input), "hello yaml")
 			})
 			t.Run("YAML", func(t *testing.T) {
 				opt := &Optional[*mockGenericCodec]{}
 				check.NotError(t, opt.UnmarshalText([]byte("hello yaml")))
 				check.Equal(t, opt.v.count, 1)
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 				check.Equal(t, string(opt.v.input), "hello yaml")
 			})
 			t.Run("string", func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestOptioal(t *testing.T) {
 			t.Run("FallbackError", func(t *testing.T) {
 				opt := &Optional[fun.Future[string]]{}
 				check.Error(t, opt.UnmarshalText(nil))
-				check.True(t, !opt.OK())
+				check.True(t, !opt.Ok())
 			})
 		})
 	})
@@ -358,21 +358,21 @@ func TestOptioal(t *testing.T) {
 				check.NotError(t, opt.UnmarshalBinary([]byte("hello bson")))
 				check.Equal(t, opt.v.count, 1)
 				check.Equal(t, string(opt.v.input), "hello bson")
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("Generic", func(t *testing.T) {
 				opt := &Optional[*mockGenericCodec]{}
 				check.NotError(t, opt.UnmarshalBinary([]byte("hello whoever")))
 				check.Equal(t, opt.v.count, 1)
 				check.Equal(t, string(opt.v.input), "hello whoever")
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("StdEncoding", func(t *testing.T) {
 				opt := &Optional[*mockBinaryCodec]{}
 				check.NotError(t, opt.UnmarshalBinary([]byte("hello runtime")))
 				check.Equal(t, opt.v.count, 1)
 				check.Equal(t, string(opt.v.input), "hello runtime")
-				check.True(t, opt.OK())
+				check.True(t, opt.Ok())
 			})
 			t.Run("Byte", func(t *testing.T) {
 				opt := &Optional[[]byte]{}
@@ -382,7 +382,7 @@ func TestOptioal(t *testing.T) {
 			t.Run("Unknown", func(t *testing.T) {
 				opt := &Optional[fun.Future[string]]{}
 				check.Error(t, opt.UnmarshalBinary([]byte("hello")))
-				check.True(t, !opt.OK())
+				check.True(t, !opt.Ok())
 			})
 		})
 	})

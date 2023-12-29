@@ -28,21 +28,21 @@ type RuntimeInvariant struct{}
 // IsTrue provides a runtime assertion that the condition is true, and
 // annotates panic object, which is an error rooted in the
 // ErrInvariantViolation. In all other cases the operation is a noop.
-func (RuntimeInvariant) IsTrue(cond bool, args ...any) { Invariant.OK(cond, args...) }
+func (RuntimeInvariant) IsTrue(cond bool, args ...any) { Invariant.Ok(cond, args...) }
 
 // IsFalse provides a runtime assertion that the condition is false,
 // and annotates panic object, which is an error rooted in the
 // ErrInvariantViolation. In all other cases the operation is a noop.
-func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.OK(!cond, args...) }
+func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.Ok(!cond, args...) }
 
 // Failure unconditionally raises an invariant failure error and
 // processes the arguments as with the other invariant failures:
 // extracting errors and aggregating constituent errors.
-func (RuntimeInvariant) Failure(args ...any) { Invariant.OK(false, args...) }
+func (RuntimeInvariant) Failure(args ...any) { Invariant.Ok(false, args...) }
 
-// OK panics if the condition is false, passing an error that is
+// Ok panics if the condition is false, passing an error that is
 // rooted in InvariantViolation. Otherwise the operation is a noop.
-func (RuntimeInvariant) OK(cond bool, args ...any) {
+func (RuntimeInvariant) Ok(cond bool, args ...any) {
 	if !cond {
 		panic(ers.NewInvariantViolation(args...))
 	}
@@ -52,5 +52,5 @@ func (RuntimeInvariant) OK(cond bool, args ...any) {
 // of the panic is both--via wrapping--an ErrInvariantViolation and
 // the error itself.
 func (RuntimeInvariant) Must(err error, args ...any) {
-	Invariant.OK(err == nil, func() error { return ers.Wrap(err, args...) })
+	Invariant.Ok(err == nil, func() error { return ers.Wrap(err, args...) })
 }

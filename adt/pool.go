@@ -133,7 +133,7 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // byte slices, as you need and wish.
 func MakeBufferPool(min, max int) *Pool[dt.Slice[byte]] {
 	min, max = intish.Bounds(min, max)
-	fun.Invariant.OK(max > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
+	fun.Invariant.Ok(max > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
 	bufpool := &Pool[dt.Slice[byte]]{}
 	bufpool.SetCleanupHook(func(buf dt.Slice[byte]) dt.Slice[byte] {
 		if cap(buf) > max {

@@ -179,7 +179,7 @@ func (wf Operation) If(cond bool) Operation { return wf.Worker().If(cond).Ignore
 // of times. The resulting operation is safe for concurrent use, but
 // operations can run concurrently.
 func (wf Operation) Limit(in int) Operation {
-	Invariant.OK(in > 0, "limit must be greater than zero;", in)
+	Invariant.Ok(in > 0, "limit must be greater than zero;", in)
 	counter := &atomic.Int64{}
 
 	return wf.When(func() bool {

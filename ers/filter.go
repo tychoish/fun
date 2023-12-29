@@ -20,7 +20,7 @@ func FilterExclude(exclusions ...error) Filter {
 	if len(exclusions) == 0 {
 		return FilterNoop()
 	}
-	return FilterCheck(func(err error) bool { return OK(err) || Is(err, exclusions...) })
+	return FilterCheck(func(err error) bool { return Ok(err) || Is(err, exclusions...) })
 }
 
 // FilterNoop produces a filter that always returns the original error.
@@ -41,7 +41,7 @@ func FilterCheck(ep func(error) bool) Filter {
 // errors, and returns nil otherwise.
 func FilterConvert(output error) Filter {
 	return func(err error) error {
-		if OK(err) {
+		if Ok(err) {
 			return nil
 		}
 		return output
@@ -83,9 +83,9 @@ func extractAndJoin(in []any, withErrs ...error) error {
 	return Join(append(out, errs...)...)
 }
 
-// RemoveOK removes all nil errors from a slice of errors, returning
+// RemoveOk removes all nil errors from a slice of errors, returning
 // the consolidated slice.
-func RemoveOK(errs []error) []error {
+func RemoveOk(errs []error) []error {
 	out := make([]error, 0, len(errs))
 	for idx := range errs {
 		if IsError(errs[idx]) {

@@ -241,7 +241,7 @@ func (s Slice[T]) Zero() {
 // outside of the bounds of the slice, an invariant violation panic is
 // raised.
 func (s Slice[T]) ZeroRange(start, end int) {
-	fun.Invariant.OK(start >= 0 && end > start && end < len(s)-1,
+	fun.Invariant.Ok(start >= 0 && end > start && end < len(s)-1,
 		"start = ", start, "end = ", end, "are not valid bounds")
 	for i := start; i <= end; i++ {
 		var zero T
@@ -252,7 +252,7 @@ func (s Slice[T]) ZeroRange(start, end int) {
 // FillTo appends zero values to the slice until it reaches the
 // specified length, and returns the resulting slice.
 func (s Slice[T]) FillTo(length int) Slice[T] {
-	fun.Invariant.OK(length > len(s), ers.ErrInvalidInput,
+	fun.Invariant.Ok(length > len(s), ers.ErrInvalidInput,
 		"cannot grow a slice to a length that is less than the current length:",
 		"fill", length, "<=, current", len(s))
 

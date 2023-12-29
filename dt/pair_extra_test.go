@@ -31,7 +31,7 @@ func TestPairExtra(t *testing.T) {
 			pl := p.List()
 			check.NotEqual(t, pl, p.ll)
 			idx := 1
-			for item := pl.Front(); item.OK(); item = item.Next() {
+			for item := pl.Front(); item.Ok(); item = item.Next() {
 				check.Equal(t, item.Value().Value, idx)
 				check.Equal(t, item.Value().Key, fmt.Sprint(idx))
 				idx++
@@ -45,7 +45,7 @@ func TestPairExtra(t *testing.T) {
 			pl := p.Copy()
 			check.NotEqual(t, pl, p)
 			idx := 1
-			for item := pl.ll.Front(); item.OK(); item = item.Next() {
+			for item := pl.ll.Front(); item.Ok(); item = item.Next() {
 				check.Equal(t, item.Value().Value, idx)
 				check.Equal(t, item.Value().Key, fmt.Sprint(idx))
 				idx++

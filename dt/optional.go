@@ -35,11 +35,11 @@ func NewOptional[T any](in T) Optional[T] { return Optional[T]{v: in, defined: t
 
 // Default sets value of the optional to the provided value if it is
 // not already been defined.
-func (o *Optional[T]) Default(in T) { o.SetWhen(!o.OK(), in) }
+func (o *Optional[T]) Default(in T) { o.SetWhen(!o.Ok(), in) }
 
 // DefaultFuture resolves the future if the optional has not yet been
 // set.
-func (o *Optional[T]) DefaultFuture(in fun.Future[T]) { o.SetWhenFuture(!o.OK(), in) }
+func (o *Optional[T]) DefaultFuture(in fun.Future[T]) { o.SetWhenFuture(!o.Ok(), in) }
 
 // Set changes the value of the, only when the boolean cond value is positive.
 func (o *Optional[T]) SetWhen(cond bool, v T) { ft.WhenApply(cond, o.Set, v) }
@@ -80,8 +80,8 @@ func (o *Optional[T]) Future() fun.Future[T] { return o.Resolve }
 // concurency control.
 func (o *Optional[T]) Handler() fun.Handler[T] { return o.Set }
 
-// OK returns true when the optional
-func (o Optional[T]) OK() bool { return o.defined }
+// Ok returns true when the optional
+func (o Optional[T]) Ok() bool { return o.defined }
 
 // Scan implements the sql Scanner interface. This is invalid if the
 // type of the optional value is not a primitive value type.

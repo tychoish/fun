@@ -95,7 +95,7 @@ func TestList(t *testing.T) {
 	t.Run("FrontAndBack", func(t *testing.T) {
 		list := &List[int]{}
 
-		if list.Front().OK() {
+		if list.Front().Ok() {
 			t.Error(list.Front())
 		}
 
@@ -122,7 +122,7 @@ func TestList(t *testing.T) {
 		expected := []int{19, 17, 15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20}
 
 		seen := 0
-		for item := list.Front(); item.OK(); item = item.Next() {
+		for item := list.Front(); item.Ok(); item = item.Next() {
 			if expected[seen] != item.Value() {
 				t.Error(seen, expected[seen], item.Value())
 			}
@@ -149,7 +149,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := -1 * (math.MaxInt - 1)
 			// front to back
-			for item := list.Front(); item.OK(); item = item.Next() {
+			for item := list.Front(); item.Ok(); item = item.Next() {
 				if item.Value() < 0 && item.Value() > 100 {
 					t.Fatal(item.Value())
 				}
@@ -169,7 +169,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := math.MaxInt
 			// front to back
-			for item := list.Back(); item.OK(); item = item.Previous() {
+			for item := list.Back(); item.Ok(); item = item.Previous() {
 				if item.Value() < 0 && item.Value() > 100 {
 					t.Fatal(item.Value())
 				}
@@ -197,7 +197,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := -1 * (math.MaxInt - 1)
 			// front to back
-			for item := list.PopFront(); item.OK(); item = list.PopFront() {
+			for item := list.PopFront(); item.Ok(); item = list.PopFront() {
 				if item.Value() < 0 && item.Value() > 100 {
 					t.Fatal(item.Value())
 				}
@@ -227,7 +227,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := (math.MaxInt)
 			// front to back
-			for item := list.PopBack(); item.OK(); item = list.PopBack() {
+			for item := list.PopBack(); item.Ok(); item = list.PopBack() {
 				if item.Value() < 0 && item.Value() > 100 {
 					t.Fatal(item.Value())
 				}
@@ -460,7 +460,7 @@ func TestList(t *testing.T) {
 				t.Error("should not be in list")
 			}
 
-			if !back.OK() {
+			if !back.Ok() {
 				t.Error("value should exist")
 			}
 			if back.Value() != 1 {
@@ -471,7 +471,7 @@ func TestList(t *testing.T) {
 			list := &List[int]{}
 			// this is the sentinel
 			head := list.Front()
-			if head.OK() {
+			if head.Ok() {
 				t.Error("should not be a value")
 			}
 			if head.Remove() {
@@ -483,7 +483,7 @@ func TestList(t *testing.T) {
 			if head.Set(100) {
 				t.Error("should not report success at setting sentinel")
 			}
-			if head.OK() {
+			if head.Ok() {
 				t.Error("should not set root to a value")
 			}
 			if head.Value() != 0 {
@@ -495,11 +495,11 @@ func TestList(t *testing.T) {
 		})
 		t.Run("SetOrphan", func(t *testing.T) {
 			elem := NewElement("hello world!")
-			if !elem.OK() || elem.Value() != "hello world!" {
+			if !elem.Ok() || elem.Value() != "hello world!" {
 				t.Fatal(elem.Value())
 			}
 			elem.Set("hi globe!")
-			if !elem.OK() || elem.Value() != "hi globe!" {
+			if !elem.Ok() || elem.Value() != "hi globe!" {
 				t.Fatal(elem.Value())
 			}
 		})
@@ -507,11 +507,11 @@ func TestList(t *testing.T) {
 			list := &List[int]{}
 			list.PushFront(4242)
 			elem := list.Front()
-			if !elem.OK() || elem.Value() != 4242 {
+			if !elem.Ok() || elem.Value() != 4242 {
 				t.Fatal(elem.Value())
 			}
 			elem.Set(100)
-			if !elem.OK() || elem.Value() != 100 {
+			if !elem.Ok() || elem.Value() != 100 {
 				t.Fatal(elem.Value())
 			}
 			list.Front().Set(100)
@@ -774,7 +774,7 @@ func BenchmarkList(b *testing.B) {
 			e = NewElement(i)
 		}
 		b.StopTimer()
-		if !e.OK() {
+		if !e.Ok() {
 			b.Fatal(e)
 		}
 		runtime.GC()
@@ -886,7 +886,7 @@ func BenchmarkList(b *testing.B) {
 				b.ResetTimer()
 				for j := 0; j < b.N; j++ {
 					idx := 0
-					for e := list.Front(); e.OK(); e = e.Next() {
+					for e := list.Front(); e.Ok(); e = e.Next() {
 						if idx > 2 && idx%2 != 0 {
 							e.Previous().Drop()
 						}
@@ -903,7 +903,7 @@ func BenchmarkList(b *testing.B) {
 				b.ResetTimer()
 				for j := 0; j < b.N; j++ {
 					idx := 0
-					for e := list.Front(); e.OK(); e = e.Next() {
+					for e := list.Front(); e.Ok(); e = e.Next() {
 						if idx > 2 && idx%2 != 0 {
 							e.Previous().Remove()
 						}
@@ -940,7 +940,7 @@ func BenchmarkList(b *testing.B) {
 
 					for j := 0; j < b.N; j++ {
 						idx := 0
-						for e := list.Front(); e.OK(); e = e.Next() {
+						for e := list.Front(); e.Ok(); e = e.Next() {
 							if idx > 2 && idx%2 != 0 {
 								e.Previous().Remove()
 							}
@@ -956,7 +956,7 @@ func BenchmarkList(b *testing.B) {
 
 					for j := 0; j < b.N; j++ {
 						idx := 0
-						for e := list.Front(); e.OK(); e = e.Next() {
+						for e := list.Front(); e.Ok(); e = e.Next() {
 							if idx > 2 && idx%2 != 0 {
 								e.Previous().Remove()
 							}

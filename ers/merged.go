@@ -141,9 +141,9 @@ func (e *Stack) Resolve() error {
 	}
 }
 
-// OK returns true if the Stack object contains no errors and false
+// Ok returns true if the Stack object contains no errors and false
 // otherwise.
-func (e *Stack) OK() bool { return e == nil || (e.err == nil && e.next == nil) }
+func (e *Stack) Ok() bool { return e == nil || (e.err == nil && e.next == nil) }
 
 // Add is a thin wrapper around Push, that adds each error supplied as
 // an argument individually to the stack.
@@ -165,7 +165,7 @@ func (e *Stack) Add(errs ...error) {
 // Error produces the aggregated error strings from this method. If
 // the error at the current layer is nil.
 func (e *Stack) Error() string {
-	if e.OK() {
+	if e.Ok() {
 		return "<nil>"
 	}
 
@@ -253,7 +253,7 @@ func Unwind(in error) []error { return internal.Unwind(in) }
 func Strings(errs []error) []string {
 	out := make([]string, 0, len(errs))
 	for idx := range errs {
-		if !OK(errs[idx]) {
+		if !Ok(errs[idx]) {
 			out = append(out, errs[idx].Error())
 		}
 	}

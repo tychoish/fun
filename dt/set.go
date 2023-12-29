@@ -64,7 +64,7 @@ func (s *Set[T]) Order() {
 	if s.list != nil {
 		return
 	}
-	fun.Invariant.OK(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
+	fun.Invariant.Ok(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
 	s.list = &List[T]{}
 }
 
@@ -90,7 +90,7 @@ func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
 }
 
 func (s *Set[T]) forceSetupOrdered() {
-	fun.Invariant.OK(s.list == nil)
+	fun.Invariant.Ok(s.list == nil)
 	s.list = &List[T]{}
 	for item := range s.hash {
 		s.list.PushBack(item)
@@ -101,8 +101,8 @@ func (s *Set[T]) forceSetupOrdered() {
 // mutex. If the mutex is nil, or the Set is already synchronized with
 // a different mutex, WithLock panics with an invariant violation.
 func (s *Set[T]) WithLock(mtx *sync.Mutex) {
-	fun.Invariant.OK(mtx != nil, "mutexes must be non-nil")
-	fun.Invariant.OK(s.mtx.Set(mtx), "cannot override an existing mutex")
+	fun.Invariant.Ok(mtx != nil, "mutexes must be non-nil")
+	fun.Invariant.Ok(s.mtx.Set(mtx), "cannot override an existing mutex")
 }
 
 func (s *Set[T]) isOrdered() bool { return s.list != nil }

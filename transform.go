@@ -43,11 +43,11 @@ func Converter[T any, O any](op func(T) O) Transform[T, O] {
 	return func(_ context.Context, in T) (O, error) { return op(in), nil }
 }
 
-// ConverterOK builds a Transform function from a function that
+// ConverterOk builds a Transform function from a function that
 // converts between types T and O, but that returns a boolean/check
 // value. When the converter function returns false the
 // transform function returns a ErrIteratorSkip error.
-func ConverterOK[T any, O any](op func(T) (O, bool)) Transform[T, O] {
+func ConverterOk[T any, O any](op func(T) (O, bool)) Transform[T, O] {
 	return func(ctx context.Context, in T) (out O, err error) {
 		var ok bool
 		out, ok = op(in)
@@ -170,7 +170,7 @@ func (mpf Transform[T, O]) Wait() func(T) (O, error) {
 func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
 	return func(in T) (O, bool) {
 		mpfb := mpf.Wait()
-		return ers.WithRecoverOK(func() (O, error) { return mpfb(in) })
+		return ers.WithRecoverOk(func() (O, error) { return mpfb(in) })
 	}
 }
 

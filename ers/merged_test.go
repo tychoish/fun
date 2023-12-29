@@ -26,7 +26,7 @@ func TestStack(t *testing.T) {
 		if es.Len() != 0 {
 			t.Fatal("defensive nil for length")
 		}
-		check.True(t, es.OK())
+		check.True(t, es.Ok())
 		// if es.append(nil) != nil {
 		// 	t.Fatal("append nil errors should always be safe")
 		// }
@@ -77,7 +77,7 @@ func TestStack(t *testing.T) {
 		check.Equal(t, es.Len(), 0)
 		hf(ErrInvalidInput)
 		check.Equal(t, es.Len(), 1)
-		check.True(t, !es.OK())
+		check.True(t, !es.Ok())
 		check.ErrorIs(t, es, ErrInvalidInput)
 	})
 	t.Run("NilErrorStillErrors", func(t *testing.T) {

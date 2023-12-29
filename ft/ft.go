@@ -51,13 +51,13 @@ func Ptr[T any](in T) *T { return &in }
 
 // Ref takes a pointer to an value and dereferences it, If the input
 // value is nil, the output value is the zero value of the type.
-func Ref[T any](in *T) T { return IgnoreSecond(RefOK(in)) }
+func Ref[T any](in *T) T { return IgnoreSecond(RefOk(in)) }
 
-// RefOK takes a pointer to an value and returns the concrete type for
-// that pointer. If the pointer is nil, RefOK returns the zero value
+// RefOk takes a pointer to an value and returns the concrete type for
+// that pointer. If the pointer is nil, RefOk returns the zero value
 // for that type. The boolean value indicates if the zero value
 // returned is because the reference.
-func RefOK[T any](in *T) (value T, ok bool) {
+func RefOk[T any](in *T) (value T, ok bool) {
 	if in == nil {
 		return value, false
 	}
@@ -100,10 +100,10 @@ func DefaultFuture[T comparable](input T, fn func() T) T {
 	return input
 }
 
-// IsOK returns only the second argument passed to it, given a
+// IsOk returns only the second argument passed to it, given a
 // function that returns two values where the second value is a
-// boolean, you can use IsOK to discard the first value.
-func IsOK[T any](_ T, ok bool) bool { return ok }
+// boolean, you can use IsOk to discard the first value.
+func IsOk[T any](_ T, ok bool) bool { return ok }
 
 // Not inverts a boolean.
 func Not(p bool) bool { return !p }
@@ -299,12 +299,12 @@ func WithContext(op func(context.Context)) {
 	op(ctx)
 }
 
-// MustBeOK raises an invariant violation if the ok value is false,
+// MustBeOk raises an invariant violation if the ok value is false,
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := ft.MustBeOK(func() (string ok) { return "hello world", true })
-func MustBeOK[T any](out T, ok bool) T {
+//	out := ft.MustBeOk(func() (string ok) { return "hello world", true })
+func MustBeOk[T any](out T, ok bool) T {
 	WhenCall(!ok, func() { panic(ers.Join(ers.New("ok check failed"), ers.ErrInvariantViolation)) })
 	return out
 }

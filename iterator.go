@@ -324,7 +324,7 @@ func (i *Iterator[T]) Count(ctx context.Context) int {
 	proc := i.Producer()
 	var count int
 	for {
-		if !ft.IsOK(proc.Check(ctx)) {
+		if !ft.IsOk(proc.Check(ctx)) {
 			break
 		}
 

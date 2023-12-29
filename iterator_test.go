@@ -243,9 +243,9 @@ func TestIterator(t *testing.T) {
 			calls := 0
 
 			out := ConvertIterator(input,
-				ConverterOK(func(in string) (int, bool) {
+				ConverterOk(func(in string) (int, bool) {
 					calls++
-					return ers.WithRecoverOK(func() (int, error) { return strconv.Atoi(in) })
+					return ers.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
 				}),
 			)
 			sum := 0

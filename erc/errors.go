@@ -96,6 +96,6 @@ func (ec *Collector) Resolve() error {
 // false otherwise.
 func (ec *Collector) HasErrors() bool { return ec.Len() != 0 }
 
-// OK returns true if there are any underlying errors, and
+// Ok returns true if there are any underlying errors, and
 // false otherwise.
-func (ec *Collector) OK() bool { return ec.Len() == 0 }
+func (ec *Collector) Ok() bool { return ec.Len() == 0 }

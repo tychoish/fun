@@ -1074,11 +1074,11 @@ func RunIteratorStringAlgoTests(
 	t.Run("ConverterOK", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		tfrm := ConverterOK(func(in string) (string, bool) { return in, true })
+		tfrm := ConverterOk(func(in string) (string, bool) { return in, true })
 		out, err := tfrm(ctx, "hello")
 		check.Equal(t, out, "hello")
 		check.NotError(t, err)
-		tfrm = ConverterOK(func(in string) (string, bool) { return in, false })
+		tfrm = ConverterOk(func(in string) (string, bool) { return in, false })
 		out, err = tfrm(ctx, "bye")
 		check.Error(t, err)
 		check.ErrorIs(t, err, ErrIteratorSkip)

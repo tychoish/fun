@@ -108,7 +108,7 @@ func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
 		if p.ll.Len() == 0 {
 			return nil
 		}
-		for l := p.ll.Front(); l.OK(); l = l.Next() {
+		for l := p.ll.Front(); l.Ok(); l = l.Next() {
 			if err := pf(ctx, l.Value()); err != nil {
 				return err
 			}

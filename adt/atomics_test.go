@@ -237,7 +237,7 @@ func TestMnemonize(t *testing.T) {
 	}
 }
 
-func IsOK[T any](t testing.TB) func(T, bool) T {
+func IsOk[T any](t testing.TB) func(T, bool) T {
 	return func(in T, ok bool) T {
 		t.Helper()
 		if !ok {
@@ -247,7 +247,7 @@ func IsOK[T any](t testing.TB) func(T, bool) T {
 	}
 }
 
-func IsNotOK[T any](t testing.TB) func(T, bool) T {
+func IsNotOk[T any](t testing.TB) func(T, bool) T {
 	return func(in T, ok bool) T {
 		t.Helper()
 		if ok {

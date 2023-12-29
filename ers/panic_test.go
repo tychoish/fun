@@ -103,12 +103,12 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("SafeOK", func(t *testing.T) {
 		t.Run("Not", func(t *testing.T) {
-			num, ok := WithRecoverOK(func() (int, error) { return 42, io.EOF })
+			num, ok := WithRecoverOk(func() (int, error) { return 42, io.EOF })
 			assert.True(t, !ok)
 			assert.Zero(t, num)
 		})
 		t.Run("Passes", func(t *testing.T) {
-			num, ok := WithRecoverOK(func() (int, error) { return 42, nil })
+			num, ok := WithRecoverOk(func() (int, error) { return 42, nil })
 			assert.True(t, ok)
 			assert.Equal(t, 42, num)
 		})
@@ -135,7 +135,7 @@ func TestPanics(t *testing.T) {
 		t.Run("OK", func(t *testing.T) {
 			fn := func() (int, error) { panic(perr) }
 			assert.NotPanic(t, func() {
-				out, ok := WrapRecoverOK(fn)()
+				out, ok := WrapRecoverOk(fn)()
 				assert.True(t, !ok)
 				assert.Zero(t, out)
 			})
@@ -146,7 +146,7 @@ func TestPanics(t *testing.T) {
 				out, err := WrapRecoverDo(func() int { return 42 })()
 				assert.Equal(t, out, 42)
 				assert.NotError(t, err)
-				out, ok := WrapRecoverOK(func() (int, error) { return 12, nil })()
+				out, ok := WrapRecoverOk(func() (int, error) { return 12, nil })()
 				assert.Equal(t, out, 12)
 				assert.True(t, ok)
 			})

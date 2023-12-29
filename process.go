@@ -94,7 +94,7 @@ func (pf Processor[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in
 
 // Check processes the input and returns true when the error is nil,
 // and false when there was an error.
-func (pf Processor[T]) Check(ctx context.Context, in T) bool { return ers.OK(pf(ctx, in)) }
+func (pf Processor[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ctx, in)) }
 
 // Force processes the input, but discards the error and uses a
 // context that will not expire.

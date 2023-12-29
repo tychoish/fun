@@ -66,9 +66,9 @@ func TestWhen(t *testing.T) {
 
 func TestMust(t *testing.T) {
 	assert.Panic(t, func() { Must("32", ers.Error("whoop")) })
-	assert.Panic(t, func() { MustBeOK("32", false) })
+	assert.Panic(t, func() { MustBeOk("32", false) })
 	assert.NotPanic(t, func() { check.Equal(t, "32", Must("32", nil)) })
-	assert.NotPanic(t, func() { check.Equal(t, "32", MustBeOK("32", true)) })
+	assert.NotPanic(t, func() { check.Equal(t, "32", MustBeOk("32", true)) })
 }
 
 func TestContains(t *testing.T) {
@@ -226,9 +226,9 @@ func TestWrap(t *testing.T) {
 		assert.True(t, !NotZero(time.Time{}))
 	})
 	t.Run("IsOk", func(t *testing.T) {
-		assert.True(t, IsOK(100, true))
-		assert.True(t, !IsOK(100, false))
-		assert.True(t, IsOK(func() (int, bool) { return 100, true }()))
+		assert.True(t, IsOk(100, true))
+		assert.True(t, !IsOk(100, false))
+		assert.True(t, IsOk(func() (int, bool) { return 100, true }()))
 	})
 	t.Run("SafeCall", func(t *testing.T) {
 		count := 0
@@ -328,16 +328,16 @@ func TestWrap(t *testing.T) {
 		var strptr *string
 		assert.True(t, strptr == nil)
 		assert.Equal(t, "", Ref(strptr))
-		assert.True(t, !IsOK(RefOK(strptr)))
+		assert.True(t, !IsOk(RefOk(strptr)))
 
 		strptr = Ptr("")
 		assert.True(t, strptr != nil)
 		assert.Equal(t, "", Ref(strptr))
-		assert.True(t, IsOK(RefOK(strptr)))
+		assert.True(t, IsOk(RefOk(strptr)))
 
 		strptr = Ptr("hello")
 		assert.True(t, strptr != nil)
-		assert.True(t, IsOK(RefOK(strptr)))
+		assert.True(t, IsOk(RefOk(strptr)))
 		assert.Equal(t, "hello", Ref(strptr))
 	})
 	t.Run("DefaultNew", func(t *testing.T) {

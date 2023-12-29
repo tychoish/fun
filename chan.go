@@ -165,7 +165,7 @@ func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
-func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOK(ro.Producer().Check(ctx)) }
+func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOk(ro.Producer().Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
 func (ro ChanReceive[T]) Ignore(ctx context.Context) { ro.Producer().Ignore(ctx).Resolve() }
@@ -182,10 +182,10 @@ func (ro ChanReceive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(c
 // otherwise.
 func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ro.Producer().Check(ctx) }
 
-// OK attempts to read from a channel returns true either when the
+// Ok attempts to read from a channel returns true either when the
 // channel is blocked or an item is read from the channel and false
 // when the channel has been closed.
-func (ro ChanReceive[T]) OK() bool {
+func (ro ChanReceive[T]) Ok() bool {
 	switch ro.mode {
 	case modeBlocking:
 		_, ok := <-ro.ch

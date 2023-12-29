@@ -298,5 +298,4 @@ func (Handlers) Counter(max int) *Iterator[int] {
 
 		return -1, io.EOF
 	}).Iterator()
-
 }

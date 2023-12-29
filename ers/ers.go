@@ -40,7 +40,7 @@ func Whenf(cond bool, tmpl string, args ...any) error {
 // This, roughly mirrors the usage "github/pkg/errors.Wrap" but
 // taking advantage of newer standard library error wrapping.
 func Wrap(err error, annotation ...any) error {
-	if OK(err) {
+	if Ok(err) {
 		return nil
 	}
 	return Join(err, errors.New(fmt.Sprint(annotation...)))
@@ -53,7 +53,7 @@ func Wrap(err error, annotation ...any) error {
 // This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
 // taking advantage of newer standard library error wrapping.
 func Wrapf(err error, tmpl string, args ...any) error {
-	if OK(err) {
+	if Ok(err) {
 		return nil
 	}
 
@@ -78,23 +78,23 @@ func Append(errs []error, es ...error) []error {
 	return errs
 }
 
-// OK returns true when the error is nil, and false otherwise. It
+// Ok returns true when the error is nil, and false otherwise. It
 // should always be inlined, and mostly exists for clarity at call
-// sites in bool/OK check relevant contexts.
-func OK(err error) bool {
+// sites in bool/Ok check relevant contexts.
+func Ok(err error) bool {
 	switch e := err.(type) {
 	case nil:
 		return true
-	case interface{ OK() bool }:
-		return e.OK()
+	case interface{ Ok() bool }:
+		return e.Ok()
 	default:
 		return false
 	}
 }
 
 // IsError returns true when the error is non-nill. Provides the
-// inverse of OK().
-func IsError(err error) bool { return !OK(err) }
+// inverse of Ok().
+func IsError(err error) bool { return !Ok(err) }
 
 // Is returns true if the error is one of the target errors, (or one
 // of it's constituent (wrapped) errors is a target error. ers.Is uses
@@ -128,7 +128,7 @@ func IsTerminating(err error) bool {
 // ErrInvariantViolation.
 func IsInvariantViolation(r any) bool {
 	err := Cast(r)
-	if r == nil || OK(err) {
+	if r == nil || Ok(err) {
 		return false
 	}
 

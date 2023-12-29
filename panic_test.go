@@ -36,7 +36,7 @@ func TestPanics(t *testing.T) {
 	t.Run("Invariant", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
 			err := ers.WithRecoverCall(func() {
-				Invariant.OK(1 == 2, "math is a construct")
+				Invariant.Ok(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ErrInvariantViolation)
@@ -51,7 +51,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("ErrorPlus", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ers.WithRecoverCall(func() { Invariant.OK(false, err, 42) })
+			se := ers.WithRecoverCall(func() { Invariant.Ok(false, err, 42) })
 			if !errors.Is(se, err) {
 				t.Log("se", se)
 				t.Log("err", err)
@@ -152,11 +152,11 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("MustBeOk", func(t *testing.T) {
 		assert.NotPanic(t, func() {
-			foo := ft.MustBeOK(func() (string, bool) { return "foo", true }())
+			foo := ft.MustBeOk(func() (string, bool) { return "foo", true }())
 			assert.Equal(t, "foo", foo)
 		})
 		assert.Panic(t, func() {
-			foo := ft.MustBeOK(func() (string, bool) { return "foo", false }())
+			foo := ft.MustBeOk(func() (string, bool) { return "foo", false }())
 			assert.Equal(t, "foo", foo)
 		})
 	})
