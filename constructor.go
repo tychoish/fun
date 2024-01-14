@@ -265,16 +265,22 @@ func (Handlers) StrSliceConcatinate(input []string) Future[string] {
 func (Handlers) Stringer(op fmt.Stringer) Future[string] { return op.String }
 
 // Lines provides a fun.Iterator access over the contexts of a
-// (presumably plaintext) io.Reader, using the bufio.Scanner. During
-// iteration the leading and trailing space is also trimmed.
+// (presumably plaintext) io.Reader, using the bufio.Scanner.
 func (Handlers) Lines(reader io.Reader) *Iterator[string] {
 	scanner := bufio.NewScanner(reader)
 	return Generator(func(ctx context.Context) (string, error) {
 		if !scanner.Scan() {
 			return "", ers.Join(io.EOF, scanner.Err())
 		}
-		return strings.TrimSpace(scanner.Text()), nil
+		return scanner.Text(), nil
 	})
+}
+
+// LinesWithSpaceTrimed provides an iterator with access to the
+// line-separated content of an io.Reader, line Lines(), but with the
+// leading and trailing space trimmed from each line.
+func (Handlers) LinesWithSpaceTrimed(reader io.Reader) *Iterator[string] {
+	return HF.Lines(reader).Transform(Converter(strings.TrimSpace))
 }
 
 // Itoa produces a Transform function that converts integers into

@@ -299,7 +299,7 @@ func Monotonic(max int) *fun.Iterator[int] { return fun.HF.Counter(max) }
 // documents into objects in the form of an iterator.
 func JSON[T any](in io.Reader) *fun.Iterator[T] {
 	var zero T
-	return fun.ConvertIterator(fun.HF.Lines(in), fun.ConverterErr(func(in string) (out T, err error) {
+	return fun.ConvertIterator(fun.HF.LinesWithSpaceTrimed(in), fun.ConverterErr(func(in string) (out T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err
