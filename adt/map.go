@@ -3,6 +3,7 @@ package adt
 import (
 	"context"
 	"encoding/json"
+	"iter"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -159,6 +160,9 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) {
 func (mp *Map[K, V]) Iterator() *fun.Iterator[dt.Pair[K, V]] {
 	return makeMapIterator(mp, func(k K, v V) dt.Pair[K, V] { return dt.MakePair(k, v) })
 }
+
+// Seq2 returns a new-style iterator for a fun/dt.Map object.
+func (mp *Map[K, V]) Seq2() iter.Seq2[K, V] { return mp.Range }
 
 // Keys returns an iterator that renders all of the keys in the map.
 //

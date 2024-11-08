@@ -3,6 +3,7 @@ package dt
 
 import (
 	"context"
+	"iter"
 	"sync"
 
 	"github.com/tychoish/fun"
@@ -66,6 +67,20 @@ func (p *Tuples[K, V]) Consume(iter *fun.Iterator[Tuple[K, V]]) fun.Worker {
 
 // Iterator return an iterator over each key-value tuples.
 func (p *Tuples[K, V]) Iterator() *fun.Iterator[Tuple[K, V]] { p.init(); return p.ll.Iterator() }
+
+// Seq2 returns a native go iterator over the items in a collections of tuples.
+func (p *Tuples[K, V]) Seq2() iter.Seq2[K, V] {
+	return func(yield func(key K, value V) bool) {
+		pairs := p.Iterator()
+		ctx := context.Background()
+		for {
+			item, err := pairs.ReadOne(ctx)
+			if err != nil || !yield(item.One, item.Two) {
+				return
+			}
+		}
+	}
+}
 
 // Ones returns an iterator over only the keys in a sequence of
 // iterator items.

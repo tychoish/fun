@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"iter"
 
 	"github.com/tychoish/fun"
 )
@@ -331,6 +332,9 @@ func (s *Stack[T]) ProducerPop() fun.Producer[T] {
 // stack. Iterator will not observe new items added to the stack
 // during iteration.
 func (s *Stack[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
+
+// Seq returns a native go iterator function for the items in a set.
+func (s *Stack[T]) Seq() iter.Seq[T] { return s.Iterator().Seq(context.Background()) }
 
 // PopIterator returns a destructive iterator over the Items in a
 // stack. PopIterator will not observe new items added to the

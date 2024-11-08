@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"iter"
 	"sync"
 	"sync/atomic"
 
@@ -390,7 +391,7 @@ func (i *Iterator[T]) Observe(fn Handler[T]) Worker {
 				// this is (realistically) only context
 				// cancellation errors, because ReadOne puts
 				// all errors into the iterator's
-				// Close()method.
+				// Close() method.
 				return err
 			}
 		}
@@ -431,7 +432,6 @@ func (i *Iterator[T]) Process(fn Processor[T]) Worker {
 			}
 		}
 	}
-
 }
 
 // Join merges multiple iterators processing and producing their results
@@ -606,4 +606,16 @@ func (i *Iterator[T]) ParallelBuffer(n int) *Iterator[T] {
 	buf := Blocking(make(chan T, n))
 	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Producer().PreHook(pipe).IteratorWithHook(func(si *Iterator[T]) { si.AddError(i.Close()) })
+}
+
+// Seq converts a fun.Iterator into a native go iterator.
+func (i *Iterator[T]) Seq(ctx context.Context) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for {
+			item, err := i.ReadOne(ctx)
+			if err != nil || !yield(item) {
+				return
+			}
+		}
+	}
 }

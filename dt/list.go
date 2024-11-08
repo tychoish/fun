@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"iter"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
@@ -455,6 +456,9 @@ func (l *List[T]) Slice() Slice[T] {
 	out.Populate(l.Iterator()).Ignore().Wait()
 	return out
 }
+
+// Seq returns a native go iterator function for the items in a list.
+func (l *List[T]) Seq() iter.Seq[T] { return l.Iterator().Seq(context.Background()) }
 
 func (l *List[T]) lazySetup() {
 	if l == nil {

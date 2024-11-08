@@ -2,6 +2,7 @@ package dt
 
 import (
 	"context"
+	"iter"
 	"sync"
 	stdatomic "sync/atomic"
 
@@ -131,6 +132,8 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 // Iterator provides a way to iterate over the items in the
 // set. Provides items in iteration order if the set is ordered.
 func (s *Set[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
+
+func (s *Set[T]) Seq() iter.Seq[T] { return s.Iterator().Seq(context.Background()) }
 
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise
