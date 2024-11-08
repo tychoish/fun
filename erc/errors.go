@@ -12,19 +12,6 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
-// // Producer exposes the state of the error stack as a producer
-// // function, and can be used to build iterators or other operatios in
-// // the fun package.
-// func (e *Stack) Producer() fun.Producer[error] { return fun.CheckProducer(e.CheckProducer()) }
-
-// // Iterator returns an iterator object over the contents of the
-// // stack. While the content of the iterator is immutable and will not
-// // observe new errors added to the stack, the iterator itself is not
-// // safe for concurrent access, and must only be used from one
-// // goroutine, or with a synchronized approach. You may create multiple
-// // Iterators on the same stack without issue.
-// func (e *Stack) Iterator() *fun.Iterator[error] { return e.Producer().Iterator() }
-
 // Collector is a simplified version of the error collector in
 // github.com/tychoish/emt. The collector is thread safe and
 // aggregates errors which can be resolved as a single error. The

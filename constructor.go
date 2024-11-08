@@ -127,10 +127,22 @@ func (Handlers) ErrorStackHandler() (*ers.Stack, Handler[error]) {
 	return s, s.Handler()
 }
 
+// ErrorStackIterator creates an iterator object to view the contents
+// of a ers.Stack object (error collection).
+func (Handlers) ErrorStackIterator(s *ers.Stack) *Iterator[error] {
+	return HF.ErrorStackProducer(s).Iterator()
+}
+
+// ErrorStackProducer creates an producer function to yield the
+// contents of a ers.Stack object (error collection).
+func (Handlers) ErrorStackProducer(s *ers.Stack) Producer[error] {
+	return CheckProducer(s.CheckProducer())
+}
+
 // ErrorCollector provides a basic error aggregation facility around
 // ers.Stack (as with ErrorStackHandler, though this is an
 // implementation detail.) ErrorCollector does use a mutex to guard
-// access to this. operation.
+// these objects.
 func (Handlers) ErrorCollector() (Handler[error], Future[error]) {
 	s, hf := HF.ErrorStackHandler()
 	mtx := &sync.Mutex{}

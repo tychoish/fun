@@ -2,6 +2,7 @@ package dt
 
 import (
 	"context"
+	"iter"
 	"sort"
 
 	"github.com/tychoish/fun"
@@ -112,6 +113,9 @@ func Transform[T any, O any](in Slice[T], op fun.Transform[T, O]) fun.Producer[S
 // Iterator returns an iterator to the items of the slice the range
 // keyword also works for these slices.
 func (s Slice[T]) Iterator() *fun.Iterator[T] { return fun.SliceIterator(s) }
+
+// Seq returns a native go iterator for the items in a slice object.
+func (s Slice[T]) Seq() iter.Seq[T] { return s.Iterator().Seq(context.Background()) }
 
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false

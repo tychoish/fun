@@ -2,6 +2,7 @@ package dt
 
 import (
 	"context"
+	"iter"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
@@ -66,6 +67,12 @@ func MapValues[K comparable, V any](in map[K]V) *fun.Iterator[V] { return NewMap
 // specifying types.
 func NewMap[K comparable, V any](in map[K]V) Map[K, V] { return in }
 
+func NewMapFromIterator[K comparable, V any](ctx context.Context, it *fun.Iterator[Pair[K, V]]) Map[K, V] {
+	out := Map[K, V]{}
+	it.Observe(out.AddPair).Ignore().Run(ctx)
+	return out
+}
+
 // Mapify provides a constructor that will produce a fun.Map without
 // specifying types.
 //
@@ -100,7 +107,7 @@ func (m Map[K, V]) Pairs() *Pairs[K, V] {
 	return p
 }
 
-// Tupes exports a map a Pairs object, containing the contents of the map.
+// Tuples exports a map a Pairs object, containing the contents of the map.
 func (m Map[K, V]) Tuples() *Tuples[K, V] {
 	tp := MakeTuples[K, V]()
 	for k, v := range m {
@@ -184,6 +191,21 @@ func (m Map[K, V]) ConsumeValues(iter *fun.Iterator[V], keyf func(V) K) fun.Work
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
 func (m Map[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return m.Producer().Iterator() }
+
+// Seq2 provides a native golang iterator over the keys and values
+// from a map value.
+func (m Map[K, V]) Seq2() iter.Seq2[K, V] {
+	return func(yield func(k K, v V) bool) {
+		i := m.Iterator()
+		ctx := context.Background()
+		for {
+			item, err := i.ReadOne(ctx)
+			if err != nil || !yield(item.Key, item.Value) {
+				return
+			}
+		}
+	}
+}
 
 // Keys provides an iterator over just the keys in the map.
 func (m Map[K, V]) Keys() *fun.Iterator[K] { return m.ProducerKeys().Iterator() }
