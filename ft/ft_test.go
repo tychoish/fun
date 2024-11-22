@@ -85,7 +85,7 @@ func TestPtr(t *testing.T) {
 	assert.True(t, out != nil)
 	check.Equal(t, *out, 123)
 
-	var nptr *string
+	var nptr *string //nolint:staticcheck
 	var err error
 
 	check.True(t, IsNil(nptr))
