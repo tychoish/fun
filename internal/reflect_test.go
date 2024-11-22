@@ -5,7 +5,7 @@ import (
 )
 
 func TestPtr(t *testing.T) {
-	var nptr *string
+	var nptr *string //nolint:staticcheck
 	var err error
 
 	if !IsNil(nptr) {
