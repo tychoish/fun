@@ -88,9 +88,6 @@ func (p *Pairs[K, V]) List() *List[Pair[K, V]] { p.init(); return p.ll.Copy() }
 // Copy produces a new Pairs object with the same values.
 func (p *Pairs[K, V]) Copy() *Pairs[K, V] { return &Pairs[K, V]{ll: p.List()} }
 
-// Map constructs a map from a pairs object.
-func (p *Pairs[K, V]) Map() Map[K, V] { return NewMapFromIterator(p.Iterator()) }
-
 // SortMerge performs a merge sort on the collected pairs.
 func (p *Pairs[K, V]) SortMerge(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.SortMerge(c) }
 
