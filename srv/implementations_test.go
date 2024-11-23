@@ -347,32 +347,33 @@ func TestDaemon(t *testing.T) {
 		assert.True(t, baseCleanupCalled.Load())
 		assert.True(t, baseShutdownCalled.Load())
 	})
-
 	t.Run("CloseTriggers", func(t *testing.T) {
 		ctx := testt.Context(t)
 		baseRunCounter := &atomic.Int64{}
 		baseService := &Service{
 			Run: func(_ context.Context) error {
 				baseRunCounter.Add(1)
-
 				time.Sleep(time.Millisecond)
 				return errors.New("kip")
 			},
 		}
-		ds := Daemon(baseService, 10*time.Millisecond)
+		ds := Daemon(baseService, 5*time.Millisecond)
 		var err error
 		check.MaxRuntime(t, 20*time.Millisecond, func() {
 			check.NotError(t, ds.Start(ctx))
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			runtime.Gosched()
 			ds.Close()
 			err = ds.Wait()
 			check.Error(t, err)
 		})
-		assert.True(t, baseRunCounter.Load() >= 2)
+		baseRunCount := baseRunCounter.Load()
+		testt.Log(t, "baseRunCounter", baseRunCount)
+		testt.Log(t, err)
+		assert.True(t, baseRunCount >= 2)
 		errs := len(ers.Unwind(err))
+		testt.Log(t, err == nil, errs)
 		assert.True(t, errs >= 2)
-		testt.Log(t, errs)
 		assert.Substring(t, err.Error(), "kip")
 	})
 	t.Run("ShutdownTriggers", func(t *testing.T) {
@@ -381,22 +382,24 @@ func TestDaemon(t *testing.T) {
 		baseService := &Service{
 			Run: func(_ context.Context) error {
 				baseRunCounter.Add(1)
-
 				time.Sleep(time.Millisecond)
 				return errors.New("kip")
 			},
 		}
-		ds := Daemon(baseService, 10*time.Millisecond)
+		ds := Daemon(baseService, 5*time.Millisecond)
 		var err error
 		check.MaxRuntime(t, 20*time.Millisecond, func() {
 			check.NotError(t, ds.Start(ctx))
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			runtime.Gosched()
 			check.NotError(t, ds.Shutdown())
 			err = ds.Wait()
 			check.Error(t, err)
 		})
-		assert.True(t, baseRunCounter.Load() >= 2)
+		baseRunCount := baseRunCounter.Load()
+		testt.Log(t, "errs", err == nil, err)
+		testt.Log(t, "baseRunCounter", baseRunCount)
+		assert.True(t, baseRunCount >= 2)
 		assert.True(t, len(ers.Unwind(err)) >= 2)
 		assert.Substring(t, err.Error(), "kip")
 	})
