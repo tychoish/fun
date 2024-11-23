@@ -73,7 +73,7 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			iter := SliceIterator([]int{})
-			assert.NotError(t, iter.Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
+			assert.NotError(t, iter.Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 
 			_, err := iter.ReadOne(ctx)
 			assert.ErrorIs(t, err, io.EOF)
@@ -119,7 +119,7 @@ func TestIterator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		count := 0
-		iter := Generator(func(ctx context.Context) (int, error) {
+		iter := Generator(func(_ context.Context) (int, error) {
 			count++
 			switch {
 			case count > 128:
@@ -160,7 +160,7 @@ func TestIterator(t *testing.T) {
 
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(func(ctx context.Context, i int) error { count++; return nil }).Run(ctx)
+			err := iter.Process(func(_ context.Context, _ int) error { count++; return nil }).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
 		})
@@ -169,7 +169,7 @@ func TestIterator(t *testing.T) {
 			defer cancel()
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			op := Processor[int](func(ctx context.Context, i int) error { count++; return nil }).Iterator(iter)
+			op := Processor[int](func(_ context.Context, _ int) error { count++; return nil }).Iterator(iter)
 			err := op(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
@@ -179,7 +179,7 @@ func TestIterator(t *testing.T) {
 			defer cancel()
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(func(ctx context.Context, i int) error { count++; return io.EOF }).Run(ctx)
+			err := iter.Process(func(_ context.Context, _ int) error { count++; return io.EOF }).Run(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, 1, count)
 		})
@@ -188,7 +188,7 @@ func TestIterator(t *testing.T) {
 			defer cancel()
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(func(ctx context.Context, i int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
+			err := iter.Process(func(_ context.Context, _ int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrLimitExceeded)
 			assert.Equal(t, 1, count)
@@ -198,7 +198,7 @@ func TestIterator(t *testing.T) {
 			defer cancel()
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(func(ctx context.Context, i int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
+			err := iter.Process(func(_ context.Context, _ int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, ErrRecoveredPanic)
@@ -209,7 +209,7 @@ func TestIterator(t *testing.T) {
 
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.Process(func(ctx context.Context, i int) error { count++; cancel(); return ctx.Err() }).Run(ctx)
+			err := iter.Process(func(ctx context.Context, _ int) error { count++; cancel(); return ctx.Err() }).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, context.Canceled)
@@ -221,7 +221,7 @@ func TestIterator(t *testing.T) {
 			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
 			err := iter.ProcessParallel(
-				func(ctx context.Context, i int) error { count.Add(1); return nil },
+				func(_ context.Context, _ int) error { count.Add(1); return nil },
 				WorkerGroupConfNumWorkers(2),
 				WorkerGroupConfContinueOnError(),
 				WorkerGroupConfContinueOnPanic(),
@@ -670,9 +670,9 @@ func TestEmptyIteration(t *testing.T) {
 	close(ch)
 
 	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, SliceIterator([]int{}).Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
-		assert.NotError(t, VariadicIterator[int]().Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
-		assert.NotError(t, ChannelIterator(ch).Observe(func(in int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, SliceIterator([]int{}).Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, VariadicIterator[int]().Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, ChannelIterator(ch).Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 	})
 
 }

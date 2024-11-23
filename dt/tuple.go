@@ -146,7 +146,7 @@ func (p *Tuples[K, V]) Push(tuple Tuple[K, V]) { p.init(); p.ll.PushBack(tuple) 
 
 // Append as a collection of tuples to the collection of key/value
 // tuples.
-func (p *Tuples[K, V]) Append(new ...Tuple[K, V]) { p.init(); p.ll.Append(new...) }
+func (p *Tuples[K, V]) Append(vals ...Tuple[K, V]) { p.init(); p.ll.Append(vals...) }
 
 // Extend adds the items from a Tuples object (slice of Tuple) without
 // modifying the donating object.

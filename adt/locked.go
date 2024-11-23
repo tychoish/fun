@@ -78,4 +78,7 @@ func (s *Synchronized[T]) Load() T { defer With(Lock(&s.mtx)); return s.obj }
 func (s *Synchronized[T]) Using(op func()) { defer With(Lock(&s.mtx)); op() }
 
 // Swap sets the locked value to the new value and returns the old.
-func (s *Synchronized[T]) Swap(new T) (old T) { s.Using(func() { old = s.obj; s.obj = new }); return }
+func (s *Synchronized[T]) Swap(newVal T) (old T) {
+	s.Using(func() { old = s.obj; s.obj = newVal })
+	return
+}

@@ -305,16 +305,16 @@ func MinRuntime(t testing.TB, dur time.Duration, op func()) {
 // Runtime asserts that the function will execute for less than the
 // absolute difference of the two durations provided. The absolute
 // difference between the durations is use to max
-func Runtime(t testing.TB, min, max time.Duration, op func()) {
+func Runtime(t testing.TB, minVal, maxVal time.Duration, op func()) {
 	t.Helper()
 	start := time.Now()
 	op()
 	ranFor := time.Since(start)
 
-	if intish.Min(min, max) > ranFor || intish.Max(min, max) < ranFor {
-		t.Log(intish.Min(min, max) > ranFor, "||", intish.Max(min, max) < ranFor)
+	if intish.Min(minVal, maxVal) > ranFor || intish.Max(minVal, maxVal) < ranFor {
+		t.Log(intish.Min(minVal, maxVal) > ranFor, "||", intish.Max(minVal, maxVal) < ranFor)
 		t.Errorf("operation ran for %s which is not between %s and %s",
-			ranFor, intish.Min(min, max), intish.Max(min, max),
+			ranFor, intish.Min(minVal, maxVal), intish.Max(minVal, maxVal),
 		)
 	}
 

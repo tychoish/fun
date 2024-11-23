@@ -76,7 +76,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		called := 0
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			called++
 			check.Equal(t, 42, n)
 			return nil
@@ -97,7 +97,7 @@ func TestProcess(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		called := 0
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			called++
 			check.Equal(t, 42, n)
 			return nil
@@ -118,7 +118,7 @@ func TestProcess(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		called := 0
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			called++
 			check.Equal(t, 42, n)
 			return nil
@@ -133,7 +133,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			check.Equal(t, 42, n)
 			called++
 			return root
@@ -150,7 +150,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			check.Equal(t, 42, n)
 			called++
 			return root
@@ -245,7 +245,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			check.Equal(t, 42, n)
 			called++
 			return root
@@ -261,7 +261,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := Processify(func(_ context.Context, n int) error {
 			time.Sleep(250 * time.Millisecond)
 			check.Equal(t, 42, n)
 			called++
@@ -346,8 +346,8 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		nopCt := 0
-		var nopProd Producer[string] = func(ctx context.Context) (string, error) { nopCt++; return "nop", nil }
-		var nopProc Processor[string] = func(ctx context.Context, in string) error { nopCt++; check.Equal(t, in, "nop"); return nil }
+		var nopProd Producer[string] = func(_ context.Context) (string, error) { nopCt++; return "nop", nil }
+		var nopProc Processor[string] = func(_ context.Context, in string) error { nopCt++; check.Equal(t, in, "nop"); return nil }
 		op := nopProc.ReadOne(nopProd)
 		check.Equal(t, nopCt, 0)
 		check.NotError(t, op(ctx))
@@ -389,7 +389,7 @@ func TestProcess(t *testing.T) {
 			sig1 := make(chan struct{})
 			sig2 := make(chan struct{})
 			sig3 := make(chan struct{})
-			one := Processor[string](func(ctx context.Context, in string) error {
+			one := Processor[string](func(_ context.Context, in string) error {
 				defer close(sig1)
 				<-sig2
 				onect++
@@ -397,7 +397,7 @@ func TestProcess(t *testing.T) {
 
 				return nil
 			})
-			two := Processor[string](func(ctx context.Context, in string) error {
+			two := Processor[string](func(_ context.Context, in string) error {
 				twoct++
 				check.Equal(t, in, t.Name())
 				return nil
@@ -453,12 +453,12 @@ func TestProcess(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Processify(func(ctx context.Context, in int) error {
+			pf := Processify(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Equal(t, count, 1)
 				count++
 				return nil
-			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
+			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++; panic(root) })
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := pf(ctx, 42)
@@ -468,12 +468,12 @@ func TestProcess(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Processify(func(ctx context.Context, in int) error {
+			pf := Processify(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Equal(t, count, 1)
 				count++
 				return nil
-			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++ })
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := pf(ctx, 42)
@@ -485,7 +485,7 @@ func TestProcess(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Processify(func(ctx context.Context, in int) error {
+			pf := Processify(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Zero(t, count)
 				count++
@@ -499,7 +499,7 @@ func TestProcess(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Processify(func(ctx context.Context, in int) error {
+			pf := Processify(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Zero(t, count)
 				count++
@@ -518,7 +518,7 @@ func TestProcess(t *testing.T) {
 			defer cancel()
 
 			count := 0
-			var wf Processor[int] = func(ctx context.Context, in int) error { check.Equal(t, in, 42); count++; return nil }
+			var wf Processor[int] = func(_ context.Context, in int) error { check.Equal(t, in, 42); count++; return nil }
 			wf = wf.Limit(10)
 			for i := 0; i < 100; i++ {
 				check.NotError(t, wf(ctx, 42))
@@ -530,7 +530,7 @@ func TestProcess(t *testing.T) {
 			defer cancel()
 
 			count := &atomic.Int64{}
-			var wf Processor[int] = func(ctx context.Context, in int) error { check.Equal(t, in, 42); count.Add(1); return nil }
+			var wf Processor[int] = func(_ context.Context, in int) error { check.Equal(t, in, 42); count.Add(1); return nil }
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {

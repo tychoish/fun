@@ -37,7 +37,7 @@ func TestSmoke(t *testing.T) {
 	t.Run("MapReduce", func(t *testing.T) {
 		prod := MapReduce(
 			fun.VariadicIterator(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024),
-			func(ctx context.Context, in int) (string, error) {
+			func(_ context.Context, in int) (string, error) {
 				return fmt.Sprint(in), nil
 			},
 			func(strv string, rv int16) (int16, error) {
@@ -133,7 +133,7 @@ func TestSmoke(t *testing.T) {
 			elems := makeIntSlice(32)
 			iter := fun.SliceIterator(elems)
 			count := 0
-			sum, err := Reduce(ctx, iter, func(in int, value int) (int, error) {
+			sum, err := Reduce(ctx, iter, func(_ int, value int) (int, error) {
 				count++
 				if count == 1 {
 					return 42, nil
@@ -149,7 +149,7 @@ func TestSmoke(t *testing.T) {
 			elems := makeIntSlice(32)
 			iter := fun.SliceIterator(elems)
 			count := 0
-			sum, err := Reduce(ctx, iter, func(in int, value int) (int, error) {
+			sum, err := Reduce(ctx, iter, func(_ int, _ int) (int, error) {
 				count++
 				if count == 16 {
 					return 0, io.EOF
@@ -328,7 +328,7 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Serial", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).Process(func(ctx context.Context, in int) error {
+		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).Process(func(_ context.Context, in int) error {
 			check.True(t, in >= 0)
 			check.True(t, in <= 100)
 			count.Add(1)
@@ -347,7 +347,7 @@ func TestRateLimit(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
 		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).
-			ProcessParallel(func(ctx context.Context, in int) error {
+			ProcessParallel(func(_ context.Context, in int) error {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)
@@ -370,7 +370,7 @@ func TestRateLimit(t *testing.T) {
 		go func() { time.Sleep(time.Second); cancel() }()
 		count := &intish.Atomic[int]{}
 		err := RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Second).
-			Process(func(ctx context.Context, in int) error {
+			Process(func(_ context.Context, in int) error {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)

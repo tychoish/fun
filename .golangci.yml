@@ -47,7 +47,7 @@ linters:
     - misspell
     - noctx
     - nolintlint
-    # - revive
+    - revive
     - staticcheck
     - stylecheck
     - unconvert

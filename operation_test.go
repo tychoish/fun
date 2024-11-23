@@ -106,7 +106,7 @@ func TestOperation(t *testing.T) {
 		defer cancel()
 
 		called := 0
-		wf := Operation(func(ctx context.Context) {
+		wf := Operation(func(_ context.Context) {
 			called++
 		})
 
@@ -126,7 +126,7 @@ func TestOperation(t *testing.T) {
 		defer cancel()
 
 		called := 0
-		wf := Operation(func(ctx context.Context) {
+		wf := Operation(func(_ context.Context) {
 			called++
 		})
 
@@ -403,10 +403,10 @@ func TestOperation(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Operation(func(ctx context.Context) {
+			pf := Operation(func(_ context.Context) {
 				assert.Equal(t, count, 1)
 				count++
-			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++ })
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -417,7 +417,7 @@ func TestOperation(t *testing.T) {
 	})
 	t.Run("PostHook", func(t *testing.T) {
 		count := 0
-		pf := Operation(func(ctx context.Context) {
+		pf := Operation(func(_ context.Context) {
 			assert.Zero(t, count)
 			count++
 		}).PostHook(func() { assert.Equal(t, count, 1); count++ })

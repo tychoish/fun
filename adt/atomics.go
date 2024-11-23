@@ -121,8 +121,8 @@ func (a *Atomic[T]) Load() T { return ft.SafeCast[T](a.val.Load()) }
 // exchanging the new value for the old. Unlike sync.Atomic.Swap() if
 // new is nil, adt.Atomic.Swap() does NOT panic, and instead
 // constructs the zero value of type T.
-func (a *Atomic[T]) Swap(new T) (old T) {
-	switch v := a.val.Swap(new).(type) {
+func (a *Atomic[T]) Swap(newVal T) (old T) {
+	switch v := a.val.Swap(newVal).(type) {
 	case T:
 		return v
 	default:
@@ -135,19 +135,19 @@ func (a *Atomic[T]) Swap(new T) (old T) {
 // Synchronized types, as well as any type that implement a
 // CompareAndSwap method for old/new values of T. Panics for all other
 // types.
-func CompareAndSwap[T comparable, A AtomicValue[T]](a A, old, new T) bool {
+func CompareAndSwap[T comparable, A AtomicValue[T]](a A, oldVal, newVal T) bool {
 	switch atom := any(a).(type) {
 	case *Atomic[T]:
-		return atom.val.CompareAndSwap(old, new)
+		return atom.val.CompareAndSwap(oldVal, newVal)
 	case *Synchronized[T]:
 		defer With(Lock(&atom.mtx))
-		if atom.obj == old {
-			atom.obj = new
+		if atom.obj == oldVal {
+			atom.obj = newVal
 			return true
 		}
 		return false
 	case interface{ CompareAndSwap(a, b T) bool }:
-		return atom.CompareAndSwap(old, new)
+		return atom.CompareAndSwap(oldVal, newVal)
 	default:
 		panic(fmt.Errorf("compare and swap operation not supported: %w", fun.ErrInvariantViolation))
 	}

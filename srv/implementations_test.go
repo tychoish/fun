@@ -47,7 +47,7 @@ func TestHelpers(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessIterator(
 				makeIterator(100),
-				func(_ context.Context, in int) error { count.Add(1); return nil },
+				func(_ context.Context, _ int) error { count.Add(1); return nil },
 				fun.WorkerGroupConfNumWorkers(2),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -67,7 +67,7 @@ func TestHelpers(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessIterator(
 				makeIterator(50),
-				func(_ context.Context, in int) error {
+				func(_ context.Context, _ int) error {
 					time.Sleep(10 * time.Millisecond)
 					count.Add(1)
 					return nil
@@ -352,7 +352,7 @@ func TestDaemon(t *testing.T) {
 		ctx := testt.Context(t)
 		baseRunCounter := &atomic.Int64{}
 		baseService := &Service{
-			Run: func(ctx context.Context) error {
+			Run: func(_ context.Context) error {
 				baseRunCounter.Add(1)
 
 				time.Sleep(time.Millisecond)
@@ -379,7 +379,7 @@ func TestDaemon(t *testing.T) {
 		ctx := testt.Context(t)
 		baseRunCounter := &atomic.Int64{}
 		baseService := &Service{
-			Run: func(ctx context.Context) error {
+			Run: func(_ context.Context) error {
 				baseRunCounter.Add(1)
 
 				time.Sleep(time.Millisecond)
@@ -404,7 +404,7 @@ func TestDaemon(t *testing.T) {
 		ctx, cancel := context.WithCancel(testt.Context(t))
 		baseRunCounter := &atomic.Int64{}
 		baseService := &Service{
-			Run: func(ctx context.Context) error {
+			Run: func(_ context.Context) error {
 				baseRunCounter.Add(1)
 				time.Sleep(2 * time.Millisecond)
 				return nil
