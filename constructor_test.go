@@ -88,7 +88,7 @@ func TestHandlers(t *testing.T) {
 		count := 0
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		proc := HF.ErrorProcessor(func(ctx context.Context, err error) error {
+		proc := HF.ErrorProcessor(func(_ context.Context, err error) error {
 			count++
 			return err
 		})

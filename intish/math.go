@@ -25,7 +25,7 @@ type Unsigned interface {
 // Abs returns the absolute value of the integer.
 func Abs[T Signed](in T) T {
 	if in < 0 {
-		in = in * -1
+		in *= -1
 	}
 	return in
 }
@@ -43,12 +43,12 @@ func Range[T Numbers](a, b T) (start T, end T) { return Min(a, b), Max(a, b) }
 
 // Bounds returns the two arguments as a (min,max): values less than
 // zero become zero.
-func Bounds[T Numbers](a, b T) (min T, max T) { return Max(0, Min(a, b)), Max(0, Max(a, b)) }
+func Bounds[T Numbers](a, b T) (minVal T, maxVal T) { return Max(0, Min(a, b)), Max(0, Max(a, b)) }
 
 // AbsBounds resolves the absolute values of two numbers and then
 // return the lower (absolute) value followed by the higher absolute
 // value.
-func AbsBounds[T Signed](a, b T) (min T, max T) { return AbsMin(a, b), AbsMax(a, b) }
+func AbsBounds[T Signed](a, b T) (minVal T, maxVal T) { return AbsMin(a, b), AbsMax(a, b) }
 
 // AbsMax resolves the absolute value of both arguments and returns
 // the larger value.
@@ -96,9 +96,9 @@ func Millis[T Signed](in float64) T {
 // value.
 func RoundToMultipleAwayFromZero[T Signed](a, b T) T {
 	multiple := AbsMin(a, b)
-	max := AbsMax(a, b)
+	maxVal := AbsMax(a, b)
 
-	return (max + multiple - (max % multiple)) * roundedSign(multiple, a, b)
+	return (maxVal + multiple - (maxVal % multiple)) * roundedSign(multiple, a, b)
 }
 
 func roundedSign[T Signed](multiple, a, b T) T {
@@ -123,9 +123,9 @@ func roundedSign[T Signed](multiple, a, b T) T {
 // The rounded always has a lower absolute value than the input value.
 func RoundToMultipleTowardZero[T Signed](a, b T) T {
 	multiple := AbsMin(a, b)
-	max := AbsMax(a, b)
+	maxVal := AbsMax(a, b)
 
-	return (max - (max % multiple)) * roundedSign(multiple, a, b)
+	return (maxVal - (maxVal % multiple)) * roundedSign(multiple, a, b)
 }
 
 // RoundToSmallestMultiple rounds to smaller numbers: The argument

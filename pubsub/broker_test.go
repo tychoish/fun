@@ -25,7 +25,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 	return []BrokerFixture[T]{
 		{
 			Name: "Parallel/ZeroBuffer",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{ParallelDispatch: true})
 			},
 		},
@@ -41,13 +41,13 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Serial/ZeroBuffer",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{ParallelDispatch: false})
 			},
 		},
 		{
 			Name: "Parallel/FullyBuffered/NoBlock",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: true,
 					BufferSize:       len(elems),
@@ -57,7 +57,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Parallel/HalfBuffered/NoBlock",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: true,
 					BufferSize:       len(elems) / 2,
@@ -67,7 +67,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Parallel/FullyBuffered",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: true,
 					BufferSize:       len(elems),
@@ -77,7 +77,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Serial/FullyBuffered",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: false,
 					BufferSize:       len(elems),
@@ -87,7 +87,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Parallel/HalfBufferedNonBlocking",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: true,
 					BufferSize:       len(elems) / 2,
@@ -97,7 +97,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Serial/HalfBuffered",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: false,
 					BufferSize:       len(elems) / 2,
@@ -107,7 +107,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Parallel/DoubleBuffered",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: true,
 					BufferSize:       len(elems) * 2,
@@ -117,7 +117,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Serial/DoubleBuffered",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewBroker[T](ctx, BrokerOptions{
 					ParallelDispatch: false,
 					BufferSize:       len(elems) * 2,
@@ -212,7 +212,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		// deque cases
 		{
 			Name: "Deque/Serial/Unbuffered/OneWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker(ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
@@ -221,7 +221,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Deque/Serial/Unbuffered/TwoWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
@@ -231,7 +231,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Deque/Parallel/Unbuffered/TwoWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
@@ -240,7 +240,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Deque/Serial/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: false,
@@ -250,7 +250,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 		},
 		{
 			Name: "Deque/Parallel/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				queue := NewUnlimitedDeque[T]()
 				return NewDequeBroker[T](ctx, queue, BrokerOptions{
 					ParallelDispatch: true,
@@ -445,7 +445,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 
 					for i := 0; i < 20; i++ {
 						wg.Add(1)
-						go func(id int) {
+						go func(_ int) {
 							defer wg.Done()
 							for idx := range elems {
 								broker.Publish(ctx, elems[idx])

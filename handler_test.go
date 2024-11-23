@@ -12,7 +12,7 @@ import (
 
 func TestHandler(t *testing.T) {
 	t.Run("Check", func(t *testing.T) {
-		var ob Handler[int] = func(in int) {
+		var ob Handler[int] = func(_ int) {
 			panic(io.EOF)
 
 		}
@@ -27,7 +27,7 @@ func TestHandler(t *testing.T) {
 			}
 		}
 
-		var ob Handler[int] = func(in int) {
+		var ob Handler[int] = func(_ int) {
 			panic(io.EOF)
 
 		}
@@ -197,7 +197,7 @@ func TestHandler(t *testing.T) {
 	})
 	t.Run("Error", func(t *testing.T) {
 		called := 0
-		oef := HF.ErrorHandler(func(err error) { called++ })
+		oef := HF.ErrorHandler(func(_ error) { called++ })
 		oef(nil)
 		check.Equal(t, called, 0)
 		oef(io.EOF)

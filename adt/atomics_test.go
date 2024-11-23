@@ -268,8 +268,8 @@ func NewUnsafe[T any](initial T) *Unsafe[T] { a := &Unsafe[T]{}; a.Store(initial
 func (a *Unsafe[T]) Store(in T) { a.val = in }
 func (a *Unsafe[T]) Load() T    { return a.val }
 
-func (a *Unsafe[T]) Swap(new T) T {
+func (a *Unsafe[T]) Swap(newVal T) T {
 	out := a.val
-	a.val = new
+	a.val = newVal
 	return out
 }

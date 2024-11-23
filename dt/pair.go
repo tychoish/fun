@@ -128,7 +128,7 @@ func (p *Pairs[K, V]) Push(pair Pair[K, V]) { p.init(); p.ll.PushBack(pair) }
 
 // Append as a collection of pairs to the collection of key/value
 // pairs.
-func (p *Pairs[K, V]) Append(new ...Pair[K, V]) { p.init(); p.ll.Append(new...) }
+func (p *Pairs[K, V]) Append(vals ...Pair[K, V]) { p.init(); p.ll.Append(vals...) }
 
 // Extend adds the items from a Pairs object (slice of Pair) without
 // modifying the donating object.

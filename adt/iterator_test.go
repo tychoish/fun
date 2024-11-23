@@ -85,11 +85,14 @@ func TestIterator(t *testing.T) {
 			iter := fun.Producer[int](func(ctx context.Context) (int, error) {
 				if err := ctx.Err(); err != nil {
 					return 0, err
-				} else if val := counter.Add(1); val > 64 {
-					return 0, io.EOF
-				} else {
-					return int(val), nil
 				}
+
+				val := counter.Add(1)
+				if val > 64 {
+					return 0, io.EOF
+				}
+
+				return int(val), nil
 			}).Lock().Iterator()
 			for {
 				val, err := iter.ReadOne(ctx)
@@ -112,11 +115,13 @@ func TestIterator(t *testing.T) {
 			iter := fun.Producer[int](func(ctx context.Context) (int, error) {
 				if err := ctx.Err(); err != nil {
 					return 0, err
-				} else if val := counter.Add(1); val > 64 {
-					return 0, io.EOF
-				} else {
-					return int(val), nil
 				}
+				val := counter.Add(1)
+				if val > 64 {
+					return 0, io.EOF
+				}
+				return int(val), nil
+
 			}).Lock().Iterator()
 
 			for {

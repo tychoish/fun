@@ -186,7 +186,7 @@ func TestService(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			list.PushBack(&Service{
 				Name: fmt.Sprint(i),
-				Run: func(ctx context.Context) error {
+				Run: func(_ context.Context) error {
 					counter.Add(1)
 					return nil
 				},
@@ -338,7 +338,7 @@ func TestService(t *testing.T) {
 		t.Run("ErrorShutdown", func(t *testing.T) {
 			hs := &http.Server{
 				Addr: "127.0.0.2:2340",
-				Handler: http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				Handler: http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 					time.Sleep(20 * time.Millisecond)
 				}),
 			}

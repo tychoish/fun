@@ -307,7 +307,7 @@ func (s *Stack[T]) Pop() *Item[T] {
 
 func (s *Stack[T]) Producer() fun.Producer[T] {
 	item := &Item[T]{next: s.head}
-	return func(ctx context.Context) (o T, _ error) {
+	return func(_ context.Context) (o T, _ error) {
 		item = item.Next()
 		if !item.Ok() {
 			return o, io.EOF
@@ -318,7 +318,7 @@ func (s *Stack[T]) Producer() fun.Producer[T] {
 
 func (s *Stack[T]) ProducerPop() fun.Producer[T] {
 	var item *Item[T]
-	return func(ctx context.Context) (out T, _ error) {
+	return func(_ context.Context) (out T, _ error) {
 		item = s.Pop()
 		if item == s.head {
 			return out, io.EOF

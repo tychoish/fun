@@ -157,7 +157,7 @@ func (Handlers) ErrorHandlerWithoutTerminating(of Handler[error]) Handler[error]
 // filter, and the transformer's context is not used. The error value
 // of the Transform function is always nil.
 func (Handlers) ErrorUnwindTransformer(filter ers.Filter) Transform[error, []error] {
-	return func(ctx context.Context, err error) ([]error, error) {
+	return func(_ context.Context, err error) ([]error, error) {
 		unwound := ers.Unwind(err)
 		out := make([]error, 0, len(unwound))
 		for idx := range unwound {
@@ -268,7 +268,7 @@ func (Handlers) Stringer(op fmt.Stringer) Future[string] { return op.String }
 // (presumably plaintext) io.Reader, using the bufio.Scanner.
 func (Handlers) Lines(reader io.Reader) *Iterator[string] {
 	scanner := bufio.NewScanner(reader)
-	return Generator(func(ctx context.Context) (string, error) {
+	return Generator(func(_ context.Context) (string, error) {
 		if !scanner.Scan() {
 			return "", ers.Join(io.EOF, scanner.Err())
 		}
@@ -295,10 +295,10 @@ func (Handlers) Atoi() Transform[string, int] { return ConverterErr(strconv.Atoi
 
 // Counter produces an iterator that, starting at 1, yields
 // monotonically increasing integers until the maximum is reached.
-func (Handlers) Counter(max int) *Iterator[int] {
+func (Handlers) Counter(maxVal int) *Iterator[int] {
 	state := &atomic.Int64{}
 	return MakeProducer(func() (int, error) {
-		if prev := int(state.Add(1)); prev <= max {
+		if prev := int(state.Add(1)); prev <= maxVal {
 			return prev, nil
 		}
 

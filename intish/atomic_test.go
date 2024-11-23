@@ -55,7 +55,7 @@ func TestAtomic(t *testing.T) {
 				t.Error(val)
 			}
 		})
-		t.Run("CompareAndSwap", func(t *testing.T) {
+		t.Run("CompareAndSwap", func(_ *testing.T) {
 			atom := &Atomic[uint32]{}
 			doTimes(256, func() {
 				for i := uint32(0); i < 100; i++ {

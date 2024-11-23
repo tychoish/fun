@@ -156,9 +156,7 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) {
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces an iterator that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Iterator() *fun.Iterator[dt.Pair[K, V]] {
-	return makeMapIterator(mp, func(k K, v V) dt.Pair[K, V] { return dt.MakePair(k, v) })
-}
+func (mp *Map[K, V]) Iterator() *fun.Iterator[dt.Pair[K, V]] { return makeMapIterator(mp, dt.MakePair) }
 
 // Keys returns an iterator that renders all of the keys in the map.
 //

@@ -48,7 +48,7 @@ func Converter[T any, O any](op func(T) O) Transform[T, O] {
 // value. When the converter function returns false the
 // transform function returns a ErrIteratorSkip error.
 func ConverterOk[T any, O any](op func(T) (O, bool)) Transform[T, O] {
-	return func(ctx context.Context, in T) (out O, err error) {
+	return func(_ context.Context, in T) (out O, err error) {
 		var ok bool
 		out, ok = op(in)
 		if !ok {

@@ -128,7 +128,7 @@ func TestMapReduce(t *testing.T) {
 		wg := &WaitGroup{}
 		pipe <- t.Name()
 
-		var mf Transform[string, int] = func(ctx context.Context, in string) (int, error) { return 53, nil }
+		var mf Transform[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
 		mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
 			ReadAll(Blocking(pipe).Receive().Producer()).
 			Ignore().
@@ -260,7 +260,7 @@ func TestParallelForEach(t *testing.T) {
 				count := &atomic.Int64{}
 
 				err := SliceIterator(elems).ProcessParallel(
-					func(ctx context.Context, in int) error {
+					func(_ context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
 						count.Add(1)
 
@@ -289,7 +289,7 @@ func TestParallelForEach(t *testing.T) {
 		errCount := &atomic.Int64{}
 		err := SliceIterator(makeIntSlice(200)).
 			ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, in int) error {
 					count.Add(1)
 					runtime.Gosched()
 					if in >= 100 {
@@ -320,7 +320,7 @@ func TestParallelForEach(t *testing.T) {
 
 		err := SliceIterator(makeIntSlice(10)).
 			ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, in int) error {
 					if in == 8 {
 						paned.Store(true)
 						// make sure something else
@@ -354,7 +354,7 @@ func TestParallelForEach(t *testing.T) {
 
 		err := SliceIterator(makeIntSlice(10)).
 			ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, in int) error {
 					if in == 4 {
 						cancel()
 						panic("gotcha")
@@ -374,7 +374,7 @@ func TestParallelForEach(t *testing.T) {
 
 		err := SliceIterator(makeIntSlice(10)).
 			ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, in int) error {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
 				},
@@ -399,7 +399,7 @@ func TestParallelForEach(t *testing.T) {
 
 		err := SliceIterator(makeIntSlice(100)).
 			ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
 				WorkerGroupConfNumWorkers(2),
@@ -420,7 +420,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceIterator(makeIntSlice(100)).ProcessParallel(
-			func(ctx context.Context, in int) error {
+			func(_ context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
 			WorkerGroupConfWorkerPerCPU(),
@@ -442,7 +442,7 @@ func TestParallelForEach(t *testing.T) {
 			defer cancel()
 
 			err := SliceIterator(makeIntSlice(2)).ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
 			).Run(ctx)
@@ -456,7 +456,7 @@ func TestParallelForEach(t *testing.T) {
 			defer cancel()
 
 			err := SliceIterator(makeIntSlice(2)).ProcessParallel(
-				func(ctx context.Context, in int) error {
+				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
 				WorkerGroupConfIncludeContextErrors(),
@@ -522,7 +522,7 @@ func RunIteratorImplementationTests[T comparable](
 
 							out, err := Map[T](
 								baseBuilder(elems),
-								func(ctx context.Context, input T) (T, error) {
+								func(_ context.Context, _ T) (T, error) {
 									panic("whoop")
 								},
 							).Slice(ctx)
@@ -543,7 +543,7 @@ func RunIteratorImplementationTests[T comparable](
 
 							out, err := Map(
 								baseBuilder(elems),
-								func(ctx context.Context, input T) (T, error) {
+								func(_ context.Context, _ T) (T, error) {
 									panic("whoop")
 								},
 								WorkerGroupConfNumWorkers(2),
@@ -590,7 +590,7 @@ func RunIteratorIntegerAlgoTests(
 
 							out, err := Map(
 								baseBuilder(elems),
-								func(ctx context.Context, input int) (int, error) {
+								func(_ context.Context, input int) (int, error) {
 									if input == elems[2] {
 										return 0, errors.New("whoop")
 									}
@@ -616,7 +616,7 @@ func RunIteratorIntegerAlgoTests(
 
 							out, err := Map(
 								baseBuilder(elems),
-								func(ctx context.Context, input int) (int, error) {
+								func(_ context.Context, input int) (int, error) {
 									if input == elems[3] {
 										panic("whoops")
 									}
@@ -640,7 +640,7 @@ func RunIteratorIntegerAlgoTests(
 							expectedErr := errors.New("whoop")
 							out, err := Map(
 								baseBuilder(elems),
-								func(ctx context.Context, input int) (int, error) {
+								func(_ context.Context, input int) (int, error) {
 									if input >= elems[2] {
 										return 0, expectedErr
 									}
@@ -666,7 +666,7 @@ func RunIteratorIntegerAlgoTests(
 							expectedErr := errors.New("whoop")
 							out, err := Map(
 								baseBuilder(elems),
-								func(ctx context.Context, input int) (int, error) {
+								func(_ context.Context, input int) (int, error) {
 									if input == len(elems)/2+1 {
 										return 0, expectedErr
 									}
@@ -747,7 +747,7 @@ func RunIteratorStringAlgoTests(
 						iter := builder()
 						out := Map[string, string](
 							iter,
-							func(ctx context.Context, str string) (string, error) {
+							func(_ context.Context, str string) (string, error) {
 								return str, nil
 							},
 						)
@@ -768,7 +768,7 @@ func RunIteratorStringAlgoTests(
 
 						out := Map(
 							MergeIterators(builder(), builder(), builder()),
-							func(ctx context.Context, str string) (string, error) {
+							func(_ context.Context, str string) (string, error) {
 								for _, c := range []string{"a", "e", "i", "o", "u"} {
 									str = strings.ReplaceAll(str, c, "")
 								}
@@ -802,7 +802,7 @@ func RunIteratorStringAlgoTests(
 
 							inputs := GenerateRandomStringSlice(512)
 							count := &atomic.Int32{}
-							out := Producer[string](func(ctx context.Context) (string, error) {
+							out := Producer[string](func(_ context.Context) (string, error) {
 								count.Add(1)
 								if int(count.Load()) > len(inputs) {
 									return "", io.EOF
@@ -828,7 +828,7 @@ func RunIteratorStringAlgoTests(
 
 							inputs := GenerateRandomStringSlice(512)
 							count := &atomic.Int32{}
-							out := Producer[string](func(ctx context.Context) (string, error) {
+							out := Producer[string](func(_ context.Context) (string, error) {
 								count.Add(1)
 								if int(count.Load()) > len(inputs) {
 									return "", io.EOF
@@ -852,7 +852,7 @@ func RunIteratorStringAlgoTests(
 						t.Run("PanicSafety", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
-							out := Producer[string](func(ctx context.Context) (string, error) {
+							out := Producer[string](func(_ context.Context) (string, error) {
 								panic("foo")
 							}).GenerateParallel()
 
@@ -870,7 +870,7 @@ func RunIteratorStringAlgoTests(
 
 							count := 0
 							out := Producer[string](
-								func(ctx context.Context) (string, error) {
+								func(_ context.Context) (string, error) {
 									count++
 									if count == 3 {
 										panic("foo")
@@ -898,7 +898,7 @@ func RunIteratorStringAlgoTests(
 							defer cancel()
 
 							count := 0
-							out := Producer[string](func(ctx context.Context) (string, error) {
+							out := Producer[string](func(_ context.Context) (string, error) {
 								count++
 								if count == 4 {
 									return "", errors.New("beep")
@@ -923,7 +923,7 @@ func RunIteratorStringAlgoTests(
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
 							count := 0
-							out := Producer[string](func(ctx context.Context) (string, error) {
+							out := Producer[string](func(_ context.Context) (string, error) {
 								count++
 								if count == 3 {
 									return "", errors.New("beep")
@@ -1009,7 +1009,7 @@ func RunIteratorStringAlgoTests(
 						elems := makeIntSlice(32)
 						iter := SliceIterator(elems)
 						count := 0
-						sum, err := iter.Reduce(func(in int, value int) (int, error) {
+						sum, err := iter.Reduce(func(_ int, value int) (int, error) {
 							count++
 							if count == 1 {
 								return 42, nil
@@ -1027,7 +1027,7 @@ func RunIteratorStringAlgoTests(
 						elems := makeIntSlice(32)
 						iter := SliceIterator(elems)
 						count := 0
-						sum, err := iter.Reduce(func(in int, value int) (int, error) {
+						sum, err := iter.Reduce(func(_ int, _ int) (int, error) {
 							count++
 							if count == 16 {
 								return 300, io.EOF
@@ -1148,7 +1148,7 @@ func RunIteratorStringAlgoTests(
 	t.Run("Lock", func(t *testing.T) {
 		count := &atomic.Int64{}
 
-		mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+		mpf := Transform[int, string](func(_ context.Context, in int) (string, error) {
 			check.Equal(t, in, 42)
 			count.Add(1)
 			return fmt.Sprint(in), nil
@@ -1169,7 +1169,7 @@ func RunIteratorStringAlgoTests(
 	t.Run("Pipe", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
 			var root error
-			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
+			tfm := Transform[int, string](func(_ context.Context, in int) (string, error) { return fmt.Sprint(in), root })
 			proc, prod := tfm.Pipe()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1187,7 +1187,7 @@ func RunIteratorStringAlgoTests(
 		})
 		t.Run("Parallel", func(t *testing.T) {
 			var root error
-			tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { return fmt.Sprint(in), root })
+			tfm := Transform[int, string](func(_ context.Context, in int) (string, error) { return fmt.Sprint(in), root })
 			proc, prod := tfm.Pipe()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1208,7 +1208,7 @@ func RunIteratorStringAlgoTests(
 		var proccount int
 		var maxIter int
 		reset := func() { tfmcount, prodcount, proccount = 0, 0, 0; prodroot, procroot = nil, nil; maxIter = 1 }
-		prod := Producer[int](func(ctx context.Context) (int, error) {
+		prod := Producer[int](func(_ context.Context) (int, error) {
 			if prodroot == nil && prodcount >= maxIter {
 				return -1, io.EOF
 			}
@@ -1216,7 +1216,7 @@ func RunIteratorStringAlgoTests(
 			return 42, prodroot
 
 		})
-		proc := Processor[string](func(ctx context.Context, in string) error {
+		proc := Processor[string](func(_ context.Context, in string) error {
 			if proccount >= maxIter && procroot == nil {
 				return io.EOF
 			}
@@ -1224,7 +1224,7 @@ func RunIteratorStringAlgoTests(
 			check.Equal(t, in, "42")
 			return procroot
 		})
-		tfm := Transform[int, string](func(ctx context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
+		tfm := Transform[int, string](func(_ context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
 		worker := tfm.ProcessPipe(prod, proc)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

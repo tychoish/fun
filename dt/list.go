@@ -173,8 +173,8 @@ func (l *List[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-func (e *Element[T]) appendable(new *Element[T]) bool {
-	return new != nil && new.ok && e.list != nil // && new.list == nil && new.list != e.list //&& new.next == nil && new.prev == nil
+func (e *Element[T]) appendable(val *Element[T]) bool {
+	return val != nil && val.ok && e.list != nil // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
 }
 
 // Append adds the element 'new' after the element 'e', inserting it
@@ -183,13 +183,13 @@ func (e *Element[T]) appendable(new *Element[T]) bool {
 // list, or is attached to other elements, is already a member of this
 // list, or is otherwise invalid.) PushBack and PushFront, are
 // implemented in terms of Append.
-func (e *Element[T]) Append(new *Element[T]) *Element[T] {
-	if !e.appendable(new) {
+func (e *Element[T]) Append(val *Element[T]) *Element[T] {
+	if !e.appendable(val) {
 		return e
 	}
 
-	e.uncheckedAppend(new)
-	return new
+	e.uncheckedAppend(val)
+	return val
 }
 
 // Remove removes the elemtn from the list, returning true if the operation
@@ -239,13 +239,13 @@ func (e *Element[T]) removable() bool {
 	return e.list != nil && e.list.root != e && e.list.length > 0
 }
 
-func (e *Element[T]) uncheckedAppend(new *Element[T]) {
+func (e *Element[T]) uncheckedAppend(val *Element[T]) {
 	e.list.length++
-	new.list = e.list
-	new.prev = e
-	new.next = e.next
-	new.prev.next = new
-	new.next.prev = new
+	val.list = e.list
+	val.prev = e
+	val.next = e.next
+	val.prev.next = val
+	val.next.prev = val
 }
 
 func (e *Element[T]) uncheckedRemove() {
@@ -321,7 +321,7 @@ func (l *List[T]) Back() *Element[T] { l.lazySetup(); return l.root.prev }
 func (l *List[T]) Producer() fun.Producer[T] {
 	l.lazySetup()
 	current := l.root
-	return func(ctx context.Context) (o T, _ error) {
+	return func(_ context.Context) (o T, _ error) {
 		current = current.Next()
 		if !current.Ok() || current == l.root {
 			return o, io.EOF
@@ -343,7 +343,7 @@ func (l *List[T]) Producer() fun.Producer[T] {
 func (l *List[T]) ProducerPop() fun.Producer[T] {
 	l.lazySetup()
 	var current *Element[T]
-	return func(ctx context.Context) (o T, _ error) {
+	return func(_ context.Context) (o T, _ error) {
 		current = l.PopFront()
 
 		if !current.Ok() || current == l.root {
@@ -360,7 +360,7 @@ func (l *List[T]) ProducerPop() fun.Producer[T] {
 func (l *List[T]) ProducerReverse() fun.Producer[T] {
 	l.lazySetup()
 	current := l.root
-	return func(ctx context.Context) (o T, _ error) {
+	return func(_ context.Context) (o T, _ error) {
 		current = current.Previous()
 		if !current.Ok() || current == l.root {
 			return o, io.EOF
@@ -375,7 +375,7 @@ func (l *List[T]) ProducerReverse() fun.Producer[T] {
 func (l *List[T]) ProducerReversePop() fun.Producer[T] {
 	l.lazySetup()
 	var current *Element[T]
-	return func(ctx context.Context) (o T, _ error) {
+	return func(_ context.Context) (o T, _ error) {
 		current = l.PopBack()
 		if !current.Ok() || current == l.root {
 			return o, io.EOF

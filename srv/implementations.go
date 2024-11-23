@@ -295,7 +295,7 @@ func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
 	wg := &fun.WaitGroup{}
 
 	return &Service{
-		Run: func(ctx context.Context) error {
+		Run: func(_ context.Context) error {
 			wg.Add(1)
 			defer wg.Done()
 
