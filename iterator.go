@@ -522,7 +522,7 @@ func (i *Iterator[T]) UnmarshalJSON(in []byte) error {
 		return err
 	}
 	var idx int
-	i.operation = i.operation.Join(func(ctx context.Context) (out T, err error) {
+	i.operation = i.operation.Join(func(_ context.Context) (out T, err error) {
 		if idx >= len(rv) {
 			return out, io.EOF
 		}

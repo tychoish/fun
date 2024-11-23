@@ -74,7 +74,7 @@ func (wf Operation) Signal(ctx context.Context) <-chan struct{} {
 // underlying operation returns.
 func (wf Operation) Launch(ctx context.Context) Operation {
 	sig := wf.Signal(ctx)
-	return func(ctx context.Context) { WaitChannel(sig) }
+	return func(_ context.Context) { WaitChannel(sig) }
 }
 
 // Background launches the operation in a go routine. There is no panic-safety

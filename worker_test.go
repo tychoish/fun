@@ -22,7 +22,7 @@ func TestWorker(t *testing.T) {
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
 			start := time.Now()
-			err := Worker(func(ctx context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Block()
+			err := Worker(func(_ context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Block()
 			dur := time.Since(start)
 			if dur < 10*time.Millisecond {
 				t.Error("did not block long enough", dur)
@@ -37,7 +37,7 @@ func TestWorker(t *testing.T) {
 			defer cancel()
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
-			Worker(func(ctx context.Context) error { called.Add(1); panic(expected) }).WithRecover().
+			Worker(func(_ context.Context) error { called.Add(1); panic(expected) }).WithRecover().
 				Launch(ctx).
 				Observe(ctx, func(err error) {
 					check.Error(t, err)
@@ -61,7 +61,7 @@ func TestWorker(t *testing.T) {
 				runtime.LockOSThread()
 				defer runtime.UnlockOSThread()
 
-				Worker(func(ctx context.Context) error {
+				Worker(func(_ context.Context) error {
 					assert.Equal(t, wg.Num(), 1)
 					count.Add(1)
 					return nil
@@ -81,7 +81,7 @@ func TestWorker(t *testing.T) {
 			t.Run("ObserveNilErrors", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
-				Worker(func(ctx context.Context) error { called.Store(true); return nil }).Observe(ctx, func(error) { observed.Store(true) })
+				Worker(func(_ context.Context) error { called.Store(true); return nil }).Observe(ctx, func(error) { observed.Store(true) })
 				assert.True(t, called.Load())
 				assert.True(t, observed.Load())
 			})
@@ -89,7 +89,7 @@ func TestWorker(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
 				expected := errors.New("hello")
-				Worker(func(ctx context.Context) error {
+				Worker(func(_ context.Context) error {
 					called.Store(true)
 					return expected
 				}).Observe(ctx, func(err error) {
@@ -103,7 +103,7 @@ func TestWorker(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
 				expected := errors.New("hello")
-				wf := Worker(func(ctx context.Context) error {
+				wf := Worker(func(_ context.Context) error {
 					called.Store(true)
 					return expected
 				}).Operation(func(err error) {
@@ -473,7 +473,7 @@ func TestWorker(t *testing.T) {
 			err := errors.New("test error")
 			var hf Future[error] = func() error { return err }
 			called := 0
-			wf := Worker(func(ctx context.Context) error { called++; return nil })
+			wf := Worker(func(_ context.Context) error { called++; return nil })
 			ecpf := wf.WithErrorCheck(hf)
 			e := ecpf.Wait()
 			check.Error(t, e)
@@ -484,7 +484,7 @@ func TestWorker(t *testing.T) {
 		t.Run("Noop", func(t *testing.T) {
 			var hf Future[error] = func() error { return nil }
 			called := 0
-			wf := Worker(func(ctx context.Context) error { called++; return nil })
+			wf := Worker(func(_ context.Context) error { called++; return nil })
 			ecpf := wf.WithErrorCheck(hf)
 			e := ecpf.Wait()
 			check.NotError(t, e)
@@ -503,7 +503,7 @@ func TestWorker(t *testing.T) {
 				}
 				return errors.New("unexpected error")
 			}
-			wf := Worker(func(ctx context.Context) error {
+			wf := Worker(func(_ context.Context) error {
 				called++
 				if hfcall == 3 {
 					return io.EOF
@@ -677,7 +677,7 @@ func TestWorker(t *testing.T) {
 		})
 		t.Run("Loop", func(t *testing.T) {
 			start := time.Now()
-			var wf Worker = func(ctx context.Context) error {
+			var wf Worker = func(_ context.Context) error {
 				time.Sleep(5 * time.Millisecond)
 				return ft.WhenDo(time.Since(start) > 50*time.Millisecond, func() error { return io.EOF })
 			}
@@ -709,10 +709,10 @@ func TestWorker(t *testing.T) {
 			errCt := 0
 			nopCt := 0
 			reset := func() { errCt = 0; nopCt = 0 }
-			errProd := func(ctx context.Context) (string, error) { errCt++; return "", expected }
-			nopProd := func(ctx context.Context) (string, error) { nopCt++; return "nop", nil }
-			errProc := func(ctx context.Context, in string) error { errCt++; return expected }
-			nopProc := func(ctx context.Context, in string) error { nopCt++; return nil }
+			errProd := func(_ context.Context) (string, error) { errCt++; return "", expected }
+			nopProd := func(_ context.Context) (string, error) { nopCt++; return "nop", nil }
+			errProc := func(_ context.Context, _ string) error { errCt++; return expected }
+			nopProc := func(_ context.Context, _ string) error { nopCt++; return nil }
 
 			var worker Worker
 
@@ -751,7 +751,7 @@ func TestWorker(t *testing.T) {
 		t.Run("RespectsSkips", func(t *testing.T) {
 			prodCt := 0
 			procCt := 0
-			prod := func(ctx context.Context) (string, error) {
+			prod := func(_ context.Context) (string, error) {
 				prodCt++
 				if prodCt <= 5 {
 					return "", ErrIteratorSkip
@@ -759,7 +759,7 @@ func TestWorker(t *testing.T) {
 
 				return "", io.EOF
 			}
-			proc := func(ctx context.Context, in string) error { procCt++; return nil }
+			proc := func(_ context.Context, _ string) error { procCt++; return nil }
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -866,11 +866,11 @@ func TestWorker(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Worker(func(ctx context.Context) error {
+			pf := Worker(func(_ context.Context) error {
 				assert.Equal(t, count, 1)
 				count++
 				return nil
-			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++; panic(root) })
+			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++; panic(root) })
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := pf(ctx)
@@ -880,11 +880,11 @@ func TestWorker(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Worker(func(ctx context.Context) error {
+			pf := Worker(func(_ context.Context) error {
 				assert.Equal(t, count, 1)
 				count++
 				return nil
-			}).PreHook(func(ctx context.Context) { assert.Zero(t, count); count++ })
+			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++ })
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := pf(ctx)
@@ -896,7 +896,7 @@ func TestWorker(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Worker(func(ctx context.Context) error {
+			pf := Worker(func(_ context.Context) error {
 				assert.Zero(t, count)
 				count++
 				return nil
@@ -909,7 +909,7 @@ func TestWorker(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Worker(func(ctx context.Context) error {
+			pf := Worker(func(_ context.Context) error {
 				assert.Zero(t, count)
 				count++
 				return nil

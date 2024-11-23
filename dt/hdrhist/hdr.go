@@ -123,27 +123,27 @@ func (h *Histogram) TotalCount() int64 {
 
 // Max returns the approximate maximum recorded value.
 func (h *Histogram) Max() int64 {
-	var max int64
+	var maxVal int64
 	i := h.iterator()
 	for i.next() {
 		if i.countAtIdx != 0 {
-			max = i.highestEquivalentValue
+			maxVal = i.highestEquivalentValue
 		}
 	}
-	return h.highestEquivalentValue(max)
+	return h.highestEquivalentValue(maxVal)
 }
 
 // Min returns the approximate minimum recorded value.
 func (h *Histogram) Min() int64 {
-	var min int64
+	var minVal int64
 	i := h.iterator()
 	for i.next() {
-		if i.countAtIdx != 0 && min == 0 {
-			min = i.highestEquivalentValue
+		if i.countAtIdx != 0 && minVal == 0 {
+			minVal = i.highestEquivalentValue
 			break
 		}
 	}
-	return h.lowestEquivalentValue(min)
+	return h.lowestEquivalentValue(minVal)
 }
 
 // Mean returns the approximate arithmetic mean of the recorded values.

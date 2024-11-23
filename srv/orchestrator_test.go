@@ -35,7 +35,7 @@ func TestOrchestrator(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
-					Run: func(ctx context.Context) error {
+					Run: func(_ context.Context) error {
 						counter.Add(1)
 						return nil
 					},
@@ -108,7 +108,7 @@ func TestOrchestrator(t *testing.T) {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
-					Run: func(ctx context.Context) error {
+					Run: func(_ context.Context) error {
 						counter.Add(1)
 						wg.Done()
 						return nil
@@ -142,7 +142,7 @@ func TestOrchestrator(t *testing.T) {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
-					Run: func(ctx context.Context) error {
+					Run: func(_ context.Context) error {
 						defer wg.Done()
 						return errors.New("expected")
 					},
@@ -177,7 +177,7 @@ func TestOrchestrator(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				s := &Service{
 					Name: fmt.Sprint(i),
-					Run: func(ctx context.Context) error {
+					Run: func(_ context.Context) error {
 						return errors.New("42")
 					},
 				}
@@ -301,7 +301,7 @@ func TestOrchestrator(t *testing.T) {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
-					Run: func(ctx context.Context) error {
+					Run: func(_ context.Context) error {
 						counter.Add(1)
 						wg.Done()
 						return nil
@@ -335,7 +335,7 @@ func TestOrchestrator(t *testing.T) {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
-					Run: func(ctx context.Context) error {
+					Run: func(_ context.Context) error {
 						defer wg.Done()
 						return errors.New("42")
 					},

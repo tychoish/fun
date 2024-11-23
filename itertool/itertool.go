@@ -293,7 +293,7 @@ func MergeSlices[T any](sls ...[]T) *fun.Iterator[T] {
 
 // Monotonic creates an iterator that produces increasing numbers
 // until a specified maximum.
-func Monotonic(max int) *fun.Iterator[int] { return fun.HF.Counter(max) }
+func Monotonic(maxVal int) *fun.Iterator[int] { return fun.HF.Counter(maxVal) }
 
 // JSON takes a stream of line-oriented JSON and marshals those
 // documents into objects in the form of an iterator.

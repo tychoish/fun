@@ -18,7 +18,7 @@ func TestOptionProvider(t *testing.T) {
 		etwo := errors.New("3")
 
 		err := WorkerGroupConfAddExcludeErrors(eone, etwo).Join(
-			func(o *WorkerGroupConf) error {
+			func(_ *WorkerGroupConf) error {
 				return nil
 			},
 			WorkerGroupConfSet(newc),
@@ -53,7 +53,7 @@ func TestOptionProvider(t *testing.T) {
 		assert.True(t, n != nil)
 		assert.Equal(t, n.NumWorkers, 42)
 
-		n, err = OptionProvider[*WorkerGroupConf](func(cc *WorkerGroupConf) error { return errors.New("hi") }).Build(opt)
+		n, err = OptionProvider[*WorkerGroupConf](func(_ *WorkerGroupConf) error { return errors.New("hi") }).Build(opt)
 		assert.Error(t, err)
 		assert.True(t, n == nil)
 
@@ -83,7 +83,7 @@ func TestOptionProvider(t *testing.T) {
 			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
 
 			wg := &WaitGroup{}
-			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+			wg.DoTimes(ctx, 128, func(_ context.Context) {
 				opt.ErrorHandler(ers.New("hello"))
 			})
 			wg.Operation().Wait()
@@ -94,14 +94,14 @@ func TestOptionProvider(t *testing.T) {
 		opt := &WorkerGroupConf{}
 		t.Run("NilError", func(t *testing.T) {
 			called := 0
-			opt.ErrorHandler = func(err error) { called++ }
+			opt.ErrorHandler = func(_ error) { called++ }
 
 			check.True(t, opt.CanContinueOnError(nil))
 			check.Equal(t, 0, called)
 		})
 		t.Run("Continue", func(t *testing.T) {
 			called := 0
-			opt.ErrorHandler = func(err error) { called++ }
+			opt.ErrorHandler = func(_ error) { called++ }
 			check.True(t, opt.CanContinueOnError(ErrIteratorSkip))
 			check.Equal(t, 0, called)
 		})

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/dt/hdrhist"
 )
 
@@ -397,10 +398,10 @@ func TestSubBucketMaskOverflow(t *testing.T) {
 func TestExportImport(t *testing.T) {
 	defer without(raceDetector())
 
-	min := int64(1)
-	max := num
+	minVal := int64(1)
+	maxVal := num
 	sigfigs := 3
-	h := hdrhist.New(min, max, sigfigs)
+	h := hdrhist.New(minVal, maxVal, sigfigs)
 	for i := int64(0); i < num/10; i++ {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
@@ -409,12 +410,12 @@ func TestExportImport(t *testing.T) {
 
 	s := h.Export()
 
-	if v := s.LowestTrackableValue; v != min {
-		t.Errorf("LowestTrackableValue was %v, but expected %v", v, min)
+	if v := s.LowestTrackableValue; v != minVal {
+		t.Errorf("LowestTrackableValue was %v, but expected %v", v, minVal)
 	}
 
-	if v := s.HighestTrackableValue; v != max {
-		t.Errorf("HighestTrackableValue was %v, but expected %v", v, max)
+	if v := s.HighestTrackableValue; v != maxVal {
+		t.Errorf("HighestTrackableValue was %v, but expected %v", v, maxVal)
 	}
 
 	if v := int(s.SignificantFigures); v != sigfigs {
@@ -559,11 +560,16 @@ func TestEdgeCases(t *testing.T) {
 		})
 		t.Run("Valid", func(t *testing.T) {
 			// shouldn't panic
-			hdrhist.New(0, 10000, 1)
-			hdrhist.New(0, 10000, 2)
-			hdrhist.New(0, 10000, 3)
-			hdrhist.New(0, 10000, 4)
-			hdrhist.New(0, 10000, 5)
+
+			assert.NotPanic(t, func() {
+
+				hdrhist.New(0, 10000, 1)
+				hdrhist.New(0, 10000, 2)
+				hdrhist.New(0, 10000, 3)
+				hdrhist.New(0, 10000, 4)
+				hdrhist.New(0, 10000, 5)
+
+			})
 		})
 	})
 }

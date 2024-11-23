@@ -144,7 +144,7 @@ func TestOperations(t *testing.T) {
 		}))
 	})
 	t.Run("BlockForceOp", func(t *testing.T) {
-		assert.Zero(t, BlockForceOp(func(ctx context.Context) (out int, err error) {
+		assert.Zero(t, BlockForceOp(func(_ context.Context) (out int, err error) {
 			out = 100 //nolint
 			panic("hi")
 		}))
@@ -153,12 +153,12 @@ func TestOperations(t *testing.T) {
 			check.NotError(t, ctx.Err())
 			return 100, nil
 		}))
-		assert.Equal(t, 100, BlockForceOp(func(ctx context.Context) (int, error) {
+		assert.Equal(t, 100, BlockForceOp(func(_ context.Context) (int, error) {
 			return 100, errors.New("foo")
 		}))
 	})
 	t.Run("Try", func(t *testing.T) {
-		assert.Equal(t, 100, Try(func(i int) (int, error) { return 0, errors.New("foo") }, 100))
+		assert.Equal(t, 100, Try(func(_ int) (int, error) { return 0, errors.New("foo") }, 100))
 		assert.Equal(t, 42, Try(func(i int) (int, error) { check.Equal(t, i, 100); return 42, nil }, 100))
 	})
 	t.Run("Cast", func(t *testing.T) {
@@ -180,7 +180,7 @@ func TestApply(t *testing.T) {
 		assert.NotEqual(t, magnitutde[idx], primes[idx])
 		assert.Equal(t, magnitutde[idx]/10, primes[idx])
 	}
-	t.Run("Lazy", func(t *testing.T) {
+	t.Run("Lazy", func(_ *testing.T) {
 
 	})
 

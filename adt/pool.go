@@ -131,17 +131,17 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // alias for Go's slice type with convenience methods for common slice
 // operations. You can use these values interchangeably with vanilla
 // byte slices, as you need and wish.
-func MakeBufferPool(min, max int) *Pool[dt.Slice[byte]] {
-	min, max = intish.Bounds(min, max)
-	fun.Invariant.Ok(max > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
+func MakeBufferPool(minVal, maxVal int) *Pool[dt.Slice[byte]] {
+	minVal, maxVal = intish.Bounds(minVal, maxVal)
+	fun.Invariant.Ok(maxVal > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
 	bufpool := &Pool[dt.Slice[byte]]{}
 	bufpool.SetCleanupHook(func(buf dt.Slice[byte]) dt.Slice[byte] {
-		if cap(buf) > max {
+		if cap(buf) > maxVal {
 			return nil
 		}
 		return buf[:0]
 	})
-	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.NewSlice(make([]byte, 0, min)) })
+	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.NewSlice(make([]byte, 0, minVal)) })
 	bufpool.FinalizeSetup()
 
 	return bufpool

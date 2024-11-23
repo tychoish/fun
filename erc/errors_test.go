@@ -401,7 +401,7 @@ func TestError(t *testing.T) {
 
 		for i := 0; i < 5; i++ {
 			wg.Add(1)
-			go func(id int) {
+			go func(_ int) {
 				defer wg.Done()
 				ticker := time.NewTicker(5 * time.Millisecond)
 				defer ticker.Stop()

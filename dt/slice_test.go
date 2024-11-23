@@ -270,7 +270,7 @@ func TestSlice(t *testing.T) {
 		t.Run("Full", func(t *testing.T) {
 			s := randomIntSlice(batchSize)
 			count := 0
-			worker := s.Process(func(ctx context.Context, in int) error {
+			worker := s.Process(func(_ context.Context, in int) error {
 				count++
 				check.NotZero(t, in)
 				return nil
@@ -282,7 +282,7 @@ func TestSlice(t *testing.T) {
 		t.Run("SafeAbort", func(t *testing.T) {
 			s := randomIntSlice(batchSize)
 			count := 0
-			worker := s.Process(func(ctx context.Context, in int) error {
+			worker := s.Process(func(_ context.Context, in int) error {
 				count++
 				if count > batchSize/2 {
 					return io.EOF
@@ -297,7 +297,7 @@ func TestSlice(t *testing.T) {
 		t.Run("PropogateError", func(t *testing.T) {
 			s := randomIntSlice(batchSize)
 			count := 0
-			worker := s.Process(func(ctx context.Context, in int) error {
+			worker := s.Process(func(_ context.Context, in int) error {
 				count++
 				if count == 64 {
 					return ers.ErrLimitExceeded
