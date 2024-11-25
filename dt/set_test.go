@@ -63,9 +63,6 @@ func TestSet(t *testing.T) {
 
 			})
 			t.Run("JSON", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
 				set := builder()
 				set.Add("hello")
 				set.Add("merlin")
@@ -75,12 +72,10 @@ func TestSet(t *testing.T) {
 
 				data, err := json.Marshal(set)
 				check.NotError(t, err)
-				iter := set.Iterator()
 				count := 0
 				rjson := string(data)
-				for iter.Next(ctx) {
+				for item := range set.Seq() {
 					count++
-					item := iter.Value()
 					switch {
 					case strings.Contains(rjson, "hello"):
 						continue

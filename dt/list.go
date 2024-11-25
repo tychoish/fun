@@ -425,7 +425,6 @@ func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().
 
 // Extend removes items from the front of the input list, and appends
 // them to the end of the current list.
-
 func (l *List[T]) Extend(input *List[T]) {
 	if input.Len() == 0 {
 		return

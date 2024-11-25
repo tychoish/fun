@@ -122,9 +122,9 @@ func TestList(t *testing.T) {
 		expected := []int{19, 17, 15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20}
 
 		seen := 0
-		for item := list.Front(); item.Ok(); item = item.Next() {
-			if expected[seen] != item.Value() {
-				t.Error(seen, expected[seen], item.Value())
+		for item := range list.Seq() {
+			if expected[seen] != item {
+				t.Error(seen, expected[seen], item)
 			}
 			seen++
 		}

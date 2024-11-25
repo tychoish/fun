@@ -1,6 +1,7 @@
 package dt
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/tychoish/fun"
@@ -72,8 +73,4 @@ func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Iterator().Observe(p.P
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.
-func (p *Pairs[K, V]) Map() map[K]V {
-	out := Map[K, V]{}
-	p.Iterator().Observe(out.AddPair).Ignore().Wait()
-	return out
-}
+func (p *Pairs[K, V]) Map() map[K]V { return NewMapFromIterator(context.Background(), p.Iterator()) }

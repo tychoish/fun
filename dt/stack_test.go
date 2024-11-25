@@ -415,13 +415,28 @@ func TestStack(t *testing.T) {
 	t.Run("NewPopulateError", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		iter := fun.VariadicIterator(10, 100, 1000, 10000)
-
-		out, err := NewStackFromIterator[int](ctx, iter)
+		out, err := NewStackFromIterator(ctx, fun.VariadicIterator(10, 100, 1000, 10000))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.True(t, out == nil)
 	})
+
+	t.Run("Seq", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		stack, err := NewStackFromIterator(ctx, fun.VariadicIterator(100_000, 10_000, 1_000, 100, 10, 1))
+		assert.NotError(t, err)
+		last := 1 // initialize to one to avoid dividing by zero
+		for item := range stack.Seq() {
+			check.True(t, item%last == 0)
+			if t.Failed() {
+				t.Log(item, last, item%last, item%last == 0)
+				t.FailNow()
+			}
+			last = item
+		}
+	})
+
 }
 
 func GenerateStack(t *testing.T, size int) *Stack[int] {

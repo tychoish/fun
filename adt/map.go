@@ -146,9 +146,7 @@ func (mp *Map[K, V]) Len() int {
 // the map is being modified while being marshaled: keys will only
 // appear at most once but order or which version of a value is not
 // defined.
-func (mp *Map[K, V]) Range(fn func(K, V) bool) {
-	mp.mp.Range(func(ak, av any) bool { return fn(ak.(K), av.(V)) })
-}
+func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Seq2()(fn) }
 
 // Iterator returns an iterator that produces a sequence of pair
 // objects.
@@ -160,7 +158,11 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) {
 func (mp *Map[K, V]) Iterator() *fun.Iterator[dt.Pair[K, V]] { return makeMapIterator(mp, dt.MakePair) }
 
 // Seq2 returns a new-style iterator for a fun/dt.Map object.
-func (mp *Map[K, V]) Seq2() iter.Seq2[K, V] { return mp.Range }
+func (mp *Map[K, V]) Seq2() iter.Seq2[K, V] {
+	return func(fn func(K, V) bool) {
+		mp.mp.Range(func(ak, av any) bool { return fn(ak.(K), av.(V)) })
+	}
+}
 
 // Keys returns an iterator that renders all of the keys in the map.
 //
