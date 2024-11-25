@@ -17,6 +17,24 @@ type Pair[K comparable, V any] struct {
 	Value V
 }
 
+// Get returns only the key and value of a Pair. Provided for symmetry.
+func (p Pair[K, V]) Get() (K, V) { return p.Key, p.Value }
+
+// GetValue returns only the key of a Pair. Provided for symmetry.
+func (p Pair[K, V]) GetKey() K { return p.Key }
+
+// GetValue returns only the value of a Pair. Provided for symmetry.
+func (p Pair[K, V]) GetValue() V { return p.Value }
+
+// Set is a helper to modify the both values of a pair. This method can be chained.
+func (p *Pair[K, V]) Set(k K, v V) *Pair[K, V] { p.Key = k; p.Value = v; return p }
+
+// SetKey modifies the key of a pair. This method can be chained.
+func (p *Pair[K, V]) SetKey(k K) *Pair[K, V] { p.Key = k; return p }
+
+// SetValue modifies the value of a pair. This method can be chained.
+func (p *Pair[K, V]) SetValue(v V) *Pair[K, V] { p.Value = v; return p }
+
 // MakePair constructs a pair object. This is identical to using the
 // literal constructor but may be more ergonomic as the compiler seems
 // to be better at inferring types in function calls over literal
@@ -37,7 +55,6 @@ type Pairs[K comparable, V any] struct {
 // To build Pairs objects from other types, use the Consume methods.
 func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 	p := &Pairs[K, V]{}
-	p.init()
 	p.Append(in...)
 	return p
 }
@@ -54,10 +71,8 @@ func ConsumePairs[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) fun.Produ
 	}
 }
 
-func (p *Pairs[K, V]) init() { p.setup.Do(p.initalizeList) }
-func (p *Pairs[K, V]) initalizeList() {
-	ft.WhenCall(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} })
-}
+func (p *Pairs[K, V]) init()     { p.setup.Do(p.initImpl) }
+func (p *Pairs[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} }) }
 
 // Consume adds items from an iterator of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) Consume(iter *fun.Iterator[Pair[K, V]]) fun.Worker {
@@ -109,11 +124,13 @@ func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
 		if p.ll.Len() == 0 {
 			return nil
 		}
-		for l := p.ll.Front(); l.Ok(); l = l.Next() {
-			if err := pf(ctx, l.Value()); err != nil {
+
+		for val := range p.Seq() {
+			if err := pf(ctx, val); err != nil {
 				return err
 			}
 		}
+
 		return nil
 	}
 }
@@ -135,14 +152,24 @@ func (p *Pairs[K, V]) Append(vals ...Pair[K, V]) { p.init(); p.ll.Append(vals...
 // modifying the donating object.
 func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
 
+// Seq returns a native go iterator function for pair items.
+func (p *Pairs[K, V]) Seq() iter.Seq[Pair[K, V]] {
+	return func(yield func(value Pair[K, V]) bool) {
+		p.init()
+		for item := p.ll.Front(); item.Ok(); item = item.Next() {
+			if !yield(item.Value()) {
+				return
+			}
+		}
+	}
+}
+
 // Seq2 returns a native go iterator function for the items in a pairs
 // sequence.
-func (p *Pairs[K, V]) Seq2(ctx context.Context) iter.Seq2[K, V] {
+func (p *Pairs[K, V]) Seq2() iter.Seq2[K, V] {
 	return func(yield func(key K, value V) bool) {
-		pairs := p.Iterator()
-		for {
-			item, err := pairs.ReadOne(ctx)
-			if err != nil || !yield(item.Key, item.Value) {
+		for item := range p.Seq() {
+			if !yield(item.Key, item.Value) {
 				return
 			}
 		}

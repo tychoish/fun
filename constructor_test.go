@@ -239,6 +239,37 @@ func TestHandlers(t *testing.T) {
 			check.EqualItems(t, out, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 		})
 	})
+	t.Run("ErrorStack", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
+			assert.Equal(t, 0, HF.ErrorStackIterator(&ers.Stack{}).Count(context.Background()))
+		})
+		t.Run("Number", func(t *testing.T) {
+			errs := &ers.Stack{}
+			errs.Add(ers.New("foof"), ers.New("boop"))
+			assert.Equal(t, 2, HF.ErrorStackIterator(errs).Count(context.Background()))
+		})
+
+		t.Run("Is", func(t *testing.T) {
+			const err ers.Error = "foo"
+			errs := &ers.Stack{}
+			errs.Add(err)
+			errs.Add(ers.Error("bar"))
+			errs.Add(ers.Error("baz"))
+
+			var count int
+			var match int
+			for e := range HF.ErrorStackIterator(errs).Seq(context.Background()) {
+				count++
+				if errors.Is(e, err) {
+					match++
+				}
+			}
+			check.Equal(t, count, 3)
+			check.Equal(t, match, 1)
+		})
+
+	})
+
 }
 
 func (Handlers) String() string { return "Handlers<>" }

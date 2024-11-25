@@ -489,11 +489,7 @@ func (i *Iterator[T]) MarshalJSON() ([]byte, error) {
 	// iterator or not care
 	ctx := context.TODO()
 
-	for {
-		val, err := i.ReadOne(ctx)
-		if err != nil {
-			break
-		}
+	for val := range i.Seq(ctx) {
 		if first {
 			first = false
 		} else {

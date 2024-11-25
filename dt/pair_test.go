@@ -45,6 +45,44 @@ func TestPairs(t *testing.T) {
 		}
 		check.Equal(t, idx, 128)
 	})
+	t.Run("Seq2Iteration", func(t *testing.T) {
+		ps := Pairs[int, int]{}
+		for i := 0; i < 128; i++ {
+			ps.Add(i, i)
+		}
+
+		assert.Equal(t, ps.Len(), 128)
+
+		var idx int
+		for k, v := range ps.Seq2() {
+			check.Equal(t, idx, k)
+			check.Equal(t, idx, v)
+			idx++
+		}
+
+		check.Equal(t, idx, 128)
+	})
+	t.Run("Seq2IterationAborted", func(t *testing.T) {
+		ps := Pairs[int, int]{}
+		for i := 0; i < 128; i++ {
+			ps.Add(i, i)
+		}
+
+		assert.Equal(t, ps.Len(), 128)
+
+		var idx int
+		for k, v := range ps.Seq2() {
+			check.Equal(t, idx, k)
+			check.Equal(t, idx, v)
+			idx++
+			if idx == 64 {
+				break
+			}
+		}
+
+		check.Equal(t, idx, 64)
+	})
+
 	t.Run("Extend", func(t *testing.T) {
 		ps := &Pairs[string, string]{}
 		ps.Extend(MakePairs(MakePair("one", "1"), MakePair("two", "2")))
@@ -115,6 +153,52 @@ func TestPairs(t *testing.T) {
 			check.True(t, ft.Not(list.IsSorted(cmp)))
 			ps.SortMerge(cmp)
 			check.True(t, list.IsSorted(cmp))
+		})
+	})
+	t.Run("Methods", func(t *testing.T) {
+		t.Run("Getters", func(t *testing.T) {
+			p := MakePair("key", 42)
+			check.Equal(t, p.GetKey(), "key")
+			check.Equal(t, p.GetValue(), 42)
+		})
+		t.Run("Get", func(t *testing.T) {
+			p := MakePair("key", 42)
+			k, v := p.Get()
+
+			check.Equal(t, k, "key")
+			check.Equal(t, v, 42)
+		})
+		t.Run("Set", func(t *testing.T) {
+			p := MakePair("", -1)
+			k, v := p.Get()
+			check.NotEqual(t, k, "key")
+			check.NotEqual(t, v, 42)
+
+			p.Set("key", 42)
+
+			k, v = p.Get()
+			check.Equal(t, k, "key")
+			check.Equal(t, v, 42)
+		})
+		t.Run("Setters", func(t *testing.T) {
+			p := MakePair("", -1)
+			k, v := p.Get()
+			check.NotEqual(t, k, "key")
+			check.NotEqual(t, v, 42)
+
+			p.SetKey("key")
+			p.SetValue(42)
+
+			k, v = p.Get()
+			check.Equal(t, k, "key")
+			check.Equal(t, v, 42)
+		})
+		t.Run("Chains", func(t *testing.T) {
+			p := &Pair[string, int]{Key: "key", Value: 42}
+
+			// this is true because pointers are compared
+			// by value
+			assert.Equal(t, p, p.Set("key3", 428))
 		})
 	})
 }

@@ -133,6 +133,7 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 // set. Provides items in iteration order if the set is ordered.
 func (s *Set[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
 
+// Seq returns a new-style native Go iterator for the items in the set.
 func (s *Set[T]) Seq() iter.Seq[T] { return s.Iterator().Seq(context.Background()) }
 
 // DeleteCheck removes the item from the set, return true when the

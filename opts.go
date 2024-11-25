@@ -131,12 +131,12 @@ func JoinOptionProviders[T any](op ...OptionProvider[T]) OptionProvider[T] {
 // and if the type T implements a Validate() method, calls that. All
 // errors are aggregated.
 func (op OptionProvider[T]) Apply(in T) error {
+	err := op(in)
 	switch validator := any(in).(type) {
 	case interface{ Validate() error }:
-		return ers.Join(validator.Validate(), op(in))
-	default:
-		return op(in)
+		err = ers.Join(validator.Validate(), err)
 	}
+	return err
 }
 
 // Build processes a configuration object, returning a modified

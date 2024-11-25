@@ -46,6 +46,43 @@ func TestTuples(t *testing.T) {
 		}
 		check.Equal(t, idx, 128)
 	})
+	t.Run("Seq2Iteration", func(t *testing.T) {
+		ps := Tuples[int, int]{}
+		for i := 0; i < 128; i++ {
+			ps.Add(i, i)
+		}
+
+		assert.Equal(t, ps.Len(), 128)
+
+		var idx int
+		for k, v := range ps.Seq2() {
+			check.Equal(t, idx, k)
+			check.Equal(t, idx, v)
+			idx++
+		}
+
+		check.Equal(t, idx, 128)
+	})
+	t.Run("Seq2IterationAborted", func(t *testing.T) {
+		ps := Tuples[int, int]{}
+		for i := 0; i < 128; i++ {
+			ps.Add(i, i)
+		}
+
+		assert.Equal(t, ps.Len(), 128)
+
+		var idx int
+		for k, v := range ps.Seq2() {
+			check.Equal(t, idx, k)
+			check.Equal(t, idx, v)
+			idx++
+			if idx == 64 {
+				break
+			}
+		}
+
+		check.Equal(t, idx, 64)
+	})
 	t.Run("Extend", func(t *testing.T) {
 		ps := &Tuples[string, string]{}
 		ps.Extend(MakeTuples(MakeTuple("one", "1"), MakeTuple("two", "2")))

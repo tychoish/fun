@@ -38,7 +38,6 @@ type Tuples[K any, V any] struct {
 // To build Tuples objects from other types, use the Consume methods.
 func MakeTuples[K any, V any](in ...Tuple[K, V]) *Tuples[K, V] {
 	p := &Tuples[K, V]{}
-	p.init()
 	p.Append(in...)
 	return p
 }
@@ -55,32 +54,39 @@ func ConsumeTuples[K any, V any](iter *fun.Iterator[Tuple[K, V]]) fun.Producer[*
 	}
 }
 
-func (p *Tuples[K, V]) init() { p.setup.Do(p.initalizeList) }
-func (p *Tuples[K, V]) initalizeList() {
-	ft.WhenCall(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} })
-}
+func (p *Tuples[K, V]) init()     { p.setup.Do(p.initImpl) }
+func (p *Tuples[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
 
 // Consume adds items from an iterator of tuples to the current Tuples slice.
 func (p *Tuples[K, V]) Consume(iter *fun.Iterator[Tuple[K, V]]) fun.Worker {
 	return iter.Observe(func(item Tuple[K, V]) { p.Push(item) })
 }
 
-// Iterator return an iterator over each key-value tuples.
-func (p *Tuples[K, V]) Iterator() *fun.Iterator[Tuple[K, V]] { p.init(); return p.ll.Iterator() }
-
-// Seq2 returns a native go iterator over the items in a collections of tuples.
-func (p *Tuples[K, V]) Seq2() iter.Seq2[K, V] {
-	return func(yield func(key K, value V) bool) {
-		pairs := p.Iterator()
-		ctx := context.Background()
-		for {
-			item, err := pairs.ReadOne(ctx)
-			if err != nil || !yield(item.One, item.Two) {
+// Seq returns a native go iterator function for tuples.
+func (p *Tuples[K, V]) Seq() iter.Seq[Tuple[K, V]] {
+	return func(yield func(value Tuple[K, V]) bool) {
+		p.init()
+		for item := p.ll.Front(); item.Ok(); item = item.Next() {
+			if !yield(item.Value()) {
 				return
 			}
 		}
 	}
 }
+
+// Seq2 returns a native go iterator over the items in a collections of tuples.
+func (p *Tuples[K, V]) Seq2() iter.Seq2[K, V] {
+	return func(yield func(key K, value V) bool) {
+		for item := range p.Seq() {
+			if !yield(item.One, item.Two) {
+				return
+			}
+		}
+	}
+}
+
+// Iterator return an iterator over each key-value tuples.
+func (p *Tuples[K, V]) Iterator() *fun.Iterator[Tuple[K, V]] { p.init(); return p.ll.Iterator() }
 
 // Ones returns an iterator over only the keys in a sequence of
 // iterator items.
@@ -126,8 +132,9 @@ func (p *Tuples[K, V]) Process(pf fun.Processor[Tuple[K, V]]) fun.Worker {
 		if p.ll.Len() == 0 {
 			return nil
 		}
-		for l := p.ll.Front(); l.Ok(); l = l.Next() {
-			if err := pf(ctx, l.Value()); err != nil {
+
+		for item := range p.Seq() {
+			if err := pf(ctx, item); err != nil {
 				return err
 			}
 		}
