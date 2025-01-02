@@ -12,7 +12,7 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-func TestOptioal(t *testing.T) {
+func TestOptional(t *testing.T) {
 	t.Run("Zero", func(t *testing.T) {
 		var opt Optional[string]
 		check.True(t, ft.Not(opt.Ok()))
