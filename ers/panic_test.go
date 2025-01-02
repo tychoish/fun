@@ -26,6 +26,7 @@ func TestPanics(t *testing.T) {
 		}
 		assert.NotPanic(t, func() {
 			defer Recover(ob)
+			assert.True(t, !called)
 			panic("hi")
 		})
 		assert.True(t, called)
