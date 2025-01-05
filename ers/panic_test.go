@@ -60,7 +60,7 @@ func TestPanics(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			check.Equal(t, 2, len(Unwind(err)))
+			check.Equal(t, 3, len(Unwind(err)))
 		})
 		t.Run("ArbitraryObject", func(t *testing.T) {
 			err := ParsePanic(t)
