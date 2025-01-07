@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -39,9 +40,8 @@ type ChanOp[T any] struct {
 }
 
 // Chan constructs a channel op, like "make(chan T)", with the
-// optionally specified length. The underlying channel is blocking by
-// default. Uses the Blocking() and NonBlocking methods on the channel
-// operation to access versions
+// optionally specified length. Operations (like read from and write
+// to a channel) on the channel are blocking by default, but the
 func Chan[T any](args ...int) ChanOp[T] {
 	switch len(args) {
 	case 0:
@@ -94,10 +94,12 @@ func (op ChanOp[T]) Len() int { return len(op.ch) }
 // Cap returns the current capacity of the channel.
 func (op ChanOp[T]) Cap() int { return cap(op.ch) }
 
-// Blocking returns a version of the ChanOp in blocking mode.
+// Blocking returns a version of the ChanOp in blocking mode. This is
+// not an atomic operation.
 func (op ChanOp[T]) Blocking() ChanOp[T] { op.mode = modeBlocking; return op }
 
 // NonBlocking returns a version of the ChanOp in non-blocking mode.
+// This is not an atomic operation.
 func (op ChanOp[T]) NonBlocking() ChanOp[T] { op.mode = modeNonBlocking; return op }
 
 // Channel returns the underlying channel.
@@ -115,6 +117,9 @@ func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mo
 // iterator. This is equivalent to fun.ChannelIterator(), but may be
 // more accessible in some contexts.
 func (op ChanOp[T]) Iterator() *Iterator[T] { return op.Receive().Producer().Iterator() }
+
+func (op ChanOp[T]) Seq(ctx context.Context) iter.Seq[T]        { return op.Receive().Seq(ctx) }
+func (op ChanOp[T]) Seq2(ctx context.Context) iter.Seq2[int, T] { return op.Receive().Seq2(ctx) }
 
 // Processor exposes the "send" aspect of the channel as a Processor function.
 func (op ChanOp[T]) Processor() Processor[T] { return op.Send().Processor() }
@@ -251,9 +256,39 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 // existing tools.
 func (ro ChanReceive[T]) Producer() Producer[T] { return ro.Read }
 
-// Iterator expoeses aspects to the contents of the channel as an
-// iterator.
+// Iterator provides access to the contents of the channel as a
+// fun-style iterator. For ChanRecieve objects in
+// non-blocking mode, iteration ends when there are no items in the
+// channel. In blocking mode, iteration ends when the context is
+// canceled or the channel is closed.
 func (ro ChanReceive[T]) Iterator() *Iterator[T] { return ro.Producer().Iterator() }
+
+// Iterator provides access to the contents of the channel as a
+// new-style standard library iterator. For ChanRecieve objects in
+// non-blocking mode, iteration ends when there are no items in the
+// channel. In blocking mode, iteration ends when the context is
+// canceled or the channel is closed.
+func (ro ChanReceive[T]) Seq(ctx context.Context) iter.Seq[T] { return ro.Iterator().Seq(ctx) }
+
+// Iterator provides access to the contents of the channel as a
+// new-style standard library iterator. For ChanRecieve objects in
+// non-blocking mode, iteration ends when there are no items in the
+// channel. In blocking mode, iteration ends when the context is
+// canceled or the channel is closed.
+func (ro ChanReceive[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
+	var idx int
+
+	return func(yield func(idx int, val T) bool) {
+		for {
+			item, err := ro.Read(ctx)
+			if err != nil || !yield(idx, item) {
+				return
+			}
+			idx++
+		}
+
+	}
+}
 
 // Consume returns a Worker function that processes the output of data
 // from the channel with the Processor function. If the processor
