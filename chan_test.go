@@ -451,6 +451,47 @@ func TestChannel(t *testing.T) {
 				check.NotError(t, err)
 			})
 		})
+		t.Run("Seq", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := Chan[int](2)
+			check.NotError(t, ch.Send().Write(ctx, 42))
+			check.NotError(t, ch.Send().Write(ctx, 84))
+			ch.Close()
+			idx := 0
+			for num := range ch.Seq(ctx) {
+				switch idx {
+				case 0:
+					check.Equal(t, num, 42)
+				case 1:
+					check.Equal(t, num, 84)
+				default:
+					t.Fatal("impossible situation", idx, num)
+				}
+				idx++
+			}
+		})
+		t.Run("Seq2", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ch := Chan[int](2)
+			check.NotError(t, ch.Send().Write(ctx, 42))
+			check.NotError(t, ch.Send().Write(ctx, 84))
+			ch.Close()
+
+			for idx, num := range ch.Seq2(ctx) {
+				switch idx {
+				case 0:
+					check.Equal(t, num, 42)
+				case 1:
+					check.Equal(t, num, 84)
+				default:
+					t.Fatal("impossible situation", idx, num)
+				}
+			}
+		})
 		t.Run("Ok", func(t *testing.T) {
 			t.Run("DirectReturns", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -491,7 +532,7 @@ func TestChannel(t *testing.T) {
 			check.True(t, ch != nil)
 			chCp := ch
 			check.Equal(t, ch, chCp)
-			ch = DefaultChan[int](ch, 12).Channel()
+			ch = DefaultChan(ch, 12).Channel()
 			check.True(t, ch != nil)
 			check.Equal(t, cap(ch), 0)
 			check.Equal(t, ch, chCp)
