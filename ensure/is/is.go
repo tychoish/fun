@@ -5,6 +5,7 @@ package is
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/tychoish/fun"
@@ -156,13 +157,13 @@ func NotSubstring(s, substr string) That {
 // Contained asserts that the slice (sl) has at least one element
 // equal to the item.
 func Contained[T comparable](item T, sl []T) That {
-	return assertf(ft.Contains(item, sl), "list (len=%d) does not contain contains %v", len(sl), item)
+	return assertf(slices.Contains(sl, item), "list (len=%d) does not contain contains %v", len(sl), item)
 }
 
 // NotContained asserts that the slice (sl) has no elements that are
 // equal to the item.
 func NotContained[T comparable](item T, sl []T) That {
-	return assertf(!ft.Contains(item, sl), "list (len=%d) does not contain contains %v", len(sl), item)
+	return assertf(!slices.Contains(sl, item), "list (len=%d) does not contain contains %v", len(sl), item)
 }
 
 // Panic asserts that the function (op) panics when executed.
