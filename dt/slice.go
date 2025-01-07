@@ -23,6 +23,10 @@ func NewSlice[T any](in []T) Slice[T] { return in }
 // Deprecated: use NewSlice for this case.
 func Sliceify[T any](in []T) Slice[T] { return NewSlice(in) }
 
+// Variadic constructs a slice of type T from a sequence of variadic
+// elements.
+func Variadic[T any](in ...T) Slice[T] { return in }
+
 // SlicePtrs converts a slice of values to a slice of
 // values. This is a helper for Sliceify(in).Ptrs().
 func SlicePtrs[T any](in []T) Slice[*T] { return NewSlice(in).Ptrs() }
@@ -69,10 +73,6 @@ func MergeSlices[T any](sls ...[]T) Slice[T] {
 	}
 	return out
 }
-
-// Variadic constructs a slice of type T from a sequence of variadic
-// options.
-func Variadic[T any](in ...T) Slice[T] { return in }
 
 // DefaultSlice takes a slice value and returns it if it's non-nil. If
 // the slice is nil, it returns a slice of the specified length (and
@@ -282,7 +282,7 @@ func (s Slice[T]) Ptrs() []*T {
 // reflection), if the value is nil, and only adds the item when it is
 // not-nil.
 func (s Slice[T]) Sparse() Slice[T] {
-	// use a List to avoid pre-allocating
+	// use a List to avoid (over) pre-allocating.
 	buf := &List[T]{}
 	for idx := range s {
 		if !ft.IsNil(s[idx]) {

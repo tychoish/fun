@@ -24,7 +24,8 @@ func (a *Atomic[T]) CompareAndSwap(oldVal, newValue T) bool {
 // AtomicFloat64 provides full-fidelity atomic storage for float64
 // values (by converting them) as bits to int64 and storing them using
 // sync/atomic.Int64 values. The Add() method is correct, but must
-// spin, unlike for integers which rely on an optimized underlying instruction.
+// spin, unlike for integers which rely on an optimized underlying
+// instruction.
 //
 // AtomicFloat64 shares an interface with the adt.Atomic wrapper types.
 type AtomicFloat64 struct{ n atomic.Int64 }

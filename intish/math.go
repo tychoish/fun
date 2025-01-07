@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// Numbers are the set of singed and unsinged integers, used by this package.
+// Numbers are the set of singed and unsinged integers as used by this package.
 type Numbers interface {
 	Signed | Unsigned
 }
@@ -70,7 +70,7 @@ func Max[T Numbers](a, b T) T {
 func Diff[T Numbers](a, b T) T { return Max(a, b) - Min(a, b) }
 
 // FloatMillis reverses, though potentially (often) not without some
-// loss of fidelity
+// loss of fidelity, the operation of Millis.
 func FloatMillis[T Signed](in T) float64 { return float64(in) / 1000 }
 
 // Millis converts a float into a an integer that represents one
