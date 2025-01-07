@@ -2,6 +2,7 @@ package ft
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -177,11 +178,7 @@ func WhenApplyFuture[T any](cond bool, op func(T), arg func() T) {
 // WhenHandle passes the argument "in" to the operation IF the
 // condition function (which also takes "in") returns true. Panics if
 // the function is nil.
-func WhenHandle[T any](cond func(T) bool, op func(T), in T) {
-	if cond(in) {
-		op(in)
-	}
-}
+func WhenHandle[T any](cond func(T) bool, op func(T), in T) { WhenApply(cond(in), op, in) }
 
 // DoTimes runs the specified option n times.
 func DoTimes(n int, op func()) {
@@ -198,7 +195,7 @@ func SafeCall(op func()) {
 }
 
 // SafeDo calls the function when the operation is non-nil, and
-// returns either the output of the function or
+// returns either the output of the function or the zero value of T.
 func SafeDo[T any](op func() T) (out T) {
 	if op != nil {
 		out = op()
@@ -214,7 +211,7 @@ func SafeWrap(op func()) func() { return func() { SafeCall(op) } }
 
 // Flip takes two arguments and returns them in the opposite
 // order. Intended to wrap other functions to reduce the friction when
-// briding APIs
+// briding APIs.
 func Flip[A any, B any](first A, second B) (B, A) { return second, first }
 
 // Ignore is a noop, but can be used to annotate operations rather
@@ -237,8 +234,10 @@ func IgnoreSecond[A any, B any](a A, _ B) A { return a }
 // object.
 func Once(f func()) func() { o := &sync.Once{}; f = SafeWrap(f); return func() { o.Do(f) } }
 
-// OnceDo runs a function, exactly once, to produce a value which is
-// then cached, and returned on any successive calls to the function.
+// OnceDo returns a function, that will run exactly once. The value
+// returned by the inner function is cached transparently, so
+// subsequent calls to the function returned by OnceDo will return the
+// original value.
 func OnceDo[T any](op func() T) func() T {
 	var cache T
 	opw := Once(func() { cache = op() })
@@ -247,14 +246,9 @@ func OnceDo[T any](op func() T) func() T {
 
 // Contain returns true if an element of the slice is equal to the
 // item.
-func Contains[T comparable](item T, slice []T) bool {
-	for _, i := range slice {
-		if i == item {
-			return true
-		}
-	}
-	return false
-}
+//
+// Deprecated: use slices.Contains from the standard library.
+func Contains[T comparable](item T, slice []T) bool { return slices.Contains(slice, item) }
 
 // Wrapper produces a function that always returns the value
 // provided. Useful for bridging interface paradigms, and for storing
@@ -262,7 +256,8 @@ func Contains[T comparable](item T, slice []T) bool {
 func Wrapper[T any](in T) func() T { return func() T { return in } }
 
 // Join creates a function that iterates over all of the input
-// functions and calls all non-nil functions. Nil inputs are ignored..
+// functions and calls all non-nil functions sequentially. Nil
+// functions are ignored.
 func Join(fns ...func()) func() {
 	return func() {
 		for _, f := range fns {
@@ -303,8 +298,8 @@ func WithContext(op func(context.Context)) {
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := ft.MustBeOk(func() (string ok) { return "hello world", true })
+//	out := ft.MustBeOk(func() (string, bool) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T {
-	WhenCall(!ok, func() { panic(ers.Join(ers.New("ok check failed"), ers.ErrInvariantViolation)) })
+	WhenCall(!ok, func() { panic(ers.Join(ers.New("check failed"), ers.ErrInvariantViolation)) })
 	return out
 }
