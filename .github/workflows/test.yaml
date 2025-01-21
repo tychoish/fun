@@ -1,12 +1,19 @@
 name: go test
 on:
   pull_request:
+    paths:
+      - "**.go"
+    branches:
+      - main
+      - next
+      - v0.10.x
   push:
     paths:
       - "**.go"
     branches:
       - main
       - next
+      - v0.10.x
 
 jobs:
   tests:

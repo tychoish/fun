@@ -4,10 +4,12 @@ on:
     branches:
       - main
       - next
+      - v0.10.x
   push:
     branches:
       - main
       - next
+      - v0.10.x
 
 jobs:
   golangci:
