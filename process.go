@@ -10,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 // Processor are generic functions that take an argument (and a
@@ -123,7 +122,7 @@ func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(
 // If the function produces a negative duration, there is no delay.
 func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
 	return func(ctx context.Context, in T) error {
-		timer := time.NewTimer(intish.Max(0, jf()))
+		timer := time.NewTimer(max(0, jf()))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
@@ -341,7 +340,7 @@ func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) 
 
 // ReadAll reads elements from the producer until an error is
 // encountered and passes them to a producer, until the first error is
-// encountered. The work
+// encountered. The worker is blocking.
 func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 	return func(ctx context.Context) error {
 
@@ -417,7 +416,7 @@ func limitExec[T any](in int) func(func() T) T {
 
 		if num < int64(in) {
 			output = op()
-			counter.Store(intish.Min(int64(in), num+1))
+			counter.Store(min(int64(in), num+1))
 		}
 
 		return output

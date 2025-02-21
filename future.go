@@ -14,7 +14,13 @@ type Future[T any] func() T
 
 // Futureize is a simple wrapper to convert a function object to a
 // Future[T] object.
+//
+// Deprecated: Use MakeFuture instead.
 func Futurize[T any](f func() T) Future[T] { return f }
+
+// MakeFuture constructs a Future[T] object from a function
+// object.
+func MakeFuture[T any](f func() T) Future[T] { return f }
 
 // AsFuture wraps a value and returns a future object that, when
 // called, will return the provided value.

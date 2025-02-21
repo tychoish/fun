@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/intish"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -59,7 +58,7 @@ type WorkerGroupConf struct {
 // Validate ensures that the configuration is valid, and returns an
 // error if there are impossible configurations
 func (o *WorkerGroupConf) Validate() error {
-	o.NumWorkers = intish.Max(1, o.NumWorkers)
+	o.NumWorkers = max(1, o.NumWorkers)
 	ehIsNotNil := o.ErrorHandler != nil
 	erIsNotNil := o.ErrorResolver != nil
 
@@ -215,7 +214,7 @@ func WorkerGroupConfWorkerPerCPU() OptionProvider[*WorkerGroupConf] {
 // configured. It is not possible to set this value to less than 1:
 // negative values and 0 are always ignored.
 func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error { opts.NumWorkers = intish.Max(1, num); return nil }
+	return func(opts *WorkerGroupConf) error { opts.NumWorkers = max(1, num); return nil }
 }
 
 // WorkerGroupConfWithErrorCollector saves an error observer to the

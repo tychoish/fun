@@ -10,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 // Producer is a function type that is a failrly common
@@ -131,20 +130,20 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 			return zero, ferr
 		case runFirstFunc:
 
-		RETRY:
+		RETRY_FIRST:
 			for {
 				out, err = pf(ctx)
 				switch {
 				case err == nil:
 					return out, nil
 				case errors.Is(err, ErrIteratorSkip):
-					continue RETRY
+					continue RETRY_FIRST
 				case !errors.Is(err, io.EOF):
 					ferr = err
 					stage.Store(firstFunctionErrored)
 					return zero, err
 				}
-				break RETRY
+				break RETRY_FIRST
 			}
 			stage.Store(runSecondFunc)
 			fallthrough
@@ -309,7 +308,7 @@ func (pf Producer[T]) Delay(d time.Duration) Producer[T] { return pf.Jitter(ft.W
 // If the function produces a negative duration, there is no delay.
 func (pf Producer[T]) Jitter(jf func() time.Duration) Producer[T] {
 	return func(ctx context.Context) (out T, _ error) {
-		timer := time.NewTimer(intish.Max(0, jf()))
+		timer := time.NewTimer(max(0, jf()))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():

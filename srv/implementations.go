@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 )
@@ -400,7 +399,7 @@ func Daemon(s *Service, minInterval time.Duration) *Service {
 				}
 				ec.Add(err)
 
-				timer.Reset(intish.Max(0, minInterval-time.Since(start)))
+				timer.Reset(max(0, minInterval-time.Since(start)))
 
 				select {
 				case <-shouldShutdown:

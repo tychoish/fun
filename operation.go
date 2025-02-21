@@ -233,7 +233,9 @@ func (wf Operation) merge(next Operation) Operation {
 }
 
 // PostHook unconditionally runs the post-hook operation after the
-// operation returns. Use the hook to run cleanup operations.
+// operation returns, as a defer. Use the hook to run cleanup
+// operations. The Operation returned from this method runs both the
+// original hook, and the hook function.
 func (wf Operation) PostHook(hook func()) Operation {
 	return func(ctx context.Context) { defer hook(); wf(ctx) }
 }
@@ -241,7 +243,8 @@ func (wf Operation) PostHook(hook func()) Operation {
 // PreHook unconditionally runs the hook operation before the
 // underlying operation. Use Operaiton.Once() operations for the hook
 // to initialize resources for use by the operation, or without Once
-// to reset.
+// to provide reset semantics. The Operation returned from this method
+// runs both the original hook, and the hook function.
 func (wf Operation) PreHook(hook Operation) Operation {
 	return func(c context.Context) { hook(c); wf(c) }
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 // Worker represents a basic function used in worker pools and
@@ -227,7 +226,7 @@ func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrapper(d
 // If the function produces a negative duration, there is no delay.
 func (wf Worker) Jitter(jf func() time.Duration) Worker {
 	return func(ctx context.Context) error {
-		timer := time.NewTimer(intish.Max(0, jf()))
+		timer := time.NewTimer(max(0, jf()))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():

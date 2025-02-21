@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/internal"
-	"github.com/tychoish/fun/intish"
 )
 
 // True causes a test to fail if the condition is false.
@@ -311,10 +310,10 @@ func Runtime(t testing.TB, minVal, maxVal time.Duration, op func()) {
 	op()
 	ranFor := time.Since(start)
 
-	if intish.Min(minVal, maxVal) > ranFor || intish.Max(minVal, maxVal) < ranFor {
-		t.Log(intish.Min(minVal, maxVal) > ranFor, "||", intish.Max(minVal, maxVal) < ranFor)
+	if min(minVal, maxVal) > ranFor || max(minVal, maxVal) < ranFor {
+		t.Log(min(minVal, maxVal) > ranFor, "||", max(minVal, maxVal) < ranFor)
 		t.Errorf("operation ran for %s which is not between %s and %s",
-			ranFor, intish.Min(minVal, maxVal), intish.Max(minVal, maxVal),
+			ranFor, min(minVal, maxVal), max(minVal, maxVal),
 		)
 	}
 

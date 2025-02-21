@@ -31,6 +31,8 @@ func Abs[T Signed](in T) T {
 }
 
 // Min returns the lowest value.
+//
+// Deprecated: use the built in min() function from the standard library.
 func Min[T Numbers](a, b T) T {
 	if a < b {
 		return a
@@ -39,11 +41,11 @@ func Min[T Numbers](a, b T) T {
 }
 
 // Range orders two numbers and returns the pair as (lower, higher).
-func Range[T Numbers](a, b T) (start T, end T) { return Min(a, b), Max(a, b) }
+func Range[T Numbers](a, b T) (start T, end T) { return min(a, b), max(a, b) }
 
 // Bounds returns the two arguments as a (min,max): values less than
 // zero become zero.
-func Bounds[T Numbers](a, b T) (minVal T, maxVal T) { return Max(0, Min(a, b)), Max(0, Max(a, b)) }
+func Bounds[T Numbers](a, b T) (minVal T, maxVal T) { return max(0, min(a, b)), max(0, max(a, b)) }
 
 // AbsBounds resolves the absolute values of two numbers and then
 // return the lower (absolute) value followed by the higher absolute
@@ -52,13 +54,15 @@ func AbsBounds[T Signed](a, b T) (minVal T, maxVal T) { return AbsMin(a, b), Abs
 
 // AbsMax resolves the absolute value of both arguments and returns
 // the larger value.
-func AbsMax[T Signed](a, b T) T { return Max(Abs(a), Abs(b)) }
+func AbsMax[T Signed](a, b T) T { return max(Abs(a), Abs(b)) }
 
 // AbsMin resolves the absolute value of both arguments and returns
 // the smaller value.
-func AbsMin[T Signed](a, b T) T { return Min(Abs(a), Abs(b)) }
+func AbsMin[T Signed](a, b T) T { return min(Abs(a), Abs(b)) }
 
 // Max returns the highest value.
+//
+// Deprecated: use the built in max() function from the standard library.
 func Max[T Numbers](a, b T) T {
 	if a > b {
 		return a
@@ -67,7 +71,7 @@ func Max[T Numbers](a, b T) T {
 }
 
 // Diff returns the absolute value of the difference between two values.
-func Diff[T Numbers](a, b T) T { return Max(a, b) - Min(a, b) }
+func Diff[T Numbers](a, b T) T { return max(a, b) - min(a, b) }
 
 // FloatMillis reverses, though potentially (often) not without some
 // loss of fidelity, the operation of Millis.
@@ -134,7 +138,7 @@ func RoundToMultipleTowardZero[T Signed](a, b T) T {
 //
 // The rounded value is always *smaller* than the input value.
 func RoundToSmallestMultiple[T Signed](a, b T) T {
-	return Min(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
+	return min(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
 }
 
 // RoundToLargestMultiple rounds up to a larger value: The argument
@@ -143,5 +147,5 @@ func RoundToSmallestMultiple[T Signed](a, b T) T {
 //
 // The output value is always *larget* than the input value.
 func RoundToLargestMultiple[T Signed](a, b T) T {
-	return Max(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
+	return max(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
 }

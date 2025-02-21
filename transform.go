@@ -25,12 +25,8 @@ import (
 // function. Panics in the map function are converted to errors and
 // always collected but may abort the operation if ContinueOnPanic is
 // not set.
-func Map[T any, O any](
-	input *Iterator[T],
-	mpf Transform[T, O],
-	optp ...OptionProvider[*WorkerGroupConf],
-) *Iterator[O] {
-	return mpf.ProcessParallel(input, optp...)
+func Map[T any, O any](it *Iterator[T], mpf Transform[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Iterator[O] {
+	return mpf.ProcessParallel(it, optp...)
 }
 
 // Transform is a function type that converts T objects int objects of
@@ -96,7 +92,6 @@ func (mpf Transform[T, O]) ProcessParallel(
 		splits := iter.Split(opts.NumWorkers)
 		for idx := range splits {
 			// for each split, run a mapWorker
-
 			mf.mapPullProcess(output.Send().Write, opts).
 				ReadAll(splits[idx].Producer()).
 				Operation(func(err error) {
@@ -168,10 +163,7 @@ func (mpf Transform[T, O]) Wait() func(T) (O, error) {
 // canceled. The second value is true as long as the transform
 // function returns a nil error and false in all other cases
 func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
-	return func(in T) (O, bool) {
-		mpfb := mpf.Wait()
-		return ers.WithRecoverOk(func() (O, error) { return mpfb(in) })
-	}
+	return func(in T) (O, bool) { return ers.WithRecoverOk(mpf.Convert(in).Wait) }
 }
 
 // Run executes the transform function with the provided output.
@@ -228,8 +220,7 @@ func (mpf Transform[T, O]) Lock() Transform[T, O] {
 // provided mutex.
 func (mpf Transform[T, O]) WithLock(mu sync.Locker) Transform[T, O] {
 	return func(ctx context.Context, val T) (O, error) {
-		mu.Lock()
-		defer mu.Unlock()
+		defer with(lock(mu))
 		return mpf.Run(ctx, val)
 	}
 }

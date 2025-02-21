@@ -13,7 +13,6 @@ import (
 	"math"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/intish"
 )
 
 // A Bracket is a part of a cumulative distribution.
@@ -52,11 +51,11 @@ func New(minValue, maxValue int64, sigfigs int) *Histogram {
 	subBucketCountMagnitude := int32(math.Ceil(math.Log2(largestValueWithSingleUnitResolution)))
 
 	subBucketHalfCountMagnitude := subBucketCountMagnitude
-	subBucketHalfCountMagnitude = intish.Max(subBucketHalfCountMagnitude, 1)
+	subBucketHalfCountMagnitude = max(subBucketHalfCountMagnitude, 1)
 	subBucketHalfCountMagnitude--
 
 	unitMagnitude := int32(math.Floor(math.Log2(float64(minValue))))
-	unitMagnitude = intish.Max(unitMagnitude, 0)
+	unitMagnitude = max(unitMagnitude, 0)
 
 	subBucketCount := int32(math.Pow(2, float64(subBucketHalfCountMagnitude)+1))
 

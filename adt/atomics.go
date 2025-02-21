@@ -63,15 +63,17 @@ func NewOnce[T any](fn func() T) *Once[T] {
 // concurrent access: while the Do/Resolve operations are synchronized,
 // the return value from Do is responsible for its own
 // synchronization.
-func (o *Once[T]) Do(ctor func() T) {
-	o.once.Do(func() { o.ctor.Set(ctor); o.defined.Store(true); o.populate() })
-}
+func (o *Once[T]) Do(ctor func() T)     { o.once.Do(func() { o.ctor.Set(ctor); o.populate() }) }
+func (o *Once[T]) Call(ctor func() T) T { o.Do(ctor); return o.comp }
 
 // Resolve runs the stored, if and only if it hasn't been run function
 // and returns its output. Once the function has run, Resolve will
 // continue to return the cached value.
 func (o *Once[T]) Resolve() T { o.once.Do(o.populate); return o.comp }
-func (o *Once[T]) populate()  { o.called.Store(true); o.comp = ft.SafeDo(o.ctor.Get()); o.ctor.Set(nil) }
+
+func (o *Once[T]) populate() {
+	ft.WhenCall(o.called.CompareAndSwap(false, true), func() { o.comp = ft.SafeDo(o.ctor.Get()); o.ctor.Set(nil) })
+}
 
 // Set sets the constrctor/operation for the Once object, but does not
 // execute the operation. The operation is atomic, is a noop after the
