@@ -36,7 +36,7 @@ func (f Future[T]) Resolve() T { return f() }
 
 // Once returns a future that will only run the underlying future
 // exactly once.
-func (f Future[T]) Once() Future[T] { return ft.OnceDo(f) }
+func (f Future[T]) Once() Future[T] { return sync.OnceValue(f) }
 
 // Producer returns a producer function that wraps the future.
 func (f Future[T]) Producer() Producer[T] { return ConsistentProducer(f) }

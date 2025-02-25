@@ -153,6 +153,16 @@ func TestAtomics(t *testing.T) {
 			assert.Equal(t, count.Load(), 1)
 
 		})
+		t.Run("Call", func(t *testing.T) {
+			t.Parallel()
+
+			o := &Once[int]{}
+			prev := &atomic.Bool{}
+			o.Set(func() int { prev.Store(true); return 1 })
+			assert.Equal(t, o.Call(func() int { return 2 }), 2)
+			assert.True(t, !prev.Load())
+			assert.True(t, o.Called())
+		})
 		t.Run("Resolve", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)

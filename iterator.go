@@ -129,42 +129,93 @@ func (i *Iterator[T]) Transform(op Transform[T, T]) *Iterator[T] { return op.Pro
 // MergeIterators takes a collection of iterators of the same type of
 // objects and provides a single iterator over these items.
 //
-// There are a collection of background threads which will iterate
-// over the inputs and will provide the items to the output
-// iterator. These threads start on the first iteration and will exit
-// if this context is canceled.
+// There are a collection of background threads, one for each input
+// iterator, which will iterate over the inputs and will provide the
+// items to the output iterator. These threads start on the first
+// iteration and will return if this context is canceled.
 //
 // The iterator will continue to produce items until all input
 // iterators have been consumed, the initial context is canceled, or
 // the Close method is called, or all of the input iterators have
 // returned an error.
-func MergeIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
+//
+// Use MergeIterators when producing an item takes a non-trivial
+// amount of time. Use ChainIterators or FlattenIterators if order is
+// important. Use FlattenIterator for larger numbers of iterators.
+func MergeIterators[T any](iters *Iterator[*Iterator[T]]) *Iterator[T] {
 	pipe := Blocking(make(chan T))
-
 	es := &ers.Stack{}
 	mu := &sync.Mutex{}
+
 	eh := HF.ErrorHandlerWithoutEOF(es.Handler()).WithLock(mu)
-	ep := Futurize(es.Future()).WithLock(mu)
+	ep := MakeFuture(es.Future()).WithLock(mu)
 
 	init := Operation(func(ctx context.Context) {
 		wg := &WaitGroup{}
 		wctx, cancel := context.WithCancel(ctx)
-
-		// start a go routine for every iterator, to read from
-		// the incoming iterator and push it to the pipe
-
 		send := pipe.Send()
-		for idx := range iters {
-			send.Consume(iters[idx]).Operation(eh).Add(wctx, wg)
-		}
 
-		wg.Operation().PostHook(cancel).PostHook(pipe.Close).Background(ctx)
-	}).Once()
+		iters.Observe(func(iter *Iterator[T]) {
+			send.Consume(iter).Operation(eh).Add(ctx, wg)
+		}).Operation(eh).Add(wctx, wg)
+
+		wg.Operation().
+			PostHook(cancel).
+			PostHook(pipe.Close).
+			Background(ctx)
+	}).Go().Once()
 
 	return pipe.Receive().
 		Producer().
 		PreHook(init).
 		IteratorWithErrorCollector(eh, ep)
+}
+
+// ChainIterators, like MergeIterators and FlattenIterators, takes a
+// sequence of iterators and produces a combined
+// iterator. ChainIterators processes items sequentially from each
+// iterator. By contrast, MergeIterators constructs an iterator that
+// reads all of the items from the input iterators in parallel, and
+// returns items in an arbitrary order.
+//
+// Use ChainIterators or FlattenIterators if order is important. Use
+// FlattenIterator for larger numbers of iterators. Use MergeIterators
+// when producing an item takes a non-trivial amount of time.
+func ChainIterators[T any](iters ...*Iterator[T]) *Iterator[T] {
+	return new(Iterator[T]).Join(iters...)
+}
+
+// FlattenIterators combines input iterators into a single output iterator.
+//
+// There is no buffering of the flattened iterator, but elements in
+// the output iterator are drawn from the input iterators sequentially
+// and in order: both order of the input iterator and the items in all
+// constituent iterators are reflected in the output.
+//
+// Use FlattenIterators or ChainIterators if order is important. Use
+// FlattenIterator for larger numbers of iterators. Use MergeIterators
+// when producing an item takes a non-trivial amount of time.
+func FlattenIterators[T any](iters *Iterator[*Iterator[T]]) *Iterator[T] {
+	pipe := Blocking(make(chan T))
+	es := &ers.Stack{}
+	mu := &sync.Mutex{}
+
+	eh := HF.ErrorHandlerWithoutEOF(es.Handler()).WithLock(mu)
+	ep := MakeFuture(es.Future()).WithLock(mu)
+
+	return pipe.
+		Producer().
+		PreHook(Operation(
+			func(ctx context.Context) {
+				defer pipe.Close()
+
+				send := pipe.Processor()
+				iters.Observe(func(in *Iterator[T]) {
+					in.Process(send).Observe(ctx, eh)
+				}).Observe(ctx, eh)
+			}).
+			Go().Once(),
+		).IteratorWithErrorCollector(eh, ep)
 }
 
 func (i *Iterator[T]) doClose() {
@@ -210,12 +261,7 @@ func (i *Iterator[T]) Value() T { return i.value }
 // directly, or use Split to create an iterator that safely draws
 // items from the parent iterator.
 func (i *Iterator[T]) Next(ctx context.Context) bool {
-	if i.operation == nil || i.closer.state.Load() || ctx.Err() != nil {
-		return false
-	}
-
-	val, err := i.ReadOne(ctx)
-	if err == nil {
+	if val, err := i.ReadOne(ctx); err == nil {
 		i.value = val
 		return true
 	}
@@ -230,10 +276,10 @@ func (i *Iterator[T]) Next(ctx context.Context) bool {
 // produced by the iterator. All errors produced by ReadOne are
 // terminal and indicate that no further iteration is possible.
 func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
-	if i.operation == nil || i.closer.state.Load() {
-		return out, io.EOF
-	} else if err = ctx.Err(); err != nil {
+	if err = ctx.Err(); err != nil {
 		return out, err
+	} else if i.closer.state.Load() || i.operation == nil {
+		return out, io.EOF
 	}
 
 	defer func() { ft.WhenCall(err != nil, i.doClose) }()
@@ -259,7 +305,7 @@ func (i *Iterator[T]) ReadOne(ctx context.Context) (out T, err error) {
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map()
 func (i *Iterator[T]) Filter(check func(T) bool) *Iterator[T] {
-	return Producer[T](func(ctx context.Context) (out T, _ error) {
+	return NewProducer(func(ctx context.Context) (out T, _ error) {
 		for {
 			item, err := i.ReadOne(ctx)
 			if err != nil {
@@ -321,14 +367,8 @@ func (i *Iterator[T]) Reduce(
 
 // Count returns the number of items observed by the iterator. Callers
 // should still manually call Close on the iterator.
-func (i *Iterator[T]) Count(ctx context.Context) int {
-	proc := i.Producer()
-	var count int
-	for {
-		if !ft.IsOk(proc.Check(ctx)) {
-			break
-		}
-
+func (i *Iterator[T]) Count(ctx context.Context) (count int) {
+	for proc := i.Producer(); ft.IsOk(proc.Check(ctx)); {
 		count++
 	}
 	return count
@@ -354,7 +394,9 @@ func (i *Iterator[T]) Split(num int) []*Iterator[T] {
 	setup := pipe.Processor().
 		ReadAll(i.Producer()).
 		PostHook(pipe.Close).
-		Ignore().Go().Once()
+		Ignore().
+		Go().
+		Once()
 
 	output := make([]*Iterator[T], num)
 	for idx := range output {
@@ -436,7 +478,7 @@ func (i *Iterator[T]) Process(fn Processor[T]) Worker {
 
 // Join merges multiple iterators processing and producing their results
 // sequentially, and without starting any go routines. Otherwise
-// similar to MergeIterators (which processes each iterator in parallel).
+// similar to Flatten (which processes each iterator in parallel).
 func (i *Iterator[T]) Join(iters ...*Iterator[T]) *Iterator[T] {
 	proc := i.Producer()
 	for idx := range iters {
@@ -571,7 +613,10 @@ func (i *Iterator[T]) ProcessParallel(
 				Add(ctx, wg)
 		}
 
-		wg.Operation().Block()
+		// use the blocking wait because we want the workers
+		// to exit on their own: passing a context here would
+		// mean that this function would return too early.
+		wg.Operation().Wait()
 		return opts.ErrorResolver()
 	}
 }

@@ -232,12 +232,16 @@ func IgnoreSecond[A any, B any](a A, _ B) A { return a }
 // Once uses a sync.Once to wrap to provide an output function that
 // will execute at most one time, while eliding/managing the sync.Once
 // object.
+//
+// Deprecated: Use sync.OnceFunc() from the standard library. Be aware that sync.OnceFunc has slightly different semantics around panic handling.
 func Once(f func()) func() { o := &sync.Once{}; f = SafeWrap(f); return func() { o.Do(f) } }
 
 // OnceDo returns a function, that will run exactly once. The value
 // returned by the inner function is cached transparently, so
 // subsequent calls to the function returned by OnceDo will return the
 // original value.
+//
+// Deprecated: Use sync.OnceValue from the standard library. Be aware that sync.OnceValue has slightly different semantics around panic handling.
 func OnceDo[T any](op func() T) func() T {
 	var cache T
 	opw := Once(func() { cache = op() })

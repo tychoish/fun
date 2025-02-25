@@ -598,12 +598,14 @@ func TestIterator(t *testing.T) {
 		defer cancel()
 		elems := GenerateRandomStringSlice(100)
 
-		iter := MergeIterators(
-			SliceIterator(elems),
-			SliceIterator(elems),
-			SliceIterator(elems),
-			SliceIterator(elems),
-			SliceIterator(elems),
+		iter := FlattenIterators(
+			VariadicIterator(
+				SliceIterator(elems),
+				SliceIterator(elems),
+				SliceIterator(elems),
+				SliceIterator(elems),
+				SliceIterator(elems),
+			),
 		)
 		seen := make(map[string]struct{}, len(elems))
 		var count int
@@ -631,7 +633,7 @@ func TestIterator(t *testing.T) {
 		defer cancel()
 
 		pipe := make(chan string)
-		iter := MergeIterators(
+		iter := ChainIterators(
 			Blocking(pipe).Iterator(),
 			Blocking(pipe).Iterator(),
 			Blocking(pipe).Iterator(),

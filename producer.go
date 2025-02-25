@@ -282,7 +282,7 @@ func (pf Producer[T]) IteratorWithErrorCollector(ec Handler[error], er Future[er
 func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
 	iter := pf.Iterator()
 	closer := iter.closer.op
-	iter.closer.op = ft.Once(func() { hook(iter); closer() })
+	iter.closer.op = sync.OnceFunc(func() { hook(iter); closer() })
 	return iter
 }
 

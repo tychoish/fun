@@ -767,7 +767,7 @@ func RunIteratorStringAlgoTests(
 						defer cancel()
 
 						out := Map(
-							MergeIterators(builder(), builder(), builder()),
+							MergeIterators(VariadicIterator(builder(), builder(), builder())),
 							func(_ context.Context, str string) (string, error) {
 								for _, c := range []string{"a", "e", "i", "o", "u"} {
 									str = strings.ReplaceAll(str, c, "")

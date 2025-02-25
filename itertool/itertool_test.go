@@ -303,7 +303,7 @@ func TestMergeSlices(t *testing.T) {
 		assert.Equal(t, count, 256)
 	})
 	t.Run("Slice", func(t *testing.T) {
-		iter := MergeSlices(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64))
+		iter := FlattenSlices(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64))
 		count := 0
 		err := iter.Observe(func(in int) {
 			count++

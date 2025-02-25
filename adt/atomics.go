@@ -31,10 +31,17 @@ type AtomicValue[T any] interface {
 // concurrently, there is no provision for protecting mutable types
 // returned by the function and concurrent modification of mutable
 // returned values is a race.
+//
+// Deprecated: Use sync.OnceValue from the standard library. Be aware that this will have slightly different around panic handling.
 func Mnemonize[T any](in func() T) func() T { return ft.OnceDo(in) }
 
 // Once provides a mnemonic form of sync.Once, caching and returning a
 // value after the Do() function is called.
+//
+// Panics are only thrown when the underlying constructor is called
+// (and it panics.) Nil constructors are ignored and subsequent
+// attempts to access the value will return the zero value for the
+// return type.
 type Once[T any] struct {
 	ctor    Atomic[func() T]
 	once    sync.Once
@@ -46,7 +53,7 @@ type Once[T any] struct {
 // NewOnce creates a Once object and initializes it with the function
 // provided. This is optional and this function can be later
 // overridden by Set() or Do(). When the operation is complete, the
-// Once operation has been
+// Once value is populated and the .Resolve() method will return the value.
 func NewOnce[T any](fn func() T) *Once[T] {
 	o := &Once[T]{}
 	o.defined.Store(true)
@@ -67,8 +74,10 @@ func (o *Once[T]) Do(ctor func() T)     { o.once.Do(func() { o.ctor.Set(ctor); o
 func (o *Once[T]) Call(ctor func() T) T { o.Do(ctor); return o.comp }
 
 // Resolve runs the stored, if and only if it hasn't been run function
-// and returns its output. Once the function has run, Resolve will
-// continue to return the cached value.
+// and returns its output. If the constructor hasn't been populated,
+// as with Set(), then Resolve() will return the zero value for
+// T. Once the function has run, Resolve will continue to return the
+// cached value.
 func (o *Once[T]) Resolve() T { o.once.Do(o.populate); return o.comp }
 
 func (o *Once[T]) populate() {

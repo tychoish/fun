@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun"
@@ -105,7 +106,7 @@ func Generate[T any](
 // not set.
 func Map[T any, O any](
 	input *fun.Iterator[T],
-	mapFn func(context.Context, T) (O, error),
+	mapFn fun.Transform[T, O],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *fun.Iterator[O] {
 	return fun.Map(input, mapFn, optp...)
@@ -124,7 +125,7 @@ func Map[T any, O any](
 // waits for the input iterator to produce values.
 func MapReduce[T any, O any, R any](
 	input *fun.Iterator[T],
-	mapFn func(context.Context, T) (O, error),
+	mapFn fun.Transform[T, O],
 	reduceFn func(O, R) (R, error),
 	initialReduceValue R,
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
@@ -220,75 +221,46 @@ func DropZeroValues[T comparable](iter *fun.Iterator[T]) *fun.Iterator[T] {
 }
 
 // Chain, like merge, takes a sequence of iterators and produces a
-// combined iterator. Chain processes each iterator provided in
-// sequence, where merge reads from all iterators in at once.
+// combined iterator.
+//
+// Chain is an alias for fun.ChainIterators
 func Chain[T any](iters ...*fun.Iterator[T]) *fun.Iterator[T] {
-	pipe := fun.Blocking(make(chan T))
-	ec := &erc.Collector{}
+	return fun.ChainIterators(iters...)
+}
 
-	init := fun.Operation(func(ctx context.Context) {
-		defer pipe.Close()
-		iteriter := dt.NewSlice(iters).Iterator()
+// Merge, takes a sequence of iterators and produces a combined
+// iterator. The input iterators are processed in parallel and objects
+// are emitted in an arbitrary order.
+//
+// Merge is an alias for fun.MergeIterators
+func Merge[T any](iters *fun.Iterator[*fun.Iterator[T]]) *fun.Iterator[T] {
+	return fun.MergeIterators(iters)
+}
 
-		// use direct iteration because this function has full
-		// ownership of the iterator and this is the easiest
-		// way to make sure that the outer iterator aborts
-		// when the context is canceled.
-		for iteriter.Next(ctx) {
-			iter := iteriter.Value()
+// Flatten converts an iterator of iterators to an flattened iterator
+// of their elements.
+//
+// Flatten is an alias for fun.FlattenIterators.
+func Flatten[T any](iter *fun.Iterator[*fun.Iterator[T]]) *fun.Iterator[T] {
+	return fun.FlattenIterators(iter)
+}
 
-			// iterate using the helper, so we get more
-			// atomic iteration, and the ability to
-			// respond to cancellation/blocking from the
-			// outgoing function.
-			for {
-				val, err := iter.ReadOne(ctx)
-				if err == nil {
-					if pipe.Send().Check(ctx, val) {
-						continue
-					}
-				}
-				break
-			}
-			ec.Add(iter.Close())
-		}
-	}).Go().Once()
-
-	return pipe.Producer().PreHook(init).IteratorWithHook(erc.IteratorHook[T](ec))
+// FlattenSliceIterators converts an iterator of slices to an flattened
+// iterator of their elements.
+func FlattenSliceIterators[T any](iter *fun.Iterator[[]T]) *fun.Iterator[T] {
+	return Flatten(fun.Converter(fun.SliceIterator[T]).Process(iter))
 }
 
 // MergeSliceIterators converts an iterator of slices to an flattened
 // iterator of their elements.
 func MergeSliceIterators[T any](iter *fun.Iterator[[]T]) *fun.Iterator[T] {
-	pipe := fun.Blocking(make(chan T))
-	send := pipe.Processor()
-	ec := &erc.Collector{}
-	closepipe := ft.Once(pipe.Close)
-
-	errHandler := ec.Handler().PreHook(func(err error) { ft.WhenCall(ers.IsTerminating(err), closepipe) })
-
-	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
-		iter.Observe(func(in []T) {
-			dt.NewSlice(in).Process(send).Observe(ctx, errHandler)
-		}).Observe(ctx, errHandler)
-	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
+	return Merge(fun.Converter(fun.SliceIterator[T]).Process(iter))
 }
 
-// MergeSlices converts an arbitrary number of slices and returns a
+// FlattenSlices converts an arbitrary number of slices and returns a
 // single iterator for their items.
-func MergeSlices[T any](sls ...[]T) *fun.Iterator[T] {
-	pipe := fun.Blocking(make(chan T))
-	send := pipe.Processor()
-	ec := &erc.Collector{}
-	closepipe := ft.Once(pipe.Close)
-
-	errHandler := ec.Handler().PreHook(func(err error) { ft.WhenCall(ers.IsTerminating(err), closepipe) })
-
-	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
-		dt.NewSlice(sls).Process(fun.MakeProcessor(func(sl []T) error {
-			return dt.NewSlice(sl).Process(send).Run(ctx)
-		})).Observe(ctx, errHandler)
-	}).PostHook(closepipe).Go().Once()).IteratorWithHook(erc.IteratorHook[T](ec))
+func FlattenSlices[T any](sls ...[]T) *fun.Iterator[T] {
+	return FlattenSliceIterators(fun.SliceIterator(sls))
 }
 
 // Monotonic creates an iterator that produces increasing numbers
@@ -311,13 +283,14 @@ func JSON[T any](in io.Reader) *fun.Iterator[T] {
 // Indexed produces an iterator that keeps track of and reports the
 // sequence/index id of the item in the iteration sequence.
 func Indexed[T any](iter *fun.Iterator[T]) *fun.Iterator[dt.Pair[int, T]] {
-	idx := -1
-	return fun.ConvertIterator(iter, fun.Converter(func(in T) dt.Pair[int, T] { idx++; return dt.MakePair(idx, in) }))
+	idx := &atomic.Int64{}
+	idx.Store(-1)
+	return fun.ConvertIterator(iter, fun.Converter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }))
 }
 
 // RateLimit wraps an iterator with a rate-limiter to ensure that the
 // output iterator will produce no more than <num> items in any given
-// <window>. Does not garuntee
+// <window>.
 func RateLimit[T any](iter *fun.Iterator[T], num int, window time.Duration) *fun.Iterator[T] {
 	queue := &dt.List[time.Time]{}
 	timer := time.NewTimer(0)
