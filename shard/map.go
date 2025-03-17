@@ -1,6 +1,7 @@
 package shard
 
 import (
+	"fmt"
 	"hash/maphash"
 	"sync/atomic"
 
@@ -14,7 +15,12 @@ var hashSeed = adt.NewOnce(func() maphash.Seed { return maphash.MakeSeed() })
 
 var hasherPool *adt.Pool[*maphash.Hash]
 
-const defaultSize = 32
+var numWorkers = fun.WorkerGroupConfNumWorkers
+
+const (
+	defaultSize                    = 32
+	defaultShMap MapImplementation = MapImplementationSyncMap
+)
 
 func init() {
 	hasherPool = &adt.Pool[*maphash.Hash]{}
@@ -41,69 +47,55 @@ func init() {
 // iteration would require exclusive access to all of the data and the
 // implementation doesn't contain provisions for this.
 type Map[K comparable, V any] struct {
-	sh    adt.Once[[]shmap[K, V]]
+	sh    adt.Once[[]sh[K, V]]
+	clock atomic.Uint64
 	num   uint64
-	clock atomic.Uint64
+	imp   MapImplementation
 }
 
-func (m *Map[K, V]) setNum(n int)                 { m.num = ft.Default(max(0, uint64(n)), defaultSize) }
-func (m *Map[K, V]) init(n int) []shmap[K, V]     { m.setNum(n); return m.makeShards() }
-func (m *Map[K, V]) makeShards() []shmap[K, V]    { return make([]shmap[K, V], m.num) }
-func (m *Map[K, V]) defaultShards() []shmap[K, V] { return m.init(defaultSize) }
-
-func (m *Map[K, V]) shards() dt.Slice[shmap[K, V]] { return m.sh.Call(m.defaultShards) }
-func (m *Map[K, V]) shard(key K) *shmap[K, V]      { return m.shards().Ptr(int(m.shardID(key))) }
-func (m *Map[K, V]) inc() *Map[K, V]               { m.clock.Add(1); return m }
-
-func (m *Map[K, V]) shardPtrs() dt.Slice[*shmap[K, V]]      { return m.shards().Ptrs() }
-func (m *Map[K, V]) shardIter() *fun.Iterator[*shmap[K, V]] { return m.shardPtrs().Iterator() }
-
-type shmap[K comparable, V any] struct {
-	data  adt.Map[K, *Versioned[V]]
-	clock atomic.Uint64
+// Setup initializes the shard with non-default shard size and backing map implementation.
+func (m *Map[K, V]) Setup(n int, mi MapImplementation) {
+	m.sh.Do(func() []sh[K, V] { return m.init(n, mi) })
 }
 
-func (sh *shmap[K, V]) read() *adt.Map[K, *Versioned[V]]  { return &sh.data }
-func (sh *shmap[K, V]) write() *adt.Map[K, *Versioned[V]] { sh.clock.Add(1); return &sh.data }
-
-func (sh *shmap[K, V]) Keys() *fun.Iterator[K]      { return sh.read().Keys() }
-func (sh *shmap[K, V]) Set(it dt.Pair[K, V])        { sh.Store(it.Key, it.Value) }
-func (sh *shmap[K, V]) Load(k K) (V, bool)          { v, ok := sh.read().Load(k); return v.Load(), ok }
-func (sh *shmap[K, V]) Version() uint64             { return sh.clock.Load() }
-func (sh *shmap[K, V]) Versioned(k K) *Versioned[V] { return ft.IgnoreSecond(sh.read().Load(k)) }
-
-func (sh *shmap[K, V]) Atomic(k K) *adt.Atomic[V] {
-	v := sh.Versioned(k)
-	return ft.WhenDo(v != nil, v.Atomic)
+func (m *Map[K, V]) init(n int, mi MapImplementation) []sh[K, V] {
+	m.num = ft.Default(max(0, uint64(n)), defaultSize)
+	m.imp = ft.Default(mi, MapImplementationSyncMap)
+	return m.makeShards()
 }
 
-func (sh *shmap[K, V]) Store(k K, v V) {
-	mp := sh.write()
-	if val, ok := mp.Load(k); ok {
-		val.Set(v)
-		mp.Store(k, val)
-	} else {
-		mp.Store(k, Version(v))
+// String reports the type name, number of configured shards, and
+// current version of the map.
+func (m *Map[K, V]) String() string {
+	return fmt.Sprintf("ShardedMap<%s> Shards(%d) Version(%d)", m.imp, m.num, m.clock.Load())
+}
+
+func (m *Map[K, V]) makeShards() []sh[K, V] {
+	shards := make([]sh[K, V], m.num)
+	for idx := range shards {
+		shards[idx].data = shards[idx].makeVmap(m.imp)
 	}
+	return shards
 }
 
-func (sh *shmap[K, V]) Fetch(k K) (out V, _ uint64, _ bool) {
-	mp := sh.read()
-	for {
-		v := sh.clock.Load()
-		d, ok := mp.Load(k)
-		switch {
-		case !ok:
-			return out, 0, false
-		case v == sh.clock.Load():
-			return d.Load(), v, ok
-		}
-	}
-}
-
-func (m *Map[K, V]) SetupShards(n int)           { m.sh.Do(func() []shmap[K, V] { return m.init(n) }) }
-func (m *Map[K, V]) Versioned(k K) *Versioned[V] { return m.shard(k).Versioned(k) }
-func (m *Map[K, V]) Atomic(k K) *adt.Atomic[V]   { return m.shard(k).Atomic(k) }
+func (m *Map[K, V]) defaultShards() []sh[K, V]                      { return m.init(defaultSize, defaultShMap) }
+func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                     { return m.sh.Call(m.defaultShards) }
+func (m *Map[K, V]) shard(key K) *sh[K, V]                          { return m.shards().Ptr(int(m.shardID(key))) }
+func (m *Map[K, V]) inc() *Map[K, V]                                { m.clock.Add(1); return m }
+func to[T, O any](in func(T) O) fun.Transform[T, O]                 { return fun.Converter(in) }
+func (m *Map[K, V]) sk() fun.Transform[*sh[K, V], *fun.Iterator[K]] { return to(m.shKeys) }
+func (m *Map[K, V]) sv() fun.Transform[*sh[K, V], *fun.Iterator[V]] { return to(m.shVals) }
+func (m *Map[K, V]) vp() fun.Transform[*sh[K, V], *fun.Iterator[V]] { return to(m.shValsp) }
+func (m *Map[K, V]) keyToItem() fun.Transform[K, MapItem[K, V]]     { return to(m.Fetch) }
+func (*Map[K, V]) shKeys(sh *sh[K, V]) *fun.Iterator[K]             { return sh.keys() }
+func (*Map[K, V]) shVals(sh *sh[K, V]) *fun.Iterator[V]             { return sh.values() }
+func (m *Map[K, V]) shValsp(sh *sh[K, V]) *fun.Iterator[V]          { return sh.valuesp(m.num) }
+func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                    { return m.shards().Ptrs() }
+func (m *Map[K, V]) shIter() *fun.Iterator[*sh[K, V]]               { return m.shPtrs().Iterator() }
+func (m *Map[K, V]) keyItr() *fun.Iterator[*fun.Iterator[K]]        { return m.sk().Process(m.shIter()) }
+func (m *Map[K, V]) valItr() *fun.Iterator[*fun.Iterator[V]]        { return m.sv().Process(m.shIter()) }
+func (m *Map[K, V]) valItrp() *fun.Iterator[*fun.Iterator[V]]       { return m.vp().Process(m.shIter()) }
+func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf] { return numWorkers(int(m.num)) }
 
 func (m *Map[K, V]) shardID(key K) uint64 {
 	h := hasherPool.Get()
@@ -115,16 +107,66 @@ func (m *Map[K, V]) shardID(key K) uint64 {
 
 // Store adds a key and value to the map, replacing any existing
 // values as needed.
-func (m *Map[K, V]) Store(key K, value V) { m.inc().shard(key).Store(key, value) }
+func (m *Map[K, V]) Store(key K, value V) { m.inc().shard(key).store(key, value) }
 
+// Version returns the version for the entire sharded map.
 func (m *Map[K, V]) Version() uint64 { return m.clock.Load() }
 
+// Clocks returns a slice of the versions for the map and all of the shards. The first value is the "global" version
+func (m *Map[K, V]) Clocks() []uint64 {
+	shards := m.shards()
+	out := make([]uint64, 1+m.num)
+	out[0] = m.clock.Load()
+	for idx := range shards {
+		out[idx+1] = shards[idx].clock.Load()
+	}
+	return out
+}
+
+// Keys returns an iterator for all the keys in the map. Items are
+// provdied from shards sequentially, and in the same sequence, but
+// are randomized within the shard. The keys are NOT captured in a
+// snapshot, so keys reflecting different logical moments will appear
+// in the iterator. No key will appear more than once.
+func (m *Map[K, V]) Keys() *fun.Iterator[K] { return fun.FlattenIterators(m.keyItr()) }
+
+// Values returns an iterator for all of the keys in the map. Values
+// are provided from shards sequentially, and always in the same
+// sequences, but randomized within each shard. The values are NOT
+// captured in a snapshot, so values reflecting different logical
+// moments will appear in the iterator.
+func (m *Map[K, V]) Values() *fun.Iterator[V] { return fun.FlattenIterators(m.valItr()) }
+
+// Iterator provides an iterator over all items in the map. The
+// MapItem type captures the version information and information about
+// the sharded configuration.
+func (m *Map[K, V]) Iterator() *fun.Iterator[MapItem[K, V]] { return m.keyToItem().Process(m.Keys()) }
+
+// ParallelIterator provides an iterator that resolves MapItems in
+// parallel, which may be useful in avoiding slow iteration with
+// highly contended mutexes. Additionally, because items are processed
+// concurrently, items are presented in fully arbitrary order. It's
+// possible that the iterator could return some items where
+// MapItem.Exists is false if items are deleted during iteration.
+func (m *Map[K, V]) ParallelIterator() *fun.Iterator[MapItem[K, V]] {
+	return fun.Map(m.Keys(), m.keyToItem(), m.popt())
+}
+
+// ParallelValues returns an iterator over all values in the sharded map. Because items are processed
+// concurrently, items are presented in fully arbitrary order.
+func (m *Map[K, V]) ParallelValues() *fun.Iterator[V] { return fun.MergeIterators(m.valItrp()) }
+
+// ParallelValues provides an iterator over the Values in a sharded map in
+// parallel, which may be useful in avoiding slow iteration with
+// highly contended mutexes. Additionally, because items are processed
+// concurrently, items are presented in fully arbitrary order.
 type MapItem[K comparable, V any] struct {
 	Exists        bool
 	GlobalVersion uint64
 	ShardVersion  uint64
+	Version       uint64
 	ShardID       uint64
-	NumShards     uint
+	NumShards     uint64
 	Key           K
 	Value         V
 }
@@ -133,11 +175,11 @@ type MapItem[K comparable, V any] struct {
 // relevant version numbers.
 func (m *Map[K, V]) Fetch(k K) MapItem[K, V] {
 	shards := m.shards()
-	it := MapItem[K, V]{Key: k, ShardID: m.shardID(k), NumShards: uint(len(shards))}
+	it := MapItem[K, V]{Key: k, ShardID: m.shardID(k), NumShards: uint64(len(shards))}
 
 	for {
 		it.GlobalVersion = m.clock.Load()
-		it.Value, it.ShardVersion, it.Exists = shards[it.ShardID].Fetch(k)
+		it.Value, it.Version, it.ShardVersion, it.Exists = shards[it.ShardID].fetch(k)
 		if it.GlobalVersion == m.clock.Load() {
 			return it
 		}
@@ -145,34 +187,11 @@ func (m *Map[K, V]) Fetch(k K) MapItem[K, V] {
 	}
 }
 
-func (m *Map[K, V]) shardToKeyIter() fun.Transform[*shmap[K, V], *fun.Iterator[K]] {
-	return fun.Converter(func(i *shmap[K, V]) *fun.Iterator[K] { return i.Keys() })
-}
-func (m *Map[K, V]) keyToItem() fun.Transform[K, MapItem[K, V]] {
-	return fun.Converter(func(k K) MapItem[K, V] { return m.Fetch(k) })
-}
-func (m *Map[K, V]) popts() fun.OptionProvider[*fun.WorkerGroupConf] {
-	return fun.WorkerGroupConfNumWorkers(int(m.num))
-}
-
-func (m *Map[K, V]) Keys() *fun.Iterator[K] {
-	return fun.FlattenIterators(m.shardToKeyIter().Process(m.shardIter()))
-}
-func (m *Map[K, V]) ParallelKeys() *fun.Iterator[K] {
-	return fun.FlattenIterators(m.shardToKeyIter().ProcessParallel(m.shardIter(), m.popts()))
-}
-func (m *Map[K, V]) ParallelIterator() *fun.Iterator[MapItem[K, V]] {
-	return m.keyToItem().ProcessParallel(fun.FlattenIterators(m.shardToKeyIter().ProcessParallel(m.shardIter(), m.popts())))
-}
-func (m *Map[K, V]) Iterator() *fun.Iterator[MapItem[K, V]] {
-	return m.keyToItem().Process(m.Keys())
-}
-
 // Load retrieves the value from the map. The semantics are the same
 // as for maps in go: if the value does not exist it always returns
 // the zero value for the type, while the second value indicates if
 // the key was present in the map.
-func (m *Map[K, V]) Load(key K) (V, bool) { return m.shard(key).Load(key) }
+func (m *Map[K, V]) Load(key K) (V, bool) { return m.shard(key).load(key) }
 
 // Delete removes a key--and its corresponding value--from the map, if
 // it exists.
@@ -184,27 +203,6 @@ func (m *Map[K, V]) Set(it dt.Pair[K, V]) { m.Store(it.Key, it.Value) }
 // Check returns true if the key exists in the map or false otherwise.
 func (m *Map[K, V]) Check(key K) bool { return m.shard(key).read().Check(key) }
 
-type Versioned[T any] struct {
-	value adt.Atomic[T]
-	clock atomic.Uint64
-}
-
-func Version[T any](in T) *Versioned[T]              { o := &Versioned[T]{}; o.Set(in); return o }
-func (vv *Versioned[T]) inc()                        { vv.clock.Add(1) }
-func (vv *Versioned[T]) innerAtomic() *adt.Atomic[T] { return ft.Ptr(vv.value) }
-func (vv *Versioned[T]) innerLoad() T                { return vv.value.Load() }
-func (vv *Versioned[T]) innerVersion() uint64        { return vv.clock.Load() }
-
-func (vv *Versioned[T]) Atomic() *adt.Atomic[T] { return ft.WhenDo(vv != nil, vv.innerAtomic) }
-func (vv *Versioned[T]) Version() uint64        { return ft.WhenDo(vv != nil, vv.innerVersion) }
-func (vv *Versioned[T]) Load() T                { return ft.WhenDo(vv != nil, vv.innerLoad) }
-func (vv *Versioned[T]) Set(newValue T)         { vv.inc(); vv.value.Store(newValue) }
-func (vv *Versioned[T]) Fetch() (T, uint64) {
-	for {
-		version := vv.clock.Load()
-		val := vv.value.Load()
-		if version == vv.clock.Load() {
-			return val, version
-		}
-	}
-}
+// Versioned returns the wrapped Versioned object which tracks the
+// version (modification count) of the stored object.
+func (m *Map[K, V]) Versioned(k K) *Versioned[V] { return ft.IgnoreSecond(m.shard(k).read().Load(k)) }
