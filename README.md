@@ -19,6 +19,9 @@ Packages:
   simple tools for handling function objects.
 - [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly typed
   atomic data structures, wrappers, tools, and operations.)
+- [shard](https://pkg.go.dev/github.com/tychoish/fun/adt/shard) is a
+  "sharded map" to reduce contention for multi-threaded access of
+  synchronized maps.
 - [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
   (iterator tools.)
 - [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
@@ -32,8 +35,9 @@ Packages:
   provide non-critical assertions.
 - [testt](https://pkg.go.dev/github.com/tychoish/fun/testt) (testy)
   are a collection of "nice to have" test helpers and utilities.
-- [ensure](https://pkg.go.dev/github.com/tychoish/fun/ensure) An
-  experimental test harness and orchestration tool.
+- [ensure](https://pkg.go.dev/github.com/tychoish/fun/ensure) is an
+  experimental test harness and orchestration tool with more "natural"
+  assertions.
 
 For more information, see the documentation, but of general interest:
 
