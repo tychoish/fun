@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 const (
@@ -100,7 +101,7 @@ func (s *Service) String() string { return fmt.Sprintf("Service<%s>", s.Name) }
 // after close is called.
 func (s *Service) Running() bool { return s.isRunning.Load() }
 
-// Start launches the configured service and tracks  its lifecycle. If
+// Start launches the configured service and tracks its lifecycle. If
 // the context is canceled, the service returns, and any errors
 // collected during the service's lifecycle are returned by the close
 // (or wait) methods.
@@ -112,7 +113,7 @@ func (s *Service) Start(ctx context.Context) error {
 		return ErrServiceReturned
 	}
 
-	if s.isRunning.Swap(true) {
+	if s.isStarted.Load() || !s.isRunning.CompareAndSwap(false, true) {
 		return ErrServiceAlreadyStarted
 	}
 
@@ -191,8 +192,8 @@ func (s *Service) Start(ctx context.Context) error {
 // started or isn't running this has no effect. Close is safe to call
 // multiple times.
 func (s *Service) Close() {
-	if s.isRunning.Load() && s.cancel != nil {
-		s.cancel()
+	if s.isRunning.Load() {
+		ft.SafeCall(s.cancel)
 	}
 }
 

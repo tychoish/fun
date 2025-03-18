@@ -112,11 +112,7 @@ func (Handlers) Recover(ob Handler[error]) { ob(ers.ParsePanic(recover())) }
 // ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
 func (Handlers) ErrorHandler(of Handler[error]) Handler[error] {
-	return func(err error) {
-		if err != nil {
-			of(err)
-		}
-	}
+	return func(err error) { ft.WhenApply(err != nil, of, err) }
 }
 
 // ErrorStackHandler returns an ers.ErrorStack, and a

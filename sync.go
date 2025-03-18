@@ -31,18 +31,15 @@ type WaitGroup struct {
 	counter int
 }
 
-func (wg *WaitGroup) init() {
-	if wg.cond == nil {
-		wg.cond = sync.NewCond(&wg.mu)
-	}
-}
+func (wg *WaitGroup) initOp()            { wg.cond = sync.NewCond(&wg.mu) }
+func (wg *WaitGroup) init()              { ft.WhenCall(wg.cond == nil, wg.initOp) }
+func (wg *WaitGroup) mutex() *sync.Mutex { return &wg.mu }
 
 // Add modifies the internal counter. Raises an ErrInvariantViolation
 // error if any modification causes the internal coutner to be less
 // than 0.
 func (wg *WaitGroup) Add(num int) {
-	wg.mu.Lock()
-	defer wg.mu.Unlock()
+	defer with(lock(wg.mutex()))
 	wg.init()
 
 	Invariant.IsTrue(wg.counter+num >= 0, "cannot decrement waitgroup to less than 0: ", wg.counter, " + ", num)
@@ -61,20 +58,10 @@ func (wg *WaitGroup) Done() { wg.Add(-1) }
 func (wg *WaitGroup) Inc() { wg.Add(1) }
 
 // Num returns the number of pending workers.
-func (wg *WaitGroup) Num() int {
-	wg.mu.Lock()
-	defer wg.mu.Unlock()
-
-	return wg.counter
-}
+func (wg *WaitGroup) Num() int { defer with(lock(wg.mutex())); return wg.counter }
 
 // IsDone returns true if there is pending work, and false otherwise.
-func (wg *WaitGroup) IsDone() bool {
-	wg.mu.Lock()
-	defer wg.mu.Unlock()
-
-	return wg.counter == 0
-}
+func (wg *WaitGroup) IsDone() bool { defer with(lock(wg.mutex())); return wg.counter == 0 }
 
 // Operation returns with WaitGroups Wait method as a Operation.
 func (wg *WaitGroup) Operation() Operation { return wg.Wait }
@@ -116,8 +103,7 @@ func (wg *WaitGroup) Worker() Worker {
 // Consider using `fun.Operation(wg.Wait).Block()` if you want blocking
 // semantics with the other features of this WaitGroup implementation.
 func (wg *WaitGroup) Wait(ctx context.Context) {
-	wg.mu.Lock()
-	defer wg.mu.Unlock()
+	defer with(lock(wg.mutex()))
 
 	if wg.counter == 0 || ctx.Err() != nil {
 		return

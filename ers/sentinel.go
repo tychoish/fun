@@ -25,6 +25,10 @@ const ErrLimitExceeded Error = Error("limit exceeded")
 // generally retriable.
 const ErrInvalidInput Error = Error("invalid input")
 
+// ErrNotImplemented indicates an unfinished implementation. These
+// errors are not generally retriable.
+const ErrNotImplemented Error = Error("not implemented")
+
 // ErrInvalidRuntimeType signals a type error encountered at
 // runtime. Typically included as a component in an aggregate
 // invariant violation error.
