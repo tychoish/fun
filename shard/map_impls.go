@@ -5,28 +5,52 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 )
 
-type MapImplementation uint32
+// MapType is the enum that allows users to configure what map
+// implementation backs the sharded Map. There are (in theory)
+// performance trade offs for different map implementations based on
+// the workload and usage patterns.
+type MapType uint32
 
 const (
-	MapImplementationSyncMap MapImplementation = 0
-	MapImplementationStdlib  MapImplementation = 1
-	MapImplementationRWMutex MapImplementation = 2
-	MapImplementationMutex   MapImplementation = 3
+	// MapTypeDefault is an alias for the default map type that's
+	// used if the sharded map is not configured with a specific backing type.
+	MapTypeDefault MapType = MapTypeSync
+	// MapTypeSync is a map based on the sync.Map (via the
+	// adt.Map[K,V]) type. This map implementation is optimized
+	// for append-heavy/append-only workloads.
+	MapTypeSync MapType = 1
+	// MapTypeMutex is a standard library map (map[K]V) with all
+	// access protected with a sync.Mutex, ensuring exclusive
+	// access to all operations. May perform better than the
+	// SyncMap for write-heavy workloads with frequent
+	// modifications of existing keys.
+	MapTypeMutex MapType = 2
+	// MapTypeMutex is a standard library map (map[K]V) with all
+	// access protected with a sync.RWMutex, ensuring exclusive
+	// access for write operations and concurrent access for read
+	// operations. Will perform better for read-heavy workloads,
+	// with write workloads that are skewed towards modifications
+	// rather than additions.
+	MapTypeRWMutex MapType = 3
+	// MapTypeStdlib is a very minimal wrapper on top of a
+	// standard library map (map[K]V). This is not safe for
+	// concurrent writes, and is primarily useful for
+	// benchmarking.
+	MapTypeStdlib MapType = 4
 )
 
-func (mi MapImplementation) String() string {
+func (mi MapType) String() string {
 	switch mi {
-	case MapImplementationSyncMap:
+	case MapTypeSync:
 		return "adt.Map[K,V]"
-	case MapImplementationStdlib:
+	case MapTypeStdlib:
 		return "map[K]V{}"
-	case MapImplementationRWMutex:
+	case MapTypeRWMutex:
 		return "struct { mtx sync.RWMutex, mp map[K]V }"
-	case MapImplementationMutex:
+	case MapTypeMutex:
 		return "struct { mtx sync.Mutex, mp map[K]V }"
 	default:
 		return fmt.Sprintf("invalid<%d>", mi)
@@ -44,71 +68,52 @@ type oomap[K comparable, V any] interface {
 
 type vmap[K comparable, V any] oomap[K, *Versioned[V]]
 
-type rwMutexMap[K comparable, V any] struct {
-	mu   sync.RWMutex
-	data dt.Map[K, V]
+type rmtxMap[K comparable, V any] struct {
+	mu sync.RWMutex
+	d  dt.Map[K, V]
 }
 
-func (mmp *rwMutexMap[K, V]) mutex() sync.Locker   { return &mmp.mu }
-func (mmp *rwMutexMap[K, V]) rwmutex() sync.Locker { return mmp.mu.RLocker() }
+func withR(m *sync.RWMutex)                 { m.RUnlock() }
+func lockR(m *sync.RWMutex) *sync.RWMutex   { m.RLock(); return m }
+func withW(m *sync.RWMutex)                 { m.Unlock() }
+func lockW(m *sync.RWMutex) *sync.RWMutex   { m.Lock(); return m }
+func (m *rmtxMap[K, V]) Store(k K, v V)     { defer withW(lockW(&m.mu)); m.d.Store(k, v) }
+func (m *rmtxMap[K, V]) Delete(k K)         { defer withW(lockW(&m.mu)); m.d.Delete(k) }
+func (m *rmtxMap[K, V]) Load(k K) (V, bool) { defer withR(lockR(&m.mu)); return m.d.Load(k) }
+func (m *rmtxMap[K, V]) Check(k K) bool     { defer withR(lockR(&m.mu)); return m.d.Check(k) }
 
-func (mmp *rwMutexMap[K, V]) Load(k K) (V, bool) {
-	defer adt.With(adt.Lock(mmp.rwmutex()))
-	return mmp.data.Load(k)
-}
+func (m *rmtxMap[K, V]) Keys() *fun.Iterator[K] {
+	defer withR(lockR(&m.mu))
 
-func (mmp *rwMutexMap[K, V]) Store(k K, v V) {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	mmp.data.Store(k, v)
-}
-func (mmp *rwMutexMap[K, V]) Delete(k K) {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	mmp.data.Delete(k)
-
-}
-func (mmp *rwMutexMap[K, V]) Check(k K) bool {
-	defer adt.With(adt.Lock(mmp.rwmutex()))
-	return mmp.data.Check(k)
-}
-func (mmp *rwMutexMap[K, V]) Keys() *fun.Iterator[K] {
-	defer adt.With(adt.Lock(mmp.rwmutex()))
-	return mmp.data.Keys()
-}
-func (mmp *rwMutexMap[K, V]) Values() *fun.Iterator[V] {
-	defer adt.With(adt.Lock(mmp.rwmutex()))
-	return mmp.data.Values()
+	return m.d.Keys().Producer().WithLock(m.mu.RLocker()).Iterator()
 }
 
-type mutexMap[K comparable, V any] struct {
-	mu   sync.Mutex
-	data dt.Map[K, V]
+func (m *rmtxMap[K, V]) Values() *fun.Iterator[V] {
+	defer withR(lockR(&m.mu))
+
+	return m.d.Values().Producer().WithLock(m.mu.RLocker()).Iterator()
 }
 
-func (mmp *mutexMap[K, V]) mutex() sync.Locker { return &mmp.mu }
-
-func (mmp *mutexMap[K, V]) Load(k K) (V, bool) {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	return mmp.data.Load(k)
+type mtxMap[K comparable, V any] struct {
+	mu sync.Mutex
+	d  dt.Map[K, V]
 }
 
-func (mmp *mutexMap[K, V]) Store(k K, v V) {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	mmp.data.Store(k, v)
-}
-func (mmp *mutexMap[K, V]) Delete(k K) {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	mmp.data.Delete(k)
+func with(m *sync.Mutex)                   { m.Unlock() }
+func lock(m *sync.Mutex) *sync.Mutex       { m.Lock(); return m }
+func (m *mtxMap[K, V]) Store(k K, v V)     { defer with(lock(&m.mu)); m.d.Store(k, v) }
+func (m *mtxMap[K, V]) Delete(k K)         { defer with(lock(&m.mu)); m.d.Delete(k) }
+func (m *mtxMap[K, V]) Load(k K) (V, bool) { defer with(lock(&m.mu)); return m.d.Load(k) }
+func (m *mtxMap[K, V]) Check(k K) bool     { defer with(lock(&m.mu)); return m.d.Check(k) }
+
+func (m *mtxMap[K, V]) Keys() *fun.Iterator[K] {
+	defer with(lock(&m.mu))
+
+	return m.d.Keys().Producer().WithLock(&m.mu).Iterator()
 }
 
-func (mmp *mutexMap[K, V]) Check(k K) bool {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	return mmp.data.Check(k)
-}
-func (mmp *mutexMap[K, V]) Keys() *fun.Iterator[K] {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	return mmp.data.Keys()
-}
-func (mmp *mutexMap[K, V]) Values() *fun.Iterator[V] {
-	defer adt.With(adt.Lock(mmp.mutex()))
-	return mmp.data.Values()
+func (m *mtxMap[K, V]) Values() *fun.Iterator[V] {
+	defer with(lock(&m.mu))
+
+	return m.d.Values().Producer().WithLock(&m.mu).Iterator()
 }

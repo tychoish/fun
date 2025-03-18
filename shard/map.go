@@ -13,20 +13,19 @@ import (
 
 var hashSeed = adt.NewOnce(func() maphash.Seed { return maphash.MakeSeed() })
 
-var hasherPool *adt.Pool[*maphash.Hash]
+var hashPool *adt.Pool[*maphash.Hash]
 
-var numWorkers = fun.WorkerGroupConfNumWorkers
+var poolOpts = fun.WorkerGroupConfNumWorkers
 
 const (
-	defaultSize                    = 32
-	defaultShMap MapImplementation = MapImplementationSyncMap
+	defaultSize = 32
 )
 
 func init() {
-	hasherPool = &adt.Pool[*maphash.Hash]{}
-	hasherPool.SetCleanupHook(func(h *maphash.Hash) *maphash.Hash { h.Reset(); return h })
-	hasherPool.SetConstructor(func() *maphash.Hash { h := &maphash.Hash{}; h.SetSeed(hashSeed.Resolve()); return h })
-	hasherPool.FinalizeSetup()
+	hashPool = &adt.Pool[*maphash.Hash]{}
+	hashPool.SetCleanupHook(func(h *maphash.Hash) *maphash.Hash { h.Reset(); return h })
+	hashPool.SetConstructor(func() *maphash.Hash { h := &maphash.Hash{}; h.SetSeed(hashSeed.Resolve()); return h })
+	hashPool.FinalizeSetup()
 }
 
 // Map behaves like a simple map but divides the contents of
@@ -50,27 +49,39 @@ type Map[K comparable, V any] struct {
 	sh    adt.Once[[]sh[K, V]]
 	clock atomic.Uint64
 	num   uint64
-	imp   MapImplementation
+	imp   MapType
 }
 
-// Setup initializes the shard with non-default shard size and backing map implementation.
-func (m *Map[K, V]) Setup(n int, mi MapImplementation) {
-	m.sh.Do(func() []sh[K, V] { return m.init(n, mi) })
-}
+// Setup initializes the shard with non-default shard size and backing
+// map implementation. Once the Map is initialized (e.g. after calling
+// this function, modifying the map, or accessing the contents of the
+// map, this function becomes a no-op.)
+func (m *Map[K, V]) Setup(n int, mi MapType) { m.sh.Do(func() []sh[K, V] { return m.init(n, mi) }) }
 
-func (m *Map[K, V]) init(n int, mi MapImplementation) []sh[K, V] {
+func (m *Map[K, V]) init(n int, mi MapType) []sh[K, V] {
+	// ONLY called within the sync.Once scope.
+
 	m.num = ft.Default(max(0, uint64(n)), defaultSize)
-	m.imp = ft.Default(mi, MapImplementationSyncMap)
+	m.imp = ft.Default(mi, MapTypeDefault)
 	return m.makeShards()
 }
 
 // String reports the type name, number of configured shards, and
 // current version of the map.
 func (m *Map[K, V]) String() string {
-	return fmt.Sprintf("ShardedMap<%s> Shards(%d) Version(%d)", m.imp, m.num, m.clock.Load())
+	m.sh.Do(m.defaultShards)
+
+	var (
+		k K
+		v V
+	)
+
+	return fmt.Sprintf("ShardedMap[%T, %T]<%s> Shards(%d) Version(%d)", k, v, m.imp, m.num, m.clock.Load())
 }
 
 func (m *Map[K, V]) makeShards() []sh[K, V] {
+	// ONLY called within the sync.Once scope.
+
 	shards := make([]sh[K, V], m.num)
 	for idx := range shards {
 		shards[idx].data = shards[idx].makeVmap(m.imp)
@@ -78,30 +89,31 @@ func (m *Map[K, V]) makeShards() []sh[K, V] {
 	return shards
 }
 
-func (m *Map[K, V]) defaultShards() []sh[K, V]                      { return m.init(defaultSize, defaultShMap) }
-func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                     { return m.sh.Call(m.defaultShards) }
-func (m *Map[K, V]) shard(key K) *sh[K, V]                          { return m.shards().Ptr(int(m.shardID(key))) }
-func (m *Map[K, V]) inc() *Map[K, V]                                { m.clock.Add(1); return m }
-func to[T, O any](in func(T) O) fun.Transform[T, O]                 { return fun.Converter(in) }
-func (m *Map[K, V]) sk() fun.Transform[*sh[K, V], *fun.Iterator[K]] { return to(m.shKeys) }
-func (m *Map[K, V]) sv() fun.Transform[*sh[K, V], *fun.Iterator[V]] { return to(m.shVals) }
-func (m *Map[K, V]) vp() fun.Transform[*sh[K, V], *fun.Iterator[V]] { return to(m.shValsp) }
-func (m *Map[K, V]) keyToItem() fun.Transform[K, MapItem[K, V]]     { return to(m.Fetch) }
-func (*Map[K, V]) shKeys(sh *sh[K, V]) *fun.Iterator[K]             { return sh.keys() }
-func (*Map[K, V]) shVals(sh *sh[K, V]) *fun.Iterator[V]             { return sh.values() }
-func (m *Map[K, V]) shValsp(sh *sh[K, V]) *fun.Iterator[V]          { return sh.valuesp(m.num) }
-func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                    { return m.shards().Ptrs() }
-func (m *Map[K, V]) shIter() *fun.Iterator[*sh[K, V]]               { return m.shPtrs().Iterator() }
-func (m *Map[K, V]) keyItr() *fun.Iterator[*fun.Iterator[K]]        { return m.sk().Process(m.shIter()) }
-func (m *Map[K, V]) valItr() *fun.Iterator[*fun.Iterator[V]]        { return m.sv().Process(m.shIter()) }
-func (m *Map[K, V]) valItrp() *fun.Iterator[*fun.Iterator[V]]       { return m.vp().Process(m.shIter()) }
-func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf] { return numWorkers(int(m.num)) }
+func (m *Map[K, V]) defaultShards() []sh[K, V]                        { return m.init(defaultSize, MapTypeDefault) }
+func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                       { return m.sh.Call(m.defaultShards) }
+func (m *Map[K, V]) shard(key K) *sh[K, V]                            { return m.shards().Ptr(int(m.shardID(key))) }
+func (m *Map[K, V]) inc() *Map[K, V]                                  { m.clock.Add(1); return m }
+func to[T, O any](in func(T) O) fun.Transform[T, O]                   { return fun.Converter(in) }
+func (m *Map[K, V]) s2ks() fun.Transform[*sh[K, V], *fun.Iterator[K]] { return to(m.shKeys) }
+func (m *Map[K, V]) s2vs() fun.Transform[*sh[K, V], *fun.Iterator[V]] { return to(m.shValues) }
+func (m *Map[K, V]) vp() fun.Transform[*sh[K, V], *fun.Iterator[V]]   { return to(m.shValsp) }
+func (m *Map[K, V]) keyToItem() fun.Transform[K, MapItem[K, V]]       { return to(m.Fetch) }
+func (*Map[K, V]) shKeys(sh *sh[K, V]) *fun.Iterator[K]               { return sh.keys() }
+func (*Map[K, V]) shValues(sh *sh[K, V]) *fun.Iterator[V]             { return sh.values() }
+func (m *Map[K, V]) shValsp(sh *sh[K, V]) *fun.Iterator[V]            { return sh.valsp(int(m.num)) }
+func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                      { return m.shards().Ptrs() }
+func (m *Map[K, V]) shIter() *fun.Iterator[*sh[K, V]]                 { return m.shPtrs().Iterator() }
+func (m *Map[K, V]) keyItr() *fun.Iterator[*fun.Iterator[K]]          { return m.s2ks().Process(m.shIter()) }
+func (m *Map[K, V]) valItr() *fun.Iterator[*fun.Iterator[V]]          { return m.s2vs().Process(m.shIter()) }
+func (m *Map[K, V]) valItrp() *fun.Iterator[*fun.Iterator[V]]         { return m.vp().Process(m.shIter()) }
+func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf]   { return poolOpts(int(m.num)) }
 
 func (m *Map[K, V]) shardID(key K) uint64 {
-	h := hasherPool.Get()
-	defer hasherPool.Put(h)
+	h := hashPool.Get()
+	defer hashPool.Put(h)
 
 	maphash.WriteComparable(h, key)
+
 	return h.Sum64() % m.num
 }
 
@@ -140,7 +152,11 @@ func (m *Map[K, V]) Values() *fun.Iterator[V] { return fun.FlattenIterators(m.va
 // Iterator provides an iterator over all items in the map. The
 // MapItem type captures the version information and information about
 // the sharded configuration.
-func (m *Map[K, V]) Iterator() *fun.Iterator[MapItem[K, V]] { return m.keyToItem().Process(m.Keys()) }
+func (m *Map[K, V]) Iterator() *fun.Iterator[MapItem[K, V]] {
+	return m.keyToItem().Process(m.Keys()).Filter(m.filter)
+}
+
+func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }
 
 // ParallelIterator provides an iterator that resolves MapItems in
 // parallel, which may be useful in avoiding slow iteration with
@@ -149,7 +165,7 @@ func (m *Map[K, V]) Iterator() *fun.Iterator[MapItem[K, V]] { return m.keyToItem
 // possible that the iterator could return some items where
 // MapItem.Exists is false if items are deleted during iteration.
 func (m *Map[K, V]) ParallelIterator() *fun.Iterator[MapItem[K, V]] {
-	return fun.Map(m.Keys(), m.keyToItem(), m.popt())
+	return m.keyToItem().Map(m.Keys(), m.popt()).Filter(m.filter)
 }
 
 // ParallelValues returns an iterator over all values in the sharded map. Because items are processed

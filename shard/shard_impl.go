@@ -1,6 +1,7 @@
 package shard
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/tychoish/fun"
@@ -14,33 +15,29 @@ type sh[K comparable, V any] struct {
 	clock atomic.Uint64
 }
 
-func (*sh[K, V]) makeVmap(impl MapImplementation) vmap[K, V] {
+func (*sh[K, V]) makeVmap(impl MapType) vmap[K, V] {
 	switch impl {
-	case MapImplementationSyncMap:
+	case MapTypeSync:
 		return &adt.Map[K, *Versioned[V]]{}
-	case MapImplementationStdlib:
+	case MapTypeStdlib:
 		return dt.Map[K, *Versioned[V]]{}
-	case MapImplementationRWMutex:
-		return &mutexMap[K, *Versioned[V]]{}
-	case MapImplementationMutex:
-		return &mutexMap[K, *Versioned[V]]{}
+	case MapTypeRWMutex:
+		return &rmtxMap[K, *Versioned[V]]{d: dt.Map[K, *Versioned[V]]{}}
+	case MapTypeMutex:
+		return &mtxMap[K, *Versioned[V]]{d: dt.Map[K, *Versioned[V]]{}}
 	default:
-		panic(ers.ErrInvalidInput)
+		panic(ers.Join(ers.ErrInvalidInput, fmt.Errorf("map<%d> is does not exist", impl)))
 	}
-
 }
 
-func (sh *sh[K, V]) read() vmap[K, V]                     { return sh.data }
-func (sh *sh[K, V]) write() vmap[K, V]                    { sh.clock.Add(1); return sh.data }
-func (sh *sh[K, V]) load(k K) (V, bool)                   { v, ok := sh.read().Load(k); return v.Load(), ok }
-func (sh *sh[K, V]) keys() *fun.Iterator[K]               { return sh.read().Keys() }
-func (sh *sh[K, V]) vvIter() *fun.Iterator[*Versioned[V]] { return sh.read().Values() }
-func (sh *sh[K, V]) values() *fun.Iterator[V]             { return to(sh.unwrap).Process(sh.vvIter()) }
-func (*sh[K, V]) unwrap(vv *Versioned[V]) V               { return vv.Load() }
-
-func (sh *sh[K, V]) valuesp(n uint64) *fun.Iterator[V] {
-	return to(sh.unwrap).ProcessParallel(sh.vvIter(), numWorkers(int(n)))
-}
+func (sh *sh[K, V]) read() vmap[K, V]                    { return sh.data }
+func (sh *sh[K, V]) write() vmap[K, V]                   { sh.clock.Add(1); return sh.data }
+func (sh *sh[K, V]) load(k K) (V, bool)                  { v, ok := sh.read().Load(k); return v.Load(), ok }
+func (sh *sh[K, V]) keys() *fun.Iterator[K]              { return sh.read().Keys() }
+func (sh *sh[K, V]) vvals() *fun.Iterator[*Versioned[V]] { return sh.read().Values() }
+func (sh *sh[K, V]) values() *fun.Iterator[V]            { return to(sh.inner).Process(sh.vvals()) }
+func (*sh[K, V]) inner(vv *Versioned[V]) V               { return vv.Load() }
+func (sh *sh[K, V]) valsp(n int) *fun.Iterator[V]        { return to(sh.inner).Map(sh.vvals(), poolOpts(n)) }
 
 func (sh *sh[K, V]) store(k K, v V) {
 	mp := sh.write()

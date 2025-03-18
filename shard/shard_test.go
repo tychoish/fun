@@ -1,6 +1,8 @@
 package shard
 
 import (
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -42,4 +44,26 @@ func TestShardedMap(t *testing.T) {
 
 		assert.Equal(t, m.Version(), m.Clocks()[0])
 	})
+	t.Run("Maps", func(t *testing.T) {
+		m := &Map[string, string]{}
+
+		var invalid MapType = math.MaxUint8
+		assert.Substring(t, invalid.String(), "invalid")
+		assert.Substring(t, invalid.String(), fmt.Sprint(math.MaxUint8))
+
+		// because it's invalid
+		assert.Panic(t, func() { m.Setup(100, invalid) })
+
+		// because it only runs once
+		assert.NotPanic(t, func() { m.Setup(100, invalid) })
+	})
+
+	t.Run("Maps", func(t *testing.T) {
+		m := &Map[string, string]{}
+		assert.Substring(t, m.String(), "[string, string]")
+		assert.Substring(t, m.String(), "adt.Map")
+		assert.Substring(t, m.String(), "Shards(32)")
+		assert.Substring(t, m.String(), "Version(0)")
+	})
+
 }

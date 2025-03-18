@@ -41,7 +41,7 @@ type Synchronized[T any] struct {
 //
 //	mtx := &sync.Mutex{}
 //	defer adt.With(adt.Lock(mtx))
-func Lock(mtx sync.Locker) sync.Locker { mtx.Lock(); return mtx }
+func Lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
 
 // With takes a lock as an argument and then releases the lock when it
 // executes.
@@ -52,7 +52,7 @@ func Lock(mtx sync.Locker) sync.Locker { mtx.Lock(); return mtx }
 //
 //	mtx := &sync.Mutex{}
 //	defer adt.With(adt.Lock(mtx))
-func With(mtx sync.Locker) { mtx.Unlock() }
+func With(mtx *sync.Mutex) { mtx.Unlock() }
 
 // NewSynchronized constructs a new synchronized object that wraps the
 // input type.

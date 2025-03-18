@@ -1,6 +1,7 @@
 package shard_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -19,81 +20,184 @@ func sumUint64(in []uint64) (out uint64) {
 }
 
 func TestShardedMap(t *testing.T) {
-	t.Run("Smoke", func(t *testing.T) {
-		m := &shard.Map[string, int]{}
-		check.Equal(t, m.Version(), 0)
+	for _, impl := range []shard.MapType{
+		shard.MapTypeMutex,
+		shard.MapTypeRWMutex,
+		shard.MapTypeStdlib,
+		shard.MapTypeSync,
+	} {
+		t.Run(fmt.Sprintf("MapImpl_%s", impl), func(t *testing.T) {
+			t.Run("Smoke", func(t *testing.T) {
+				m := &shard.Map[string, int]{}
+				m.Setup(32, impl)
 
-		m.Store("a", 42)
-		check.Equal(t, m.Version(), 1)
-		check.Equal(t, ft.MustBeOk(m.Load("a")), 42)
-		_, ok := m.Load("b")
-		check.True(t, !ok)
+				check.Equal(t, m.Version(), 0)
 
-		m.Store("a", 84)
-		check.Equal(t, m.Version(), 2)
+				m.Store("a", 42)
+				check.Equal(t, m.Version(), 1)
+				check.Equal(t, ft.MustBeOk(m.Load("a")), 42)
+				_, ok := m.Load("b")
+				check.True(t, !ok)
 
-		m.Store("b", 42)
-		check.Equal(t, m.Version(), 3)
-		check.Equal(t, ft.MustBeOk(m.Load("b")), 42)
-		assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
-	})
-	t.Run("Iterator", func(t *testing.T) {
-		ctx := testt.Context(t)
-		m := &shard.Map[string, int]{}
-		m.Store("one", 1)
-		assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
-		m.Store("two", 2)
-		assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
-		m.Store("three", 3)
-		assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
+				m.Store("a", 84)
+				check.Equal(t, m.Version(), 2)
 
-		keys := map[string]struct{}{"one": {}, "two": {}, "three": {}}
+				m.Store("b", 42)
+				check.Equal(t, m.Version(), 3)
+				check.Equal(t, ft.MustBeOk(m.Load("b")), 42)
+				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
+			})
+			t.Run("Iterator", func(t *testing.T) {
+				ctx := testt.Context(t)
+				m := &shard.Map[string, int]{}
+				m.Setup(32, impl)
 
-		check := func(t *testing.T, item shard.MapItem[string, int]) {
-			t.Helper()
+				m.Store("one", 1)
+				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
+				m.Store("two", 2)
+				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
+				m.Store("three", 3)
+				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
 
-			assert.True(t, item.Exists)
-			_, ok := keys[item.Key]
-			assert.True(t, ok)
-			assert.Equal(t, 3, item.GlobalVersion)
-			assert.Equal(t, 32, item.NumShards)
-		}
+				keys := map[string]struct{}{"one": {}, "two": {}, "three": {}}
 
-		t.Run("Standard", func(t *testing.T) {
-			ct := 0
-			for item := range m.Iterator().Seq(ctx) {
-				ct++
-				check(t, item)
-			}
-			assert.Equal(t, ct, 3)
+				check := func(t *testing.T, item shard.MapItem[string, int]) {
+					t.Helper()
+
+					assert.True(t, item.Exists)
+					_, ok := keys[item.Key]
+					assert.True(t, ok)
+					assert.Equal(t, 3, item.GlobalVersion)
+					assert.Equal(t, 32, item.NumShards)
+				}
+
+				t.Run("Standard", func(t *testing.T) {
+					ct := 0
+					for item := range m.Iterator().Seq(ctx) {
+						ct++
+						check(t, item)
+					}
+					assert.Equal(t, ct, 3)
+				})
+				t.Run("Parallel", func(t *testing.T) {
+					ct := 0
+					for item := range m.ParallelIterator().Seq(ctx) {
+						ct++
+						check(t, item)
+					}
+					assert.Equal(t, ct, 3)
+				})
+
+			})
+			t.Run("Fetch", func(t *testing.T) {
+				var item shard.MapItem[string, int]
+
+				m := &shard.Map[string, int]{}
+				m.Setup(32, impl)
+
+				m.Set(dt.MakePair("one", 37))
+				item = m.Fetch("one")
+				assert.True(t, item.Exists)
+				assert.Equal(t, item.Value, 37)
+				assert.Equal(t, item.Key, "one")
+				assert.Equal(t, item.NumShards, 32)
+			})
+			t.Run("SetupCustomShards", func(t *testing.T) {
+				var item shard.MapItem[string, int]
+
+				m := &shard.Map[string, int]{}
+				m.Setup(42, impl)
+				assert.Equal(t, len(m.Clocks()), 42+1)
+
+				t.Run("BeforePopulated", func(t *testing.T) {
+					item = m.Fetch("one")
+					assert.True(t, ft.Not(m.Check("one")))
+					assert.True(t, ft.Not(item.Exists))
+					assert.Equal(t, item.NumShards, 42)
+					assert.Equal(t, 42+1, len(m.Clocks()))
+				})
+				t.Run("AfterPopulated", func(t *testing.T) {
+					m.Set(dt.MakePair("one", 37))
+					assert.True(t, m.Check("one"))
+					item = m.Fetch("one")
+					assert.True(t, item.Exists)
+					assert.Equal(t, item.Value, 37)
+					assert.Equal(t, item.Key, "one")
+					assert.Equal(t, item.NumShards, 42)
+				})
+				t.Run("PostDelete", func(t *testing.T) {
+					assert.True(t, m.Check("one"))
+					m.Delete("one")
+					assert.True(t, ft.Not(m.Check("one")))
+
+					item = m.Fetch("one")
+					assert.True(t, ft.Not(item.Exists))
+					assert.Equal(t, item.NumShards, 42)
+				})
+			})
+			t.Run("Keys", func(t *testing.T) {
+				ctx := testt.Context(t)
+				m := &shard.Map[string, int]{}
+				m.Setup(32, impl)
+
+				m.Store("one", 1)
+				m.Store("two", 2)
+				m.Store("three", 3)
+				keys := map[string]struct{}{"one": {}, "two": {}, "three": {}}
+				t.Run("Standard", func(t *testing.T) {
+					ct := 0
+					for item := range m.Keys().Seq(ctx) {
+						ct++
+						_, ok := keys[item]
+						assert.True(t, ok)
+					}
+					assert.Equal(t, ct, 3)
+				})
+			})
+			t.Run("Values", func(t *testing.T) {
+				m := &shard.Map[string, int]{}
+				m.Setup(32, impl)
+				sum := 0
+				for idx := range 100 * 32 {
+					sum += idx
+					m.Store(fmt.Sprint(idx), idx)
+				}
+
+				obsum := 0
+				ct := 0
+				ctx := testt.Context(t)
+				for val := range m.Values().Seq(ctx) {
+					obsum += val
+					ct++
+				}
+				assert.Equal(t, obsum, sum)
+				assert.Equal(t, ct, 100*32)
+			})
+			t.Run("ParallelValues", func(t *testing.T) {
+				m := &shard.Map[string, int]{}
+				m.Setup(32, impl)
+				sum := 0
+				for idx := range 100 * 32 {
+					sum += idx
+					m.Store(fmt.Sprint(idx), idx)
+				}
+
+				obsum := 0
+				ct := 0
+				ctx := testt.Context(t)
+				for val := range m.ParallelValues().Seq(ctx) {
+					obsum += val
+					ct++
+				}
+				assert.Equal(t, obsum, sum)
+				assert.Equal(t, ct, 100*32)
+			})
 		})
-		t.Run("Parallel", func(t *testing.T) {
-			ct := 0
-			for item := range m.ParallelIterator().Seq(ctx) {
-				ct++
-				check(t, item)
-			}
-			assert.Equal(t, ct, 3)
-		})
-
-	})
-	t.Run("Fetch", func(t *testing.T) {
-		var item shard.MapItem[string, int]
-
-		m := &shard.Map[string, int]{}
-
-		m.Set(dt.MakePair("one", 37))
-		item = m.Fetch("one")
-		assert.True(t, item.Exists)
-		assert.Equal(t, item.Value, 37)
-		assert.Equal(t, item.Key, "one")
-		assert.Equal(t, item.NumShards, 32)
-	})
+	}
 	t.Run("DefaultSetup", func(t *testing.T) {
 		var item shard.MapItem[string, int]
 
 		m := &shard.Map[string, int]{}
-
 		t.Run("BeforePopulated", func(t *testing.T) {
 			item = m.Fetch("one")
 			assert.True(t, ft.Not(m.Check("one")))
@@ -116,57 +220,6 @@ func TestShardedMap(t *testing.T) {
 			item = m.Fetch("one")
 			assert.True(t, ft.Not(item.Exists))
 			assert.Equal(t, item.NumShards, 32)
-		})
-	})
-	t.Run("SetupCustomShards", func(t *testing.T) {
-		var item shard.MapItem[string, int]
-
-		m := &shard.Map[string, int]{}
-		m.SetupShards(42)
-		assert.Equal(t, len(m.Clocks()), 42+1)
-
-		t.Run("BeforePopulated", func(t *testing.T) {
-			item = m.Fetch("one")
-			assert.True(t, ft.Not(m.Check("one")))
-			assert.True(t, ft.Not(item.Exists))
-			assert.Equal(t, item.NumShards, 42)
-			assert.Equal(t, 42+1, len(m.Clocks()))
-		})
-		t.Run("AfterPopulated", func(t *testing.T) {
-			m.Set(dt.MakePair("one", 37))
-			assert.True(t, m.Check("one"))
-			item = m.Fetch("one")
-			assert.True(t, item.Exists)
-			assert.Equal(t, item.Value, 37)
-			assert.Equal(t, item.Key, "one")
-			assert.Equal(t, item.NumShards, 42)
-		})
-		t.Run("PostDelete", func(t *testing.T) {
-			assert.True(t, m.Check("one"))
-			m.Delete("one")
-			assert.True(t, ft.Not(m.Check("one")))
-
-			item = m.Fetch("one")
-			assert.True(t, ft.Not(item.Exists))
-			assert.Equal(t, item.NumShards, 42)
-		})
-	})
-
-	t.Run("Keys", func(t *testing.T) {
-		ctx := testt.Context(t)
-		m := &shard.Map[string, int]{}
-		m.Store("one", 1)
-		m.Store("two", 2)
-		m.Store("three", 3)
-		keys := map[string]struct{}{"one": {}, "two": {}, "three": {}}
-		t.Run("Standard", func(t *testing.T) {
-			ct := 0
-			for item := range m.Keys().Seq(ctx) {
-				ct++
-				_, ok := keys[item]
-				assert.True(t, ok)
-			}
-			assert.Equal(t, ct, 3)
 		})
 	})
 	t.Run("VersionedObject", func(t *testing.T) {

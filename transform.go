@@ -26,7 +26,7 @@ import (
 // always collected but may abort the operation if ContinueOnPanic is
 // not set.
 func Map[T any, O any](it *Iterator[T], mpf Transform[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Iterator[O] {
-	return mpf.ProcessParallel(it, optp...)
+	return mpf.Map(it, optp...)
 }
 
 // Transform is a function type that converts T objects int objects of
@@ -66,6 +66,15 @@ func ConverterErr[T any, O any](op func(T) (O, error)) Transform[T, O] {
 // performed serially and lazily and respects ErrIteratorSkip.
 func (mpf Transform[T, O]) Process(iter *Iterator[T]) *Iterator[O] {
 	return mpf.Producer(iter.ReadOne).Iterator()
+}
+
+// Map is an alias for ProcessParallel provided for
+// ergonomics. `fun.Map` exposes the same operation.
+func (mpf Transform[T, O]) Map(
+	iter *Iterator[T],
+	optp ...OptionProvider[*WorkerGroupConf],
+) *Iterator[O] {
+	return mpf.ProcessParallel(iter, optp...)
 }
 
 // ProcessParallel runs the input iterator through the transform
