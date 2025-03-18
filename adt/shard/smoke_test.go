@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tychoish/fun/adt/shard"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/shard"
 	"github.com/tychoish/fun/testt"
 )
 
