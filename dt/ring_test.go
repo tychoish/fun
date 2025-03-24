@@ -7,7 +7,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestRing(t *testing.T) {
@@ -98,7 +97,6 @@ func TestRing(t *testing.T) {
 				assert.Equal(t, ring.Total(), 25)
 
 				fifo := ft.Must(ring.FIFO().Slice(t.Context()))
-				testt.Log(t, fifo)
 				expected := []int{0, 1, 2, 3, 4}
 				for idx := range fifo {
 					check.Equal(t, fifo[idx], expected[idx])
@@ -121,7 +119,6 @@ func TestRing(t *testing.T) {
 
 				lifo := ft.Must(ring.LIFO().Slice(t.Context()))
 				expected := []int{4, 3, 2, 1, 0}
-				testt.Log(t, lifo)
 				for idx := range lifo {
 					check.Equal(t, lifo[idx], expected[idx])
 				}
@@ -135,8 +132,6 @@ func TestRing(t *testing.T) {
 			ring.Push(idx)
 		}
 		assert.Equal(t, ring.Len(), 5)
-
-		testt.Log(t, ft.Must(ring.FIFO().Slice(t.Context())))
 
 		assert.Equal(t, ring.Total(), 5)
 		for idx := range 5 {
