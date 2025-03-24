@@ -1,9 +1,9 @@
-# More info on config here: https://golangci-lint.run/usage/configuration/
 run:
-  deadline: 5m
+  timeout: 5m
   issues-exit-code: 1
   allow-parallel-runners: true
   tests: true
+  go: "1.24"
 
 output:
   sort-results: false
@@ -15,21 +15,8 @@ issues:
   max-issues-per-linter: 0
   fix: true
 
-linters-settings:
-  govet:
-    shadow: true
-  gci:
-    custom-order: true
-    skip-generated: true
-    sections:
-      - standard
-      - default
-      - Prefix(github.com/tychoish)
-  stylecheck:
-    checks: ["all", "-ST1023", "-ST1003", "-ST4023"]
-
 linters:
-  disable-all: true
+  default: none
   enable:
     - asciicheck
     - bodyclose
@@ -39,9 +26,6 @@ linters:
     - errchkjson
     - exhaustive
     - copyloopvar
-    - gci
-    - goimports
-    - gosimple
     - govet
     - ineffassign
     - misspell
@@ -49,6 +33,17 @@ linters:
     - nolintlint
     - revive
     - staticcheck
-    - stylecheck
     - unconvert
     - unused
+
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      custom-order: true
+      skip-generated: true
+      sections:
+       - standard
+       - default
+       - Prefix(github.com/tychoish)
