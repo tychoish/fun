@@ -12,7 +12,7 @@ func TestUnwind(t *testing.T) {
 		err := errors.New("root")
 		wrapped := fmt.Errorf("wrap: %w", err)
 		errs := Unwind(wrapped)
-		if !(len(errs) == 2) {
+		if len(errs) != 2 {
 			t.Fatal("assertion failure")
 		}
 		if errs[1].Error() != err.Error() {

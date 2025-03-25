@@ -163,10 +163,10 @@ func TestMap(t *testing.T) {
 		seen := 0
 		for iter.Next(ctx) {
 			item := iter.Value()
-			switch {
-			case item.Key == "hi":
+			switch item.Key {
+			case "hi":
 				check.Equal(t, item.Value, "there")
-			case item.Key == "how":
+			case "how":
 				check.Equal(t, item.Value, "are you doing")
 			default:
 				t.Errorf("unexpected value: %s", item)

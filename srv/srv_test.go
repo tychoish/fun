@@ -125,7 +125,7 @@ func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Wo
 			return nil
 		}))
 	}
-	queue.Close()
+	assert.NotError(t, queue.Close())
 	return queue
 }
 
@@ -141,6 +141,6 @@ func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queu
 			return fmt.Errorf("%d.%q", idx, t.Name())
 		}))
 	}
-	queue.Close()
+	assert.NotError(t, queue.Close())
 	return queue
 }

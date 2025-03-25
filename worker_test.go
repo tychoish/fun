@@ -124,8 +124,7 @@ func TestWorker(t *testing.T) {
 			t.Run("Must", func(t *testing.T) {
 				expected := errors.New("merlin")
 				err := ers.WithRecoverCall(func() {
-					var wf Operation //nolint:gosimple
-					wf = Worker(func(context.Context) error {
+					wf := Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
 					t.Log(wf)
@@ -137,8 +136,7 @@ func TestWorker(t *testing.T) {
 				defer cancel()
 
 				err = ers.WithRecoverCall(func() {
-					var wf Operation //nolint:gosimple
-					wf = Worker(func(context.Context) error {
+					wf := Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
 					wf(ctx)

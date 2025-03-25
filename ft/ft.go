@@ -219,7 +219,7 @@ func Flip[A any, B any](first A, second B) (B, A) { return second, first }
 //
 //	_ = operation()
 //	ft.Ignore(operation())
-func Ignore[T any](_ T) { return } //nolint:gosimple
+func Ignore[T any](_ T) { return } //nolint:staticcheck
 
 // IgnoreFirst takes two arguments and returns only the second, for
 // use in wrapping functions that return two values.

@@ -125,7 +125,7 @@ func TestQueueClose(t *testing.T) {
 	q.mustAdd("alpha")
 	q.mustAdd("bravo")
 	q.mustAdd("charlie")
-	q.Close()
+	assert.NotError(t, q.Close())
 
 	// After closing the queue, subsequent writes should fail.
 	if err := q.Add("foxtrot"); err == nil {
@@ -202,7 +202,7 @@ func TestQueueWait(t *testing.T) {
 			}
 		}()
 
-		q.Close()
+		assert.NotError(t, q.Close())
 		<-done
 	})
 }
@@ -432,7 +432,7 @@ func TestQueueIterator(t *testing.T) {
 			t.Fatal("should iterate once")
 		}
 
-		queue.Close()
+		assert.NotError(t, queue.Close())
 		for i := 0; i < 2; i++ {
 			if iter.Next(ctx) {
 				t.Log("should not iterate")

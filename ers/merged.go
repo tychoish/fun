@@ -211,10 +211,7 @@ func (e *Stack) Unwind() []error {
 	out := make([]error, 0, e.count)
 	iter := &Stack{next: e}
 
-	for {
-		if iter.next == nil || iter.next.err == nil {
-			break
-		}
+	for iter.next != nil && iter.next.err != nil {
 		iter = iter.next
 		out = append(out, iter.err)
 	}

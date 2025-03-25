@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -202,15 +203,15 @@ func TestContext(t *testing.T) {
 		if orca := GetOrchestrator(ctx); orca == nil {
 			t.Error("should have orchestrator")
 		} else {
-			var _ *Orchestrator = orca
+			assert.True(t, ft.IsType[*Orchestrator](orca))
 		}
 		if bctx := GetBaseContext(ctx); bctx == nil {
 			t.Error("should have base context")
 		} else {
-			var _ context.Context = bctx
+			assert.True(t, ft.IsType[*context.Context](bctx))
 		}
 		if shutdown := GetShutdownSignal(ctx); shutdown != nil {
-			var _ context.CancelFunc = shutdown
+			assert.True(t, ft.IsType[*context.CancelFunc](shutdown))
 		}
 	})
 	t.Run("ContextsAreAStack", func(t *testing.T) {
