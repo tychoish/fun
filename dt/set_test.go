@@ -521,7 +521,7 @@ func BenchmarkSet(b *testing.B) {
 				set.Check(iter.Value())
 				set.Check(iter.Value())
 			}
-			iter.Close()
+			_ = iter.Close()
 		}
 		b.Run("Map", func(b *testing.B) {
 			set := &Set[int]{}

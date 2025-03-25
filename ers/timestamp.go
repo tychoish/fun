@@ -53,13 +53,13 @@ func (e *timestamped) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
 		if s.Flag('+') {
-			fmt.Fprintf(s, "[%s] %v", e.ts.Format(time.RFC3339), e.err)
+			_, _ = fmt.Fprintf(s, "[%s] %v", e.ts.Format(time.RFC3339), e.err)
 			return
 		}
 		fallthrough
 	case 's':
 		_, _ = fmt.Fprint(s, e.Error())
 	case 'q':
-		fmt.Fprintf(s, "%q", e.Error())
+		_, _ = fmt.Fprintf(s, "%q", e.Error())
 	}
 }

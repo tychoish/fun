@@ -73,7 +73,7 @@ func TestDistributor(t *testing.T) {
 			iter := dist.Iterator()
 			go func() {
 				time.Sleep(100 * time.Millisecond)
-				queue.Close()
+				assert.NotError(t, queue.Close())
 			}()
 			if err := iter.Observe(func(in string) { set.Add(in); seen++ }).Run(ctx); err != nil {
 				t.Fatal(seen, err)
@@ -269,7 +269,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 				out := queue.Distributor()
 				send := out.Processor()
 				go func() {
-					defer queue.Close()
+					defer func() { _ = queue.Close() }()
 					for input.Next(ctx) {
 						err := send(ctx, input.Value())
 						if err != nil {

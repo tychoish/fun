@@ -525,7 +525,7 @@ type pIterator struct {
 }
 
 func (p *pIterator) next() bool {
-	if !(p.countToIdx < p.h.totalCount) {
+	if p.countToIdx >= p.h.totalCount {
 		if p.seenLastValue {
 			return false
 		}

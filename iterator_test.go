@@ -770,21 +770,21 @@ func TestJSON(t *testing.T) {
 
 		ch := iter.Channel(ctx)
 		count := 0
+	OUTER:
 		for {
 			select {
 			case <-ctx.Done():
 				t.Error("context should not have expired")
-				break
+				break OUTER
 			case it, ok := <-ch:
 				if !ok {
-					break
+					break OUTER
 				}
 
 				count++
 				check.NotZero(t, it)
-				continue
+				continue OUTER
 			}
-			break
 		}
 		assert.Equal(t, 9, count)
 		assert.NotError(t, ctx.Err())

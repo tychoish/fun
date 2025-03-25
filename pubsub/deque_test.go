@@ -680,10 +680,12 @@ func TestDeque(t *testing.T) {
 			t.Fatal(dq.Len())
 		}
 
-		dq.Close()
+		if err := dq.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		if dq.Len() != 2 {
-			t.Fatal(dq.Len())
+			t.Fatal(2, "!=", dq.Len())
 		}
 
 		t.Run("Push", func(t *testing.T) {

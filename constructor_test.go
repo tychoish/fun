@@ -206,10 +206,10 @@ func TestHandlers(t *testing.T) {
 	t.Run("Lines", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		last := sha256.Sum256([]byte(fmt.Sprint(time.Now().UTC().UnixMilli())))
-		buf.WriteString(fmt.Sprintf("%x", last))
+		_, _ = fmt.Fprintf(buf, "%x", last)
 		for i := 1; i < 128; i++ {
 			next := sha256.Sum256(last[:])
-			buf.WriteString(fmt.Sprintf("\n%x", next))
+			_, _ = fmt.Fprintf(buf, "\n%x", next)
 		}
 
 		count := 0
