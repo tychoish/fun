@@ -208,10 +208,10 @@ func TestContext(t *testing.T) {
 		if bctx := GetBaseContext(ctx); bctx == nil {
 			t.Error("should have base context")
 		} else {
-			assert.True(t, ft.IsType[*context.Context](bctx))
+			assert.True(t, ft.IsType[context.Context](bctx))
 		}
 		if shutdown := GetShutdownSignal(ctx); shutdown != nil {
-			assert.True(t, ft.IsType[*context.CancelFunc](shutdown))
+			assert.True(t, ft.IsType[context.CancelFunc](shutdown))
 		}
 	})
 	t.Run("ContextsAreAStack", func(t *testing.T) {
