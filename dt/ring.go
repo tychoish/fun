@@ -39,7 +39,9 @@ func (r *Ring[T]) innerInit() {
 	r.buf.nils = make([]*T, r.size)
 }
 
-func (r *Ring[T]) Setup(size int) { r.size = size }
+// Setup sets the size of the ring buffer and initializes the buffer,
+// if the buffer hasn't been used. Using the buffer initializes it with a size of 1024.
+func (r *Ring[T]) Setup(size int) { r.size = ft.IfValue(r.size == 0, size, r.size); r.init() }
 func (r *Ring[T]) Cap() int       { return r.size }
 func (r *Ring[T]) Len() int       { return r.count }
 func (r *Ring[T]) Total() uint64  { return r.total }

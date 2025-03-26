@@ -65,6 +65,8 @@ func TestRing(t *testing.T) {
 		assert.Zero(t, ring.Tail())
 		assert.Equal(t, ring.Cap(), 2048)
 		assert.Equal(t, 0, ring.Len())
+		ring.Setup(2000)
+		assert.Equal(t, 2038, r.size)
 	})
 	t.Run("Overload", func(t *testing.T) {
 		t.Run("Limit", func(t *testing.T) {
