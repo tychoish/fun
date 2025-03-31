@@ -2,6 +2,7 @@ package dt
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -66,7 +67,7 @@ func TestRing(t *testing.T) {
 		assert.Equal(t, ring.Cap(), 2048)
 		assert.Equal(t, 0, ring.Len())
 		ring.Setup(2000)
-		assert.Equal(t, 2038, ring.size)
+		assert.Equal(t, 2048, ring.size)
 	})
 	t.Run("Overload", func(t *testing.T) {
 		t.Run("Limit", func(t *testing.T) {
@@ -127,6 +128,26 @@ func TestRing(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Size", func(t *testing.T) {
+		t.Run("Ring", func(t *testing.T) {
+			ring := &Ring[int]{}
+			// this panics because it fails validation during the
+			// lazy init.
+			assert.Panic(t, func() { ring.Setup(math.MaxInt64) })
+			assert.Panic(t, func() { ring.Setup(maxRingSize + 2) })
+
+		})
+		t.Run("Safety", func(t *testing.T) {
+			// the max ring-size is big enough to OOM the
+			// test in many cases.
+
+			ring := &Ring[struct{}]{}
+			assert.NotPanic(t, func() { ring.Push(struct{}{}) })
+			assert.NotPanic(t, func() { ring.after(math.MaxInt64) })
+			assert.NotPanic(t, func() { ring.before(math.MaxInt64) })
+		})
+	})
+
 	t.Run("Pop", func(t *testing.T) {
 		ring := &Ring[int]{}
 
@@ -159,7 +180,29 @@ func TestRing(t *testing.T) {
 		check.Equal(t, ring.Head(), 0)
 		check.Equal(t, ring.Tail(), 4)
 	})
+	t.Run("PopIterator", func(t *testing.T) {
+		ring := &Ring[int]{}
 
+		for idx := range defaultRingSize * 2 {
+			ring.Push(idx)
+			check.Equal(t, ring.Tail(), idx)
+		}
+		assert.Equal(t, ring.Cap(), defaultRingSize)
+		assert.Equal(t, ring.Len(), defaultRingSize)
+		assert.Equal(t, int(ring.Total()), 2*defaultRingSize)
+
+		count := 0
+		for value := range ring.PopFIFO().Seq(t.Context()) {
+			count++
+			assert.NotNil(t, value)
+			assert.True(t, *value >= count)
+		}
+
+		assert.Equal(t, count, defaultRingSize)
+		assert.Equal(t, ring.Cap(), defaultRingSize)
+		assert.Equal(t, ring.Len(), 0)
+		assert.Equal(t, int(ring.Total()), 2*defaultRingSize)
+	})
 }
 
 func sum(in []int) int {
