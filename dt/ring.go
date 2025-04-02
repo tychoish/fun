@@ -85,7 +85,7 @@ func (r *Ring[T]) Push(val T) {
 	r.init()
 
 	r.total++
-	if r.count < r.size && r.buf.nils[r.pos] == nil {
+	if r.count < r.size {
 		r.count++
 	}
 
