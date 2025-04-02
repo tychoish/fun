@@ -34,6 +34,10 @@ type Ring[T any] struct {
 	}
 }
 
+// Setup sets the size of the ring buffer and initializes the buffer,
+// if the buffer hasn't been used. Using the buffer initializes it with a size of 1024.
+func (r *Ring[T]) Setup(size int) { r.size = ft.IfValue(r.size == 0, size, r.size); r.init() }
+
 func (r *Ring[T]) init() { ft.WhenCall(r.buf.ring == nil, r.innerInit) }
 func (r *Ring[T]) innerInit() {
 	r.size = ft.Default(r.size, defaultRingSize)
@@ -45,9 +49,11 @@ func (r *Ring[T]) innerInit() {
 	r.buf.nils = make([]*T, r.size)
 }
 
-// Setup sets the size of the ring buffer and initializes the buffer,
-// if the buffer hasn't been used. Using the buffer initializes it with a size of 1024.
-func (r *Ring[T]) Setup(size int) { r.size = ft.IfValue(r.size == 0, size, r.size); r.init() }
+func (*Ring[T]) zero() (out T)            { return out }
+func (r *Ring[T]) offset(idx, by int) int { return intish.AbsMax(r.size, r.size*idx) + (idx + by) }
+func (r *Ring[T]) oldest() int            { return ft.IfValue(int(r.total) < r.size, 0, r.pos) }
+func (r *Ring[T]) after(idx int) int      { return r.offset(idx, 1) % r.size }
+func (r *Ring[T]) before(idx int) int     { return r.offset(idx, -1) % r.size }
 
 // Returns the capacity of the ring buffer. This is either the size
 // passed to Setup() or the default 1024.
@@ -68,36 +74,6 @@ func (r *Ring[T]) Head() T { r.init(); return r.buf.ring[r.oldest()] }
 
 // Tail returns the newest (or most recently added) element in the buffer.
 func (r *Ring[T]) Tail() T { r.init(); return r.buf.ring[r.before(r.pos)] }
-
-// FIFO returns an iterator that begins at the first (oldest; Head) element
-// and iterators forward to the current or most recently added element
-// in the buffer.
-func (r *Ring[T]) FIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.oldest(), r.after) }
-
-// LIFO returns the element that was most recently added to buffer and
-// iterates backwords to the oldest element in the buffer.
-func (r *Ring[T]) LIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
-
-// PopFIFO returns a FIFO iterator that consumes elements in the
-// buffer, starting with the oldest element in the buffer and moving
-// through all elements. When the buffer is
-func (r *Ring[T]) PopFIFO() *fun.Iterator[*T] {
-	r.init()
-
-	return fun.MakeProducer(func() (*T, error) {
-		v := r.Pop()
-		if v == nil {
-			return nil, io.EOF
-		}
-		return v, nil
-	}).Iterator()
-}
-
-func (*Ring[T]) zero() (out T)            { return out }
-func (r *Ring[T]) offset(idx, by int) int { return intish.AbsMax(r.size, r.size*idx) + (idx + by) }
-func (r *Ring[T]) oldest() int            { return ft.IfValue(int(r.total) < r.size, 0, r.pos) }
-func (r *Ring[T]) after(idx int) int      { return r.offset(idx, 1) % r.size }
-func (r *Ring[T]) before(idx int) int     { return r.offset(idx, -1) % r.size }
 
 // Push adds an element to the buffer in the next position,
 // potentially overwriting the oldest element in the buffer once the
@@ -141,6 +117,30 @@ func (r *Ring[T]) Pop() *T {
 	return nil
 }
 
+// FIFO returns an iterator that begins at the first (oldest; Head) element
+// and iterators forward to the current or most recently added element
+// in the buffer.
+func (r *Ring[T]) FIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.oldest(), r.after) }
+
+// LIFO returns the element that was most recently added to buffer and
+// iterates backwords to the oldest element in the buffer.
+func (r *Ring[T]) LIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
+
+// PopFIFO returns a FIFO iterator that consumes elements in the
+// buffer, starting with the oldest element in the buffer and moving
+// through all elements. When the buffer is
+func (r *Ring[T]) PopFIFO() *fun.Iterator[*T] {
+	r.init()
+
+	return fun.MakeProducer(func() (*T, error) {
+		v := r.Pop()
+		if v == nil {
+			return nil, io.EOF
+		}
+		return v, nil
+	}).Iterator()
+}
+
 func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 	var count int
 	var current int
@@ -149,7 +149,7 @@ func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 
 	return fun.CheckProducer(func() (T, bool) {
 		for {
-			if count >= len(r.buf.ring) || (next == from && count > 0) {
+			if count >= r.size || (next == from && count > 0) {
 				return r.zero(), false
 			}
 
