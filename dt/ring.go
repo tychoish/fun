@@ -138,11 +138,7 @@ func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 	next := from
 
 	return fun.CheckProducer(func() (T, bool) {
-		for {
-			if r.count == 0 || (next == from && count > 0) {
-				return r.zero(), false
-			}
-
+		for r.count > 0 && (count == 0 || next != from) {
 			current = next
 			next = advance(current)
 
@@ -152,5 +148,7 @@ func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 				return r.buf.ring[current], true
 			}
 		}
+
+		return r.zero(), false
 	}).Iterator()
 }
