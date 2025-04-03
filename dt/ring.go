@@ -1,8 +1,6 @@
 package dt
 
 import (
-	"io"
-
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
@@ -50,8 +48,9 @@ func (r *Ring[T]) innerInit() {
 }
 
 func (*Ring[T]) zero() (out T)            { return out }
-func (r *Ring[T]) offset(idx, by int) int { return intish.AbsMax(r.size, r.size*idx) + (idx + by) }
-func (r *Ring[T]) oldest() int            { return ft.IfValue(int(r.total) < r.size, 0, r.pos) }
+func (r *Ring[T]) hasWrapped() bool       { return int(r.total) > r.size }
+func (r *Ring[T]) offset(idx, by int) int { return (r.size * max(1, intish.Abs(idx))) + (idx + by) }
+func (r *Ring[T]) oldest() int            { return ft.IfValue(r.hasWrapped(), r.pos, 0) }
 func (r *Ring[T]) after(idx int) int      { return r.offset(idx, 1) % r.size }
 func (r *Ring[T]) before(idx int) int     { return r.offset(idx, -1) % r.size }
 
@@ -102,6 +101,7 @@ func (r *Ring[T]) Push(val T) {
 // is independent of the value stored in the ring.
 func (r *Ring[T]) Pop() *T {
 	r.init()
+
 	for idx := r.oldest(); r.count > 0; idx = r.after(idx) {
 		if r.buf.nils[idx] == nil {
 			continue
@@ -129,17 +129,7 @@ func (r *Ring[T]) LIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.before(
 // PopFIFO returns a FIFO iterator that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
 // through all elements. When the buffer is
-func (r *Ring[T]) PopFIFO() *fun.Iterator[*T] {
-	r.init()
-
-	return fun.MakeProducer(func() (*T, error) {
-		v := r.Pop()
-		if v == nil {
-			return nil, io.EOF
-		}
-		return v, nil
-	}).Iterator()
-}
+func (r *Ring[T]) PopFIFO() *fun.Iterator[T] { return fun.PtrProducer(r.Pop).Iterator() }
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 	var count int
@@ -149,7 +139,7 @@ func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 
 	return fun.CheckProducer(func() (T, bool) {
 		for {
-			if count >= r.size || (next == from && count > 0) {
+			if r.count == 0 || (next == from && count > 0) {
 				return r.zero(), false
 			}
 

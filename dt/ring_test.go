@@ -194,8 +194,7 @@ func TestRing(t *testing.T) {
 		count := 0
 		for value := range ring.PopFIFO().Seq(t.Context()) {
 			count++
-			assert.NotNil(t, value)
-			assert.True(t, *value >= count)
+			assert.True(t, value >= count)
 		}
 
 		assert.Equal(t, count, defaultRingSize)
