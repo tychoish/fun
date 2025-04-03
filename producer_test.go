@@ -112,6 +112,55 @@ func TestProducer(t *testing.T) {
 				assert.Equal(t, v, 42)
 			}
 		})
+		t.Run("Ptr", func(t *testing.T) {
+			t.Run("Empty", func(t *testing.T) {
+				pf := PtrProducer(func() *int { return nil })
+				ctx := t.Context()
+
+				for i := 0; i < 1024; i++ {
+					v, err := pf(ctx)
+					assert.ErrorIs(t, err, io.EOF)
+					assert.Zero(t, v)
+				}
+			})
+			t.Run("Always", func(t *testing.T) {
+				pf := PtrProducer(func() *int { return ft.Ptr(42) })
+				ctx := t.Context()
+
+				for i := 0; i < 1024; i++ {
+					v, err := pf(ctx)
+					assert.NotError(t, err)
+					assert.Equal(t, v, 42)
+				}
+			})
+			t.Run("Few", func(t *testing.T) {
+				count := 0
+				pf := PtrProducer(func() *int {
+					if count < 512 {
+						count++
+						return ft.Ptr(42)
+					}
+					return nil
+				})
+				ctx := t.Context()
+
+				fortyTwos := 0
+				errs := 0
+				for i := 0; i < 1024; i++ {
+					v, err := pf(ctx)
+					if err != nil {
+						errs++
+						assert.Zero(t, v)
+
+						continue
+					}
+					fortyTwos++
+					assert.Equal(t, v, 42)
+				}
+				assert.Equal(t, fortyTwos, 512)
+				assert.Equal(t, errs, 512)
+			})
+		})
 		t.Run("Static", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

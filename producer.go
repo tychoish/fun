@@ -61,6 +61,19 @@ func CheckProducer[T any](op func() (T, bool)) Producer[T] {
 	}
 }
 
+// PtrProducer uses a function that returns a pointer to a value and
+// converts that into a producer that de-references and returns
+// non-nil values of the pointer, and returns EOF for nil values of
+// the pointer.
+func PtrProducer[T any](fn func() *T) Producer[T] {
+	return CheckProducer(func() (out T, _ bool) {
+		if val := fn(); val != nil {
+			return *val, true
+		}
+		return out, false
+	})
+}
+
 // Run executes the producer and returns the result
 //
 // Deprecated: Use the Resolve() helper.
