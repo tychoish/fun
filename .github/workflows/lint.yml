@@ -1,19 +1,20 @@
 name: go lint
 on:
   pull_request:
+    paths:
+      - "**.go"
     branches:
       - main
       - next
-      - v0.10.x
   push:
+    paths:
+      - "**.go"
     branches:
       - main
       - next
-      - v0.10.x
 
 jobs:
   golangci:
-    name: golangci-lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,11 +29,11 @@ jobs:
             go.mod
             go.sum
       - uses: golangci/golangci-lint-action@v7
+        if: env.GIT_DIFF
         with:
           # Required: the version of golangci-lint is required and
           # must be specified with patch version: we always use the
           # latest patch version.
           version: v2.0.0
-          args: --timeout 5m
+          args: --timeout 8m
           github-token: ${{ secrets.github_token }}
-        if: env.GIT_DIFF

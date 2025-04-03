@@ -6,26 +6,22 @@ on:
     branches:
       - main
       - next
-      - v0.10.x
   push:
     paths:
       - "**.go"
     branches:
       - main
       - next
-      - v0.10.x
 
 jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
           go-version: "1.24"
-      - uses: actions/checkout@v3
       - uses: technote-space/get-diff-action@v6
         with:
           PATTERNS: |
