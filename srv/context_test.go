@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 )
@@ -40,8 +41,8 @@ func TestContext(t *testing.T) {
 			if !strings.Contains(errStr, "panic") {
 				t.Error(errStr)
 			}
-			if !errors.Is(err, fun.ErrInvariantViolation) {
-				t.Error(err, errors.Is(err, fun.ErrInvariantViolation))
+			if !errors.Is(err, ers.ErrInvariantViolation) {
+				t.Error(err, errors.Is(err, ers.ErrInvariantViolation))
 			}
 		})
 		t.Run("GetOrchestrator", func(t *testing.T) {

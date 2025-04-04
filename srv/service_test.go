@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
@@ -146,7 +145,7 @@ func TestService(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		})
 		t.Run("NilRun", func(t *testing.T) {
 			s := &Service{}
@@ -160,7 +159,7 @@ func TestService(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		})
 		t.Run("Run", func(t *testing.T) {
 			s := &Service{
@@ -177,7 +176,7 @@ func TestService(t *testing.T) {
 			if err == nil {
 				t.Fatal("should error")
 			}
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		})
 	})
 	t.Run("Group", func(t *testing.T) {
@@ -233,7 +232,7 @@ func TestService(t *testing.T) {
 				t.Fatal("expected error")
 			}
 
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		})
 		t.Run("ErrorPropogates", func(t *testing.T) {
 			s := &Service{

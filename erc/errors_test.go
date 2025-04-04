@@ -151,7 +151,7 @@ func TestError(t *testing.T) {
 				t.Error("no panic recovered")
 			}
 			err := &es.stack
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "boop")
 		})
 
@@ -169,7 +169,7 @@ func TestError(t *testing.T) {
 				t.Error("no panic recovered")
 			}
 
-			check.ErrorIs(t, es.Resolve(), fun.ErrRecoveredPanic)
+			check.ErrorIs(t, es.Resolve(), ers.ErrRecoveredPanic)
 
 			t.Log(es.Resolve())
 			t.Log(ers.Unwind(es.Resolve()))
@@ -212,7 +212,7 @@ func TestError(t *testing.T) {
 				t.Error("no panic recovered")
 			}
 
-			check.ErrorIs(t, es.Resolve(), fun.ErrRecoveredPanic)
+			check.ErrorIs(t, es.Resolve(), ers.ErrRecoveredPanic)
 
 			if counter != 1 {
 				t.Error("callback not called")
@@ -354,7 +354,7 @@ func TestError(t *testing.T) {
 			}
 			err := ec.Resolve()
 			assert.Error(t, err)
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "foo")
 
 			if out != "" {
@@ -370,7 +370,7 @@ func TestError(t *testing.T) {
 			}
 			err := ec.Resolve()
 			assert.Error(t, err)
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "foo")
 		})
 	})

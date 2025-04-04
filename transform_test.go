@@ -531,7 +531,7 @@ func RunIteratorImplementationTests[T comparable](
 								t.Error("expected error")
 							}
 
-							check.ErrorIs(t, err, ErrRecoveredPanic)
+							check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 
 							if len(out) != 0 {
 								t.Fatal("unexpected output", out)
@@ -554,7 +554,7 @@ func RunIteratorImplementationTests[T comparable](
 								t.Error("expected error")
 							}
 
-							assert.ErrorIs(t, err, ErrRecoveredPanic)
+							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 
 							if !strings.Contains(err.Error(), "whoop") {
 								t.Fatalf("panic error isn't propogated %q", err.Error())
@@ -629,7 +629,7 @@ func RunIteratorIntegerAlgoTests(
 							if err == nil {
 								t.Error("expected error", err)
 							}
-							check.ErrorIs(t, err, ErrRecoveredPanic)
+							check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 							if len(out) != len(elems)-1 {
 								t.Error("unexpected output", len(out), "->", out)
 							}
@@ -861,7 +861,7 @@ func RunIteratorStringAlgoTests(
 							}
 
 							err := out.Close()
-							assert.ErrorIs(t, err, ErrRecoveredPanic)
+							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 							assert.Substring(t, err.Error(), "foo")
 						})
 						t.Run("ContinueOnPanic", func(t *testing.T) {
@@ -891,7 +891,7 @@ func RunIteratorStringAlgoTests(
 								t.Fatal("should have errored")
 							}
 							assert.Substring(t, err.Error(), "foo")
-							assert.ErrorIs(t, err, ErrRecoveredPanic)
+							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 						})
 						t.Run("ArbitraryErrorAborts", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())

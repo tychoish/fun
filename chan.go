@@ -204,7 +204,7 @@ func (ro ChanReceive[T]) Ok() bool {
 		}
 	default:
 		// should be impossible outside of the package,
-		panic(ErrInvariantViolation)
+		panic(ers.ErrInvariantViolation)
 	}
 }
 

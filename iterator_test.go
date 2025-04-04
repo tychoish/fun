@@ -94,7 +94,7 @@ func TestIterator(t *testing.T) {
 			if called != 3 {
 				t.Error(called)
 			}
-			if !errors.Is(err, ErrRecoveredPanic) {
+			if !errors.Is(err, ers.ErrRecoveredPanic) {
 				t.Error(err)
 			}
 		})
@@ -201,7 +201,7 @@ func TestIterator(t *testing.T) {
 			err := iter.Process(func(_ context.Context, _ int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
-			check.ErrorIs(t, err, ErrRecoveredPanic)
+			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		})
 		t.Run("ContextExpired", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

@@ -38,7 +38,7 @@ type WorkerGroupConf struct {
 	IncludeContextExpirationErrors bool
 	// ExcludedErrors is a list of that should not be included
 	// in the collected errors of the
-	// output. fun.ErrRecoveredPanic is always included and io.EOF
+	// output. ers.ErrRecoveredPanic is always included and io.EOF
 	// is never included.
 	ExcludedErrors []error
 	// ErrorHandler is used to collect and aggregate errors in
@@ -82,7 +82,7 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 		return true
 	}
 
-	hadPanic := errors.Is(err, ErrRecoveredPanic)
+	hadPanic := errors.Is(err, ers.ErrRecoveredPanic)
 
 	switch {
 	case hadPanic && !o.ContinueOnPanic:
@@ -176,7 +176,7 @@ func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
 // the input iterators is ErrRecoveredPanic.
 func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
-		if ers.Is(ErrRecoveredPanic, errs...) {
+		if ers.Is(ers.ErrRecoveredPanic, errs...) {
 			return fmt.Errorf("cannot exclude recovered panics: %w", ers.ErrInvalidInput)
 		}
 		opts.ExcludedErrors = append(opts.ExcludedErrors, errs...)

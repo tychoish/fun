@@ -915,7 +915,7 @@ func TestProducer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := ers.Join(ErrInvariantViolation, ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
+		err := ers.Join(ers.ErrInvariantViolation, ers.ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
 		stack := &ers.Stack{}
 		assert.True(t, errors.As(err, &stack))
 		errs := ft.Must(CheckProducer(stack.CheckProducer()).Iterator().Slice(ctx))

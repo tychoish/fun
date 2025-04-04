@@ -75,7 +75,7 @@ func RecoverHook(ec *Collector, hook func()) {
 			ec.Add(fmt.Errorf("%v", err))
 		}
 
-		ec.Add(fun.ErrRecoveredPanic)
+		ec.Add(ers.ErrRecoveredPanic)
 
 		if hook != nil {
 			hook()

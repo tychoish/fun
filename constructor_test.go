@@ -158,7 +158,7 @@ func TestHandlers(t *testing.T) {
 		proc(context.Canceled)
 		check.Equal(t, count, 1)
 
-		proc(ErrInvariantViolation)
+		proc(ers.ErrInvariantViolation)
 		check.Equal(t, count, 2)
 
 		proc(nil)
@@ -169,7 +169,7 @@ func TestHandlers(t *testing.T) {
 			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			errs, err := unwinder(ctx, ers.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ErrInvariantViolation))
+			errs, err := unwinder(ctx, ers.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ers.ErrInvariantViolation))
 			assert.NotError(t, err)
 			check.Equal(t, len(errs), 3)
 		})

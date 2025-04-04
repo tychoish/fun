@@ -39,8 +39,8 @@ func TestPanics(t *testing.T) {
 				Invariant.Ok(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
-			assert.ErrorIs(t, err, ErrInvariantViolation)
-			assert.ErrorIs(t, err, ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrInvariantViolation)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.True(t, ers.IsInvariantViolation(err))
 		})
 		t.Run("Error", func(t *testing.T) {
@@ -69,10 +69,10 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
 			err := ers.WithRecoverCall(func() { Invariant.IsTrue(1 == 2) })
-			if !errors.Is(err, ErrInvariantViolation) {
+			if !errors.Is(err, ers.ErrInvariantViolation) {
 				t.Fatal(err)
 			}
-			if !errors.Is(err, ErrRecoveredPanic) {
+			if !errors.Is(err, ers.ErrRecoveredPanic) {
 				t.Fatal(err)
 			}
 		})
@@ -120,7 +120,7 @@ func TestPanics(t *testing.T) {
 				t.Fatal("expected error")
 			}
 			assert.ErrorIs(t, err, root)
-			assert.ErrorIs(t, err, ErrInvariantViolation)
+			assert.ErrorIs(t, err, ers.ErrInvariantViolation)
 		})
 		t.Run("Propagate", func(t *testing.T) {
 			root := errors.New("kip")
@@ -130,13 +130,13 @@ func TestPanics(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if !errors.Is(err, ErrInvariantViolation) {
+			if !errors.Is(err, ers.ErrInvariantViolation) {
 				t.Error(err)
 			}
 			if !errors.Is(err, root) {
 				t.Error(err)
 			}
-			assert.ErrorIs(t, err, ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			if !strings.Contains(err.Error(), "annotate") {
 				t.Error(err)
 			}
@@ -186,7 +186,7 @@ func TestPanics(t *testing.T) {
 			assert.NotPanic(t, func() {
 				err := of.Worker("hi").Run(ctx)
 				assert.ErrorIs(t, err, io.EOF)
-				assert.ErrorIs(t, err, ErrRecoveredPanic)
+				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			})
 			assert.True(t, called)
 		})

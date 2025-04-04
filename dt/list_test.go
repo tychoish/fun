@@ -59,7 +59,7 @@ func TestList(t *testing.T) {
 		if !errors.Is(err, ErrUninitializedContainer) {
 			t.Error(err)
 		}
-		assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		assert.ErrorIs(t, err, ErrUninitializedContainer)
 	})
 	t.Run("LengthTracks", func(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -160,7 +160,7 @@ func CompareAndSwap[T comparable, A AtomicValue[T]](a A, oldVal, newVal T) bool 
 	case interface{ CompareAndSwap(a, b T) bool }:
 		return atom.CompareAndSwap(oldVal, newVal)
 	default:
-		panic(fmt.Errorf("compare and swap operation not supported: %w", fun.ErrInvariantViolation))
+		panic(fmt.Errorf("compare and swap operation not supported: %w", ers.ErrInvariantViolation))
 	}
 }
 

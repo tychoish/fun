@@ -147,7 +147,7 @@ func SetShutdownSignal(ctx context.Context) context.Context {
 // call the cancelfunction returned by GetShutdownSignal.
 //
 // If a shutdown function was not set, GetShutdownSignal panics with a
-// fun.ErrInvariantViolation error.
+// ers.ErrInvariantViolation error.
 func GetShutdownSignal(ctx context.Context) context.CancelFunc {
 	cancel, ok := ctx.Value(shutdownTriggerCtxKey{}).(context.CancelFunc)
 
@@ -179,7 +179,7 @@ func SetBaseContext(ctx context.Context) context.Context {
 
 // GetBaseContext gets a base context attached with SetBaseContext
 // from the current context. If the base context is not attached,
-// GetBaseContext panics with a fun.ErrInvariantViolation error.
+// GetBaseContext panics with a ers.ErrInvariantViolation error.
 //
 // Use this context to start background services that should respect
 // global shutdown and have access to the process' context, in the
