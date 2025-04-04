@@ -44,6 +44,11 @@ func TestList(t *testing.T) {
 		assert.Equal(t, list.Back().Value(), 0)
 		assert.Equal(t, list.Front().Value(), 1)
 	})
+	t.Run("NilSafeLen", func(t *testing.T) {
+		var l *List[int]
+		assert.NotPanic(t, func() { l.Len() })
+		assert.Zero(t, l.Len())
+	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := ers.WithRecoverDo(func() bool {
 			var list *List[string]

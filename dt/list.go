@@ -64,8 +64,6 @@ type Element[T any] struct {
 	item T
 }
 
-func (e *Element[T]) isRoot() bool { return e.list != nil && e.list.head != nil && e.list.head == e }
-
 // NewElement produces an unattached Element that you can use with
 // Append. Element.Append(NewElement()) is essentially the same as
 // List.PushBack().
@@ -76,13 +74,6 @@ func (e *Element[T]) String() string { return fmt.Sprint(e.item) }
 
 // Value accesses the element's value.
 func (e *Element[T]) Value() T { return e.item }
-
-// Ok checks that an element is valid. Invalid elements can be
-// produced at the end of iterations (e.g. the list's root object,) or
-// if you attempt to Pop an element off of an empty list.
-//
-// Returns false when the element is nil.
-func (e *Element[T]) Ok() bool { return e != nil && e.ok }
 
 // Next produces the next element. This is always non-nil, *unless*
 // the element is not a member of a list. At the ends of a list, the
@@ -106,13 +97,14 @@ func (e *Element[T]) In(l *List[T]) bool { return e.list != nil && e.list == l }
 //
 // Set is safe to call on nil elements.
 func (e *Element[T]) Set(v T) bool {
-	if e == nil || (e.list != nil && e.list.head == e) {
-		return false
+	if e.settable() {
+		e.ok = true
+		e.item = v
+		return true
+
 	}
 
-	e.ok = true
-	e.item = v
-	return true
+	return false
 }
 
 // UnmarshalJSON reads the json value, and sets the value of the
@@ -185,40 +177,38 @@ func (l *List[T]) UnmarshalJSON(in []byte) error {
 // list, or is otherwise invalid.) PushBack and PushFront, are
 // implemented in terms of Append.
 func (e *Element[T]) Append(val *Element[T]) *Element[T] {
-	if !e.appendable(val) {
-		return e
+	if e.appendable(val) {
+		return e.uncheckedAppend(val)
 	}
 
-	e.uncheckedAppend(val)
-	return val
+	return e
 }
 
-func (e *Element[T]) Push(v T) *Element[T] { return e.Append(makeElem(v)) }
+func (e *Element[T]) Push(v T) *Element[T] { return e.Append(NewElement(v)) }
 
 // Remove removes the elemtn from the list, returning true if the operation
 // was successful. Remove returns false when the element is not valid
 // to be removed (e.g. is not part of a list, is the root element of
 // the list, etc.)
 func (e *Element[T]) Remove() bool {
-	if !e.removable() {
-		return false
+	if e.removable() {
+		e.uncheckedRemove()
+		return true
 	}
-	e.uncheckedRemove()
-	return true
+
+	return false
 }
 
 // Drop wraps remove, and additionally, if the remove was successful,
 // drops the value and sets the Ok value to false.
 func (e *Element[T]) Drop() {
-	if !e.Remove() {
-		return
+	if e.Remove() {
+		e.item = e.zero()
+		e.ok = false
 	}
-	e.item = e.zero()
-	e.ok = false
 }
 
 func (*Element[T]) zero() (o T) { return }
-func (*List[T]) zero() (o T)    { return }
 
 // Swap exchanges the location of two elements in a list, returning
 // true if the operation was successful, and false if the elements are
@@ -227,31 +217,42 @@ func (*List[T]) zero() (o T)    { return }
 // around effect. Swap will not operate if either element is nil, or
 // not a member of the same list.
 func (e *Element[T]) Swap(with *Element[T]) bool {
-	if !e.swapable(with) {
-		return false
+	if e.swappable(with) {
+		wprev := *with.prev
+		with.uncheckedRemove()
+		e.prev.uncheckedAppend(with)
+		e.uncheckedRemove()
+		wprev.uncheckedAppend(e)
+		return true
 	}
-	wprev := *with.prev
-	with.uncheckedRemove()
-	e.prev.uncheckedAppend(with)
-	e.uncheckedRemove()
-	wprev.uncheckedAppend(e)
-	return true
+
+	return false
 }
 
-// make sure we have members of the same list, and not the same element.
-func (e *Element[T]) swapable(with *Element[T]) bool {
-	return with != nil && e != nil && e.list != nil && e.list == with.list && e != with
-}
+// Ok checks that an element is valid. Invalid elements can be
+// produced at the end of iterations (e.g. the list's root object,) or
+// if you attempt to Pop an element off of an empty list.
+//
+// Returns false when the element is nil.
+func (e *Element[T]) Ok() bool                        { return e != nil && e.ok && !e.isRoot() }
 func (e *Element[T]) appendable(val *Element[T]) bool { return val != nil && val.ok && e.list != nil } // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
-func (e *Element[T]) removable() bool                 { return e.list != nil && e.list.head != e && e.list.length > 0 }
+func (e *Element[T]) removable() bool                 { return e.list != nil && !e.isRoot() && e.list.length > 0 }
+func (e *Element[T]) settable() bool                  { return e != nil && !e.isRoot() }
+func (e *Element[T]) isRoot() bool                    { return e.list != nil && e.list.head != nil && e.list.head == e }
 
-func (e *Element[T]) uncheckedAppend(val *Element[T]) {
+// make sure we have members of the same list
+func (e *Element[T]) swappable(it *Element[T]) bool {
+	return it != nil && e != nil && e.list != nil && e.list == it.list && e != it
+}
+
+func (e *Element[T]) uncheckedAppend(val *Element[T]) *Element[T] {
 	e.list.length++
 	val.list = e.list
 	val.prev = e
 	val.next = e.next
 	val.prev.next = val
 	val.next.prev = val
+	return val
 }
 
 func (e *Element[T]) uncheckedRemove() {
@@ -291,7 +292,7 @@ func (l *List[T]) PushBack(it T) { l.Back().Push(it) }
 //	for e := list.PopFront(); e.Ok(); e = input.PopFront() {
 //		// do work
 //	}
-func (l *List[T]) PopFront() *Element[T] { return l.pop(l.root().next) }
+func (l *List[T]) PopFront() *Element[T] { return l.pop(l.Front()) }
 
 // PopBack removes the last element from the list. If the list is
 // empty, this returns a detached non-nil value, that will report an
@@ -301,7 +302,7 @@ func (l *List[T]) PopFront() *Element[T] { return l.pop(l.root().next) }
 //	for e := list.PopBack(); e.Ok(); e = input.PopBack() {
 //		// do work
 //	}
-func (l *List[T]) PopBack() *Element[T] { return l.pop(l.root().prev) }
+func (l *List[T]) PopBack() *Element[T] { return l.pop(l.Back()) }
 
 // Front returns a pointer to the first element of the list. If the
 // list is empty, this is also the last element of the list. The
@@ -333,7 +334,7 @@ func (l *List[T]) Producer() fun.Producer[T] {
 	current := l.root()
 	return func(_ context.Context) (o T, _ error) {
 		current = current.Next()
-		if !current.Ok() || current.isRoot() {
+		if !current.Ok() {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -355,7 +356,7 @@ func (l *List[T]) ProducerPop() fun.Producer[T] {
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopFront()
 
-		if !current.Ok() || current.isRoot() {
+		if !current.Ok() {
 			return o, io.EOF
 		}
 
@@ -432,10 +433,6 @@ func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().
 // Extend removes items from the front of the input list, and appends
 // them to the end (back) of the current list.
 func (l *List[T]) Extend(input *List[T]) {
-	if input.Len() == 0 {
-		return
-	}
-
 	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
 		l.Back().Append(elem)
 	}
@@ -446,12 +443,9 @@ func (l *List[T]) Extend(input *List[T]) {
 // values of both lists would be shared.
 func (l *List[T]) Copy() *List[T] {
 	out := &List[T]{}
-	if l.Len() == 0 {
-		return &List[T]{}
-	}
 
 	for elem := l.Front(); elem.Ok(); elem = elem.Next() {
-		out.PushBack(elem.Value())
+		out.Back().Push(elem.Value())
 	}
 
 	return out
@@ -478,8 +472,6 @@ func (l *List[T]) uncheckedSetup() {
 	l.head.list = l
 	l.head.ok = false
 }
-
-func makeElem[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 
 func (l *List[T]) pop(it *Element[T]) *Element[T] {
 	if !it.removable() || it.list == nil || l.head == nil || it.list.head != l.head {
