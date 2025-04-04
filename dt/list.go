@@ -8,6 +8,7 @@ import (
 	"iter"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/risky"
 )
@@ -62,6 +63,8 @@ type Element[T any] struct {
 	ok   bool
 	item T
 }
+
+func (e *Element[T]) isRoot() bool { return e.list != nil && e.list.head != nil && e.list.head == e }
 
 // NewElement produces an unattached Element that you can use with
 // Append. Element.Append(NewElement()) is essentially the same as
@@ -240,9 +243,7 @@ func (e *Element[T]) swapable(with *Element[T]) bool {
 	return with != nil && e != nil && e.list != nil && e.list == with.list && e != with
 }
 func (e *Element[T]) appendable(val *Element[T]) bool { return val != nil && val.ok && e.list != nil } // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
-func (e *Element[T]) removable() bool {
-	return e.list != nil && e.list.head != e && e.list.length > 0
-}
+func (e *Element[T]) removable() bool                 { return e.list != nil && e.list.head != e && e.list.length > 0 }
 
 func (e *Element[T]) uncheckedAppend(val *Element[T]) {
 	e.list.length++
@@ -332,7 +333,7 @@ func (l *List[T]) Producer() fun.Producer[T] {
 	current := l.root()
 	return func(_ context.Context) (o T, _ error) {
 		current = current.Next()
-		if !current.Ok() || current == l.root() {
+		if !current.Ok() || current.isRoot() {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -354,7 +355,7 @@ func (l *List[T]) ProducerPop() fun.Producer[T] {
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopFront()
 
-		if !current.Ok() || current == l.root() {
+		if !current.Ok() || current.isRoot() {
 			return o, io.EOF
 		}
 
@@ -369,7 +370,7 @@ func (l *List[T]) ProducerReverse() fun.Producer[T] {
 	current := l.root()
 	return func(_ context.Context) (o T, _ error) {
 		current = current.Previous()
-		if !current.Ok() || current == l.root() {
+		if !current.Ok() || current.isRoot() {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -383,7 +384,7 @@ func (l *List[T]) ProducerReversePop() fun.Producer[T] {
 	var current *Element[T]
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopBack()
-		if !current.Ok() || current == l.root() {
+		if !current.Ok() || current.isRoot() {
 			return o, io.EOF
 		}
 		return current.item, nil
@@ -463,24 +464,25 @@ func (l *List[T]) Slice() Slice[T] { return fun.NewProducer(l.Iterator().Slice).
 func (l *List[T]) Seq() iter.Seq[T] { return risky.Block(l.Iterator().Seq) }
 
 func (l *List[T]) root() *Element[T] {
-	if l == nil {
-		panic(ErrUninitializedContainer)
-	}
+	fun.Invariant.Ok(l != nil, ErrUninitializedContainer)
 
-	if l.head == nil {
-		l.head = makeElem(l.zero())
-		l.head.next = l.head
-		l.head.prev = l.head
-		l.head.list = l
-		l.head.ok = false
-	}
+	ft.WhenCall(l.head == nil, l.uncheckedSetup)
+
 	return l.head
+}
+
+func (l *List[T]) uncheckedSetup() {
+	l.head = &Element[T]{}
+	l.head.next = l.head
+	l.head.prev = l.head
+	l.head.list = l
+	l.head.ok = false
 }
 
 func makeElem[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 
 func (l *List[T]) pop(it *Element[T]) *Element[T] {
-	if !it.removable() || it.list.root() != l.root() {
+	if !it.removable() || it.list == nil || l.head == nil || it.list.head != l.head {
 		return &Element[T]{}
 	}
 
