@@ -9,6 +9,8 @@ package risky
 
 import (
 	"context"
+
+	"github.com/tychoish/fun/ft"
 )
 
 // Check takes two values and returns the first value and a second
@@ -31,14 +33,9 @@ func Block[T any](fn func(context.Context) T) T { return fn(context.Background()
 // itself so that it can ignore a possible panic and return an
 // output. In the case of a panic or an error the output value is
 // often the zero value for the type.
-func ForceOp[T any](fn func() (T, error)) (out T) {
-	defer Recover()
-	out, _ = fn()
-	return out
-}
+func ForceOp[T any](fn func() (T, error)) T { defer Recover(); return ft.IgnoreSecond(fn()) }
 
-// Cast just provides as a wrapper in.(T); however, risky.Cast(in)
-// has the benefit of raising the redflag that it should!
+// Cast just provides as a wrapper around in.(T). Cast will panic.
 func Cast[T any](in any) T { return in.(T) }
 
 // BlockForce combines Block with ForceOp to run a function with a
@@ -46,8 +43,7 @@ func Cast[T any](in any) T { return in.(T) }
 // the output value.
 func BlockForceOp[T any](fn func(context.Context) (T, error)) T {
 	defer Recover()
-	out, _ := fn(context.Background())
-	return out
+	return ft.IgnoreSecond(fn(context.Background()))
 }
 
 // Ignore runs a function that takes an arbitrary argument and ignores
@@ -60,7 +56,7 @@ func BlockForceOp[T any](fn func(context.Context) (T, error)) T {
 // recover *before* the defer.
 func Ignore[T any](fn func(T) error, arg T) { defer Recover(); _ = fn(arg) }
 
-// Recover catches a panic and discards its contents.
+// Recover catches a panic and discards its value.
 func Recover() { _ = recover() }
 
 // Try runs a function with the provided input, and returns the
@@ -91,7 +87,7 @@ func IgnoreMust[T any, O any](fn func(T) (O, error), arg T) O {
 }
 
 // Apply processes an input slice, with the provided function,
-// returning a new slice that holds the result.
+// returning a new slice that holds the results.
 func Apply[T any](fn func(T) T, in []T) []T {
 	out := make([]T, len(in))
 
