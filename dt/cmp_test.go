@@ -8,7 +8,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
@@ -159,7 +158,7 @@ func TestSort(t *testing.T) {
 				t.Error(err)
 			}
 
-			assert.ErrorIs(t, err, fun.ErrRecoveredPanic)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.ErrorIs(t, err, ErrUninitializedContainer)
 		})
 		t.Run("IteratorConstructor", func(t *testing.T) {
@@ -167,8 +166,8 @@ func TestSort(t *testing.T) {
 			heap, err := NewHeapFromIterator(ctx, cmp.LessThanNative[int], iter)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)
-			assert.Equal(t, heap.list.Back().Value(), 9)
-			assert.Equal(t, heap.list.Front().Value(), 0)
+			assert.Equal(t, heap.data.Back().Value(), 9)
+			assert.Equal(t, heap.data.Front().Value(), 0)
 		})
 		t.Run("Iterator", func(t *testing.T) {
 			heap := &Heap[int]{LT: cmp.LessThanNative[int]}

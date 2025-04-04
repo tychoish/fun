@@ -21,7 +21,7 @@ import (
 // if LT is not set.
 type Heap[T any] struct {
 	LT   cmp.LessThan[T]
-	list *List[T]
+	data *List[T]
 }
 
 // NewHeapFromIterator constructs and populates a heap using the input
@@ -30,30 +30,31 @@ type Heap[T any] struct {
 // return the populated heap.
 func NewHeapFromIterator[T any](ctx context.Context, cmp cmp.LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
 	out := &Heap[T]{LT: cmp}
-	out.lazySetup()
+	out.list()
 	return out, iter.Observe(func(in T) { out.Push(in) }).Run(ctx)
 }
 
-func (h *Heap[T]) lazySetup() {
+func (h *Heap[T]) list() *List[T] {
 	if h == nil || h.LT == nil {
 		panic(ErrUninitializedContainer)
 	}
 
-	if h.list == nil {
-		h.list = &List[T]{}
-		h.list.lazySetup()
+	if h.data == nil {
+		h.data = &List[T]{}
 	}
+	return h.data
 }
 
 // Push adds an item to the heap.
 func (h *Heap[T]) Push(t T) {
-	h.lazySetup()
-	if h.list.length == 0 {
-		h.list.PushBack(t)
+	list := h.list()
+
+	if list.Len() == 0 {
+		list.PushBack(t)
 		return
 	}
 
-	for item := h.list.Back(); item.Ok(); item = item.Previous() {
+	for item := list.Back(); item.Ok(); item = item.Previous() {
 		if h.LT(t, item.item) {
 			continue
 		}
@@ -62,27 +63,21 @@ func (h *Heap[T]) Push(t T) {
 		return
 	}
 
-	h.list.PushFront(t)
+	list.PushFront(t)
 }
 
 // Len reports the size of the heap. Because the heap tracks its size
 // with Push/Pop operations, this is a constant time operation.
-func (h *Heap[T]) Len() int {
-	if h.list == nil {
-		return 0
-	}
-
-	return h.list.Len()
-}
+func (h *Heap[T]) Len() int { return h.list().Len() }
 
 // Pop removes the element from the underlying list and returns
 // it, with an Ok value, which is true when the value returned is valid.
-func (h *Heap[T]) Pop() (T, bool) { h.lazySetup(); e := h.list.PopFront(); return e.Value(), e.Ok() }
+func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), e.Ok() }
 
 // Iterator provides an fun.Iterator interface to the heap. The
 // iterator consumes items from the heap, and will return when the
 // heap is empty.
-func (h *Heap[T]) Iterator() *fun.Iterator[T] { h.lazySetup(); return h.list.Iterator() }
+func (h *Heap[T]) Iterator() *fun.Iterator[T] { ; return h.list().Iterator() }
 
 // IsSorted reports if the list is sorted from low to high, according
 // to the LessThan function.
@@ -91,7 +86,7 @@ func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
 		return true
 	}
 
-	for item := l.root.Next(); item.next.Ok(); item = item.Next() {
+	for item := l.Front(); item.Next().Ok(); item = item.Next() {
 		if lt(item.Value(), item.Previous().Value()) {
 			return false
 		}
@@ -140,7 +135,6 @@ func mergeSort[T any](head *List[T], lt cmp.LessThan[T]) *List[T] {
 func split[T any](list *List[T]) *List[T] {
 	total := list.Len()
 	out := &List[T]{}
-	out.lazySetup()
 	for list.Len() > total/2 {
 		out.Back().Append(list.PopFront())
 	}
@@ -149,7 +143,6 @@ func split[T any](list *List[T]) *List[T] {
 
 func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 	out := &List[T]{}
-	out.lazySetup()
 	for a.Len() != 0 && b.Len() != 0 {
 		if lt(a.Front().Value(), b.Front().Value()) {
 			out.Back().Append(a.PopFront())

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/risky"
 )
 
 // List provides a doubly linked list. Callers are responsible for
@@ -18,7 +19,7 @@ import (
 // The Deque implementation in the pubsub package provides a similar
 // implementation with locking and a notification system.
 type List[T any] struct {
-	root   *Element[T]
+	head   *Element[T]
 	length int
 }
 
@@ -102,7 +103,7 @@ func (e *Element[T]) In(l *List[T]) bool { return e.list != nil && e.list == l }
 //
 // Set is safe to call on nil elements.
 func (e *Element[T]) Set(v T) bool {
-	if e == nil || (e.list != nil && e.list.root == e) {
+	if e == nil || (e.list != nil && e.list.head == e) {
 		return false
 	}
 
@@ -174,10 +175,6 @@ func (l *List[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-func (e *Element[T]) appendable(val *Element[T]) bool {
-	return val != nil && val.ok && e.list != nil // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
-}
-
 // Append adds the element 'new' after the element 'e', inserting it
 // in the next position in the list. Will return 'e' if 'new' is not
 // valid for insertion into this list (e.g. it belongs to another
@@ -192,6 +189,8 @@ func (e *Element[T]) Append(val *Element[T]) *Element[T] {
 	e.uncheckedAppend(val)
 	return val
 }
+
+func (e *Element[T]) Push(v T) *Element[T] { return e.Append(makeElem(v)) }
 
 // Remove removes the elemtn from the list, returning true if the operation
 // was successful. Remove returns false when the element is not valid
@@ -211,10 +210,12 @@ func (e *Element[T]) Drop() {
 	if !e.Remove() {
 		return
 	}
-	var empty T
-	e.item = empty
+	e.item = e.zero()
 	e.ok = false
 }
+
+func (*Element[T]) zero() (o T) { return }
+func (*List[T]) zero() (o T)    { return }
 
 // Swap exchanges the location of two elements in a list, returning
 // true if the operation was successful, and false if the elements are
@@ -223,9 +224,7 @@ func (e *Element[T]) Drop() {
 // around effect. Swap will not operate if either element is nil, or
 // not a member of the same list.
 func (e *Element[T]) Swap(with *Element[T]) bool {
-	// make sure we have members of the same list, and not the
-	// same element.
-	if with == nil || e == nil || e.list == nil || e.list != with.list || e == with {
+	if !e.swapable(with) {
 		return false
 	}
 	wprev := *with.prev
@@ -236,8 +235,13 @@ func (e *Element[T]) Swap(with *Element[T]) bool {
 	return true
 }
 
+// make sure we have members of the same list, and not the same element.
+func (e *Element[T]) swapable(with *Element[T]) bool {
+	return with != nil && e != nil && e.list != nil && e.list == with.list && e != with
+}
+func (e *Element[T]) appendable(val *Element[T]) bool { return val != nil && val.ok && e.list != nil } // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
 func (e *Element[T]) removable() bool {
-	return e.list != nil && e.list.root != e && e.list.length > 0
+	return e.list != nil && e.list.head != e && e.list.length > 0
 }
 
 func (e *Element[T]) uncheckedAppend(val *Element[T]) {
@@ -263,15 +267,20 @@ func (e *Element[T]) uncheckedRemove() {
 
 // Len returns the length of the list. As the Append/Remove operations
 // track the length of the list, this is an O(1) operation.
-func (l *List[T]) Len() int { return l.length }
+func (l *List[T]) Len() int {
+	if l == nil {
+		return 0
+	}
+	return l.length
+}
 
 // PushFront creates an element and prepends it to the list. The
 // performance of PushFront and PushBack are the same.
-func (l *List[T]) PushFront(it T) { l.lazySetup(); l.root.Append(makeElem(it)) }
+func (l *List[T]) PushFront(it T) { l.root().Push(it) }
 
 // PushBack creates an element and appends it to the list. The
 // performance of PushFront and PushBack are the same.
-func (l *List[T]) PushBack(it T) { l.lazySetup(); l.root.prev.Append(makeElem(it)) }
+func (l *List[T]) PushBack(it T) { l.Back().Push(it) }
 
 // PopFront removes the first element from the list. If the list is
 // empty, this returns a nil value, that will report an Ok() false
@@ -281,7 +290,7 @@ func (l *List[T]) PushBack(it T) { l.lazySetup(); l.root.prev.Append(makeElem(it
 //	for e := list.PopFront(); e.Ok(); e = input.PopFront() {
 //		// do work
 //	}
-func (l *List[T]) PopFront() *Element[T] { l.lazySetup(); return l.pop(l.root.next) }
+func (l *List[T]) PopFront() *Element[T] { return l.pop(l.root().next) }
 
 // PopBack removes the last element from the list. If the list is
 // empty, this returns a detached non-nil value, that will report an
@@ -291,7 +300,7 @@ func (l *List[T]) PopFront() *Element[T] { l.lazySetup(); return l.pop(l.root.ne
 //	for e := list.PopBack(); e.Ok(); e = input.PopBack() {
 //		// do work
 //	}
-func (l *List[T]) PopBack() *Element[T] { l.lazySetup(); return l.pop(l.root.prev) }
+func (l *List[T]) PopBack() *Element[T] { return l.pop(l.root().prev) }
 
 // Front returns a pointer to the first element of the list. If the
 // list is empty, this is also the last element of the list. The
@@ -301,7 +310,7 @@ func (l *List[T]) PopBack() *Element[T] { l.lazySetup(); return l.pop(l.root.pre
 //	for e := list.Front(); e.Ok(); e = e.Next() {
 //	       // operate
 //	}
-func (l *List[T]) Front() *Element[T] { l.lazySetup(); return l.root.next }
+func (l *List[T]) Front() *Element[T] { return l.root().next }
 
 // Back returns a pointer to the last element of the list. If the
 // list is empty, this is also the first element of the list. The
@@ -311,7 +320,7 @@ func (l *List[T]) Front() *Element[T] { l.lazySetup(); return l.root.next }
 //	for e := list.Back(); e.Ok(); e = e.Previous() {
 //	       // operate
 //	}
-func (l *List[T]) Back() *Element[T] { l.lazySetup(); return l.root.prev }
+func (l *List[T]) Back() *Element[T] { return l.root().prev }
 
 // Producer provides a producer function that iterates through the
 // contents of the list. When the producer reaches has fully iterated
@@ -320,11 +329,10 @@ func (l *List[T]) Back() *Element[T] { l.lazySetup(); return l.root.prev }
 //
 // The Producer starts at the front of the list and iterates in order.
 func (l *List[T]) Producer() fun.Producer[T] {
-	l.lazySetup()
-	current := l.root
+	current := l.root()
 	return func(_ context.Context) (o T, _ error) {
 		current = current.Next()
-		if !current.Ok() || current == l.root {
+		if !current.Ok() || current == l.root() {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -342,12 +350,11 @@ func (l *List[T]) Producer() fun.Producer[T] {
 //
 // The Producer starts at the front of the list and iterates in order.
 func (l *List[T]) ProducerPop() fun.Producer[T] {
-	l.lazySetup()
 	var current *Element[T]
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopFront()
 
-		if !current.Ok() || current == l.root {
+		if !current.Ok() || current == l.root() {
 			return o, io.EOF
 		}
 
@@ -359,11 +366,10 @@ func (l *List[T]) ProducerPop() fun.Producer[T] {
 // Producer operation, but starts at the end/tail of the list and
 // works forward.
 func (l *List[T]) ProducerReverse() fun.Producer[T] {
-	l.lazySetup()
-	current := l.root
+	current := l.root()
 	return func(_ context.Context) (o T, _ error) {
 		current = current.Previous()
-		if !current.Ok() || current == l.root {
+		if !current.Ok() || current == l.root() {
 			return o, io.EOF
 		}
 		return current.Value(), nil
@@ -374,11 +380,10 @@ func (l *List[T]) ProducerReverse() fun.Producer[T] {
 // ProducerPop operation, but starts at the end/tail of the list and
 // works forward.
 func (l *List[T]) ProducerReversePop() fun.Producer[T] {
-	l.lazySetup()
 	var current *Element[T]
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopBack()
-		if !current.Ok() || current == l.root {
+		if !current.Ok() || current == l.root() {
 			return o, io.EOF
 		}
 		return current.item, nil
@@ -424,15 +429,14 @@ func (l *List[T]) PopIterator() *fun.Iterator[T] { return l.ProducerPop().Iterat
 func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().Iterator() }
 
 // Extend removes items from the front of the input list, and appends
-// them to the end of the current list.
+// them to the end (back) of the current list.
 func (l *List[T]) Extend(input *List[T]) {
 	if input.Len() == 0 {
 		return
 	}
 
-	back := l.Back()
 	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
-		back = back.Append(elem)
+		l.Back().Append(elem)
 	}
 }
 
@@ -441,43 +445,42 @@ func (l *List[T]) Extend(input *List[T]) {
 // values of both lists would be shared.
 func (l *List[T]) Copy() *List[T] {
 	out := &List[T]{}
-	if l.Len() > 0 {
-		for elem := l.Front(); elem.Ok(); elem = elem.Next() {
-			out.PushBack(elem.Value())
-		}
+	if l.Len() == 0 {
+		return &List[T]{}
 	}
+
+	for elem := l.Front(); elem.Ok(); elem = elem.Next() {
+		out.PushBack(elem.Value())
+	}
+
 	return out
 }
 
 // Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() Slice[T] {
-	out := NewSlice(make([]T, 0, l.Len()))
-	out.Populate(l.Iterator()).Ignore().Wait()
-	return out
-}
+func (l *List[T]) Slice() Slice[T] { return fun.NewProducer(l.Iterator().Slice).Force().Resolve() }
 
 // Seq returns a native go iterator function for the items in a list.
-func (l *List[T]) Seq() iter.Seq[T] { return l.Iterator().Seq(context.Background()) }
+func (l *List[T]) Seq() iter.Seq[T] { return risky.Block(l.Iterator().Seq) }
 
-func (l *List[T]) lazySetup() {
+func (l *List[T]) root() *Element[T] {
 	if l == nil {
 		panic(ErrUninitializedContainer)
 	}
 
-	if l.root == nil {
-		var val T
-		l.root = makeElem(val)
-		l.root.next = l.root
-		l.root.prev = l.root
-		l.root.list = l
-		l.root.ok = false
+	if l.head == nil {
+		l.head = makeElem(l.zero())
+		l.head.next = l.head
+		l.head.prev = l.head
+		l.head.list = l
+		l.head.ok = false
 	}
+	return l.head
 }
 
 func makeElem[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 
 func (l *List[T]) pop(it *Element[T]) *Element[T] {
-	if !it.removable() || it.list != l {
+	if !it.removable() || it.list.root() != l.root() {
 		return &Element[T]{}
 	}
 
