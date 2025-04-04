@@ -269,20 +269,18 @@ func (s *Stack[T]) lazyInit() {
 	if s.head == nil {
 		var val T
 		s.length = 0
-		s.head = makeItem(val)
+		s.head = NewItem(val)
 		s.head.ok = false
 		s.head.stack = s
 	}
 }
-
-func makeItem[T any](val T) *Item[T] { return &Item[T]{value: val, ok: true} }
 
 // Len returns the length of the stack. Because stack's track their
 // own size, this is an O(1) operation.
 func (s *Stack[T]) Len() int { return s.length }
 
 // Push appends an item to the stack.
-func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(makeItem(it)) }
+func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(NewItem(it)) }
 
 // Head returns the item at the top of this stack. This is a non
 // destructive operation.
