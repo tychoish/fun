@@ -110,16 +110,24 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("RemovingRoot", func(t *testing.T) {
 			stack := &Stack[int]{}
+			assert.Equal(t, stack.Len(), 0)
+
+			// head is non-nil and we can't remove it
+			assert.NotNil(t , stack.Head())
+			assert.True(t, ft.Not(stack.Head().Remove()))
+
+			// add an element
 			stack.Push(100)
-			if !stack.Head().Remove() {
-				t.Fatal("should have removed element")
-			}
-			if stack.Len() != 0 {
-				t.Fatal("Should be empty")
-			}
-			if stack.Head() == nil {
-				t.Fatal("should give us the root node")
-			}
+			assert.Equal(t, stack.Len(), 1)
+
+			// we can remove it
+			assert.True(t, stack.Head().Remove())
+			assert.Equal(t, stack.Len(), 0)
+
+			// head still isn't nil
+			assert.NotNil(t , stack.Head())
+
+			// the root node is in the stack
 			if stack.Head().In(stack) {
 				t.Fatal(stack.Len(), stack.Head().Value())
 			}

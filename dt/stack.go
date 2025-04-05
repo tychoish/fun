@@ -9,6 +9,7 @@ import (
 	"iter"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ft"
 )
 
 // Stack provides a generic singly linked list, with an interface that
@@ -81,9 +82,10 @@ func (it *Item[T]) In(s *Stack[T]) bool { return it.stack == s }
 // has been successful. The operation fails if the Item is the
 // head item in a stack or not a member of a stack.
 func (it *Item[T]) Set(v T) bool {
-	if it.stack != nil && it.next == nil {
+	if it.stack != nil && (it.stack.head == it || it.next == nil) {
 		return false
 	}
+
 	it.ok = true
 	it.value = v
 	return true
@@ -96,8 +98,8 @@ func (it *Item[T]) Append(n *Item[T]) *Item[T] {
 	if n == nil || it.stack == nil || it.stack == n.stack || n.stack != nil || !n.ok {
 		return it
 	}
-	it.stack.lazyInit()
-	n.next = it.stack.head
+
+	n.next = it.stack.root()
 	n.stack = it.stack
 	n.stack.head = n
 	n.stack.length++
@@ -244,11 +246,10 @@ func (s *Stack[T]) UnmarshalJSON(in []byte) error {
 	if err := json.Unmarshal(in, &rv); err != nil {
 		return err
 	}
-	var zero T
 	ns := &Stack[T]{}
 	head := ns.Head()
 	for idx := range rv {
-		elem := NewItem(zero)
+		elem := NewItem(s.zero())
 		if err := elem.UnmarshalJSON(rv[idx]); err != nil {
 			return err
 		}
@@ -261,46 +262,40 @@ func (s *Stack[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-func (s *Stack[T]) lazyInit() {
-	if s == nil {
-		panic(ErrUninitializedContainer)
-	}
+func (s *Stack[T]) root() *Item[T] {
+	fun.Invariant.Ok(s != nil, ErrUninitializedContainer)
+	ft.WhenCall(s.head == nil, s.uncheckedSetup)
 
-	if s.head == nil {
-		var val T
-		s.length = 0
-		s.head = NewItem(val)
-		s.head.ok = false
-		s.head.stack = s
-	}
+	return s.head
 }
+
+func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
+func (*Stack[T]) zero() (o T)       { return }
 
 // Len returns the length of the stack. Because stack's track their
 // own size, this is an O(1) operation.
 func (s *Stack[T]) Len() int { return s.length }
 
 // Push appends an item to the stack.
-func (s *Stack[T]) Push(it T) { s.lazyInit(); s.head.Append(NewItem(it)) }
+func (s *Stack[T]) Push(it T) { s.root().Append(NewItem(it)) }
 
 // Head returns the item at the top of this stack. This is a non
 // destructive operation.
-func (s *Stack[T]) Head() *Item[T] { s.lazyInit(); return s.head }
+func (s *Stack[T]) Head() *Item[T] { return s.root() }
 
 // Pop removes the item on the top of the stack, and returns it. If
 // the stack is empty, this will return, but not detach, the root item
 // of the stack, which will report a false Ok() value.
 func (s *Stack[T]) Pop() *Item[T] {
-	if s.head == nil {
-		s.head = &Item[T]{}
-		return s.head
+	out := s.root()
+
+	if s.length > 0 {
+		s.length--
+		out := s.head
+		out.stack = nil
+		s.head = s.head.next
 	}
-	if s.length == 0 {
-		return s.head
-	}
-	s.length--
-	out := s.head
-	out.stack = nil
-	s.head = s.head.next
+
 	return out
 }
 
