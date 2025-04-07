@@ -39,7 +39,7 @@ type Set[T comparable] struct {
 // slice to the new set.
 func NewSetFromSlice[T comparable](in []T) *Set[T] {
 	out := &Set[T]{}
-	out.Populate(fun.SliceIterator(in))
+	out.Populate(fun.SliceStream(in))
 	return out
 }
 
@@ -49,7 +49,7 @@ func NewSetFromSlice[T comparable](in []T) *Set[T] {
 // of the map, and may not therefore roundtrip.
 func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 	out := &Set[Pair[K, V]]{}
-	out.Populate(MapIterator(in))
+	out.Populate(MapStream(in))
 	return out
 }
 
@@ -129,12 +129,12 @@ func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(
 // Delete attempts to remove the item from the set.
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 
-// Iterator provides a way to iterate over the items in the
+// Stream provides a way to iterate over the items in the
 // set. Provides items in iteration order if the set is ordered.
-func (s *Set[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
+func (s *Set[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
 // Seq returns a new-style native Go iterator for the items in the set.
-func (s *Set[T]) Seq() iter.Seq[T] { return s.Iterator().Seq(context.Background()) }
+func (s *Set[T]) Seq() iter.Seq[T] { return s.Stream().Seq(context.Background()) }
 
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise
@@ -173,34 +173,32 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 	return
 }
 
-// Populate adds all items encountered in the iterator to the set.
-func (s *Set[T]) Populate(iter *fun.Iterator[T]) {
-	fun.Invariant.Must(iter.Observe(s.Add).Wait())
-}
+// Populate adds all items encountered in the stream to the set.
+func (s *Set[T]) Populate(iter *fun.Stream[T]) { iter.Observe(s.Add).Ignore().Wait() }
 
 // Extend adds the items of one set to this set.
-func (s *Set[T]) Extend(extra *Set[T]) { s.Populate(extra.Iterator()) }
+func (s *Set[T]) Extend(extra *Set[T]) { s.Populate(extra.Stream()) }
 
-func (s *Set[T]) unsafeIterator() *fun.Iterator[T] {
+func (s *Set[T]) unsafeStream() *fun.Stream[T] {
 	if s.list != nil {
-		return s.list.Iterator()
+		return s.list.StreamFront()
 	}
 	return s.hash.Keys()
 }
 
-// Producer will produce each item from set on successive calls. If
-// the Set is ordered, then the producer produces items in the set's
-// order. If the Set is synchronize, then the Producer always holds
+// Generator will produce each item from set on successive calls. If
+// the Set is ordered, then the generator produces items in the set's
+// order. If the Set is synchronize, then the Generator always holds
 // the Set's lock when called.
-func (s *Set[T]) Producer() (out fun.Producer[T]) {
+func (s *Set[T]) Generator() (out fun.Generator[T]) {
 	defer s.with(s.lock())
-	defer func() { mu := s.mtx.Get(); ft.WhenDo(mu != nil, func() fun.Producer[T] { return out.WithLock(mu) }) }()
+	defer func() { mu := s.mtx.Get(); ft.WhenDo(mu != nil, func() fun.Generator[T] { return out.WithLock(mu) }) }()
 
 	if s.list != nil {
-		return s.list.Producer()
+		return s.list.GeneratorFront()
 	}
 
-	return s.hash.ProducerKeys()
+	return s.hash.GeneratorKeys()
 }
 
 // Equal tests two sets, returning true if the items in the sets have
@@ -214,10 +212,10 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 	}
 
 	ctx := context.Background()
-	iter := s.unsafeIterator()
+	iter := s.unsafeStream()
 
 	if s.isOrdered() {
-		otherIter := other.Iterator()
+		otherIter := other.Stream()
 		for iter.Next(ctx) && otherIter.Next(ctx) {
 			if iter.Value() != otherIter.Value() {
 				return false
@@ -237,13 +235,13 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 }
 
 // MarshalJSON generates a JSON array of the items in the set.
-func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Iterator().MarshalJSON() }
+func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Stream().MarshalJSON() }
 
 // UnmarshalJSON reads input JSON data, constructs an array in memory
 // and then adds items from the array to existing set. Items that are
 // in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
-	iter := NewSlice([]T{}).Iterator()
+	iter := NewSlice([]T{}).Stream()
 	iter.AddError(iter.UnmarshalJSON(in))
 	s.Populate(iter)
 	return iter.Close()

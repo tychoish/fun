@@ -2,6 +2,7 @@ package ft
 
 import (
 	"context"
+	"iter"
 	"slices"
 	"sync"
 	"time"
@@ -141,74 +142,6 @@ func IfValue[T any](cond bool, ifVal T, elseVal T) T {
 	return elseVal
 }
 
-// WhenCall runs a function when condition is true, and is a noop
-// otherwise. Panics if the function is nil.
-func WhenCall(cond bool, op func()) { IfCall(cond, op, nil) }
-
-// WhenDo calls the function when the condition is true, and returns
-// the result, or if the condition is false, the operation is a noop,
-// and returns zero-value for the type. Panics if the function is nil.
-func WhenDo[T any](cond bool, op func() T) (out T) { return IfDo(cond, op, nil) }
-
-// UnlessCall is inverse form of WhenCall, calling the provided
-// function only when the conditional is false. Panics if the function
-// is nil.
-func UnlessCall(cond bool, op func()) { IfCall(cond, nil, op) }
-
-// UnlessDo is the inverse form of WhenDo, calling the function only
-// when the condition is false. Panics if the function is nil.
-func UnlessDo[T any](cond bool, op func() T) T { return IfDo(cond, nil, op) }
-
-// WhenApply runs the function with the supplied argument only when
-// the condition is true. Panics if the function is nil.
-func WhenApply[T any](cond bool, op func(T), arg T) {
-	if cond {
-		op(arg)
-	}
-}
-
-// WhenApplyFuture resolves the future and calls the operation
-// function only when the conditional is true.
-func WhenApplyFuture[T any](cond bool, op func(T), arg func() T) {
-	if cond {
-		op(arg())
-	}
-}
-
-// WhenHandle passes the argument "in" to the operation IF the
-// condition function (which also takes "in") returns true. Panics if
-// the function is nil.
-func WhenHandle[T any](cond func(T) bool, op func(T), in T) { WhenApply(cond(in), op, in) }
-
-// DoTimes runs the specified option n times.
-func DoTimes(n int, op func()) {
-	for i := 0; i < n; i++ {
-		op()
-	}
-}
-
-// SafeCall only calls the operation when it's non-nil.
-func SafeCall(op func()) {
-	if op != nil {
-		op()
-	}
-}
-
-// SafeDo calls the function when the operation is non-nil, and
-// returns either the output of the function or the zero value of T.
-func SafeDo[T any](op func() T) (out T) {
-	if op != nil {
-		out = op()
-	}
-
-	return out
-}
-
-// SafeWrap wraps an operation with SafeCall so that the resulting
-// operation is never nil, and will never panic if the input operation
-// is nil.
-func SafeWrap(op func()) func() { return func() { SafeCall(op) } }
-
 // Flip takes two arguments and returns them in the opposite
 // order. Intended to wrap other functions to reduce the friction when
 // briding APIs.
@@ -258,25 +191,128 @@ func OnceDo[T any](op func() T) func() T {
 // Deprecated: use slices.Contains from the standard library.
 func Contains[T comparable](item T, slice []T) bool { return slices.Contains(slice, item) }
 
-// Wrapper produces a function that always returns the value
+// WhenCall runs a function when condition is true, and is a noop
+// otherwise. Panics if the function is nil.
+func WhenCall(cond bool, op func()) { IfCall(cond, op, nil) }
+
+// WhenDo calls the function when the condition is true, and returns
+// the result, or if the condition is false, the operation is a noop,
+// and returns zero-value for the type. Panics if the function is nil.
+func WhenDo[T any](cond bool, op func() T) (out T) { return IfDo(cond, op, nil) }
+
+// UnlessCall is inverse form of WhenCall, calling the provided
+// function only when the conditional is false. Panics if the function
+// is nil.
+func UnlessCall(cond bool, op func()) { IfCall(cond, nil, op) }
+
+// UnlessDo is the inverse form of WhenDo, calling the function only
+// when the condition is false. Panics if the function is nil.
+func UnlessDo[T any](cond bool, op func() T) T { return IfDo(cond, nil, op) }
+
+// WhenApply runs the function with the supplied argument only when
+// the condition is true. Panics if the function is nil.
+func WhenApply[T any](cond bool, op func(T), arg T) {
+	if cond {
+		op(arg)
+	}
+}
+
+// WhenApplyFuture resolves the future and calls the operation
+// function only when the conditional is true.
+func WhenApplyFuture[T any](cond bool, op func(T), arg func() T) {
+	if cond {
+		op(arg())
+	}
+}
+
+// WhenHandle passes the argument "in" to the operation IF the
+// condition function (which also takes "in") returns true. Panics if
+// the function is nil.
+func WhenHandle[T any](cond func(T) bool, op func(T), in T) { WhenApply(cond(in), op, in) }
+
+// DoTimes runs the specified option n times.
+func DoTimes(n int, op func()) {
+	for i := 0; i < n; i++ {
+		op()
+	}
+}
+
+// SafeCall only calls the operation when it's non-nil.
+func SafeCall(op func()) { WhenCall(op != nil, op) }
+
+// SafeDo calls the function when the operation is non-nil, and
+// returns either the output of the function or the zero value of T.
+func SafeDo[T any](op func() T) T { return WhenDo(op != nil, op) }
+
+// SafeWrap wraps an operation with SafeCall so that the resulting
+// operation is never nil, and will never panic if the input operation
+// is nil.
+func SafeWrap(op func()) func() { return func() { SafeCall(op) } }
+
+// Wrap produces a function that always returns the value
 // provided. Useful for bridging interface paradigms, and for storing
 // interface-typed objects in atomics.
-func Wrapper[T any](in T) func() T { return func() T { return in } }
+func Wrap[T any](in T) func() T { return func() T { return in } }
 
-// Join creates a function that iterates over all of the input
+// SafeApply calls the function, fn, on the value, arg, only if the
+// function is not nil.
+func SafeApply[T any](fn func(T), arg T) { WhenApply(fn != nil, fn, arg) }
+
+// JoinFuture creates a function that iterates over all of the input
 // functions and calls all non-nil functions sequentially. Nil
 // functions are ignored.
-func Join(fns ...func()) func() {
-	return func() {
-		for _, f := range fns {
-			SafeCall(f)
+func JoinFuture(fns []func()) func() { return func() { CallMany(fns) } }
+
+func Call(op func()) { op() }
+
+func Do[T any](op func() T) T { return op() }
+
+func ApplyMany[T any](fn func(T), args []T) {
+	for idx := 0; idx < len(args) && fn != nil; idx++ {
+		// don't need to use the safe variant because we check
+		// if it's nil in the loop
+		Apply(fn, args[idx])
+	}
+}
+
+func CallMany(ops []func()) {
+	for idx := range ops {
+		SafeCall(ops[idx])
+	}
+}
+
+func DoMany[T any](ops []func() T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for idx := 0; idx < len(ops); idx++ {
+			if op := ops[idx]; op == nil || yield(op()) {
+				continue
+			}
+
+			break
 		}
 	}
 }
 
-// Apply returns a function object that, when called calls the input
+func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		for idx := 0; idx < len(ops); idx++ {
+			if op := ops[idx]; op == nil || yield(op()) {
+				continue
+			}
+
+			break
+		}
+	}
+}
+
+func Slice[T any](items ...T) []T { return items }
+
+// Apply calls the input function with the provided argument.
+func Apply[T any](fn func(T), arg T) { fn(arg) }
+
+// JoinApply returns a function object that, when called calls the input
 // function with the provided argument.
-func Apply[T any](fn func(T), arg T) func() { return func() { fn(arg) } }
+func ApplyFuture[T any](fn func(T), arg T) func() { return func() { Apply(fn, arg) } }
 
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.

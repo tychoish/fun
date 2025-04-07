@@ -28,29 +28,17 @@ func MakeProcessor[T any](fn func(T) error) Processor[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
 
-// MakeHandlerProcessor converts a handler-type function to a processor.
-func MakeHandlerProcessor[T any](fn func(T)) Processor[T] {
-	return func(_ context.Context, in T) error { fn(in); return nil }
-}
-
 // NewProcessors returns a processor as a convenience function to
 // avoid the extra cast when creating new function objects.
 func NewProcessor[T any](fn func(context.Context, T) error) Processor[T] { return fn }
 
-// Processify provides an easy converter/constructor for
-// Processor-type function.
-//
-// Deprecated: use NewProcessor for this case.
-func Processify[T any](fn func(context.Context, T) error) Processor[T] { return NewProcessor(fn) }
+func MakeHandlerProcessor[T any](fn func(T)) Processor[T] {
+	return func(_ context.Context, in T) error { fn(in); return nil }
+}
 
-// ProcessifyHandler converts a handler-type function to a processor.
-//
-// Deprecated: use MakeHandlerProcessor for this case.
-func ProcessifyHandler[T any](fn Handler[T]) Processor[T] { return MakeHandlerProcessor(fn) }
-
-// ProcessorGroup takes a collection of Processor functions and merges
+// JoinProcessors takes a collection of Processor functions and merges
 // them into a single chain, eliding any nil processors.
-func ProcessorGroup[T any](pfs ...Processor[T]) Processor[T] {
+func JoinProcessors[T any](pfs ...Processor[T]) Processor[T] {
 	var pf Processor[T]
 	for _, fn := range pfs {
 		switch {
@@ -113,7 +101,7 @@ func (pf Processor[T]) After(ts time.Time) Processor[T] { return pf.Delay(time.U
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(ft.Wrapper(dur)) }
+func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(ft.Wrap(dur)) }
 
 // Jitter wraps a Processor that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
@@ -138,7 +126,7 @@ func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
 // nil.
 //
 // The resulting processor can be used more than once.
-func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(ft.Wrapper(c)) }
+func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(ft.Wrap(c)) }
 
 // When returns a processor function that runs if the conditional function
 // returns true, and does not run otherwise. The conditional function
@@ -183,12 +171,6 @@ func (pf Processor[T]) merge(next Processor[T]) Processor[T] {
 		return next.If(ctx.Err() == nil).Run(ctx, in)
 	}
 }
-
-// Iterator creates a worker function that processes the iterator with
-// the processor function, merging/collecting all errors, and
-// respecting the worker's context. The processing does not begin
-// until the worker is called.
-func (pf Processor[T]) Iterator(iter *Iterator[T]) Worker { return iter.Process(pf) }
 
 // Background processes an item in a separate goroutine and returns a
 // worker that will block until the underlying operation is complete.
@@ -336,12 +318,12 @@ func (pf Processor[T]) WithErrorCheck(ef Future[error]) Processor[T] {
 // ReadOne returns a future (Worker) that calls the processor function
 // on the output of the provided producer function. ReadOne uses the
 // fun.Pipe() operation for the underlying implementation.
-func (pf Processor[T]) ReadOne(prod Producer[T]) Worker { return Pipe(prod, pf) }
+func (pf Processor[T]) ReadOne(prod Generator[T]) Worker { return Pipe(prod, pf) }
 
 // ReadAll reads elements from the producer until an error is
 // encountered and passes them to a producer, until the first error is
 // encountered. The worker is blocking.
-func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
+func (pf Processor[T]) ReadAll(prod Generator[T]) Worker {
 	return func(ctx context.Context) error {
 
 	LOOP:
@@ -352,7 +334,7 @@ func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 			}
 
 			switch {
-			case err == nil || errors.Is(err, ErrIteratorSkip):
+			case err == nil || errors.Is(err, ErrStreamContinue):
 				continue LOOP
 			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 				return nil
@@ -367,7 +349,7 @@ func (pf Processor[T]) ReadAll(prod Producer[T]) Worker {
 // processes them concurrently. All panics are converted to errors and
 // all errors are aggregated.
 func (pf Processor[T]) Parallel(ops ...T) Worker {
-	return SliceIterator(ops).ProcessParallel(pf,
+	return SliceStream(ops).ProcessParallel(pf,
 		WorkerGroupConfNumWorkers(len(ops)),
 		WorkerGroupConfContinueOnError(),
 		WorkerGroupConfContinueOnPanic(),
@@ -381,15 +363,15 @@ func (pf Processor[T]) Parallel(ops ...T) Worker {
 //
 // Context cancellation errors are returned to the caller, other
 // terminating errors are not, with any other errors encountered
-// during retries. ErrIteratorSkip is always ignored and not
+// during retries. ErrStreamContinue is always ignored and notfun.Mfun.M
 // aggregated. All errors are discarded if the retry operation
 // succeeds in the provided number of retries.
 //
-// Except for ErrIteratorSkip, which is ignored, all other errors are
+// Except for ErrStreamContinue, which is ignored, all other errors are
 // aggregated and returned to the caller only if the retry fails. It's
 // possible to return a nil error without successfully completing the
 // underlying operation, if the processor only returned
-// ErrIteratorSkip values.
+// ErrStreamContinue values.
 func (pf Processor[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
 
 ////////////////////////////////////////////////////////////////////////

@@ -185,7 +185,7 @@ func TestOperation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
-		HF.OperationPool(SliceIterator(wfs)).Run(ctx)
+		MAKE.OperationPool(SliceStream(wfs)).Run(ctx)
 		dur := time.Since(start)
 		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 			t.Error(dur)
@@ -203,7 +203,7 @@ func TestOperation(t *testing.T) {
 			counter++
 		}
 
-		wf := of.Iterator(SliceIterator(ops))
+		wf := SliceStream(ops).Observe(of)
 
 		if len(seen) != 0 || counter != 0 {
 			t.Error("should be lazy execution", counter, seen)
@@ -333,7 +333,7 @@ func TestOperation(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op) })
 
-			err := SliceIterator(jobs).ProcessParallel(HF.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
+			err := SliceStream(jobs).ProcessParallel(MAKE.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 		})

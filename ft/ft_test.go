@@ -172,7 +172,7 @@ func TestWhenHandle(t *testing.T) {
 
 func TestApply(t *testing.T) {
 	called := 0
-	out := Apply(func(n int) { called++; check.Equal(t, 42, n) }, 42)
+	out := ApplyFuture(func(n int) { called++; check.Equal(t, 42, n) }, 42)
 	check.Equal(t, 0, called)
 	out()
 	check.Equal(t, 1, called)
@@ -180,10 +180,10 @@ func TestApply(t *testing.T) {
 
 func TestWrap(t *testing.T) {
 	t.Run("Wrapper", func(t *testing.T) {
-		assert.NotError(t, Wrapper[error](nil)())
-		assert.Error(t, Wrapper(errors.New("Hello"))())
-		assert.Equal(t, Wrapper(1)(), 1)
-		assert.Equal(t, Wrapper("hello")(), "hello")
+		assert.NotError(t, Wrap[error](nil)())
+		assert.Error(t, Wrap(errors.New("Hello"))())
+		assert.Equal(t, Wrap(1)(), 1)
+		assert.Equal(t, Wrap("hello")(), "hello")
 	})
 	t.Run("Cast", func(t *testing.T) {
 		var out string
@@ -389,13 +389,13 @@ func TestContexts(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		assert.NotPanic(t, func() { Join() })
-		assert.NotPanic(t, func() { Join(nil, nil) })
+		assert.NotPanic(t, func() { JoinFuture(Slice[func()]()) })
+		assert.NotPanic(t, func() { JoinFuture(Slice[func()](nil, nil)) })
 	})
 	t.Run("Called", func(t *testing.T) {
 		count := 0
 		fn := func() { count++ }
-		Join(fn, fn, nil, fn, fn)()
+		JoinFuture(Slice(fn, fn, nil, fn, fn))()
 		assert.Equal(t, count, 4)
 	})
 }

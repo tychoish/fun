@@ -47,7 +47,7 @@ func TestShardedMap(t *testing.T) {
 				check.Equal(t, ft.MustBeOk(m.Load("b")), 42)
 				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
 			})
-			t.Run("Iterator", func(t *testing.T) {
+			t.Run("Stream", func(t *testing.T) {
 				ctx := testt.Context(t)
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
@@ -73,7 +73,7 @@ func TestShardedMap(t *testing.T) {
 
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
-					for item := range m.Iterator().Seq(ctx) {
+					for item := range m.Stream().Seq(ctx) {
 						ct++
 						check(t, item)
 					}
@@ -81,7 +81,7 @@ func TestShardedMap(t *testing.T) {
 				})
 				t.Run("Parallel", func(t *testing.T) {
 					ct := 0
-					for item := range m.ParallelIterator().Seq(ctx) {
+					for item := range m.ParallelStream().Seq(ctx) {
 						ct++
 						check(t, item)
 					}

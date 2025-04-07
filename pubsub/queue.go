@@ -122,7 +122,7 @@ func (q *Queue[T]) doAdd(item T) error {
 		q.nempty.Signal()
 	}
 
-	// for the iterator, signal for any updates
+	// for the stream, signal for any updates
 	q.nupdates.Signal()
 
 	return nil
@@ -193,7 +193,7 @@ func (q *Queue[T]) Wait(ctx context.Context) (out T, _ error) {
 }
 
 // caller must hold the lock, but this implements the wait behavior
-// without modifying the queue for use in the iterator.
+// without modifying the queue for use in the stream.
 func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 	// If the context terminates, wake the waiter.
 	ctx, cancel := context.WithCancel(ctx)
@@ -317,18 +317,18 @@ type entry[T any] struct {
 	link *entry[T]
 }
 
-// Iterator produces an iterator implementation that wraps the
-// underlying queue linked list. The iterator respects the Queue's
+// Stream produces a stream implementation that wraps the
+// underlying queue linked list. The stream respects the Queue's
 // mutex and is safe for concurrent access and current queue
-// operations, without additional locking. The iterator does not
+// operations, without additional locking. The stream does not
 // modify or remove items from the queue, and will only terminate when
 // the queue has been closed via the Close() method.
 //
-// To create a "consuming" iterator, use a Distributor.
-func (q *Queue[T]) Iterator() *fun.Iterator[T] { return q.Producer().Iterator() }
+// To create a "consuming" stream, use a Distributor.
+func (q *Queue[T]) Stream() *fun.Stream[T] { return q.Generator().Stream() }
 
 // Distributor creates a object used to process the items in the
-// queue: items yielded by the Distributor's iterator, are removed
+// queue: items yielded by the Distributor's stream, are removed
 // from the queue.
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
@@ -345,10 +345,10 @@ func (q *Queue[T]) Distributor() Distributor[T] {
 	}
 }
 
-// Producer returns a function that produces items from the
+// Generator returns a function that produces items from the
 // queue, iteratively. It's not destructive, and has the same
-// semantics as the Iterator.
-func (q *Queue[T]) Producer() fun.Producer[T] {
+// semantics as the Stream.
+func (q *Queue[T]) Generator() fun.Generator[T] {
 	var next *entry[T]
 	return func(ctx context.Context) (o T, _ error) {
 		if next == nil {

@@ -20,14 +20,14 @@ import (
 )
 
 // Group makes it possible to have a collection of services, provided
-// via an iterator, that behave as a single service. All services are
+// via a stream, that behave as a single service. All services are
 // started concurrently (and without order) and shutdown concurrently
 // (and without order). The Service produced by group, has the same
 // semantics as any other Service.
 //
 // Use Group(itertool.Slice([]*Service)) to produce a group from a
 // slice of *Services,
-func Group(services *fun.Iterator[*Service]) *Service {
+func Group(services *fun.Stream[*Service]) *Service {
 	waiters := pubsub.NewUnlimitedQueue[func() error]()
 	wg := &fun.WaitGroup{}
 	ec := &erc.Collector{}
@@ -54,10 +54,10 @@ func Group(services *fun.Iterator[*Service]) *Service {
 			// the chance to collect all errors from the contained
 			// services. This will cause our "group service" to
 			// have the same semantics as a single service, however.
-			iter := waiters.Iterator()
+			iter := waiters.Stream()
 
 			// because we know that the implementation of the
-			// waiters iterator won't block in this context, it's
+			// waiters stream won't block in this context, it's
 			// safe to call it with a background context, though
 			// it's worth being careful here
 			ctx := context.Background()
@@ -108,7 +108,7 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 }
 
 // Wait creates a service that runs until *both* all wait functions
-// have returned *and* the iterator is exhausted. The Service's wait
+// have returned *and* the stream is exhausted. The Service's wait
 // function returns an error that aggregates all errors (e.g. panics)
 // encountered by the constituent wait functions.
 //
@@ -117,9 +117,9 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // existing orchestration tools.
 //
 // When the service returns all worker Goroutines as well as the input
-// worker will have returned. Use a blocking pubsub iterator to
+// worker will have returned. Use a blocking pubsub stream to
 // dispatch wait functions throughout the lifecycle of your program.
-func Wait(iter *fun.Iterator[fun.Operation]) *Service {
+func Wait(iter *fun.Stream[fun.Operation]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
@@ -147,11 +147,11 @@ func Wait(iter *fun.Iterator[fun.Operation]) *Service {
 	}
 }
 
-// ProcessIterator runs an itertool.ParallelForEach operation as a
-// *Service. For a long running service, use an iterator that is
+// ProcessStream runs an itertool.ParallelForEach operation as a
+// *Service. For a long running service, use a stream that is
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
-func ProcessIterator[T any](
-	iter *fun.Iterator[T],
+func ProcessStream[T any](
+	iter *fun.Stream[T],
 	processor fun.Processor[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
@@ -176,7 +176,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 
 	return &Service{
 		Run: func(ctx context.Context) error {
-			iter := pipe.Distributor().Iterator()
+			iter := pipe.Distributor().Stream()
 
 			for {
 				item, err := iter.ReadOne(ctx)
@@ -197,7 +197,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 
 			ec := &erc.Collector{}
 
-			ec.Add(itertool.ParallelForEach(ctx, cache.PopIterator(),
+			ec.Add(itertool.ParallelForEach(ctx, cache.StreamPopFront(),
 				func(ctx context.Context, wf fun.Worker) error {
 					ec.Add(wf.WithRecover().Run(ctx))
 					return nil
@@ -221,7 +221,7 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 	return &Service{
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
-				workQueue.Distributor().Iterator(),
+				workQueue.Distributor().Stream(),
 				func(ctx context.Context, fn fun.Worker) error {
 					return fn.Run(ctx)
 				},
@@ -254,7 +254,7 @@ func HandlerWorkerPool(
 	s := &Service{
 		Run: func(ctx context.Context) error {
 			return itertool.ParallelForEach(ctx,
-				workQueue.Distributor().Iterator(),
+				workQueue.Distributor().Stream(),
 				func(ctx context.Context, fn fun.Worker) error {
 					observer(fn.Run(ctx))
 					return nil

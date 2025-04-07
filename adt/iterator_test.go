@@ -17,7 +17,7 @@ import (
 	"github.com/tychoish/fun/testt"
 )
 
-func TestIterator(t *testing.T) {
+func TestStream(t *testing.T) {
 	t.Run("Semantics", func(t *testing.T) {
 		ctx := testt.Context(t)
 		mp := &Map[string, int]{}
@@ -26,7 +26,7 @@ func TestIterator(t *testing.T) {
 		mp.Store("three", 3)
 		mp.Store("four", 4)
 
-		iter := mp.Iterator()
+		iter := mp.Stream()
 
 		seen := 0
 		for iter.Next(ctx) {
@@ -75,14 +75,14 @@ func TestIterator(t *testing.T) {
 		wg.Wait()
 		assert.Equal(t, count.Load(), 1000)
 	})
-	t.Run("AlternateSyncIterator", func(t *testing.T) {
+	t.Run("AlternateSyncStream", func(t *testing.T) {
 		t.Run("Normal", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			counter := &atomic.Int64{}
 
-			iter := fun.Producer[int](func(ctx context.Context) (int, error) {
+			iter := fun.Generator[int](func(ctx context.Context) (int, error) {
 				if err := ctx.Err(); err != nil {
 					return 0, err
 				}
@@ -93,7 +93,7 @@ func TestIterator(t *testing.T) {
 				}
 
 				return int(val), nil
-			}).Lock().Iterator()
+			}).Lock().Stream()
 			for {
 				val, err := iter.ReadOne(ctx)
 				testt.Log(t, err, val)
@@ -112,7 +112,7 @@ func TestIterator(t *testing.T) {
 
 			counter := &atomic.Int64{}
 
-			iter := fun.Producer[int](func(ctx context.Context) (int, error) {
+			iter := fun.Generator[int](func(ctx context.Context) (int, error) {
 				if err := ctx.Err(); err != nil {
 					return 0, err
 				}
@@ -122,7 +122,7 @@ func TestIterator(t *testing.T) {
 				}
 				return int(val), nil
 
-			}).Lock().Iterator()
+			}).Lock().Stream()
 
 			for {
 				val, err := iter.ReadOne(ctx)

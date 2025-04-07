@@ -13,7 +13,7 @@ const ErrUninitializedContainer ers.Error = ers.Error("uninitialized container")
 
 // Map is just a generic type wrapper around a map, mostly for the
 // purpose of being able to interact with Pair[K,V] objects and
-// Iterators.
+// Streams.
 //
 // All normal map operations are still accessible, these methods
 // exist to provide accessible function objects for use in contexts
@@ -38,46 +38,33 @@ func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
 	}
 }
 
-// MapIterator converts a map into an iterator of dt.Pair objects. The
-// iterator is panic-safe, and uses one go routine to track the
+// MapStream converts a map into a stream of dt.Pair objects. The
+// stream is panic-safe, and uses one go routine to track the
 // progress through the map. As a result you should always, either
-// exhaust the iterator, cancel the context that you pass to the
-// iterator OR call iterator.Close().
+// exhaust the stream, cancel the context that you pass to the
+// stream OR call stream.Close().
 //
-// To use this iterator the items in the map are not copied, and the
+// To use this stream the items in the map are not copied, and the
 // iteration order is randomized following the convention in go.
 //
-// Use in combination with other iterator processing tools
+// Use in combination with other stream processing tools
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func MapIterator[K comparable, V any](in map[K]V) *fun.Iterator[Pair[K, V]] {
-	return NewMap(in).Iterator()
+func MapStream[K comparable, V any](in map[K]V) *fun.Stream[Pair[K, V]] {
+	return NewMap(in).Stream()
 }
 
-// MapKeys takes an arbitrary map and produces an iterator over only
+// MapKeys takes an arbitrary map and produces a stream over only
 // the keys.
-func MapKeys[K comparable, V any](in map[K]V) *fun.Iterator[K] { return NewMap(in).Keys() }
+func MapKeys[K comparable, V any](in map[K]V) *fun.Stream[K] { return NewMap(in).Keys() }
 
-// MapValues takes an arbitrary map and produces an iterator over only
+// MapValues takes an arbitrary map and produces a stream over only
 // the values.
-func MapValues[K comparable, V any](in map[K]V) *fun.Iterator[V] { return NewMap(in).Values() }
+func MapValues[K comparable, V any](in map[K]V) *fun.Stream[V] { return NewMap(in).Values() }
 
 // NewMap provides a constructor that will produce a fun.Map without
 // specifying types.
 func NewMap[K comparable, V any](in map[K]V) Map[K, V] { return in }
-
-// NewMapFromIterator constructs an map from a fun.Iterator of pairs.
-func NewMapFromIterator[K comparable, V any](ctx context.Context, it *fun.Iterator[Pair[K, V]]) Map[K, V] {
-	out := Map[K, V]{}
-	it.Observe(out.AddPair).Ignore().Run(ctx)
-	return out
-}
-
-// Mapify provides a constructor that will produce a fun.Map without
-// specifying types.
-//
-// Deprecated: use NewMap() for this case.
-func Mapify[K comparable, V any](in map[K]V) Map[K, V] { return NewMap(in) }
 
 // Check returns true if the value K is in the map.
 func (m Map[K, V]) Check(key K) bool { _, ok := m[key]; return ok }
@@ -140,7 +127,7 @@ func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
 func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
-	fun.Invariant.Must(pairs.Iterator().Observe(m.AddPair).Wait())
+	pairs.Stream().Observe(m.AddPair).Ignore().Wait()
 }
 
 // ConsumeMap adds all the keys from the input map the map.
@@ -163,48 +150,59 @@ func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 // ConsumePairs adds items to the map from a Pairs object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ConsumePairs(pairs *Pairs[K, V]) {
-	pairs.Iterator().Observe(m.AddPair).Ignore().Wait()
+	pairs.Stream().Observe(m.AddPair).Ignore().Wait()
 }
 
 // ConsumeTuples adds items to the map from a Tuples object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ConsumeTuples(tuples *Tuples[K, V]) {
-	tuples.Iterator().Observe(m.AddTuple).Ignore().Wait()
+	tuples.Stream().Observe(m.AddTuple).Ignore().Wait()
 }
 
+// ConsumeStream adds items to the map. If a key already exists in the
+// map, it will be overwritten for subsequent appearances of that key.
+//
+// This operation is lazy, and returns a Worker (future) function that
+// must be excuted to process the stream.
+func (m Map[K, V]) ConsumeStream(it *fun.Stream[Pair[K, V]]) fun.Worker { return it.Observe(m.AddPair) }
+
 // ConsumeValues adds items to the map, using the function to generate
-// the keys for the values.
+// the keys for the values. If a key already exists in the map, it
+// will be overwritten for subsequent appearances of that key.
+//
+// This operation is lazy, and returns a Worker (future) function that
+// must be excuted to process the stream.
 //
 // This operation will panic (with an ErrInvariantValidation) if the
 // keyf panics.
-func (m Map[K, V]) ConsumeValues(iter *fun.Iterator[V], keyf func(V) K) fun.Worker {
+func (m Map[K, V]) ConsumeValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
 	return iter.Observe(func(in V) { m[keyf(in)] = in })
 }
 
-// Iterator converts a map into an iterator of dt.Pair objects. The
-// iterator is panic-safe, and uses one go routine to track the
+// Stream converts a map into a stream of dt.Pair objects. The
+// stream is panic-safe, and uses one go routine to track the
 // progress through the map. As a result you should always, either
-// exhaust the iterator, cancel the context that you pass to the
-// iterator OR call iterator.Close().
+// exhaust the stream, cancel the context that you pass to the
+// stream OR call stream.Close().
 //
-// To use this iterator the items in the map are not copied, and the
+// To use this stream the items in the map are not copied, and the
 // iteration order is randomized following the convention in go.
 //
-// Use in combination with other iterator processing tools
+// Use in combination with other stream processing tools
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func (m Map[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { return m.Producer().Iterator() }
+func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] { return m.Generator().Stream() }
 
-// Keys provides an iterator over just the keys in the map.
-func (m Map[K, V]) Keys() *fun.Iterator[K] { return m.ProducerKeys().Iterator() }
+// Keys provides a stream over just the keys in the map.
+func (m Map[K, V]) Keys() *fun.Stream[K] { return m.GeneratorKeys().Stream() }
 
-// Values provides an iterator over just the values in the map.
-func (m Map[K, V]) Values() *fun.Iterator[V] { return m.ProducerValues().Iterator() }
+// Values provides a stream over just the values in the map.
+func (m Map[K, V]) Values() *fun.Stream[V] { return m.GeneratorValues().Stream() }
 
-// Producer constructs a fun.Producer function for the pairs in the
+// Generator constructs a fun.Generator function for the pairs in the
 // map. The operation starts a goroutine on the first iteration that
-// tracks the state of the iterator. Iteration order is randomized.
-func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
+// tracks the state of the stream. Iteration order is randomized.
+func (m Map[K, V]) Generator() fun.Generator[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -217,13 +215,13 @@ func (m Map[K, V]) Producer() fun.Producer[Pair[K, V]] {
 		}
 	}).Go().Once()
 
-	return pipe.Receive().Producer().PreHook(init)
+	return pipe.Receive().Generator().PreHook(init)
 }
 
-// ProducerKeys returns a generator that generates the keys of the
+// GeneratorKeys returns a generator that generates the keys of the
 // map. The operation requires a goroutine to keep track of the state
 // of the iteration, but does not buffer or cache keys.
-func (m Map[K, V]) ProducerKeys() fun.Producer[K] {
+func (m Map[K, V]) GeneratorKeys() fun.Generator[K] {
 	pipe := fun.Blocking(make(chan K))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -236,13 +234,13 @@ func (m Map[K, V]) ProducerKeys() fun.Producer[K] {
 		}
 	}).Go().Once()
 
-	return pipe.Receive().Producer().PreHook(init)
+	return pipe.Receive().Generator().PreHook(init)
 }
 
-// ProducerValues returns a generator that generates the values of the
+// GeneratorValues returns a generator that generates the values of the
 // map. The operation requires a goroutine to keep track of the state
 // of the iteration, but does not buffer or cache values.
-func (m Map[K, V]) ProducerValues() fun.Producer[V] {
+func (m Map[K, V]) GeneratorValues() fun.Generator[V] {
 	pipe := fun.Blocking(make(chan V))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -255,5 +253,5 @@ func (m Map[K, V]) ProducerValues() fun.Producer[V] {
 		}
 	}).Go().Once()
 
-	return pipe.Receive().Producer().PreHook(init)
+	return pipe.Receive().Generator().PreHook(init)
 }

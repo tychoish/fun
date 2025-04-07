@@ -39,7 +39,7 @@ func (c *Collector) Add(err error) {
 
 type none struct{}
 
-func testIntIter(t *testing.T, size int) *Iterator[int] {
+func testIntIter(t *testing.T, size int) *Stream[int] {
 	t.Helper()
 
 	var count int
@@ -49,13 +49,13 @@ func testIntIter(t *testing.T, size int) *Iterator[int] {
 		check.Equal(t, count, size)
 	})
 
-	return Generator(func(context.Context) (int, error) {
+	return MakeGenerator(func() (int, error) {
 		if count >= size {
 			return 0, io.EOF
 		}
 		count++
 		return count - 1, nil
-	})
+	}).Stream()
 
 }
 
@@ -67,12 +67,12 @@ func GenerateRandomStringSlice(size int) []string {
 	return out
 }
 
-func TestIterator(t *testing.T) {
+func TestStream(t *testing.T) {
 	t.Run("Observe", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{})
+			iter := SliceStream([]int{})
 			assert.NotError(t, iter.Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 
 			_, err := iter.ReadOne(ctx)
@@ -82,7 +82,7 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			called := 0
-			err := SliceIterator([]int{1, 2, 34, 56}).Observe(func(in int) {
+			err := SliceStream([]int{1, 2, 34, 56}).Observe(func(in int) {
 				called++
 				if in > 3 {
 					panic("eep!")
@@ -103,7 +103,7 @@ func TestIterator(t *testing.T) {
 			cancel()
 			count := 0
 			assert.Error(t, ctx.Err())
-			err := SliceIterator([]int{1, 2, 34, 56}).Observe(func(int) {
+			err := SliceStream([]int{1, 2, 34, 56}).Observe(func(int) {
 				count++
 			}).Run(ctx)
 			t.Log(err)
@@ -119,7 +119,7 @@ func TestIterator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		count := 0
-		iter := Generator(func(_ context.Context) (int, error) {
+		iter := NewGenerator(func(_ context.Context) (int, error) {
 			count++
 			switch {
 			case count > 128:
@@ -128,9 +128,9 @@ func TestIterator(t *testing.T) {
 			case count%2 == 0:
 				return count, nil
 			default:
-				return -1, ErrIteratorSkip
+				return -1, ErrStreamContinue
 			}
-		})
+		}).Stream()
 		ints, err := iter.Slice(ctx)
 		check.NotError(t, err)
 		check.Equal(t, len(ints), 64)
@@ -142,14 +142,14 @@ func TestIterator(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, HF.Counter(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
+		check.NotError(t, MAKE.Counter(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
 	t.Run("Transform", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		out := ft.Must(VariadicIterator(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(Converter(func(in int) int { return in / 4 })).Slice(ctx))
+		out := ft.Must(VariadicStream(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(Converter(func(in int) int { return in / 4 })).Slice(ctx))
 
 		check.EqualItems(t, out, []int{1, 2, 4, 8, 16, 32, 64, 128, 256})
 	})
@@ -158,7 +158,7 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(_ context.Context, _ int) error { count++; return nil }).Run(ctx)
 			assert.NotError(t, err)
@@ -167,9 +167,9 @@ func TestIterator(t *testing.T) {
 		t.Run("ProcessWorker", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			op := Processor[int](func(_ context.Context, _ int) error { count++; return nil }).Iterator(iter)
+			op := iter.Process(func(_ context.Context, _ int) error { count++; return nil })
 			err := op(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
@@ -177,7 +177,7 @@ func TestIterator(t *testing.T) {
 		t.Run("Abort", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(_ context.Context, _ int) error { count++; return io.EOF }).Run(ctx)
 			assert.NotError(t, err)
@@ -186,7 +186,7 @@ func TestIterator(t *testing.T) {
 		t.Run("OperationError", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(_ context.Context, _ int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
 			assert.Error(t, err)
@@ -196,7 +196,7 @@ func TestIterator(t *testing.T) {
 		t.Run("Panic", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(_ context.Context, _ int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
 			assert.Error(t, err)
@@ -207,7 +207,7 @@ func TestIterator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.Process(func(ctx context.Context, _ int) error { count++; cancel(); return ctx.Err() }).Run(ctx)
 			assert.Error(t, err)
@@ -218,7 +218,7 @@ func TestIterator(t *testing.T) {
 		t.Run("Parallel", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
 			err := iter.ProcessParallel(
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
@@ -234,7 +234,7 @@ func TestIterator(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			input := SliceIterator([]string{
+			input := SliceStream([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
 				fmt.Sprint(20),
@@ -242,7 +242,7 @@ func TestIterator(t *testing.T) {
 			})
 			calls := 0
 
-			out := ConvertIterator(input,
+			out := ConvertStream(input,
 				ConverterOk(func(in string) (int, bool) {
 					calls++
 					return ers.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
@@ -259,7 +259,7 @@ func TestIterator(t *testing.T) {
 		t.Run("Skips", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			input := SliceIterator([]string{
+			input := SliceStream([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
 				fmt.Sprint(20),
@@ -267,9 +267,9 @@ func TestIterator(t *testing.T) {
 			})
 			calls := 0
 
-			out := ConvertIterator(input, ConverterErr(func(in string) (int, error) {
+			out := ConvertStream(input, ConverterErr(func(in string) (int, error) {
 				if in == "2" {
-					return 0, ErrIteratorSkip
+					return 0, ErrStreamContinue
 				}
 				calls++
 				return strconv.Atoi(in)
@@ -285,7 +285,7 @@ func TestIterator(t *testing.T) {
 		t.Run("ErrorPropogation", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			input := SliceIterator([]string{
+			input := SliceStream([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
 				fmt.Sprint(20),
@@ -293,7 +293,7 @@ func TestIterator(t *testing.T) {
 			})
 			calls := 0
 
-			out := ConvertIterator(input, ConverterErr(func(in string) (int, error) {
+			out := ConvertStream(input, ConverterErr(func(in string) (int, error) {
 				if in == "20" {
 					return 0, ers.ErrInvalidInput
 				}
@@ -316,9 +316,9 @@ func TestIterator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		t.Run("BasicOperation", func(t *testing.T) {
-			iter := Generator(func(context.Context) (int, error) {
+			iter := NewGenerator(func(context.Context) (int, error) {
 				return 1, nil
-			})
+			}).Stream()
 
 			if iter.Value() != 0 {
 				t.Error("should initialize to zero")
@@ -335,13 +335,13 @@ func TestIterator(t *testing.T) {
 		})
 		t.Run("RespectEOF", func(t *testing.T) {
 			count := 0
-			iter := Generator(func(context.Context) (int, error) {
+			iter := NewGenerator(func(context.Context) (int, error) {
 				count++
 				if count > 10 {
 					return 1000, io.EOF
 				}
 				return count, nil
-			})
+			}).Stream()
 
 			seen := 0
 			for iter.Next(ctx) {
@@ -359,14 +359,14 @@ func TestIterator(t *testing.T) {
 			count := 0
 			expected := errors.New("kip")
 			returned := false
-			iter := Generator(func(context.Context) (int, error) {
+			iter := NewGenerator(func(context.Context) (int, error) {
 				count++
 				if count > 10 {
 					returned = true
 					return 1000, expected
 				}
 				return count, nil
-			})
+			}).Stream()
 
 			seen := 0
 			for iter.Next(ctx) {
@@ -400,7 +400,7 @@ func TestIterator(t *testing.T) {
 	t.Run("Split", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		input := SliceIterator(GenerateRandomStringSlice(100))
+		input := SliceStream(GenerateRandomStringSlice(100))
 
 		splits := input.Split(0)
 		if splits != nil {
@@ -418,7 +418,7 @@ func TestIterator(t *testing.T) {
 		for _, iter := range splits {
 			wg.Add(1)
 
-			go func(it *Iterator[string]) {
+			go func(it *Stream[string]) {
 				defer wg.Done()
 				for it.Next(ctx) {
 					count.Add(1)
@@ -437,7 +437,7 @@ func TestIterator(t *testing.T) {
 	t.Run("Buffer", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		input := SliceIterator(GenerateRandomStringSlice(128))
+		input := SliceStream(GenerateRandomStringSlice(128))
 		buf := input.Buffer(256)
 		check.Equal(t, buf.Count(ctx), 128)
 		check.True(t, buf.closer.state.Load())
@@ -446,7 +446,7 @@ func TestIterator(t *testing.T) {
 	t.Run("ParallelBuffer", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		input := SliceIterator(GenerateRandomStringSlice(128))
+		input := SliceStream(GenerateRandomStringSlice(128))
 		buf := input.ParallelBuffer(256)
 		check.Equal(t, buf.Count(ctx), 128)
 		check.True(t, buf.closer.state.Load())
@@ -456,7 +456,7 @@ func TestIterator(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			iter := SliceIterator([]int{1, 2, 3, 4})
+			iter := SliceStream([]int{1, 2, 3, 4})
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -474,19 +474,23 @@ func TestIterator(t *testing.T) {
 		t.Run("Canceled", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			iter := &Iterator[int]{
+			iter := &Stream[int]{
 				operation: func(context.Context) (int, error) { return 0, nil },
 			}
-			iter.closer.op = func() {}
-			seen := 0
-			for iter.Next(ctx) {
-				seen++
-			}
-			if seen != 0 {
-				t.Error(seen)
-			}
-			if iter.Close() != nil {
-				t.Error(iter.Close())
+			iter.closer.ops = []func(){
+				func() {
+					seen := 0
+					for iter.Next(ctx) {
+						seen++
+					}
+					if seen != 0 {
+						t.Error(seen)
+					}
+					if iter.Close() != nil {
+						t.Error(iter.Close())
+					}
+
+				},
 			}
 		})
 	})
@@ -598,13 +602,13 @@ func TestIterator(t *testing.T) {
 		defer cancel()
 		elems := GenerateRandomStringSlice(100)
 
-		iter := FlattenIterators(
-			VariadicIterator(
-				SliceIterator(elems),
-				SliceIterator(elems),
-				SliceIterator(elems),
-				SliceIterator(elems),
-				SliceIterator(elems),
+		iter := FlattenStreams(
+			VariadicStream(
+				SliceStream(elems),
+				SliceStream(elems),
+				SliceStream(elems),
+				SliceStream(elems),
+				SliceStream(elems),
 			),
 		)
 		seen := make(map[string]struct{}, len(elems))
@@ -633,10 +637,10 @@ func TestIterator(t *testing.T) {
 		defer cancel()
 
 		pipe := make(chan string)
-		iter := ChainIterators(
-			Blocking(pipe).Iterator(),
-			Blocking(pipe).Iterator(),
-			Blocking(pipe).Iterator(),
+		iter := JoinStreams(
+			Blocking(pipe).Stream(),
+			Blocking(pipe).Stream(),
+			Blocking(pipe).Stream(),
 		)
 
 		ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
@@ -655,7 +659,7 @@ func TestAny(t *testing.T) {
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
 	count := 0
-	err := SliceIterator(sl).Any().Observe(func(in any) {
+	err := SliceStream(sl).Any().Observe(func(in any) {
 		count++
 		_, ok := in.(int)
 		check.True(t, ok)
@@ -672,9 +676,9 @@ func TestEmptyIteration(t *testing.T) {
 	close(ch)
 
 	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, SliceIterator([]int{}).Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
-		assert.NotError(t, VariadicIterator[int]().Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
-		assert.NotError(t, ChannelIterator(ch).Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, SliceStream([]int{}).Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, VariadicStream[int]().Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, ChannelStream(ch).Observe(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 	})
 
 }
@@ -684,13 +688,13 @@ func TestChain(t *testing.T) {
 	defer cancel()
 
 	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
-	iter := SliceIterator(num).Join(SliceIterator(num))
+	iter := SliceStream(num).Join(SliceStream(num))
 
 	n := iter.Count(ctx)
 
 	assert.Equal(t, len(num)*2, n)
 
-	iter = SliceIterator(num).Join(SliceIterator(num), SliceIterator(num), SliceIterator(num))
+	iter = SliceStream(num).Join(SliceStream(num), SliceStream(num), SliceStream(num))
 	cancel()
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
@@ -701,7 +705,7 @@ func TestJSON(t *testing.T) {
 	defer cancel()
 
 	t.Run("RoundTrip", func(t *testing.T) {
-		iter := SliceIterator([]int{400, 300, 42})
+		iter := SliceStream([]int{400, 300, 42})
 		out, err := iter.MarshalJSON()
 		if err != nil {
 			t.Fatal(err)
@@ -715,14 +719,14 @@ func TestJSON(t *testing.T) {
 		}
 	})
 	t.Run("MarshalErrors", func(t *testing.T) {
-		iter := SliceIterator([]Worker{func(context.Context) error { return nil }})
+		iter := SliceStream([]Worker{func(context.Context) error { return nil }})
 		_, err := iter.MarshalJSON()
 		if err == nil {
 			t.Fatal(err)
 		}
 	})
 	t.Run("Unmarshal", func(t *testing.T) {
-		iter := SliceIterator([]string{})
+		iter := SliceStream([]string{})
 		if err := iter.UnmarshalJSON([]byte(`["foo", "arg"]`)); err != nil {
 			t.Error(err)
 		}
@@ -746,7 +750,7 @@ func TestJSON(t *testing.T) {
 		}
 	})
 	t.Run("ErrorHandler", func(t *testing.T) {
-		iter := SliceIterator([]string{})
+		iter := SliceStream([]string{})
 
 		ec := iter.ErrorHandler()
 		ec(io.EOF)
@@ -764,7 +768,7 @@ func TestJSON(t *testing.T) {
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
 	})
 	t.Run("Channel", func(t *testing.T) {
-		iter := SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
+		iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Millisecond)
 		defer cancel()
 

@@ -58,7 +58,7 @@ func WorkerFuture(ch <-chan error) Worker {
 	}
 }
 
-// Pipe sends the output of a producer into the processor as if it
+// Pipe sends the output of a generator into the processor as if it
 // were a pipe. As a Worker this operation is delayed until the worker
 // is called.
 //
@@ -66,20 +66,20 @@ func WorkerFuture(ch <-chan error) Worker {
 // either function returns an error, it is cached, and successive
 // calls to the worker will return the same error. The only limitation
 // is that there is no way to distinguish between an error encountered
-// by the Producer and one by the processor.
+// by the Generator and one by the processor.
 //
-// If the producer returns ErrIteratorSkip, it will be called again.
-func Pipe[T any](from Producer[T], to Processor[T]) Worker {
+// If the generator returns ErrStreamContinue, it will be called again.
+func Pipe[T any](from Generator[T], to Processor[T]) Worker {
 	hasErrored := &atomic.Bool{}
-	var (
-		err error
-		val T
-	)
+
+	var err error
 
 	return func(ctx context.Context) error {
 		if hasErrored.Load() {
 			return err
 		}
+
+		var val T
 
 	RETRY:
 		for {
@@ -87,7 +87,7 @@ func Pipe[T any](from Producer[T], to Processor[T]) Worker {
 			switch {
 			case err == nil:
 				break RETRY
-			case errors.Is(err, ErrIteratorSkip):
+			case errors.Is(err, ErrStreamContinue):
 				continue
 			default:
 				hasErrored.Store(true)
@@ -192,7 +192,7 @@ func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ers.Ign
 // true. The error is always nil if the condition is false. If-ed
 // functions may be called more than once, and will run multiple
 // times potentiall.y
-func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrapper(cond)) }
+func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrap(cond)) }
 
 // When wraps a Worker function that will only run if the condition
 // function returns true. If the condition is false the worker does
@@ -217,7 +217,7 @@ func (wf Worker) After(ts time.Time) Worker {
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrapper(dur)) }
+func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrap(dur)) }
 
 // Jitter wraps a Worker that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
@@ -364,7 +364,7 @@ func (wf Worker) PostHook(op func()) Worker {
 // WithErrorCheck takes an error future, and checks it before
 // executing the worker function. If the error future returns an
 // error (any error), the worker propagates that error, rather than
-// running the underying producer. Useful for injecting an abort into
+// running the underying generator. Useful for injecting an abort into
 // an existing pipleine or chain.
 //
 // The error future is called before running the underlying worker,
@@ -389,7 +389,7 @@ func (wf Worker) WithErrorCheck(ef Future[error]) Worker {
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	wg := &WaitGroup{}
 
-	eh, ep := HF.ErrorCollector()
+	eh, ep := MAKE.ErrorCollector()
 
 	wf.Operation(eh).StartGroup(ctx, wg, n)
 
@@ -430,7 +430,7 @@ func (wf Worker) WithoutErrors(errs ...error) Worker {
 // terminating errors are not. All errors are discarded if the retry
 // operation succeeds in the provided number of retries.
 //
-// Except for ErrIteratorSkip, which is ignored, all other errors are
+// Except for ErrStreamContinue, which is ignored, all other errors are
 // aggregated and returned to the caller only if the retry fails.
 func (wf Worker) Retry(n int) Worker {
 	return func(ctx context.Context) (err error) {
@@ -441,7 +441,7 @@ func (wf Worker) Retry(n int) Worker {
 				return nil
 			case ers.IsExpiredContext(attemptErr):
 				return ers.Join(attemptErr, err)
-			case errors.Is(attemptErr, ErrIteratorSkip):
+			case errors.Is(attemptErr, ErrStreamContinue):
 				continue
 			case ers.IsTerminating(attemptErr):
 				return nil

@@ -123,7 +123,7 @@ func (h *Histogram) TotalCount() int64 {
 // Max returns the approximate maximum recorded value.
 func (h *Histogram) Max() int64 {
 	var maxVal int64
-	i := h.iterator()
+	i := h.stream()
 	for i.next() {
 		if i.countAtIdx != 0 {
 			maxVal = i.highestEquivalentValue
@@ -135,7 +135,7 @@ func (h *Histogram) Max() int64 {
 // Min returns the approximate minimum recorded value.
 func (h *Histogram) Min() int64 {
 	var minVal int64
-	i := h.iterator()
+	i := h.stream()
 	for i.next() {
 		if i.countAtIdx != 0 && minVal == 0 {
 			minVal = i.highestEquivalentValue
@@ -151,7 +151,7 @@ func (h *Histogram) Mean() float64 {
 		return 0
 	}
 	var total int64
-	i := h.iterator()
+	i := h.stream()
 	for i.next() {
 		if i.countAtIdx != 0 {
 			total += i.countAtIdx * h.medianEquivalentValue(i.valueFromIdx)
@@ -169,7 +169,7 @@ func (h *Histogram) StdDev() float64 {
 	mean := h.Mean()
 	geometricDevTotal := 0.0
 
-	i := h.iterator()
+	i := h.stream()
 	for i.next() {
 		if i.countAtIdx != 0 {
 			dev := float64(h.medianEquivalentValue(i.valueFromIdx)) - mean
@@ -242,7 +242,7 @@ func (h *Histogram) ValueAtQuantile(q float64) int64 {
 	total := int64(0)
 	countAtPercentile := int64(((q / 100) * float64(h.totalCount)) + 0.5)
 
-	i := h.iterator()
+	i := h.stream()
 	for i.next() {
 		total += i.countAtIdx
 		if total >= countAtPercentile {
@@ -296,7 +296,7 @@ type Bar struct {
 // Distribution returns an ordered list of bars of the
 // distribution of recorded values, counts can be normalized to a probability
 func (h *Histogram) Distribution() (result []Bar) {
-	i := h.iterator()
+	i := h.stream()
 	for i.next() {
 		result = append(result, Bar{
 			Count: i.countAtIdx,
@@ -370,7 +370,7 @@ func Import(s *Snapshot) *Histogram {
 	return h
 }
 
-func (h *Histogram) iterator() *iterator {
+func (h *Histogram) stream() *iterator {
 	return &iterator{
 		h:            h,
 		subBucketIdx: -1,

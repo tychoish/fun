@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"context"
 	"encoding/json"
 
 	"github.com/tychoish/fun"
@@ -55,22 +54,22 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-// ConsumeValues adds all of the values in the input iterator,
+// ConsumeValues adds all of the values from the input stream,
 // generating the keys using the function provided.
-func (p *Pairs[K, V]) ConsumeValues(iter *fun.Iterator[V], keyf func(V) K) fun.Worker {
+func (p *Pairs[K, V]) ConsumeValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
 	return p.Consume(fun.Converter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Process(iter))
 }
 
-// ConsumeSlice adds all the values in the input slice to the Pairs
+// ConsumeSlice adds all the values from the input slice to the Pairs
 // object, creating the keys using the function provide.
 func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 	NewSlice(in).Observe(func(value V) { p.Add(keyf(value), value) })
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.
-func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Iterator().Observe(p.Push).Ignore().Wait() }
+func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Stream().Observe(p.Push).Ignore().Wait() }
 
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.
-func (p *Pairs[K, V]) Map() map[K]V { return NewMapFromIterator(context.Background(), p.Iterator()) }
+func (p *Pairs[K, V]) Map() Map[K, V] { m := NewMap(map[K]V{}); m.ConsumePairs(p); return m }

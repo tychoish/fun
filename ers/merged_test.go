@@ -47,7 +47,7 @@ func TestStack(t *testing.T) {
 			t.Fatal("unexpected empty length", es.Len())
 		}
 
-		if l := collect(t, es.CheckProducer()); len(l) != 0 || l != nil {
+		if l := collect(t, es.Generator()); len(l) != 0 || l != nil {
 			t.Fatal("unexpected errors report", l)
 		}
 
@@ -55,14 +55,14 @@ func TestStack(t *testing.T) {
 	t.Run("ErrorsReportSingle", func(t *testing.T) {
 		es := &Stack{}
 		es.Push(errors.New(errval))
-		if l := collect(t, es.CheckProducer()); len(l) != 1 || l == nil {
+		if l := collect(t, es.Generator()); len(l) != 1 || l == nil {
 			t.Fatal("unexpected errors report", l)
 		}
 	})
 	t.Run("StackErrorStack", func(t *testing.T) {
 		es := &Stack{err: errors.New("outer")}
 		es.Push(&Stack{err: errors.New("inner")})
-		if l := collect(t, es.CheckProducer()); len(l) != 2 || l == nil {
+		if l := collect(t, es.Generator()); len(l) != 2 || l == nil {
 			t.Log(es.count, es)
 			t.Log(es.Error())
 			t.Fatal("unexpected errors report", l)

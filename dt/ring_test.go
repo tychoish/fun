@@ -180,7 +180,7 @@ func TestRing(t *testing.T) {
 		check.Equal(t, ring.Head(), 0)
 		check.Equal(t, ring.Tail(), 4)
 	})
-	t.Run("PopIterator", func(t *testing.T) {
+	t.Run("PopStream", func(t *testing.T) {
 		ring := &Ring[int]{}
 
 		for idx := range defaultRingSize * 2 {

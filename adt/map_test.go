@@ -171,7 +171,7 @@ func TestMap(t *testing.T) {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
-		iter := mp.Iterator()
+		iter := mp.Stream()
 		ctx := testt.Context(t)
 		count := 0
 		for iter.Next(ctx) {
@@ -186,14 +186,14 @@ func TestMap(t *testing.T) {
 		assert.NotError(t, iter.Close())
 		assert.Equal(t, count, 200)
 	})
-	t.Run("Iterator", func(t *testing.T) {
+	t.Run("Stream", func(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 200; i++ {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
-		iter := mp.Iterator()
+		iter := mp.Stream()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -310,7 +310,7 @@ func TestMap(t *testing.T) {
 		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 10})
 		check.True(t, !ok)
 	})
-	t.Run("Iterators", func(t *testing.T) {
+	t.Run("Streams", func(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
 			mp := &Map[string, int]{}
 			mp.Default.SetConstructor(func() int { return 38 })

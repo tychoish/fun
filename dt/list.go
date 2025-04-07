@@ -2,14 +2,12 @@ package dt
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"iter"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -20,21 +18,8 @@ import (
 // The Deque implementation in the pubsub package provides a similar
 // implementation with locking and a notification system.
 type List[T any] struct {
-	head   *Element[T]
-	length int
-}
-
-// NewListFromIterator builds a list from the elements in the
-// iterator. Any error returned is either a context cancellation error
-// or the result of a panic in the input iterator. The close method on
-// the input iterator is not called.
-func NewListFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*List[T], error) {
-	out := &List[T]{}
-	if err := out.Populate(iter).Run(ctx); err != nil {
-		return nil, err
-	}
-
-	return out, nil
+	head *Element[T]
+	meta *struct{ length int }
 }
 
 // Append adds a variadic sequence of items to the end of the list.
@@ -44,16 +29,238 @@ func (l *List[T]) Append(items ...T) {
 	}
 }
 
-// Populate returns a worker that adds items from the iterator to the
+// Populate returns a worker that adds items from the stream to the
 // list. Any error returned is either a context cancellation error or
-// the result of a panic in the input iterator. The close method on
-// the input iterator is not called.
-func (l *List[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
-	return iter.Process(fun.Handle(l.PushBack).Processor())
+// the result of a panic in the input stream. The close method on
+// the input stream is not called.
+func (l *List[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.Observe(l.PushBack) }
+
+// Len returns the length of the list. As the Append/Remove operations
+// track the length of the list, this is an O(1) operation.
+func (l *List[T]) Len() int {
+	if l == nil || l.meta == nil {
+		return 0
+	}
+	return l.meta.length
 }
 
+// PushFront creates an element and prepends it to the list. The
+// performance of PushFront and PushBack are the same.
+func (l *List[T]) PushFront(it T) { l.root().Push(it) }
+
+// PushBack creates an element and appends it to the list. The
+// performance of PushFront and PushBack are the same.
+func (l *List[T]) PushBack(it T) { l.Back().Push(it) }
+
+// PopFront removes the first element from the list. If the list is
+// empty, this returns a nil value, that will report an Ok() false
+// You can use this element to produce a C-style stream over
+// the list, that removes items during the iteration:
+//
+//	for e := list.PopFront(); e.Ok(); e = input.PopFront() {
+//		// do work
+//	}
+func (l *List[T]) PopFront() *Element[T] { return l.pop(l.Front()) }
+
+// PopBack removes the last element from the list. If the list is
+// empty, this returns a detached non-nil value, that will report an
+// Ok() false value. You can use this element to produce a C-style stream
+// over the list, that removes items during the iteration:
+//
+//	for e := list.PopBack(); e.Ok(); e = input.PopBack() {
+//		// do work
+//	}
+func (l *List[T]) PopBack() *Element[T] { return l.pop(l.Back()) }
+
+// Front returns a pointer to the first element of the list. If the
+// list is empty, this is also the last element of the list. The
+// operation is non-destructive. You can use this pointer to begin a
+// c-style iteration over the list:
+//
+//	for e := list.Front(); e.Ok(); e = e.Next() {
+//	       // operate
+//	}
+func (l *List[T]) Front() *Element[T] { return l.root().next }
+
+// Back returns a pointer to the last element of the list. If the
+// list is empty, this is also the first element of the list. The
+// operation is non-destructive. You can use this pointer to begin a
+// c-style iteration over the list:
+//
+//	for e := list.Back(); e.Ok(); e = e.Previous() {
+//	       // operate
+//	}
+func (l *List[T]) Back() *Element[T] { return l.root().prev }
+
+// GeneratorFront provides a generator function that iterates through the
+// contents of the list, front-to-back. When the generator has
+// fully iterated through the list, or iterates to an item that has
+// been removed (likely due to concurrent access,) the generator
+// returns io.EOF.
+//
+// The GeneratorFront starts at the front of the list and iterates in order.
+func (l *List[T]) GeneratorFront() fun.Generator[T] {
+	current := l.root()
+	return func(_ context.Context) (o T, _ error) {
+		current = current.Next()
+		if !current.Ok() || current.isDetatched() {
+			return o, io.EOF
+		}
+		return current.Value(), nil
+	}
+}
+
+// GeneratorPopFront provides a generator function that iterates through the
+// contents of the list, removing each item from the list as it
+// encounters it. When the generator reaches has fully iterated
+// through the list, or iterates to an item that has been removed
+// (likely due to concurrent access,) the generator returns io.EOF.
+//
+// In most cases, for destructive iteration, use the pubsub.Queue,
+// pubsub.Deque, or one of the pubsub.Distributor implementations.
+//
+// The generator starts at the front of the list and iterates in order.
+func (l *List[T]) GeneratorPopFront() fun.Generator[T] {
+	var current *Element[T]
+	return func(_ context.Context) (o T, _ error) {
+		current = l.PopFront()
+
+		if !current.Ok() || current.isDetatched() {
+			return o, io.EOF
+		}
+
+		return current.item, nil
+	}
+}
+
+// GeneratorBack provides the same semantics and operation as the
+// Generator operation, but starts at the end/tail of the list and
+// works forward.
+func (l *List[T]) GeneratorBack() fun.Generator[T] {
+	current := l.root()
+	return func(_ context.Context) (o T, _ error) {
+		current = current.Previous()
+		if !current.Ok() || current.isDetatched() {
+			return o, io.EOF
+		}
+		return current.Value(), nil
+	}
+}
+
+// GeneratorPopBack provides the same semantics and operation as the
+// GeneratorPopBack operation, but starts at the end/tail of the list and
+// works forward.
+func (l *List[T]) GeneratorPopBack() fun.Generator[T] {
+	var current *Element[T]
+	return func(_ context.Context) (o T, _ error) {
+		current = l.PopBack()
+		if !current.Ok() || current.isDetatched() {
+			return o, io.EOF
+		}
+		return current.item, nil
+	}
+}
+
+// StreamFront returns a stream over the values in the list in
+// front-to-back order. The Stream is not synchronized with the
+// values in the list, and will be exhausted when you reach the end of
+// the list.
+//
+// If you add values to the list during iteration *behind* where the
+// stream is, these values will not be present in the stream;
+// however, values added ahead of the stream, will be visible.
+func (l *List[T]) StreamFront() *fun.Stream[T] { return l.GeneratorFront().Stream() }
+
+// StreamBack returns a stream that produces elements from the list,
+// from the back to the front. The stream is not
+// synchronized with the values in the list, and will be exhausted
+// when you reach the front of the list.
+//
+// If you add values to the list during iteration *behind* where the
+// stream is, these values will not be present in the stream;
+// however, values added ahead of the stream, will be visible.
+func (l *List[T]) StreamBack() *fun.Stream[T] { return l.GeneratorBack().Stream() }
+
+// PopStream produces a stream that consumes elements from the
+// list as it iterates, moving front-to-back.
+//
+// If you add values to the list during iteration *behind* where the
+// stream is, these values will not be present in the stream;
+// however, values added ahead of the stream, will be visible.
+func (l *List[T]) StreamPopFront() *fun.Stream[T] { return l.GeneratorPopFront().Stream() }
+
+// StreamPopBack produces a stream that consumes elements from the
+// list as it iterates, moving back-to-front. To access a stream of
+// the *values* in the list, use PopReverseValues() for an
+// stream over the values.
+//
+// If you add values to the list during iteration *behind* where the
+// stream is, these values will not be present in the stream;
+// however, values added ahead of the stream, will be visible.
+func (l *List[T]) StreamPopBack() *fun.Stream[T] { return l.GeneratorPopBack().Stream() }
+
+// Extend removes items from the front of the input list, and appends
+// them to the end (back) of the current list.
+func (l *List[T]) Extend(input *List[T]) {
+	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
+		l.Back().Append(elem)
+	}
+}
+
+// Copy duplicates the list. The element objects in the list are
+// distinct, though if the Values are themselves references, the
+// values of both lists would be shared.
+func (l *List[T]) Copy() *List[T] {
+	out := &List[T]{}
+
+	for elem := l.Front(); elem.Ok(); elem = elem.Next() {
+		out.Back().Push(elem.Value())
+	}
+
+	return out
+}
+
+// Slice exports the contents of the list to a slice.
+func (l *List[T]) Slice() Slice[T] { return risky.BlockForceOp(l.StreamFront().Slice) }
+
+// Seq returns a native go stream function for the items in a list.
+func (l *List[T]) Seq() iter.Seq[T] { return risky.Block(l.StreamFront().Seq) }
+
+func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != nil }
+
+func (l *List[T]) root() *Element[T] {
+	fun.Invariant.Ok(l != nil, ErrUninitializedContainer)
+
+	ft.WhenCall(l.head == nil, l.uncheckedSetup)
+
+	return l.head
+}
+
+func (l *List[T]) uncheckedSetup() {
+	l.meta = &struct{ length int }{}
+	l.head = &Element[T]{}
+	l.head.next = l.head
+	l.head.prev = l.head
+	l.head.list = l
+	l.head.ok = false
+}
+
+func (l *List[T]) pop(it *Element[T]) *Element[T] {
+	if !it.removable() || it.list == nil || l.head == nil || it.list.head != l.head {
+		return &Element[T]{}
+	}
+
+	it.uncheckedRemove()
+
+	return it
+}
+
+////////////////////////////////////////////////////////////////////////
+//
+// Element implementation
+
 // Element is the underlying component of a list, provided by
-// iterators, the Pop operations, and the Front/Back accesses in the
+// streams, the Pop operations, and the Front/Back accesses in the
 // list. You can use the methods on this objects to iterate through
 // the list, and the Ok() method for validating zero-valued items.
 type Element[T any] struct {
@@ -89,7 +296,7 @@ func (e *Element[T]) Previous() *Element[T] { return e.prev }
 // elements hold a pointer to their list, this is an O(1) operation.
 //
 // Returns false when the element is nil.
-func (e *Element[T]) In(l *List[T]) bool { return e.list != nil && e.list == l }
+func (e *Element[T]) In(l *List[T]) bool { return e.list.nonNil() && e.list == l }
 
 // Set allows you to change set the value of an item in place. Returns
 // true if the operation is successful. The operation fails if the Element is the
@@ -107,69 +314,6 @@ func (e *Element[T]) Set(v T) bool {
 	return false
 }
 
-// UnmarshalJSON reads the json value, and sets the value of the
-// element to the value in the json, potentially overriding an
-// existing value. By supporting json.Marshaler and json.Unmarshaler,
-// Elements and lists can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (e *Element[T]) UnmarshalJSON(in []byte) error {
-	var val T
-	if err := json.Unmarshal(in, &val); err != nil {
-		return err
-	}
-	e.Set(val)
-	return nil
-}
-
-// MarshalJSON produces a JSON array representing the items in the
-// list. By supporting json.Marshaler and json.Unmarshaler, Elements
-// and lists can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (l *List[T]) MarshalJSON() ([]byte, error) {
-	buf := &internal.IgnoreNewLinesBuffer{}
-	enc := json.NewEncoder(buf)
-
-	_ = buf.WriteByte('[')
-
-	if l.Len() > 0 {
-		for i := l.Front(); i.Ok(); i = i.Next() {
-			if i != l.Front() {
-				_ = buf.WriteByte(',')
-			}
-			if err := enc.Encode(i.Value()); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	_ = buf.WriteByte(']')
-
-	return buf.Bytes(), nil
-}
-
-// UnmarshalJSON reads json input and adds that to values in the
-// list. If there are elements in the list, they are not removed. By
-// supporting json.Marshaler and json.Unmarshaler, Elements and lists
-// can behave as arrays in larger json objects, and can be as the
-// output/input of json.Marshal and json.Unmarshal.
-func (l *List[T]) UnmarshalJSON(in []byte) error {
-	rv := []json.RawMessage{}
-
-	if err := json.Unmarshal(in, &rv); err != nil {
-		return err
-	}
-	var zero T
-	tail := l.Back()
-	for idx := range rv {
-		elem := NewElement(zero)
-		if err := elem.UnmarshalJSON(rv[idx]); err != nil {
-			return err
-		}
-		tail = tail.Append(elem)
-	}
-	return nil
-}
-
 // Append adds the element 'new' after the element 'e', inserting it
 // in the next position in the list. Will return 'e' if 'new' is not
 // valid for insertion into this list (e.g. it belongs to another
@@ -177,13 +321,16 @@ func (l *List[T]) UnmarshalJSON(in []byte) error {
 // list, or is otherwise invalid.) PushBack and PushFront, are
 // implemented in terms of Append.
 func (e *Element[T]) Append(val *Element[T]) *Element[T] {
-	if e.appendable(val) {
+
+	if e.appendable(val) && !val.isDetatched() {
 		return e.uncheckedAppend(val)
 	}
 
+	fun.Invariant.Ok(e.list.nonNil(), "cannot pushed to a detached element")
 	return e
 }
 
+// Push adds a value to the list, and returns the resulting element.
 func (e *Element[T]) Push(v T) *Element[T] { return e.Append(NewElement(v)) }
 
 // Remove removes the elemtn from the list, returning true if the operation
@@ -235,18 +382,19 @@ func (e *Element[T]) Swap(with *Element[T]) bool {
 //
 // Returns false when the element is nil.
 func (e *Element[T]) Ok() bool                        { return e != nil && e.ok && !e.isRoot() }
-func (e *Element[T]) appendable(val *Element[T]) bool { return val != nil && val.ok && e.list != nil } // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
-func (e *Element[T]) removable() bool                 { return e.list != nil && !e.isRoot() && e.list.length > 0 }
+func (e *Element[T]) appendable(val *Element[T]) bool { return val != nil && val.ok && e.list.nonNil() } // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
+func (e *Element[T]) removable() bool                 { return e.list.nonNil() && !e.isRoot() && e.list.Len() > 0 }
 func (e *Element[T]) settable() bool                  { return e != nil && !e.isRoot() }
-func (e *Element[T]) isRoot() bool                    { return e.list != nil && e.list.head != nil && e.list.head == e }
+func (e *Element[T]) isRoot() bool                    { return e.list.nonNil() && e.list.head == e }
+func (e *Element[T]) isDetatched() bool               { return e.list == nil }
 
 // make sure we have members of the same list
 func (e *Element[T]) swappable(it *Element[T]) bool {
-	return it != nil && e != nil && e.list != nil && e.list == it.list && e != it
+	return it != nil && e != nil && it != e && e.list.nonNil() && e.list == it.list
 }
 
 func (e *Element[T]) uncheckedAppend(val *Element[T]) *Element[T] {
-	e.list.length++
+	e.list.meta.length++
 	val.list = e.list
 	val.prev = e
 	val.next = e.next
@@ -256,7 +404,7 @@ func (e *Element[T]) uncheckedAppend(val *Element[T]) *Element[T] {
 }
 
 func (e *Element[T]) uncheckedRemove() {
-	e.list.length--
+	e.list.meta.length--
 	e.prev.next = e.next
 	e.next.prev = e.prev
 	e.list = nil
@@ -265,220 +413,4 @@ func (e *Element[T]) uncheckedRemove() {
 	//
 	// e.next = nil
 	// e.prev = nil
-}
-
-// Len returns the length of the list. As the Append/Remove operations
-// track the length of the list, this is an O(1) operation.
-func (l *List[T]) Len() int {
-	if l == nil {
-		return 0
-	}
-	return l.length
-}
-
-// PushFront creates an element and prepends it to the list. The
-// performance of PushFront and PushBack are the same.
-func (l *List[T]) PushFront(it T) { l.root().Push(it) }
-
-// PushBack creates an element and appends it to the list. The
-// performance of PushFront and PushBack are the same.
-func (l *List[T]) PushBack(it T) { l.Back().Push(it) }
-
-// PopFront removes the first element from the list. If the list is
-// empty, this returns a nil value, that will report an Ok() false
-// You can use this element to produce a C-style iterator over
-// the list, that removes items during the iteration:
-//
-//	for e := list.PopFront(); e.Ok(); e = input.PopFront() {
-//		// do work
-//	}
-func (l *List[T]) PopFront() *Element[T] { return l.pop(l.Front()) }
-
-// PopBack removes the last element from the list. If the list is
-// empty, this returns a detached non-nil value, that will report an
-// Ok() false value. You can use this element to produce a C-style iterator
-// over the list, that removes items during the iteration:
-//
-//	for e := list.PopBack(); e.Ok(); e = input.PopBack() {
-//		// do work
-//	}
-func (l *List[T]) PopBack() *Element[T] { return l.pop(l.Back()) }
-
-// Front returns a pointer to the first element of the list. If the
-// list is empty, this is also the last element of the list. The
-// operation is non-destructive. You can use this pointer to begin a
-// c-style iteration over the list:
-//
-//	for e := list.Front(); e.Ok(); e = e.Next() {
-//	       // operate
-//	}
-func (l *List[T]) Front() *Element[T] { return l.root().next }
-
-// Back returns a pointer to the last element of the list. If the
-// list is empty, this is also the first element of the list. The
-// operation is non-destructive. You can use this pointer to begin a
-// c-style iteration over the list:
-//
-//	for e := list.Back(); e.Ok(); e = e.Previous() {
-//	       // operate
-//	}
-func (l *List[T]) Back() *Element[T] { return l.root().prev }
-
-// Producer provides a producer function that iterates through the
-// contents of the list. When the producer reaches has fully iterated
-// through the list, or iterates to an item that has been removed
-// (likely due to concurrent access,) the producer returns io.EOF.
-//
-// The Producer starts at the front of the list and iterates in order.
-func (l *List[T]) Producer() fun.Producer[T] {
-	current := l.root()
-	return func(_ context.Context) (o T, _ error) {
-		current = current.Next()
-		if !current.Ok() {
-			return o, io.EOF
-		}
-		return current.Value(), nil
-	}
-}
-
-// ProducerPop provides a producer function that iterates through the
-// contents of the list, removing each item from the list as it
-// encounters it. When the producer reaches has fully iterated
-// through the list, or iterates to an item that has been removed
-// (likely due to concurrent access,) the producer returns io.EOF.
-//
-// In most cases, for destructive iteration, use the pubsub.Queue,
-// pubsub.Deque, or one of the pubsub.Distributor implementations.
-//
-// The Producer starts at the front of the list and iterates in order.
-func (l *List[T]) ProducerPop() fun.Producer[T] {
-	var current *Element[T]
-	return func(_ context.Context) (o T, _ error) {
-		current = l.PopFront()
-
-		if !current.Ok() {
-			return o, io.EOF
-		}
-
-		return current.item, nil
-	}
-}
-
-// ProducerReverse provides the same semantics and operation as the
-// Producer operation, but starts at the end/tail of the list and
-// works forward.
-func (l *List[T]) ProducerReverse() fun.Producer[T] {
-	current := l.root()
-	return func(_ context.Context) (o T, _ error) {
-		current = current.Previous()
-		if !current.Ok() || current.isRoot() {
-			return o, io.EOF
-		}
-		return current.Value(), nil
-	}
-}
-
-// ProducerReverse provides the same semantics and operation as the
-// ProducerPop operation, but starts at the end/tail of the list and
-// works forward.
-func (l *List[T]) ProducerReversePop() fun.Producer[T] {
-	var current *Element[T]
-	return func(_ context.Context) (o T, _ error) {
-		current = l.PopBack()
-		if !current.Ok() || current.isRoot() {
-			return o, io.EOF
-		}
-		return current.item, nil
-	}
-}
-
-// Iterator returns an iterator over the values in the list in
-// front-to-back order. The Iterator is not synchronized with the
-// values in the list, and will be exhausted when you reach the end of
-// the list.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visible.
-func (l *List[T]) Iterator() *fun.Iterator[T] { return l.Producer().Iterator() }
-
-// Reverse returns an iterator that produces elements from the list,
-// from the back to the front. The iterator is not
-// synchronized with the values in the list, and will be exhausted
-// when you reach the front of the list.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visible.
-func (l *List[T]) Reverse() *fun.Iterator[T] { return l.ProducerReverse().Iterator() }
-
-// PopIterator produces an iterator that consumes elements from the
-// list as it iterates, moving front-to-back.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopIterator() *fun.Iterator[T] { return l.ProducerPop().Iterator() }
-
-// PopReverse produces an iterator that consumes elements from the
-// list as it iterates, moving back-to-front. To access an iterator of
-// the *values* in the list, use PopReverseValues() for an
-// iterator over the values.
-//
-// If you add values to the list during iteration *behind* where the
-// iterator is, these values will not be present in the iterator;
-// however, values added ahead of the iterator, will be visible.
-func (l *List[T]) PopReverse() *fun.Iterator[T] { return l.ProducerReversePop().Iterator() }
-
-// Extend removes items from the front of the input list, and appends
-// them to the end (back) of the current list.
-func (l *List[T]) Extend(input *List[T]) {
-	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
-		l.Back().Append(elem)
-	}
-}
-
-// Copy duplicates the list. The element objects in the list are
-// distinct, though if the Values are themselves references, the
-// values of both lists would be shared.
-func (l *List[T]) Copy() *List[T] {
-	out := &List[T]{}
-
-	for elem := l.Front(); elem.Ok(); elem = elem.Next() {
-		out.Back().Push(elem.Value())
-	}
-
-	return out
-}
-
-// Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() Slice[T] { return fun.NewProducer(l.Iterator().Slice).Force().Resolve() }
-
-// Seq returns a native go iterator function for the items in a list.
-func (l *List[T]) Seq() iter.Seq[T] { return risky.Block(l.Iterator().Seq) }
-
-func (l *List[T]) root() *Element[T] {
-	fun.Invariant.Ok(l != nil, ErrUninitializedContainer)
-
-	ft.WhenCall(l.head == nil, l.uncheckedSetup)
-
-	return l.head
-}
-
-func (l *List[T]) uncheckedSetup() {
-	l.head = &Element[T]{}
-	l.head.next = l.head
-	l.head.prev = l.head
-	l.head.list = l
-	l.head.ok = false
-}
-
-func (l *List[T]) pop(it *Element[T]) *Element[T] {
-	if !it.removable() || it.list == nil || l.head == nil || it.list.head != l.head {
-		return &Element[T]{}
-	}
-
-	it.uncheckedRemove()
-
-	return it
 }

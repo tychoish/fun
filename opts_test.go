@@ -63,14 +63,14 @@ func TestOptionProvider(t *testing.T) {
 			opt := &WorkerGroupConf{}
 			check.True(t, opt.ErrorHandler == nil)
 			check.True(t, opt.ErrorResolver == nil)
-			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
+			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
 			check.True(t, opt.ErrorHandler != nil)
 			check.True(t, opt.ErrorResolver != nil)
 			check.NotError(t, opt.Validate())
 		})
 		t.Run("CollectionRoundTrip", func(t *testing.T) {
 			opt := &WorkerGroupConf{}
-			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
+			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 0)
 			opt.ErrorHandler(ers.New("hello"))
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 1)
@@ -80,7 +80,7 @@ func TestOptionProvider(t *testing.T) {
 			defer cancel()
 
 			opt := &WorkerGroupConf{}
-			check.NotError(t, WorkerGroupConfErrorCollectorPair(HF.ErrorCollector())(opt))
+			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
 
 			wg := &WaitGroup{}
 			wg.DoTimes(ctx, 128, func(_ context.Context) {
@@ -102,7 +102,7 @@ func TestOptionProvider(t *testing.T) {
 		t.Run("Continue", func(t *testing.T) {
 			called := 0
 			opt.ErrorHandler = func(_ error) { called++ }
-			check.True(t, opt.CanContinueOnError(ErrIteratorSkip))
+			check.True(t, opt.CanContinueOnError(ErrStreamContinue))
 			check.Equal(t, 0, called)
 		})
 	})

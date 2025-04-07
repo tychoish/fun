@@ -178,7 +178,7 @@ func TestChannel(t *testing.T) {
 				t.Run("Producer", func(t *testing.T) {
 					ch := make(chan string, 1)
 					ch <- "hello world"
-					val, err := Blocking(ch).Receive().Producer().Run(ctx)
+					val, err := Blocking(ch).Receive().Generator().Run(ctx)
 					assert.NotError(t, err)
 					assert.Equal(t, val, "hello world")
 				})
@@ -441,7 +441,7 @@ func TestChannel(t *testing.T) {
 					check.Equal(t, in, "beep")
 					if count == 1 {
 						skipped = true
-						return ErrIteratorSkip
+						return ErrStreamContinue
 					}
 					return nil
 				}).Run(ctx)
@@ -574,7 +574,7 @@ func TestChannel(t *testing.T) {
 				func(err error) { check.NotError(t, err) },
 				func(in int) bool { return in%2 == 0 && in != 0 },
 			).
-			Iterator().
+			Stream().
 			Observe(func(in int) {
 				count++
 				check.True(t, ft.Not(in == 0))

@@ -58,7 +58,7 @@ func TestPairExtra(t *testing.T) {
 
 			p := Pairs[string, int]{}
 			err := p.ConsumeValues(
-				NewSlice([]int{1, 2, 3}).Iterator(),
+				NewSlice([]int{1, 2, 3}).Stream(),
 				func(in int) string { return fmt.Sprint(in) },
 			).Run(ctx)
 			assert.NotError(t, err)
@@ -125,14 +125,14 @@ func TestPairExtra(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
-	t.Run("FunctionalIterators", func(t *testing.T) {
+	t.Run("FunctionalStreams", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		num := 1000
 		seen := &Set[int]{}
 
-		ps, err := ConsumePairs(randNumPairListFixture(t, num).PopIterator()).Resolve(ctx)
+		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Resolve(ctx)
 		assert.NotError(t, err)
 		ps.Observe(func(p Pair[int, int]) {
 			check.Equal(t, p.Key, p.Value)
@@ -152,7 +152,7 @@ func TestPairExtra(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Iterator()).Run(ctx))
+		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := ps.Map()
 		assert.Equal(t, len(mp), 128)

@@ -7,9 +7,6 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-func lock(mtx sync.Locker) sync.Locker { mtx.Lock(); return mtx }
-func with(mtx sync.Locker)             { mtx.Unlock() }
-
 // WaitGroup works like sync.WaitGroup, except that the Wait method
 // takes a context (and can be passed as a fun.Operation). The
 // implementation is exceptionally simple. The only constraint, like
@@ -34,6 +31,9 @@ type WaitGroup struct {
 func (wg *WaitGroup) initOp()            { wg.cond = sync.NewCond(&wg.mu) }
 func (wg *WaitGroup) init()              { ft.WhenCall(wg.cond == nil, wg.initOp) }
 func (wg *WaitGroup) mutex() *sync.Mutex { return &wg.mu }
+
+func lock(mtx sync.Locker) sync.Locker { mtx.Lock(); return mtx }
+func with(mtx sync.Locker)             { mtx.Unlock() }
 
 // Add modifies the internal counter. Raises an ErrInvariantViolation
 // error if any modification causes the internal coutner to be less

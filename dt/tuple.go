@@ -42,9 +42,9 @@ func MakeTuples[K any, V any](in ...Tuple[K, V]) *Tuples[K, V] {
 	return p
 }
 
-// ConsumeTuples creates a *Tuples[K,V] object from an iterator of
+// ConsumeTuples creates a *Tuples[K,V] object from a stream of
 // Tuple[K,V] objects.
-func ConsumeTuples[K any, V any](iter *fun.Iterator[Tuple[K, V]]) fun.Producer[*Tuples[K, V]] {
+func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*Tuples[K, V]] {
 	return func(ctx context.Context) (*Tuples[K, V], error) {
 		p := &Tuples[K, V]{}
 		if err := p.Consume(iter).Run(ctx); err != nil {
@@ -57,8 +57,8 @@ func ConsumeTuples[K any, V any](iter *fun.Iterator[Tuple[K, V]]) fun.Producer[*
 func (p *Tuples[K, V]) init()     { p.setup.Do(p.initImpl) }
 func (p *Tuples[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
 
-// Consume adds items from an iterator of tuples to the current Tuples slice.
-func (p *Tuples[K, V]) Consume(iter *fun.Iterator[Tuple[K, V]]) fun.Worker {
+// Consume adds items from a stream of tuples to the current Tuples slice.
+func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
 	return iter.Observe(func(item Tuple[K, V]) { p.Push(item) })
 }
 
@@ -85,19 +85,19 @@ func (p *Tuples[K, V]) Seq2() iter.Seq2[K, V] {
 	}
 }
 
-// Iterator return an iterator over each key-value tuples.
-func (p *Tuples[K, V]) Iterator() *fun.Iterator[Tuple[K, V]] { p.init(); return p.ll.Iterator() }
+// Stream return a stream over each key-value tuples.
+func (p *Tuples[K, V]) Stream() *fun.Stream[Tuple[K, V]] { p.init(); return p.ll.StreamFront() }
 
-// Ones returns an iterator over only the keys in a sequence of
-// iterator items.
-func (p *Tuples[K, V]) Ones() *fun.Iterator[K] {
-	return fun.Converter(func(p Tuple[K, V]) K { return p.One }).Process(p.Iterator())
+// Ones returns a stream over only the first item from a sequence of
+// tuples.
+func (p *Tuples[K, V]) Ones() *fun.Stream[K] {
+	return fun.Converter(func(p Tuple[K, V]) K { return p.One }).Process(p.Stream())
 }
 
-// Twos returns an iterator over only the values in a sequence of
-// iterator tuples.
-func (p *Tuples[K, V]) Twos() *fun.Iterator[V] {
-	return fun.Converter(func(p Tuple[K, V]) V { return p.Two }).Process(p.Iterator())
+// Twos returns a stream over only the second item from a sequence of
+// tuples.
+func (p *Tuples[K, V]) Twos() *fun.Stream[V] {
+	return fun.Converter(func(p Tuple[K, V]) V { return p.Two }).Process(p.Stream())
 }
 
 // Slice creates a new slice of all the Tuple objects.
@@ -121,7 +121,7 @@ func (p *Tuples[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Observe calls the handler function for every tuple in the container.
 func (p *Tuples[K, V]) Observe(hf fun.Handler[Tuple[K, V]]) {
-	p.Process(hf.Processor()).Ignore().Wait()
+	p.Process(fun.MakeHandlerProcessor(hf)).Ignore().Wait()
 }
 
 // Process returns a worker, that when executed calls the processor

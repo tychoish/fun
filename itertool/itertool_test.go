@@ -26,7 +26,7 @@ func TestSmoke(t *testing.T) {
 		ctx := testt.Context(t)
 
 		count := &atomic.Int64{}
-		err := Worker(ctx, fun.SliceIterator([]fun.Operation{
+		err := Worker(ctx, fun.SliceStream([]fun.Operation{
 			func(context.Context) { count.Add(1) },
 			func(context.Context) { count.Add(1) },
 			func(context.Context) { count.Add(1) },
@@ -36,7 +36,7 @@ func TestSmoke(t *testing.T) {
 	})
 	t.Run("MapReduce", func(t *testing.T) {
 		prod := MapReduce(
-			fun.VariadicIterator(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024),
+			fun.VariadicStream(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024),
 			func(_ context.Context, in int) (string, error) {
 				return fmt.Sprint(in), nil
 			},
@@ -78,7 +78,7 @@ func TestSmoke(t *testing.T) {
 			ctx := testt.Context(t)
 
 			elems := makeIntSlice(32)
-			iter := fun.SliceIterator(elems)
+			iter := fun.SliceStream(elems)
 			seen := make(map[int]struct{}, len(elems))
 			sum, err := Reduce(ctx, iter, func(in int, value string) (string, error) {
 				seen[in] = struct{}{}
@@ -97,7 +97,7 @@ func TestSmoke(t *testing.T) {
 			ctx := testt.Context(t)
 
 			elems := makeIntSlice(32)
-			iter := fun.SliceIterator(elems)
+			iter := fun.SliceStream(elems)
 
 			seen := map[int]none{}
 
@@ -131,14 +131,14 @@ func TestSmoke(t *testing.T) {
 			ctx := testt.Context(t)
 
 			elems := makeIntSlice(32)
-			iter := fun.SliceIterator(elems)
+			iter := fun.SliceStream(elems)
 			count := 0
 			sum, err := Reduce(ctx, iter, func(_ int, value int) (int, error) {
 				count++
 				if count == 1 {
 					return 42, nil
 				}
-				return value, fun.ErrIteratorSkip
+				return value, fun.ErrStreamContinue
 			}, 0)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
@@ -147,7 +147,7 @@ func TestSmoke(t *testing.T) {
 		t.Run("ReduceEarlyExit", func(t *testing.T) {
 			ctx := testt.Context(t)
 			elems := makeIntSlice(32)
-			iter := fun.SliceIterator(elems)
+			iter := fun.SliceStream(elems)
 			count := 0
 			sum, err := Reduce(ctx, iter, func(_ int, _ int) (int, error) {
 				count++
@@ -229,10 +229,10 @@ func TestContains(t *testing.T) {
 	defer cancel()
 
 	t.Run("Exists", func(t *testing.T) {
-		assert.True(t, Contains[int](ctx, 1, fun.SliceIterator([]int{12, 3, 44, 1})))
+		assert.True(t, Contains[int](ctx, 1, fun.SliceStream([]int{12, 3, 44, 1})))
 	})
 	t.Run("NotExists", func(t *testing.T) {
-		assert.True(t, !Contains[int](ctx, 1, fun.SliceIterator([]int{12, 3, 44})))
+		assert.True(t, !Contains[int](ctx, 1, fun.SliceStream([]int{12, 3, 44})))
 	})
 }
 
@@ -241,9 +241,9 @@ func TestUniq(t *testing.T) {
 	defer cancel()
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
-	assert.Equal(t, fun.SliceIterator(sl).Count(ctx), 8)
+	assert.Equal(t, fun.SliceStream(sl).Count(ctx), 8)
 
-	assert.Equal(t, Uniq(fun.SliceIterator(sl)).Count(ctx), 6)
+	assert.Equal(t, Uniq(fun.SliceStream(sl)).Count(ctx), 6)
 }
 
 func TestChain(t *testing.T) {
@@ -251,11 +251,11 @@ func TestChain(t *testing.T) {
 	defer cancel()
 
 	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
-	iter := Chain[int](fun.SliceIterator(num), fun.SliceIterator(num))
+	iter := Chain[int](fun.SliceStream(num), fun.SliceStream(num))
 	n := iter.Count(ctx)
 	assert.Equal(t, len(num)*2, n)
 
-	iter = Chain[int](fun.SliceIterator(num), fun.SliceIterator(num), fun.SliceIterator(num), fun.SliceIterator(num))
+	iter = Chain[int](fun.SliceStream(num), fun.SliceStream(num), fun.SliceStream(num), fun.SliceStream(num))
 	cancel()
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
@@ -266,15 +266,15 @@ func TestDropZeros(t *testing.T) {
 	defer cancel()
 
 	all := make([]string, 100)
-	n := fun.SliceIterator(all).Count(ctx)
+	n := fun.SliceStream(all).Count(ctx)
 	assert.Equal(t, 100, n)
-	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
+	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	check.NotError(t, DropZeroValues[string](fun.SliceIterator(all)).Observe(func(in string) { assert.Zero(t, in) }).Run(ctx))
+	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).Observe(func(in string) { assert.Zero(t, in) }).Run(ctx))
 
 	all[45] = "49"
-	n = DropZeroValues[string](fun.SliceIterator(all)).Count(ctx)
+	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
 	assert.Equal(t, 1, n)
 }
 
@@ -282,7 +282,7 @@ func TestIndexed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	iter := Indexed(fun.VariadicIterator(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+	iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 	count := 0
 	err := iter.Observe(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
 	check.NotError(t, err)
@@ -292,8 +292,8 @@ func TestIndexed(t *testing.T) {
 func TestMergeSlices(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	t.Run("Iterators", func(t *testing.T) {
-		iter := MergeSliceIterators(fun.VariadicIterator(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
+	t.Run("Streams", func(t *testing.T) {
+		iter := MergeSlices(fun.VariadicStream(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
 		count := 0
 		err := iter.Observe(func(in int) {
 			count++
@@ -303,7 +303,11 @@ func TestMergeSlices(t *testing.T) {
 		assert.Equal(t, count, 256)
 	})
 	t.Run("Slice", func(t *testing.T) {
-		iter := FlattenSlices(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64))
+		iter := Chain(
+			fun.SliceStream(makeIntSlice(64)),
+			fun.SliceStream(makeIntSlice(64)),
+			fun.SliceStream(makeIntSlice(64)),
+		)
 		count := 0
 		err := iter.Observe(func(in int) {
 			count++
@@ -328,7 +332,7 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Serial", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).Process(func(_ context.Context, in int) error {
+		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).Process(func(_ context.Context, in int) error {
 			check.True(t, in >= 0)
 			check.True(t, in <= 100)
 			count.Add(1)
@@ -346,7 +350,7 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Parallel", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Millisecond).
+		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).
 			ProcessParallel(func(_ context.Context, in int) error {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
@@ -369,7 +373,7 @@ func TestRateLimit(t *testing.T) {
 		start := time.Now()
 		go func() { time.Sleep(time.Second); cancel() }()
 		count := &intish.Atomic[int]{}
-		err := RateLimit(fun.SliceIterator(makeIntSlice(100)), 10, 100*time.Second).
+		err := RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Second).
 			Process(func(_ context.Context, in int) error {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)

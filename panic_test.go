@@ -198,7 +198,7 @@ func TestPanics(t *testing.T) {
 				seen = in
 			}
 
-			err := of.Processor().Run(ctx, "hello")
+			err := MakeHandlerProcessor(of).Run(ctx, "hello")
 			if err != nil {
 				t.Fatal(err)
 			}

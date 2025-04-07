@@ -16,8 +16,16 @@ import (
 // other related types.
 type Handler[T any] func(T)
 
-// Handle produces an Handler[T] function as a helper.
-func Handle[T any](in func(T)) Handler[T] { return in }
+// NewHandler produces an Handler[T] function as a helper.
+func NewHandler[T any](in func(T)) Handler[T] { return in }
+
+func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
+	return func(value T) {
+		for idx := range ops {
+			ft.SafeApply(ops[idx], value)
+		}
+	}
+}
 
 // HandlePassthrough creates a bit of syntactic sugar to handle the
 // _second_ return value of a function with a provided handler
@@ -57,17 +65,9 @@ func (of Handler[T]) Operation(in T) Operation { return func(context.Context) { 
 // but only when executed later.
 func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
 
-// Processor converts the handler to an handler function. The
-// Processor will always return nil, and the context is ignored.
-func (of Handler[T]) Processor() Processor[T] { return ProcessifyHandler(of) }
-
-// Iterator produces a worker that processes every item in the
-// iterator with the handler function function.
-func (of Handler[T]) Iterator(iter *Iterator[T]) Worker { return iter.Observe(of) }
-
 // If returns an handler that only executes the root handler if the
 // condition is true.
-func (of Handler[T]) If(cond bool) Handler[T] { return of.When(ft.Wrapper(cond)) }
+func (of Handler[T]) If(cond bool) Handler[T] { return of.When(ft.Wrap(cond)) }
 
 // When returns an handler function that only executes the handler
 // function if the condition function returns true. The condition
@@ -94,10 +94,16 @@ func (of Handler[T]) Filter(filter func(T) T) Handler[T] {
 
 // Join creates an handler function that runs both the root handler
 // and the "next" handler.
-func (of Handler[T]) Join(next Handler[T]) Handler[T] { return func(in T) { of(in); next(in) } }
+//
+// Returns itself if next is nil.
+func (of Handler[T]) Join(next Handler[T]) Handler[T] {
+	return ft.IfValue(next == nil, of, func(in T) { of(in); next(in) })
+}
 
 // PreHook provides the inverse operation to Join, running "prev"
 // handler before the base handler.
+//
+// Returns itself if prev is nil.
 func (of Handler[T]) PreHook(prev Handler[T]) Handler[T] { return prev.Join(of) }
 
 // Chain calls the base handler, and then calls every handler in the chain.

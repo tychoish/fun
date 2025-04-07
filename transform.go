@@ -11,21 +11,21 @@ import (
 )
 
 // Map provides an orthodox functional map implementation based around
-// fun.Iterator. Operates in asynchronous/streaming manner, so that
-// the output Iterator must be consumed. The zero values of Options
+// fun.Stream. Operates in asynchronous/streaming manner, so that
+// the output Stream must be consumed. The zero values of Options
 // provide reasonable defaults for abort-on-error and single-threaded
 // map operation.
 //
 // If the mapper function errors, the result isn't included, but the
 // errors would be aggregated and propagated to the `Close()` method
-// of the resulting iterator. The mapping operation respects the
+// of the resulting stream. The mapping operation respects the
 // fun.ErrIterationSkip error, If there are more than one error (as is
 // the case with a panic or with ContinueOnError semantics,) the error
 // can be unwrapped or converted to a slice with the fun.Unwind
 // function. Panics in the map function are converted to errors and
 // always collected but may abort the operation if ContinueOnPanic is
 // not set.
-func Map[T any, O any](it *Iterator[T], mpf Transform[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Iterator[O] {
+func Map[T any, O any](it *Stream[T], mpf Transform[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Stream[O] {
 	return mpf.Map(it, optp...)
 }
 
@@ -42,13 +42,13 @@ func Converter[T any, O any](op func(T) O) Transform[T, O] {
 // ConverterOk builds a Transform function from a function that
 // converts between types T and O, but that returns a boolean/check
 // value. When the converter function returns false the
-// transform function returns a ErrIteratorSkip error.
+// transform function returns a ErrStreamContinue error.
 func ConverterOk[T any, O any](op func(T) (O, bool)) Transform[T, O] {
 	return func(_ context.Context, in T) (out O, err error) {
 		var ok bool
 		out, ok = op(in)
 		if !ok {
-			err = ErrIteratorSkip
+			err = ErrStreamContinue
 		}
 
 		return
@@ -61,36 +61,36 @@ func ConverterErr[T any, O any](op func(T) (O, error)) Transform[T, O] {
 	return func(_ context.Context, in T) (O, error) { return op(in) }
 }
 
-// Process takes an iterator and runs the transformer over every item,
-// producing a new iterator with the output values. The processing is
-// performed serially and lazily and respects ErrIteratorSkip.
-func (mpf Transform[T, O]) Process(iter *Iterator[T]) *Iterator[O] {
-	return mpf.Producer(iter.ReadOne).Iterator()
+// Process takes a stream and runs the transformer over every item,
+// producing a new stream with the output values. The processing is
+// performed serially and lazily and respects ErrStreamContinue.
+func (mpf Transform[T, O]) Process(iter *Stream[T]) *Stream[O] {
+	return mpf.Generator(iter.ReadOne).Stream()
 }
 
 // Map is an alias for ProcessParallel provided for
 // ergonomics. `fun.Map` exposes the same operation.
 func (mpf Transform[T, O]) Map(
-	iter *Iterator[T],
+	iter *Stream[T],
 	optp ...OptionProvider[*WorkerGroupConf],
-) *Iterator[O] {
+) *Stream[O] {
 	return mpf.ProcessParallel(iter, optp...)
 }
 
-// ProcessParallel runs the input iterator through the transform
-// operation and produces an output iterator, much like
+// ProcessParallel runs the input stream through the transform
+// operation and produces an output stream, much like
 // convert. However, the ProcessParallel implementation has
 // configurable parallelism, and error handling with the
 // WorkerGroupConf options.
 func (mpf Transform[T, O]) ProcessParallel(
-	iter *Iterator[T],
+	iter *Stream[T],
 	optp ...OptionProvider[*WorkerGroupConf],
-) *Iterator[O] {
+) *Stream[O] {
 	output := Blocking(make(chan O))
 	opts := &WorkerGroupConf{}
 
 	// this operations starts the background thread for the
-	// mapper/iterator, but doesn't run until the first
+	// mapper/stream, but doesn't run until the first
 	// iteration, so opts doesn't have to be populated/applied
 	// till later, and error handling gets much easier if we
 	// wait.
@@ -102,7 +102,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 		for idx := range splits {
 			// for each split, run a mapWorker
 			mf.mapPullProcess(output.Send().Write, opts).
-				ReadAll(splits[idx].Producer()).
+				ReadAll(splits[idx].Generator()).
 				Operation(func(err error) {
 					ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), wcancel)
 				}).
@@ -114,7 +114,7 @@ func (mpf Transform[T, O]) ProcessParallel(
 		wg.Operation().PostHook(wcancel).PostHook(output.Close).Background(ctx)
 	}).Once()
 
-	outputIter := output.Producer().PreHook(init).IteratorWithHook(func(out *Iterator[O]) { out.AddError(iter.Close()) })
+	outputIter := output.Generator().PreHook(init).Stream().WithHook(func(out *Stream[O]) { out.AddError(iter.Close()) })
 
 	err := JoinOptionProviders(optp...).Apply(opts)
 	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = outputIter.ErrorHandler().Lock() })
@@ -125,15 +125,15 @@ func (mpf Transform[T, O]) ProcessParallel(
 	return outputIter
 }
 
-// Producer processes an input producer function with the Transform
-// function. Each call to the output producer returns one value from
-// the input producer after processing the item with the transform
-// function applied. The output producer returns any error encountered
+// Generator processes an input generator function with the Transform
+// function. Each call to the output generator returns one value from
+// the input generator after processing the item with the transform
+// function applied. The output generator returns any error encountered
 // during these operations (input, transform, output) to its caller
-// *except* ErrIteratorSkip, which is respected.
-func (mpf Transform[T, O]) Producer(prod Producer[T]) Producer[O] {
+// *except* ErrStreamContinue, which is respected.
+func (mpf Transform[T, O]) Generator(prod Generator[T]) Generator[O] {
 	var zero O
-	return Producer[O](func(ctx context.Context) (out O, _ error) {
+	return Generator[O](func(ctx context.Context) (out O, _ error) {
 		for {
 			item, err := prod(ctx)
 			if err == nil {
@@ -144,7 +144,7 @@ func (mpf Transform[T, O]) Producer(prod Producer[T]) Producer[O] {
 			}
 
 			switch {
-			case errors.Is(err, ErrIteratorSkip):
+			case errors.Is(err, ErrStreamContinue):
 				continue
 			default:
 				return zero, err
@@ -153,14 +153,14 @@ func (mpf Transform[T, O]) Producer(prod Producer[T]) Producer[O] {
 	})
 }
 
-// Pipe creates a Processor (input)/ Producer (output) pair that has
+// Pipe creates a Processor (input)/ Generator (output) pair that has
 // data processed by the Transform function. The pipe has a buffer of
 // one item and is never closed, and both input and output operations
 // are blocking. The closer function will abort the connection and
 // cause all successive operations to return io.EOF.
-func (mpf Transform[T, O]) Pipe() (in Processor[T], out Producer[O]) {
+func (mpf Transform[T, O]) Pipe() (in Processor[T], out Generator[O]) {
 	pipe := Blocking(make(chan T, 1))
-	return pipe.Processor(), mpf.Producer(pipe.Producer())
+	return pipe.Processor(), mpf.Generator(pipe.Generator())
 }
 
 // Wait calls the transform function passing a context that cannot expire.
@@ -178,26 +178,25 @@ func (mpf Transform[T, O]) CheckWait() func(T) (O, bool) {
 // Run executes the transform function with the provided output.
 func (mpf Transform[T, O]) Run(ctx context.Context, in T) (O, error) { return mpf(ctx, in) }
 
-// Convert returns a Producer function which will translate the input
+// Convert returns a Generator function which will translate the input
 // value. The execution is lazy, to provide a future-like interface.
-func (mpf Transform[T, O]) Convert(in T) Producer[O] {
+func (mpf Transform[T, O]) Convert(in T) Generator[O] {
 	return func(ctx context.Context) (O, error) { return mpf.Run(ctx, in) }
 }
 
-// Convert returns a Producer function which will translate value of
+// Convert returns a Generator function which will translate value of
 // the input future as the input value of the translation
 // operation. The execution is lazy, to provide a future-like
 // interface and neither the resolution of the future or the
-// transformation itself is done until the Producer is executed.
-func (mpf Transform[T, O]) ConvertFuture(fn Future[T]) Producer[O] {
+// transformation itself is done until the Generator is executed.
+func (mpf Transform[T, O]) ConvertFuture(fn Future[T]) Generator[O] {
 	return func(ctx context.Context) (O, error) { return mpf.Run(ctx, fn.Resolve()) }
 }
 
-// ConvertProducer takes an input-typed producer function and converts
+// CovnertGenerator takes an input-typed producer function and converts
 // it to an output-typed producer function.
-func (mpf Transform[T, O]) ConvertProducer(fn Producer[T]) Producer[O] {
-	var zero O
-	return func(ctx context.Context) (O, error) {
+func (mpf Transform[T, O]) CovnertGenerator(fn Generator[T]) Generator[O] {
+	return func(ctx context.Context) (zero O, _ error) {
 		val, err := fn(ctx)
 		if err != nil {
 			return zero, err
@@ -246,12 +245,12 @@ func (mpf Transform[T, O]) WithRecover() Transform[T, O] {
 
 // ProcessPipe collects a Produer and Processor pair, and returns a
 // worker that, when run processes the input collected by the
-// Processorand returns it to the Producer. This operation runs until
+// Processor and returns it to the Producer. This operation runs until
 // the producer, transformer, or processor returns an
-// error. ErrIteratorSkip errors are respected, while io.EOF errors
+// error. ErrStreamContinue errors are respected, while io.EOF errors
 // cause the ProcessPipe to abort but are not propogated to the
 // caller.
-func (mpf Transform[T, O]) ProcessPipe(in Producer[T], out Processor[O]) Worker {
+func (mpf Transform[T, O]) ProcessPipe(in Generator[T], out Processor[O]) Worker {
 	return func(ctx context.Context) error {
 		var (
 			input  T
@@ -269,7 +268,7 @@ func (mpf Transform[T, O]) ProcessPipe(in Producer[T], out Processor[O]) Worker 
 			}
 
 			switch {
-			case err == nil || errors.Is(err, ErrIteratorSkip):
+			case err == nil || errors.Is(err, ErrStreamContinue):
 				continue
 			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
 				return nil

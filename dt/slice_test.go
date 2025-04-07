@@ -224,12 +224,12 @@ func TestSlice(t *testing.T) {
 		assert.Equal(t, s.Last(), 49)
 		assert.Equal(t, s.Len(), 50)
 	})
-	t.Run("Iterator", func(t *testing.T) {
+	t.Run("Stream", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		s := randomIntSlice(100)
-		iter := s.Iterator()
+		iter := s.Stream()
 		count := 0
 		for iter.Next(ctx) {
 			func(val int) {
@@ -366,7 +366,7 @@ func TestSlice(t *testing.T) {
 						return "", io.EOF
 					}
 					if count%2 == 0 {
-						return "", fun.ErrIteratorSkip
+						return "", fun.ErrStreamContinue
 					}
 					return fmt.Sprint(in), nil
 				})).Resolve(ctx)
@@ -424,7 +424,8 @@ func TestSlice(t *testing.T) {
 		defer cancel()
 
 		sl := randomIntSlice(128)
-		ls, err := NewListFromIterator(ctx, sl.Iterator())
+		ls := &List[int]{}
+		err := ls.Populate(sl.Stream()).Run(ctx)
 
 		assert.NotError(t, err)
 

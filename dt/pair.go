@@ -59,9 +59,9 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 	return p
 }
 
-// ConsumePairs creates a *Pairs[K,V] object from an iterator of
+// ConsumePairs creates a *Pairs[K,V] object from a stream of
 // Pair[K,V] objects.
-func ConsumePairs[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) fun.Producer[*Pairs[K, V]] {
+func ConsumePairs[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fun.Generator[*Pairs[K, V]] {
 	return func(ctx context.Context) (*Pairs[K, V], error) {
 		p := &Pairs[K, V]{}
 		if err := p.Consume(iter).Run(ctx); err != nil {
@@ -74,24 +74,24 @@ func ConsumePairs[K comparable, V any](iter *fun.Iterator[Pair[K, V]]) fun.Produ
 func (p *Pairs[K, V]) init()     { p.setup.Do(p.initImpl) }
 func (p *Pairs[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} }) }
 
-// Consume adds items from an iterator of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) Consume(iter *fun.Iterator[Pair[K, V]]) fun.Worker {
+// Consume adds items from a stream of pairs to the current Pairs slice.
+func (p *Pairs[K, V]) Consume(iter *fun.Stream[Pair[K, V]]) fun.Worker {
 	return iter.Observe(func(item Pair[K, V]) { p.Push(item) })
 }
 
-// Iterator return an iterator over each key-value pairs.
-func (p *Pairs[K, V]) Iterator() *fun.Iterator[Pair[K, V]] { p.init(); return p.ll.Iterator() }
+// Stream return a stream over each key-value pairs.
+func (p *Pairs[K, V]) Stream() *fun.Stream[Pair[K, V]] { p.init(); return p.ll.StreamFront() }
 
-// Keys returns an iterator over only the keys in a sequence of
+// Keys returns a stream over only the keys in a sequence of
 // iterator items.
-func (p *Pairs[K, V]) Keys() *fun.Iterator[K] {
-	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Process(p.Iterator())
+func (p *Pairs[K, V]) Keys() *fun.Stream[K] {
+	return fun.Converter(func(p Pair[K, V]) K { return p.Key }).Process(p.Stream())
 }
 
-// Values returns an iterator over only the values in a sequence of
+// Values returns a stream over only the values in a sequence of
 // iterator pairs.
-func (p *Pairs[K, V]) Values() *fun.Iterator[V] {
-	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Process(p.Iterator())
+func (p *Pairs[K, V]) Values() *fun.Stream[V] {
+	return fun.Converter(func(p Pair[K, V]) V { return p.Value }).Process(p.Stream())
 }
 
 // Slice creates a new slice of all the Pair objects.
@@ -114,7 +114,9 @@ func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.Sor
 func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Observe calls the handler function for every pair in the container.
-func (p *Pairs[K, V]) Observe(hf fun.Handler[Pair[K, V]]) { p.Process(hf.Processor()).Ignore().Wait() }
+func (p *Pairs[K, V]) Observe(hf fun.Handler[Pair[K, V]]) {
+	p.Process(fun.MakeHandlerProcessor(hf)).Ignore().Wait()
+}
 
 // Process returns a worker, that when executed calls the processor
 // function for every pair in the container.

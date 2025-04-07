@@ -11,12 +11,9 @@ import (
 // implementations (e.g. Queue, Deque, and channels) for buffering and
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
-//
-// Distributors returned by the pubsub package provide iterators that
-// are destructive, and
 type Distributor[T any] struct {
 	push fun.Processor[T]
-	pop  fun.Producer[T]
+	pop  fun.Generator[T]
 	size func() int
 }
 
@@ -24,7 +21,7 @@ type Distributor[T any] struct {
 // functions.
 func MakeDistributor[T any](
 	processor fun.Processor[T],
-	producer fun.Producer[T],
+	producer fun.Generator[T],
 	length func() int,
 ) Distributor[T] {
 	return Distributor[T]{
@@ -66,15 +63,14 @@ func (d Distributor[T]) Receive(ctx context.Context) (T, error) { return d.pop(c
 // distributor as a fun.Processor function.
 func (d Distributor[T]) Processor() fun.Processor[T] { return d.push }
 
-// Producer provides a convenient access to the "receive" side of the
-// as a fun.Producer function
-func (d Distributor[T]) Producer() fun.Producer[T] { return d.pop }
+// Generator provides a convenient access to the "receive" side of the
+// as a fun.Generator function
+func (d Distributor[T]) Generator() fun.Generator[T] { return d.pop }
 
-// Iterator allows iterator-like access to a
-// distributor. These iterators are blocking and destructive. The
-// iterator's close method does *not* close the distributor's
-// underlying structure.
-func (d Distributor[T]) Iterator() *fun.Iterator[T] { return d.Producer().Iterator() }
+// Stream allows iterator-like access to a distributor. These streams
+// are blocking and destructive. The stream's close method does *not*
+// close the distributor's underlying structure.
+func (d Distributor[T]) Stream() *fun.Stream[T] { return d.Generator().Stream() }
 
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
@@ -85,5 +81,5 @@ func DistributorChannel[T any](ch chan T) Distributor[T] { return DistributorCha
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions
 func DistributorChanOp[T any](ch fun.ChanOp[T]) Distributor[T] {
-	return MakeDistributor(ch.Send().Processor(), ch.Receive().Producer(), ch.Len)
+	return MakeDistributor(ch.Send().Processor(), ch.Receive().Generator(), ch.Len)
 }

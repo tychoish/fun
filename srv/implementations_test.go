@@ -26,7 +26,7 @@ func TestHelpers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(fun.VariadicIterator(fun.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
+		svc := Wait(fun.VariadicStream(fun.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)
@@ -45,8 +45,8 @@ func TestHelpers(t *testing.T) {
 		t.Parallel()
 		t.Run("Large", func(t *testing.T) {
 			count := atomic.Int64{}
-			srv := ProcessIterator(
-				makeIterator(100),
+			srv := ProcessStream(
+				makeStream(100),
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
 				fun.WorkerGroupConfNumWorkers(2),
 			)
@@ -65,8 +65,8 @@ func TestHelpers(t *testing.T) {
 		})
 		t.Run("Medium", func(t *testing.T) {
 			count := atomic.Int64{}
-			srv := ProcessIterator(
-				makeIterator(50),
+			srv := ProcessStream(
+				makeStream(50),
 				func(_ context.Context, _ int) error {
 					time.Sleep(10 * time.Millisecond)
 					count.Add(1)

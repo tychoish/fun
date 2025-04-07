@@ -4,7 +4,7 @@ import (
 	"github.com/tychoish/fun"
 )
 
-// Slice converts an iterator into a slice: this will not abort or
-// timeout if the iterator is blocking. The iterator's close method is
+// Slice converts a stream into a slice: this will not abort or
+// timeout if the stream is blocking. The streams close method is
 // not processed.
-func Slice[T any](iter *fun.Iterator[T]) []T { return fun.NewProducer(iter.Slice).Force().Resolve() }
+func Slice[T any](iter *fun.Stream[T]) []T { return fun.NewGenerator(iter.Slice).Force().Resolve() }

@@ -17,18 +17,12 @@ type Slice[T any] []T
 // avoid needing to specify types.
 func NewSlice[T any](in []T) Slice[T] { return in }
 
-// Sliceify produces a slice object as a convenience constructor to
-// avoid needing to specify types.
-//
-// Deprecated: use NewSlice for this case.
-func Sliceify[T any](in []T) Slice[T] { return NewSlice(in) }
-
 // Variadic constructs a slice of type T from a sequence of variadic
 // elements.
 func Variadic[T any](in ...T) Slice[T] { return in }
 
 // SlicePtrs converts a slice of values to a slice of
-// values. This is a helper for Sliceify(in).Ptrs().
+// values. This is a helper for NewSlice(in).Ptrs().
 func SlicePtrs[T any](in []T) Slice[*T] { return NewSlice(in).Ptrs() }
 
 // SliceRefs converts a slice of pointers to a slice of objects,
@@ -95,23 +89,23 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 
 // Transform processes a slice of one type into a slice of another
 // type using the transformation function. Errors abort the
-// transformation, with the exception of fun.ErrIteratorSkip. All
+// transformation, with the exception of fun.ErrStreamContinue. All
 // errors are returned to the caller, except io.EOF which indicates
 // the (early) end of iteration.
-func Transform[T any, O any](in Slice[T], op fun.Transform[T, O]) fun.Producer[Slice[O]] {
+func Transform[T any, O any](in Slice[T], op fun.Transform[T, O]) fun.Generator[Slice[O]] {
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
-		if err := op.Process(in.Iterator()).Observe(out.Add).Run(ctx); err != nil {
+		if err := op.Process(in.Stream()).Observe(out.Add).Run(ctx); err != nil {
 			return nil, err
 		}
 		return out, nil
 	}
 }
 
-// Iterator returns an iterator to the items of the slice the range
+// Stream returns a stream to the items of the slice the range
 // keyword also works for these slices.
-func (s Slice[T]) Iterator() *fun.Iterator[T] { return fun.SliceIterator(s) }
+func (s Slice[T]) Stream() *fun.Stream[T] { return fun.SliceStream(s) }
 
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false
@@ -291,20 +285,20 @@ func (s Slice[T]) Sparse() Slice[T] {
 	}
 
 	out := NewSlice(make([]T, 0, buf.Len()))
-	out.Populate(buf.PopIterator()).Ignore().Wait()
+	out.Populate(buf.StreamPopFront()).Ignore().Wait()
 	return out
 }
 
 // Process creates a future in the form of a work that, when called
 // iterates through all items in the slice, returning when the
 // processor errors. io.EOF errors are not returned, but do abort
-// iteration early, while fun.ErrIteratorSkip is respected.
+// iteration early, while fun.ErrStreamContinue is respected.
 func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
-	return s.Iterator().Process(pf)
+	return s.Stream().Process(pf)
 }
 
 // Populate constructs an operation that adds all items from the
-// iterator to the slice.
-func (s *Slice[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
+// stream to the slice.
+func (s *Slice[T]) Populate(iter *fun.Stream[T]) fun.Worker {
 	return iter.Observe(s.Add)
 }

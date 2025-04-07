@@ -12,47 +12,37 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// Producer is a function type that is a failrly common
-// constructor. It's signature is used to create iterators, as a
-// generator, and functions like a Future.
-type Producer[T any] func(context.Context) (T, error)
+// Generator is a function type that is a failrly common
+// constructor. It's signature is used to create iterators/streams, as
+// a generator, and functions like a Future.
+type Generator[T any] func(context.Context) (T, error)
 
-// MakeProducer constructs a producer that wraps a similar
+// MakeGenerator constructs a generator that wraps a similar
 // function that does not take a context.
-func MakeProducer[T any](fn func() (T, error)) Producer[T] {
+func MakeGenerator[T any](fn func() (T, error)) Generator[T] {
 	return func(context.Context) (T, error) { return fn() }
 }
 
-// NewProducer returns a producer as a convenience function to avoid
+// NewGenerator returns a generator as a convenience function to avoid
 // the extra cast when creating new function objects.
-func NewProducer[T any](fn func(ctx context.Context) (T, error)) Producer[T] { return fn }
+func NewGenerator[T any](fn func(ctx context.Context) (T, error)) Generator[T] { return fn }
 
-// ConsistentProducer constructs a wrapper around a similar function
-// type that does not return an error or take a context. The resulting
-// function will never error.
-func ConsistentProducer[T any](fn func() T) Producer[T] {
-	return func(context.Context) (T, error) { return fn(), nil }
-}
-
-// StaticProducer returns a producer function that always returns the
+// StaticGenerator returns a generator function that always returns the
 // provided values.
-func StaticProducer[T any](val T, err error) Producer[T] {
+func StaticGenerator[T any](val T, err error) Generator[T] {
 	return func(context.Context) (T, error) { return val, err }
 }
 
-// ValueProducer returns a producer function that always returns the
+// ValueGenerator returns a generator function that always returns the
 // provided value, and a nill error.
-func ValueProducer[T any](val T) Producer[T] {
-	return StaticProducer(val, nil)
-}
+func ValueGenerator[T any](val T) Generator[T] { return StaticGenerator(val, nil) }
 
-// CheckProducer wraps a function object that uses the second ("OK")
+// CheckedGenerator wraps a function object that uses the second ("OK")
 // value to indicate that no more values will be produced. Errors
 // returned from the resulting produce are always either the context
 // cancellation error or io.EOF.
-func CheckProducer[T any](op func() (T, bool)) Producer[T] {
-	var zero T
-	return func(ctx context.Context) (_ T, err error) {
+func CheckedGenerator[T any](op func() (T, bool)) Generator[T] {
+	return func(ctx context.Context) (zero T, _ error) {
 		out, ok := op()
 		if !ok {
 			return zero, ft.Default(ctx.Err(), io.EOF)
@@ -61,66 +51,66 @@ func CheckProducer[T any](op func() (T, bool)) Producer[T] {
 	}
 }
 
-// PtrProducer uses a function that returns a pointer to a value and
-// converts that into a producer that de-references and returns
+// PtrGenerator uses a function that returns a pointer to a value and
+// converts that into a generator that de-references and returns
 // non-nil values of the pointer, and returns EOF for nil values of
 // the pointer.
-func PtrProducer[T any](fn func() *T) Producer[T] {
-	return CheckProducer(func() (out T, _ bool) {
+func PtrGenerator[T any](fn func() *T) Generator[T] {
+	return CheckedGenerator(func() (zero T, _ bool) {
 		if val := fn(); val != nil {
 			return *val, true
 		}
-		return out, false
+		return zero, false
 	})
 }
 
-// Run executes the producer and returns the result
+// Run executes the generator and returns the result
 //
 // Deprecated: Use the Resolve() helper.
-func (pf Producer[T]) Run(ctx context.Context) (T, error) { return pf.Resolve(ctx) }
+func (pf Generator[T]) Run(ctx context.Context) (T, error) { return pf.Resolve(ctx) }
 
-// Run executes the producer and returns the result
-func (pf Producer[T]) Resolve(ctx context.Context) (T, error) { return pf(ctx) }
+// Run executes the generator and returns the result
+func (pf Generator[T]) Resolve(ctx context.Context) (T, error) { return pf(ctx) }
 
-// Background constructs a worker that runs the provided Producer in a
+// Background constructs a worker that runs the provided Generator in a
 // background thread and passes the produced value to the observe.
 //
 // The worker function's return value captures the procuder's error,
-// and will block until the producer has completed.
-func (pf Producer[T]) Background(ctx context.Context, of Handler[T]) Worker {
+// and will block until the generator has completed.
+func (pf Generator[T]) Background(ctx context.Context, of Handler[T]) Worker {
 	return pf.Worker(of).Launch(ctx)
 }
 
 // Worker passes the produced value to an observer and returns a
-// worker that runs the producer, calls the observer, and returns the
+// worker that runs the generator, calls the observer, and returns the
 // error.
-func (pf Producer[T]) Worker(of Handler[T]) Worker {
+func (pf Generator[T]) Worker(of Handler[T]) Worker {
 	return func(ctx context.Context) error { o, e := pf(ctx); of(o); return e }
 }
 
 // Operation produces a wait function, using two observers to handle the
-// output of the Producer.
-func (pf Producer[T]) Operation(of Handler[T], eo Handler[error]) Operation {
+// output of the Generator.
+func (pf Generator[T]) Operation(of Handler[T], eo Handler[error]) Operation {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 
-// WithRecover returns a wrapped producer with a panic handler that converts
+// WithRecover returns a wrapped generator with a panic handler that converts
 // any panic to an error.
-func (pf Producer[T]) WithRecover() Producer[T] {
+func (pf Generator[T]) WithRecover() Generator[T] {
 	return func(ctx context.Context) (_ T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		return pf(ctx)
 	}
 }
 
-// Join, on successive calls, runs the first producer until it
+// Join, on successive calls, runs the first generator until it
 // returns an io.EOF error, and then returns the results of the second
-// producer. If either producer returns another error (context
+// generator. If either generator returns another error (context
 // cancelation or otherwise,) those errors are returned.
 //
 // When the second function returns io.EOF, all successive calls will
 // return io.EOF.
-func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
+func (pf Generator[T]) Join(next Generator[T]) Generator[T] {
 	const (
 		runFirstFunc int64 = iota
 		firstFunctionErrored
@@ -149,7 +139,7 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 				switch {
 				case err == nil:
 					return out, nil
-				case errors.Is(err, ErrIteratorSkip):
+				case errors.Is(err, ErrStreamContinue):
 					continue RETRY_FIRST
 				case !errors.Is(err, io.EOF):
 					ferr = err
@@ -168,7 +158,7 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 				switch {
 				case err == nil:
 					return out, nil
-				case errors.Is(err, ErrIteratorSkip):
+				case errors.Is(err, ErrStreamContinue):
 					continue RETRY_SECOND
 				case !errors.Is(err, io.EOF):
 					serr = err
@@ -188,60 +178,60 @@ func (pf Producer[T]) Join(next Producer[T]) Producer[T] {
 
 // Future creates a future function using the context provided and
 // error observer to collect the error.
-func (pf Producer[T]) Future(ctx context.Context, ob Handler[error]) Future[T] {
+func (pf Generator[T]) Future(ctx context.Context, ob Handler[error]) Future[T] {
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
-// Ignore creates a future that runs the producer and returns
+// Ignore creates a future that runs the generator and returns
 // the value, ignoring the error.
-func (pf Producer[T]) Ignore(ctx context.Context) Future[T] {
+func (pf Generator[T]) Ignore(ctx context.Context) Future[T] {
 	return func() T { return ft.IgnoreSecond(pf(ctx)) }
 }
 
-// Must returns a future that resolves the producer returning the
-// constructed value and panicing if the producer errors.
-func (pf Producer[T]) Must(ctx context.Context) Future[T] {
+// Must returns a future that resolves the generator returning the
+// constructed value and panicing if the generator errors.
+func (pf Generator[T]) Must(ctx context.Context) Future[T] {
 	return func() T { return ft.Must(pf.Resolve(ctx)) }
 }
 
 // Force combines the semantics of Must and Wait as a future: when the
-// future is resolved, the producer executes with a context that never
+// future is resolved, the generator executes with a context that never
 // expires and panics in the case of an error.
-func (pf Producer[T]) Force() Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
+func (pf Generator[T]) Force() Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
 
-// Block runs the producer with a context that will ever expire.
+// Block runs the generator with a context that will ever expire.
 //
 // Deprecated: Use Wait() rather than block.
-func (pf Producer[T]) Block() (T, error) { return pf.Wait() }
+func (pf Generator[T]) Block() (T, error) { return pf.Wait() }
 
-// Wait runs the producer with a context that will ever expire.
-func (pf Producer[T]) Wait() (T, error) { return pf(context.Background()) }
+// Wait runs the generator with a context that will ever expire.
+func (pf Generator[T]) Wait() (T, error) { return pf(context.Background()) }
 
 // Check converts the error into a boolean, with true indicating
 // success and false indicating (but not propagating it.).
-func (pf Producer[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
-func (pf Producer[T]) CheckForce() (T, bool)               { o, e := pf.Wait(); return o, e == nil }
+func (pf Generator[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
+func (pf Generator[T]) CheckForce() (T, bool)               { o, e := pf.Wait(); return o, e == nil }
 
-// Launch runs the producer in the background, and returns a producer
-// that and returns a producer which, when called, blocks until the
-// original producer returns.
-func (pf Producer[T]) Launch(ctx context.Context) Producer[T] {
-	eh, ef := HF.ErrorCollector()
+// Launch runs the generator in the background, and returns a generator
+// that and returns a generator which, when called, blocks until the
+// original generator returns.
+func (pf Generator[T]) Launch(ctx context.Context) Generator[T] {
+	eh, ef := MAKE.ErrorCollector()
 	pipe := Blocking(make(chan T))
 	pipe.Send().Processor().
 		ReadAll(pf).
 		Operation(eh).
 		PostHook(pipe.Close).
 		Background(ctx)
-	return pipe.Producer().WithErrorCheck(ef)
+	return pipe.Generator().WithErrorCheck(ef)
 }
 
 // WithErrorCheck takes an error future, and checks it before
-// executing the producer function. If the error future returns an
-// error (any error), the producer propagates that error, rather than
-// running the underying producer. Useful for injecting an abort into
+// executing the generator function. If the error future returns an
+// error (any error), the generator propagates that error, rather than
+// running the underying generator. Useful for injecting an abort into
 // an existing pipleine or chain.
-func (pf Producer[T]) WithErrorCheck(ef Future[error]) Producer[T] {
+func (pf Generator[T]) WithErrorCheck(ef Future[error]) Generator[T] {
 	var zero T
 	return func(ctx context.Context) (T, error) {
 		if err := ef(); err != nil {
@@ -255,10 +245,10 @@ func (pf Producer[T]) WithErrorCheck(ef Future[error]) Producer[T] {
 	}
 }
 
-// Once returns a producer that only executes ones, and caches the
-// return values, so that subsequent calls to the output producer will
+// Once returns a generator that only executes ones, and caches the
+// return values, so that subsequent calls to the output generator will
 // return the same values.
-func (pf Producer[T]) Once() Producer[T] {
+func (pf Generator[T]) Once() Generator[T] {
 	var (
 		out T
 		err error
@@ -272,54 +262,33 @@ func (pf Producer[T]) Once() Producer[T] {
 	}
 }
 
-// Iterator creates an iterator that calls the Producer function once
+// Stream creates a stream that calls the Generator function once
 // for every iteration, until it errors. Errors that are not context
-// cancellation errors or io.EOF are propgated to the iterators Close
+// cancellation errors or io.EOF are propgated to the stream's Close
 // method.
-func (pf Producer[T]) Iterator() *Iterator[T] {
-	return pf.IteratorWithErrorCollector(HF.ErrorCollector())
-}
+func (pf Generator[T]) Stream() *Stream[T] { return MakeStream(pf) }
 
-func (pf Producer[T]) IteratorWithErrorCollector(ec Handler[error], er Future[error]) *Iterator[T] {
-	op, cancel := pf.WithCancel()
-	iter := &Iterator[T]{operation: op}
-	iter.closer.op = cancel
-	iter.err.handler = ec
-	iter.err.future = er
-	return iter
-}
-
-// IteratorWithHook constructs an Iterator from the producer. The
-// provided hook function will run during the Iterators Close()
-// method.
-func (pf Producer[T]) IteratorWithHook(hook func(*Iterator[T])) *Iterator[T] {
-	iter := pf.Iterator()
-	closer := iter.closer.op
-	iter.closer.op = sync.OnceFunc(func() { hook(iter); closer() })
-	return iter
-}
-
-// If returns a producer that will execute the root producer only if
+// If returns a generator that will execute the root generator only if
 // the cond value is true. Otherwise, If will return the zero value
 // for T and a nil error.
-func (pf Producer[T]) If(cond bool) Producer[T] { return pf.When(ft.Wrapper(cond)) }
+func (pf Generator[T]) If(cond bool) Generator[T] { return pf.When(ft.Wrap(cond)) }
 
-// After will return a Producer that will block until the provided
+// After will return a Generator that will block until the provided
 // time is in the past, and then execute normally.
-func (pf Producer[T]) After(ts time.Time) Producer[T] { return pf.Delay(time.Until(ts)) }
+func (pf Generator[T]) After(ts time.Time) Generator[T] { return pf.Delay(time.Until(ts)) }
 
-// Delay wraps a Producer in a function that will always wait for the
+// Delay wraps a Generator in a function that will always wait for the
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Producer[T]) Delay(d time.Duration) Producer[T] { return pf.Jitter(ft.Wrapper(d)) }
+func (pf Generator[T]) Delay(d time.Duration) Generator[T] { return pf.Jitter(ft.Wrap(d)) }
 
-// Jitter wraps a Producer that runs the jitter function (jf) once
+// Jitter wraps a Generator that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
-// resulting duration before running the Producer.
+// resulting duration before running the Generator.
 //
 // If the function produces a negative duration, there is no delay.
-func (pf Producer[T]) Jitter(jf func() time.Duration) Producer[T] {
+func (pf Generator[T]) Jitter(jf func() time.Duration) Generator[T] {
 	return func(ctx context.Context) (out T, _ error) {
 		timer := time.NewTimer(max(0, jf()))
 		defer timer.Stop()
@@ -332,11 +301,11 @@ func (pf Producer[T]) Jitter(jf func() time.Duration) Producer[T] {
 	}
 }
 
-// When constructs a producer that will call the cond upon every
+// When constructs a generator that will call the cond upon every
 // execution, and when true, will run and return the results of the
-// root producer. Otherwise When will return the zero value of T and a
+// root generator. Otherwise When will return the zero value of T and a
 // nil error.
-func (pf Producer[T]) When(cond func() bool) Producer[T] {
+func (pf Generator[T]) When(cond func() bool) Generator[T] {
 	return func(ctx context.Context) (out T, _ error) {
 		if cond() {
 			return pf(ctx)
@@ -346,13 +315,13 @@ func (pf Producer[T]) When(cond func() bool) Producer[T] {
 	}
 }
 
-// Lock creates a producer that runs the root mutex as per normal, but
+// Lock creates a generator that runs the root mutex as per normal, but
 // under the protection of a mutex so that there's only one execution
-// of the producer at a time.
-func (pf Producer[T]) Lock() Producer[T] { return pf.WithLock(&sync.Mutex{}) }
+// of the generator at a time.
+func (pf Generator[T]) Lock() Generator[T] { return pf.WithLock(&sync.Mutex{}) }
 
-// WithLock uses the provided mutex to protect the execution of the producer.
-func (pf Producer[T]) WithLock(mtx sync.Locker) Producer[T] {
+// WithLock uses the provided mutex to protect the execution of the generator.
+func (pf Generator[T]) WithLock(mtx sync.Locker) Generator[T] {
 	return func(ctx context.Context) (T, error) {
 		mtx.Lock()
 		defer mtx.Unlock()
@@ -361,22 +330,22 @@ func (pf Producer[T]) WithLock(mtx sync.Locker) Producer[T] {
 }
 
 // SendOne makes a Worker function that, as a future, calls the
-// producer once and then passes the output, if there are no errors,
+// generator once and then passes the output, if there are no errors,
 // to the processor function. Provides the inverse operation of
 // Processor.ReadOne.
-func (pf Producer[T]) SendOne(proc Processor[T]) Worker { return proc.ReadOne(pf) }
+func (pf Generator[T]) SendOne(proc Processor[T]) Worker { return proc.ReadOne(pf) }
 
 // SendAll provides a form of iteration, by construction a future
-// (Worker) that consumes the values of the producer with the
+// (Worker) that consumes the values of the generator with the
 // processor until either function returns an error. SendAll respects
-// ErrIteratorSkip and io.EOF
-func (pf Producer[T]) SendAll(proc Processor[T]) Worker { return proc.ReadAll(pf) }
+// ErrStreamContinue and io.EOF
+func (pf Generator[T]) SendAll(proc Processor[T]) Worker { return proc.ReadAll(pf) }
 
-// WithCancel creates a Producer and a cancel function which will
-// terminate the context that the root Producer is running
+// WithCancel creates a Generator and a cancel function which will
+// terminate the context that the root Generator is running
 // with. This context isn't canceled *unless* the cancel function is
-// called (or the context passed to the Producer is canceled.)
-func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
+// called (or the context passed to the Generator is canceled.)
+func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
 	var wctx context.Context
 	var cancel context.CancelFunc
 	once := &sync.Once{}
@@ -388,10 +357,10 @@ func (pf Producer[T]) WithCancel() (Producer[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
-// Limit runs the producer a specified number of times, and caches the
+// Limit runs the generator a specified number of times, and caches the
 // result of the last execution and returns that value for any
 // subsequent executions.
-func (pf Producer[T]) Limit(in int) Producer[T] {
+func (pf Generator[T]) Limit(in int) Generator[T] {
 	resolver := limitExec[tuple[T, error]](in)
 
 	return func(ctx context.Context) (T, error) {
@@ -404,22 +373,22 @@ func (pf Producer[T]) Limit(in int) Producer[T] {
 }
 
 // Retry constructs a worker function that takes runs the underlying
-// producer until the error value is nil, or it encounters a
+// generator until the error value is nil, or it encounters a
 // terminating error (io.EOF, ers.ErrAbortCurrentOp, or context
 // cancellation.) In all cases, unless the error value is nil
 // (e.g. the retry succeeds)
 //
 // Context cancellation errors are returned to the caller, other
 // terminating errors are not, with any other errors encountered
-// during retries. ErrIteratorSkip is always ignored and not
+// during retries. ErrStreamContinue is always ignored and not
 // aggregated. All errors are discarded if the retry operation
 // succeeds in the provided number of retries.
 //
-// Except for ErrIteratorSkip, which is ignored, all other errors are
+// Except for ErrStreamContinue, which is ignored, all other errors are
 // aggregated and returned to the caller only if the retry fails. It's
-// possible to return a nil error and a zero value, if the producer
-// only returned ErrIteratorSkip values.
-func (pf Producer[T]) Retry(n int) Producer[T] {
+// possible to return a nil error and a zero value, if the generator
+// only returned ErrStreamContinue values.
+func (pf Generator[T]) Retry(n int) Generator[T] {
 	var zero T
 	return func(ctx context.Context) (_ T, err error) {
 		for i := 0; i < n; i++ {
@@ -429,7 +398,7 @@ func (pf Producer[T]) Retry(n int) Producer[T] {
 				return value, nil
 			case ers.IsTerminating(attemptErr):
 				return zero, ers.Join(attemptErr, err)
-			case errors.Is(attemptErr, ErrIteratorSkip):
+			case errors.Is(attemptErr, ErrStreamContinue):
 				continue
 			default:
 				err = ers.Join(attemptErr, err)
@@ -440,9 +409,9 @@ func (pf Producer[T]) Retry(n int) Producer[T] {
 	}
 }
 
-// TTL runs the producer only one time per specified interval. The
+// TTL runs the generator only one time per specified interval. The
 // interval must me greater than 0.
-func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
+func (pf Generator[T]) TTL(dur time.Duration) Generator[T] {
 	resolver := ttlExec[tuple[T, error]](dur)
 
 	return func(ctx context.Context) (T, error) {
@@ -455,10 +424,10 @@ func (pf Producer[T]) TTL(dur time.Duration) Producer[T] {
 }
 
 // PreHook configures an operation function to run before the returned
-// producer. If the pre-hook panics, it is converted to an error which
-// is aggregated with the (potential) error from the producer, and
-// returned with the producer's output.
-func (pf Producer[T]) PreHook(op Operation) Producer[T] {
+// generator. If the pre-hook panics, it is converted to an error which
+// is aggregated with the (potential) error from the generator, and
+// returned with the generator's output.
+func (pf Generator[T]) PreHook(op Operation) Generator[T] {
 	return func(ctx context.Context) (out T, err error) {
 		e := ers.WithRecoverCall(func() { op(ctx) })
 		out, err = pf(ctx)
@@ -466,13 +435,13 @@ func (pf Producer[T]) PreHook(op Operation) Producer[T] {
 	}
 }
 
-// PostHook appends a function to the execution of the producer. If
+// PostHook appends a function to the execution of the generator. If
 // the function panics it is converted to an error and aggregated with
-// the error of the producer.
+// the error of the generator.
 //
 // Useful for calling context.CancelFunc, closers, or incrementing
 // counters as necessary.
-func (pf Producer[T]) PostHook(op func()) Producer[T] {
+func (pf Generator[T]) PostHook(op func()) Generator[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
 		e = ers.Join(ers.WithRecoverCall(op), e)
@@ -480,27 +449,27 @@ func (pf Producer[T]) PostHook(op func()) Producer[T] {
 	}
 }
 
-// WithoutErrors returns a Producer function that wraps the root
-// producer and, after running the root producer, and makes the error
-// value of the producer nil if the error returned is in the error
+// WithoutErrors returns a Generator function that wraps the root
+// generator and, after running the root generator, and makes the error
+// value of the generator nil if the error returned is in the error
 // list. The produced value in these cases is almost always the zero
 // value for the type.
-func (pf Producer[T]) WithoutErrors(errs ...error) Producer[T] {
+func (pf Generator[T]) WithoutErrors(errs ...error) Generator[T] {
 	return pf.WithErrorFilter(ers.FilterExclude(errs...))
 }
 
-// WithErrorFilter passes the error of the root Producer function with
+// WithErrorFilter passes the error of the root Generator function with
 // the ers.Filter.
-func (pf Producer[T]) WithErrorFilter(ef ers.Filter) Producer[T] {
+func (pf Generator[T]) WithErrorFilter(ef ers.Filter) Generator[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
 }
 
-// Filter creates a function that passes the output of the producer to
+// Filter creates a function that passes the output of the generator to
 // the filter function, which, if it returns true. is returned to the
-// caller, otherwise the Producer returns the zero value of type T and
-// ers.ErrCurrentOpSkip error (e.g. continue), which iterators and
-// other producer-consuming functions can respect.
-func (pf Producer[T]) Filter(fl func(T) bool) Producer[T] {
+// caller, otherwise the Generator returns the zero value of type T and
+// ers.ErrCurrentOpSkip error (e.g. continue), which streams and
+// other generator-consuming functions can respect.
+func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
 	var zero T
 	return func(ctx context.Context) (T, error) {
 		val, err := pf(ctx)
@@ -514,15 +483,15 @@ func (pf Producer[T]) Filter(fl func(T) bool) Producer[T] {
 	}
 }
 
-// ParallelGenerate creates an iterator using a generator pattern which
+// ParallelGenerate creates a stream using a generator pattern which
 // produces items until the generator function returns
 // io.EOF, or the context (passed to the first call to
 // Next()) is canceled. Parallel operation, continue on
 // error/continue-on-panic semantics are available and share
 // configuration with the ParallelProcess and Map operations.
-func (pf Producer[T]) GenerateParallel(
+func (pf Generator[T]) GenerateParallel(
 	optp ...OptionProvider[*WorkerGroupConf],
-) *Iterator[T] {
+) *Stream[T] {
 	opts := &WorkerGroupConf{}
 	initErr := JoinOptionProviders(optp...).Apply(opts)
 
@@ -539,7 +508,7 @@ func (pf Producer[T]) GenerateParallel(
 				value, err := pf(ctx)
 				if err != nil {
 					if opts.CanContinueOnError(err) {
-						return zero, ErrIteratorSkip
+						return zero, ErrStreamContinue
 					}
 
 					return zero, io.EOF
@@ -554,7 +523,7 @@ func (pf Producer[T]) GenerateParallel(
 		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Background(ctx)
 	}).Once()
 
-	iter := pipe.Receive().Producer().PreHook(init).Iterator()
+	iter := pipe.Receive().Generator().PreHook(init).Stream()
 
 	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = iter.ErrorHandler().Lock() })
 

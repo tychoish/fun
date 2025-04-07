@@ -14,10 +14,10 @@ import (
 
 // Deque proves a basic double ended queue backed by a doubly linked
 // list, with features to support a maximum capacity, burstable limits
-// and soft quotas, as well as iterators, that safe for access from
+// and soft quotas, as well as streams, that safe for access from
 // multiple concurrent go-routines. Furthermore, the implementation
 // safely handles multiple concurrent blocking operations (e.g. Wait,
-// iterators).
+// streams).
 //
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
@@ -112,7 +112,7 @@ func makeDeque[T any]() *Deque[T] {
 // this implementation.
 func (dq *Deque[T]) Len() int { defer adt.With(adt.Lock(dq.mtx)); return dq.tracker.len() }
 
-// Close marks the deque as closed, after which point all iterators
+// Close marks the deque as closed, after which point all streams
 // will stop and no more operations will succeed. The error value is
 // not used in the current operation.
 func (dq *Deque[T]) Close() error { defer adt.With(adt.Lock(dq.mtx)); dq.closed = true; return nil }
@@ -243,61 +243,61 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	return dq.addAfter(it, afterGetter())
 }
 
-// IteratorReverse starts at the back of the queue and iterates
-// towards the front. When the iterator reaches the beginning of the queue
-// it ends.
-func (dq *Deque[T]) Iterator() *fun.Iterator[T] {
-	return dq.Producer().Iterator()
+// StreamFront starts at the front of the queue and iterates towards
+// the back. When the stream reaches the beginning of the queue it
+// ends.
+func (dq *Deque[T]) StreamFront() *fun.Stream[T] {
+	return dq.GeneratorFront().Stream()
 }
 
-// IteratorReverse starts at the back of the queue and iterates
-// towards the front. When the iterator reaches the end of the queue
+// StreamBack starts at the back of the queue and iterates
+// towards the front. When the stream reaches the end of the queue
 // it ends.
-func (dq *Deque[T]) IteratorReverse() *fun.Iterator[T] {
-	return dq.ProducerReverse().Iterator()
+func (dq *Deque[T]) StreamBack() *fun.Stream[T] {
+	return dq.GeneratorBack().Stream()
 }
 
-// Producer exposes the deque to a single-function interface for
-// iteration. The producer function operation will not modify the
+// GeneratorFront exposes the deque to a single-function interface for
+// iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back.
-func (dq *Deque[T]) Producer() fun.Producer[T] {
+func (dq *Deque[T]) GeneratorFront() fun.Generator[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confProducer(dqNext, false).WithLock(dq.mtx)
+	return dq.confGenerator(dqNext, false).WithLock(dq.mtx)
 }
 
-// ProducerBlocking exposes the deque to a single-function interface
-// for iteration. The producer function operation will not modify the
+// BlockingGeneratorFront exposes the deque to a single-function interface
+// for iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back, and will block for a new element if the deque is
-// empty or the producer reaches the end, the operation will block
+// empty or the generator reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) ProducerBlocking() fun.Producer[T] {
+func (dq *Deque[T]) BlockingGeneratorFront() fun.Generator[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confProducer(dqNext, true).WithLock(dq.mtx)
+	return dq.confGenerator(dqNext, true).WithLock(dq.mtx)
 }
 
-// Producer exposes the deque to a single-function interface for
-// iteration. The producer function operation will not modify the
+// GeneratorBack exposes the deque to a single-function interface for
+// iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to front.
-func (dq *Deque[T]) ProducerReverse() fun.Producer[T] {
+func (dq *Deque[T]) GeneratorBack() fun.Generator[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confProducer(dqPrev, false).WithLock(dq.mtx)
+	return dq.confGenerator(dqPrev, false).WithLock(dq.mtx)
 }
 
-// ProducerReverseBlocking exposes the deque to a single-function interface
-// for iteration. The producer function operation will not modify the
+// BlockingGeneratorBack exposes the deque to a single-function interface
+// for iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to fron, and will block for a new element if the deque is
-// empty or the producer reaches the end, the operation will block
+// empty or the generator reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) ProducerReverseBlocking() fun.Producer[T] {
+func (dq *Deque[T]) BlockingGeneratorBack() fun.Generator[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confProducer(dqPrev, true).WithLock(dq.mtx)
+	return dq.confGenerator(dqPrev, true).WithLock(dq.mtx)
 }
 
-func (dq *Deque[T]) confProducer(direction dqDirection, blocking bool) fun.Producer[T] {
+func (dq *Deque[T]) confGenerator(direction dqDirection, blocking bool) fun.Generator[T] {
 	var current *element[T]
 	return func(ctx context.Context) (out T, _ error) {
 		if current == nil {
@@ -319,11 +319,11 @@ func (dq *Deque[T]) confProducer(direction dqDirection, blocking bool) fun.Produ
 	}
 }
 
-// Distributor produces a Distributor instance with
+// BlockingDistributor produces a BlockingDistributor instance with
 // Send/Receive operations that block if Deque is full or empty
 // (respectively). Receive operations always remove the element from
 // the Deque.
-func (dq *Deque[T]) Distributor() Distributor[T] {
+func (dq *Deque[T]) BlockingDistributor() Distributor[T] {
 	return Distributor[T]{
 		push: dq.WaitPushBack,
 		pop:  dq.WaitFront,
@@ -331,10 +331,10 @@ func (dq *Deque[T]) Distributor() Distributor[T] {
 	}
 }
 
-// DistributorNonBlocking produces a distributor instance that always
+// Distributor produces a distributor instance that always
 // accepts send items: if the deque is full, it removes one element
 // from the front of the queue before adding them to the back.
-func (dq *Deque[T]) DistributorNonBlocking() Distributor[T] {
+func (dq *Deque[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
 		push: fun.MakeProcessor(dq.ForcePushBack),
 		pop:  dq.WaitFront,
@@ -391,7 +391,7 @@ func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 	it.next.prev = it.prev
 
 	// don't reset poointers in the item in case we're using this
-	// item in an iterator
+	// item in a stream
 	// it.next = nil
 	// it.prev = nil
 

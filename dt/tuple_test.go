@@ -100,7 +100,7 @@ func TestTuples(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Iterator()).Run(ctx))
+		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
 		mp.ConsumeTuples(&ps)
@@ -109,7 +109,7 @@ func TestTuples(t *testing.T) {
 	t.Run("ConsumeTuples", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			expected := errors.New("hi")
-			iter := fun.StaticProducer(MakeTuple("1", 1), expected).Iterator()
+			iter := fun.StaticGenerator(MakeTuple("1", 1), expected).Stream()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -124,7 +124,7 @@ func TestTuples(t *testing.T) {
 				MakeTuple("1", 1), MakeTuple("2", 2),
 				MakeTuple("3", 3), MakeTuple("4", 4),
 				MakeTuple("5", 5), MakeTuple("6", 6),
-			}).Iterator()
+			}).Stream()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

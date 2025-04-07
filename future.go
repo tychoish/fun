@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -12,19 +13,13 @@ import (
 // type.
 type Future[T any] func() T
 
-// Futureize is a simple wrapper to convert a function object to a
-// Future[T] object.
-//
-// Deprecated: Use MakeFuture instead.
-func Futurize[T any](f func() T) Future[T] { return f }
-
 // MakeFuture constructs a Future[T] object from a function
 // object.
 func MakeFuture[T any](f func() T) Future[T] { return f }
 
 // AsFuture wraps a value and returns a future object that, when
 // called, will return the provided value.
-func AsFuture[T any](in T) Future[T] { return ft.Wrapper(in) }
+func AsFuture[T any](in T) Future[T] { return ft.Wrap(in) }
 
 // Translate converts a future from one type to another.
 func Translate[T any, O any](in Future[T], tfn func(T) O) Future[O] {
@@ -38,8 +33,10 @@ func (f Future[T]) Resolve() T { return f() }
 // exactly once.
 func (f Future[T]) Once() Future[T] { return sync.OnceValue(f) }
 
-// Producer returns a producer function that wraps the future.
-func (f Future[T]) Producer() Producer[T] { return ConsistentProducer(f) }
+// Generator returns a producer function that wraps the future.
+func (f Future[T]) Generator() Generator[T] {
+	return func(context.Context) (T, error) { return f(), nil }
+}
 
 // Ignore produces a function that will call the Future but discards
 // the output.
@@ -88,11 +85,14 @@ func (f Future[T]) Reduce(merge func(T, T) T, next Future[T]) Future[T] {
 }
 
 // Join iteratively merges a collection of future operations.
+//
+// If any of the futures are nil, the zero value for T is used. The
+// merge function MUST NOT be nil.
 func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 	return func() (out T) {
-		out = f()
+		out = ft.SafeDo(f)
 		for idx := range ops {
-			out = merge(out, ops[idx]())
+			out = merge(out, ft.SafeDo(ops[idx]))
 		}
 		return out
 	}

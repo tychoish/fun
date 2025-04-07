@@ -43,14 +43,14 @@ type FixtureData[T any] struct {
 	Elements []T
 }
 
-type FixtureIteratorConstuctors[T any] struct {
+type FixtureStreamConstructors[T any] struct {
 	Name        string
-	Constructor func([]T) *Iterator[T]
+	Constructor func([]T) *Stream[T]
 }
 
-type FixtureIteratorFilter[T any] struct {
+type FixtureStreamFilter[T any] struct {
 	Name   string
-	Filter func(*Iterator[T]) *Iterator[T]
+	Filter func(*Stream[T]) *Stream[T]
 }
 
 func makeIntSlice(size int) []int {
@@ -88,7 +88,7 @@ func TestTools(t *testing.T) {
 					}
 				}()
 
-				output := Blocking(pipe).Iterator().Channel(ctx)
+				output := Blocking(pipe).Stream().Channel(ctx)
 				runtime.Gosched()
 
 				count := 0
@@ -130,7 +130,7 @@ func TestMapReduce(t *testing.T) {
 
 		var mf Transform[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
 		mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
-			ReadAll(Blocking(pipe).Receive().Producer()).
+			ReadAll(Blocking(pipe).Receive().Generator()).
 			Ignore().
 			Add(ctx, wg)
 
@@ -158,42 +158,36 @@ func TestMapReduce(t *testing.T) {
 	})
 }
 
-func getConstructors[T comparable]() []FixtureIteratorConstuctors[T] {
-	return []FixtureIteratorConstuctors[T]{
-		{
-			Name: "SlicifyIterator",
-			Constructor: func(elems []T) *Iterator[T] {
-				return SliceIterator(elems)
-			},
-		},
+func getConstructors[T comparable]() []FixtureStreamConstructors[T] {
+	return []FixtureStreamConstructors[T]{
 		{
 			Name: "Slice",
-			Constructor: func(elems []T) *Iterator[T] {
-				return SliceIterator(elems)
+			Constructor: func(elems []T) *Stream[T] {
+				return SliceStream(elems)
 			},
 		},
 		{
-			Name: "VariadicIterator",
-			Constructor: func(elems []T) *Iterator[T] {
-				return VariadicIterator(elems...)
+			Name: "VariadicStream",
+			Constructor: func(elems []T) *Stream[T] {
+				return VariadicStream(elems...)
 			},
 		},
 		{
-			Name: "ChannelIterator",
-			Constructor: func(elems []T) *Iterator[T] {
+			Name: "ChannelStream",
+			Constructor: func(elems []T) *Stream[T] {
 				vals := make(chan T, len(elems))
 				for idx := range elems {
 					vals <- elems[idx]
 				}
 				close(vals)
-				return Blocking(vals).Iterator()
+				return Blocking(vals).Stream()
 			},
 		},
 	}
 
 }
 
-func TestIteratorImplementations(t *testing.T) {
+func TestStreamImplementations(t *testing.T) {
 	t.Parallel()
 	elems := []FixtureData[string]{
 		{
@@ -207,15 +201,15 @@ func TestIteratorImplementations(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(t, elems, getConstructors[string]())
+		RunStreamImplementationTests(t, elems, getConstructors[string]())
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorStringAlgoTests(t, elems, getConstructors[string]())
+		RunStreamStringAlgoTests(t, elems, getConstructors[string]())
 	})
 }
 
-func TestIteratorAlgoInts(t *testing.T) {
+func TestStreamAlgoInts(t *testing.T) {
 	t.Parallel()
 
 	elemGenerator := func() []int {
@@ -238,11 +232,11 @@ func TestIteratorAlgoInts(t *testing.T) {
 	}
 
 	t.Run("SimpleOperations", func(t *testing.T) {
-		RunIteratorImplementationTests(t, elems, getConstructors[int]())
+		RunStreamImplementationTests(t, elems, getConstructors[int]())
 	})
 
 	t.Run("Aggregations", func(t *testing.T) {
-		RunIteratorIntegerAlgoTests(t, elems, getConstructors[int]())
+		RunStreamIntegerAlgoTests(t, elems, getConstructors[int]())
 	})
 }
 
@@ -259,7 +253,7 @@ func TestParallelForEach(t *testing.T) {
 				seen := &atomic.Int64{}
 				count := &atomic.Int64{}
 
-				err := SliceIterator(elems).ProcessParallel(
+				err := SliceStream(elems).ProcessParallel(
 					func(_ context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
 						count.Add(1)
@@ -287,7 +281,7 @@ func TestParallelForEach(t *testing.T) {
 	t.Run("ContinueOnPanic", func(t *testing.T) {
 		count := &atomic.Int64{}
 		errCount := &atomic.Int64{}
-		err := SliceIterator(makeIntSlice(200)).
+		err := SliceStream(makeIntSlice(200)).
 			ProcessParallel(
 				func(_ context.Context, in int) error {
 					count.Add(1)
@@ -318,7 +312,7 @@ func TestParallelForEach(t *testing.T) {
 		seenCount := &atomic.Int64{}
 		paned := &atomic.Bool{}
 
-		err := SliceIterator(makeIntSlice(10)).
+		err := SliceStream(makeIntSlice(10)).
 			ProcessParallel(
 				func(_ context.Context, in int) error {
 					if in == 8 {
@@ -352,7 +346,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := SliceIterator(makeIntSlice(10)).
+		err := SliceStream(makeIntSlice(10)).
 			ProcessParallel(
 				func(_ context.Context, in int) error {
 					if in == 4 {
@@ -372,7 +366,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 		count := &atomic.Int64{}
 
-		err := SliceIterator(makeIntSlice(10)).
+		err := SliceStream(makeIntSlice(10)).
 			ProcessParallel(
 				func(_ context.Context, in int) error {
 					count.Add(1)
@@ -397,7 +391,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := SliceIterator(makeIntSlice(100)).
+		err := SliceStream(makeIntSlice(100)).
 			ProcessParallel(
 				func(_ context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
@@ -419,7 +413,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := SliceIterator(makeIntSlice(100)).ProcessParallel(
+		err := SliceStream(makeIntSlice(100)).ProcessParallel(
 			func(_ context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
@@ -441,7 +435,7 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceIterator(makeIntSlice(2)).ProcessParallel(
+			err := SliceStream(makeIntSlice(2)).ProcessParallel(
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
@@ -455,7 +449,7 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceIterator(makeIntSlice(2)).ProcessParallel(
+			err := SliceStream(makeIntSlice(2)).ProcessParallel(
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
@@ -467,10 +461,10 @@ func TestParallelForEach(t *testing.T) {
 	})
 }
 
-func RunIteratorImplementationTests[T comparable](
+func RunStreamImplementationTests[T comparable](
 	t *testing.T,
 	elements []FixtureData[T],
-	builders []FixtureIteratorConstuctors[T],
+	builders []FixtureStreamConstructors[T],
 ) {
 	for _, elems := range elements {
 		t.Run(elems.Name, func(t *testing.T) {
@@ -481,7 +475,7 @@ func RunIteratorImplementationTests[T comparable](
 					// name := builder.Name
 					t.Parallel()
 
-					builder := func() *Iterator[T] { return baseBuilder(elems) }
+					builder := func() *Stream[T] { return baseBuilder(elems) }
 
 					t.Run("Single", func(t *testing.T) {
 						ctx, cancel := context.WithCancel(context.Background())
@@ -570,10 +564,10 @@ func RunIteratorImplementationTests[T comparable](
 	}
 }
 
-func RunIteratorIntegerAlgoTests(
+func RunStreamIntegerAlgoTests(
 	t *testing.T,
 	elements []FixtureData[int],
-	builders []FixtureIteratorConstuctors[int],
+	builders []FixtureStreamConstructors[int],
 ) {
 	for _, elems := range elements {
 		t.Run(elems.Name, func(t *testing.T) {
@@ -693,10 +687,10 @@ func RunIteratorIntegerAlgoTests(
 	}
 }
 
-func RunIteratorStringAlgoTests(
+func RunStreamStringAlgoTests(
 	t *testing.T,
 	elements []FixtureData[string],
-	builders []FixtureIteratorConstuctors[string],
+	builders []FixtureStreamConstructors[string],
 ) {
 	for _, elems := range elements {
 		t.Run(elems.Name, func(t *testing.T) {
@@ -707,7 +701,7 @@ func RunIteratorStringAlgoTests(
 					name := builder.Name
 					t.Parallel()
 
-					builder := func() *Iterator[string] { return (baseBuilder(elems)) }
+					builder := func() *Stream[string] { return (baseBuilder(elems)) }
 					t.Run("Channel", func(t *testing.T) {
 						ctx, cancel := context.WithCancel(context.Background())
 						defer cancel()
@@ -732,10 +726,7 @@ func RunIteratorStringAlgoTests(
 						if err != nil {
 							t.Fatal(err)
 						}
-						// skip implementation with random order
-						if name != "SetIterator" {
-							check.EqualItems(t, elems, vals)
-						}
+						check.EqualItems(t, elems, vals)
 						if err := iter.Close(); err != nil {
 							t.Fatal(err)
 						}
@@ -757,17 +748,14 @@ func RunIteratorStringAlgoTests(
 							t.Fatal(err)
 						}
 
-						// skip implementation with random order
-						if name != "SetIterator" {
-							check.EqualItems(t, elems, vals)
-						}
+						check.EqualItems(t, elems, vals)
 					})
 					t.Run("ParallelMap", func(t *testing.T) {
 						ctx, cancel := context.WithCancel(context.Background())
 						defer cancel()
 
 						out := Map(
-							MergeIterators(VariadicIterator(builder(), builder(), builder())),
+							MergeStreams(VariadicStream(builder(), builder(), builder())),
 							func(_ context.Context, str string) (string, error) {
 								for _, c := range []string{"a", "e", "i", "o", "u"} {
 									str = strings.ReplaceAll(str, c, "")
@@ -802,7 +790,7 @@ func RunIteratorStringAlgoTests(
 
 							inputs := GenerateRandomStringSlice(512)
 							count := &atomic.Int32{}
-							out := Producer[string](func(_ context.Context) (string, error) {
+							out := Generator[string](func(_ context.Context) (string, error) {
 								count.Add(1)
 								if int(count.Load()) > len(inputs) {
 									return "", io.EOF
@@ -828,7 +816,7 @@ func RunIteratorStringAlgoTests(
 
 							inputs := GenerateRandomStringSlice(512)
 							count := &atomic.Int32{}
-							out := Producer[string](func(_ context.Context) (string, error) {
+							out := Generator[string](func(_ context.Context) (string, error) {
 								count.Add(1)
 								if int(count.Load()) > len(inputs) {
 									return "", io.EOF
@@ -852,7 +840,7 @@ func RunIteratorStringAlgoTests(
 						t.Run("PanicSafety", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
-							out := Producer[string](func(_ context.Context) (string, error) {
+							out := Generator[string](func(_ context.Context) (string, error) {
 								panic("foo")
 							}).GenerateParallel()
 
@@ -869,7 +857,7 @@ func RunIteratorStringAlgoTests(
 							defer cancel()
 
 							count := 0
-							out := Producer[string](
+							out := Generator[string](
 								func(_ context.Context) (string, error) {
 									count++
 									if count == 3 {
@@ -898,7 +886,7 @@ func RunIteratorStringAlgoTests(
 							defer cancel()
 
 							count := 0
-							out := Producer[string](func(_ context.Context) (string, error) {
+							out := Generator[string](func(_ context.Context) (string, error) {
 								count++
 								if count == 4 {
 									return "", errors.New("beep")
@@ -923,7 +911,7 @@ func RunIteratorStringAlgoTests(
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
 							count := 0
-							out := Producer[string](func(_ context.Context) (string, error) {
+							out := Generator[string](func(_ context.Context) (string, error) {
 								count++
 								if count == 3 {
 									return "", errors.New("beep")
@@ -1007,14 +995,14 @@ func RunIteratorStringAlgoTests(
 						defer cancel()
 
 						elems := makeIntSlice(32)
-						iter := SliceIterator(elems)
+						iter := SliceStream(elems)
 						count := 0
 						sum, err := iter.Reduce(func(_ int, value int) (int, error) {
 							count++
 							if count == 1 {
 								return 42, nil
 							}
-							return value, ErrIteratorSkip
+							return value, ErrStreamContinue
 						}).Run(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
@@ -1025,7 +1013,7 @@ func RunIteratorStringAlgoTests(
 						defer cancel()
 
 						elems := makeIntSlice(32)
-						iter := SliceIterator(elems)
+						iter := SliceStream(elems)
 						count := 0
 						sum, err := iter.Reduce(func(_ int, _ int) (int, error) {
 							count++
@@ -1081,7 +1069,7 @@ func RunIteratorStringAlgoTests(
 		tfrm = ConverterOk(func(in string) (string, bool) { return in, false })
 		out, err = tfrm(ctx, "bye")
 		check.Error(t, err)
-		check.ErrorIs(t, err, ErrIteratorSkip)
+		check.ErrorIs(t, err, ErrStreamContinue)
 		check.Equal(t, out, "bye")
 	})
 	t.Run("Block", func(t *testing.T) {
@@ -1208,7 +1196,7 @@ func RunIteratorStringAlgoTests(
 		var proccount int
 		var maxIter int
 		reset := func() { tfmcount, prodcount, proccount = 0, 0, 0; prodroot, procroot = nil, nil; maxIter = 1 }
-		prod := Producer[int](func(_ context.Context) (int, error) {
+		prod := Generator[int](func(_ context.Context) (int, error) {
 			if prodroot == nil && prodcount >= maxIter {
 				return -1, io.EOF
 			}
@@ -1300,7 +1288,7 @@ func TestTransformFunctions(t *testing.T) {
 				count := 0
 				mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
 				check.Equal(t, count, 0)
-				prod := mpf.ConvertProducer(AsFuture(42).Producer())
+				prod := mpf.CovnertGenerator(AsFuture(42).Generator())
 				check.Equal(t, count, 0)
 				out := prod.Ignore(ctx)
 				check.Equal(t, count, 0)
@@ -1315,7 +1303,7 @@ func TestTransformFunctions(t *testing.T) {
 				mpf := Converter(func(in int) string { mcount++; return fmt.Sprint(in) })
 				check.Equal(t, mcount, 0)
 				check.Equal(t, pcount, 0)
-				prod := mpf.ConvertProducer(MakeProducer(func() (int, error) { pcount++; return 42, ers.ErrInvalidInput }))
+				prod := mpf.CovnertGenerator(MakeGenerator(func() (int, error) { pcount++; return 42, ers.ErrInvalidInput }))
 				check.Equal(t, mcount, 0)
 				check.Equal(t, pcount, 0)
 				out, err := prod.Run(ctx)

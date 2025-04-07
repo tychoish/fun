@@ -36,7 +36,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return MakeDistributorBroker(ctx, d.Distributor(), BrokerOptions{})
+				return MakeDistributorBroker(ctx, d.BlockingDistributor(), BrokerOptions{})
 			},
 		},
 		{
@@ -612,7 +612,7 @@ func TestBroker(t *testing.T) {
 		t.Parallel()
 		input := randomIntSlice(100)
 
-		iter := fun.SliceIterator(input)
+		iter := fun.SliceStream(input)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()

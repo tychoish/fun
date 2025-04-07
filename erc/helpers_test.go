@@ -109,10 +109,10 @@ func TestCollections(t *testing.T) {
 			}
 		})
 	})
-	t.Run("IteratorHook", func(t *testing.T) {
+	t.Run("StreamHook", func(t *testing.T) {
 		ec := &Collector{}
 		count := 0
-		op := fun.Producer[int](func(context.Context) (int, error) {
+		op := fun.Generator[int](func(context.Context) (int, error) {
 			ec.Add(ers.Error("hi"))
 			if count >= 32 {
 				return 0, io.EOF
@@ -121,7 +121,7 @@ func TestCollections(t *testing.T) {
 			return count, nil
 		})
 
-		iter := op.IteratorWithHook(IteratorHook[int](ec))
+		iter := op.Stream().WithHook(StreamHook[int](ec))
 		assert.Equal(t, iter.Count(testt.Context(t)), 32)
 		testt.Log(t, ers.Unwind(ec.Resolve()))
 		assert.Equal(t, len(ers.Unwind(ec.Resolve())), 33)
@@ -139,14 +139,14 @@ func TestCollections(t *testing.T) {
 				ch := make(chan error)
 				close(ch)
 				ec := New()
-				Stream(ctx, ec, ch)
+				Consume(ctx, ec, ch)
 				assert.NotError(t, ec.Resolve())
 			})
 			t.Run("One", func(t *testing.T) {
 				ch := getPopulatedErrChan(1)
 				close(ch)
 				ec := New()
-				Stream(ctx, ec, ch)
+				Consume(ctx, ec, ch)
 				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
@@ -162,7 +162,7 @@ func TestCollections(t *testing.T) {
 				close(ch)
 				fun.Invariant.IsTrue(len(ch) == 10)
 				ec := New()
-				Stream(ctx, ec, ch)
+				Consume(ctx, ec, ch)
 				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)

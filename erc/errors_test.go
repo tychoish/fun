@@ -63,7 +63,7 @@ func collect[T any](t testing.TB, prod func() (T, bool)) []T {
 	return out
 }
 
-func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Iterator[T]) []T {
+func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Stream[T]) []T {
 	t.Helper()
 
 	out := []T{}
@@ -221,7 +221,7 @@ func TestError(t *testing.T) {
 				t.Error(es.Resolve(), "error not propogated")
 			}
 		})
-		t.Run("Iterator", func(t *testing.T) {
+		t.Run("Stream", func(t *testing.T) {
 			ctx := testt.Context(t)
 			es := &Collector{}
 			for i := 0; i < 10; i++ {
@@ -231,15 +231,15 @@ func TestError(t *testing.T) {
 				t.Error("should have seen errors")
 			}
 
-			errs := collectIter(ctx, t, es.Iterator())
+			errs := collectIter(ctx, t, es.Stream())
 			if len(errs) != 10 {
-				t.Error("iterator was incomplete", len(errs))
+				t.Error("stream was incomplete", len(errs))
 			}
 		})
-		t.Run("NilIterator", func(t *testing.T) {
+		t.Run("NilStream", func(t *testing.T) {
 			ctx := testt.Context(t)
 			es := &Collector{}
-			errs := collectIter(ctx, t, es.Iterator())
+			errs := collectIter(ctx, t, es.Stream())
 			assert.Zero(t, len(errs))
 		})
 		t.Run("ProducerCanceled", func(t *testing.T) {
@@ -247,7 +247,7 @@ func TestError(t *testing.T) {
 			es.Add(errors.New("hello"))
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			prod := fun.CheckProducer(es.stack.CheckProducer())
+			prod := fun.CheckedGenerator(es.stack.Generator())
 
 			err, err2 := prod(ctx)
 			assert.Error(t, err)
@@ -496,19 +496,19 @@ func BenchmarkErrorStack(b *testing.B) {
 				}
 			}
 		})
-		b.Run("StackIterator", func(b *testing.B) {
+		b.Run("StackStream", func(b *testing.B) {
 			es := &ers.Stack{}
 			for i := 0; i < count; i++ {
 				es.Push(errors.New("foo"))
 			}
-			errs := collect(b, es.CheckProducer())
+			errs := collect(b, es.Generator())
 			if len(errs) != count {
 				b.Fatal(len(errs))
 			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
-				errs = collect(b, es.CheckProducer())
+				errs = collect(b, es.Generator())
 				if len(errs) == 0 {
 					b.Fatal()
 				}

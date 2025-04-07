@@ -29,10 +29,10 @@ func TestMap(t *testing.T) {
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
 		check.Equal(t, mp.Pairs().Len(), 100)
-		check.Equal(t, mp.Iterator().Count(ctx), 100)
+		check.Equal(t, mp.Stream().Count(ctx), 100)
 		check.Equal(t, mp.Keys().Count(ctx), 100)
 		check.Equal(t, mp.Values().Count(ctx), 100)
-		check.Equal(t, MapIterator(mp).Count(ctx), 100)
+		check.Equal(t, MapStream(mp).Count(ctx), 100)
 	})
 	t.Run("Extend", func(t *testing.T) {
 		mp := makeMap(100)
@@ -52,11 +52,11 @@ func TestMap(t *testing.T) {
 		mp := makeMap(100)
 
 		// noop because same keys
-		mp.Append(ft.Must(mp.Pairs().Iterator().Slice(ctx))...)
+		mp.Append(ft.Must(mp.Pairs().Stream().Slice(ctx))...)
 		check.Equal(t, mp.Len(), 100)
 
 		// works because different keys, probably
-		mp.Append(ft.Must(makeMap(100).Iterator().Slice(ctx))...)
+		mp.Append(ft.Must(makeMap(100).Stream().Slice(ctx))...)
 		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("Merge", func(t *testing.T) {
@@ -74,16 +74,16 @@ func TestMap(t *testing.T) {
 		num := int(time.Microsecond)
 		mp := makeMap(num)
 
-		check.True(t, mp.Iterator().Count(ctx) == mp.Len())
+		check.True(t, mp.Stream().Count(ctx) == mp.Len())
 
-		iter := mp.Iterator()
+		iter := mp.Stream()
 		check.True(t, iter.Next(ctx))
 
 		cancel()
 
 		check.True(t, !iter.Next(ctx))
 
-		check.True(t, mp.Iterator().Count(ctx) < num)
+		check.True(t, mp.Stream().Count(ctx) < num)
 	})
 	t.Run("SetDefaultAndCheck", func(t *testing.T) {
 		mp := Map[string, bool]{}
@@ -141,7 +141,7 @@ func TestMap(t *testing.T) {
 
 			mp := Map[string, int]{}
 			err := mp.ConsumeValues(
-				NewSlice([]int{1, 2, 3}).Iterator(),
+				NewSlice([]int{1, 2, 3}).Stream(),
 				func(in int) string { return fmt.Sprint(in) },
 			).Run(ctx)
 			check.NotError(t, err)
@@ -159,7 +159,7 @@ func TestMap(t *testing.T) {
 			"how": "are you doing",
 		}
 
-		iter := NewMap(in).Iterator()
+		iter := NewMap(in).Stream()
 		seen := 0
 		for iter.Next(ctx) {
 			item := iter.Value()
@@ -176,8 +176,8 @@ func TestMap(t *testing.T) {
 		assert.Equal(t, seen, len(in))
 	})
 	t.Run("Helpers", func(t *testing.T) {
-		assert.NotPanic(t, func() { Sliceify([]int{1, 2, 3}) })
-		assert.NotPanic(t, func() { Mapify(map[string]int{"a": 1, "b": 2, "c": 3}) })
+		assert.NotPanic(t, func() { NewSlice([]int{1, 2, 3}) })
+		assert.NotPanic(t, func() { NewMap(map[string]int{"a": 1, "b": 2, "c": 3}) })
 	})
 
 	t.Run("Constructors", func(t *testing.T) {

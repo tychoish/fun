@@ -36,14 +36,6 @@ func TestList(t *testing.T) {
 			t.Fatal(v)
 		}
 	})
-	t.Run("NewFromIterator", func(t *testing.T) {
-		iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
-		list, err := NewListFromIterator(ctx, iter)
-		assert.NotError(t, err)
-		assert.Equal(t, list.Len(), 10)
-		assert.Equal(t, list.Back().Value(), 0)
-		assert.Equal(t, list.Front().Value(), 1)
-	})
 	t.Run("NilSafeLen", func(t *testing.T) {
 		var l *List[int]
 		assert.NotPanic(t, func() { l.Len() })
@@ -137,7 +129,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), ft.Must(list.Iterator().Slice(ctx)))
+			t.Log(seen, list.Len(), ft.Must(list.StreamFront().Slice(ctx)))
 			t.Error(seen, len(expected), expected)
 
 		}
@@ -251,12 +243,12 @@ func TestList(t *testing.T) {
 			}
 		})
 	})
-	t.Run("Iterators", func(t *testing.T) {
+	t.Run("Streams", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			list := &List[int]{}
 			ct := 0
 			assert.NotPanic(t, func() {
-				iter := list.Iterator()
+				iter := list.StreamFront()
 				for iter.Next(ctx) {
 					ct++
 				}
@@ -274,7 +266,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.Iterator()
+			iter := list.StreamFront()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -303,7 +295,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.PopIterator()
+			iter := list.StreamPopFront()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -338,7 +330,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.Reverse()
+			iter := list.StreamBack()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -367,7 +359,7 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.PopReverse()
+			iter := list.StreamPopBack()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
@@ -397,16 +389,16 @@ func TestList(t *testing.T) {
 			for i := 1; i <= 100; i++ {
 				list.PushBack(i)
 			}
-			iter := list.Iterator()
+			iter := list.StreamFront()
 			for i := 0; i < 50; i++ {
 				if !iter.Next(ctx) {
-					t.Error("iterator should be open", i)
+					t.Error("stream should be open", i)
 				}
 			}
 			fun.Invariant.IsTrue(iter.Close() == nil)
 			for i := 0; i < 50; i++ {
 				if iter.Next(ctx) {
-					t.Error("iterator should be closed", i)
+					t.Error("stream should be closed", i)
 				}
 			}
 
@@ -562,14 +554,14 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 			// ["hello", "world"]
 			if list.Front().Value() != "hello" && list.Front().Next().Value() != "world" {
-				t.Fatal(list.Iterator().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(ctx))
 			}
 			if !list.Front().Swap(list.Back()) {
-				t.Fatal(list.Iterator().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(ctx))
 			}
 
 			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
-				t.Fatal(list.Iterator().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(ctx))
 			}
 		})
 		t.Run("Self", func(t *testing.T) {
@@ -578,7 +570,7 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 
 			if list.Front().Swap(list.Front()) {
-				t.Fatal(list.Iterator().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(ctx))
 			}
 		})
 		t.Run("NilList", func(t *testing.T) {
@@ -586,7 +578,7 @@ func TestList(t *testing.T) {
 			list.PushFront("hello")
 
 			if list.Front().Swap(NewElement("world")) {
-				t.Fatal(list.Iterator().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(ctx))
 			}
 		})
 		t.Run("Root", func(t *testing.T) {
@@ -616,17 +608,17 @@ func TestList(t *testing.T) {
 
 			if !list.Back().Swap(list.Front().Next()) {
 				t.Log("should have swapped")
-				t.Fatal(list.Iterator().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(ctx))
 			}
 			// expected: [42, 840, 420, 84]
-			slice := ft.Must(list.Iterator().Slice(ctx))
+			slice := ft.Must(list.StreamFront().Slice(ctx))
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
 			}
 
 			idx := 0
-			iter := list.Iterator()
+			iter := list.StreamFront()
 			for iter.Next(ctx) {
 				if slice[idx] != iter.Value() {
 					t.Error(idx, slice[idx], iter.Value())
@@ -676,10 +668,10 @@ func TestList(t *testing.T) {
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := GetPopulatedList(t, 100)
-			itemsOne := ft.Must(lOne.Iterator().Slice(ctx))
+			itemsOne := ft.Must(lOne.StreamFront().Slice(ctx))
 
 			lTwo := GetPopulatedList(t, 100)
-			itemsTwo := ft.Must(lTwo.Iterator().Slice(ctx))
+			itemsTwo := ft.Must(lTwo.StreamFront().Slice(ctx))
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())
@@ -690,7 +682,7 @@ func TestList(t *testing.T) {
 
 			lOne.Extend(lTwo)
 			combined := append(itemsOne, itemsTwo...)
-			iter := lOne.Iterator()
+			iter := lOne.StreamFront()
 			idx := 0
 			for iter.Next(ctx) {
 				if combined[idx] != iter.Value() {
@@ -759,17 +751,6 @@ func TestList(t *testing.T) {
 			}
 		})
 	})
-	t.Run("NewPopulateError", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		iter := fun.VariadicIterator(10, 100, 1000, 10000)
-
-		out, err := NewListFromIterator[int](ctx, iter)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
-		assert.True(t, out == nil)
-	})
-
 }
 
 func BenchmarkList(b *testing.B) {
@@ -916,14 +897,14 @@ func BenchmarkList(b *testing.B) {
 					}
 				}
 			})
-			b.Run("Iterator", func(b *testing.B) {
+			b.Run("Stream", func(b *testing.B) {
 				list := &List[int]{}
 				for i := 0; i < size; i++ {
 					list.PushFront(i)
 				}
 
 				b.ResetTimer()
-				iter := list.Iterator()
+				iter := list.StreamFront()
 				var value = -1
 				for j := 0; j < b.N; j++ {
 					idx := 0

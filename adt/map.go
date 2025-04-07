@@ -13,8 +13,8 @@ import (
 
 // Map provides a wrapper around the standard library's sync.Map type
 // with key/value types enforced by generics. Additional helpers
-// support adding multiple items to the map, while Iterator and
-// StoreFrom provide compatibility with iterators.
+// support adding multiple items to the map, while Stream and
+// StoreFrom provide compatibility with streams.
 type Map[K comparable, V any] struct {
 	// Default handles construction and pools objects in
 	// the map for the Ensure and Get operations which must
@@ -148,52 +148,52 @@ func (mp *Map[K, V]) Len() int {
 // defined.
 func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Seq2()(fn) }
 
-// Iterator returns an iterator that produces a sequence of pair
+// Stream returns a stream that produces a sequence of pair
 // objects.
 //
-// This operation relies on a the underlying Range iterator, and
+// This operation relies on a the underlying Range stream, and
 // advances lazily through the Range operation as callers advance the
-// iterator. Be aware that this produces an iterator that does not
+// stream. Be aware that this produces a stream that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Iterator() *fun.Iterator[dt.Pair[K, V]] { return makeMapIterator(mp, dt.MakePair) }
+func (mp *Map[K, V]) Stream() *fun.Stream[dt.Pair[K, V]] { return makeMapStream(mp, dt.MakePair) }
 
-// Seq2 returns a new-style iterator for a fun/dt.Map object.
+// Seq2 returns a new-style stream for a fun/dt.Map object.
 func (mp *Map[K, V]) Seq2() iter.Seq2[K, V] {
 	return func(fn func(K, V) bool) {
 		mp.mp.Range(func(ak, av any) bool { return fn(ak.(K), av.(V)) })
 	}
 }
 
-// Keys returns an iterator that renders all of the keys in the map.
+// Keys returns a stream that renders all of the keys in the map.
 //
-// This operation relies on a the underlying Range iterator, and
+// This operation relies on a the underlying Range stream, and
 // advances lazily through the Range operation as callers advance the
-// iterator. Be aware that this produces an iterator that does not
-// reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Keys() *fun.Iterator[K] {
-	return makeMapIterator(mp, func(k K, _ V) K { return k })
+// stream. Be aware that this produces a stream that does not reflect
+// any particular atomic of the underlying map.
+func (mp *Map[K, V]) Keys() *fun.Stream[K] {
+	return makeMapStream(mp, func(k K, _ V) K { return k })
 }
 
-// Values returns an iterator that renders all of the values in the
+// Values returns a stream that renders all of the values in the
 // map.
 //
 // This operation relies on a the underlying Range iterator, and
 // advances lazily through the Range operation as callers advance the
-// iterator. Be aware that this produces an iterator that does not
+// stream. Be aware that this produces a stream that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Values() *fun.Iterator[V] {
-	return makeMapIterator(mp, func(_ K, v V) V { return v })
+func (mp *Map[K, V]) Values() *fun.Stream[V] {
+	return makeMapStream(mp, func(_ K, v V) V { return v })
 }
 
-func makeMapIterator[K comparable, V any, O any](
+func makeMapStream[K comparable, V any, O any](
 	mp *Map[K, V],
 	rf func(K, V) O,
-) *fun.Iterator[O] {
+) *fun.Stream[O] {
 	pipe := fun.Blocking(make(chan O))
-	return pipe.Producer().PreHook(fun.Operation(func(ctx context.Context) {
+	return pipe.Generator().PreHook(fun.Operation(func(ctx context.Context) {
 		send := pipe.Send()
 		mp.Range(func(key K, value V) bool {
 			return send.Check(ctx, rf(key, value))
 		})
-	}).PostHook(pipe.Close).Go().Once()).Iterator()
+	}).PostHook(pipe.Close).Go().Once()).Stream()
 }

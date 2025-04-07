@@ -14,20 +14,20 @@ import (
 // operation.
 type WorkerGroupConf struct {
 	// NumWorkers describes the number of parallel workers
-	// processing the incoming iterator items and running the map
+	// processing the incoming stream items and running the map
 	// function. All values less than 1 are converted to 1. Any
 	// value greater than 1 will result in out-of-sequence results
-	// in the output iterator.
+	// in the output stream.
 	NumWorkers int
 	// ContinueOnPanic prevents the operations from halting when a
 	// single processing function panics. In all modes mode panics
 	// are converted to errors and propagated to the output
-	// iterator's Close() method,.
+	// stream's Close() method,.
 	ContinueOnPanic bool
 	// ContinueOnError allows a processing function to return an
 	// error and allow the work of the broader operation to
 	// continue. Errors are aggregated propagated to the output
-	// iterator's Close() method.
+	// stream's Close() method.
 	ContinueOnError bool
 	// IncludeContextExpirationErrors changes the default handling
 	// of context cancellation errors. By default all errors
@@ -73,7 +73,7 @@ func (o *WorkerGroupConf) Validate() error {
 // the WorkerGroupConf, and then returning true if processing should
 // continue and false otherwise.
 //
-// Neither io.EOF nor EerrIteratorSkip errors are ever observed.
+// Neither io.EOF nor ErrStreamContinue errors are ever observed.
 // All panic errors are observed. Context cancellation errors are
 // observed only when configured. as well as context cancellation
 // errors when configured.
@@ -91,7 +91,7 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	case hadPanic && o.ContinueOnPanic:
 		o.ErrorHandler(err)
 		return true
-	case errors.Is(err, ErrIteratorSkip):
+	case errors.Is(err, ErrStreamContinue):
 		return true
 	case errors.Is(err, io.EOF):
 		return false
@@ -108,7 +108,7 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 }
 
 // OptionProvider is a function type for building functional
-// arguments, and is used for the parallel iterator processing (map,
+// arguments, and is used for the parallel stream processing (map,
 // transform, for-each, etc.) in the fun and itertool packages, and
 // available with tooling for use in other contexts.
 //
@@ -173,7 +173,7 @@ func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
 
 // WorkerGroupConfAddExcludeErrors appends the provided errors to the
 // ExcludedErrors value. The provider will return an error if any of
-// the input iterators is ErrRecoveredPanic.
+// the input streams is ErrRecoveredPanic.
 func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
 		if ers.Is(ers.ErrRecoveredPanic, errs...) {
@@ -261,7 +261,7 @@ func WorkerGroupConfWithErrorCollector(
 
 // WorkerGroupConfErrorCollectorPair uses an Handler/Producer pair to
 // collect errors. A basic implementation, accessible via
-// HF.ErrorCollector() is suitable for this purpose.
+// fun.MAKE.ErrorCollector() is suitable for this purpose.
 func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Future[error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(

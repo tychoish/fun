@@ -56,13 +56,13 @@ func (ec *Collector) Future() fun.Future[error] { return ec.Resolve }
 // "height," but this is the same for the top level.
 func (ec *Collector) Len() int { defer with(lock(&ec.mu)); return ec.stack.Len() }
 
-// Iterator produces an iterator for all errors present in the
-// collector. The iterator proceeds from the current error to the
+// Stream produces a stream for all errors present in the
+// collector. The stream proceeds from the current error to the
 // oldest error, and will not observe new errors added to the
 // collector.
-func (ec *Collector) Iterator() *fun.Iterator[error] {
+func (ec *Collector) Stream() *fun.Stream[error] {
 	defer with(lock(&ec.mu))
-	return fun.CheckProducer(ec.stack.CheckProducer()).Iterator()
+	return fun.CheckedGenerator(ec.stack.Generator()).Stream()
 }
 
 // Resolve returns an error of type *erc.Stack, or nil if there have

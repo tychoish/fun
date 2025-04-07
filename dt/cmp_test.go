@@ -117,11 +117,11 @@ func TestSort(t *testing.T) {
 			}
 			list.SortMerge(cmp.LessThanNative[int])
 			if !stdCheckSortedIntsFromList(ctx, t, list) {
-				t.Log(list.Iterator().Slice(ctx))
+				t.Log(list.StreamFront().Slice(ctx))
 				t.Fatal("sort should be verified, externally")
 			}
 			if !list.IsSorted(cmp.LessThanNative[int]) {
-				t.Log(list.Iterator().Slice(ctx))
+				t.Log(list.StreamFront().Slice(ctx))
 				t.Fatal("should be sorted")
 			}
 		})
@@ -130,8 +130,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			list.SortMerge(cmp.LessThanNative[int])
 			lcopy.SortQuick(cmp.LessThanNative[int])
-			listVals := ft.Must(list.Iterator().Slice(ctx))
-			copyVals := ft.Must(lcopy.Iterator().Slice(ctx))
+			listVals := ft.Must(list.StreamFront().Slice(ctx))
+			copyVals := ft.Must(lcopy.StreamFront().Slice(ctx))
 			assert.Equal(t, len(listVals), len(copyVals))
 			assert.True(t, len(listVals) == 10)
 			for i := 0; i < 10; i++ {
@@ -161,15 +161,16 @@ func TestSort(t *testing.T) {
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.ErrorIs(t, err, ErrUninitializedContainer)
 		})
-		t.Run("IteratorConstructor", func(t *testing.T) {
-			iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Iterator()
-			heap, err := NewHeapFromIterator(ctx, cmp.LessThanNative[int], iter)
+		t.Run("StreamConstructor", func(t *testing.T) {
+			iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Stream()
+			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
+			err := heap.Populate(iter).Run(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)
 			assert.Equal(t, heap.data.Back().Value(), 9)
 			assert.Equal(t, heap.data.Front().Value(), 0)
 		})
-		t.Run("Iterator", func(t *testing.T) {
+		t.Run("Stream", func(t *testing.T) {
 			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
 			if heap.Len() != 0 {
 				t.Fatal("heap should be empty to start")
@@ -185,7 +186,7 @@ func TestSort(t *testing.T) {
 				t.Fatal("heap should have expected number of items", heap.Len())
 			}
 			var last = math.MinInt
-			iter := heap.Iterator()
+			iter := heap.Stream()
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -240,7 +241,7 @@ func TestSort(t *testing.T) {
 
 }
 func getSliceForList(ctx context.Context, list *List[int]) []int {
-	return ft.Must(list.Iterator().Slice(ctx))
+	return ft.Must(list.StreamFront().Slice(ctx))
 }
 
 func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {

@@ -752,7 +752,7 @@ func TestWorker(t *testing.T) {
 			prod := func(_ context.Context) (string, error) {
 				prodCt++
 				if prodCt <= 5 {
-					return "", ErrIteratorSkip
+					return "", ErrStreamContinue
 				}
 
 				return "", io.EOF
@@ -1020,7 +1020,7 @@ func TestWorker(t *testing.T) {
 			defer cancel()
 			start := time.Now()
 			assert.Equal(t, counter.Load(), 0)
-			err := HF.WorkerPool(SliceIterator(wfs)).Run(ctx)
+			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
 			if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 				t.Error(dur)
@@ -1041,7 +1041,7 @@ func TestWorker(t *testing.T) {
 			start := time.Now()
 			assert.Equal(t, counter.Load(), 0)
 
-			err := HF.WorkerPool(SliceIterator(wfs)).Run(ctx)
+			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
 			if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
 				t.Error(dur)

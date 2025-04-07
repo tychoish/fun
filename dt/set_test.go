@@ -31,7 +31,7 @@ func TestSet(t *testing.T) {
 				set := builder()
 				ct := 0
 				assert.NotPanic(t, func() {
-					iter := set.Iterator()
+					iter := set.Stream()
 					for iter.Next(ctx) {
 						ct++
 					}
@@ -113,9 +113,9 @@ func TestSet(t *testing.T) {
 
 				ctx, cancel := context.WithCancel(context.Background())
 				before := runtime.NumGoroutine()
-				_, err := set.hash.ProducerKeys().Resolve(ctx)
+				_, err := set.hash.GeneratorKeys().Resolve(ctx)
 				assert.NotError(t, err)
-				_, err = set.hash.ProducerValues().Resolve(ctx)
+				_, err = set.hash.GeneratorValues().Resolve(ctx)
 				assert.NotError(t, err)
 
 				during := runtime.NumGoroutine()
@@ -177,14 +177,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force()
+						getNextValue := set.Stream().Generator().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force()
+						getNextValue = set.Stream().Generator().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -203,14 +203,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force()
+						getNextValue := set.Stream().Generator().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force()
+						getNextValue = set.Stream().Generator().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -231,14 +231,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force()
+						getNextValue := set.Stream().Generator().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force()
+						getNextValue = set.Stream().Generator().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -257,14 +257,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Iterator().Producer().Force()
+						getNextValue := set.Stream().Generator().Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Iterator().Producer().Force()
+						getNextValue = set.Stream().Generator().Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -332,7 +332,7 @@ func TestSet(t *testing.T) {
 						set := builder()
 						populator(set)
 						count := 0
-						iter := set.Iterator()
+						iter := set.Stream()
 						collected := []string{}
 						for iter.Next(ctx) {
 							count++
@@ -516,7 +516,7 @@ func BenchmarkSet(b *testing.B) {
 			for i := 0; i < size; i++ {
 				set.Add(i * size)
 			}
-			iter := set.Iterator()
+			iter := set.Stream()
 			for iter.Next(ctx) {
 				set.Check(iter.Value())
 				set.Check(iter.Value())

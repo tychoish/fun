@@ -8,13 +8,13 @@ import (
 	"github.com/tychoish/fun/assert"
 )
 
-func TestIterator(t *testing.T) {
+func TestStream(t *testing.T) {
 	t.Run("Slice", func(t *testing.T) {
 		out := make([]int, 100)
 		for idx := range out {
 			out[idx] = idx + rand.Intn(10*idx+1)
 		}
-		iter := fun.SliceIterator(out)
+		iter := fun.SliceStream(out)
 		cpy := Slice(iter)
 		assert.EqualItems(t, out, cpy)
 	})

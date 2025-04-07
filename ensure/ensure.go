@@ -89,7 +89,7 @@ func (a *Assertion) Add(sub *Assertion) *Assertion { a.subtests.PushBack(sub); r
 // unconditionally in verbose mode. Operates generally like t.Log() or
 // fmt.Sprint().
 func (a *Assertion) Log(args ...any) *Assertion {
-	a.messages.PushBack(fun.HF.Sprint(args...))
+	a.messages.PushBack(fun.MAKE.Sprint(args...))
 	return a
 }
 
@@ -97,7 +97,7 @@ func (a *Assertion) Log(args ...any) *Assertion {
 // unconditionally in verbose mode. Operates like t.Logf or
 // fmt.Sprintf.
 func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
-	a.messages.PushBack(fun.HF.Sprintf(tmpl, args...))
+	a.messages.PushBack(fun.MAKE.Sprintf(tmpl, args...))
 	return a
 }
 
@@ -106,8 +106,8 @@ func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
 //
 // Each pair is logged as it's own Log statement.
 func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
-	fun.Invariant.Must(md.Iterator().Observe(func(p dt.Pair[string, any]) {
-		a.messages.PushBack(fun.HF.Sprintf(`%s: "%v"`, p.Key, p.Value))
+	fun.Invariant.Must(md.Stream().Observe(func(p dt.Pair[string, any]) {
+		a.messages.PushBack(fun.MAKE.Sprintf(`%s: "%v"`, p.Key, p.Value))
 	}).Wait())
 	return a
 }

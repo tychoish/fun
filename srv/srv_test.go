@@ -106,12 +106,12 @@ func testCheckOrderingEffects(t *testing.T, s *Service) {
 	}
 }
 
-func makeIterator(size int) *fun.Iterator[int] {
+func makeStream(size int) *fun.Stream[int] {
 	slice := make([]int, size)
 	for i := 0; i < size; i++ {
 		slice[i] = rand.Intn(size)
 	}
-	return fun.SliceIterator(slice)
+	return fun.SliceStream(slice)
 }
 
 func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {

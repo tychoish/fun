@@ -1,9 +1,7 @@
 package dt
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"iter"
@@ -19,31 +17,15 @@ type Stack[T any] struct {
 	length int
 }
 
-// NewListFromIterator builds a stack from the elements in the
-// iterator. In general, any error would be the result of the input
-// iterators's close method.
-func NewStackFromIterator[T any](ctx context.Context, iter *fun.Iterator[T]) (*Stack[T], error) {
-	out := &Stack[T]{}
-	if err := out.Populate(iter).Run(ctx); err != nil {
-		return nil, err
-	}
-
-	return out, nil
-}
-
 // Append adds a variadic sequence of items to the list.
-func (s *Stack[T]) Append(items ...T) {
-	for idx := range items {
-		s.Push(items[idx])
-	}
-}
+func (s *Stack[T]) Append(items ...T) { ft.ApplyMany(s.Push, items) }
 
-// Populate returns a worker that adds items from the iterator to the
+// Populate returns a worker that adds items from the stream to the
 // stack. Any error returned is either a context cancellation error or
-// the result of a panic in the input iterator. The close method on
-// the input iterator is not called.
-func (s *Stack[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
-	return iter.Process(fun.Handle(s.Push).Processor())
+// the result of a panic in the input stream. The close method on
+// the input stream is not called.
+func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker {
+	return iter.Process(fun.MakeHandlerProcessor(s.Push))
 }
 
 // Item is a common wrapper for the elements in a stack.
@@ -190,78 +172,6 @@ func (it *Item[T]) Attach(stack *Stack[T]) bool {
 	return true
 }
 
-// MarshalJSON returns the result of json.Marshal on the value of the
-// item. By supporting json.Marshaler and json.Unmarshaler,
-// Items and stacks can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (it *Item[T]) MarshalJSON() ([]byte, error) { return json.Marshal(it.Value()) }
-
-// UnmarshalJSON reads the json value, and sets the value of the
-// item to the value in the json, potentially overriding an
-// existing value. By supporting json.Marshaler and json.Unmarshaler,
-// Items and stacks can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (it *Item[T]) UnmarshalJSON(in []byte) error {
-	var val T
-	if err := json.Unmarshal(in, &val); err != nil {
-		return err
-	}
-	it.Set(val)
-	return nil
-}
-
-// MarshalJSON produces a JSON array representing the items in the
-// stack. By supporting json.Marshaler and json.Unmarshaler, Items
-// and stacks can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (s *Stack[T]) MarshalJSON() ([]byte, error) {
-	buf := &bytes.Buffer{}
-	_, _ = buf.Write([]byte("["))
-
-	for i := s.Head(); i.Ok(); i = i.Next() {
-		if i != s.Head() {
-			_, _ = buf.Write([]byte(","))
-		}
-
-		e, err := i.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-
-		_, _ = buf.Write(e)
-	}
-	_, _ = buf.Write([]byte("]"))
-
-	return buf.Bytes(), nil
-}
-
-// UnmarshalJSON reads json input and adds that to values in the
-// stack. If there are items in the stack, they are not removed. By
-// supporting json.Marshaler and json.Unmarshaler, Items and stacks
-// can behave as arrays in larger json objects, and can be as the
-// output/input of json.Marshal and json.Unmarshal.
-func (s *Stack[T]) UnmarshalJSON(in []byte) error {
-	rv := []json.RawMessage{}
-
-	if err := json.Unmarshal(in, &rv); err != nil {
-		return err
-	}
-	ns := &Stack[T]{}
-	head := ns.Head()
-	for idx := range rv {
-		elem := NewItem(s.zero())
-		if err := elem.UnmarshalJSON(rv[idx]); err != nil {
-			return err
-		}
-		head = head.Append(elem)
-	}
-	head = s.Head()
-	for it := ns.Pop(); it.Ok(); it = ns.Pop() {
-		head.Append(it)
-	}
-	return nil
-}
-
 func (s *Stack[T]) root() *Item[T] {
 	fun.Invariant.Ok(s != nil, ErrUninitializedContainer)
 	ft.WhenCall(s.head == nil, s.uncheckedSetup)
@@ -299,7 +209,7 @@ func (s *Stack[T]) Pop() *Item[T] {
 	return out
 }
 
-func (s *Stack[T]) Producer() fun.Producer[T] {
+func (s *Stack[T]) Generator() fun.Generator[T] {
 	item := &Item[T]{next: s.head}
 	return func(_ context.Context) (o T, _ error) {
 		item = item.Next()
@@ -310,7 +220,7 @@ func (s *Stack[T]) Producer() fun.Producer[T] {
 	}
 }
 
-func (s *Stack[T]) ProducerPop() fun.Producer[T] {
+func (s *Stack[T]) GeneratorPop() fun.Generator[T] {
 	var item *Item[T]
 	return func(_ context.Context) (out T, _ error) {
 		item = s.Pop()
@@ -321,15 +231,15 @@ func (s *Stack[T]) ProducerPop() fun.Producer[T] {
 	}
 }
 
-// Iterator returns a non-destructive iterator over the Items in a
-// stack. Iterator will not observe new items added to the stack
+// Stream returns a non-destructive stream over the Items in a
+// stack. Stream will not observe new items added to the stack
 // during iteration.
-func (s *Stack[T]) Iterator() *fun.Iterator[T] { return s.Producer().Iterator() }
+func (s *Stack[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
 // Seq returns a native go iterator function for the items in a set.
-func (s *Stack[T]) Seq() iter.Seq[T] { return s.Iterator().Seq(context.Background()) }
+func (s *Stack[T]) Seq() iter.Seq[T] { return s.Stream().Seq(context.Background()) }
 
-// PopIterator returns a destructive iterator over the Items in a
-// stack. PopIterator will not observe new items added to the
+// StreamPop returns a destructive stream over the Items in a
+// stack. StreamPop will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) PopIterator() *fun.Iterator[T] { return s.ProducerPop().Iterator() }
+func (s *Stack[T]) StreamPop() *fun.Stream[T] { return s.GeneratorPop().Stream() }

@@ -172,7 +172,7 @@ func (e *Stack) Error() string {
 	// TODO: pool buffers.
 	buf := &bytes.Buffer{}
 
-	prod := e.CheckProducer()
+	prod := e.Generator()
 
 	for err, ok := prod(); ok; err, ok = prod() {
 		if buf.Len() > 0 {
@@ -193,7 +193,7 @@ func (e *Stack) Is(err error) bool { return errors.Is(e.err, err) }
 // with errors.As, which takes advantage of this interface.
 func (e *Stack) As(target any) bool { return errors.As(e.err, target) }
 
-// Unwrap returns the next iterator in the stack, and is compatible
+// Unwrap returns the next error in the stack, and is compatible
 // with errors.Unwrap. The error objects returned by unwrap are all
 // Stack objects. When the
 func (e *Stack) Unwrap() error {
@@ -219,10 +219,11 @@ func (e *Stack) Unwind() []error {
 	return out
 }
 
-// CheckProducer provides a pull-based iterator function for iterating
-// through the errors (without Stack object wrappers.)  The output
-// function yields errors: the boolean return
-func (e *Stack) CheckProducer() func() (error, bool) {
+// Generator provides a pull-based iteration function for processing
+// the errors (without Stack object wrappers.)  The output function
+// yields errors: the boolean indicates if there are additional items
+// in the stack.
+func (e *Stack) Generator() func() (error, bool) {
 	iter := &Stack{next: e}
 	return func() (error, bool) {
 		if iter.next == nil || iter.next.err == nil {

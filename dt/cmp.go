@@ -9,7 +9,6 @@
 package dt
 
 import (
-	"context"
 	"sort"
 
 	"github.com/tychoish/fun"
@@ -24,14 +23,8 @@ type Heap[T any] struct {
 	data *List[T]
 }
 
-// NewHeapFromIterator constructs and populates a heap using the input
-// iterator and corresponding comparison function. Will return the
-// input iterators Close() error if one exists, and otherwise will
-// return the populated heap.
-func NewHeapFromIterator[T any](ctx context.Context, cmp cmp.LessThan[T], iter *fun.Iterator[T]) (*Heap[T], error) {
-	out := &Heap[T]{LT: cmp}
-	out.list()
-	return out, iter.Observe(func(in T) { out.Push(in) }).Run(ctx)
+func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker {
+	return iter.Process(fun.MakeHandlerProcessor(h.Push))
 }
 
 func (h *Heap[T]) list() *List[T] {
@@ -74,10 +67,10 @@ func (h *Heap[T]) Len() int { return h.list().Len() }
 // it, with an Ok value, which is true when the value returned is valid.
 func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), e.Ok() }
 
-// Iterator provides an fun.Iterator interface to the heap. The
-// iterator consumes items from the heap, and will return when the
+// Stream provides an fun.Stream interface to the heap. The
+// stream consumes items from the heap, and will return when the
 // heap is empty.
-func (h *Heap[T]) Iterator() *fun.Iterator[T] { ; return h.list().Iterator() }
+func (h *Heap[T]) Stream() *fun.Stream[T] { ; return h.list().StreamFront() }
 
 // IsSorted reports if the list is sorted from low to high, according
 // to the LessThan function.

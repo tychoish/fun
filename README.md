@@ -23,7 +23,7 @@ Packages:
   "sharded map" to reduce contention for multi-threaded access of
   synchronized maps.
 - [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
-  (iterator tools.)
+  (stream/iteration tools.)
 - [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
   broker and concurrency-safe queue and deque.)
 - [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
@@ -43,11 +43,11 @@ For more information, see the documentation, but of general interest:
 
 - The root `fun` package contains a few generic function types and
   with a collection of methods for interacting and managing and
-  manipulating these operations. The `fun.Iterator` provides a
+  manipulating these operations. The `fun.Stream` provides a
   framework for interacting with sequences, including some powerful
   high-level parallel processing tools.
-- In `itertools` and with `fun.Iterator`, an iterator framework and
-  tools for interacting with iterators and generators.
+- In `itertools` and with `fun.Stream`, a stream framework and tools
+  for interacting with streams (iterators) and generators.
 - In `srv`, a service orchestration toolkit and lifecycle tools.
 - In `ft` a number of low-level function-manipulation tools.
 - In `pubsub`, a channel-based message broker (for one-to-many channel

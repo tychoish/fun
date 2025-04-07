@@ -87,23 +87,20 @@ func RecoverHook(ec *Collector, hook func()) {
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fn func() error) { ec.Add(fn()) }
 
-// Stream collects all errors from an error channel, and returns the
-// aggregated error. Stream blocks until the context expires (but
+// Consume collects all errors from an error channel, and returns the
+// aggregated error. Consume blocks until the context expires (but
 // does not add a context cancellation error) or the error channel is
 // closed.
+func Consume(ctx context.Context, ec *Collector, errCh <-chan error) {
+	Stream(ctx, ec, fun.ChannelStream(errCh))
+}
+
+// Stream iterates through all errors in the fun.Stream and
+// returning the aggregated (*erc.Stack) error for these errors.
 //
 // Because Stream() is a fun.ProcessFunc you can convert this into
 // fun.Worker and fun.Operation objects as needed.
-func Stream(ctx context.Context, ec *Collector, errCh <-chan error) {
-	Consume(ctx, ec, fun.ChannelIterator(errCh))
-}
-
-// Consume iterates through all errors in the fun.Iterator and
-// returning the aggregated (*erc.Stack) error for these errors.
-//
-// Because Consume() is a fun.ProcessFunc you can convert this into
-// fun.Worker and fun.Operation objects as needed.
-func Consume(ctx context.Context, ec *Collector, iter *fun.Iterator[error]) {
+func Stream(ctx context.Context, ec *Collector, iter *fun.Stream[error]) {
 	ec.Add(iter.Observe(ec.Handler()).Run(ctx))
 }
 
@@ -126,8 +123,12 @@ func Collect[T any](ec *Collector) func(T, error) T {
 	return func(out T, err error) T { ec.Add(err); return out }
 }
 
-// IteratorHook adds errors to an iterator from a collector when the
-// iterator closes.
-func IteratorHook[T any](ec *Collector) fun.Handler[*fun.Iterator[T]] {
-	return func(it *fun.Iterator[T]) { it.AddError(ec.Resolve()) }
+// StreamHook adds errors to the Stream's error collector from the
+// provided Collector when the stream closes.
+//
+//	ec := &Collector{}
+//	stream := fun.Stream[int]
+//	stream.WithHook(erc.StreamHook(ec))
+func StreamHook[T any](ec *Collector) fun.Handler[*fun.Stream[T]] {
+	return func(it *fun.Stream[T]) { it.AddError(ec.Resolve()) }
 }

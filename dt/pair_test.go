@@ -100,7 +100,7 @@ func TestPairs(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Iterator()).Run(ctx))
+		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
 		mp.ConsumePairs(&ps)
@@ -109,7 +109,7 @@ func TestPairs(t *testing.T) {
 	t.Run("ConsumePairs", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			expected := errors.New("hi")
-			iter := fun.StaticProducer(MakePair("1", 1), expected).Iterator()
+			iter := fun.StaticGenerator(MakePair("1", 1), expected).Stream()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -124,7 +124,7 @@ func TestPairs(t *testing.T) {
 				MakePair("1", 1), MakePair("2", 2),
 				MakePair("3", 3), MakePair("4", 4),
 				MakePair("5", 5), MakePair("6", 6),
-			}).Iterator()
+			}).Stream()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

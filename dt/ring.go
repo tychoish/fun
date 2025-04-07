@@ -14,7 +14,7 @@ const maxRingSize int = 4294967296
 const defaultRingSize int = 1024
 
 // Ring is a simple generic ring-buffer implemented on top of a slice/array
-// with a few conveniences: there are forward and backward iterators;
+// with a few conveniences: there are forward and backward streams;
 // you can pop items from the "end" (oldest) in the buffer. The
 // Total() method maintains a count of the total number of items added
 // to the buffer.
@@ -117,27 +117,27 @@ func (r *Ring[T]) Pop() *T {
 	return nil
 }
 
-// FIFO returns an iterator that begins at the first (oldest; Head) element
-// and iterators forward to the current or most recently added element
+// FIFO returns a stream that begins at the first (oldest; Head) element
+// and streams forward to the current or most recently added element
 // in the buffer.
-func (r *Ring[T]) FIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.oldest(), r.after) }
+func (r *Ring[T]) FIFO() *fun.Stream[T] { r.init(); return r.iterate(r.oldest(), r.after) }
 
 // LIFO returns the element that was most recently added to buffer and
 // iterates backwords to the oldest element in the buffer.
-func (r *Ring[T]) LIFO() *fun.Iterator[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
+func (r *Ring[T]) LIFO() *fun.Stream[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
 
-// PopFIFO returns a FIFO iterator that consumes elements in the
+// PopFIFO returns a FIFO stream that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
 // through all elements. When the buffer is
-func (r *Ring[T]) PopFIFO() *fun.Iterator[T] { return fun.PtrProducer(r.Pop).Iterator() }
+func (r *Ring[T]) PopFIFO() *fun.Stream[T] { return fun.PtrGenerator(r.Pop).Stream() }
 
-func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
+func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Stream[T] {
 	var count int
 	var current int
 
 	next := from
 
-	return fun.CheckProducer(func() (T, bool) {
+	return fun.CheckedGenerator(func() (T, bool) {
 		for r.count > 0 && (count == 0 || next != from) {
 			current = next
 			next = advance(current)
@@ -150,5 +150,5 @@ func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Iterator[T] {
 		}
 
 		return r.zero(), false
-	}).Iterator()
+	}).Stream()
 }

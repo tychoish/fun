@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -111,7 +112,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, deque.Distributor(), opts)
+	return MakeDistributorBroker(ctx, deque.BlockingDistributor(), opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -124,7 +125,7 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // is fixed, and must be a positive integer greater than 0,
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
 func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
-	return MakeDistributorBroker(ctx, risky.Force(NewDeque[T](DequeOptions{Capacity: capacity})).DistributorNonBlocking(), opts)
+	return MakeDistributorBroker(ctx, risky.Force(NewDeque[T](DequeOptions{Capacity: capacity})).Distributor(), opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -198,7 +199,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 	}
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Iterator[chan T], msg T) {
+func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
 		wg := &fun.WaitGroup{}
@@ -221,24 +222,12 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Iterator[chan
 }
 
 // Populate creates a fun.Worker function that publishes items from
-// the input iterator to the broker, returning when its context
-// expires or the iterator is closed (propagating its error).
+// the input stream to the broker, returning when its context
+// expires or the stream is closed (propagating its error).
 //
-// Callers should avoid using an iterator that will retain input
+// Callers should avoid using a stream that will retain input
 // items in memory.
-func (b *Broker[T]) Populate(iter *fun.Iterator[T]) fun.Worker {
-	return func(ctx context.Context) error {
-		for {
-			val, err := iter.ReadOne(ctx)
-			if err != nil {
-				break
-			}
-			b.Publish(ctx, val)
-		}
-
-		return iter.Close()
-	}
-}
+func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.Process(b.Processor) }
 
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
@@ -319,9 +308,14 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 }
 
 // Publish distributes a message to all subscribers.
-func (b *Broker[T]) Publish(ctx context.Context, msg T) {
+func (b *Broker[T]) Publish(ctx context.Context, msg T) { ft.Ignore(b.Processor(ctx, msg)) }
+
+// Processor distributes a message to all subscribers.
+func (b *Broker[T]) Processor(ctx context.Context, msg T) error {
 	select {
 	case <-ctx.Done():
+		return ctx.Err()
 	case b.publishCh <- msg:
+		return nil
 	}
 }

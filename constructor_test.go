@@ -21,7 +21,7 @@ func TestHandlers(t *testing.T) {
 	t.Parallel()
 	const root ers.Error = ers.Error("root-error")
 	t.Run("ErrorHandlerSingle", func(t *testing.T) {
-		hf, ef := HF.ErrorHandlerSingle()
+		hf, ef := MAKE.ErrorHandlerSingle()
 
 		t.Run("NoopsOnZero", func(t *testing.T) {
 			ft.DoTimes(100, func() {
@@ -46,7 +46,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorHandlerAbort", func(t *testing.T) {
 		count := 0
-		eh := HF.ErrorHandlerWithAbort(func() { count++ })
+		eh := MAKE.ErrorHandlerWithAbort(func() { count++ })
 		checkNoopSemantics := func(n int) {
 			t.Run("NoopErrors", func(t *testing.T) {
 				t.Run("NotError", func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestHandlers(t *testing.T) {
 		count := 0
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		proc := HF.ErrorProcessor(func(_ context.Context, err error) error {
+		proc := MAKE.ErrorProcessor(func(_ context.Context, err error) error {
 			count++
 			return err
 		})
@@ -104,7 +104,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorProcessorWithoutEOF", func(t *testing.T) {
 		count := 0
-		proc := HF.ErrorHandlerWithoutEOF(func(err error) {
+		proc := MAKE.ErrorHandlerWithoutEOF(func(err error) {
 			count++
 			if errors.Is(err, io.EOF) || err == nil {
 				t.Error("unexpected error", err)
@@ -133,14 +133,14 @@ func TestHandlers(t *testing.T) {
 			called = true
 		}
 		assert.NotPanic(t, func() {
-			defer HF.Recover(ob)
+			defer MAKE.Recover(ob)
 			panic("hi")
 		})
 		check.True(t, called)
 	})
 	t.Run("ErrorProcessorWithoutTerminating", func(t *testing.T) {
 		count := 0
-		proc := HF.ErrorHandlerWithoutTerminating(func(err error) {
+		proc := MAKE.ErrorHandlerWithoutTerminating(func(err error) {
 			count++
 			if ers.IsTerminating(err) || err == nil {
 				t.Error("unexpected error", err)
@@ -166,7 +166,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("Unwinder", func(t *testing.T) {
 		t.Run("BasicUnwind", func(t *testing.T) {
-			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
+			unwinder := MAKE.ErrorUnwindTransformer(ers.FilterNoop())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			errs, err := unwinder(ctx, ers.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ers.ErrInvariantViolation))
@@ -174,7 +174,7 @@ func TestHandlers(t *testing.T) {
 			check.Equal(t, len(errs), 3)
 		})
 		t.Run("Empty", func(t *testing.T) {
-			unwinder := HF.ErrorUnwindTransformer(ers.FilterNoop())
+			unwinder := MAKE.ErrorUnwindTransformer(ers.FilterNoop())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			errs, err := unwinder(ctx, nil)
@@ -183,25 +183,25 @@ func TestHandlers(t *testing.T) {
 		})
 	})
 	t.Run("ErrorCollector", func(t *testing.T) {
-		ob, prod := HF.ErrorCollector()
+		ob, prod := MAKE.ErrorCollector()
 		ft.DoTimes(128, func() { ob(nil) })
 		check.Equal(t, 0, len(internal.Unwind(prod.Resolve())))
 		ft.DoTimes(128, func() { ob(ers.Error("test")) })
 		check.Equal(t, 128, len(internal.Unwind(prod.Resolve())))
 	})
 	t.Run("StringFuture", func(t *testing.T) {
-		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprintf("%s:%d", "hi", 42)()) })
-		t.Run("Sprintln", func(t *testing.T) { check.Equal(t, "hi : 42\n", HF.Sprintln("hi", ":", 42)()) })
-		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprint("hi:", 42)()) })
-		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", HF.Sprint("hi:", "42")()) })
-		t.Run("Stringer", func(t *testing.T) { check.Equal(t, "Handlers<>", HF.Stringer(HF)()) })
-		t.Run("Str", func(t *testing.T) { check.Equal(t, "hi:42", HF.Str([]any{"hi:", 42})()) })
-		t.Run("Strf", func(t *testing.T) { check.Equal(t, "hi:42", HF.Strf("%s:%d", []any{"hi", 42})()) })
-		t.Run("Strln", func(t *testing.T) { check.Equal(t, "hi : 42\n", HF.Strln([]any{"hi", ":", 42})()) })
-		t.Run("StrJoin/Empty", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrJoin([]string{"hi", ":", "42"}, "")()) })
-		t.Run("StrJoin/Dots", func(t *testing.T) { check.Equal(t, "hi.:.42", HF.StrJoin([]string{"hi", ":", "42"}, ".")()) })
-		t.Run("StrSliceConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrSliceConcatinate([]string{"hi", ":", "42"})()) })
-		t.Run("StrConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", HF.StrConcatinate("hi", ":", "42")()) })
+		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprintf("%s:%d", "hi", 42)()) })
+		t.Run("Sprintln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Sprintln("hi", ":", 42)()) })
+		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprint("hi:", 42)()) })
+		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprint("hi:", "42")()) })
+		t.Run("Stringer", func(t *testing.T) { check.Equal(t, "Handlers<>", MAKE.Stringer(MAKE)()) })
+		t.Run("Str", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Str([]any{"hi:", 42})()) })
+		t.Run("Strf", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Strf("%s:%d", []any{"hi", 42})()) })
+		t.Run("Strln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Strln([]any{"hi", ":", 42})()) })
+		t.Run("StrJoin/Empty", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.StrJoin([]string{"hi", ":", "42"}, "")()) })
+		t.Run("StrJoin/Dots", func(t *testing.T) { check.Equal(t, "hi.:.42", MAKE.StrJoin([]string{"hi", ":", "42"}, ".")()) })
+		t.Run("StrSliceConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.StrSliceConcatinate([]string{"hi", ":", "42"})()) })
+		t.Run("StrConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.StrConcatinate("hi", ":", "42")()) })
 	})
 	t.Run("Lines", func(t *testing.T) {
 		buf := &bytes.Buffer{}
@@ -216,7 +216,7 @@ func TestHandlers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		var prev string
-		check.NotError(t, HF.LinesWithSpaceTrimed(buf).Observe(func(line string) {
+		check.NotError(t, MAKE.LinesWithSpaceTrimed(buf).Observe(func(line string) {
 			count++
 			assert.Equal(t, len(line), 64)
 			assert.NotEqual(t, prev, line)
@@ -227,26 +227,26 @@ func TestHandlers(t *testing.T) {
 		t.Run("Itoa", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			out := ft.Must(ConvertIterator(HF.Counter(10), HF.Itoa()).Slice(ctx))
+			out := ft.Must(ConvertStream(MAKE.Counter(10), MAKE.Itoa()).Slice(ctx))
 
 			check.EqualItems(t, out, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
 		})
 		t.Run("Atoi", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			out := ft.Must(ConvertIterator(SliceIterator([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}), HF.Atoi()).Slice(ctx))
+			out := ft.Must(ConvertStream(SliceStream([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}), MAKE.Atoi()).Slice(ctx))
 
 			check.EqualItems(t, out, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 		})
 	})
 	t.Run("ErrorStack", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			assert.Equal(t, 0, HF.ErrorStackIterator(&ers.Stack{}).Count(context.Background()))
+			assert.Equal(t, 0, MAKE.ErrorStackStream(&ers.Stack{}).Count(context.Background()))
 		})
 		t.Run("Number", func(t *testing.T) {
 			errs := &ers.Stack{}
 			errs.Add(ers.New("foof"), ers.New("boop"))
-			assert.Equal(t, 2, HF.ErrorStackIterator(errs).Count(context.Background()))
+			assert.Equal(t, 2, MAKE.ErrorStackStream(errs).Count(context.Background()))
 		})
 
 		t.Run("Is", func(t *testing.T) {
@@ -258,7 +258,7 @@ func TestHandlers(t *testing.T) {
 
 			var count int
 			var match int
-			for e := range HF.ErrorStackIterator(errs).Seq(context.Background()) {
+			for e := range MAKE.ErrorStackStream(errs).Seq(context.Background()) {
 				count++
 				if errors.Is(e, err) {
 					match++
@@ -272,4 +272,4 @@ func TestHandlers(t *testing.T) {
 
 }
 
-func (Handlers) String() string { return "Handlers<>" }
+func (Constructors) String() string { return "Handlers<>" }

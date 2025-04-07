@@ -36,13 +36,6 @@ func TestStack(t *testing.T) {
 		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		assert.ErrorIs(t, err, ErrUninitializedContainer)
 	})
-	t.Run("NewFromIterator", func(t *testing.T) {
-		iter := fun.SliceIterator([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0})
-		stack, err := NewStackFromIterator(ctx, iter)
-		assert.NotError(t, err)
-		assert.Equal(t, stack.Len(), 10)
-		assert.Equal(t, stack.Head().Value(), 0)
-	})
 	t.Run("Constructor", func(t *testing.T) {
 		stack := &Stack[int]{}
 
@@ -287,12 +280,12 @@ func TestStack(t *testing.T) {
 
 		})
 	})
-	t.Run("Iterators", func(t *testing.T) {
+	t.Run("Streams", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			list := &Stack[int]{}
 			ct := 0
 			assert.NotPanic(t, func() {
-				iter := list.Iterator()
+				iter := list.Stream()
 				for iter.Next(ctx) {
 					ct++
 				}
@@ -302,7 +295,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Content", func(t *testing.T) {
 			stack := GenerateStack(t, 100)
-			items := ft.Must(stack.Iterator().Slice(ctx))
+			items := ft.Must(stack.Stream().Slice(ctx))
 			if len(items) != stack.Len() {
 				t.Fatal("unexpected collection", len(items), stack.Len())
 			}
@@ -322,7 +315,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Interface", func(t *testing.T) {
 			stack := GenerateStack(t, 5)
-			iter := stack.Iterator()
+			iter := stack.Stream()
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -335,7 +328,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Destructive", func(t *testing.T) {
 			stack := GenerateStack(t, 50)
-			iter := stack.PopIterator()
+			iter := stack.StreamPop()
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -351,7 +344,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("EmptyStart", func(t *testing.T) {
 			stack := &Stack[int]{}
-			iter := stack.PopIterator()
+			iter := stack.StreamPop()
 			seen := 0
 			for iter.Next(ctx) {
 				seen++
@@ -421,28 +414,33 @@ func TestStack(t *testing.T) {
 		})
 	})
 	t.Run("NewPopulateError", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		out, err := NewStackFromIterator(ctx, fun.VariadicIterator(10, 100, 1000, 10000))
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
-		assert.True(t, out == nil)
+		// ctx, cancel := context.WithCancel(context.Background())
+		// cancel()
+
+		// out := &Stack[int]{}
+		// out.
+		panic("fix me")
+		// out, err := NewStackFromIterator(ctx, fun.VariadicStream(10, 100, 1000, 10000))
+		// assert.Error(t, err)
+		// assert.ErrorIs(t, err, context.Canceled)
+		// assert.True(t, out == nil)
 	})
 
 	t.Run("Seq", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		stack, err := NewStackFromIterator(ctx, fun.VariadicIterator(100_000, 10_000, 1_000, 100, 10, 1))
-		assert.NotError(t, err)
-		last := 1 // initialize to one to avoid dividing by zero
-		for item := range stack.Seq() {
-			check.True(t, item%last == 0)
-			if t.Failed() {
-				t.Log(item, last, item%last, item%last == 0)
-				t.FailNow()
-			}
-			last = item
-		}
+		// ctx, cancel := context.WithCancel(context.Background())
+		// defer cancel()
+		// stack, err := NewStackFromIterator(ctx, fun.VariadicStream(100_000, 10_000, 1_000, 100, 10, 1))
+		// assert.NotError(t, err)
+		// last := 1 // initialize to one to avoid dividing by zero
+		// for item := range stack.Seq() {
+		// 	check.True(t, item%last == 0)
+		// 	if t.Failed() {
+		// 		t.Log(item, last, item%last, item%last == 0)
+		// 		t.FailNow()
+		// 	}
+		// 	last = item
+		// }
+		panic("fix me")
 	})
 
 }

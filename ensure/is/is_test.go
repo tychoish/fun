@@ -32,7 +32,7 @@ func TestFundamentals(t *testing.T) {
 			ex = append(ex, exx...)
 			check.True(t, ex == nil)
 		})
-		t.Run("Sliceify", func(t *testing.T) {
+		t.Run("NewSlice", func(t *testing.T) {
 			var base []string
 			ex := dt.NewSlice(base)
 			check.True(t, ex == nil)

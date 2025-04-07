@@ -38,7 +38,7 @@ func TestProcess(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		wf, cancel := Processify(func(ctx context.Context, in int) error {
+		wf, cancel := NewProcessor(func(ctx context.Context, in int) error {
 			check.Equal(t, in, 42)
 			timer := time.NewTimer(time.Hour)
 			defer timer.Stop()
@@ -76,7 +76,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		called := 0
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			called++
 			check.Equal(t, 42, n)
 			return nil
@@ -97,7 +97,7 @@ func TestProcess(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		called := 0
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			called++
 			check.Equal(t, 42, n)
 			return nil
@@ -118,7 +118,7 @@ func TestProcess(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		called := 0
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			called++
 			check.Equal(t, 42, n)
 			return nil
@@ -133,7 +133,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			check.Equal(t, 42, n)
 			called++
 			return root
@@ -150,7 +150,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			check.Equal(t, 42, n)
 			called++
 			return root
@@ -163,7 +163,7 @@ func TestProcess(t *testing.T) {
 	})
 	t.Run("Capture", func(t *testing.T) {
 		called := 0
-		pf := Processify(func(ctx context.Context, n int) error {
+		pf := NewProcessor(func(ctx context.Context, n int) error {
 			check.NotNil(t, ctx)
 			check.Equal(t, 42, n)
 			called++
@@ -245,7 +245,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			check.Equal(t, 42, n)
 			called++
 			return root
@@ -261,7 +261,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 		called := 0
 		root := ers.New("foo")
-		pf := Processify(func(_ context.Context, n int) error {
+		pf := NewProcessor(func(_ context.Context, n int) error {
 			time.Sleep(250 * time.Millisecond)
 			check.Equal(t, 42, n)
 			called++
@@ -278,7 +278,7 @@ func TestProcess(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			op := Processify(func(_ context.Context, in int) error {
+			op := NewProcessor(func(_ context.Context, in int) error {
 				count++
 				check.Equal(t, in, 42)
 				return nil
@@ -292,14 +292,14 @@ func TestProcess(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			op := Processify(func(_ context.Context, in int) error {
+			op := NewProcessor(func(_ context.Context, in int) error {
 				count++
 				check.Equal(t, in, 42)
 				return nil
 			})
 
 			wg := &WaitGroup{}
-			oe := HF.ErrorHandler(func(err error) { Invariant.Must(err) })
+			oe := MAKE.ErrorHandler(func(err error) { Invariant.Must(err) })
 			op = op.Lock()
 
 			ft.DoTimes(128, func() { op.Operation(oe, 42).Add(ctx, wg) })
@@ -310,7 +310,7 @@ func TestProcess(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			op := Processify(func(_ context.Context, in int) error {
+			op := NewProcessor(func(_ context.Context, in int) error {
 				count++
 				check.Equal(t, in, 42)
 				return nil
@@ -346,7 +346,7 @@ func TestProcess(t *testing.T) {
 		defer cancel()
 
 		nopCt := 0
-		var nopProd Producer[string] = func(_ context.Context) (string, error) { nopCt++; return "nop", nil }
+		var nopProd Generator[string] = func(_ context.Context) (string, error) { nopCt++; return "nop", nil }
 		var nopProc Processor[string] = func(_ context.Context, in string) error { nopCt++; check.Equal(t, in, "nop"); return nil }
 		op := nopProc.ReadOne(nopProd)
 		check.Equal(t, nopCt, 0)
@@ -421,18 +421,18 @@ func TestProcess(t *testing.T) {
 		pf := MakeProcessor(func(in int) error { counter++; assert.Equal(t, in, 42); return nil })
 		t.Run("All", func(t *testing.T) {
 			defer reset()
-			pg := ProcessorGroup(pf, pf, pf, pf, pf, pf, pf, pf)
+			pg := JoinProcessors(pf, pf, pf, pf, pf, pf, pf, pf)
 			assert.NotError(t, pg.Block(42))
 			assert.Equal(t, counter, 8)
 		})
 		t.Run("WithNils", func(t *testing.T) {
 			defer reset()
-			pg := ProcessorGroup(pf, nil, pf, pf, nil, pf, pf, pf, pf, pf, nil)
+			pg := JoinProcessors(pf, nil, pf, pf, nil, pf, pf, pf, pf, pf, nil)
 			assert.NotError(t, pg.Block(42))
 			assert.Equal(t, counter, 8)
 		})
 		t.Run("Empty", func(t *testing.T) {
-			pg := ProcessorGroup[int]()
+			pg := JoinProcessors[int]()
 			assert.Nil(t, pg)
 		})
 	})
@@ -453,7 +453,7 @@ func TestProcess(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Processify(func(_ context.Context, in int) error {
+			pf := NewProcessor(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Equal(t, count, 1)
 				count++
@@ -468,7 +468,7 @@ func TestProcess(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Processify(func(_ context.Context, in int) error {
+			pf := NewProcessor(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Equal(t, count, 1)
 				count++
@@ -485,7 +485,7 @@ func TestProcess(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Processify(func(_ context.Context, in int) error {
+			pf := NewProcessor(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Zero(t, count)
 				count++
@@ -499,7 +499,7 @@ func TestProcess(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Processify(func(_ context.Context, in int) error {
+			pf := NewProcessor(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
 				assert.Zero(t, count)
 				count++
@@ -732,14 +732,14 @@ func TestProcess(t *testing.T) {
 	})
 	t.Run("Group", func(t *testing.T) {
 		t.Run("Noop", func(t *testing.T) {
-			check.Nil(t, ProcessorGroup[int](nil, nil))
-			check.Nil(t, ProcessorGroup[int]())
+			check.Nil(t, JoinProcessors[int](nil, nil))
+			check.Nil(t, JoinProcessors[int]())
 
 		})
 		t.Run("Single", func(t *testing.T) {
 			var count int
 			pf := MakeProcessor(func(in int) error { count++; check.Equal(t, in, 42); return nil })
-			op := ProcessorGroup(pf)
+			op := JoinProcessors(pf)
 			check.Equal(t, 0, count)
 			assert.NotError(t, op.Block(42))
 			check.Equal(t, 1, count)
@@ -747,7 +747,7 @@ func TestProcess(t *testing.T) {
 		t.Run("Multi", func(t *testing.T) {
 			var count int
 			pf := MakeProcessor(func(in int) error { count++; check.Equal(t, in, 42); return nil })
-			op := ProcessorGroup(pf, pf, pf, pf)
+			op := JoinProcessors(pf, pf, pf, pf)
 
 			check.Equal(t, 0, count)
 			assert.NotError(t, op.Block(42))

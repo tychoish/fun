@@ -13,6 +13,9 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+// Cast just provides as a wrapper around in.(T). Cast will panic.
+func Cast[T any](in any) T { return in.(T) }
+
 // Check takes two values and returns the first value and a second
 // "ok" value. The second value is true if the error is nil (isOK) and
 // false otherwise. This is not too risky.
@@ -24,26 +27,26 @@ func Check[T any](out T, err error) (T, bool) { return out, err == nil }
 //	size += risky.Force(buffer.Write([]byte("hello world")))
 func Force[T any](out T, _ error) T { return out }
 
-// Block runs the function with a context that is never canceled. Use
-// this in cases where you don't want to plumb a context through *and*
-// the operation cannot block on the context.
-func Block[T any](fn func(context.Context) T) T { return fn(context.Background()) }
-
 // ForceOp, is like Force, except it takes the function and calls it
 // itself so that it can ignore a possible panic and return an
 // output. In the case of a panic or an error the output value is
 // often the zero value for the type.
 func ForceOp[T any](fn func() (T, error)) T { defer Recover(); return ft.IgnoreSecond(fn()) }
 
-// Cast just provides as a wrapper around in.(T). Cast will panic.
-func Cast[T any](in any) T { return in.(T) }
+// Block runs the function with a context that is never canceled. Use
+// this in cases where you don't want to plumb a context through *and*
+// the operation cannot block on the context.
+func Block[T any](fn func(context.Context) T) T { return fn(context.Background()) }
 
-// BlockForce combines Block with ForceOp to run a function with a
+// BlockOp runs a function with a background Context, like Block.
+func BlockOp[T any](fn func(context.Context) (T, error)) (T, error) { return fn(context.Background()) }
+
+// BlockForceOp combines Block with ForceOp to run a function with a
 // context that is never canceled, ignoring any panics and returning
 // the output value.
 func BlockForceOp[T any](fn func(context.Context) (T, error)) T {
 	defer Recover()
-	return ft.IgnoreSecond(fn(context.Background()))
+	return ft.IgnoreSecond(BlockOp(fn))
 }
 
 // Ignore runs a function that takes an arbitrary argument and ignores
