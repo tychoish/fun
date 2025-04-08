@@ -227,7 +227,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 //
 // Callers should avoid using a stream that will retain input
 // items in memory.
-func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.Process(b.Processor) }
+func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.Process(b.Handler) }
 
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
@@ -308,10 +308,10 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 }
 
 // Publish distributes a message to all subscribers.
-func (b *Broker[T]) Publish(ctx context.Context, msg T) { ft.Ignore(b.Processor(ctx, msg)) }
+func (b *Broker[T]) Publish(ctx context.Context, msg T) { ft.Ignore(b.Handler(ctx, msg)) }
 
-// Processor distributes a message to all subscribers.
-func (b *Broker[T]) Processor(ctx context.Context, msg T) error {
+// Handler distributes a message to all subscribers.
+func (b *Broker[T]) Handler(ctx context.Context, msg T) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

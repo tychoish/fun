@@ -24,7 +24,7 @@ type Heap[T any] struct {
 }
 
 func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.Process(fun.MakeHandlerProcessor(h.Push))
+	return iter.Process(fun.MakeHandlerHandler(h.Push))
 }
 
 func (h *Heap[T]) list() *List[T] {

@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -1203,7 +1204,7 @@ func RunStreamStringAlgoTests(
 			return 42, prodroot
 
 		})
-		proc := Processor[string](func(_ context.Context, in string) error {
+		proc := Handler[string](func(_ context.Context, in string) error {
 			if proccount >= maxIter && procroot == nil {
 				return io.EOF
 			}
@@ -1273,7 +1274,7 @@ func TestTransformFunctions(t *testing.T) {
 			count := 0
 			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
 			assert.Equal(t, count, 0)
-			prod := mpf.ConvertFuture(AsFuture(42))
+			prod := mpf.ConvertFuture(fn.AsFuture(42))
 			assert.Equal(t, count, 0)
 			out := prod.Ignore(ctx)
 			assert.Equal(t, count, 0)
@@ -1287,7 +1288,7 @@ func TestTransformFunctions(t *testing.T) {
 				count := 0
 				mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
 				check.Equal(t, count, 0)
-				prod := mpf.CovnertGenerator(AsFuture(42).Generator())
+				prod := mpf.CovnertGenerator(FutureGenerator(fn.AsFuture(42)))
 				check.Equal(t, count, 0)
 				out := prod.Ignore(ctx)
 				check.Equal(t, count, 0)

@@ -30,6 +30,7 @@ func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
 // Capture returns a function that handles the specified value,
 // but only when executed later.
 func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
+func (of Handler[T]) Safe() func(T) error { return of.RecoverPanic }
 
 // Handler provides a more expository operation to call a handler
 // function.

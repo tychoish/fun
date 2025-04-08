@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -27,7 +28,9 @@ func Translate[T any, O any](in Future[T], tfn func(T) O) Future[O] {
 }
 
 // Resolve executes the future and returns its value.
-func (f Future[T]) Resolve() T { return f() }
+func (f Future[T]) Resolve() T               { return f() }
+func (f Future[T]) Safe() func() (T, error)  { return f.RecoverPanic }
+func (f Future[T]) RecoverPanic() (T, error) { return ers.WithRecoverDo(f) }
 
 // Once returns a future that will only run the underlying future
 // exactly once.

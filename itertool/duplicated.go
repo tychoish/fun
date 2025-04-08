@@ -49,7 +49,7 @@ func Monotonic(maxVal int) *fun.Stream[int] { return fun.MAKE.Counter(maxVal) }
 // as work is processed.
 func ParallelForEach[T any](
 	iter *fun.Stream[T],
-	fn fun.Processor[T],
+	fn fun.Handler[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) fun.Worker {
 	return iter.ProcessParallel(fn, append(optp, fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}))...)
@@ -72,7 +72,7 @@ func Generate[T any](
 // ParallelForEach, but otherwise is identical.
 func Process[T any](
 	iter *fun.Stream[T],
-	fn fun.Processor[T],
+	fn fun.Handler[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) fun.Worker {
 	return ParallelForEach(iter, fn, optp...)

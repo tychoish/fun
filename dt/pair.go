@@ -116,12 +116,12 @@ func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Observe calls the handler function for every pair in the container.
 func (p *Pairs[K, V]) Observe(hf fn.Handler[Pair[K, V]]) {
-	p.Process(fun.MakeHandlerProcessor(hf)).Ignore().Wait()
+	p.Process(fun.MakeHandlerHandler(hf)).Ignore().Wait()
 }
 
 // Process returns a worker, that when executed calls the processor
 // function for every pair in the container.
-func (p *Pairs[K, V]) Process(pf fun.Processor[Pair[K, V]]) fun.Worker {
+func (p *Pairs[K, V]) Process(pf fun.Handler[Pair[K, V]]) fun.Worker {
 	return func(ctx context.Context) error {
 		p.init()
 		if p.ll.Len() == 0 {

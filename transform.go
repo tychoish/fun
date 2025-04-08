@@ -155,14 +155,14 @@ func (mpf Transform[T, O]) Generator(prod Generator[T]) Generator[O] {
 	})
 }
 
-// Pipe creates a Processor (input)/ Generator (output) pair that has
+// Pipe creates a Handler (input)/ Generator (output) pair that has
 // data processed by the Transform function. The pipe has a buffer of
 // one item and is never closed, and both input and output operations
 // are blocking. The closer function will abort the connection and
 // cause all successive operations to return io.EOF.
-func (mpf Transform[T, O]) Pipe() (in Processor[T], out Generator[O]) {
+func (mpf Transform[T, O]) Pipe() (in Handler[T], out Generator[O]) {
 	pipe := Blocking(make(chan T, 1))
-	return pipe.Processor(), mpf.Generator(pipe.Generator())
+	return pipe.Handler(), mpf.Generator(pipe.Generator())
 }
 
 // Wait calls the transform function passing a context that cannot expire.
@@ -245,14 +245,14 @@ func (mpf Transform[T, O]) WithRecover() Transform[T, O] {
 	}
 }
 
-// ProcessPipe collects a Produer and Processor pair, and returns a
+// ProcessPipe collects a Produer and Handler pair, and returns a
 // worker that, when run processes the input collected by the
-// Processor and returns it to the Generator. This operation runs until
+// Handler and returns it to the Generator. This operation runs until
 // the producer, transformer, or processor returns an
 // error. ErrStreamContinue errors are respected, while io.EOF errors
 // cause the ProcessPipe to abort but are not propogated to the
 // caller.
-func (mpf Transform[T, O]) ProcessPipe(in Generator[T], out Processor[O]) Worker {
+func (mpf Transform[T, O]) ProcessPipe(in Generator[T], out Handler[O]) Worker {
 	return func(ctx context.Context) error {
 		var (
 			input  T
@@ -286,10 +286,10 @@ func (mpf Transform[T, O]) ProcessPipe(in Generator[T], out Processor[O]) Worker
 // them to the transform function, and then "sends" them with the
 // provided processor function.
 func (mpf Transform[T, O]) mapPullProcess(
-	output Processor[O],
+	output Handler[O],
 	opts *WorkerGroupConf,
-) Processor[T] {
-	return Processor[T](func(ctx context.Context, in T) error {
+) Handler[T] {
+	return Handler[T](func(ctx context.Context, in T) error {
 		val, err := mpf(ctx, in)
 		if err != nil {
 			if opts.CanContinueOnError(err) {

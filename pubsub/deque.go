@@ -336,7 +336,7 @@ func (dq *Deque[T]) BlockingDistributor() Distributor[T] {
 // from the front of the queue before adding them to the back.
 func (dq *Deque[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
-		push: fun.MakeProcessor(dq.ForcePushBack),
+		push: fun.MakeHandler(dq.ForcePushBack),
 		pop:  dq.WaitFront,
 		size: dq.Len,
 	}

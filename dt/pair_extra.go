@@ -21,7 +21,7 @@ func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteByte('{')
 
 	idx := 0
-	if err := p.Process(fun.MakeProcessor(func(item Pair[K, V]) error {
+	if err := p.Process(fun.MakeHandler(func(item Pair[K, V]) error {
 		if idx != 0 {
 			buf.WriteByte(',')
 		}

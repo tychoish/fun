@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/fn"
@@ -103,7 +104,7 @@ func TestLocked(t *testing.T) {
 			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
 			mget, mset := AccessorsWithLock(getter, setter)
 			start := time.Now()
-			sw := mset.Worker(267).Launch(ctx)
+			sw := fun.MakeHandler(mset.Safe()).Worker(267).Launch(ctx)
 			runtime.Gosched()
 			sig := make(chan struct{})
 			go func() {
@@ -132,7 +133,7 @@ func TestLocked(t *testing.T) {
 			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
 			mget, mset := AccessorsWithReadLock(getter, setter)
 			start := time.Now()
-			sw := mset.Worker(267).Launch(ctx)
+			sw := fun.MakeHandler(mset.Safe()).Worker(267).Launch(ctx)
 			runtime.Gosched()
 			wg := &sync.WaitGroup{}
 			wg.Add(2)

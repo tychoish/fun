@@ -60,7 +60,7 @@ func (p *Tuples[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteByte('[')
 
 	idx := 0
-	if err := p.Process(fun.MakeProcessor(func(item Tuple[K, V]) error {
+	if err := p.Process(fun.MakeHandler(func(item Tuple[K, V]) error {
 		if idx != 0 {
 			buf.WriteByte(',')
 		}

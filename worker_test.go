@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -162,8 +163,8 @@ func TestWorker(t *testing.T) {
 		ch := make(chan struct{}, 1)
 
 		expected := errors.New("kip")
-		var oee Handler[error] = func(err error) { check.ErrorIs(t, err, expected); Blocking(ch).Send().Signal(ctx) }
-		var oen Handler[error] = func(err error) { check.NotError(t, err); Blocking(ch).Send().Signal(ctx) }
+		var oee fn.Handler[error] = func(err error) { check.ErrorIs(t, err, expected); Blocking(ch).Send().Signal(ctx) }
+		var oen fn.Handler[error] = func(err error) { check.NotError(t, err); Blocking(ch).Send().Signal(ctx) }
 		var wf Worker
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
@@ -469,7 +470,7 @@ func TestWorker(t *testing.T) {
 	t.Run("ErrorCheck", func(t *testing.T) {
 		t.Run("ShortCircut", func(t *testing.T) {
 			err := errors.New("test error")
-			var hf Future[error] = func() error { return err }
+			var hf fn.Future[error] = func() error { return err }
 			called := 0
 			wf := Worker(func(_ context.Context) error { called++; return nil })
 			ecpf := wf.WithErrorCheck(hf)
@@ -480,7 +481,7 @@ func TestWorker(t *testing.T) {
 
 		})
 		t.Run("Noop", func(t *testing.T) {
-			var hf Future[error] = func() error { return nil }
+			var hf fn.Future[error] = func() error { return nil }
 			called := 0
 			wf := Worker(func(_ context.Context) error { called++; return nil })
 			ecpf := wf.WithErrorCheck(hf)
@@ -491,7 +492,7 @@ func TestWorker(t *testing.T) {
 		t.Run("Multi", func(t *testing.T) {
 			called := 0
 			hfcall := 0
-			var hf Future[error] = func() error {
+			var hf fn.Future[error] = func() error {
 				hfcall++
 				switch hfcall {
 				case 1, 2, 3:

@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -206,7 +207,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("Consistent", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			pf := MakeFuture(func() int { return 42 }).Generator()
+			pf := FutureGenerator(func() int { return 42 })
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
 				assert.Equal(t, v, 42)
@@ -281,7 +282,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			obct := 0
-			obv := NewHandler(func(in int) { obct++; check.Equal(t, in, 42) }).Lock()
+			obv := fn.NewHandler(func(in int) { obct++; check.Equal(t, in, 42) }).Lock()
 			jobs := []Worker{}
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op.Background(ctx, obv)) })
@@ -632,7 +633,7 @@ func TestGenerator(t *testing.T) {
 	t.Run("ErrorCheck", func(t *testing.T) {
 		t.Run("ShortCircut", func(t *testing.T) {
 			err := errors.New("test error")
-			var hf Future[error] = func() error { return err }
+			var hf fn.Future[error] = func() error { return err }
 			called := 0
 			pf := MakeGenerator(func() (int, error) { called++; return 42, nil })
 			ecpf := pf.WithErrorCheck(hf)
@@ -644,7 +645,7 @@ func TestGenerator(t *testing.T) {
 
 		})
 		t.Run("Noop", func(t *testing.T) {
-			var hf Future[error] = func() error { return nil }
+			var hf fn.Future[error] = func() error { return nil }
 			called := 0
 			pf := MakeGenerator(func() (int, error) { called++; return 42, nil })
 			ecpf := pf.WithErrorCheck(hf)
@@ -656,7 +657,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("Multi", func(t *testing.T) {
 			called := 0
 			hfcall := 0
-			var hf Future[error] = func() error {
+			var hf fn.Future[error] = func() error {
 				hfcall++
 				switch hfcall {
 				case 1, 2, 3:

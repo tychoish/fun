@@ -66,6 +66,8 @@ func PtrGenerator[T any](fn func() *T) Generator[T] {
 	})
 }
 
+func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.Safe()) }
+
 // Run executes the generator and returns the result
 //
 // Deprecated: Use the Resolve() helper.
@@ -220,7 +222,7 @@ func (pf Generator[T]) CheckForce() (T, bool)               { o, e := pf.Wait();
 func (pf Generator[T]) Launch(ctx context.Context) Generator[T] {
 	eh, ef := MAKE.ErrorCollector()
 	pipe := Blocking(make(chan T))
-	pipe.Send().Processor().
+	pipe.Send().Handler().
 		ReadAll(pf).
 		Operation(eh).
 		PostHook(pipe.Close).
@@ -329,14 +331,14 @@ func (pf Generator[T]) WithLocker(mtx sync.Locker) Generator[T] {
 // SendOne makes a Worker function that, as a future, calls the
 // generator once and then passes the output, if there are no errors,
 // to the processor function. Provides the inverse operation of
-// Processor.ReadOne.
-func (pf Generator[T]) SendOne(proc Processor[T]) Worker { return proc.ReadOne(pf) }
+// Handler.ReadOne.
+func (pf Generator[T]) SendOne(proc Handler[T]) Worker { return proc.ReadOne(pf) }
 
 // SendAll provides a form of iteration, by construction a future
 // (Worker) that consumes the values of the generator with the
 // processor until either function returns an error. SendAll respects
 // ErrStreamContinue and io.EOF
-func (pf Generator[T]) SendAll(proc Processor[T]) Worker { return proc.ReadAll(pf) }
+func (pf Generator[T]) SendAll(proc Handler[T]) Worker { return proc.ReadAll(pf) }
 
 // WithCancel creates a Generator and a cancel function which will
 // terminate the context that the root Generator is running
@@ -535,7 +537,7 @@ func (pf Generator[T]) Parallel(
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &WaitGroup{}
 
-		pipe.Processor().ReadAll(func(ctx context.Context) (zero T, _ error) {
+		pipe.Handler().ReadAll(func(ctx context.Context) (zero T, _ error) {
 			value, err := pf(ctx)
 			if err != nil {
 				if opts.CanContinueOnError(err) {

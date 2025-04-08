@@ -28,16 +28,16 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
-			t.Run("Processor", func(t *testing.T) {
+			t.Run("Handler", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
 				ch := make(chan int, 2)
-				err := Blocking(ch).Send().Processor().Run(ctx, 1)
+				err := Blocking(ch).Send().Handler().Run(ctx, 1)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 1)
 
-				err = NonBlocking(ch).Send().Processor().Run(ctx, 3)
+				err = NonBlocking(ch).Send().Handler().Run(ctx, 3)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
@@ -392,7 +392,7 @@ func TestChannel(t *testing.T) {
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, experr)
 			})
-			t.Run("SuppressProcessorEOF", func(t *testing.T) {
+			t.Run("SuppressHandlerEOF", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 

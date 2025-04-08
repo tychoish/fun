@@ -122,15 +122,15 @@ func (op ChanOp[T]) Stream() *Stream[T] { return op.Receive().Generator().Stream
 func (op ChanOp[T]) Seq(ctx context.Context) iter.Seq[T]        { return op.Receive().Seq(ctx) }
 func (op ChanOp[T]) Seq2(ctx context.Context) iter.Seq2[int, T] { return op.Receive().Seq2(ctx) }
 
-// Processor exposes the "send" aspect of the channel as a Processor function.
-func (op ChanOp[T]) Processor() Processor[T] { return op.Send().Processor() }
+// Handler exposes the "send" aspect of the channel as a Handler function.
+func (op ChanOp[T]) Handler() Handler[T] { return op.Send().Handler() }
 
 // Generator expoess the "receive" aspect of the channel as a Generator function.
 func (op ChanOp[T]) Generator() Generator[T] { return op.Receive().Generator() }
 
 // Pipe creates a linked pair of functions for transmitting data via
 // these interfaces.
-func (op ChanOp[T]) Pipe() (Processor[T], Generator[T]) { return op.Processor(), op.Generator() }
+func (op ChanOp[T]) Pipe() (Handler[T], Generator[T]) { return op.Handler(), op.Generator() }
 
 // ChanReceive, wraps a channel fore <-chan T operations. It is the type
 // returned by the ChanReceive() method on ChannelOp. The primary method
@@ -150,7 +150,7 @@ func (ro ChanReceive[T]) Filter(ctx context.Context, eh fn.Handler[error], filte
 	ro.Generator().
 		WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).
 		Filter(filter).
-		SendAll(out.Processor()).
+		SendAll(out.Handler()).
 		Background(ctx, eh)
 
 	return out.Receive()
@@ -292,11 +292,11 @@ func (ro ChanReceive[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
 }
 
 // Consume returns a Worker function that processes the output of data
-// from the channel with the Processor function. If the processor
+// from the channel with the Handler function. If the processor
 // function returns ErrStreamContinue, the processing will continue. All
-// other Processor errors (and problems reading from the channel,)
+// other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) Consume(op Processor[T]) Worker {
+func (ro ChanReceive[T]) Consume(op Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
@@ -346,14 +346,14 @@ func NonBlockingSend[T any](ch chan<- T) ChanSend[T] {
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
-func (sm ChanSend[T]) Check(ctx context.Context, it T) bool { return sm.Processor().Check(ctx, it) }
+func (sm ChanSend[T]) Check(ctx context.Context, it T) bool { return sm.Handler().Check(ctx, it) }
 
 // Ignore performs a send and omits the error.
-func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { sm.Processor().Ignore(ctx, it) }
+func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { sm.Handler().Ignore(ctx, it) }
 
-// Processor returns the Write method as a processor for integration
+// Handler returns the Write method as a processor for integration
 // into existing tools
-func (sm ChanSend[T]) Processor() Processor[T] { return sm.Write }
+func (sm ChanSend[T]) Handler() Handler[T] { return sm.Write }
 
 // Zero sends the zero value of T through the channel.
 func (sm ChanSend[T]) Zero(ctx context.Context) error { var v T; return sm.Write(ctx, v) }
@@ -410,6 +410,6 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 func (sm ChanSend[T]) Consume(iter *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
-		return iter.Process(sm.Processor()).Run(ctx)
+		return iter.Process(sm.Handler()).Run(ctx)
 	}
 }

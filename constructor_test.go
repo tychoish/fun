@@ -84,25 +84,35 @@ func TestHandlers(t *testing.T) {
 
 		check.Equal(t, count, 2)
 	})
-	t.Run("ErrorProcessor", func(t *testing.T) {
+	t.Run("ErrorHandler", func(t *testing.T) {
 		count := 0
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		proc := MAKE.ErrorProcessor(func(_ context.Context, err error) error {
-			count++
-			return err
-		})
-		check.NotError(t, proc(ctx, nil))
+		proc, fut := MAKE.ErrorCollector()
+		proc.Join(func(err error) { count++ })
+
+		proc(nil)
+		check.NotError(t, fut())
 		check.Equal(t, count, 0)
 
-		check.ErrorIs(t, proc(ctx, root), root)
+		proc(root)
+		check.ErrorIs(t, fut(), root)
 		check.Equal(t, count, 1)
-		check.ErrorIs(t, proc(ctx, io.EOF), io.EOF)
+
+		check.ErrorIs(t, fut(), io.EOF)
+		check.ErrorIs(t, fut(), root)
 		check.Equal(t, count, 2)
-		check.NotError(t, proc(ctx, nil))
+
+		proc(nil)
 		check.Equal(t, count, 2)
 	})
-	t.Run("ErrorProcessorWithoutEOF", func(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		called := 0
+		oef := MAKE.ErrorHandler(func(_ error) { called++ })
+		oef(nil)
+		check.Equal(t, called, 0)
+		oef(io.EOF)
+		check.Equal(t, called, 1)
+	})
+	t.Run("ErrorHandlerWithoutEOF", func(t *testing.T) {
 		count := 0
 		proc := MAKE.ErrorHandlerWithoutEOF(func(err error) {
 			count++
@@ -138,7 +148,7 @@ func TestHandlers(t *testing.T) {
 		})
 		check.True(t, called)
 	})
-	t.Run("ErrorProcessorWithoutTerminating", func(t *testing.T) {
+	t.Run("ErrorHandlerWithoutTerminating", func(t *testing.T) {
 		count := 0
 		proc := MAKE.ErrorHandlerWithoutTerminating(func(err error) {
 			count++

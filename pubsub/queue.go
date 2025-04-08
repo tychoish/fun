@@ -332,7 +332,7 @@ func (q *Queue[T]) Stream() *fun.Stream[T] { return q.Generator().Stream() }
 // from the queue.
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
-		push: fun.MakeProcessor(q.Add),
+		push: fun.MakeHandler(q.Add),
 		pop: func(ctx context.Context) (_ T, err error) {
 			msg, ok := q.Remove()
 			if ok {

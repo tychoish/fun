@@ -13,7 +13,7 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Processor are generic functions that take an argument (and a
+// Handler are generic functions that take an argument (and a
 // context) and return an error. They're the type of function used by
 // the itertool.Process/itertool.ParallelForEach and useful in other
 // situations as a compliment to fun.Worker and Operation.
@@ -21,26 +21,26 @@ import (
 // In general the implementations of the methods for processing
 // functions are wrappers around their similarly named fun.Worker
 // analogues.
-type Processor[T any] func(context.Context, T) error
+type Handler[T any] func(context.Context, T) error
 
-// MakeProcessor converts a function with the Processor signature
+// MakeHandler converts a function with the Handler signature
 // (minus the context) for easy conversion.
-func MakeProcessor[T any](fn func(T) error) Processor[T] {
+func MakeHandler[T any](fn func(T) error) Handler[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
 
-// NewProcessors returns a processor as a convenience function to
+// NewHandlers returns a processor as a convenience function to
 // avoid the extra cast when creating new function objects.
-func NewProcessor[T any](fn func(context.Context, T) error) Processor[T] { return fn }
+func NewHandler[T any](fn func(context.Context, T) error) Handler[T] { return fn }
 
-func MakeHandlerProcessor[T any](fn func(T)) Processor[T] {
+func MakeHandlerHandler[T any](fn fn.Handler[T]) Handler[T] {
 	return func(_ context.Context, in T) error { fn(in); return nil }
 }
 
-// JoinProcessors takes a collection of Processor functions and merges
+// JoinHandlers takes a collection of Handler functions and merges
 // them into a single chain, eliding any nil processors.
-func JoinProcessors[T any](pfs ...Processor[T]) Processor[T] {
-	var pf Processor[T]
+func JoinHandlers[T any](pfs ...Handler[T]) Handler[T] {
+	var pf Handler[T]
 	for _, fn := range pfs {
 		switch {
 		case fn == nil:
@@ -54,62 +54,62 @@ func JoinProcessors[T any](pfs ...Processor[T]) Processor[T] {
 	return pf
 }
 
-// Run executes the Processors but creates a context within the
+// Run executes the Handlers but creates a context within the
 // function (decended from the context provided in the arguments,)
 // that is canceled when Run() returns to avoid leaking well behaved
 // resources outside of the scope of the function execution. Run can
-// also be passed as a Processor func.
-func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(in).Run(ctx) }
+// also be passed as a Handler func.
+func (pf Handler[T]) Run(ctx context.Context, in T) error { return pf.Worker(in).Run(ctx) }
 
 // Add begins running the process in a different goroutine, using the
 // provided arguments to manage the operation.
-func (pf Processor[T]) Add(ctx context.Context, wg *WaitGroup, eh fn.Handler[error], op T) {
+func (pf Handler[T]) Add(ctx context.Context, wg *WaitGroup, eh fn.Handler[error], op T) {
 	pf.Operation(eh, op).Add(ctx, wg)
 }
 
-// Block runs the Processor with a context that will never be
+// Block runs the Handler with a context that will never be
 // canceled.
 //
 // Deprecated: use Wait() instead.
-func (pf Processor[T]) Block(in T) error { return pf.Wait(in) }
+func (pf Handler[T]) Block(in T) error { return pf.Wait(in) }
 
-// Wait runs the Processor with a context that will never be
+// Wait runs the Handler with a context that will never be
 // canceled.
-func (pf Processor[T]) Wait(in T) error { return pf.Worker(in).Wait() }
+func (pf Handler[T]) Wait(in T) error { return pf.Worker(in).Wait() }
 
 // Ignore runs the process function and discards the error.
-func (pf Processor[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in)) }
+func (pf Handler[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in)) }
 
 // Check processes the input and returns true when the error is nil,
 // and false when there was an error.
-func (pf Processor[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ctx, in)) }
+func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ctx, in)) }
 
 // Force processes the input, but discards the error and uses a
 // context that will not expire.
-func (pf Processor[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
+func (pf Handler[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
 
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.
-func (pf Processor[T]) WithRecover() Processor[T] {
+func (pf Handler[T]) WithRecover() Handler[T] {
 	return func(ctx context.Context, in T) error { return pf.Worker(in).WithRecover().Run(ctx) }
 }
 
-// After produces a Processor that will execute after the provided
+// After produces a Handler that will execute after the provided
 // timestamp.
-func (pf Processor[T]) After(ts time.Time) Processor[T] { return pf.Delay(time.Until(ts)) }
+func (pf Handler[T]) After(ts time.Time) Handler[T] { return pf.Delay(time.Until(ts)) }
 
-// Delay wraps a Processor in a function that will always wait for the
+// Delay wraps a Handler in a function that will always wait for the
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Processor[T]) Delay(dur time.Duration) Processor[T] { return pf.Jitter(ft.Wrap(dur)) }
+func (pf Handler[T]) Delay(dur time.Duration) Handler[T] { return pf.Jitter(ft.Wrap(dur)) }
 
-// Jitter wraps a Processor that runs the jitter function (jf) once
+// Jitter wraps a Handler that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
 // resulting duration before running the processor.
 //
 // If the function produces a negative duration, there is no delay.
-func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
+func (pf Handler[T]) Jitter(jf func() time.Duration) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		timer := time.NewTimer(max(0, jf()))
 		defer timer.Stop()
@@ -127,12 +127,12 @@ func (pf Processor[T]) Jitter(jf func() time.Duration) Processor[T] {
 // nil.
 //
 // The resulting processor can be used more than once.
-func (pf Processor[T]) If(c bool) Processor[T] { return pf.When(ft.Wrap(c)) }
+func (pf Handler[T]) If(c bool) Handler[T] { return pf.When(ft.Wrap(c)) }
 
 // When returns a processor function that runs if the conditional function
 // returns true, and does not run otherwise. The conditional function
 // is evaluated every time the returned processor is run.
-func (pf Processor[T]) When(c func() bool) Processor[T] {
+func (pf Handler[T]) When(c func() bool) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		if c() {
 			return pf(ctx, in)
@@ -144,7 +144,7 @@ func (pf Processor[T]) When(c func() bool) Processor[T] {
 // Filter returns a wrapping processor that takes a function a
 // function that only calls the processor when the filter function
 // returns true, and returns ers.ErrCurrentOpSkip otherwise.
-func (pf Processor[T]) Filter(fl func(T) bool) Processor[T] {
+func (pf Handler[T]) Filter(fl func(T) bool) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		if !fl(in) {
 			return ers.ErrCurrentOpSkip
@@ -157,14 +157,14 @@ func (pf Processor[T]) Filter(fl func(T) bool) Processor[T] {
 // each function in order, as long as there is no error and the
 // context does not expire. Context expiration errors are not
 // propagated.
-func (pf Processor[T]) Join(pfs ...Processor[T]) Processor[T] {
+func (pf Handler[T]) Join(pfs ...Handler[T]) Handler[T] {
 	for idx := range pfs {
 		pf = pf.merge(pfs[idx])
 	}
 	return pf
 }
 
-func (pf Processor[T]) merge(next Processor[T]) Processor[T] {
+func (pf Handler[T]) merge(next Handler[T]) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		if err := pf(ctx, in); err != nil {
 			return err
@@ -175,36 +175,36 @@ func (pf Processor[T]) merge(next Processor[T]) Processor[T] {
 
 // Background processes an item in a separate goroutine and returns a
 // worker that will block until the underlying operation is complete.
-func (pf Processor[T]) Background(ctx context.Context, op T) Worker {
+func (pf Handler[T]) Background(ctx context.Context, op T) Worker {
 	return pf.Worker(op).Launch(ctx)
 }
 
-// Capture creates a handler function that like, Processor.Force,
+// Capture creates a handler function that like, Handler.Force,
 // passes a background context and ignores the processors error.
-func (pf Processor[T]) Capture() fn.Handler[T] { return pf.Force }
+func (pf Handler[T]) Capture() fn.Handler[T] { return pf.Force }
 
 // Operation converts a processor into a worker that will process the input
 // provided when executed.
-func (pf Processor[T]) Operation(of fn.Handler[error], in T) Operation {
+func (pf Handler[T]) Operation(of fn.Handler[error], in T) Operation {
 	return pf.Worker(in).Operation(of)
 }
 
 // Handler converts a processor into an observer, handling the error
 // with the error observer and using the provided context.
-func (pf Processor[T]) Handler(ctx context.Context, oe fn.Handler[error]) fn.Handler[T] {
+func (pf Handler[T]) Handler(ctx context.Context, oe fn.Handler[error]) fn.Handler[T] {
 	return func(in T) { oe(pf(ctx, in)) }
 }
 
 // Worker converts the processor into a worker, passing the provide
-// input into the root processor function. The Processor is not run
+// input into the root processor function. The Handler is not run
 // until the worker is called.
-func (pf Processor[T]) Worker(in T) Worker {
+func (pf Handler[T]) Worker(in T) Worker {
 	return func(ctx context.Context) error { return pf(ctx, in) }
 }
 
 // Once make a processor that can only run once. Subsequent calls to
 // the processor return the cached error of the original run.
-func (pf Processor[T]) Once() Processor[T] {
+func (pf Handler[T]) Once() Handler[T] {
 	once := &sync.Once{}
 	var err error
 	return func(ctx context.Context, in T) error {
@@ -213,12 +213,12 @@ func (pf Processor[T]) Once() Processor[T] {
 	}
 }
 
-// Lock wraps the Processor and protects its execution with a mutex.
-func (pf Processor[T]) Lock() Processor[T] { return pf.WithLock(&sync.Mutex{}) }
+// Lock wraps the Handler and protects its execution with a mutex.
+func (pf Handler[T]) Lock() Handler[T] { return pf.WithLock(&sync.Mutex{}) }
 
-// WithLock wraps the Processor and ensures that the mutex is always
-// held while the root Processor is called.
-func (pf Processor[T]) WithLock(mtx sync.Locker) Processor[T] {
+// WithLock wraps the Handler and ensures that the mutex is always
+// held while the root Handler is called.
+func (pf Handler[T]) WithLock(mtx sync.Locker) Handler[T] {
 	return func(ctx context.Context, arg T) error {
 		mtx.Lock()
 		defer mtx.Unlock()
@@ -227,7 +227,7 @@ func (pf Processor[T]) WithLock(mtx sync.Locker) Processor[T] {
 }
 
 // Limit ensures that the processor is called at most n times.
-func (pf Processor[T]) Limit(n int) Processor[T] {
+func (pf Handler[T]) Limit(n int) Handler[T] {
 	resolver := internal.LimitExec[error](n)
 
 	return func(ctx context.Context, arg T) error {
@@ -235,11 +235,11 @@ func (pf Processor[T]) Limit(n int) Processor[T] {
 	}
 }
 
-// TTL returns a Processor that runs once in the specified window, and
+// TTL returns a Handler that runs once in the specified window, and
 // returns the error from the last run in between this interval. While
 // the executions of the underlying function happen in isolation,
 // in between, the processor is concurrently accessible.
-func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
+func (pf Handler[T]) TTL(dur time.Duration) Handler[T] {
 	resolver := internal.TTLExec[error](dur)
 
 	return func(ctx context.Context, arg T) error {
@@ -247,11 +247,11 @@ func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
 	}
 }
 
-// WithCancel creates a Processor and a cancel function which will
+// WithCancel creates a Handler and a cancel function which will
 // terminate the context that the root proccessor is running
 // with. This context isn't canceled *unless* the cancel function is
-// called (or the context passed to the Processor is canceled.)
-func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
+// called (or the context passed to the Handler is canceled.)
+func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 	var wctx context.Context
 	var cancel context.CancelFunc
 	once := &sync.Once{}
@@ -263,12 +263,12 @@ func (pf Processor[T]) WithCancel() (Processor[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
-// PreHook creates an amalgamated Processor that runs the operation
+// PreHook creates an amalgamated Handler that runs the operation
 // before the root processor. If the operation panics that panic is
 // converted to an error and merged with the processor's error. Use
 // with Operation.Once() to create an "init" function that runs once
 // before a processor is called the first time.
-func (pf Processor[T]) PreHook(op Operation) Processor[T] {
+func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		return ers.Join(ers.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
 	}
@@ -279,7 +279,7 @@ func (pf Processor[T]) PreHook(op Operation) Processor[T] {
 // aggregated with the processors error. The hook operation is
 // unconditionally called after the processor function (except in the
 // case of a processor panic.)
-func (pf Processor[T]) PostHook(op func()) Processor[T] {
+func (pf Handler[T]) PostHook(op func()) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		return ers.Join(ft.Flip(pf(ctx, in), ers.WithRecoverCall(op)))
 	}
@@ -287,13 +287,13 @@ func (pf Processor[T]) PostHook(op func()) Processor[T] {
 
 // WithErrorFilter uses an ers.Filter to process the error respose from
 // the processor.
-func (pf Processor[T]) WithErrorFilter(ef ers.Filter) Processor[T] {
+func (pf Handler[T]) WithErrorFilter(ef ers.Filter) Handler[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }
 
 // WithoutErrors returns a producer that will convert a non-nil error
 // of the provided types to a nil error.
-func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
+func (pf Handler[T]) WithoutErrors(errs ...error) Handler[T] {
 	return pf.WithErrorFilter(ers.FilterExclude(errs...))
 }
 
@@ -307,7 +307,7 @@ func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 // to short circuit the operation, and also a second time when
 // processor has returned in case an error has occurred during the
 // operation of the processor.
-func (pf Processor[T]) WithErrorCheck(ef fn.Future[error]) Processor[T] {
+func (pf Handler[T]) WithErrorCheck(ef fn.Future[error]) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		if err := ef(); err != nil {
 			return err
@@ -319,12 +319,12 @@ func (pf Processor[T]) WithErrorCheck(ef fn.Future[error]) Processor[T] {
 // ReadOne returns a future (Worker) that calls the processor function
 // on the output of the provided producer function. ReadOne uses the
 // fun.Pipe() operation for the underlying implementation.
-func (pf Processor[T]) ReadOne(prod Generator[T]) Worker { return Pipe(prod, pf) }
+func (pf Handler[T]) ReadOne(prod Generator[T]) Worker { return Pipe(prod, pf) }
 
 // ReadAll reads elements from the producer until an error is
 // encountered and passes them to a producer, until the first error is
 // encountered. The worker is blocking.
-func (pf Processor[T]) ReadAll(prod Generator[T]) Worker {
+func (pf Handler[T]) ReadAll(prod Generator[T]) Worker {
 	return func(ctx context.Context) error {
 
 	LOOP:
@@ -349,7 +349,7 @@ func (pf Processor[T]) ReadAll(prod Generator[T]) Worker {
 // Parallel takes a variadic number of items and returns a worker that
 // processes them concurrently. All panics are converted to errors and
 // all errors are aggregated.
-func (pf Processor[T]) Parallel(ops ...T) Worker {
+func (pf Handler[T]) Parallel(ops ...T) Worker {
 	return SliceStream(ops).ProcessParallel(pf,
 		WorkerGroupConfNumWorkers(len(ops)),
 		WorkerGroupConfContinueOnError(),
@@ -373,4 +373,4 @@ func (pf Processor[T]) Parallel(ops ...T) Worker {
 // possible to return a nil error without successfully completing the
 // underlying operation, if the processor only returned
 // ErrStreamContinue values.
-func (pf Processor[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
+func (pf Handler[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }

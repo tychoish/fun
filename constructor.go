@@ -24,7 +24,7 @@ var MAKE = Constructors{}
 // this package.
 type Constructors struct{}
 
-// ProcessWorker constructs a Processor function for running Worker
+// ProcessWorker constructs a Handler function for running Worker
 // functions. Use in combination with Process and ProcessParallel, and
 // to build worker pools.
 //
@@ -33,7 +33,7 @@ type Constructors struct{}
 // method as in:
 //
 //	fun.MAKE.ProcessWorker()
-func (Constructors) ProcessWorker() Processor[Worker] {
+func (Constructors) ProcessWorker() Handler[Worker] {
 	return func(ctx context.Context, wf Worker) error { return wf(ctx) }
 }
 
@@ -85,7 +85,7 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 	}
 }
 
-// ProcessOperation constructs a Processor function for running Worker
+// ProcessOperation constructs a Handler function for running Worker
 // functions. Use in combination with Process and ProcessParallel, and
 // to build worker pools.
 //
@@ -94,27 +94,19 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 // method as in:
 //
 //	fun.MAKE.ProcessOperation()
-func (Constructors) ProcessOperation() Processor[Operation] {
+func (Constructors) ProcessOperation() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
 }
-
-// ErrorProcessor produces an error Processor function for errors that
-// only calls the input Processor if the error is non-nil.
-func (Constructors) ErrorProcessor(pf Processor[error]) Processor[error] {
-	return func(ctx context.Context, in error) error {
-		return ft.WhenDo(in != nil, func() error { return pf(ctx, in) })
-	}
-}
-
-// Recovery catches a panic, turns it into an error and passes it to
-// the provided observer function.
-func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
 // ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
 func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 	return func(err error) { ft.WhenApply(err != nil, of, err) }
 }
+
+// Recovery catches a panic, turns it into an error and passes it to
+// the provided observer function.
+func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
 func (Constructors) ErrorStack() *ers.Stack { return &ers.Stack{} }
 

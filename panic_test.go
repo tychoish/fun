@@ -10,6 +10,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -175,7 +176,7 @@ func TestPanics(t *testing.T) {
 	t.Run("Handler", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		var of Handler[string]
+		var of fn.Handler[string]
 		t.Run("Worker", func(t *testing.T) {
 			var called bool
 			of = func(string) {
@@ -184,13 +185,14 @@ func TestPanics(t *testing.T) {
 			}
 
 			assert.NotPanic(t, func() {
-				err := of.Worker("hi").Run(ctx)
+				err := of.Safe()("hi")
+
 				assert.ErrorIs(t, err, io.EOF)
 				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			})
 			assert.True(t, called)
 		})
-		t.Run("Processor", func(t *testing.T) {
+		t.Run("Handler", func(t *testing.T) {
 			var called bool
 			var seen string
 			of = func(in string) {
@@ -198,7 +200,7 @@ func TestPanics(t *testing.T) {
 				seen = in
 			}
 
-			err := MakeHandlerProcessor(of).Run(ctx, "hello")
+			err := MakeHandlerHandler(of).Run(ctx, "hello")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -217,7 +219,7 @@ func TestPanics(t *testing.T) {
 				panic("hi")
 			}
 
-			assert.Panic(t, func() { of.Operation("hi").Run(ctx) })
+			assert.NotPanic(t, func() { ts := of.Safe(); assert.Error(t, ts("hi")) })
 			assert.True(t, called)
 		})
 		t.Run("Failure", func(t *testing.T) {

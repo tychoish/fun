@@ -25,7 +25,7 @@ func (s *Stack[T]) Append(items ...T) { ft.ApplyMany(s.Push, items) }
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
 func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.Process(fun.MakeHandlerProcessor(s.Push))
+	return iter.Process(fun.MakeHandlerHandler(s.Push))
 }
 
 // Item is a common wrapper for the elements in a stack.

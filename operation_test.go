@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -198,7 +199,7 @@ func TestOperation(t *testing.T) {
 		}
 		seen := make(map[int]struct{})
 		counter := 0
-		var of Handler[int] = func(in int) {
+		var of fn.Handler[int] = func(in int) {
 			seen[in] = struct{}{}
 			counter++
 		}

@@ -187,12 +187,4 @@ func TestHandler(t *testing.T) {
 		of(300)
 		check.Equal(t, count, 2)
 	})
-	t.Run("Error", func(t *testing.T) {
-		called := 0
-		oef := MAKE.ErrorHandler(func(_ error) { called++ })
-		oef(nil)
-		check.Equal(t, called, 0)
-		oef(io.EOF)
-		check.Equal(t, called, 1)
-	})
 }

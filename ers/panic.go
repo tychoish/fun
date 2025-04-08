@@ -77,6 +77,14 @@ func WithRecoverDo[T any](fn func() T) (out T, err error) {
 	return
 }
 
+// WithRecoverApply runs a function with a panic handler that converts
+// the panic to an error.
+func WithRecoverApply[T any](op func(T), in T) (err error) {
+	defer func() { err = ParsePanic(recover()) }()
+	op(in)
+	return
+}
+
 // WrapRecoverDo wraps a function that returns a single value, with
 // one that returns that argument and an error if the underlying
 // function panics.

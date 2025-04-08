@@ -4,8 +4,12 @@ import (
 	"context"
 	"math/rand"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/fn"
 )
 
 func TestWaitGroup(t *testing.T) {
@@ -141,4 +145,36 @@ func TestWaitGroup(t *testing.T) {
 		}
 	})
 
+	t.Run("Lock", func(t *testing.T) {
+		count := 0
+		thunk := fn.MakeFuture(func() int { count++; return 42 }).Lock()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// tempt the race detector.
+		wg := &WaitGroup{}
+		wg.DoTimes(ctx, 128, func(context.Context) {
+			check.Equal(t, thunk(), 42)
+		})
+		wg.Wait(ctx)
+
+		check.Equal(t, count, 128)
+	})
+	t.Run("WithLock", func(t *testing.T) {
+		count := 0
+		thunk := fn.MakeFuture(func() int { count++; return 42 }).WithLock(&sync.Mutex{})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// tempt the race detector.
+		wg := &WaitGroup{}
+		wg.DoTimes(ctx, 128, func(context.Context) {
+			check.Equal(t, thunk(), 42)
+		})
+
+		wg.Wait(ctx)
+		check.Equal(t, count, 128)
+	})
 }

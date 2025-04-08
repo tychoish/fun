@@ -294,7 +294,7 @@ func (s Slice[T]) Sparse() Slice[T] {
 // iterates through all items in the slice, returning when the
 // processor errors. io.EOF errors are not returned, but do abort
 // iteration early, while fun.ErrStreamContinue is respected.
-func (s Slice[T]) Process(pf fun.Processor[T]) fun.Worker {
+func (s Slice[T]) Process(pf fun.Handler[T]) fun.Worker {
 	return s.Stream().Process(pf)
 }
 

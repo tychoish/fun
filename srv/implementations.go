@@ -153,7 +153,7 @@ func Wait(iter *fun.Stream[fun.Operation]) *Service {
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessStream[T any](
 	iter *fun.Stream[T],
-	processor fun.Processor[T],
+	processor fun.Handler[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	return &Service{

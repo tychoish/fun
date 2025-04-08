@@ -414,7 +414,7 @@ func (i *Stream[T]) Split(num int) []*Stream[T] {
 	}
 
 	pipe := Blocking(make(chan T))
-	setup := pipe.Processor().
+	setup := pipe.Handler().
 		ReadAll(i.Generator()).
 		PostHook(pipe.Close).
 		Ignore().
@@ -472,7 +472,7 @@ func (i *Stream[T]) Observe(fn fn.Handler[T]) Worker {
 // of the worker, and abort the processing. If the processor function
 // returns ErrStreamContinue, processing continues. All other errors
 // abort processing and are returned by the worker.
-func (i *Stream[T]) Process(fn Processor[T]) Worker {
+func (i *Stream[T]) Process(fn Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
@@ -531,7 +531,7 @@ func (i *Stream[T]) Channel(ctx context.Context) <-chan T { return i.BufferedCha
 func (i *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
 
-	out.Processor().
+	out.Handler().
 		ReadAll(i.Generator()).
 		PostHook(out.Close).
 		Operation(i.AddError).
@@ -607,7 +607,7 @@ func (i *Stream[T]) UnmarshalJSON(in []byte) error {
 // the basis of worker pools, even processing, or message dispatching
 // for pubsub queues and related systems.
 func (i *Stream[T]) ProcessParallel(
-	fn Processor[T],
+	fn Handler[T],
 	optp ...OptionProvider[*WorkerGroupConf],
 ) Worker {
 	return func(ctx context.Context) (err error) {
@@ -671,7 +671,7 @@ func (i *Stream[T]) Buffer(n int) *Stream[T] {
 // consumer of the stream.
 func (i *Stream[T]) ParallelBuffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := i.ProcessParallel(buf.Processor(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
+	pipe := i.ProcessParallel(buf.Handler(), WorkerGroupConfNumWorkers(n)).Operation(i.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Generator().PreHook(pipe).Stream().WithHook(func(si *Stream[T]) { si.AddError(i.Close()) })
 }
 

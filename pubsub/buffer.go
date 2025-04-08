@@ -12,7 +12,7 @@ import (
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
 type Distributor[T any] struct {
-	push fun.Processor[T]
+	push fun.Handler[T]
 	pop  fun.Generator[T]
 	size func() int
 }
@@ -20,7 +20,7 @@ type Distributor[T any] struct {
 // MakeDistributor builds a distributor from producer and processor
 // functions.
 func MakeDistributor[T any](
-	processor fun.Processor[T],
+	processor fun.Handler[T],
 	producer fun.Generator[T],
 	length func() int,
 ) Distributor[T] {
@@ -59,9 +59,9 @@ func (d Distributor[T]) Send(ctx context.Context, in T) error { return d.push(ct
 // Receive pulls an object from the distributor.
 func (d Distributor[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
 
-// Processor provides convienet access to the "send" side of the
-// distributor as a fun.Processor function.
-func (d Distributor[T]) Processor() fun.Processor[T] { return d.push }
+// Handler provides convienet access to the "send" side of the
+// distributor as a fun.Handler function.
+func (d Distributor[T]) Handler() fun.Handler[T] { return d.push }
 
 // Generator provides a convenient access to the "receive" side of the
 // as a fun.Generator function
@@ -81,5 +81,5 @@ func DistributorChannel[T any](ch chan T) Distributor[T] { return DistributorCha
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions
 func DistributorChanOp[T any](ch fun.ChanOp[T]) Distributor[T] {
-	return MakeDistributor(ch.Send().Processor(), ch.Receive().Generator(), ch.Len)
+	return MakeDistributor(ch.Send().Handler(), ch.Receive().Generator(), ch.Len)
 }
