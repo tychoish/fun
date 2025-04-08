@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -189,7 +191,7 @@ func (mpf Transform[T, O]) Convert(in T) Generator[O] {
 // operation. The execution is lazy, to provide a future-like
 // interface and neither the resolution of the future or the
 // transformation itself is done until the Generator is executed.
-func (mpf Transform[T, O]) ConvertFuture(fn Future[T]) Generator[O] {
+func (mpf Transform[T, O]) ConvertFuture(fn fn.Future[T]) Generator[O] {
 	return func(ctx context.Context) (O, error) { return mpf.Run(ctx, fn.Resolve()) }
 }
 
@@ -208,12 +210,12 @@ func (mpf Transform[T, O]) CovnertGenerator(fn Generator[T]) Generator[O] {
 // Worker transforms the input value passing the output of the
 // translation to the handler function. The transform operation only
 // executes when the worker function runs.
-func (mpf Transform[T, O]) Worker(in T, hf Handler[O]) Worker { return mpf.Convert(in).Worker(hf) }
+func (mpf Transform[T, O]) Worker(in T, hf fn.Handler[O]) Worker { return mpf.Convert(in).Worker(hf) }
 
 // WorkerFuture transforms the future and passes the transformed value
 // to the handler function. The operation is executed only after the
 // worker function is called.
-func (mpf Transform[T, O]) WorkerFuture(fn Future[T], hf Handler[O]) Worker {
+func (mpf Transform[T, O]) WorkerFuture(fn fn.Future[T], hf fn.Handler[O]) Worker {
 	return mpf.ConvertFuture(fn).Worker(hf)
 }
 
@@ -226,9 +228,9 @@ func (mpf Transform[T, O]) Lock() Transform[T, O] {
 
 // WithLock returns a Transform function inside of the scope of the
 // provided mutex.
-func (mpf Transform[T, O]) WithLock(mu sync.Locker) Transform[T, O] {
+func (mpf Transform[T, O]) WithLock(mu *sync.Mutex) Transform[T, O] {
 	return func(ctx context.Context, val T) (O, error) {
-		defer with(lock(mu))
+		defer internal.With(internal.Lock(mu))
 		return mpf.Run(ctx, val)
 	}
 }
@@ -245,7 +247,7 @@ func (mpf Transform[T, O]) WithRecover() Transform[T, O] {
 
 // ProcessPipe collects a Produer and Processor pair, and returns a
 // worker that, when run processes the input collected by the
-// Processor and returns it to the Producer. This operation runs until
+// Processor and returns it to the Generator. This operation runs until
 // the producer, transformer, or processor returns an
 // error. ErrStreamContinue errors are respected, while io.EOF errors
 // cause the ProcessPipe to abort but are not propogated to the

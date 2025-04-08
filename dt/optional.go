@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -39,13 +39,13 @@ func (o *Optional[T]) Default(in T) { o.SetWhen(!o.Ok(), in) }
 
 // DefaultFuture resolves the future if the optional has not yet been
 // set.
-func (o *Optional[T]) DefaultFuture(in fun.Future[T]) { o.SetWhenFuture(!o.Ok(), in) }
+func (o *Optional[T]) DefaultFuture(in fn.Future[T]) { o.SetWhenFuture(!o.Ok(), in) }
 
 // Set changes the value of the, only when the boolean cond value is positive.
 func (o *Optional[T]) SetWhen(cond bool, v T) { ft.WhenApply(cond, o.Set, v) }
 
 // SetWhenFuture resolves the future only when
-func (o *Optional[T]) SetWhenFuture(cond bool, v fun.Future[T]) { ft.WhenApplyFuture(cond, o.Set, v) }
+func (o *Optional[T]) SetWhenFuture(cond bool, v fn.Future[T]) { ft.WhenApplyFuture(cond, o.Set, v) }
 
 // Set marks the optional value as defined, and sets the optional
 // value. You can set an optional to the zero value for type T. To
@@ -72,13 +72,13 @@ func (o *Optional[T]) Get() (T, bool) { return o.v, o.defined }
 // function. This does not disambiguate zero values. Use in
 // conjunction with Optional.Handler and adt.AccessorsWithLock and
 // adt.AccessorsWithReadLock to handle concurency control.
-func (o *Optional[T]) Future() fun.Future[T] { return o.Resolve }
+func (o *Optional[T]) Future() fn.Future[T] { return o.Resolve }
 
 // Handler provides access to setting the optional value as
-// fun.Handler function. Use in conjunction with Optional.Future and
+// fn.Handler function. Use in conjunction with Optional.Future and
 // adt.AccessorsWithLock and adt.AccessorsWithReadLock to handle
 // concurency control.
-func (o *Optional[T]) Handler() fun.Handler[T] { return o.Set }
+func (o *Optional[T]) Handler() fn.Handler[T] { return o.Set }
 
 // Ok returns true when the optional
 func (o Optional[T]) Ok() bool { return o.defined }

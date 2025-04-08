@@ -117,12 +117,12 @@ func (e *Stack) Push(err error) {
 
 }
 
-// Handler provides a fun.Handler[error] typed function (though
+// Handler provides a fn.Handler[error] typed function (though
 // because ers is upstream of the root-fun package, it is not
 // explicitly typed as such.) which will Add errors to the stack.
 func (e *Stack) Handler() func(err error) { return e.Push }
 
-// Future provides a fun.Future[error] typed function (though
+// Future provides a fn.Future[error] typed function (though
 // because ers is upstream of the root-fun package, it is not
 // explicitly typed as such.) which will resolve the stack.
 func (e *Stack) Future() func() error { return e.Resolve }

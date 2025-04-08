@@ -1,11 +1,11 @@
-package fun
+package fn
 
 import (
-	"context"
 	"sync"
 	"time"
 
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Future is a basic function for providing a fun-style function type
@@ -33,11 +33,6 @@ func (f Future[T]) Resolve() T { return f() }
 // exactly once.
 func (f Future[T]) Once() Future[T] { return sync.OnceValue(f) }
 
-// Generator returns a producer function that wraps the future.
-func (f Future[T]) Generator() Generator[T] {
-	return func(context.Context) (T, error) { return f(), nil }
-}
-
 // Ignore produces a function that will call the Future but discards
 // the output.
 func (f Future[T]) Ignore() func() { return func() { _ = f() } }
@@ -62,8 +57,14 @@ func (f Future[T]) When(c func() bool) Future[T] { return func() T { return ft.W
 func (f Future[T]) Lock() Future[T] { return f.WithLock(&sync.Mutex{}) }
 
 // WithLock return a future that is protected with the provided mutex.
-func (f Future[T]) WithLock(m sync.Locker) Future[T] {
-	return func() T { defer with(lock(m)); return f() }
+func (f Future[T]) WithLock(m *sync.Mutex) Future[T] {
+	return func() T { defer internal.With(internal.Lock(m)); return f() }
+}
+
+// WithLocker return a future that is protected with the provided
+// sync.Locker implementation.
+func (f Future[T]) WithLocker(m sync.Locker) Future[T] {
+	return func() T { defer internal.WithL(internal.LockL(m)); return f() }
 }
 
 // PreHook unconditionally runs the provided function before running
@@ -99,11 +100,11 @@ func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 }
 
 func (f Future[T]) TTL(dur time.Duration) Future[T] {
-	resolver := ttlExec[T](dur)
+	resolver := internal.TTLExec[T](dur)
 	return func() T { return resolver(f) }
 }
 
 func (f Future[T]) Limit(in int) Future[T] {
-	resolver := limitExec[T](in)
+	resolver := internal.LimitExec[T](in)
 	return func() T { return resolver(f) }
 }

@@ -5,11 +5,12 @@ import (
 	"errors"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Processor are generic functions that take an argument (and a
@@ -62,7 +63,7 @@ func (pf Processor[T]) Run(ctx context.Context, in T) error { return pf.Worker(i
 
 // Add begins running the process in a different goroutine, using the
 // provided arguments to manage the operation.
-func (pf Processor[T]) Add(ctx context.Context, wg *WaitGroup, eh Handler[error], op T) {
+func (pf Processor[T]) Add(ctx context.Context, wg *WaitGroup, eh fn.Handler[error], op T) {
 	pf.Operation(eh, op).Add(ctx, wg)
 }
 
@@ -180,17 +181,17 @@ func (pf Processor[T]) Background(ctx context.Context, op T) Worker {
 
 // Capture creates a handler function that like, Processor.Force,
 // passes a background context and ignores the processors error.
-func (pf Processor[T]) Capture() Handler[T] { return pf.Force }
+func (pf Processor[T]) Capture() fn.Handler[T] { return pf.Force }
 
 // Operation converts a processor into a worker that will process the input
 // provided when executed.
-func (pf Processor[T]) Operation(of Handler[error], in T) Operation {
+func (pf Processor[T]) Operation(of fn.Handler[error], in T) Operation {
 	return pf.Worker(in).Operation(of)
 }
 
 // Handler converts a processor into an observer, handling the error
 // with the error observer and using the provided context.
-func (pf Processor[T]) Handler(ctx context.Context, oe Handler[error]) Handler[T] {
+func (pf Processor[T]) Handler(ctx context.Context, oe fn.Handler[error]) fn.Handler[T] {
 	return func(in T) { oe(pf(ctx, in)) }
 }
 
@@ -227,7 +228,7 @@ func (pf Processor[T]) WithLock(mtx sync.Locker) Processor[T] {
 
 // Limit ensures that the processor is called at most n times.
 func (pf Processor[T]) Limit(n int) Processor[T] {
-	resolver := limitExec[error](n)
+	resolver := internal.LimitExec[error](n)
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })
@@ -239,7 +240,7 @@ func (pf Processor[T]) Limit(n int) Processor[T] {
 // the executions of the underlying function happen in isolation,
 // in between, the processor is concurrently accessible.
 func (pf Processor[T]) TTL(dur time.Duration) Processor[T] {
-	resolver := ttlExec[error](dur)
+	resolver := internal.TTLExec[error](dur)
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })
@@ -306,7 +307,7 @@ func (pf Processor[T]) WithoutErrors(errs ...error) Processor[T] {
 // to short circuit the operation, and also a second time when
 // processor has returned in case an error has occurred during the
 // operation of the processor.
-func (pf Processor[T]) WithErrorCheck(ef Future[error]) Processor[T] {
+func (pf Processor[T]) WithErrorCheck(ef fn.Future[error]) Processor[T] {
 	return func(ctx context.Context, in T) error {
 		if err := ef(); err != nil {
 			return err
@@ -373,69 +374,3 @@ func (pf Processor[T]) Parallel(ops ...T) Worker {
 // underlying operation, if the processor only returned
 // ErrStreamContinue values.
 func (pf Processor[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
-
-////////////////////////////////////////////////////////////////////////
-
-type tuple[T, U any] struct {
-	One T
-	Two U
-}
-
-func limitExec[T any](in int) func(func() T) T {
-	Invariant.IsTrue(in > 0, "limit must be greater than zero;", in)
-	counter := &atomic.Int64{}
-	mtx := &sync.Mutex{}
-
-	var output T
-	return func(op func() T) T {
-		if counter.CompareAndSwap(int64(in), int64(in)) {
-			return output
-		}
-
-		mtx.Lock()
-		defer mtx.Unlock()
-		num := counter.Load()
-
-		if num < int64(in) {
-			output = op()
-			counter.Store(min(int64(in), num+1))
-		}
-
-		return output
-	}
-}
-
-func ttlExec[T any](dur time.Duration) func(op func() T) T {
-	Invariant.IsTrue(dur >= 0, "ttl must not be negative;", dur)
-
-	if dur == 0 {
-		return func(op func() T) T { return op() }
-	}
-
-	var (
-		lastAt time.Time
-		output T
-	)
-	mtx := &sync.RWMutex{}
-
-	return func(op func() T) (out T) {
-		if out, ok := func() (T, bool) {
-			mtx.RLock()
-			defer mtx.RUnlock()
-			return output, !lastAt.IsZero() && time.Since(lastAt) < dur
-		}(); ok {
-			return out
-		}
-
-		mtx.Lock()
-		defer mtx.Unlock()
-
-		since := time.Since(lastAt)
-		if lastAt.IsZero() || since >= dur {
-			output = op()
-			lastAt = time.Now()
-		}
-
-		return output
-	}
-}

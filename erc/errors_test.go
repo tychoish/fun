@@ -126,7 +126,7 @@ func TestError(t *testing.T) {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
-		t.Run("Producer", func(t *testing.T) {
+		t.Run("Generator", func(t *testing.T) {
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
 				ec.Add(fmt.Errorf("%d", i))
@@ -242,7 +242,7 @@ func TestError(t *testing.T) {
 			errs := collectIter(ctx, t, es.Stream())
 			assert.Zero(t, len(errs))
 		})
-		t.Run("ProducerCanceled", func(t *testing.T) {
+		t.Run("GeneratorCanceled", func(t *testing.T) {
 			es := &Collector{}
 			es.Add(errors.New("hello"))
 			ctx, cancel := context.WithCancel(context.Background())

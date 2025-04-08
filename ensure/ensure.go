@@ -7,6 +7,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ensure/is"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -17,7 +18,7 @@ import (
 type Assertion struct {
 	// results collection
 	check    adt.Once[[]string]
-	messages dt.List[fun.Future[string]]
+	messages dt.List[fn.Future[string]]
 
 	// subtest options
 	subtests     dt.List[*Assertion]

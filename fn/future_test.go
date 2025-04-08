@@ -1,4 +1,4 @@
-package fun
+package fn
 
 import (
 	"context"
@@ -147,7 +147,7 @@ func TestFuture(t *testing.T) {
 		assert.Equal(t, sl[0], 42)
 		check.Equal(t, count, 1)
 	})
-	t.Run("Producer", func(t *testing.T) {
+	t.Run("Generator", func(t *testing.T) {
 		count := 0
 		thunk := MakeFuture(func() int { count++; return 42 }).Generator()
 		check.Equal(t, count, 0)

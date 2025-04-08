@@ -6,6 +6,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -155,7 +156,7 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
 
 // Observe calls the observer function on every item in the slice.
-func (s Slice[T]) Observe(of fun.Handler[T]) {
+func (s Slice[T]) Observe(of fn.Handler[T]) {
 	for idx := range s {
 		of(s[idx])
 	}
@@ -171,7 +172,7 @@ func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
 
 // FilterFuture returns a future that generates a new slice using the
 // filter to select items from the root slice.
-func (s *Slice[T]) FilterFuture(p func(T) bool) fun.Future[Slice[T]] {
+func (s *Slice[T]) FilterFuture(p func(T) bool) fn.Future[Slice[T]] {
 	return func() Slice[T] { return s.Filter(p) }
 }
 

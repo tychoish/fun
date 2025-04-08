@@ -26,11 +26,11 @@ func TestSmoke(t *testing.T) {
 		ctx := testt.Context(t)
 
 		count := &atomic.Int64{}
-		err := Worker(ctx, fun.SliceStream([]fun.Operation{
+		err := WorkerPool(fun.SliceStream([]fun.Operation{
 			func(context.Context) { count.Add(1) },
 			func(context.Context) { count.Add(1) },
 			func(context.Context) { count.Add(1) },
-		}))
+		})).Run(ctx)
 		assert.NotError(t, err)
 		assert.Equal(t, count.Load(), 3)
 	})
@@ -80,10 +80,12 @@ func TestSmoke(t *testing.T) {
 			elems := makeIntSlice(32)
 			iter := fun.SliceStream(elems)
 			seen := make(map[int]struct{}, len(elems))
-			sum, err := Reduce(ctx, iter, func(in int, value string) (string, error) {
-				seen[in] = struct{}{}
-				return fmt.Sprint(value, in), nil
-			}, "")
+			sum, err := Reduce(
+				iter,
+				func(in int, value string) (string, error) {
+					seen[in] = struct{}{}
+					return fmt.Sprint(value, in), nil
+				}, "").Resolve(ctx)
 
 			if err != nil {
 				t.Fatal(err)
@@ -102,7 +104,7 @@ func TestSmoke(t *testing.T) {
 			seen := map[int]none{}
 
 			count := 0
-			_, err := Reduce(ctx,
+			_, err := Reduce(
 				iter,
 				func(in int, val int) (int, error) {
 					check.Zero(t, val)
@@ -114,7 +116,8 @@ func TestSmoke(t *testing.T) {
 					return in + val, nil
 				},
 				0,
-			)
+			).Resolve(ctx)
+
 			check.Equal(t, count, 1)
 			if err == nil {
 				t.Fatal("expected error")
@@ -133,13 +136,15 @@ func TestSmoke(t *testing.T) {
 			elems := makeIntSlice(32)
 			iter := fun.SliceStream(elems)
 			count := 0
-			sum, err := Reduce(ctx, iter, func(_ int, value int) (int, error) {
-				count++
-				if count == 1 {
-					return 42, nil
-				}
-				return value, fun.ErrStreamContinue
-			}, 0)
+			sum, err := Reduce(
+				iter,
+				func(_ int, value int) (int, error) {
+					count++
+					if count == 1 {
+						return 42, nil
+					}
+					return value, fun.ErrStreamContinue
+				}, 0).Resolve(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 32)
@@ -149,13 +154,15 @@ func TestSmoke(t *testing.T) {
 			elems := makeIntSlice(32)
 			iter := fun.SliceStream(elems)
 			count := 0
-			sum, err := Reduce(ctx, iter, func(_ int, _ int) (int, error) {
-				count++
-				if count == 16 {
-					return 0, io.EOF
-				}
-				return 42, nil
-			}, 0)
+			sum, err := Reduce(
+				iter,
+				func(int, int) (int, error) {
+					count++
+					if count == 16 {
+						return 0, io.EOF
+					}
+					return 42, nil
+				}, 0).Resolve(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 16)

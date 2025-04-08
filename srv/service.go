@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -57,7 +58,7 @@ type Service struct {
 	//
 	// Implementations are responsible for returning promptly when
 	// the context is canceled.
-	Run func(context.Context) error
+	Run fun.Worker
 
 	// Cleanup is optional, but if defined is always called after the
 	// Run function returned. Cleanup operations should all return
@@ -80,7 +81,7 @@ type Service struct {
 	// execution (e.g. Run, Shutdown, Cleanup), and should be
 	// identical to the output of Wait(). Caller's set this value
 	// during the execution of the service.
-	ErrorHandler adt.Atomic[func(error)]
+	ErrorHandler adt.Atomic[fn.Handler[error]]
 
 	isRunning  atomic.Bool
 	isFinished atomic.Bool

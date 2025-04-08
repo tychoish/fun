@@ -202,8 +202,7 @@ func (s *Set[T]) Generator() (out fun.Generator[T]) {
 }
 
 // Equal tests two sets, returning true if the items in the sets have
-// equal values. If the iterators are ordered, order is
-// considered.
+// equal values. If the sets are ordered, order is considered.
 func (s *Set[T]) Equal(other *Set[T]) bool {
 	defer s.with(s.lock())
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -114,7 +115,7 @@ func (p *Pairs[K, V]) SortQuick(c cmp.LessThan[Pair[K, V]]) { p.init(); p.ll.Sor
 func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Observe calls the handler function for every pair in the container.
-func (p *Pairs[K, V]) Observe(hf fun.Handler[Pair[K, V]]) {
+func (p *Pairs[K, V]) Observe(hf fn.Handler[Pair[K, V]]) {
 	p.Process(fun.MakeHandlerProcessor(hf)).Ignore().Wait()
 }
 

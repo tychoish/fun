@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 )
 
@@ -73,25 +74,21 @@ type rmtxMap[K comparable, V any] struct {
 	d  dt.Map[K, V]
 }
 
-func withR(m *sync.RWMutex)                 { m.RUnlock() }
-func lockR(m *sync.RWMutex) *sync.RWMutex   { m.RLock(); return m }
-func withW(m *sync.RWMutex)                 { m.Unlock() }
-func lockW(m *sync.RWMutex) *sync.RWMutex   { m.Lock(); return m }
-func (m *rmtxMap[K, V]) Store(k K, v V)     { defer withW(lockW(&m.mu)); m.d.Store(k, v) }
-func (m *rmtxMap[K, V]) Delete(k K)         { defer withW(lockW(&m.mu)); m.d.Delete(k) }
-func (m *rmtxMap[K, V]) Load(k K) (V, bool) { defer withR(lockR(&m.mu)); return m.d.Load(k) }
-func (m *rmtxMap[K, V]) Check(k K) bool     { defer withR(lockR(&m.mu)); return m.d.Check(k) }
+func (m *rmtxMap[K, V]) Store(k K, v V)     { defer adt.WithW(adt.LockW(&m.mu)); m.d.Store(k, v) }
+func (m *rmtxMap[K, V]) Delete(k K)         { defer adt.WithW(adt.LockW(&m.mu)); m.d.Delete(k) }
+func (m *rmtxMap[K, V]) Load(k K) (V, bool) { defer adt.WithR(adt.LockR(&m.mu)); return m.d.Load(k) }
+func (m *rmtxMap[K, V]) Check(k K) bool     { defer adt.WithR(adt.LockR(&m.mu)); return m.d.Check(k) }
 
 func (m *rmtxMap[K, V]) Keys() *fun.Stream[K] {
-	defer withR(lockR(&m.mu))
+	defer adt.WithR(adt.LockR(&m.mu))
 
-	return m.d.Keys().Generator().WithLock(m.mu.RLocker()).Stream()
+	return m.d.Keys().Generator().WithLocker(m.mu.RLocker()).Stream()
 }
 
 func (m *rmtxMap[K, V]) Values() *fun.Stream[V] {
-	defer withR(lockR(&m.mu))
+	defer adt.WithR(adt.LockR(&m.mu))
 
-	return m.d.Values().Generator().WithLock(m.mu.RLocker()).Stream()
+	return m.d.Values().Generator().WithLocker(m.mu.RLocker()).Stream()
 }
 
 type mtxMap[K comparable, V any] struct {
@@ -99,21 +96,17 @@ type mtxMap[K comparable, V any] struct {
 	d  dt.Map[K, V]
 }
 
-func with(m *sync.Mutex)                   { m.Unlock() }
-func lock(m *sync.Mutex) *sync.Mutex       { m.Lock(); return m }
-func (m *mtxMap[K, V]) Store(k K, v V)     { defer with(lock(&m.mu)); m.d.Store(k, v) }
-func (m *mtxMap[K, V]) Delete(k K)         { defer with(lock(&m.mu)); m.d.Delete(k) }
-func (m *mtxMap[K, V]) Load(k K) (V, bool) { defer with(lock(&m.mu)); return m.d.Load(k) }
-func (m *mtxMap[K, V]) Check(k K) bool     { defer with(lock(&m.mu)); return m.d.Check(k) }
+func (m *mtxMap[K, V]) Store(k K, v V)     { defer adt.With(adt.Lock(&m.mu)); m.d.Store(k, v) }
+func (m *mtxMap[K, V]) Delete(k K)         { defer adt.With(adt.Lock(&m.mu)); m.d.Delete(k) }
+func (m *mtxMap[K, V]) Load(k K) (V, bool) { defer adt.With(adt.Lock(&m.mu)); return m.d.Load(k) }
+func (m *mtxMap[K, V]) Check(k K) bool     { defer adt.With(adt.Lock(&m.mu)); return m.d.Check(k) }
 
 func (m *mtxMap[K, V]) Keys() *fun.Stream[K] {
-	defer with(lock(&m.mu))
-
+	defer adt.With(adt.Lock(&m.mu))
 	return m.d.Keys().Generator().WithLock(&m.mu).Stream()
 }
 
 func (m *mtxMap[K, V]) Values() *fun.Stream[V] {
-	defer with(lock(&m.mu))
-
+	defer adt.With(adt.Lock(&m.mu))
 	return m.d.Values().Generator().WithLock(&m.mu).Stream()
 }

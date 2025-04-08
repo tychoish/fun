@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 )
@@ -156,9 +157,7 @@ func ProcessStream[T any](
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	return &Service{
-		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx, iter, processor, optp...)
-		},
+		Run:      itertool.ParallelForEach(iter, processor, optp...),
 		Shutdown: iter.Close,
 	}
 }
@@ -197,7 +196,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 
 			ec := &erc.Collector{}
 
-			ec.Add(itertool.ParallelForEach(ctx, cache.StreamPopFront(),
+			ec.Add(itertool.ParallelForEach(cache.StreamPopFront(),
 				func(ctx context.Context, wf fun.Worker) error {
 					ec.Add(wf.WithRecover().Run(ctx))
 					return nil
@@ -205,7 +204,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfContinueOnPanic(),
 				fun.WorkerGroupConfWorkerPerCPU(),
-			))
+			).Run(ctx))
 
 			return ec.Resolve()
 		},
@@ -219,15 +218,13 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // propogated to the service's ywait function.
 func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
 	return &Service{
-		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx,
-				workQueue.Distributor().Stream(),
-				func(ctx context.Context, fn fun.Worker) error {
-					return fn.Run(ctx)
-				},
-				optp...,
-			)
-		},
+		Run: itertool.ParallelForEach(
+			workQueue.Distributor().Stream(),
+			func(ctx context.Context, fn fun.Worker) error {
+				return fn.Run(ctx)
+			},
+			optp...,
+		),
 		Shutdown: workQueue.Close,
 	}
 }
@@ -248,20 +245,18 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 // execution of the workload will be observed (including panics) as well.
 func HandlerWorkerPool(
 	workQueue *pubsub.Queue[fun.Worker],
-	observer fun.Handler[error],
+	observer fn.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{
-		Run: func(ctx context.Context) error {
-			return itertool.ParallelForEach(ctx,
-				workQueue.Distributor().Stream(),
-				func(ctx context.Context, fn fun.Worker) error {
-					observer(fn.Run(ctx))
-					return nil
-				},
-				optp...,
-			)
-		},
+		Run: itertool.ParallelForEach(
+			workQueue.Distributor().Stream(),
+			func(ctx context.Context, fn fun.Worker) error {
+				observer(fn.Run(ctx))
+				return nil
+			},
+			optp...,
+		),
 		Shutdown: workQueue.Close,
 	}
 	s.ErrorHandler.Set(observer)

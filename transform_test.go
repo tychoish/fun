@@ -698,7 +698,6 @@ func RunStreamStringAlgoTests(
 				t.Run(builder.Name, func(t *testing.T) {
 					baseBuilder := builder.Constructor
 					elems := elems.Elements
-					name := builder.Name
 					t.Parallel()
 
 					builder := func() *Stream[string] { return (baseBuilder(elems)) }
@@ -796,7 +795,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).GenerateParallel()
+							}).Parallel().Stream()
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -822,7 +821,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).GenerateParallel(WorkerGroupConfNumWorkers(4))
+							}).Parallel(WorkerGroupConfNumWorkers(4)).Stream()
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -842,7 +841,7 @@ func RunStreamStringAlgoTests(
 							defer cancel()
 							out := Generator[string](func(_ context.Context) (string, error) {
 								panic("foo")
-							}).GenerateParallel()
+							}).Parallel().Stream()
 
 							if out.Next(ctx) {
 								t.Fatal("should not iterate when panic")
@@ -869,7 +868,7 @@ func RunStreamStringAlgoTests(
 									}
 									return fmt.Sprint(count), nil
 								},
-							).GenerateParallel(WorkerGroupConfContinueOnPanic())
+							).Parallel(WorkerGroupConfContinueOnPanic()).Stream()
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
 								t.Log(err, output)
@@ -892,7 +891,7 @@ func RunStreamStringAlgoTests(
 									return "", errors.New("beep")
 								}
 								return "foo", nil
-							}).GenerateParallel()
+							}).Parallel().Stream()
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
@@ -920,7 +919,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return "foo", nil
-							}).GenerateParallel(WorkerGroupConfContinueOnError())
+							}).Parallel(WorkerGroupConfContinueOnError()).Stream()
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
@@ -1281,7 +1280,7 @@ func TestTransformFunctions(t *testing.T) {
 			assert.Equal(t, "42", out())
 			assert.Equal(t, count, 1)
 		})
-		t.Run("ConvertProducer", func(t *testing.T) {
+		t.Run("ConvertGenerator", func(t *testing.T) {
 			t.Run("Passes", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()

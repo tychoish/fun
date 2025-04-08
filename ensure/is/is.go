@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -27,7 +28,7 @@ func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
 // That is the root type for the assertion helpers in this
 // package. Implementations return nil for no-errors, and one or more
 // error messages for failing assertions..
-type That fun.Future[[]string]
+type That fn.Future[[]string]
 
 // And combines a collection of That expression. All constituent
 // expressions are run in order until one fails, at which point the
@@ -66,11 +67,11 @@ func All(ops ...That) That {
 }
 
 func assert(cond bool, args ...any) That {
-	return That(fun.MakeFuture(fun.MAKE.Str(args).Slice()).Not(cond).Once())
+	return That(fn.MakeFuture(fun.MAKE.Str(args).Slice()).Not(cond).Once())
 }
 
 func assertf(cond bool, t string, a ...any) That {
-	return That(fun.MakeFuture(fun.MAKE.Strf(t, a).Slice()).Not(cond).Once())
+	return That(fn.MakeFuture(fun.MAKE.Strf(t, a).Slice()).Not(cond).Once())
 }
 
 // EqualTo asserts that two comparable values are equal to eachother.

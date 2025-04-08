@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -266,7 +266,7 @@ func TestOptional(t *testing.T) {
 				assert.Equal(t, string(val), "null")
 			})
 			t.Run("FallbackError", func(t *testing.T) {
-				opt := &Optional[fun.Future[string]]{}
+				opt := &Optional[fn.Future[string]]{}
 				opt.Set(t.Name)
 				_, err := opt.MarshalText()
 				assert.Error(t, err)
@@ -305,7 +305,7 @@ func TestOptional(t *testing.T) {
 				check.Equal(t, string(opt.v), "hello slice")
 			})
 			t.Run("FallbackError", func(t *testing.T) {
-				opt := &Optional[fun.Future[string]]{}
+				opt := &Optional[fn.Future[string]]{}
 				check.Error(t, opt.UnmarshalText(nil))
 				check.True(t, !opt.Ok())
 			})
@@ -380,7 +380,7 @@ func TestOptional(t *testing.T) {
 				check.Equal(t, string(opt.v), "hello slice")
 			})
 			t.Run("Unknown", func(t *testing.T) {
-				opt := &Optional[fun.Future[string]]{}
+				opt := &Optional[fn.Future[string]]{}
 				check.Error(t, opt.UnmarshalBinary([]byte("hello")))
 				check.True(t, !opt.Ok())
 			})

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Worker represents a basic function used in worker pools and
@@ -118,7 +120,7 @@ func (wf Worker) WithRecover() Worker {
 
 // Observe runs the worker function, and observes the error (or nil
 // response). Panics are not caught.
-func (wf Worker) Observe(ctx context.Context, ob Handler[error]) { ob(wf.Run(ctx)) }
+func (wf Worker) Observe(ctx context.Context, ob fn.Handler[error]) { ob(wf.Run(ctx)) }
 
 // Signal runs the worker function in a background goroutine and
 // returns the error in an error channel, that returns when the
@@ -146,7 +148,7 @@ func (wf Worker) Launch(ctx context.Context) Worker {
 
 // Background starts the worker function in a go routine, passing the
 // error to the provided observer function.
-func (wf Worker) Background(ctx context.Context, ob Handler[error]) Operation {
+func (wf Worker) Background(ctx context.Context, ob fn.Handler[error]) Operation {
 	return wf.Launch(ctx).Operation(ob)
 }
 
@@ -165,7 +167,7 @@ func (wf Worker) Once() Worker {
 // Operation converts a worker function into a wait function,
 // passing any error to the observer function. Only non-nil errors are
 // observed.
-func (wf Worker) Operation(ob Handler[error]) Operation {
+func (wf Worker) Operation(ob fn.Handler[error]) Operation {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
@@ -242,8 +244,7 @@ func (wf Worker) Jitter(jf func() time.Duration) Worker {
 // result of the *last* worker to execute is cached concurrent access
 // to that value is possible.
 func (wf Worker) Limit(n int) Worker {
-	resolver := limitExec[error](n)
-
+	resolver := internal.LimitExec[error](n)
 	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
 }
 
@@ -253,7 +254,7 @@ func (wf Worker) Limit(n int) Worker {
 // of the root worker is protected by a mutex, the resulting worker
 // can be used in parallel during the intervals between calls.
 func (wf Worker) TTL(dur time.Duration) Worker {
-	resolver := ttlExec[error](dur)
+	resolver := internal.TTLExec[error](dur)
 	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
 }
 
@@ -371,7 +372,7 @@ func (wf Worker) PostHook(op func()) Worker {
 // to short circuit the operation, and also a second time when
 // worker has returned in case an error has occurred during the
 // operation of the worker.
-func (wf Worker) WithErrorCheck(ef Future[error]) Worker {
+func (wf Worker) WithErrorCheck(ef fn.Future[error]) Worker {
 	return func(ctx context.Context) error {
 		if err := ef(); err != nil {
 			return err

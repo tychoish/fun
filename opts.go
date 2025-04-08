@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -47,7 +48,7 @@ type WorkerGroupConf struct {
 	// strategies may make sense in different
 	// cases. (erc.Collector has a mutex and stories collected
 	// errors in memory.)
-	ErrorHandler Handler[error]
+	ErrorHandler fn.Handler[error]
 	// ErrorResolver should return an aggregated error collected
 	// during the execution of worker
 	// threads. `erc.Collector.Resolve` suffices when collecting
@@ -221,7 +222,7 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 // configuration. Typically implementations will provide some default
 // error collection tool, and will only call the observer for non-nil
 // errors. ErrorHandlers should be safe for concurrent use.
-func WorkerGroupConfErrorHandler(observer Handler[error]) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfErrorHandler(observer fn.Handler[error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ErrorHandler = observer; return nil }
 }
 
@@ -259,10 +260,10 @@ func WorkerGroupConfWithErrorCollector(
 	}
 }
 
-// WorkerGroupConfErrorCollectorPair uses an Handler/Producer pair to
+// WorkerGroupConfErrorCollectorPair uses an Handler/Generator pair to
 // collect errors. A basic implementation, accessible via
 // fun.MAKE.ErrorCollector() is suitable for this purpose.
-func WorkerGroupConfErrorCollectorPair(ob Handler[error], resolver Future[error]) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfErrorCollectorPair(ob fn.Handler[error], resolver fn.Future[error]) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		return ers.Join(
 			WorkerGroupConfErrorHandler(ob)(opts),

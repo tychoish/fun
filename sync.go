@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
@@ -32,14 +33,11 @@ func (wg *WaitGroup) initOp()            { wg.cond = sync.NewCond(&wg.mu) }
 func (wg *WaitGroup) init()              { ft.WhenCall(wg.cond == nil, wg.initOp) }
 func (wg *WaitGroup) mutex() *sync.Mutex { return &wg.mu }
 
-func lock(mtx sync.Locker) sync.Locker { mtx.Lock(); return mtx }
-func with(mtx sync.Locker)             { mtx.Unlock() }
-
 // Add modifies the internal counter. Raises an ErrInvariantViolation
 // error if any modification causes the internal coutner to be less
 // than 0.
 func (wg *WaitGroup) Add(num int) {
-	defer with(lock(wg.mutex()))
+	defer internal.With(internal.Lock(wg.mutex()))
 	wg.init()
 
 	Invariant.IsTrue(wg.counter+num >= 0, "cannot decrement waitgroup to less than 0: ", wg.counter, " + ", num)
@@ -58,10 +56,16 @@ func (wg *WaitGroup) Done() { wg.Add(-1) }
 func (wg *WaitGroup) Inc() { wg.Add(1) }
 
 // Num returns the number of pending workers.
-func (wg *WaitGroup) Num() int { defer with(lock(wg.mutex())); return wg.counter }
+func (wg *WaitGroup) Num() int {
+	defer internal.With(internal.Lock(wg.mutex()))
+	return wg.counter
+}
 
 // IsDone returns true if there is pending work, and false otherwise.
-func (wg *WaitGroup) IsDone() bool { defer with(lock(wg.mutex())); return wg.counter == 0 }
+func (wg *WaitGroup) IsDone() bool {
+	defer internal.With(internal.Lock(wg.mutex()))
+	return wg.counter == 0
+}
 
 // Operation returns with WaitGroups Wait method as a Operation.
 func (wg *WaitGroup) Operation() Operation { return wg.Wait }
@@ -103,7 +107,7 @@ func (wg *WaitGroup) Worker() Worker {
 // Consider using `fun.Operation(wg.Wait).Block()` if you want blocking
 // semantics with the other features of this WaitGroup implementation.
 func (wg *WaitGroup) Wait(ctx context.Context) {
-	defer with(lock(wg.mutex()))
+	defer internal.With(internal.Lock(wg.mutex()))
 
 	if wg.counter == 0 || ctx.Err() != nil {
 		return

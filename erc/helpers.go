@@ -6,6 +6,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 )
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
@@ -129,6 +130,6 @@ func Collect[T any](ec *Collector) func(T, error) T {
 //	ec := &Collector{}
 //	stream := fun.Stream[int]
 //	stream.WithHook(erc.StreamHook(ec))
-func StreamHook[T any](ec *Collector) fun.Handler[*fun.Stream[T]] {
+func StreamHook[T any](ec *Collector) fn.Handler[*fun.Stream[T]] {
 	return func(it *fun.Stream[T]) { it.AddError(ec.Resolve()) }
 }

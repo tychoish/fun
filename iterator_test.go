@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 type Collector struct {
@@ -24,15 +25,15 @@ type Collector struct {
 	num int
 }
 
-func (c *Collector) HasErrors() bool { defer with(lock(&c.mtx)); return c.err != nil }
-func (c *Collector) Resolve() error  { defer with(lock(&c.mtx)); return c.err }
-func (c *Collector) Len() int        { defer with(lock(&c.mtx)); return c.num }
+func (c *Collector) HasErrors() bool { defer internal.With(internal.Lock(&c.mtx)); return c.err != nil }
+func (c *Collector) Resolve() error  { defer internal.With(internal.Lock(&c.mtx)); return c.err }
+func (c *Collector) Len() int        { defer internal.With(internal.Lock(&c.mtx)); return c.num }
 func (c *Collector) Add(err error) {
 	if err == nil {
 		return
 	}
 
-	defer with(lock(&c.mtx))
+	defer internal.With(internal.Lock(&c.mtx))
 	c.num++
 	c.err = ers.Join(err, c.err)
 }

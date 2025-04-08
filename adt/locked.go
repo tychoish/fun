@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/fn"
 )
 
 // AccessorsWithLock takes a getter/setter pair and configures both
 // with a shared mutex: all read/write operations are fully
 // synchronized with regards to eachother.
-func AccessorsWithLock[T any](getter fun.Future[T], setter fun.Handler[T]) (fun.Future[T], fun.Handler[T]) {
+func AccessorsWithLock[T any](getter fn.Future[T], setter fn.Handler[T]) (fn.Future[T], fn.Handler[T]) {
 	lock := &sync.Mutex{}
 	return getter.WithLock(lock), setter.WithLock(lock)
 }
@@ -18,9 +18,9 @@ func AccessorsWithLock[T any](getter fun.Future[T], setter fun.Handler[T]) (fun.
 // AccessorsWithReadLock takes a getter/setter pair and configures
 // them with a rw-mutex: the getter (Future) uses the read lock, while
 // the setter is write-locked.
-func AccessorsWithReadLock[T any](getter fun.Future[T], setter fun.Handler[T]) (fun.Future[T], fun.Handler[T]) {
+func AccessorsWithReadLock[T any](getter fn.Future[T], setter fn.Handler[T]) (fn.Future[T], fn.Handler[T]) {
 	lock := &sync.RWMutex{}
-	return getter.WithLock(lock.RLocker()), setter.WithLock(lock)
+	return getter.WithLocker(lock.RLocker()), setter.WithLocker(lock)
 }
 
 // Synchronized wraps an arbitrary type with a lock, and provides a
@@ -53,6 +53,11 @@ func Lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
 //	mtx := &sync.Mutex{}
 //	defer adt.With(adt.Lock(mtx))
 func With(mtx *sync.Mutex) { mtx.Unlock() }
+
+func WithR(m *sync.RWMutex)               { m.RUnlock() }
+func LockR(m *sync.RWMutex) *sync.RWMutex { m.RLock(); return m }
+func WithW(m *sync.RWMutex)               { m.Unlock() }
+func LockW(m *sync.RWMutex) *sync.RWMutex { m.Lock(); return m }
 
 // NewSynchronized constructs a new synchronized object that wraps the
 // input type.

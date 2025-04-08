@@ -784,7 +784,7 @@ func TestDeque(t *testing.T) {
 		}
 		t.Log(iter.Close(), queue.Len())
 	})
-	t.Run("Producer", func(t *testing.T) {
+	t.Run("Generator", func(t *testing.T) {
 		t.Run("BlockingEmpty", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
@@ -902,7 +902,7 @@ func TestDequeIntegration(t *testing.T) {
 		check.Equal(t, 100, counter.Load())
 		testt.Logf(t, "counter=%d, input=%d", counter.Load(), input.Load())
 	})
-	t.Run("ProducerConsumer", func(t *testing.T) {
+	t.Run("GeneratorConsumer", func(t *testing.T) {
 		t.Parallel()
 		ctx := testt.ContextWithTimeout(t, time.Second)
 		queue := risky.Force(NewDeque[func()](DequeOptions{Unlimited: true}))

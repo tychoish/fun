@@ -11,6 +11,7 @@ import (
 	"fmt"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 )
@@ -261,7 +262,7 @@ func WithWorkerPool(
 func WithHandlerWorkerPool(
 	ctx context.Context,
 	key string,
-	observer fun.Handler[error],
+	observer fn.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return SetHandlerWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
@@ -328,7 +329,7 @@ func SetHandlerWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fun.Worker],
-	observer fun.Handler[error],
+	observer fn.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {

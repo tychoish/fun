@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/fn"
 )
 
 func TestLocked(t *testing.T) {
@@ -94,8 +94,8 @@ func TestLocked(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			var getter fun.Future[int]
-			var setter fun.Handler[int]
+			var getter fn.Future[int]
+			var setter fn.Handler[int]
 			getCalled := &atomic.Bool{}
 			setCalled := &atomic.Bool{}
 
@@ -123,8 +123,8 @@ func TestLocked(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			var getter fun.Future[int]
-			var setter fun.Handler[int]
+			var getter fn.Future[int]
+			var setter fn.Handler[int]
 			getCalled := &atomic.Bool{}
 			setCalled := &atomic.Bool{}
 

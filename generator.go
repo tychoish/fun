@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Generator is a function type that is a failrly common
@@ -77,20 +79,20 @@ func (pf Generator[T]) Resolve(ctx context.Context) (T, error) { return pf(ctx) 
 //
 // The worker function's return value captures the procuder's error,
 // and will block until the generator has completed.
-func (pf Generator[T]) Background(ctx context.Context, of Handler[T]) Worker {
+func (pf Generator[T]) Background(ctx context.Context, of fn.Handler[T]) Worker {
 	return pf.Worker(of).Launch(ctx)
 }
 
 // Worker passes the produced value to an observer and returns a
 // worker that runs the generator, calls the observer, and returns the
 // error.
-func (pf Generator[T]) Worker(of Handler[T]) Worker {
+func (pf Generator[T]) Worker(of fn.Handler[T]) Worker {
 	return func(ctx context.Context) error { o, e := pf(ctx); of(o); return e }
 }
 
 // Operation produces a wait function, using two observers to handle the
 // output of the Generator.
-func (pf Generator[T]) Operation(of Handler[T], eo Handler[error]) Operation {
+func (pf Generator[T]) Operation(of fn.Handler[T], eo fn.Handler[error]) Operation {
 	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
 }
 
@@ -178,26 +180,26 @@ func (pf Generator[T]) Join(next Generator[T]) Generator[T] {
 
 // Future creates a future function using the context provided and
 // error observer to collect the error.
-func (pf Generator[T]) Future(ctx context.Context, ob Handler[error]) Future[T] {
+func (pf Generator[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Future[T] {
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
 // Ignore creates a future that runs the generator and returns
 // the value, ignoring the error.
-func (pf Generator[T]) Ignore(ctx context.Context) Future[T] {
+func (pf Generator[T]) Ignore(ctx context.Context) fn.Future[T] {
 	return func() T { return ft.IgnoreSecond(pf(ctx)) }
 }
 
 // Must returns a future that resolves the generator returning the
 // constructed value and panicing if the generator errors.
-func (pf Generator[T]) Must(ctx context.Context) Future[T] {
+func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
 	return func() T { return ft.Must(pf.Resolve(ctx)) }
 }
 
 // Force combines the semantics of Must and Wait as a future: when the
 // future is resolved, the generator executes with a context that never
 // expires and panics in the case of an error.
-func (pf Generator[T]) Force() Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
+func (pf Generator[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
 
 // Block runs the generator with a context that will ever expire.
 //
@@ -231,7 +233,7 @@ func (pf Generator[T]) Launch(ctx context.Context) Generator[T] {
 // error (any error), the generator propagates that error, rather than
 // running the underying generator. Useful for injecting an abort into
 // an existing pipleine or chain.
-func (pf Generator[T]) WithErrorCheck(ef Future[error]) Generator[T] {
+func (pf Generator[T]) WithErrorCheck(ef fn.Future[error]) Generator[T] {
 	var zero T
 	return func(ctx context.Context) (T, error) {
 		if err := ef(); err != nil {
@@ -261,12 +263,6 @@ func (pf Generator[T]) Once() Generator[T] {
 		return out, err
 	}
 }
-
-// Stream creates a stream that calls the Generator function once
-// for every iteration, until it errors. Errors that are not context
-// cancellation errors or io.EOF are propgated to the stream's Close
-// method.
-func (pf Generator[T]) Stream() *Stream[T] { return MakeStream(pf) }
 
 // If returns a generator that will execute the root generator only if
 // the cond value is true. Otherwise, If will return the zero value
@@ -321,12 +317,13 @@ func (pf Generator[T]) When(cond func() bool) Generator[T] {
 func (pf Generator[T]) Lock() Generator[T] { return pf.WithLock(&sync.Mutex{}) }
 
 // WithLock uses the provided mutex to protect the execution of the generator.
-func (pf Generator[T]) WithLock(mtx sync.Locker) Generator[T] {
-	return func(ctx context.Context) (T, error) {
-		mtx.Lock()
-		defer mtx.Unlock()
-		return pf(ctx)
-	}
+func (pf Generator[T]) WithLock(mtx *sync.Mutex) Generator[T] {
+	return func(ctx context.Context) (T, error) { defer internal.With(internal.Lock(mtx)); return pf(ctx) }
+}
+
+// WithLocker uses the provided mutex to protect the execution of the generator.
+func (pf Generator[T]) WithLocker(mtx sync.Locker) Generator[T] {
+	return func(ctx context.Context) (T, error) { defer internal.WithL(internal.LockL(mtx)); return pf(ctx) }
 }
 
 // SendOne makes a Worker function that, as a future, calls the
@@ -361,7 +358,7 @@ func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
 // result of the last execution and returns that value for any
 // subsequent executions.
 func (pf Generator[T]) Limit(in int) Generator[T] {
-	resolver := limitExec[tuple[T, error]](in)
+	resolver := internal.LimitExec[tuple[T, error]](in)
 
 	return func(ctx context.Context) (T, error) {
 		out := resolver(func() (val tuple[T, error]) {
@@ -409,10 +406,15 @@ func (pf Generator[T]) Retry(n int) Generator[T] {
 	}
 }
 
+type tuple[T, U any] struct {
+	One T
+	Two U
+}
+
 // TTL runs the generator only one time per specified interval. The
 // interval must me greater than 0.
 func (pf Generator[T]) TTL(dur time.Duration) Generator[T] {
-	resolver := ttlExec[tuple[T, error]](dur)
+	resolver := internal.TTLExec[tuple[T, error]](dur)
 
 	return func(ctx context.Context) (T, error) {
 		out := resolver(func() (val tuple[T, error]) {
@@ -483,53 +485,75 @@ func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
 	}
 }
 
-// ParallelGenerate creates a stream using a generator pattern which
-// produces items until the generator function returns
-// io.EOF, or the context (passed to the first call to
-// Next()) is canceled. Parallel operation, continue on
-// error/continue-on-panic semantics are available and share
-// configuration with the ParallelProcess and Map operations.
-func (pf Generator[T]) GenerateParallel(
-	optp ...OptionProvider[*WorkerGroupConf],
-) *Stream[T] {
-	opts := &WorkerGroupConf{}
-	initErr := JoinOptionProviders(optp...).Apply(opts)
+// TODO: the stream method is the only dependency of the generator
+// type on Stream. Should probably deprecate to avoid accidental
 
-	pipe := Blocking(make(chan T, opts.NumWorkers*2+1))
+// Stream creates a stream that calls the Generator function once
+// for every iteration, until it errors. Errors that are not context
+// cancellation errors or io.EOF are propgated to the stream's Close
+// method.
+func (pf Generator[T]) Stream() *Stream[T] { return MakeStream(pf) }
+
+func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], errOutput fn.Future[error]) Generator[T] {
+	return func(ctx context.Context) (T, error) {
+		out, err := pf(ctx)
+		handler(err)
+		return out, errOutput()
+	}
+}
+
+// Parallel returns a wrapped generator that produces items until the
+// generator function returns io.EOF, or the context. Parallel
+// operation, continue on error/continue-on-panic semantics are
+// available and share configuration with the ParallelProcess and Map
+// operations.
+//
+// You must specify a number of workers in the options greater than
+// one to get parallel operation. Otherwise, there is only one worker.
+//
+// The operation returns results from a buffer that can hold a number
+// of items equal to the number of workers. Buffered items may not be
+// returned to the caller in the case of early termination.
+func (pf Generator[T]) Parallel(
+	optp ...OptionProvider[*WorkerGroupConf],
+) Generator[T] {
+	opts := &WorkerGroupConf{}
+	if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
+		return MakeGenerator(func() (zero T, _ error) { return zero, err })
+	}
+
+	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector() })
+	ft.WhenCall(opts.ContinueOnPanic, func() { pf = pf.WithRecover() })
+
+	// this might cause us to propogate an error before the pipe
+	// is empty.
+	pf = pf.WithErrorHandler(opts.ErrorHandler, opts.ErrorResolver)
+
+	pipe := Blocking(make(chan T, opts.NumWorkers))
 
 	init := Operation(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &WaitGroup{}
 
-		pf = pf.WithRecover()
-		var zero T
-		pipe.Processor().
-			ReadAll(func(ctx context.Context) (T, error) {
-				value, err := pf(ctx)
-				if err != nil {
-					if opts.CanContinueOnError(err) {
-						return zero, ErrStreamContinue
-					}
-
-					return zero, io.EOF
+		pipe.Processor().ReadAll(func(ctx context.Context) (zero T, _ error) {
+			value, err := pf(ctx)
+			if err != nil {
+				if opts.CanContinueOnError(err) {
+					return zero, ErrStreamContinue
 				}
-				return value, nil
-			}).
-			Operation(func(err error) {
-				ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), cancel)
-			}).
-			StartGroup(wctx, wg, opts.NumWorkers)
 
-		wg.Operation().PostHook(func() { cancel(); pipe.Close() }).Background(ctx)
+				return zero, err
+			}
+			return value, nil
+		}).Operation(func(err error) {
+			ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), cancel)
+		}).StartGroup(wctx, wg, opts.NumWorkers)
+
+		wg.Operation().
+			PostHook(cancel).
+			PostHook(pipe.Close).
+			Background(ctx)
 	}).Once()
 
-	iter := pipe.Receive().Generator().PreHook(init).Stream()
-
-	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = iter.ErrorHandler().Lock() })
-
-	opts.ErrorHandler(initErr)
-
-	ft.WhenCall(initErr != nil, pipe.Close)
-
-	return iter
+	return pipe.Receive().Generator().PreHook(init)
 }

@@ -10,6 +10,8 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/internal"
 )
 
 // Collector is a simplified version of the error collector in
@@ -34,19 +36,19 @@ func (ec *Collector) Add(err error) {
 	if err == nil {
 		return
 	}
-	defer with(lock(&ec.mu))
+	defer internal.With(internal.Lock(&ec.mu))
 	ec.stack.Push(err)
 }
 
 // Obesrver returns the collector's Add method as a
-// fun.Handler[error] object for integration and use with the
+// fn.Handler[error] object for integration and use with the
 // function types.
-func (ec *Collector) Handler() fun.Handler[error] { return ec.Add }
+func (ec *Collector) Handler() fn.Handler[error] { return ec.Add }
 
 // Future returns a function that is generally equivalent to
 // Collector.Resolve(); however, the errors are returned as an unwound
 // slice of errors, rather than the ers.Stack object.
-func (ec *Collector) Future() fun.Future[error] { return ec.Resolve }
+func (ec *Collector) Future() fn.Future[error] { return ec.Resolve }
 
 // Len reports on the total number of non-nil errors collected. The
 // count tracks a cached size of the *erc.Stack, giving Len() stable

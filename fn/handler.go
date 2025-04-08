@@ -1,11 +1,11 @@
-package fun
+package fn
 
 import (
-	"context"
 	"sync"
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Handler describes a function that operates on a single object, but
@@ -27,14 +27,9 @@ func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
 	}
 }
 
-// HandlePassthrough creates a bit of syntactic sugar to handle the
-// _second_ return value of a function with a provided handler
-// function while returning the first. This is often useful for
-// processing the error value of a function with a handler while
-// returning the first (potentially zero) value.
-func HandlePassthrough[T any, O any](hf Handler[O]) func(T, O) T {
-	return func(first T, second O) T { hf(second); return first }
-}
+// Capture returns a function that handles the specified value,
+// but only when executed later.
+func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
 
 // Handler provides a more expository operation to call a handler
 // function.
@@ -49,21 +44,6 @@ func (of Handler[T]) WithRecover(oe Handler[error]) Handler[T] {
 // RecoverPanic runs the handler function with a panic handler and converts
 // a possible panic to an error.
 func (of Handler[T]) RecoverPanic(in T) error { return ers.WithRecoverCall(of.Capture(in)) }
-
-// Worker captures a variable and returns a worker function which
-// will, when executed, observe the input value. These worker
-// functions, use the Safe-mode of execution.
-func (of Handler[T]) Worker(in T) Worker {
-	return func(context.Context) error { return of.RecoverPanic(in) }
-}
-
-// Operation captures a variable and converts an Handler into a wait
-// function that observes the value when the Operation runs.
-func (of Handler[T]) Operation(in T) Operation { return func(context.Context) { of(in) } }
-
-// Capture returns a function that handles the specified value,
-// but only when executed later.
-func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
 
 // If returns an handler that only executes the root handler if the
 // condition is true.
@@ -128,12 +108,13 @@ func (of Handler[T]) Once() Handler[T] {
 func (of Handler[T]) Lock() Handler[T] { return of.WithLock(&sync.Mutex{}) }
 
 // WithLock protects the action of the handler with the provied mutex.
-func (of Handler[T]) WithLock(mtx sync.Locker) Handler[T] {
-	return func(in T) {
-		mtx.Lock()
-		defer mtx.Unlock()
-		of(in)
-	}
+func (of Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
+	return func(in T) { defer internal.With(internal.Lock(mtx)); of(in) }
+}
+
+// WithLock protects the action of the handler with the provied mutex.
+func (of Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
+	return func(in T) { defer internal.WithL(internal.LockL(mtx)); of(in) }
 }
 
 // All processes all inputs with the specified handler.

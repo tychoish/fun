@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -107,20 +108,20 @@ func (Constructors) ErrorProcessor(pf Processor[error]) Processor[error] {
 
 // Recovery catches a panic, turns it into an error and passes it to
 // the provided observer function.
-func (Constructors) Recover(ob Handler[error]) { ob(ers.ParsePanic(recover())) }
+func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
 // ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
-func (Constructors) ErrorHandler(of Handler[error]) Handler[error] {
+func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 	return func(err error) { ft.WhenApply(err != nil, of, err) }
 }
 
 func (Constructors) ErrorStack() *ers.Stack { return &ers.Stack{} }
 
 // ErrorStackHandler returns an ers.ErrorStack, and a
-// fun.Handler[error] function that will add an error to the
+// fn.Handler[error] function that will add an error to the
 // stack. This collector is not safe for concurrent use.
-func (Constructors) ErrorStackHandler() (*ers.Stack, Handler[error]) {
+func (Constructors) ErrorStackHandler() (*ers.Stack, fn.Handler[error]) {
 	s := MAKE.ErrorStack()
 	return s, s.Handler()
 }
@@ -128,12 +129,12 @@ func (Constructors) ErrorStackHandler() (*ers.Stack, Handler[error]) {
 // ErrorStackStream creates a stream object to view the contents
 // of a ers.Stack object (error collection).
 func (Constructors) ErrorStackStream(s *ers.Stack) *Stream[error] {
-	return MAKE.ErrorStackProducer(s).Stream()
+	return MAKE.ErrorStackGenerator(s).Stream()
 }
 
-// ErrorStackProducer creates an producer function to yield the
+// ErrorStackGenerator creates an generator function to yield the
 // contents of a ers.Stack object (error collection).
-func (Constructors) ErrorStackProducer(s *ers.Stack) Generator[error] {
+func (Constructors) ErrorStackGenerator(s *ers.Stack) Generator[error] {
 	return CheckedGenerator(s.Generator())
 }
 
@@ -141,17 +142,17 @@ func (Constructors) ErrorStackProducer(s *ers.Stack) Generator[error] {
 // ers.Stack (as with ErrorStackHandler, though this is an
 // implementation detail.) ErrorCollector does use a mutex to guard
 // these objects.
-func (Constructors) ErrorCollector() (Handler[error], Future[error]) {
+func (Constructors) ErrorCollector() (fn.Handler[error], fn.Future[error]) {
 	s, hf := MAKE.ErrorStackHandler()
 	mtx := &sync.Mutex{}
-	return hf.WithLock(mtx), MakeFuture(s.Future()).WithLock(mtx)
+	return hf.WithLock(mtx), fn.MakeFuture(s.Future()).WithLock(mtx)
 }
 
 func (Constructors) ErrorJoin(errOne, errTwo error) error { return ers.Join(errOne, errTwo) }
 
 // ErrorHandlerWithoutEOF wraps an error observer and propagates all
 // non-error and non-io.EOF errors to the underlying observer.
-func (Constructors) ErrorHandlerWithoutEOF(of Handler[error]) Handler[error] {
+func (Constructors) ErrorHandlerWithoutEOF(of fn.Handler[error]) fn.Handler[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.Is(err, io.EOF) })
 }
 
@@ -159,7 +160,7 @@ func (Constructors) ErrorHandlerWithoutEOF(of Handler[error]) Handler[error] {
 // calls the underlying observer if the input error is non-nil and is
 // not one of the "terminating" errors used by this package
 // (e.g. io.EOF and the context cancellation errors).
-func (Constructors) ErrorHandlerWithoutTerminating(of Handler[error]) Handler[error] {
+func (Constructors) ErrorHandlerWithoutTerminating(of fn.Handler[error]) fn.Handler[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.IsTerminating(err) })
 }
 
@@ -184,7 +185,7 @@ func (Constructors) ErrorUnwindTransformer(filter ers.Filter) Transform[error, [
 // ErrorHandlerSingle creates an Handler/Future pair for errors that
 // that, with a lightweight concurrency control, captures the first
 // non-nil error it encounters.
-func (Constructors) ErrorHandlerSingle() (Handler[error], Future[error]) {
+func (Constructors) ErrorHandlerSingle() (fn.Handler[error], fn.Future[error]) {
 	var latch = &atomic.Bool{}
 	var setter = &sync.Once{}
 	var cache error
@@ -214,7 +215,7 @@ func (Constructors) ErrorHandlerSingle() (Handler[error], Future[error]) {
 //
 // Use the Chain and Join methods of handlers to further process the
 // error.
-func (Constructors) ErrorHandlerWithAbort(cancel context.CancelFunc) Handler[error] {
+func (Constructors) ErrorHandlerWithAbort(cancel context.CancelFunc) fn.Handler[error] {
 	return func(err error) {
 		if err == nil || ers.IsExpiredContext(err) {
 			return
@@ -226,55 +227,57 @@ func (Constructors) ErrorHandlerWithAbort(cancel context.CancelFunc) Handler[err
 
 // Sprintln constructs a future that calls fmt.Sprintln over the given
 // variadic arguments.
-func (Constructors) Sprintln(args ...any) Future[string] {
+func (Constructors) Sprintln(args ...any) fn.Future[string] {
 	return func() string { return fmt.Sprintln(args...) }
 }
 
 // Sprint constructs a future that calls fmt.Sprint over the given
 // variadic arguments.
-func (Constructors) Sprint(args ...any) Future[string] {
+func (Constructors) Sprint(args ...any) fn.Future[string] {
 	return func() string { return fmt.Sprint(args...) }
 }
 
 // Sprintf produces a future that calls and returns fmt.Sprintf for
 // the provided arguments when the future is called.
-func (Constructors) Sprintf(tmpl string, args ...any) Future[string] {
+func (Constructors) Sprintf(tmpl string, args ...any) fn.Future[string] {
 	return func() string { return fmt.Sprintf(tmpl, args...) }
 }
 
 // Str provides a future that calls fmt.Sprint over a slice of
 // any objects. Use fun.MAKE.Sprint for a variadic alternative.
-func (Constructors) Str(args []any) Future[string] { return MAKE.Sprint(args...) }
+func (Constructors) Str(args []any) fn.Future[string] { return MAKE.Sprint(args...) }
 
 // Strf produces a future that calls fmt.Sprintf for the given
 // template string and arguments.
-func (Constructors) Strf(tmpl string, args []any) Future[string] { return MAKE.Sprintf(tmpl, args...) }
+func (Constructors) Strf(tmpl string, args []any) fn.Future[string] {
+	return MAKE.Sprintf(tmpl, args...)
+}
 
 // Strln constructs a future that calls fmt.Sprintln for the given
 // arguments.
-func (Constructors) Strln(args []any) Future[string] { return MAKE.Sprintln(args...) }
+func (Constructors) Strln(args []any) fn.Future[string] { return MAKE.Sprintln(args...) }
 
 // StrConcatinate produces a future that joins a variadic sequence of
 // strings into a single string.
-func (Constructors) StrConcatinate(strs ...string) Future[string] {
+func (Constructors) StrConcatinate(strs ...string) fn.Future[string] {
 	return MAKE.StrJoin(strs, "")
 }
 
 // StrJoin produces a future that combines a slice of strings into a
 // single string, joined with the separator.
-func (Constructors) StrJoin(strs []string, sep string) Future[string] {
+func (Constructors) StrJoin(strs []string, sep string) fn.Future[string] {
 	return func() string { return strings.Join(strs, sep) }
 }
 
 // StrJoinWith produces a future for strings.Join(), concatenating the
 // elements in the input slice with the provided separator.
-func (Constructors) StrSliceConcatinate(input []string) Future[string] {
+func (Constructors) StrSliceConcatinate(input []string) fn.Future[string] {
 	return MAKE.StrJoin(input, "")
 }
 
 // Stringer converts a fmt.Stringer object/method call into a
 // string-formatter.
-func (Constructors) Stringer(op fmt.Stringer) Future[string] { return op.String }
+func (Constructors) Stringer(op fmt.Stringer) fn.Future[string] { return op.String }
 
 // Lines provides a fun.Stream access over the contexts of a
 // (presumably plaintext) io.Reader, using the bufio.Scanner.

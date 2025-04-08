@@ -16,7 +16,7 @@ import (
 	"github.com/tychoish/fun/intish"
 )
 
-func TestProducer(t *testing.T) {
+func TestGenerator(t *testing.T) {
 	t.Parallel()
 	t.Run("WithCancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -911,7 +911,7 @@ func TestProducer(t *testing.T) {
 		assert.True(t, dur >= 10*time.Millisecond)
 		assert.True(t, dur < 20*time.Millisecond)
 	})
-	t.Run("CheckProducer", func(t *testing.T) {
+	t.Run("CheckGenerator", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
