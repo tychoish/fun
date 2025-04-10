@@ -106,7 +106,7 @@ func TestStack(t *testing.T) {
 			assert.Equal(t, stack.Len(), 0)
 
 			// head is non-nil and we can't remove it
-			assert.NotNil(t , stack.Head())
+			assert.NotNil(t, stack.Head())
 			assert.True(t, ft.Not(stack.Head().Remove()))
 
 			// add an element
@@ -118,7 +118,7 @@ func TestStack(t *testing.T) {
 			assert.Equal(t, stack.Len(), 0)
 
 			// head still isn't nil
-			assert.NotNil(t , stack.Head())
+			assert.NotNil(t, stack.Head())
 
 			// the root node is in the stack
 			if stack.Head().In(stack) {
@@ -413,34 +413,24 @@ func TestStack(t *testing.T) {
 			}
 		})
 	})
-	t.Run("NewPopulateError", func(t *testing.T) {
-		// ctx, cancel := context.WithCancel(context.Background())
-		// cancel()
-
-		// out := &Stack[int]{}
-		// out.
-		panic("fix me")
-		// out, err := NewStackFromIterator(ctx, fun.VariadicStream(10, 100, 1000, 10000))
-		// assert.Error(t, err)
-		// assert.ErrorIs(t, err, context.Canceled)
-		// assert.True(t, out == nil)
-	})
-
 	t.Run("Seq", func(t *testing.T) {
-		// ctx, cancel := context.WithCancel(context.Background())
-		// defer cancel()
-		// stack, err := NewStackFromIterator(ctx, fun.VariadicStream(100_000, 10_000, 1_000, 100, 10, 1))
-		// assert.NotError(t, err)
-		// last := 1 // initialize to one to avoid dividing by zero
-		// for item := range stack.Seq() {
-		// 	check.True(t, item%last == 0)
-		// 	if t.Failed() {
-		// 		t.Log(item, last, item%last, item%last == 0)
-		// 		t.FailNow()
-		// 	}
-		// 	last = item
-		// }
-		panic("fix me")
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		stack := &Stack[int]{}
+		err := stack.Populate(fun.VariadicStream(100_000, 10_000, 1_000, 100, 10, 1)).Run(ctx)
+
+		assert.NotError(t, err)
+
+		last := 1 // initialize to one to avoid dividing by zero
+		for item := range stack.Seq() {
+			check.True(t, item%last == 0)
+			if t.Failed() {
+				t.Log(item, last, item%last, item%last == 0)
+				t.FailNow()
+			}
+			last = item
+		}
 	})
 
 }

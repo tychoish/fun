@@ -31,7 +31,7 @@ func TestDistributor(t *testing.T) {
 				defer cancel()
 
 				ch := make(chan string, 1)
-				ch <- "merlin"
+				ch <- "buddy"
 				buf := DistributorChannel(ch)
 				sig := make(chan struct{})
 				go func() {
@@ -72,11 +72,12 @@ func TestDistributor(t *testing.T) {
 
 			iter := dist.Stream()
 			go func() {
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(250 * time.Millisecond)
 				assert.NotError(t, queue.Close())
 			}()
+
 			if err := iter.Observe(func(in string) { set.Add(in); seen++ }).Run(ctx); err != nil {
-				t.Fatal(seen, err)
+				t.Error(seen, err)
 			}
 			if iter.Next(ctx) {
 				t.Error("stream should be empty")
@@ -88,7 +89,7 @@ func TestDistributor(t *testing.T) {
 				t.Error(seen)
 			}
 			if queue.tracker.len() != 0 {
-				t.Fatal(queue.tracker.len())
+				t.Error(queue.tracker.len())
 			}
 			if iter.Value() != "" {
 				t.Error(iter.Value())

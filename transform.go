@@ -67,7 +67,7 @@ func ConverterErr[T any, O any](op func(T) (O, error)) Transform[T, O] {
 // producing a new stream with the output values. The processing is
 // performed serially and lazily and respects ErrStreamContinue.
 func (mpf Transform[T, O]) Process(iter *Stream[T]) *Stream[O] {
-	return mpf.Generator(iter.ReadOne).Stream()
+	return mpf.Generator(iter.ReadOne).Stream().WithErrorCollector(iter.AddError, iter.err.future)
 }
 
 // Map is an alias for ProcessParallel provided for

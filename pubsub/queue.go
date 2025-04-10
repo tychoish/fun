@@ -20,13 +20,13 @@ const (
 	// ErrQueueNoCredit is returned by the Add method of a queue when the queue has
 	// exceeded its soft quota and there is insufficient burst credit.
 	ErrQueueNoCredit = ers.Error("insufficient burst credit")
+
+	// ErrQueueClosed is returned by the Add method of a closed queue, and by
+	// the Wait method of a closed empty queue.
+	ErrQueueClosed = ers.ErrContainerClosed
 )
 
 var (
-	// ErrQueueClosed is returned by the Add method of a closed queue, and by
-	// the Wait method of a closed empty queue.
-	ErrQueueClosed = fmt.Errorf("queue is closed: %w", io.EOF)
-
 	// Sentinel errors reported by the New constructor.
 	errHardLimit   = fmt.Errorf("hard limit must be > 0 and ≥ soft quota: %w", ers.ErrMalformedConfiguration)
 	errBurstCredit = fmt.Errorf("burst credit must be non-negative: %w", ers.ErrMalformedConfiguration)
@@ -39,7 +39,7 @@ var (
 // unconditionally.
 //
 // For items in excess of the soft quota, a credit system applies: Each queue
-// maintains a burst credit score. Adding an item in excess of the soft quota
+// maintains a burst credit score. Adding an item ein excess of the soft quota
 // costs 1 unit of burst credit. If there is not enough burst credit, the add
 // will fail.
 //

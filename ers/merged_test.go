@@ -58,6 +58,9 @@ func TestStack(t *testing.T) {
 		if l := collect(t, es.Generator()); len(l) != 1 || l == nil {
 			t.Fatal("unexpected errors report", l)
 		}
+		assert.Equal(t, 1, es.Len())
+		es.Push(errors.New(errval))
+		assert.Equal(t, 2, es.Len())
 	})
 	t.Run("StackErrorStack", func(t *testing.T) {
 		es := &Stack{err: errors.New("outer")}

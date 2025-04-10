@@ -123,7 +123,7 @@ func TestDefault(t *testing.T) {
 		assert.Equal(t, Default(77, 42), 77)
 
 		assert.Equal(t, Default("", "kip"), "kip")
-		assert.Equal(t, Default("merlin", "kip"), "merlin")
+		assert.Equal(t, Default("buddy", "kip"), "buddy")
 	})
 	t.Run("Dynamic", func(t *testing.T) {
 		count := 0
@@ -135,7 +135,7 @@ func TestDefault(t *testing.T) {
 		assert.Equal(t, DefaultFuture("", func() string { count++; return "kip" }), "kip")
 		check.Equal(t, count, 2)
 
-		assert.Equal(t, DefaultFuture("merlin", func() string { count++; return "kip" }), "merlin")
+		assert.Equal(t, DefaultFuture("buddy", func() string { count++; return "kip" }), "buddy")
 		check.Equal(t, count, 2)
 	})
 }

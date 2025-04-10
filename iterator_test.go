@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -150,7 +149,8 @@ func TestStream(t *testing.T) {
 	t.Run("Transform", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		out := ft.Must(VariadicStream(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(Converter(func(in int) int { return in / 4 })).Slice(ctx))
+		out, err := VariadicStream(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(Converter(func(in int) int { return in / 4 })).Slice(ctx)
+		check.NotError(t, err)
 
 		check.EqualItems(t, out, []int{1, 2, 4, 8, 16, 32, 64, 128, 256})
 	})
@@ -305,8 +305,8 @@ func TestStream(t *testing.T) {
 			for out.Next(ctx) {
 				sum += out.Value()
 			}
-			assert.Error(t, out.Close())
-			assert.ErrorIs(t, out.Close(), ers.ErrInvalidInput)
+			check.Error(t, out.Close())
+			check.ErrorIs(t, out.Close(), ers.ErrInvalidInput)
 
 			assert.Equal(t, 20, sum)
 			assert.Equal(t, calls, 2)
@@ -498,17 +498,17 @@ func TestStream(t *testing.T) {
 	t.Run("ReadOne", func(t *testing.T) {
 		ch := make(chan string, 1)
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-		ch <- "merlin"
+		ch <- "buddy"
 		defer cancel()
 		out, err := Blocking(ch).Receive().Read(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if out != "merlin" {
+		if out != "buddy" {
 			t.Fatal(out)
 		}
 
-		ch <- "merlin"
+		ch <- "buddy"
 		cancel()
 		seenCondition := false
 		for i := 0; i < 10; i++ {
@@ -520,7 +520,7 @@ func TestStream(t *testing.T) {
 			t.Log(err)
 
 			select {
-			case ch <- "merlin":
+			case ch <- "buddy":
 			default:
 			}
 		}
@@ -546,35 +546,33 @@ func TestStream(t *testing.T) {
 		t.Run("BlockingCompatibility", func(t *testing.T) {
 			ch := make(chan string, 1)
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-			ch <- "merlin"
+			ch <- "buddy"
 			defer cancel()
 			out, err := NonBlocking(ch).Receive().Read(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if out != "merlin" {
+			if out != "buddy" {
 				t.Fatal(out)
 			}
 
-			ch <- "merlin"
+			ch <- "buddy"
 			cancel()
 			seenCondition := false
 			for i := 0; i < 10; i++ {
-				t.Log(i)
 				_, err = NonBlocking(ch).Receive().Read(ctx)
 				if errors.Is(err, context.Canceled) {
 					seenCondition = true
 				}
-				t.Log(err)
+				t.Log(i, err)
 
 				select {
-				case ch <- "merlin":
+				case ch <- "buddy":
 				default:
 				}
 			}
 			if !seenCondition {
 				t.Error("should have observed a context canceled")
-
 			}
 		})
 		t.Run("NonBlocking", func(t *testing.T) {
@@ -754,19 +752,24 @@ func TestJSON(t *testing.T) {
 		iter := SliceStream([]string{})
 
 		ec := iter.ErrorHandler()
+
 		ec(io.EOF)
+
 		ec(ers.ErrInvalidInput)
 		ec(io.ErrUnexpectedEOF)
 		ec(context.Canceled)
 
 		err := iter.Close()
 		assert.Error(t, err)
-		assert.Equal(t, len(ers.Unwind(err)), 4)
+		t.Log(ers.Unwind(err))
+		check.Equal(t, len(ers.Unwind(err)), 4)
 
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-		assert.True(t, ers.IsExpiredContext(err))
-		assert.True(t, ers.IsTerminating(err))
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.ErrorIs(t, err, io.EOF)
+
+		assert.True(t, ers.IsTerminating(err))
 	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})

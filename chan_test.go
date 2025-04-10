@@ -164,7 +164,7 @@ func TestChannel(t *testing.T) {
 					assert.Equal(t, val, "kip")
 					assert.True(t, ok)
 
-					ch <- "merlin"
+					ch <- "buddy"
 					assert.True(t, Blocking(ch).Receive().Drop(ctx))
 					// do this to verify if it the channel is now empty
 					_, err = NonBlocking(ch).Receive().Read(ctx)
@@ -301,7 +301,7 @@ func TestChannel(t *testing.T) {
 				assert.Equal(t, val, "kip")
 				assert.True(t, ok)
 
-				ch <- "merlin"
+				ch <- "buddy"
 				assert.True(t, BlockingReceive(ch).Drop(ctx))
 				// do this to verify if it the channel is now empty
 				_, err = NonBlockingReceive(ch).Read(ctx)

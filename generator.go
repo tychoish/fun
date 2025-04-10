@@ -356,6 +356,29 @@ func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
+func (pf Generator[T]) WrapErrorWith(ef fn.Future[error]) Generator[T] {
+	return func(ctx context.Context) (zero T, _ error) {
+		out, err := pf(ctx)
+		if err == nil {
+			return out, nil
+		}
+
+		if ers.Is(err, ErrStreamContinue) {
+			return out, err
+		}
+
+		ferr := MAKE.ErrorJoin(ef.RecoverPanic())
+
+		if ers.IsTerminating(err) {
+			if ferr != nil {
+				return zero, ferr
+			}
+		}
+
+		return zero, ers.Join(err, ferr)
+	}
+}
+
 // Limit runs the generator a specified number of times, and caches the
 // result of the last execution and returns that value for any
 // subsequent executions.
@@ -398,6 +421,7 @@ func (pf Generator[T]) Retry(n int) Generator[T] {
 			case ers.IsTerminating(attemptErr):
 				return zero, ers.Join(attemptErr, err)
 			case errors.Is(attemptErr, ErrStreamContinue):
+				i--
 				continue
 			default:
 				err = ers.Join(attemptErr, err)
@@ -496,11 +520,12 @@ func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
 // method.
 func (pf Generator[T]) Stream() *Stream[T] { return MakeStream(pf) }
 
-func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], errOutput fn.Future[error]) Generator[T] {
+func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.Future[error]) Generator[T] {
+	Invariant.Ok(handler != nil && resolver != nil, "must cal WithErrorHandler with non-nil operators")
 	return func(ctx context.Context) (T, error) {
 		out, err := pf(ctx)
 		handler(err)
-		return out, errOutput()
+		return out, resolver()
 	}
 }
 
@@ -520,22 +545,24 @@ func (pf Generator[T]) Parallel(
 	optp ...OptionProvider[*WorkerGroupConf],
 ) Generator[T] {
 	opts := &WorkerGroupConf{}
+
 	if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
 		return MakeGenerator(func() (zero T, _ error) { return zero, err })
 	}
 
-	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector() })
-	ft.WhenCall(opts.ContinueOnPanic, func() { pf = pf.WithRecover() })
+	if opts.ErrorHandler == nil {
+		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
+	}
 
-	// this might cause us to propogate an error before the pipe
-	// is empty.
-	pf = pf.WithErrorHandler(opts.ErrorHandler, opts.ErrorResolver)
-
-	pipe := Blocking(make(chan T, opts.NumWorkers))
+	pipe := Blocking(make(chan T, opts.NumWorkers*2+1))
+	pf = pf.WithRecover()
 
 	init := Operation(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
 		wg := &WaitGroup{}
+
+		// this might cause us to propagate an error (and abort)
+		// before the pipe is empty.
 
 		pipe.Handler().ReadAll(func(ctx context.Context) (zero T, _ error) {
 			value, err := pf(ctx)
@@ -543,19 +570,18 @@ func (pf Generator[T]) Parallel(
 				if opts.CanContinueOnError(err) {
 					return zero, ErrStreamContinue
 				}
-
-				return zero, err
+				return zero, io.EOF
 			}
 			return value, nil
 		}).Operation(func(err error) {
-			ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), cancel)
+			ft.WhenCall(ers.IsTerminating(err), cancel)
 		}).StartGroup(wctx, wg, opts.NumWorkers)
 
-		wg.Operation().
-			PostHook(cancel).
-			PostHook(pipe.Close).
-			Background(ctx)
+		// we "wait on the wg in the background", but really
+		// we're waiting on the pipe close, which happens when
+		// the waitgroup returns.
+		wg.Operation().PostHook(pipe.Close).PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
-	return pipe.Receive().Generator().PreHook(init)
+	return pipe.Receive().Generator().PreHook(init).WrapErrorWith(opts.ErrorResolver)
 }

@@ -73,6 +73,7 @@ type Stream[T any] struct {
 	value     T
 
 	err struct {
+		once    sync.Once
 		handler fn.Handler[error]
 		future  fn.Future[error]
 	}
@@ -223,6 +224,8 @@ func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 
 func (i *Stream[T]) doClose() {
 	i.closer.once.Do(func() {
+		i.ensureErrorHandler()
+
 		i.closer.state.Store(true)
 
 		fn.JoinHandlers(i.closer.hooks).Handle(i)
@@ -235,7 +238,7 @@ func (i *Stream[T]) doClose() {
 // during iteration. If the stream allocates resources, this
 // will typically release them, but close may not block until all
 // resources are released.
-func (i *Stream[T]) Close() error { i.doClose(); return ft.SafeDo(i.err.future) }
+func (i *Stream[T]) Close() error { i.doClose(); return i.err.future() }
 
 func (i *Stream[T]) WithErrorCollector(ec fn.Handler[error], er fn.Future[error]) *Stream[T] {
 	i.err.handler = ec.Join(i.err.handler)
@@ -256,10 +259,13 @@ func (st *Stream[T]) WithHook(hook fn.Handler[*Stream[T]]) *Stream[T] {
 //
 // AddError is not safe for concurrent use (with regards to other
 // AddError calls or Close).
-func (i *Stream[T]) AddError(e error) { i.err.handler(e) }
+func (i *Stream[T]) AddError(e error) {
+	i.ensureErrorHandler()
+	i.err.handler(e)
+}
 
 // ErrorHandler provides access to the AddError method as an error observer.
-func (i *Stream[T]) ErrorHandler() fn.Handler[error] { return i.err.handler }
+func (i *Stream[T]) ErrorHandler() fn.Handler[error] { i.ensureErrorHandler(); return i.err.handler }
 
 // Generator provides access to the contents of the stream as a
 // Generator function.
@@ -299,13 +305,13 @@ func (i *Stream[T]) Next(ctx context.Context) bool {
 // produced by the stream. All errors produced by ReadOne are
 // terminal and indicate that no further iteration is possible.
 func (i *Stream[T]) ReadOne(ctx context.Context) (out T, err error) {
+	defer func() { ft.WhenCall(err != nil, i.doClose) }()
+
 	if err = ctx.Err(); err != nil {
 		return out, err
 	} else if i.closer.state.Load() || i.operation == nil {
 		return out, io.EOF
 	}
-
-	defer func() { ft.WhenCall(err != nil, i.doClose) }()
 
 	for {
 		out, err = i.operation(ctx)
@@ -314,14 +320,20 @@ func (i *Stream[T]) ReadOne(ctx context.Context) (out T, err error) {
 			return out, nil
 		case errors.Is(err, ErrStreamContinue):
 			continue
+		case errors.Is(err, ers.ErrRecoveredPanic):
+			i.AddError(err)
+			return out, err
 		case ers.IsTerminating(err):
 			return out, err
 		default:
 			i.AddError(err)
-			return out, io.EOF
+			return out, err
 		}
 	}
 }
+
+func (i *Stream[T]) ensureErrorHandler()       { i.err.once.Do(i.setupDefaultErrorHandler) }
+func (i *Stream[T]) setupDefaultErrorHandler() { i.err.handler, i.err.future = MAKE.ErrorCollector() }
 
 // Filter passes every item in the stream and, if the check function
 // returns true propagates it to the output stream.  There is no
@@ -440,21 +452,19 @@ func (i *Stream[T]) Split(num int) []*Stream[T] {
 // stream may return one in its close method.
 func (i *Stream[T]) Observe(fn fn.Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(i.Close(), err, ers.ParsePanic(recover())) }()
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover()), i.Close()) }()
 		for {
 			item, err := i.ReadOne(ctx)
 			switch {
 			case err == nil:
 				fn(item)
-			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
-				return nil
 			case ers.Is(err, ErrStreamContinue):
 				continue
+			case ers.IsExpiredContext(err):
+				return err
+			case ers.IsTerminating(err):
+				return nil
 			default:
-				// It seems like we should try and process
-				// ErrStreamContinue here but ReadOne handles
-				// that case for us.
-				//
 				// this is (realistically) only context
 				// cancellation errors, because ReadOne puts
 				// all errors into the stream's
@@ -626,10 +636,10 @@ func (i *Stream[T]) ProcessParallel(
 		wg := &WaitGroup{}
 
 		operation := fn.WithRecover().WithErrorFilter(func(err error) error {
-			return ft.WhenDo(
-				!opts.CanContinueOnError(err),
-				ft.Wrap(io.EOF),
-			)
+			if opts.CanContinueOnError(err) {
+				return ErrStreamContinue
+			}
+			return err
 		})
 
 		splits := i.Split(opts.NumWorkers)

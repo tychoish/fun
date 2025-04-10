@@ -11,7 +11,7 @@ import (
 )
 
 func TestAssertion(t *testing.T) {
-	var strVal = "merlin"
+	var strVal = "buddy"
 	var zeroStr string
 	var zeroStrPtr *string
 	var emptyIface any
@@ -49,7 +49,7 @@ func TestAssertion(t *testing.T) {
 		assert.NotEqualItems(t, []int{12, 3, 56}, []int{12, 34, 56})
 		assert.Contains(t, []int{1, 2, 3}, 3)
 		assert.NotContains(t, []int{1, 2, 3}, 43)
-		assert.Substring(t, "merlin the cat", strVal)
+		assert.Substring(t, "buddy the cat", strVal)
 		assert.NotSubstring(t, "the cat", strVal)
 		assert.Type[int](t, 1)
 		assert.NotType[string](t, 2)
@@ -95,7 +95,7 @@ func TestAssertion(t *testing.T) {
 		assert.Failing(t, func(t *testing.T) { assert.Contains(t, []int{1, 2, 3}, 300) })
 		assert.Failing(t, func(t *testing.T) { assert.Contains(t, []int{}, 300) })
 		assert.Failing(t, func(t *testing.T) { assert.NotContains(t, []int{1, 2, 3}, 1) })
-		assert.Failing(t, func(t *testing.T) { assert.Substring(t, "merlin the cat", "woof") })
+		assert.Failing(t, func(t *testing.T) { assert.Substring(t, "buddy the cat", "woof") })
 		assert.Failing(t, func(t *testing.T) { assert.NotSubstring(t, "the cat", "cat") })
 		assert.Failing(t, func(t *testing.T) { assert.Type[int](t, "hello") })
 		assert.Failing(t, func(t *testing.T) { assert.NotType[int](t, 1) })

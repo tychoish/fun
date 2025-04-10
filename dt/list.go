@@ -125,7 +125,7 @@ func (l *List[T]) GeneratorPopFront() fun.Generator[T] {
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopFront()
 
-		if !current.Ok() || current.isDetatched() {
+		if !current.Ok() {
 			return o, io.EOF
 		}
 
@@ -154,7 +154,7 @@ func (l *List[T]) GeneratorPopBack() fun.Generator[T] {
 	var current *Element[T]
 	return func(_ context.Context) (o T, _ error) {
 		current = l.PopBack()
-		if !current.Ok() || current.isDetatched() {
+		if !current.Ok() {
 			return o, io.EOF
 		}
 		return current.item, nil
@@ -190,9 +190,7 @@ func (l *List[T]) StreamBack() *fun.Stream[T] { return l.GeneratorBack().Stream(
 func (l *List[T]) StreamPopFront() *fun.Stream[T] { return l.GeneratorPopFront().Stream() }
 
 // StreamPopBack produces a stream that consumes elements from the
-// list as it iterates, moving back-to-front. To access a stream of
-// the *values* in the list, use PopReverseValues() for an
-// stream over the values.
+// list as it iterates, moving back-to-front.
 //
 // If you add values to the list during iteration *behind* where the
 // stream is, these values will not be present in the stream;
@@ -321,12 +319,10 @@ func (e *Element[T]) Set(v T) bool {
 // list, or is otherwise invalid.) PushBack and PushFront, are
 // implemented in terms of Append.
 func (e *Element[T]) Append(val *Element[T]) *Element[T] {
-
-	if e.appendable(val) && !val.isDetatched() {
+	if e.appendable(val) && val.isDetatched() {
 		return e.uncheckedAppend(val)
 	}
 
-	fun.Invariant.Ok(e.list.nonNil(), "cannot pushed to a detached element")
 	return e
 }
 

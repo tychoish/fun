@@ -123,7 +123,7 @@ func TestWorker(t *testing.T) {
 				assert.True(t, observed.Load())
 			})
 			t.Run("Must", func(t *testing.T) {
-				expected := errors.New("merlin")
+				expected := errors.New("buddy")
 				err := ers.WithRecoverCall(func() {
 					wf := Worker(func(context.Context) error {
 						panic(expected)

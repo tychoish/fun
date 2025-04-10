@@ -314,6 +314,7 @@ func TestMergeSlices(t *testing.T) {
 			fun.SliceStream(makeIntSlice(64)),
 			fun.SliceStream(makeIntSlice(64)),
 			fun.SliceStream(makeIntSlice(64)),
+			fun.SliceStream(makeIntSlice(64)),
 		)
 		count := 0
 		err := iter.Observe(func(in int) {

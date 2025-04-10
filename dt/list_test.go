@@ -297,7 +297,7 @@ func TestList(t *testing.T) {
 
 			iter := list.StreamPopFront()
 			seen := 0
-			last := -1*math.MaxInt - 1
+			last := 0
 			t.Log(list.Front().Value(), "->", list.Back().Value())
 			for iter.Next(ctx) {
 				if iter.Value() < 0 && iter.Value() > 100 {
@@ -314,10 +314,10 @@ func TestList(t *testing.T) {
 				t.Fatal(err)
 			}
 			if seen != 100 {
-				t.Error("didn't observe enough items")
+				t.Error("didn't observe enough items", seen)
 			}
 			if list.Len() != 0 {
-				t.Error("did not consume enough items")
+				t.Error("did not consume enough items", list.Len())
 			}
 		})
 		t.Run("Reverse", func(t *testing.T) {

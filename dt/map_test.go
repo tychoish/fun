@@ -89,13 +89,13 @@ func TestMap(t *testing.T) {
 		mp := Map[string, bool]{}
 		assert.True(t, !mp.Check("hi"))
 		assert.True(t, !mp.Check("kip"))
-		assert.True(t, !mp.Check("merlin"))
+		assert.True(t, !mp.Check("buddy"))
 		mp.SetDefault("hi")
 		mp.SetDefault("kip")
-		mp.SetDefault("merlin")
+		mp.SetDefault("buddy")
 		assert.True(t, mp.Check("hi"))
 		assert.True(t, mp.Check("kip"))
-		assert.True(t, mp.Check("merlin"))
+		assert.True(t, mp.Check("buddy"))
 	})
 	t.Run("GetAndLoad", func(t *testing.T) {
 		mp := Map[string, bool]{}

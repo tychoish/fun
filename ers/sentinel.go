@@ -44,3 +44,5 @@ const ErrCurrentOpAbort Error = Error("abort current operation")
 // looping loop should continue. In most cases, this error should not
 // be returned to callers or aggregated with other errors.
 const ErrCurrentOpSkip Error = Error("skip current operation")
+
+const ErrContainerClosed Error = Error("container is closed")

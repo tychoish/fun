@@ -27,8 +27,8 @@ func TestService(t *testing.T) {
 			if s.String() != "Service<>" {
 				t.Error(s.String())
 			}
-			s.Name = "merlin"
-			if s.String() != "Service<merlin>" {
+			s.Name = "buddy"
+			if s.String() != "Service<buddy>" {
 				t.Error(s.String())
 			}
 		})

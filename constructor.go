@@ -135,9 +135,11 @@ func (Constructors) ErrorStackGenerator(s *ers.Stack) Generator[error] {
 // implementation detail.) ErrorCollector does use a mutex to guard
 // these objects.
 func (Constructors) ErrorCollector() (fn.Handler[error], fn.Future[error]) {
-	s, hf := MAKE.ErrorStackHandler()
 	mtx := &sync.Mutex{}
-	return hf.WithLock(mtx), fn.MakeFuture(s.Future()).WithLock(mtx)
+	s := MAKE.ErrorStack()
+	var hf fn.Handler[error] = s.Handler()
+	var ef fn.Future[error] = s.Future()
+	return hf.WithLock(mtx), ef.WithLock(mtx)
 }
 
 func (Constructors) ErrorJoin(errOne, errTwo error) error { return ers.Join(errOne, errTwo) }
@@ -145,7 +147,11 @@ func (Constructors) ErrorJoin(errOne, errTwo error) error { return ers.Join(errO
 // ErrorHandlerWithoutEOF wraps an error observer and propagates all
 // non-error and non-io.EOF errors to the underlying observer.
 func (Constructors) ErrorHandlerWithoutEOF(of fn.Handler[error]) fn.Handler[error] {
-	return of.Skip(func(err error) bool { return err != nil && !ers.Is(err, io.EOF) })
+	return of.Skip(func(err error) bool { return err != nil && !ers.Is(err, io.EOF, ers.ErrCurrentOpAbort) })
+}
+
+func (Constructors) ErrorHandlerWithoutCancelation(of fn.Handler[error]) fn.Handler[error] {
+	return of.Skip(func(err error) bool { return err != nil && !ers.IsExpiredContext(err) })
 }
 
 // ErrorHandlerWithoutTerminating wraps an error observer and only
@@ -153,7 +159,9 @@ func (Constructors) ErrorHandlerWithoutEOF(of fn.Handler[error]) fn.Handler[erro
 // not one of the "terminating" errors used by this package
 // (e.g. io.EOF and the context cancellation errors).
 func (Constructors) ErrorHandlerWithoutTerminating(of fn.Handler[error]) fn.Handler[error] {
-	return of.Skip(func(err error) bool { return err != nil && !ers.IsTerminating(err) })
+	return of.Skip(func(err error) bool {
+		return err != nil && !ers.IsTerminating(err)
+	})
 }
 
 // ErrorUnwindTransformer provides the ers.Unwind operation as a

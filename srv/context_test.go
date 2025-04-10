@@ -254,7 +254,7 @@ func TestWorkerPool(t *testing.T) {
 		<-sig
 		assert.True(t, called.Load())
 		t.Run("MultipleDistinguishablePools", func(t *testing.T) {
-			err = AddToWorkerPool(ctx, "merlin", func(context.Context) error { return nil })
+			err = AddToWorkerPool(ctx, "buddy", func(context.Context) error { return nil })
 			assert.Error(t, err)
 		})
 	})
@@ -291,7 +291,7 @@ func TestWorkerPool(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		queue := pubsub.NewUnlimitedQueue[fun.Worker]()
-		ctx = WithWorkerPool(ctx, "merlin")
+		ctx = WithWorkerPool(ctx, "buddy")
 		ctx = SetWorkerPool(ctx, "kip", queue)
 
 		if err := queue.Close(); err != nil {
@@ -307,7 +307,7 @@ func TestWorkerPool(t *testing.T) {
 		check.ErrorIs(t, err, pubsub.ErrQueueClosed)
 
 		t.Run("MultiplePools", func(t *testing.T) {
-			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error {
+			err := AddToWorkerPool(ctx, "buddy", func(context.Context) error {
 				return errors.New("shouldn't run")
 			})
 			if err != nil {
@@ -321,7 +321,7 @@ func TestWorkerPool(t *testing.T) {
 		defer cancel()
 		wpCt := &atomic.Int64{}
 		ctx = SetShutdownSignal(ctx)
-		ctx = WithWorkerPool(ctx, "merlin", fun.WorkerGroupConfNumWorkers(50))
+		ctx = WithWorkerPool(ctx, "buddy", fun.WorkerGroupConfNumWorkers(50))
 		obCt := &atomic.Int64{}
 		expected := errors.New("kip")
 		ctx = WithHandlerWorkerPool(ctx, "kip", func(err error) {
@@ -329,7 +329,7 @@ func TestWorkerPool(t *testing.T) {
 			obCt.Add(1)
 		}, fun.WorkerGroupConfNumWorkers(50))
 		for i := 0; i < 100; i++ {
-			err := AddToWorkerPool(ctx, "merlin", func(context.Context) error { wpCt.Add(1); return nil })
+			err := AddToWorkerPool(ctx, "buddy", func(context.Context) error { wpCt.Add(1); return nil })
 			assert.NotError(t, err)
 			err = AddToWorkerPool(ctx, "kip", func(context.Context) error { return expected })
 			assert.NotError(t, err)

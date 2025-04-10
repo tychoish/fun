@@ -65,7 +65,7 @@ func TestSet(t *testing.T) {
 			t.Run("JSON", func(t *testing.T) {
 				set := builder()
 				set.Add("hello")
-				set.Add("merlin")
+				set.Add("buddy")
 				set.Add("hello")
 				set.Add("kip")
 				check.Equal(t, set.Len(), 3) // hello is a dupe
@@ -79,7 +79,7 @@ func TestSet(t *testing.T) {
 					switch {
 					case strings.Contains(rjson, "hello"):
 						continue
-					case strings.Contains(rjson, "merlin"):
+					case strings.Contains(rjson, "buddy"):
 						continue
 					case strings.Contains(rjson, "kip"):
 						continue

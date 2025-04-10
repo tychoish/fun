@@ -87,22 +87,27 @@ func TestHandlers(t *testing.T) {
 	t.Run("ErrorHandler", func(t *testing.T) {
 		count := 0
 		proc, fut := MAKE.ErrorCollector()
-		proc.Join(func(err error) { count++ })
+		proc = proc.Join(func(err error) { count++ })
 
 		proc(nil)
 		check.NotError(t, fut())
-		check.Equal(t, count, 0)
+		check.Equal(t, count, 1)
+		check.Equal(t, len(ers.Unwind(fut())), 0)
 
 		proc(root)
 		check.ErrorIs(t, fut(), root)
-		check.Equal(t, count, 1)
+		check.Equal(t, len(ers.Unwind(fut())), 1)
+		check.Equal(t, count, 2) //
 
-		check.ErrorIs(t, fut(), io.EOF)
+		proc(io.EOF)
+		check.ErrorIs(t, fut(), io.EOF) //
 		check.ErrorIs(t, fut(), root)
-		check.Equal(t, count, 2)
+		check.Equal(t, len(ers.Unwind(fut())), 2)
+		check.Equal(t, count, 3) //
 
 		proc(nil)
-		check.Equal(t, count, 2)
+		check.Equal(t, count, 4) //
+		check.Equal(t, len(ers.Unwind(fut())), 2)
 	})
 	t.Run("Error", func(t *testing.T) {
 		called := 0
@@ -155,6 +160,7 @@ func TestHandlers(t *testing.T) {
 			if ers.IsTerminating(err) || err == nil {
 				t.Error("unexpected error", err)
 			}
+
 		})
 		proc(nil)
 		check.Equal(t, count, 0)
@@ -237,8 +243,8 @@ func TestHandlers(t *testing.T) {
 		t.Run("Itoa", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			out := ft.Must(ConvertStream(MAKE.Counter(10), MAKE.Itoa()).Slice(ctx))
-
+			out, err := ConvertStream(MAKE.Counter(10), MAKE.Itoa()).Slice(ctx)
+			check.NotError(t, err)
 			check.EqualItems(t, out, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
 		})
 		t.Run("Atoi", func(t *testing.T) {

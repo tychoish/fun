@@ -121,7 +121,7 @@ func IsExpiredContext(err error) bool { return Is(err, context.Canceled, context
 // processing/iteration has terminated. (e.g. context expiration, or
 // io.EOF.)
 func IsTerminating(err error) bool {
-	return Is(err, io.EOF, ErrCurrentOpAbort, context.Canceled, context.DeadlineExceeded)
+	return Is(err, io.EOF, ErrCurrentOpAbort, context.Canceled, context.DeadlineExceeded, ErrContainerClosed)
 }
 
 // IsInvariantViolation returns true if the argument is or resolves to

@@ -266,9 +266,7 @@ func TestParallelForEach(t *testing.T) {
 					},
 					WorkerGroupConfNumWorkers(int(i))).Run(ctx)
 
-				if err != nil {
-					t.Fatal(err)
-				}
+				check.NotError(t, err)
 
 				check.Equal(t, int(seen.Load()), sum(elems))
 
@@ -840,7 +838,7 @@ func RunStreamStringAlgoTests(
 						t.Run("PanicSafety", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
-							out := Generator[string](func(_ context.Context) (string, error) {
+							out := MakeGenerator(func() (string, error) {
 								panic("foo")
 							}).Parallel().Stream()
 
@@ -849,6 +847,7 @@ func RunStreamStringAlgoTests(
 							}
 
 							err := out.Close()
+
 							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 							assert.Substring(t, err.Error(), "foo")
 						})
@@ -856,18 +855,19 @@ func RunStreamStringAlgoTests(
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
 
-							count := 0
+							count := &atomic.Int64{}
 							out := Generator[string](
 								func(_ context.Context) (string, error) {
-									count++
-									if count == 3 {
+									count.Add(1)
+
+									if count.Load()%3 == 0 {
 										panic("foo")
 									}
 
-									if count == 5 {
-										return "", io.EOF
+									if count.Load()%5 == 0 {
+										return "", ers.ErrCurrentOpAbort
 									}
-									return fmt.Sprint(count), nil
+									return fmt.Sprint(count.Load()), nil
 								},
 							).Parallel(WorkerGroupConfContinueOnPanic()).Stream()
 							output, err := out.Slice(ctx)
@@ -876,7 +876,7 @@ func RunStreamStringAlgoTests(
 								t.Error(l)
 							}
 							if err == nil {
-								t.Fatal("should have errored")
+								t.Fatal("should have errored", count.Load())
 							}
 							assert.Substring(t, err.Error(), "foo")
 							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
@@ -885,38 +885,41 @@ func RunStreamStringAlgoTests(
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
 
-							count := 0
+							count := &atomic.Int64{}
+							expectedErr := errors.New("beep")
 							out := Generator[string](func(_ context.Context) (string, error) {
-								count++
-								if count == 4 {
-									return "", errors.New("beep")
+								count.Add(1)
+								if count.Load() > 5 {
+									return "", expectedErr
 								}
 								return "foo", nil
 							}).Parallel().Stream()
 
 							output, err := out.Slice(ctx)
-							if l := len(output); l != 3 {
-								t.Error(l)
-							}
-							if err == nil {
-								t.Fatal("should have errored")
+							if l := len(output); l != 5 {
+								t.Error(l, output)
 							}
 
-							if err.Error() != "beep" {
+							check.Error(t, err)
+							t.Log(err, out.Close())
+
+							// because it's parallel we collect both
+							if !ers.Is(err, expectedErr) && !ers.Is(err, io.EOF) {
 								t.Log(len(ers.Unwind(err)))
-								t.Fatalf("unexpected panic %q", err.Error())
+								t.Errorf("unexpected panic '%v'", err)
 							}
 						})
 						t.Run("ContinueOnError", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
-							count := 0
+							count := &atomic.Int64{}
+							expectedErr := errors.New("beep")
 							out := Generator[string](func(_ context.Context) (string, error) {
-								count++
-								if count == 3 {
-									return "", errors.New("beep")
+								count.Add(1)
+								if count.Load() == 3 {
+									return "", expectedErr
 								}
-								if count == 5 {
+								if count.Load() >= 5 {
 									return "", io.EOF
 								}
 								return "foo", nil
@@ -927,10 +930,11 @@ func RunStreamStringAlgoTests(
 								t.Error(l, output)
 							}
 							if err == nil {
-								t.Fatal("should have errored")
+								t.Error("should have errored")
 							}
-							if err.Error() != "beep" {
-								t.Fatalf("unexpected error %q", err.Error())
+							// because it's parallel we collect both
+							if !ers.Is(err, expectedErr) && !ers.Is(err, io.EOF) {
+								t.Errorf("unexpected error '%v'", err)
 							}
 						})
 					})

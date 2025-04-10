@@ -1,6 +1,7 @@
 package fn
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -97,6 +98,7 @@ func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 		out = ft.SafeDo(f)
 		for idx := range ops {
 			out = merge(out, ft.SafeDo(ops[idx]))
+			fmt.Println(out)
 		}
 		return out
 	}

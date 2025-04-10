@@ -34,7 +34,8 @@ func (of Handler[T]) Safe() func(T) error { return of.RecoverPanic }
 
 // Handler provides a more expository operation to call a handler
 // function.
-func (of Handler[T]) Handle(in T) { of(in) }
+func (of Handler[T]) Handle(in T)     { of(in) }
+func (of Handler[T]) SafeHandle(in T) { ft.SafeApply(of, in) }
 
 // WithRecover handles any panic encountered during the handler's execution
 // and converts it to an error.
@@ -75,10 +76,8 @@ func (of Handler[T]) Filter(filter func(T) T) Handler[T] {
 
 // Join creates an handler function that runs both the root handler
 // and the "next" handler.
-//
-// Returns itself if next is nil.
 func (of Handler[T]) Join(next Handler[T]) Handler[T] {
-	return ft.IfValue(next == nil, of, func(in T) { of(in); next(in) })
+	return func(in T) { of(in); next(in) }
 }
 
 // PreHook provides the inverse operation to Join, running "prev"

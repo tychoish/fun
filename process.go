@@ -337,7 +337,7 @@ func (pf Handler[T]) ReadAll(prod Generator[T]) Worker {
 			switch {
 			case err == nil || errors.Is(err, ErrStreamContinue):
 				continue LOOP
-			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
+			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort, ers.ErrContainerClosed):
 				return nil
 			default:
 				return err
