@@ -136,6 +136,37 @@ func TestStream(t *testing.T) {
 		check.Equal(t, len(ints), 64)
 		check.Equal(t, 128, count)
 	})
+	t.Run("Continue", func(t *testing.T) {
+		count := 0
+		observes := 0
+		sum := 0
+		err := MakeGenerator(func() (int, error) {
+			count++
+			switch count {
+			case 25, 50, 75:
+				return 100, nil
+			case 100:
+				return 0, io.EOF
+			default:
+				return -1, ErrStreamContinue
+			}
+		}).Stream().Observe(func(in int) {
+			observes++
+
+			assert.True(t, in%5 == 0)
+			assert.True(t, observes > 0)
+			assert.True(t, observes <= 3)
+			assert.True(t, count <= 100)
+
+			sum += in
+		}).Run(t.Context())
+
+		assert.NotError(t, err)
+		assert.Equal(t, sum, 300)
+		assert.Equal(t, observes, 3)
+		assert.Equal(t, count, 100)
+	})
+
 	t.Run("Monotonic", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -770,6 +801,30 @@ func TestJSON(t *testing.T) {
 		assert.ErrorIs(t, err, io.EOF)
 
 		assert.True(t, ers.IsTerminating(err))
+	})
+	t.Run("JoinErrors", func(t *testing.T) {
+		t.Run("Nil", func(t *testing.T) {
+			assert.NotError(t, (&Stream[int]{}).joinTwoErrs(nil, nil))
+		})
+		t.Run("First", func(t *testing.T) {
+			err := (&Stream[int]{}).joinTwoErrs(io.EOF, nil)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.Equal(t, err, io.EOF)
+		})
+		t.Run("Second", func(t *testing.T) {
+			err := (&Stream[int]{}).joinTwoErrs(nil, io.EOF)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.Equal(t, err, io.EOF)
+		})
+		t.Run("Both", func(t *testing.T) {
+			err := (&Stream[int]{}).joinTwoErrs(ers.ErrInvariantViolation, io.EOF)
+			assert.Error(t, err)
+			assert.NotEqual(t, err, io.EOF)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.ErrorIs(t, err, ers.ErrInvariantViolation)
+		})
 	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})

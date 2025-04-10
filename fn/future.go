@@ -105,11 +105,11 @@ func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 }
 
 func (f Future[T]) TTL(dur time.Duration) Future[T] {
-	resolver := internal.TTLExec[T](dur)
+	resolver := ft.Must(internal.TTLExec[T](dur))
 	return func() T { return resolver(f) }
 }
 
 func (f Future[T]) Limit(in int) Future[T] {
-	resolver := internal.LimitExec[T](in)
+	resolver := ft.Must(internal.LimitExec[T](in))
 	return func() T { return resolver(f) }
 }

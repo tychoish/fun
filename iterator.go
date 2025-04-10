@@ -151,7 +151,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	es := &ers.Stack{}
 	mu := &sync.Mutex{}
 
-	eh := MAKE.ErrorHandlerWithoutEOF(es.Handler()).WithLock(mu)
+	eh := MAKE.ErrorHandlerWithoutTerminating(es.Handler()).WithLock(mu)
 	ep := fn.MakeFuture(es.Future()).WithLock(mu)
 
 	init := Operation(func(ctx context.Context) {
@@ -202,7 +202,7 @@ func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := Blocking(make(chan T))
 
 	eh, ep := MAKE.ErrorCollector()
-	eh = MAKE.ErrorHandlerWithoutEOF(eh)
+	eh = MAKE.ErrorHandlerWithoutTerminating(eh)
 
 	return pipe.
 		Generator().
@@ -240,9 +240,11 @@ func (i *Stream[T]) doClose() {
 // resources are released.
 func (i *Stream[T]) Close() error { i.doClose(); return i.err.future() }
 
+func (*Stream[T]) joinTwoErrs(e1, e2 error) error { return ers.Join(e1, e2) }
+
 func (i *Stream[T]) WithErrorCollector(ec fn.Handler[error], er fn.Future[error]) *Stream[T] {
 	i.err.handler = ec.Join(i.err.handler)
-	i.err.future = er.Join(MAKE.ErrorJoin, i.err.future)
+	i.err.future = er.Join(i.joinTwoErrs, i.err.future)
 	return i
 }
 
@@ -320,10 +322,12 @@ func (i *Stream[T]) ReadOne(ctx context.Context) (out T, err error) {
 			return out, nil
 		case errors.Is(err, ErrStreamContinue):
 			continue
+		case ers.IsTerminating(err):
+			return out, err
+		case ers.IsExpiredContext(err):
+			return out, err
 		case errors.Is(err, ers.ErrRecoveredPanic):
 			i.AddError(err)
-			return out, err
-		case ers.IsTerminating(err):
 			return out, err
 		default:
 			i.AddError(err)
@@ -458,8 +462,6 @@ func (i *Stream[T]) Observe(fn fn.Handler[T]) Worker {
 			switch {
 			case err == nil:
 				fn(item)
-			case ers.Is(err, ErrStreamContinue):
-				continue
 			case ers.IsExpiredContext(err):
 				return err
 			case ers.IsTerminating(err):

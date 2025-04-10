@@ -59,15 +59,15 @@ func TestSmoke(t *testing.T) {
 	t.Run("Generate", func(t *testing.T) {
 		atom := &atomic.Int64{}
 		atom.Store(16)
-		iter := Generate(func(context.Context) (int64, error) {
+		iter := fun.MakeGenerator(func() (int64, error) {
 			prev := atom.Add(-1)
 			if prev < 0 {
 				return 0, io.EOF
 			}
 			return prev, nil
-		})
-		ctx := testt.Context(t)
+		}).Parallel().Stream()
 
+		ctx := testt.Context(t)
 		sl, err := iter.Slice(ctx)
 		assert.NotError(t, err)
 		assert.Equal(t, len(sl), 16)
@@ -173,7 +173,7 @@ func TestSmoke(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, Monotonic(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
+		check.NotError(t, fun.MAKE.Counter(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -258,11 +258,11 @@ func TestChain(t *testing.T) {
 	defer cancel()
 
 	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
-	iter := Chain[int](fun.SliceStream(num), fun.SliceStream(num))
+	iter := fun.JoinStreams[int](fun.SliceStream(num), fun.SliceStream(num))
 	n := iter.Count(ctx)
 	assert.Equal(t, len(num)*2, n)
 
-	iter = Chain[int](fun.SliceStream(num), fun.SliceStream(num), fun.SliceStream(num), fun.SliceStream(num))
+	iter = fun.JoinStreams[int](fun.SliceStream(num), fun.SliceStream(num), fun.SliceStream(num), fun.SliceStream(num))
 	cancel()
 	n = iter.Count(ctx)
 	assert.Equal(t, n, 0)
@@ -310,7 +310,7 @@ func TestMergeSlices(t *testing.T) {
 		assert.Equal(t, count, 256)
 	})
 	t.Run("Slice", func(t *testing.T) {
-		iter := Chain(
+		iter := fun.JoinStreams(
 			fun.SliceStream(makeIntSlice(64)),
 			fun.SliceStream(makeIntSlice(64)),
 			fun.SliceStream(makeIntSlice(64)),

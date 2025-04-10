@@ -119,7 +119,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorHandlerWithoutEOF", func(t *testing.T) {
 		count := 0
-		proc := MAKE.ErrorHandlerWithoutEOF(func(err error) {
+		proc := MAKE.ErrorHandlerWithoutTerminating(func(err error) {
 			count++
 			if errors.Is(err, io.EOF) || err == nil {
 				t.Error("unexpected error", err)
@@ -160,7 +160,6 @@ func TestHandlers(t *testing.T) {
 			if ers.IsTerminating(err) || err == nil {
 				t.Error("unexpected error", err)
 			}
-
 		})
 		proc(nil)
 		check.Equal(t, count, 0)
@@ -172,13 +171,42 @@ func TestHandlers(t *testing.T) {
 		check.Equal(t, count, 1)
 
 		proc(context.Canceled)
-		check.Equal(t, count, 1)
+		check.Equal(t, count, 2)
 
 		proc(ers.ErrInvariantViolation)
-		check.Equal(t, count, 2)
+		check.Equal(t, count, 3)
 
 		proc(nil)
+		check.Equal(t, count, 3)
+	})
+	t.Run("ErrorHandlerWithoutCancelation", func(t *testing.T) {
+		count := 0
+		proc := MAKE.ErrorHandlerWithoutCancelation(func(err error) {
+			count++
+			if ers.IsExpiredContext(err) || err == nil {
+				t.Error("unexpected error", err)
+			}
+		})
+		proc(nil)
+		check.Equal(t, count, 0)
+
+		proc(context.DeadlineExceeded)
+		check.Equal(t, count, 0)
+
+		proc(root)
+		check.Equal(t, count, 1)
+
+		proc(io.EOF)
 		check.Equal(t, count, 2)
+
+		proc(context.Canceled)
+		check.Equal(t, count, 2)
+
+		proc(ers.ErrInvariantViolation)
+		check.Equal(t, count, 3)
+
+		proc(nil)
+		check.Equal(t, count, 3)
 	})
 	t.Run("Unwinder", func(t *testing.T) {
 		t.Run("BasicUnwind", func(t *testing.T) {

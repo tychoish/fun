@@ -200,7 +200,7 @@ func TestPanics(t *testing.T) {
 				seen = in
 			}
 
-			err := MakeHandlerHandler(of).Run(ctx, "hello")
+			err := FromHandler(of).Run(ctx, "hello")
 			if err != nil {
 				t.Fatal(err)
 			}

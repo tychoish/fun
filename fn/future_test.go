@@ -2,11 +2,13 @@ package fn
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -150,4 +152,71 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, count, 50)
 		})
 	})
+	t.Run("Panics", func(t *testing.T) {
+		t.Run("Op", func(t *testing.T) {
+			out, err := MakeFuture(func() int { panic("foo") }).RecoverPanic()
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+			assert.Zero(t, out)
+
+		})
+		t.Run("Wrapper", func(t *testing.T) {
+			out, err := MakeFuture(func() int { panic("foo") }).Safe()()
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+			assert.Zero(t, out)
+
+		})
+
+	})
+	t.Run("Lock", func(t *testing.T) {
+		// this is mostly just tempting the race detecor
+		wg := &sync.WaitGroup{}
+		count := 0
+		var ob Future[int] = func() int {
+			defer wg.Done()
+			count++
+			return 42
+		}
+
+		lob := ob.Lock()
+
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				t.Helper()
+				out := lob()
+				assert.Equal(t, out, 42)
+			}()
+		}
+		wg.Wait()
+
+		assert.Equal(t, count, 10)
+	})
+	t.Run("Locker", func(t *testing.T) {
+		// this is mostly just tempting the race detecor
+		wg := &sync.WaitGroup{}
+		count := 0
+		var ob Future[int] = func() int {
+			defer wg.Done()
+			count++
+			return 42
+		}
+
+		rmtx := &sync.RWMutex{}
+		lob := ob.WithLocker(rmtx)
+
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				t.Helper()
+				out := lob()
+				assert.Equal(t, out, 42)
+			}()
+		}
+		wg.Wait()
+
+		assert.Equal(t, count, 10)
+	})
+
 }

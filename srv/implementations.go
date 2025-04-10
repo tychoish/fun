@@ -16,7 +16,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/itertool"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -157,7 +156,7 @@ func ProcessStream[T any](
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	return &Service{
-		Run:      itertool.ParallelForEach(iter, processor, optp...),
+		Run:      iter.ProcessParallel(processor, optp...),
 		Shutdown: iter.Close,
 	}
 }
@@ -196,7 +195,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 
 			ec := &erc.Collector{}
 
-			ec.Add(itertool.ParallelForEach(cache.StreamPopFront(),
+			ec.Add(cache.StreamPopFront().ProcessParallel(
 				func(ctx context.Context, wf fun.Worker) error {
 					ec.Add(wf.WithRecover().Run(ctx))
 					return nil
@@ -218,8 +217,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // propogated to the service's ywait function.
 func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
 	return &Service{
-		Run: itertool.ParallelForEach(
-			workQueue.Distributor().Stream(),
+		Run: workQueue.Distributor().Stream().ProcessParallel(
 			func(ctx context.Context, fn fun.Worker) error {
 				return fn.Run(ctx)
 			},
@@ -249,8 +247,7 @@ func HandlerWorkerPool(
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{
-		Run: itertool.ParallelForEach(
-			workQueue.Distributor().Stream(),
+		Run: workQueue.Distributor().Stream().ProcessParallel(
 			func(ctx context.Context, fn fun.Worker) error {
 				observer(fn.Run(ctx))
 				return nil

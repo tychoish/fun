@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -35,14 +36,14 @@ var _ interface{ WithRecover() fun.Worker } = new(fun.Operation)
 // synchronized, blocking, and destructive (e.g. so completed
 // workloads do not remain in memory) containers.
 //
-// WorkerPool is implemented using ParallelForEach.
+// WorkerPool is implemented using fun.Stream[T].ProcessParallel()
 func WorkerPool[OP fun.Worker | fun.Operation](
 	iter *fun.Stream[OP],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) fun.Worker {
-	return Process(iter, func(ctx context.Context, op OP) error {
+	return iter.ProcessParallel(func(ctx context.Context, op OP) error {
 		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover().Run(ctx)
-	}, optp...)
+	}, append(optp, fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}))...)
 }
 
 // JSON takes a stream of line-oriented JSON and marshals those

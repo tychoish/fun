@@ -13,14 +13,10 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Handler are generic functions that take an argument (and a
-// context) and return an error. They're the type of function used by
-// the itertool.Process/itertool.ParallelForEach and useful in other
-// situations as a compliment to fun.Worker and Operation.
-//
-// In general the implementations of the methods for processing
-// functions are wrappers around their similarly named fun.Worker
-// analogues.
+// Handler are generic functions that take an argument (and a context)
+// and return an error. They're the type of function used in various
+// stream methods to implement worker pools, service management, and
+// stream processing.
 type Handler[T any] func(context.Context, T) error
 
 // MakeHandler converts a function with the Handler signature
@@ -29,13 +25,11 @@ func MakeHandler[T any](fn func(T) error) Handler[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
 
+func FromHandler[T any](f fn.Handler[T]) Handler[T] { return MakeHandler(f.Safe()) }
+
 // NewHandlers returns a processor as a convenience function to
 // avoid the extra cast when creating new function objects.
 func NewHandler[T any](fn func(context.Context, T) error) Handler[T] { return fn }
-
-func MakeHandlerHandler[T any](fn fn.Handler[T]) Handler[T] {
-	return func(_ context.Context, in T) error { fn(in); return nil }
-}
 
 // JoinHandlers takes a collection of Handler functions and merges
 // them into a single chain, eliding any nil processors.
@@ -228,7 +222,7 @@ func (pf Handler[T]) WithLock(mtx sync.Locker) Handler[T] {
 
 // Limit ensures that the processor is called at most n times.
 func (pf Handler[T]) Limit(n int) Handler[T] {
-	resolver := internal.LimitExec[error](n)
+	resolver := ft.Must(internal.LimitExec[error](n))
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })
@@ -240,7 +234,7 @@ func (pf Handler[T]) Limit(n int) Handler[T] {
 // the executions of the underlying function happen in isolation,
 // in between, the processor is concurrently accessible.
 func (pf Handler[T]) TTL(dur time.Duration) Handler[T] {
-	resolver := internal.TTLExec[error](dur)
+	resolver := ft.Must(internal.TTLExec[error](dur))
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })

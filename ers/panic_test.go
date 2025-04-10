@@ -48,6 +48,23 @@ func TestPanics(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Apply", func(t *testing.T) {
+		if err := WithRecoverApply(nil, 123); err == nil {
+			t.Error("expected error")
+		}
+
+		if err := WithRecoverApply(func(in int) { panic(in) }, 123); err == nil {
+			t.Error("expected error")
+		}
+
+		if err := WithRecoverApply(func(in int) {
+			if in != 123 {
+				t.Fatal(in)
+			}
+		}, 123); err != nil {
+			t.Error(err)
+		}
+	})
 	t.Run("ParsePanic", func(t *testing.T) {
 		t.Run("NilInput", func(t *testing.T) {
 			err := ParsePanic(nil)

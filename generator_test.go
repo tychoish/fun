@@ -253,6 +253,25 @@ func TestGenerator(t *testing.T) {
 			check.Equal(t, 128, opct.Load())
 			assert.Equal(t, count, 128)
 		})
+		t.Run("Locker", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			count := 0
+			op := Generator[int](func(context.Context) (int, error) {
+				count++
+				return 42, nil
+			})
+
+			opct := &atomic.Int64{}
+			mtx := &sync.RWMutex{}
+			future := op.WithLocker(mtx).Worker(
+				func(in int) { opct.Add(1); check.Equal(t, in, 42) },
+			).StartGroup(ctx, 128)
+
+			check.NotError(t, future(ctx))
+			check.Equal(t, 128, opct.Load())
+			assert.Equal(t, count, 128)
+		})
 		t.Run("CustomLock", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1018,8 +1037,28 @@ func TestGenerator(t *testing.T) {
 			assert.Equal(t, val, 0)
 			assert.NotEqual(t, val, 100)
 		})
-
 	})
+	t.Run("ErrorHanldingOptions", func(t *testing.T) {
+		g := MakeGenerator(func() (int, error) { panic(42) })
+		g = g.Parallel(WorkerGroupConfSet(&WorkerGroupConf{ErrorHandler: func(error) { panic(24) }}))
+		out, err := g.Run(t.Context())
+		assert.Zero(t, out)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrInvalidInput)
+	})
+	t.Run("WithErrorHandler", func(t *testing.T) {
+		const (
+			ErrUnseen ers.Error = "unseen"
+			ErrSeen   ers.Error = "seen"
+		)
+
+		eh, er := func(error) {}, func() error { return ErrSeen }
+		out, err := MakeGenerator(func() (int, error) { return 0, ErrUnseen }).WithErrorHandler(eh, er).Wait()
+		assert.Error(t, err)
+		assert.Zero(t, out)
+		assert.ErrorIs(t, err, ErrSeen)
+	})
+
 }
 
 func producerContinuesOnce[T any](out T, counter *atomic.Int64) Generator[T] {

@@ -110,14 +110,6 @@ func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())
 
 func (Constructors) ErrorStack() *ers.Stack { return &ers.Stack{} }
 
-// ErrorStackHandler returns an ers.ErrorStack, and a
-// fn.Handler[error] function that will add an error to the
-// stack. This collector is not safe for concurrent use.
-func (Constructors) ErrorStackHandler() (*ers.Stack, fn.Handler[error]) {
-	s := MAKE.ErrorStack()
-	return s, s.Handler()
-}
-
 // ErrorStackStream creates a stream object to view the contents
 // of a ers.Stack object (error collection).
 func (Constructors) ErrorStackStream(s *ers.Stack) *Stream[error] {
@@ -142,14 +134,6 @@ func (Constructors) ErrorCollector() (fn.Handler[error], fn.Future[error]) {
 	return hf.WithLock(mtx), ef.WithLock(mtx)
 }
 
-func (Constructors) ErrorJoin(errOne, errTwo error) error { return ers.Join(errOne, errTwo) }
-
-// ErrorHandlerWithoutEOF wraps an error observer and propagates all
-// non-error and non-io.EOF errors to the underlying observer.
-func (Constructors) ErrorHandlerWithoutEOF(of fn.Handler[error]) fn.Handler[error] {
-	return of.Skip(func(err error) bool { return err != nil && !ers.Is(err, io.EOF, ers.ErrCurrentOpAbort) })
-}
-
 func (Constructors) ErrorHandlerWithoutCancelation(of fn.Handler[error]) fn.Handler[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.IsExpiredContext(err) })
 }
@@ -157,7 +141,8 @@ func (Constructors) ErrorHandlerWithoutCancelation(of fn.Handler[error]) fn.Hand
 // ErrorHandlerWithoutTerminating wraps an error observer and only
 // calls the underlying observer if the input error is non-nil and is
 // not one of the "terminating" errors used by this package
-// (e.g. io.EOF and the context cancellation errors).
+// (e.g. io.EOF and similar errors). Context cancellation errors can
+// and should be filtered separately.
 func (Constructors) ErrorHandlerWithoutTerminating(of fn.Handler[error]) fn.Handler[error] {
 	return of.Skip(func(err error) bool {
 		return err != nil && !ers.IsTerminating(err)

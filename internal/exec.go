@@ -1,44 +1,20 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-type Error string
-
-const ErrInvariantViolation Error = Error("invariant violation")
-
-func (e Error) Error() string { return string(e) }
-
-func (e Error) Is(err error) bool {
-	switch {
-	case err == nil && e == "":
-		return e == ""
-	case (err == nil) != (e == ""):
-		return false
-	default:
-		switch x := err.(type) {
-		case Error:
-			return x == e
-		default:
-			return false
-		}
-	}
-}
-
-func TTLExec[T any](dur time.Duration) func(op func() T) T {
+func TTLExec[T any](dur time.Duration) (func(func() T) T, error) {
 	if dur < 0 {
-		panic(errors.Join(fmt.Errorf("ttl must not be negative: %d", dur), ErrInvariantViolation))
+		return nil, fmt.Errorf("ttl must not be negative: %d", dur)
 	}
 
 	if dur == 0 {
-		return func(op func() T) T { return op() }
+		return func(op func() T) T { return op() }, nil
 	}
-
 	var (
 		lastAt time.Time
 		output T
@@ -64,12 +40,12 @@ func TTLExec[T any](dur time.Duration) func(op func() T) T {
 		}
 
 		return output
-	}
+	}, nil
 }
 
-func LimitExec[T any](in int) func(func() T) T {
+func LimitExec[T any](in int) (func(func() T) T, error) {
 	if in <= 0 {
-		panic(errors.Join(fmt.Errorf("limit must be greater than zero: %d", in), ErrInvariantViolation))
+		return nil, fmt.Errorf("limit must be greater than zero: %d", in)
 	}
 
 	counter := &atomic.Int64{}
@@ -91,5 +67,5 @@ func LimitExec[T any](in int) func(func() T) T {
 		}
 
 		return output
-	}
+	}, nil
 }

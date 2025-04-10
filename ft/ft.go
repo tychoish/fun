@@ -253,6 +253,16 @@ func SafeDo[T any](op func() T) (out T) {
 	return
 }
 
+func Convert[A any, B any](mapper func(A) B, values iter.Seq[A]) iter.Seq[B] {
+	return func(yield func(B) bool) {
+		for input := range values {
+			if !yield(mapper(input)) {
+				return
+			}
+		}
+	}
+}
+
 // SafeWrap wraps an operation with SafeCall so that the resulting
 // operation is never nil, and will never panic if the input operation
 // is nil.
@@ -293,11 +303,11 @@ func CallMany(ops []func()) {
 func DoMany[T any](ops []func() T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for idx := 0; idx < len(ops); idx++ {
-			if op := ops[idx]; op == nil || yield(op()) {
+			if op := ops[idx]; op == nil {
 				continue
+			} else if !yield(op()) {
+				return
 			}
-
-			break
 		}
 	}
 }
@@ -305,11 +315,11 @@ func DoMany[T any](ops []func() T) iter.Seq[T] {
 func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for idx := 0; idx < len(ops); idx++ {
-			if op := ops[idx]; op == nil || yield(op()) {
+			if op := ops[idx]; op == nil {
 				continue
+			} else if !yield(op()) {
+				return
 			}
-
-			break
 		}
 	}
 }

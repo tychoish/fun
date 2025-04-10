@@ -200,7 +200,7 @@ func (wf Operation) Limit(in int) Operation {
 // TTL runs an operation, and if the operation is called before the
 // specified duration, the operation is a noop.
 func (wf Operation) TTL(dur time.Duration) Operation {
-	resolver := internal.TTLExec[bool](dur)
+	resolver := ft.Must(internal.TTLExec[bool](dur))
 	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
 }
 

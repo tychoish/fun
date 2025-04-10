@@ -607,6 +607,13 @@ func TestBroker(t *testing.T) {
 			}
 		})
 	})
+	t.Run("ContextCanceled", func(t *testing.T) {
+		broker := NewBroker[int](ctx, BrokerOptions{})
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		check.Error(t, broker.Handler(ctx, 123))
+		check.ErrorIs(t, broker.Handler(ctx, 123), context.Canceled)
+	})
 
 	t.Run("Populate", func(t *testing.T) {
 		t.Parallel()

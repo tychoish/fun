@@ -14,12 +14,8 @@ import (
 func TestErrors(t *testing.T) {
 	t.Run("Predicates", func(t *testing.T) {
 		check.True(t, IsTerminating(io.EOF))
-		check.True(t, IsTerminating(context.Canceled))
-		check.True(t, IsTerminating(context.DeadlineExceeded))
 		check.True(t, !IsTerminating(Error("hello")))
 		check.True(t, IsTerminating(Join(Error("beep"), io.EOF)))
-		check.True(t, IsTerminating(Join(Error("beep"), context.Canceled)))
-		check.True(t, IsTerminating(Join(Error("beep"), context.DeadlineExceeded)))
 
 		check.True(t, !IsExpiredContext(io.EOF))
 		check.True(t, !IsExpiredContext(Join(Error("beep"), io.EOF)))

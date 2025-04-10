@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/ft"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -64,8 +65,8 @@ func (o *WorkerGroupConf) Validate() error {
 
 	return errors.Join(
 		ers.Whenf(ehIsNotNil != erIsNotNil,
-			"must configure error handler and resolver, or neither, eh=%t er=%t",
-			ehIsNotNil, erIsNotNil),
+			"must configure error handler and resolver, or neither, eh=%t er=%t; %w",
+			ehIsNotNil, erIsNotNil, ers.ErrInvalidInput),
 	)
 }
 
@@ -85,18 +86,18 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	switch {
 	case errors.Is(err, ErrStreamContinue):
 		return true
+	case ers.IsTerminating(err):
+		return false
 	case errors.Is(err, ers.ErrRecoveredPanic):
-		o.ErrorHandler.SafeHandle(err)
+		ft.SafeApply(o.ErrorHandler, err)
 		return o.ContinueOnPanic
 	case ers.IsExpiredContext(err):
 		if o.IncludeContextExpirationErrors {
-			o.ErrorHandler.SafeHandle(err)
+			ft.SafeApply(o.ErrorHandler, err)
 		}
 		return false
-	case ers.IsTerminating(err):
-		return false
 	default:
-		o.ErrorHandler.SafeHandle(err)
+		ft.SafeApply(o.ErrorHandler, err)
 		return o.ContinueOnError
 	}
 }

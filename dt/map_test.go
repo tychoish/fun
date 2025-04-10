@@ -179,7 +179,16 @@ func TestMap(t *testing.T) {
 		assert.NotPanic(t, func() { NewSlice([]int{1, 2, 3}) })
 		assert.NotPanic(t, func() { NewMap(map[string]int{"a": 1, "b": 2, "c": 3}) })
 	})
-
+	t.Run("ConsumeStream", func(t *testing.T) {
+		source := makeMap(300)
+		target := NewMap(map[string]int{})
+		assert.NotError(t, target.ConsumeStream(source.Stream()).Run(t.Context()))
+		assert.Equal(t, source.Len(), target.Len())
+		for pair := range source.Stream().Seq(t.Context()) {
+			assert.True(t, target.Check(pair.Key))
+			assert.Equal(t, pair.Value, target.Get(pair.Key))
+		}
+	})
 	t.Run("Constructors", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -254,7 +263,7 @@ func TestMap(t *testing.T) {
 
 		})
 		t.Run("Passthrough", func(t *testing.T) {
-			sl := DefaultMap[string, int](map[string]int{"one": 1}, 32)
+			sl := DefaultMap(map[string]int{"one": 1}, 32)
 			check.Equal(t, len(sl), 1)
 			check.Equal(t, sl["one"], 1)
 		})

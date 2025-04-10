@@ -7,6 +7,8 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 func TestHandler(t *testing.T) {
@@ -147,6 +149,27 @@ func TestHandler(t *testing.T) {
 
 		assert.Equal(t, count, 10)
 	})
+	t.Run("Locker", func(t *testing.T) {
+		// this is mostly just tempting the race detecor
+		wg := &sync.WaitGroup{}
+		count := 0
+		var ob Handler[int] = func(in int) {
+			defer wg.Done()
+			count++
+			check.Equal(t, in, 100)
+		}
+
+		mtx := &sync.Mutex{}
+		lob := ob.WithLocker(mtx)
+
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go lob(100)
+		}
+		wg.Wait()
+
+		assert.Equal(t, count, 10)
+	})
 	t.Run("Skip", func(t *testing.T) {
 		count := 0
 		of := NewHandler(func(i int) { count++; check.Equal(t, i, 42) })
@@ -186,5 +209,52 @@ func TestHandler(t *testing.T) {
 		of(300)
 		of(300)
 		check.Equal(t, count, 2)
+	})
+	t.Run("Panics", func(t *testing.T) {
+		t.Run("Direct", func(t *testing.T) {
+			err := NewHandler(func(in int) { assert.Equal(t, in, 33); panic("foo") }).RecoverPanic(33)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+		})
+		t.Run("Wrap", func(t *testing.T) {
+			err := NewHandler(func(in int) { assert.Equal(t, in, 33); panic("foo") }).Safe()(33)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+
+		})
+
+	})
+	t.Run("JoinHandlers", func(t *testing.T) {
+		count := 0
+		sum := 0
+		reset := func() { count, sum = 0, 0 }
+
+		handler := NewHandler(func(i int) { count++; sum += i })
+		t.Run("One", func(t *testing.T) {
+			defer reset()
+			metaHandler := JoinHandlers(ft.Slice(handler, handler, handler, handler, handler))
+
+			metaHandler(1)
+			assert.Equal(t, sum, 5)
+			assert.Equal(t, count, 5)
+		})
+
+		t.Run("Five", func(t *testing.T) {
+			defer reset()
+			metaHandler := JoinHandlers(ft.Slice(handler, handler, handler, handler, handler))
+
+			metaHandler(5)
+			assert.Equal(t, sum, 25)
+			assert.Equal(t, count, 5)
+		})
+		t.Run("NilHandling", func(t *testing.T) {
+			defer reset()
+			metaHandler := JoinHandlers(ft.Slice(handler, nil, handler, nil, handler, handler))
+
+			metaHandler(4)
+			assert.Equal(t, sum, 16)
+			assert.Equal(t, count, 4)
+		})
+
 	})
 }

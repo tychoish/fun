@@ -356,26 +356,35 @@ func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
 }
 
-func (pf Generator[T]) WrapErrorWith(ef fn.Future[error]) Generator[T] {
-	return func(ctx context.Context) (zero T, _ error) {
+// internal function for use in generators: the idea is to let the
+// inner generator produce results until it errors and then add in the
+// error from the future.
+func (pf Generator[T]) wrapErrorsWithErrorFuture(ef fn.Future[error]) Generator[T] {
+	return func(ctx context.Context) (zero T, err error) {
+		// just call the generator once: if there's no error,
+		// return the result, because otherwise we're throwing
+		// away work.
 		out, err := pf(ctx)
 		if err == nil {
 			return out, nil
 		}
 
-		if ers.Is(err, ErrStreamContinue) {
-			return out, err
+		// Now there was an error,
+
+		// first error is the error produced by the future, p
+		// error is the second error, which can only be a
+		// panic encountered by the error future.
+		ferr, perr := ef.RecoverPanic()
+
+		if ers.IsTerminating(err) && ferr != nil {
+			// if there's a real substantive error,
+			// encountered when there was an terminating
+			// error, then let's just return that.
+			return zero, ferr
 		}
 
-		ferr := MAKE.ErrorJoin(ef.RecoverPanic())
-
-		if ers.IsTerminating(err) {
-			if ferr != nil {
-				return zero, ferr
-			}
-		}
-
-		return zero, ers.Join(err, ferr)
+		// otherwise, merge everything (potentially)
+		return zero, ers.Join(err, ferr, perr)
 	}
 }
 
@@ -383,7 +392,7 @@ func (pf Generator[T]) WrapErrorWith(ef fn.Future[error]) Generator[T] {
 // result of the last execution and returns that value for any
 // subsequent executions.
 func (pf Generator[T]) Limit(in int) Generator[T] {
-	resolver := internal.LimitExec[tuple[T, error]](in)
+	resolver := ft.Must(internal.LimitExec[tuple[T, error]](in))
 
 	return func(ctx context.Context) (T, error) {
 		out := resolver(func() (val tuple[T, error]) {
@@ -420,6 +429,8 @@ func (pf Generator[T]) Retry(n int) Generator[T] {
 				return value, nil
 			case ers.IsTerminating(attemptErr):
 				return zero, ers.Join(attemptErr, err)
+			case ers.IsExpiredContext(attemptErr):
+				return zero, ers.Join(attemptErr, err)
 			case errors.Is(attemptErr, ErrStreamContinue):
 				i--
 				continue
@@ -440,7 +451,7 @@ type tuple[T, U any] struct {
 // TTL runs the generator only one time per specified interval. The
 // interval must me greater than 0.
 func (pf Generator[T]) TTL(dur time.Duration) Generator[T] {
-	resolver := internal.TTLExec[tuple[T, error]](dur)
+	resolver := ft.Must(internal.TTLExec[tuple[T, error]](dur))
 
 	return func(ctx context.Context) (T, error) {
 		out := resolver(func() (val tuple[T, error]) {
@@ -583,5 +594,5 @@ func (pf Generator[T]) Parallel(
 		wg.Operation().PostHook(pipe.Close).PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
-	return pipe.Receive().Generator().PreHook(init).WrapErrorWith(opts.ErrorResolver)
+	return pipe.Receive().Generator().PreHook(init).wrapErrorsWithErrorFuture(opts.ErrorResolver)
 }

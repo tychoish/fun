@@ -157,6 +157,48 @@ func TestLocked(t *testing.T) {
 			check.True(t, setCalled.Load())
 
 		})
+		t.Run("LockerRead", func(t *testing.T) {
+			mtx := &sync.RWMutex{}
+			var number int64
+			wg := &sync.WaitGroup{}
+			for range 2 * runtime.NumCPU() {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for range 1000 {
+						func() {
+							defer WithW(LockW(mtx))
+							switch number {
+							case 0:
+								number = 2
+							case 2:
+								number = 4
+							case 4:
+								number = 8
+							case 8:
+								number = 16
+							case 16:
+								number = 32
+							case 32:
+								number = 2
+							default:
+								panic("should never happen")
+							}
+							time.Sleep(1 + time.Duration(rand.Int63n(number)))
+						}()
+					}
+				}()
+			}
+
+			wg.Wait()
+
+			assert.Zero(t, number%4)
+		})
+	})
+	t.Run("LockR", func(t *testing.T) {
+		// straigtht forward, just making sure we don't panic
+		rmu := &sync.RWMutex{}
+		assert.NotPanic(t, func() { WithR(LockR(rmu)) })
 	})
 
 }

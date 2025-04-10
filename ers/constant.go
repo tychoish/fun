@@ -13,8 +13,6 @@ package ers
 
 import (
 	"errors"
-
-	"github.com/tychoish/fun/internal"
 )
 
 // Error is a type alias for building/declaring sentinel errors
@@ -53,8 +51,6 @@ func (e Error) Is(err error) bool {
 		return false
 	default:
 		switch x := err.(type) {
-		case internal.Error:
-			return Error(x) == e
 		case Error:
 			return x == e
 		default:

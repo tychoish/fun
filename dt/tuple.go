@@ -122,7 +122,7 @@ func (p *Tuples[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Observe calls the handler function for every tuple in the container.
 func (p *Tuples[K, V]) Observe(hf fn.Handler[Tuple[K, V]]) {
-	p.Process(fun.MakeHandlerHandler(hf)).Ignore().Wait()
+	p.Process(fun.FromHandler(hf)).Ignore().Wait()
 }
 
 // Process returns a worker, that when executed calls the processor

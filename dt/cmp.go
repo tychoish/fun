@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/fn"
 )
 
 // Heap provides a min-order heap using the Heap.LT comparison
@@ -24,7 +25,7 @@ type Heap[T any] struct {
 }
 
 func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.Process(fun.MakeHandlerHandler(h.Push))
+	return iter.Process(fun.MakeHandler(h.Handler().Safe()))
 }
 
 func (h *Heap[T]) list() *List[T] {
@@ -37,6 +38,8 @@ func (h *Heap[T]) list() *List[T] {
 	}
 	return h.data
 }
+
+func (h *Heap[T]) Handler() fn.Handler[T] { return h.Push }
 
 // Push adds an item to the heap.
 func (h *Heap[T]) Push(t T) {
