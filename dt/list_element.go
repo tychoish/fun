@@ -179,6 +179,8 @@ func (e *Element[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
+// MarshalJSON satisfies the json.Marshaler interface. Nil and unset
+// Element values are marshaled as nil.
 func (e *Element[T]) MarshalJSON() ([]byte, error) {
 	if !e.Ok() {
 		return json.Marshal(nil)

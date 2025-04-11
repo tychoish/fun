@@ -750,6 +750,28 @@ func TestList(t *testing.T) {
 				t.Fatal("expected error", string(out))
 			}
 		})
+		t.Run("ElementMarshal", func(t *testing.T) {
+			var e *Element[int]
+
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "null")
+
+			e = &Element[int]{}
+			out, err = e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "null")
+
+			e.Set(0)
+			out, err = e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "0")
+
+			e = NewElement(42)
+			out, err = e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "42")
+		})
 	})
 }
 
