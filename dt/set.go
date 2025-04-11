@@ -4,27 +4,11 @@ import (
 	"context"
 	"iter"
 	"sync"
-	stdatomic "sync/atomic"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
 )
-
-type atomic[T comparable] struct{ val stdatomic.Value }
-
-func (a *atomic[T]) Get() T { return a.resolve(a.val.Load()) }
-func (a *atomic[T]) Set(in T) bool {
-	return a.val.CompareAndSwap(nil, in) || a.val.CompareAndSwap(in, in)
-}
-
-func (*atomic[T]) resolve(in any) (val T) {
-	switch c := in.(type) {
-	case T:
-		val = c
-	}
-	return val
-}
 
 // Set provides a flexible generic set implementation, with optional
 // safety for concurrent use (via Synchronize() and WithLock() methods,)

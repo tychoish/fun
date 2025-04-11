@@ -9,8 +9,6 @@
 package dt
 
 import (
-	"sort"
-
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/fn"
@@ -74,80 +72,3 @@ func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), 
 // stream consumes items from the heap, and will return when the
 // heap is empty.
 func (h *Heap[T]) Stream() *fun.Stream[T] { ; return h.list().StreamFront() }
-
-// IsSorted reports if the list is sorted from low to high, according
-// to the LessThan function.
-func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
-	if l == nil || l.Len() <= 1 {
-		return true
-	}
-
-	for item := l.Front(); item.Next().Ok(); item = item.Next() {
-		if lt(item.Value(), item.Previous().Value()) {
-			return false
-		}
-	}
-	return true
-}
-
-// SortMerge sorts the list, using the provided comparison
-// function and a Merge Sort operation. This is something of a novelty
-// in most cases, as removing the elements from the list, adding to a
-// slice and then using sort.Slice() from the standard library, and
-// then re-adding those elements to the list, will perform better.
-//
-// The operation will modify the input list, replacing it with an new
-// list operation.
-func (l *List[T]) SortMerge(lt cmp.LessThan[T]) { *l = *mergeSort(l, lt) }
-
-// SortQuick sorts the list, by removing the elements, adding them
-// to a slice, and then using sort.SliceStable(). In many cases this
-// performs better than the merge sort implementation.
-func (l *List[T]) SortQuick(lt cmp.LessThan[T]) {
-	elems := make([]*Element[T], 0, l.Len())
-
-	for l.Len() > 0 {
-		elems = append(elems, l.PopFront())
-	}
-	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
-	for idx := range elems {
-		l.Back().Append(elems[idx])
-	}
-}
-
-func mergeSort[T any](head *List[T], lt cmp.LessThan[T]) *List[T] {
-	if head.Len() < 2 {
-		return head
-	}
-
-	tail := split(head)
-
-	head = mergeSort(head, lt)
-	tail = mergeSort(tail, lt)
-
-	return merge(lt, head, tail)
-}
-
-func split[T any](list *List[T]) *List[T] {
-	total := list.Len()
-	out := &List[T]{}
-	for list.Len() > total/2 {
-		out.Back().Append(list.PopFront())
-	}
-	return out
-}
-
-func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
-	out := &List[T]{}
-	for a.Len() != 0 && b.Len() != 0 {
-		if lt(a.Front().Value(), b.Front().Value()) {
-			out.Back().Append(a.PopFront())
-		} else {
-			out.Back().Append(b.PopFront())
-		}
-	}
-	out.Extend(a)
-	out.Extend(b)
-
-	return out
-}

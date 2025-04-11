@@ -6,20 +6,6 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// UnmarshalJSON reads the json value, and sets the value of the
-// element to the value in the json, potentially overriding an
-// existing value. By supporting json.Marshaler and json.Unmarshaler,
-// Elements and lists can behave as arrays in larger json objects, and
-// can be as the output/input of json.Marshal and json.Unmarshal.
-func (e *Element[T]) UnmarshalJSON(in []byte) error {
-	var val T
-	if err := json.Unmarshal(in, &val); err != nil {
-		return err
-	}
-	e.Set(val)
-	return nil
-}
-
 // MarshalJSON produces a JSON array representing the items in the
 // list. By supporting json.Marshaler and json.Unmarshaler, Elements
 // and lists can behave as arrays in larger json objects, and

@@ -2,14 +2,21 @@ package dt
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"iter"
+	"sort"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
+
+////////////////////////////////////////////////////////////////////////
+//
+// Double Linked List Implementation
+//
+////////////////////////////////////////////////////////////////////////
 
 // List provides a doubly linked list. Callers are responsible for
 // their own concurrency control and bounds checking, and should
@@ -255,158 +262,83 @@ func (l *List[T]) pop(it *Element[T]) *Element[T] {
 
 ////////////////////////////////////////////////////////////////////////
 //
-// Element implementation
-
-// Element is the underlying component of a list, provided by
-// streams, the Pop operations, and the Front/Back accesses in the
-// list. You can use the methods on this objects to iterate through
-// the list, and the Ok() method for validating zero-valued items.
-type Element[T any] struct {
-	next *Element[T]
-	prev *Element[T]
-	list *List[T]
-	ok   bool
-	item T
-}
-
-// NewElement produces an unattached Element that you can use with
-// Append. Element.Append(NewElement()) is essentially the same as
-// List.PushBack().
-func NewElement[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
-
-// String returns the string form of the value of the element.
-func (e *Element[T]) String() string { return fmt.Sprint(e.item) }
-
-// Value accesses the element's value.
-func (e *Element[T]) Value() T { return e.item }
-
-// Next produces the next element. This is always non-nil, *unless*
-// the element is not a member of a list. At the ends of a list, the
-// value is non-nil, but would return false for Ok.
-func (e *Element[T]) Next() *Element[T] { return e.next }
-
-// Previous produces the next element. This is always non-nil, *unless*
-// the element is not a member of a list. At the ends of a list, the
-// value is non-nil, but would return false for Ok.
-func (e *Element[T]) Previous() *Element[T] { return e.prev }
-
-// In checks to see if an element is in the specified list. Because
-// elements hold a pointer to their list, this is an O(1) operation.
+// sorting implementation
 //
-// Returns false when the element is nil.
-func (e *Element[T]) In(l *List[T]) bool { return e.list.nonNil() && e.list == l }
+////////////////////////////////////////////////////////////////////////
 
-// Set allows you to change set the value of an item in place. Returns
-// true if the operation is successful. The operation fails if the Element is the
-// root item in a list or not a member of a list.
-//
-// Set is safe to call on nil elements.
-func (e *Element[T]) Set(v T) bool {
-	if e.settable() {
-		e.ok = true
-		e.item = v
-		return true
-
-	}
-
-	return false
-}
-
-// Append adds the element 'new' after the element 'e', inserting it
-// in the next position in the list. Will return 'e' if 'new' is not
-// valid for insertion into this list (e.g. it belongs to another
-// list, or is attached to other elements, is already a member of this
-// list, or is otherwise invalid.) PushBack and PushFront, are
-// implemented in terms of Append.
-func (e *Element[T]) Append(val *Element[T]) *Element[T] {
-	if e.appendable(val) && val.isDetatched() {
-		return e.uncheckedAppend(val)
-	}
-
-	return e
-}
-
-// Push adds a value to the list, and returns the resulting element.
-func (e *Element[T]) Push(v T) *Element[T] { return e.Append(NewElement(v)) }
-
-// Remove removes the elemtn from the list, returning true if the operation
-// was successful. Remove returns false when the element is not valid
-// to be removed (e.g. is not part of a list, is the root element of
-// the list, etc.)
-func (e *Element[T]) Remove() bool {
-	if e.removable() {
-		e.uncheckedRemove()
+// IsSorted reports if the list is sorted from low to high, according
+// to the LessThan function.
+func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
+	if l == nil || l.Len() <= 1 {
 		return true
 	}
 
-	return false
-}
-
-// Drop wraps remove, and additionally, if the remove was successful,
-// drops the value and sets the Ok value to false.
-func (e *Element[T]) Drop() {
-	if e.Remove() {
-		e.item = e.zero()
-		e.ok = false
+	for item := l.Front(); item.Next().Ok(); item = item.Next() {
+		if lt(item.Value(), item.Previous().Value()) {
+			return false
+		}
 	}
+	return true
 }
 
-func (*Element[T]) zero() (o T) { return }
-
-// Swap exchanges the location of two elements in a list, returning
-// true if the operation was successful, and false if the elements are
-// not eligible to be swapped. It is valid/possible to swap the root element of
-// the list with another element to "move the head", causing a wrap
-// around effect. Swap will not operate if either element is nil, or
-// not a member of the same list.
-func (e *Element[T]) Swap(with *Element[T]) bool {
-	if e.swappable(with) {
-		wprev := *with.prev
-		with.uncheckedRemove()
-		e.prev.uncheckedAppend(with)
-		e.uncheckedRemove()
-		wprev.uncheckedAppend(e)
-		return true
-	}
-
-	return false
-}
-
-// Ok checks that an element is valid. Invalid elements can be
-// produced at the end of iterations (e.g. the list's root object,) or
-// if you attempt to Pop an element off of an empty list.
+// SortMerge sorts the list, using the provided comparison
+// function and a Merge Sort operation. This is something of a novelty
+// in most cases, as removing the elements from the list, adding to a
+// slice and then using sort.Slice() from the standard library, and
+// then re-adding those elements to the list, will perform better.
 //
-// Returns false when the element is nil.
-func (e *Element[T]) Ok() bool                        { return e != nil && e.ok && !e.isRoot() }
-func (e *Element[T]) appendable(val *Element[T]) bool { return val != nil && val.ok && e.list.nonNil() } // && new.list == nil && new.list != e.list && .next == nil && val.prev == nil
-func (e *Element[T]) removable() bool                 { return e.list.nonNil() && !e.isRoot() && e.list.Len() > 0 }
-func (e *Element[T]) settable() bool                  { return e != nil && !e.isRoot() }
-func (e *Element[T]) isRoot() bool                    { return e.list.nonNil() && e.list.head == e }
-func (e *Element[T]) isDetatched() bool               { return e.list == nil }
+// The operation will modify the input list, replacing it with an new
+// list operation.
+func (l *List[T]) SortMerge(lt cmp.LessThan[T]) { *l = *mergeSort(l, lt) }
 
-// make sure we have members of the same list
-func (e *Element[T]) swappable(it *Element[T]) bool {
-	return it != nil && e != nil && it != e && e.list.nonNil() && e.list == it.list
+// SortQuick sorts the list, by removing the elements, adding them
+// to a slice, and then using sort.SliceStable(). In many cases this
+// performs better than the merge sort implementation.
+func (l *List[T]) SortQuick(lt cmp.LessThan[T]) {
+	elems := make([]*Element[T], 0, l.Len())
+
+	for l.Len() > 0 {
+		elems = append(elems, l.PopFront())
+	}
+	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
+	for idx := range elems {
+		l.Back().Append(elems[idx])
+	}
 }
 
-func (e *Element[T]) uncheckedAppend(val *Element[T]) *Element[T] {
-	e.list.meta.length++
-	val.list = e.list
-	val.prev = e
-	val.next = e.next
-	val.prev.next = val
-	val.next.prev = val
-	return val
+func mergeSort[T any](head *List[T], lt cmp.LessThan[T]) *List[T] {
+	if head.Len() < 2 {
+		return head
+	}
+
+	tail := split(head)
+
+	head = mergeSort(head, lt)
+	tail = mergeSort(tail, lt)
+
+	return merge(lt, head, tail)
 }
 
-func (e *Element[T]) uncheckedRemove() {
-	e.list.meta.length--
-	e.prev.next = e.next
-	e.next.prev = e.prev
-	e.list = nil
-	// avoid removing references so iteration and deletes can
-	// interleve (ish)
-	//
-	// e.next = nil
-	// e.prev = nil
+func split[T any](list *List[T]) *List[T] {
+	total := list.Len()
+	out := &List[T]{}
+	for list.Len() > total/2 {
+		out.Back().Append(list.PopFront())
+	}
+	return out
+}
+
+func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
+	out := &List[T]{}
+	for a.Len() != 0 && b.Len() != 0 {
+		if lt(a.Front().Value(), b.Front().Value()) {
+			out.Back().Append(a.PopFront())
+		} else {
+			out.Back().Append(b.PopFront())
+		}
+	}
+	out.Extend(a)
+	out.Extend(b)
+
+	return out
 }

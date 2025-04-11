@@ -315,7 +315,7 @@ func TestGenerator(t *testing.T) {
 	t.Run("CheckBlock", func(t *testing.T) {
 		count := 0
 		var err error
-		var pf Generator[int] = func(_ context.Context) (int, error) {
+		var pf Generator[int] = func(context.Context) (int, error) {
 			count++
 			return 42, err
 		}
