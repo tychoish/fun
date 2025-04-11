@@ -190,9 +190,10 @@ func TestError(t *testing.T) {
 			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			if e := es.stack.Error(); e != "recovered panic: boop" {
-				t.Error(e)
-			}
+
+			assert.ErrorIs(t, es.Resolve(), ers.ErrRecoveredPanic)
+			assert.Substring(t, es.Resolve().Error(), "boop")
+
 			if counter != 1 {
 				t.Error("callback not called")
 			}

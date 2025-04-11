@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
@@ -67,18 +65,6 @@ func TestCollections(t *testing.T) {
 			assert.NotError(t, err)
 		})
 	})
-	t.Run("Wrap", func(t *testing.T) {
-		check.NotError(t, Wrap(nil, "hello"))
-		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
-		const expected ers.Error = "hello"
-		err := Wrap(expected, "hello")
-		assert.Equal(t, err.Error(), "hello: hello")
-		assert.ErrorIs(t, err, expected)
-
-		err = Wrapf(expected, "hello %s", "world")
-		assert.Equal(t, err.Error(), "hello world: hello")
-		assert.ErrorIs(t, err, expected)
-	})
 	t.Run("Collapse", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			if err := ers.Join(); err != nil {
@@ -130,7 +116,19 @@ func TestCollections(t *testing.T) {
 		assert.Equal(t, len(ers.Unwind(iter.Close())), 33)
 		assert.Equal(t, len(ers.Unwind(iter.Close())), 33)
 	})
-
+	t.Run("RecoverHookErrorSlice", func(t *testing.T) {
+		ec := new(Collector)
+		assert.NotPanic(t, func() {
+			defer RecoverHook(ec, nil)
+			panic([]error{ers.ErrImmutabilityViolation, ers.ErrInvalidInput})
+		})
+		err := ec.Resolve()
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrImmutabilityViolation)
+		assert.ErrorIs(t, err, ers.ErrInvalidInput)
+		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+		assert.Equal(t, len(ers.Unwind(err)), 3)
+	})
 	t.Run("Stream", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -139,14 +137,14 @@ func TestCollections(t *testing.T) {
 				ch := make(chan error)
 				close(ch)
 				ec := New()
-				Consume(ctx, ec, ch)
+				PopulateFromChannel(ctx, ec, ch)
 				assert.NotError(t, ec.Resolve())
 			})
 			t.Run("One", func(t *testing.T) {
 				ch := getPopulatedErrChan(1)
 				close(ch)
 				ec := New()
-				Consume(ctx, ec, ch)
+				PopulateFromChannel(ctx, ec, ch)
 				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
@@ -162,7 +160,7 @@ func TestCollections(t *testing.T) {
 				close(ch)
 				fun.Invariant.IsTrue(len(ch) == 10)
 				ec := New()
-				Consume(ctx, ec, ch)
+				PopulateFromChannel(ctx, ec, ch)
 				err := ec.Resolve()
 				if err == nil {
 					t.Logf("%T", err)
@@ -183,38 +181,6 @@ func TestCollections(t *testing.T) {
 		assert.Equal(t, out, 42)
 		assert.Error(t, ec.Resolve())
 		assert.Equal(t, ec.Resolve().Error(), "kip")
-	})
-}
-
-func TestWithTime(t *testing.T) {
-	const err ers.Error = ers.Error("ERRNO=42")
-	t.Run("Nil", func(t *testing.T) {
-		ec := &Collector{}
-		WithTime(ec, nil)
-		if ec.HasErrors() {
-			t.Fatal(ec.Resolve())
-		}
-		if err := ec.Resolve(); err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("HasTimestamp", func(t *testing.T) {
-		ec := &Collector{}
-		now := time.Now()
-		WithTime(ec, err)
-		second := time.Now()
-		if !ec.HasErrors() {
-			t.Fatal("should have error", ec.Resolve())
-		}
-		if err := ec.Resolve(); err == nil {
-			t.Fatal("should resolve error")
-		}
-		if errTime := ers.GetTime(ec.Resolve()); !now.Before(errTime) {
-			t.Error(errTime, now)
-		}
-		if errTime := ers.GetTime(ec.Resolve()); !second.After(errTime) {
-			t.Error(errTime, second)
-		}
 	})
 }
 

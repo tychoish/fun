@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -28,16 +29,22 @@ type Collector struct {
 // any special construction, but this function is shorter.
 func New() *Collector { return &Collector{} }
 
-func lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
-func with(mtx *sync.Mutex)             { mtx.Unlock() }
-
 // Add collects an error if that error is non-nil.
 func (ec *Collector) Add(err error) {
-	if err == nil {
-		return
+	if err != nil {
+		defer internal.With(internal.Lock(&ec.mu))
+		ec.stack.Push(err)
 	}
-	defer internal.With(internal.Lock(&ec.mu))
-	ec.stack.Push(err)
+}
+
+// AddWithHook adds a non-nill error and runs the provided hook
+// function.
+func (ec *Collector) AddWithHook(err error, hook func()) {
+	if err != nil {
+		defer internal.With(internal.Lock(&ec.mu))
+		ec.stack.Push(err)
+		ft.SafeCall(hook)
+	}
 }
 
 // Handler returns the collector's Add method as a
@@ -56,14 +63,14 @@ func (ec *Collector) Future() fn.Future[error] { return ec.Resolve }
 // and merge Stack and other { Unwrap() []error } errors, Len is not
 // updated beyond the current level. In this way Len really reports
 // "height," but this is the same for the top level.
-func (ec *Collector) Len() int { defer with(lock(&ec.mu)); return ec.stack.Len() }
+func (ec *Collector) Len() int { defer internal.With(internal.Lock(&ec.mu)); return ec.stack.Len() }
 
 // Stream produces a stream for all errors present in the
 // collector. The stream proceeds from the current error to the
 // oldest error, and will not observe new errors added to the
 // collector.
 func (ec *Collector) Stream() *fun.Stream[error] {
-	defer with(lock(&ec.mu))
+	defer internal.With(internal.Lock(&ec.mu))
 	return fun.CheckedGenerator(ec.stack.Generator()).Stream()
 }
 
@@ -72,7 +79,7 @@ func (ec *Collector) Stream() *fun.Stream[error] {
 // errors.As, and can be iterated or used in combination with
 // ers.Unwind() to introspect the available errors.
 func (ec *Collector) Resolve() error {
-	defer with(lock(&ec.mu))
+	defer internal.With(internal.Lock(&ec.mu))
 
 	if ec.stack.Len() == 0 {
 		return nil
