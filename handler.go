@@ -66,12 +66,6 @@ func (pf Handler[T]) Add(ctx context.Context, wg *WaitGroup, eh fn.Handler[error
 	pf.Operation(eh, op).Add(ctx, wg)
 }
 
-// Block runs the Handler with a context that will never be
-// canceled.
-//
-// Deprecated: use Wait() instead.
-func (pf Handler[T]) Block(in T) error { return pf.Wait(in) }
-
 // Wait runs the Handler with a context that will never be
 // canceled.
 func (pf Handler[T]) Wait(in T) error { return pf.Worker(in).Wait() }
@@ -85,7 +79,7 @@ func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ct
 
 // Force processes the input, but discards the error and uses a
 // context that will not expire.
-func (pf Handler[T]) Force(in T) { pf.Worker(in).Ignore().Block() }
+func (pf Handler[T]) Force(in T) { pf.Worker(in).Ignore().Wait() }
 
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.

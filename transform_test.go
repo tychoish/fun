@@ -948,7 +948,7 @@ func RunStreamStringAlgoTests(
 						sum, err := iter.Reduce(func(in string, value string) (string, error) {
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
-						}).Run(ctx)
+						}).Resolve(ctx)
 
 						if err != nil {
 							t.Fatal(err)
@@ -981,7 +981,7 @@ func RunStreamStringAlgoTests(
 								count++
 								return "", nil
 							},
-						).Run(ctx)
+						).Resolve(ctx)
 						check.Equal(t, count, 1)
 						if err == nil {
 							t.Fatal("expected error")
@@ -1007,7 +1007,7 @@ func RunStreamStringAlgoTests(
 								return 42, nil
 							}
 							return value, ErrStreamContinue
-						}).Run(ctx)
+						}).Resolve(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
@@ -1025,7 +1025,7 @@ func RunStreamStringAlgoTests(
 								return 300, io.EOF
 							}
 							return 42, nil
-						}).Run(ctx)
+						}).Resolve(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
@@ -1310,7 +1310,7 @@ func TestTransformFunctions(t *testing.T) {
 				prod := mpf.CovnertGenerator(MakeGenerator(func() (int, error) { pcount++; return 42, ers.ErrInvalidInput }))
 				check.Equal(t, mcount, 0)
 				check.Equal(t, pcount, 0)
-				out, err := prod.Run(ctx)
+				out, err := prod.Resolve(ctx)
 				check.Equal(t, mcount, 0)
 				check.Equal(t, pcount, 1)
 				check.Error(t, err)

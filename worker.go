@@ -171,12 +171,6 @@ func (wf Worker) Operation(ob fn.Handler[error]) Operation {
 	return func(ctx context.Context) { wf.Observe(ctx, ob) }
 }
 
-// Block executes the worker function with a context that will never
-// expire and returns the error. Use with caution.
-//
-// Deprecated: use Wait() instead.
-func (wf Worker) Block() error { return wf.Wait() }
-
 // Wait runs the worker with a background context and returns its
 // error.
 func (wf Worker) Wait() error { return wf.Run(context.Background()) }

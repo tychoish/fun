@@ -173,7 +173,7 @@ func TestOperation(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 		})
 		start := time.Now()
-		wf.Block()
+		wf.Wait()
 		if time.Since(start) < 10*time.Millisecond {
 			t.Error(time.Since(start))
 		}
@@ -261,7 +261,7 @@ func TestOperation(t *testing.T) {
 
 		MakeOperation(func() { ops = append(ops, "main") }).
 			PreHook(MakeOperation(func() { ops = append(ops, "pre") })).
-			Block()
+			Wait()
 
 		// check call order
 		check.EqualItems(t, ops, []string{"pre", "main"})
@@ -270,7 +270,7 @@ func TestOperation(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			ops := []string{}
 			MakeOperation(func() { ops = append(ops, "first") }).
-				Join(MakeOperation(func() { ops = append(ops, "second") })).Block()
+				Join(MakeOperation(func() { ops = append(ops, "second") })).Wait()
 			// check call order
 			check.EqualItems(t, ops, []string{"first", "second"})
 		})

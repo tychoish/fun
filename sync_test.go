@@ -105,12 +105,12 @@ func TestWaitGroup(t *testing.T) {
 			if i%4 == 0 {
 				go func(ch chan struct{}) {
 					defer close(ch)
-					_ = wg.Worker().Block()
+					_ = wg.Worker().Wait()
 				}(ch)
 			} else if i%2 == 0 {
 				go func(ch chan struct{}) {
 					defer close(ch)
-					wg.Operation().Block()
+					wg.Operation().Wait()
 				}(ch)
 			} else {
 				go func(ch chan struct{}, num int) {

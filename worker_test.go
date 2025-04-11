@@ -23,7 +23,7 @@ func TestWorker(t *testing.T) {
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
 			start := time.Now()
-			err := Worker(func(_ context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Block()
+			err := Worker(func(_ context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Wait()
 			dur := time.Since(start)
 			if dur < 10*time.Millisecond {
 				t.Error("did not block long enough", dur)

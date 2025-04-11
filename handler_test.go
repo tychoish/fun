@@ -26,7 +26,7 @@ func TestProcess(t *testing.T) {
 			called++
 			return nil
 		})
-		check.NotError(t, pf.Block(42))
+		check.NotError(t, pf.Wait(42))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -304,7 +304,7 @@ func TestProcess(t *testing.T) {
 			op = op.Lock()
 
 			ft.DoTimes(128, func() { op.Operation(oe, 42).Add(ctx, wg) })
-			wg.Operation().Block()
+			wg.Operation().Wait()
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
@@ -423,13 +423,13 @@ func TestProcess(t *testing.T) {
 		t.Run("All", func(t *testing.T) {
 			defer reset()
 			pg := JoinHandlers(pf, pf, pf, pf, pf, pf, pf, pf)
-			assert.NotError(t, pg.Block(42))
+			assert.NotError(t, pg.Wait(42))
 			assert.Equal(t, counter, 8)
 		})
 		t.Run("WithNils", func(t *testing.T) {
 			defer reset()
 			pg := JoinHandlers(pf, nil, pf, pf, nil, pf, pf, pf, pf, pf, nil)
-			assert.NotError(t, pg.Block(42))
+			assert.NotError(t, pg.Wait(42))
 			assert.Equal(t, counter, 8)
 		})
 		t.Run("Empty", func(t *testing.T) {
@@ -742,7 +742,7 @@ func TestProcess(t *testing.T) {
 			pf := MakeHandler(func(in int) error { count++; check.Equal(t, in, 42); return nil })
 			op := JoinHandlers(pf)
 			check.Equal(t, 0, count)
-			assert.NotError(t, op.Block(42))
+			assert.NotError(t, op.Wait(42))
 			check.Equal(t, 1, count)
 		})
 		t.Run("Multi", func(t *testing.T) {
@@ -751,7 +751,7 @@ func TestProcess(t *testing.T) {
 			op := JoinHandlers(pf, pf, pf, pf)
 
 			check.Equal(t, 0, count)
-			assert.NotError(t, op.Block(42))
+			assert.NotError(t, op.Wait(42))
 			check.Equal(t, 4, count)
 		})
 

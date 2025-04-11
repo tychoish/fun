@@ -129,11 +129,6 @@ func (wf Operation) While() Operation {
 	}
 }
 
-// Block runs the Operation with a context that will never be canceled.
-//
-// Deprecated: Use Wait() instead.
-func (wf Operation) Block() { wf.Wait() }
-
 // Wait runs the operation with a background context.
 func (wf Operation) Wait() { wf(context.Background()) }
 

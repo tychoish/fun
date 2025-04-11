@@ -69,11 +69,6 @@ func PtrGenerator[T any](fn func() *T) Generator[T] {
 func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.Safe()) }
 
 // Run executes the generator and returns the result
-//
-// Deprecated: Use the Resolve() helper.
-func (pf Generator[T]) Run(ctx context.Context) (T, error) { return pf.Resolve(ctx) }
-
-// Run executes the generator and returns the result
 func (pf Generator[T]) Resolve(ctx context.Context) (T, error) { return pf(ctx) }
 
 // Background constructs a worker that runs the provided Generator in a
@@ -202,11 +197,6 @@ func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
 // future is resolved, the generator executes with a context that never
 // expires and panics in the case of an error.
 func (pf Generator[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
-
-// Block runs the generator with a context that will ever expire.
-//
-// Deprecated: Use Wait() rather than block.
-func (pf Generator[T]) Block() (T, error) { return pf.Wait() }
 
 // Wait runs the generator with a context that will ever expire.
 func (pf Generator[T]) Wait() (T, error) { return pf(context.Background()) }
