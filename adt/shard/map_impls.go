@@ -29,7 +29,7 @@ const (
 	// SyncMap for write-heavy workloads with frequent
 	// modifications of existing keys.
 	MapTypeMutex MapType = 2
-	// MapTypeMutex is a standard library map (map[K]V) with all
+	// MapTypeRWMutex is a standard library map (map[K]V) with all
 	// access protected with a sync.RWMutex, ensuring exclusive
 	// access for write operations and concurrent access for read
 	// operations. Will perform better for read-heavy workloads,

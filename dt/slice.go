@@ -26,7 +26,7 @@ func Variadic[T any](in ...T) Slice[T] { return in }
 // values. This is a helper for NewSlice(in).Ptrs().
 func SlicePtrs[T any](in []T) Slice[*T] { return NewSlice(in).Ptrs() }
 
-// SliceRefs converts a slice of pointers to a slice of objects,
+// SliceSparseRefs converts a slice of pointers to a slice of objects,
 // dropping nil values. from the output slice.
 func SliceSparseRefs[T any](in []*T) Slice[T] {
 	out := make([]T, 0, len(in))

@@ -1,16 +1,14 @@
-// GENERATED FILE FROM PAIR IMPLEMENTATION
 package dt
 
 import (
-	"context"
-	"iter"
-	"sync"
+	"bytes"
+	"encoding/json"
+	"fmt"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/ers"
 )
+
+// GENERATED FILE FROM PAIR IMPLEMENTATION
 
 // Tuple represents a key-value tuple. Used by the adt synchronized map
 // implementation and the set package to handle ordered key-value tuples.
@@ -25,137 +23,41 @@ type Tuple[K any, V any] struct {
 // constructors.
 func MakeTuple[K any, V any](k K, v V) Tuple[K, V] { return Tuple[K, V]{One: k, Two: v} }
 
-// Tuples implements a collection of key-value tuples.
-type Tuples[K any, V any] struct {
-	ll    *List[Tuple[K, V]]
-	setup sync.Once
-}
-
-// MakeTuples constructs a Tuples object from a sequence of Tuples. This
-// is identical to using the literal constructor but may be more
-// ergonomic as the compiler seems to be better at inferring types in
-// function calls over literal constructors.
-//
-// To build Tuples objects from other types, use the Consume methods.
-func MakeTuples[K any, V any](in ...Tuple[K, V]) *Tuples[K, V] {
-	p := &Tuples[K, V]{}
-	p.Append(in...)
-	return p
-}
-
-// ConsumeTuples creates a *Tuples[K,V] object from a stream of
-// Tuple[K,V] objects.
-func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*Tuples[K, V]] {
-	return func(ctx context.Context) (*Tuples[K, V], error) {
-		p := &Tuples[K, V]{}
-		if err := p.Consume(iter).Run(ctx); err != nil {
-			return nil, err
-		}
-		return p, nil
+func (t Tuple[K, V]) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := ers.Join(
+		buf.WriteByte('['),
+		enc.Encode(t.One),
+		buf.WriteByte(','),
+		enc.Encode(t.Two),
+		buf.WriteByte(']'),
+	)
+	if err != nil {
+		return nil, err
 	}
+	return buf.Bytes(), nil
 }
 
-func (p *Tuples[K, V]) init()     { p.setup.Do(p.initImpl) }
-func (p *Tuples[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
+func (t *Tuple[K, V]) UnmarshalJSON(in []byte) error {
+	rt := []json.RawMessage{}
+	if err := json.Unmarshal(in, &rt); err != nil {
+		return err
+	}
+	if len(rt) > 2 {
+		return fmt.Errorf("json value has %d items", len(rt))
+	}
 
-// Consume adds items from a stream of tuples to the current Tuples slice.
-func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
-	return iter.Observe(func(item Tuple[K, V]) { p.Push(item) })
-}
+	if err := json.Unmarshal(rt[0], &t.One); err != nil {
+		return ers.Wrap(err, "tuple.One")
+	}
 
-// Seq returns a native go iterator function for tuples.
-func (p *Tuples[K, V]) Seq() iter.Seq[Tuple[K, V]] {
-	return func(yield func(value Tuple[K, V]) bool) {
-		p.init()
-		for item := p.ll.Front(); item.Ok(); item = item.Next() {
-			if !yield(item.Value()) {
-				return
-			}
+	if len(rt) == 2 {
+		if err := json.Unmarshal(rt[1], &t.Two); err != nil {
+			return ers.Wrap(err, "tuple.Two")
+
 		}
 	}
+
+	return nil
 }
-
-// Seq2 returns a native go iterator over the items in a collections of tuples.
-func (p *Tuples[K, V]) Seq2() iter.Seq2[K, V] {
-	return func(yield func(key K, value V) bool) {
-		for item := range p.Seq() {
-			if !yield(item.One, item.Two) {
-				return
-			}
-		}
-	}
-}
-
-// Stream return a stream over each key-value tuples.
-func (p *Tuples[K, V]) Stream() *fun.Stream[Tuple[K, V]] { p.init(); return p.ll.StreamFront() }
-
-// Ones returns a stream over only the first item from a sequence of
-// tuples.
-func (p *Tuples[K, V]) Ones() *fun.Stream[K] {
-	return fun.Converter(func(p Tuple[K, V]) K { return p.One }).Process(p.Stream())
-}
-
-// Twos returns a stream over only the second item from a sequence of
-// tuples.
-func (p *Tuples[K, V]) Twos() *fun.Stream[V] {
-	return fun.Converter(func(p Tuple[K, V]) V { return p.Two }).Process(p.Stream())
-}
-
-// Slice creates a new slice of all the Tuple objects.
-func (p *Tuples[K, V]) Slice() []Tuple[K, V] { return p.ll.Slice() }
-
-// List returns the sequence of tuples as a list.
-func (p *Tuples[K, V]) List() *List[Tuple[K, V]] { p.init(); return p.ll.Copy() }
-
-// Copy produces a new Tuples object with the same values.
-func (p *Tuples[K, V]) Copy() *Tuples[K, V] { return &Tuples[K, V]{ll: p.List()} }
-
-// SortMerge performs a merge sort on the collected tuples.
-func (p *Tuples[K, V]) SortMerge(c cmp.LessThan[Tuple[K, V]]) { p.init(); p.ll.SortMerge(c) }
-
-// SortQuick does a quick sort using sort.StableSort. Typically faster than
-// SortMerge, but potentially more memory intensive for some types.
-func (p *Tuples[K, V]) SortQuick(c cmp.LessThan[Tuple[K, V]]) { p.init(); p.ll.SortQuick(c) }
-
-// Len returns the number of items in the tuples object.
-func (p *Tuples[K, V]) Len() int { p.init(); return p.ll.Len() }
-
-// Observe calls the handler function for every tuple in the container.
-func (p *Tuples[K, V]) Observe(hf fn.Handler[Tuple[K, V]]) {
-	p.Process(fun.FromHandler(hf)).Ignore().Wait()
-}
-
-// Process returns a worker, that when executed calls the processor
-// function for every tuple in the container.
-func (p *Tuples[K, V]) Process(pf fun.Handler[Tuple[K, V]]) fun.Worker {
-	return func(ctx context.Context) error {
-		p.init()
-		if p.ll.Len() == 0 {
-			return nil
-		}
-
-		for item := range p.Seq() {
-			if err := pf(ctx, item); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
-// Add adds a new value to the underlying slice. This may add a
-// duplicate key. The return value is provided to support chaining
-// Add() operations
-func (p *Tuples[K, V]) Add(k K, v V) *Tuples[K, V] { p.Push(Tuple[K, V]{One: k, Two: v}); return p }
-
-// Push adds a single tuple to the slice of tuples. This may add a
-// duplicate key.
-func (p *Tuples[K, V]) Push(tuple Tuple[K, V]) { p.init(); p.ll.PushBack(tuple) }
-
-// Append as a collection of tuples to the collection of key/value
-// tuples.
-func (p *Tuples[K, V]) Append(vals ...Tuple[K, V]) { p.init(); p.ll.Append(vals...) }
-
-// Extend adds the items from a Tuples object (slice of Tuple) without
-// modifying the donating object.
-func (p *Tuples[K, V]) Extend(toAdd *Tuples[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }

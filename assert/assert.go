@@ -222,8 +222,9 @@ func Contains[T comparable](t testing.TB, slice []T, item T) {
 	t.Fatalf("item <%v> is not in %v", item, slice)
 }
 
-// Contains asserts that the item is *not* in the slice provided. If
-// the input slice is empty, this assertion will never error.
+// NotContains asserts that the item is *not* in the slice
+// provided. If the input slice is empty, this assertion will never
+// error.
 func NotContains[T comparable](t testing.TB, slice []T, item T) {
 	t.Helper()
 
@@ -249,8 +250,8 @@ func EqualItems[T comparable](t testing.TB, one, two []T) {
 	}
 }
 
-// EqualItems compares the values in two slices and creates a failure
-// if all items are not equal
+// NotEqualItems compares the values in two slices and creates a
+// failure if all items are equal.
 func NotEqualItems[T comparable](t testing.TB, one, two []T) {
 	t.Helper()
 

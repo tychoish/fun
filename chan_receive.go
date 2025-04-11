@@ -11,7 +11,7 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// ChanReceive, wraps a channel fore <-chan T operations. It is the type
+// ChanReceive wraps a channel fore <-chan T operations. It is the type
 // returned by the ChanReceive() method on ChannelOp. The primary method
 // is Read(), with other methods provided as "self-documenting"
 // helpers.

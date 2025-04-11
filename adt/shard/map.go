@@ -172,10 +172,8 @@ func (m *Map[K, V]) ParallelStream() *fun.Stream[MapItem[K, V]] {
 // concurrently, items are presented in fully arbitrary order.
 func (m *Map[K, V]) ParallelValues() *fun.Stream[V] { return fun.MergeStreams(m.valItrp()) }
 
-// ParallelValues provides a stream over the Values in a sharded map in
-// parallel, which may be useful in avoiding slow iteration with
-// highly contended mutexes. Additionally, because items are processed
-// concurrently, items are presented in fully arbitrary order.
+// MapItem wraps the value stored in a sharded map, with synchronized
+// sharding and versioning information.
 type MapItem[K comparable, V any] struct {
 	Exists        bool
 	GlobalVersion uint64

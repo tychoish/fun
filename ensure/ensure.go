@@ -11,10 +11,10 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// Assertion, produced by the ensure.That() constructor is a chainable
-// interface for annotating rich assertions, as a complement to the
-// fun/assert and fun/assert/check libraries. Use ensure.That() forms
-// to annotate
+// Assertion values are produced by the ensure.That() constructor, and
+// are a chainable interface for annotating rich assertions, as a
+// complement to the fun/assert and fun/assert/check libraries. Use
+// ensure.That() forms to create self-documenting tests.
 type Assertion struct {
 	// results collection
 	check    adt.Once[[]string]
@@ -41,10 +41,12 @@ func That(that is.That) *Assertion { return (&Assertion{}).That(that) }
 // noop.
 func (a *Assertion) That(t is.That) *Assertion { a.check.Set(t); return a }
 
-// Fatal, the default, means that the assertion has "abort-on-error"
+// Fatal means that the assertion has "abort-on-error"
 // semantics, and will cause the test to fail when the assertion
 // fails. If there are subtests, they will always run before the test
 // aborts.
+//
+// This is the default mode for Assertions.
 func (a *Assertion) Fatal() *Assertion { a.continueOnError = false; return a }
 
 // Error uses t.Error or b.Error assertions, which mean that the
@@ -58,7 +60,7 @@ func (a *Assertion) Verbose() *Assertion { a.alwaysLog = true; return a }
 
 // Quiet toggles the logging behavior to be "quiet" (e.g. only, log in
 // the case of that the Assertion fails.) This is the default.
-func (a *Assertion) Queit() *Assertion { a.alwaysLog = false; return a }
+func (a *Assertion) Quiet() *Assertion { a.alwaysLog = false; return a }
 
 // Benchmark creates a sub-benchrmark function, which is suitable for
 // use as an argument to b.Run().
@@ -86,7 +88,7 @@ func (a *Assertion) With(name string, op func(ensure *Assertion)) *Assertion {
 // Add adds an assertion object as a subtest of the root assertion.
 func (a *Assertion) Add(sub *Assertion) *Assertion { a.subtests.PushBack(sub); return a }
 
-// Logs adds a message that is printed on failure in quiet mode, and
+// Log adds a message that is printed on failure in quiet mode, and
 // unconditionally in verbose mode. Operates generally like t.Log() or
 // fmt.Sprint().
 func (a *Assertion) Log(args ...any) *Assertion {

@@ -83,7 +83,7 @@ func CompareAndSwap[T comparable, A AtomicValue[T]](a A, oldVal, newVal T) bool 
 	}
 }
 
-// Reset, for an atomic value that holds a number, sets the atomic to
+// Reset sets the atomic, for an atomic value that holds a number, to
 // 0, and returns the previously stored value.
 func Reset[T intish.Numbers, A AtomicValue[T]](a A) T {
 	var delta T

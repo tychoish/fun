@@ -58,7 +58,7 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 	}
 }
 
-// WorkerPool, creates a work that processes a stream of worker
+// WorkerPool creates a work that processes a stream of worker
 // functions, for simple and short total-duration operations. Every
 // worker in the pool runs in it's own go routine, and there are no
 // limits or throttling on the number of go routines. All errors are
@@ -104,10 +104,11 @@ func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 	return func(err error) { ft.WhenApply(err != nil, of, err) }
 }
 
-// Recovery catches a panic, turns it into an error and passes it to
+// Recover catches a panic, turns it into an error and passes it to
 // the provided observer function.
 func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
+// ErrorStack constructs an empty &ers.Stack{} value.
 func (Constructors) ErrorStack() *ers.Stack { return &ers.Stack{} }
 
 // ErrorStackStream creates a stream object to view the contents
@@ -134,6 +135,9 @@ func (Constructors) ErrorCollector() (fn.Handler[error], fn.Future[error]) {
 	return hf.WithLock(mtx), ef.WithLock(mtx)
 }
 
+// ErrorHandlerWithoutCancelation wraps and returns an error handler
+// that filters all nil errors and errors that are rooted in context
+// Cancellation from the wrapped Handler.
 func (Constructors) ErrorHandlerWithoutCancelation(of fn.Handler[error]) fn.Handler[error] {
 	return of.Skip(func(err error) bool { return err != nil && !ers.IsExpiredContext(err) })
 }
@@ -254,7 +258,7 @@ func (Constructors) StrJoin(strs []string, sep string) fn.Future[string] {
 	return func() string { return strings.Join(strs, sep) }
 }
 
-// StrJoinWith produces a future for strings.Join(), concatenating the
+// StrSliceConcatinate produces a future for strings.Join(), concatenating the
 // elements in the input slice with the provided separator.
 func (Constructors) StrSliceConcatinate(input []string) fn.Future[string] {
 	return MAKE.StrJoin(input, "")

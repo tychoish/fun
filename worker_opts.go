@@ -153,7 +153,7 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.NumWorkers = max(1, num); return nil }
 }
 
-// WorkerGroupConfWithErrorCollector saves an error observer to the
+// WorkerGroupConfErrorHandler saves an error observer to the
 // configuration. Typically implementations will provide some default
 // error collection tool, and will only call the observer for non-nil
 // errors. ErrorHandlers should be safe for concurrent use.

@@ -54,19 +54,19 @@ func TestEnsure(t *testing.T) {
 		assert.Substring(t, m.messages[2], "the-end: 42")
 	})
 	t.Run("Subtest", func(t *testing.T) {
-		t.Run("Testing", ensure.That(is.EqualTo(1, 1)).Queit().Log("one").Test())
+		t.Run("Testing", ensure.That(is.EqualTo(1, 1)).Quiet().Log("one").Test())
 		t.Run("Benchmark", func(t *testing.T) {
 			count := 0
 			op := func() []string { count++; return nil }
 
 			assert.NotPanic(t, func() {
-				ensure.That(op).Queit().Log("one").Benchmark()(&testing.B{})
+				ensure.That(op).Quiet().Log("one").Benchmark()(&testing.B{})
 			})
 			check.Equal(t, 1, count)
 			assert.NotPanic(t, func() {
 				_ = testing.Benchmark(func(b *testing.B) {
 					ensure.That(op).Add(ensure.That(op)).Add(ensure.That(op)).
-						Queit().Log("one").Run(b)
+						Quiet().Log("one").Run(b)
 				})
 			})
 			check.Equal(t, 4, count)
@@ -76,7 +76,7 @@ func TestEnsure(t *testing.T) {
 			op := func() []string { count++; return nil }
 			assert.Failing(t, func(t *testing.T) {
 				ensure.That(op).Add(ensure.That(op)).Add(ensure.That(op)).
-					Queit().Log("one").Run(struct{ *testing.T }{T: t})
+					Quiet().Log("one").Run(struct{ *testing.T }{T: t})
 			})
 			check.Equal(t, 1, count)
 		})

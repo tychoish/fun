@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Recovery catches a panic, turns it into an error and passes it to
+// Recover catches a panic, turns it into an error and passes it to
 // the provided observer function.
 func Recover(ob func(error)) { ob(ParsePanic(recover())) }
 

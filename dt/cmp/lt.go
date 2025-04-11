@@ -12,7 +12,7 @@ type OrderableNative interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | ~string
 }
 
-// OrderableUser allows users to define a method on their types which
+// Orderable allows users to define a method on their types which
 // implement a method to provide a LessThan operation.
 type Orderable[T any] interface{ LessThan(T) bool }
 

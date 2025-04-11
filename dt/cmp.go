@@ -1,4 +1,4 @@
-// package dt provides container type implementations and
+// Package dt provides container type implementations and
 // interfaces.
 //
 // All top level structures in this package can be trivially

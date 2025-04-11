@@ -25,10 +25,15 @@ func MakeHandler[T any](fn func(T) error) Handler[T] {
 	return func(_ context.Context, in T) error { return fn(in) }
 }
 
+// FromHandler up-converts a fn.Handler (e.g. a more simple handler
+// function that doesn't return an error or take a context,) into a
+// fun.Handler. the underlying function runs with a panic handler (so
+// fn.Handler panics are converted to errors.)
 func FromHandler[T any](f fn.Handler[T]) Handler[T] { return MakeHandler(f.Safe()) }
 
-// NewHandlers returns a processor as a convenience function to
-// avoid the extra cast when creating new function objects.
+// NewHandler returns a Handler Function. This is a convenience
+// function to avoid the extra cast when creating new function
+// objects.
 func NewHandler[T any](fn func(context.Context, T) error) Handler[T] { return fn }
 
 // JoinHandlers takes a collection of Handler functions and merges

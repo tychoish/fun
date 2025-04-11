@@ -1,4 +1,3 @@
-// GENERATED FILE FROM ASSERTION PACKAGE
 package check_test
 
 import (
@@ -10,6 +9,8 @@ import (
 
 	assert "github.com/tychoish/fun/assert/check"
 )
+
+// GENERATED FILE FROM ASSERTION PACKAGE
 
 func TestAssertion(t *testing.T) {
 	var strVal = "buddy"

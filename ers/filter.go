@@ -48,7 +48,7 @@ func FilterConvert(output error) Filter {
 	}
 }
 
-// Extract iterates through a list of untyped objects and removes the
+// ExtractErrors iterates through a list of untyped objects and removes the
 // errors from the list, returning both the errors and the remaining
 // items.
 func ExtractErrors(in []any) (rest []any, errs []error) {

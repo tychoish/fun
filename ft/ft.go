@@ -185,7 +185,7 @@ func OnceDo[T any](op func() T) func() T {
 	return func() T { opw(); return cache }
 }
 
-// Contain returns true if an element of the slice is equal to the
+// Contains returns true if an element of the slice is equal to the
 // item.
 //
 // Deprecated: use slices.Contains from the standard library.
@@ -329,8 +329,8 @@ func Slice[T any](items ...T) []T { return items }
 // Apply calls the input function with the provided argument.
 func Apply[T any](fn func(T), arg T) { fn(arg) }
 
-// JoinApply returns a function object that, when called calls the input
-// function with the provided argument.
+// ApplyFuture returns a function object that, when called calls the
+// input function with the provided argument.
 func ApplyFuture[T any](fn func(T), arg T) func() { return func() { Apply(fn, arg) } }
 
 // Must wraps a function that returns a value and an error, and

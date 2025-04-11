@@ -7,11 +7,11 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// Mnemonize, like adt.Once, provides a way to lazily resolve and
-// cache a value. Mnemonize takes an input function that returns a
-// type and returns a function of the same signature. When the
-// function is called the first time it caches the value and returns
-// it henceforth.
+// Mnemonize provides a way to lazily resolve and cache a value, like
+// adt.Once or sync.OnceFunc. Mnemonize takes an input function that
+// returns a type and returns a function of the same signature. When
+// the function is called the first time it caches the value and
+// returns it henceforth.
 //
 // While the function produced by Mnemonize is safe to use
 // concurrently, there is no provision for protecting mutable types

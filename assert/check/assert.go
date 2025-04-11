@@ -1,4 +1,3 @@
-// GENERATED FILE FROM ASSERTION PACKAGE
 package check
 
 import (
@@ -9,6 +8,8 @@ import (
 
 	"github.com/tychoish/fun/internal"
 )
+
+// GENERATED FILE FROM ASSERTION PACKAGE
 
 // True causes a test to fail if the condition is false.
 func True(t testing.TB, cond bool) {
@@ -219,8 +220,9 @@ func Contains[T comparable](t testing.TB, slice []T, item T) {
 	t.Errorf("item <%v> is not in %v", item, slice)
 }
 
-// Contains asserts that the item is *not* in the slice provided. If
-// the input slice is empty, this assertion will never error.
+// NotContains asserts that the item is *not* in the slice
+// provided. If the input slice is empty, this assertion will never
+// error.
 func NotContains[T comparable](t testing.TB, slice []T, item T) {
 	t.Helper()
 
@@ -246,8 +248,8 @@ func EqualItems[T comparable](t testing.TB, one, two []T) {
 	}
 }
 
-// EqualItems compares the values in two slices and creates a failure
-// if all items are not equal
+// NotEqualItems compares the values in two slices and creates a
+// failure if all items are equal.
 func NotEqualItems[T comparable](t testing.TB, one, two []T) {
 	t.Helper()
 
@@ -304,16 +306,16 @@ func MinRuntime(t testing.TB, dur time.Duration, op func()) {
 // Runtime asserts that the function will execute for less than the
 // absolute difference of the two durations provided. The absolute
 // difference between the durations is use to max
-func Runtime(t testing.TB, minVal, maxVal time.Duration, op func()) {
+func Runtime(t testing.TB, minValue, maxValue time.Duration, op func()) {
 	t.Helper()
 	start := time.Now()
 	op()
 	ranFor := time.Since(start)
 
-	if min(minVal, maxVal) > ranFor || max(minVal, maxVal) < ranFor {
-		t.Log(min(minVal, maxVal) > ranFor, "||", max(minVal, maxVal) < ranFor)
+	if min(minValue, maxValue) > ranFor || max(minValue, maxValue) < ranFor {
+		t.Log(min(minValue, maxValue) > ranFor, "||", max(minValue, maxValue) < ranFor)
 		t.Errorf("operation ran for %s which is not between %s and %s",
-			ranFor, min(minVal, maxVal), max(minVal, maxVal),
+			ranFor, min(minValue, maxValue), max(minValue, maxValue),
 		)
 	}
 

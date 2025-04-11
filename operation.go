@@ -62,7 +62,7 @@ func (wf Operation) Once() Operation {
 	return func(ctx context.Context) { once.Do(func() { wf(ctx) }) }
 }
 
-// Sginal starts the operation in a go routine, and provides a signal
+// Signal starts the operation in a go routine, and provides a signal
 // channel which will be closed when the operation is complete.
 func (wf Operation) Signal(ctx context.Context) <-chan struct{} {
 	out := make(chan struct{})

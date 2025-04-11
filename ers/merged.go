@@ -127,9 +127,11 @@ func (e *Stack) Handler() func(err error) { return e.Push }
 // explicitly typed as such.) which will resolve the stack.
 func (e *Stack) Future() func() error { return e.Resolve }
 
-// Resolve, mirroring the interface of erc.Collector, returns the
-// error (always a Stack object containing the aggregate errors,) in
-// the case that stack object contains errors, and nil otherwise.
+// Resolve returns the error (always a Stack object containing the
+// aggregate errors,) in the case that stack object contains errors,
+// and nil otherwise.
+//
+// This method existss to mirror the interface of erc.Collector.
 func (e *Stack) Resolve() error {
 	switch {
 	case e == nil || e.count == 0:
@@ -235,10 +237,11 @@ func (e *Stack) Generator() func() (error, bool) {
 	}
 }
 
-// Unwind, is a special case of the fun.Unwind operation, that
-// assembles the full "unwrapped" list of all component
+// Unwind assembles the full "unwrapped" list of all component
 // errors. Supports error implementations where the Unwrap() method
 // returns either error or []error.
+//
+// Unwind provides a special case of the dt.Unwind operation.
 //
 // If an error type implements interface{ Unwind() []error }, this
 // takes precedence over Unwrap when unwinding errors, to better

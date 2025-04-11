@@ -40,7 +40,7 @@ func (ec *Collector) Add(err error) {
 	ec.stack.Push(err)
 }
 
-// Obesrver returns the collector's Add method as a
+// Handler returns the collector's Add method as a
 // fn.Handler[error] object for integration and use with the
 // function types.
 func (ec *Collector) Handler() fn.Handler[error] { return ec.Add }

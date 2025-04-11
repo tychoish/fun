@@ -27,10 +27,10 @@ func Check[T any](out T, err error) (T, bool) { return out, err == nil }
 //	size += risky.Force(buffer.Write([]byte("hello world")))
 func Force[T any](out T, _ error) T { return out }
 
-// ForceOp, is like Force, except it takes the function and calls it
-// itself so that it can ignore a possible panic and return an
-// output. In the case of a panic or an error the output value is
-// often the zero value for the type.
+// ForceOp takes the function and calls it itself so that it can
+// ignore a possible panic and return an output. In the case of a
+// panic or an error the output value is often the zero value for the
+// type.
 func ForceOp[T any](fn func() (T, error)) T { defer Recover(); return ft.IgnoreSecond(fn()) }
 
 // Block runs the function with a context that is never canceled. Use

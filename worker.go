@@ -262,7 +262,7 @@ func (wf Worker) TTL(dur time.Duration) Worker {
 // (managed) mutex.
 func (wf Worker) Lock() Worker { return wf.WithLock(&sync.Mutex{}) }
 
-// Lock produces a Worker that will be executed within the scope of
+// WithLock produces a Worker that will be executed within the scope of
 // the provided mutex.
 func (wf Worker) WithLock(mtx sync.Locker) Worker {
 	return func(ctx context.Context) error { mtx.Lock(); defer mtx.Unlock(); return wf(ctx) }
@@ -404,7 +404,7 @@ func (wf Worker) Group(n int) Worker {
 	return func(ctx context.Context) error { return wf.StartGroup(ctx, n).Run(ctx) }
 }
 
-// Filter wraps the worker with a Worker that passes the output of the
+// WithErrorFilter wraps the worker with a Worker that passes the output of the
 // root Worker's error and returns the output of the filter.
 //
 // The ers package provides a number of filter implementations but any
