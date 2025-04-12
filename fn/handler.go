@@ -19,6 +19,8 @@ type Handler[T any] func(T)
 // NewHandler produces an Handler[T] function as a helper.
 func NewHandler[T any](in func(T)) Handler[T] { return in }
 
+// JoinHandlers returns a function that combines a collection of
+// handlers.
 func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
 	return func(value T) {
 		for idx := range ops {
@@ -30,6 +32,10 @@ func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
 // Capture returns a function that handles the specified value,
 // but only when executed later.
 func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
+
+// Safe returns a function that will execute the underlying Handler
+// function. Any panics in the underlying handler are converted to
+// errors.
 func (of Handler[T]) Safe() func(T) error { return of.RecoverPanic }
 
 // Handler provides a more expository operation to call a handler

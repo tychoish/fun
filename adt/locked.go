@@ -54,9 +54,20 @@ func Lock(mtx *sync.Mutex) *sync.Mutex { mtx.Lock(); return mtx }
 //	defer adt.With(adt.Lock(mtx))
 func With(mtx *sync.Mutex) { mtx.Unlock() }
 
-func WithR(m *sync.RWMutex)               { m.RUnlock() }
+// WithR takes a lock that's been locked in read mood, as an argument
+// and then releases the lock when it executes.
+func WithR(m *sync.RWMutex) { m.RUnlock() }
+
+// LockR takes an RWMutex locks it in read-mode and returns it to be
+// unlocked WithR.
 func LockR(m *sync.RWMutex) *sync.RWMutex { m.RLock(); return m }
-func WithW(m *sync.RWMutex)               { m.Unlock() }
+
+// WithW takes a write locked RWMutex as an argument and then releases
+// when the function it executes.
+func WithW(m *sync.RWMutex) { m.Unlock() }
+
+// LockW takes a RWMutex, locks as a write, and returns it to be
+// unlocked by WithW.
 func LockW(m *sync.RWMutex) *sync.RWMutex { m.Lock(); return m }
 
 // NewSynchronized constructs a new synchronized object that wraps the

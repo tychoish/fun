@@ -253,6 +253,8 @@ func SafeDo[T any](op func() T) (out T) {
 	return
 }
 
+// Convert takes a sequence of A and converts it, lazily into a
+// sequence of B, using the mapper function.
 func Convert[A any, B any](mapper func(A) B, values iter.Seq[A]) iter.Seq[B] {
 	return func(yield func(B) bool) {
 		for input := range values {
@@ -282,10 +284,14 @@ func SafeApply[T any](fn func(T), arg T) { WhenApply(fn != nil, fn, arg) }
 // functions are ignored.
 func JoinFuture(fns []func()) func() { return func() { CallMany(fns) } }
 
+// Call executes the provided function.
 func Call(op func()) { op() }
 
+// Do executes the provided function and returns its result.
 func Do[T any](op func() T) T { return op() }
 
+// ApplyMany calls the function on each of the items in the provided
+// slice. ApplyMany is a noop if the function is nil.
 func ApplyMany[T any](fn func(T), args []T) {
 	for idx := 0; idx < len(args) && fn != nil; idx++ {
 		// don't need to use the safe variant because we check
@@ -294,12 +300,15 @@ func ApplyMany[T any](fn func(T), args []T) {
 	}
 }
 
+// CallMany calls each of the provided function, skipping any nil functions.
 func CallMany(ops []func()) {
 	for idx := range ops {
 		SafeCall(ops[idx])
 	}
 }
 
+// DoMany calls each of the provided functions and returns an iterator
+// of their results.
 func DoMany[T any](ops []func() T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for idx := 0; idx < len(ops); idx++ {
@@ -312,6 +321,8 @@ func DoMany[T any](ops []func() T) iter.Seq[T] {
 	}
 }
 
+// DoMany2 calls each of the provided functions and returns an iterator
+// of their results.
 func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for idx := 0; idx < len(ops); idx++ {
@@ -324,6 +335,9 @@ func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
 	}
 }
 
+// Slice returns a slice for the variadic arguments. Useful for
+// adapting functions that take slice arguments where it's easier to
+// pass values variadicly.
 func Slice[T any](items ...T) []T { return items }
 
 // Apply calls the input function with the provided argument.

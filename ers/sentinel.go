@@ -45,4 +45,6 @@ const ErrCurrentOpAbort Error = Error("abort current operation")
 // be returned to callers or aggregated with other errors.
 const ErrCurrentOpSkip Error = Error("skip current operation")
 
+// ErrContainerClosed is returned for operations against a container
+// that has been closed or finished.
 const ErrContainerClosed Error = Error("container is closed")
