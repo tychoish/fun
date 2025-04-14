@@ -317,8 +317,8 @@ func (pf Generator[T]) SendOne(proc Handler[T]) Worker { return proc.ReadOne(pf)
 // SendAll provides a form of iteration, by construction a future
 // (Worker) that consumes the values of the generator with the
 // processor until either function returns an error. SendAll respects
-// ErrStreamContinue and io.EOF
-func (pf Generator[T]) SendAll(proc Handler[T]) Worker { return proc.ReadAll(pf) }
+// ErrStreamContinue and io.EOF.
+func (pf Generator[T]) SendAll(proc Handler[T]) Worker { return pf.Stream().Process(proc) }
 
 // WithCancel creates a Generator and a cancel function which will
 // terminate the context that the root Generator is running

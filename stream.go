@@ -494,17 +494,18 @@ func (st *Stream[T]) Process(fn Handler[T]) Worker {
 			for {
 				item, err := st.ReadOne(ctx)
 				if err != nil {
-					break
+					goto ERROR
 				}
 
 				err = fn(ctx, item)
 				if err != nil {
-					break
+					goto ERROR
 				}
 			}
 
+		ERROR:
 			switch {
-			case err == nil || errors.Is(err, ErrStreamContinue):
+			case errors.Is(err, ErrStreamContinue):
 				continue
 			case ers.IsTerminating(err):
 				return nil

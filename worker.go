@@ -71,6 +71,8 @@ func WorkerFuture(ch <-chan error) Worker {
 // by the Generator and one by the processor.
 //
 // If the generator returns ErrStreamContinue, it will be called again.
+//
+// Deprecated: use a Stream.
 func Pipe[T any](from Generator[T], to Handler[T]) Worker {
 	hasErrored := &atomic.Bool{}
 
