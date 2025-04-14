@@ -254,12 +254,12 @@ func TestParallelForEach(t *testing.T) {
 				seen := &atomic.Int64{}
 				count := &atomic.Int64{}
 
-				err := SliceStream(elems).ProcessParallel(
+				err := SliceStream(elems).ReadAllParallel(
 					func(_ context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
 						count.Add(1)
 
-						jitter := time.Duration(rand.Int63n(1 + abs*int64(time.Millisecond)))
+						jitter := time.Duration(rand.Int63n(2 + abs*int64(time.Millisecond)))
 						time.Sleep(time.Millisecond + jitter)
 						seen.Add(int64(in))
 						return nil
@@ -271,7 +271,7 @@ func TestParallelForEach(t *testing.T) {
 				check.Equal(t, int(seen.Load()), sum(elems))
 
 				if int(count.Load()) != len(elems) {
-					t.Error("unequal length slices")
+					t.Error("unequal length slices", count.Load(), len(elems))
 				}
 			})
 		}
@@ -281,7 +281,7 @@ func TestParallelForEach(t *testing.T) {
 		count := &atomic.Int64{}
 		errCount := &atomic.Int64{}
 		err := SliceStream(makeIntSlice(200)).
-			ProcessParallel(
+			ReadAllParallel(
 				func(_ context.Context, in int) error {
 					count.Add(1)
 					runtime.Gosched()
@@ -312,7 +312,7 @@ func TestParallelForEach(t *testing.T) {
 		paned := &atomic.Bool{}
 
 		err := SliceStream(makeIntSlice(10)).
-			ProcessParallel(
+			ReadAllParallel(
 				func(_ context.Context, in int) error {
 					if in == 8 {
 						paned.Store(true)
@@ -346,7 +346,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceStream(makeIntSlice(10)).
-			ProcessParallel(
+			ReadAllParallel(
 				func(_ context.Context, in int) error {
 					if in == 4 {
 						cancel()
@@ -366,7 +366,7 @@ func TestParallelForEach(t *testing.T) {
 		count := &atomic.Int64{}
 
 		err := SliceStream(makeIntSlice(10)).
-			ProcessParallel(
+			ReadAllParallel(
 				func(_ context.Context, in int) error {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
@@ -391,7 +391,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceStream(makeIntSlice(100)).
-			ProcessParallel(
+			ReadAllParallel(
 				func(_ context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
@@ -412,7 +412,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := SliceStream(makeIntSlice(100)).ProcessParallel(
+		err := SliceStream(makeIntSlice(100)).ReadAllParallel(
 			func(_ context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
@@ -434,7 +434,7 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceStream(makeIntSlice(2)).ProcessParallel(
+			err := SliceStream(makeIntSlice(2)).ReadAllParallel(
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
@@ -448,7 +448,7 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceStream(makeIntSlice(2)).ProcessParallel(
+			err := SliceStream(makeIntSlice(2)).ReadAllParallel(
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
@@ -948,7 +948,7 @@ func RunStreamStringAlgoTests(
 						sum, err := iter.Reduce(func(in string, value string) (string, error) {
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
-						}).Resolve(ctx)
+						}).Send(ctx)
 
 						if err != nil {
 							t.Fatal(err)
@@ -981,7 +981,7 @@ func RunStreamStringAlgoTests(
 								count++
 								return "", nil
 							},
-						).Resolve(ctx)
+						).Send(ctx)
 						check.Equal(t, count, 1)
 						if err == nil {
 							t.Fatal("expected error")
@@ -1007,7 +1007,7 @@ func RunStreamStringAlgoTests(
 								return 42, nil
 							}
 							return value, ErrStreamContinue
-						}).Resolve(ctx)
+						}).Send(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
@@ -1025,7 +1025,7 @@ func RunStreamStringAlgoTests(
 								return 300, io.EOF
 							}
 							return 42, nil
-						}).Resolve(ctx)
+						}).Send(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
@@ -1310,7 +1310,7 @@ func TestTransformFunctions(t *testing.T) {
 				prod := mpf.CovnertGenerator(MakeGenerator(func() (int, error) { pcount++; return 42, ers.ErrInvalidInput }))
 				check.Equal(t, mcount, 0)
 				check.Equal(t, pcount, 0)
-				out, err := prod.Resolve(ctx)
+				out, err := prod.Send(ctx)
 				check.Equal(t, mcount, 0)
 				check.Equal(t, pcount, 1)
 				check.Error(t, err)

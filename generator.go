@@ -308,17 +308,33 @@ func (pf Generator[T]) WithLocker(mtx sync.Locker) Generator[T] {
 // Send executes the generator and returns the result.
 func (pf Generator[T]) Send(ctx context.Context) (T, error) { return pf(ctx) }
 
-// SendOne makes a Worker function that, as a future, calls the
+// ReadOne makes a Worker function that, as a future, calls the
 // generator once and then passes the output, if there are no errors,
 // to the processor function. Provides the inverse operation of
 // Handler.ReadOne.
-func (pf Generator[T]) SendOne(proc Handler[T]) Worker { return proc.ReadOne(pf) }
+func (pf Generator[T]) ReadOne(proc Handler[T]) Worker {
+	return func(ctx context.Context) error {
+		val, err := pf.Send(ctx)
+		if err != nil {
+			return err
+		}
+		return proc(ctx, val)
+	}
+}
 
-// SendAll provides a form of iteration, by construction a future
+// ReadAll provides a form of iteration, by construction a future
 // (Worker) that consumes the values of the generator with the
-// processor until either function returns an error. SendAll respects
+// processor until either function returns an error. ReadAll respects
 // ErrStreamContinue and io.EOF.
-func (pf Generator[T]) SendAll(proc Handler[T]) Worker { return pf.Stream().Process(proc) }
+func (pf Generator[T]) ReadAll2(proc Handler[T]) Worker { return pf.Stream().ReadAll(proc) }
+
+// ReadAll provides a form of iteration, by construction a future
+// (Worker) that consumes the values of the generator with the
+// processor until either function returns an error. ReadAll respects
+// ErrStreamContinue and io.EOF.
+func (pf Generator[T]) ReadAll(proc fn.Handler[T]) Worker {
+	return pf.Stream().ReadAll(func(_ context.Context, in T) error { proc(in); return nil })
+}
 
 // WithCancel creates a Generator and a cancel function which will
 // terminate the context that the root Generator is running
@@ -360,7 +376,7 @@ func (pf Generator[T]) wrapErrorsWithErrorFuture(ef fn.Future[error]) Generator[
 			// if there's a real substantive error,
 			// encountered when there was an terminating
 			// error, then let's just return that.
-			return zero, ferr
+			return zero, ers.Join(ferr, perr)
 		}
 
 		// otherwise, merge everything (potentially)
@@ -545,33 +561,31 @@ func (pf Generator[T]) Parallel(
 		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 	}
 
-	pipe := Blocking(make(chan T, opts.NumWorkers*2+1))
+	pipe := Blocking(make(chan T, opts.NumWorkers+1))
 	pf = pf.WithRecover()
-
-	init := Operation(func(ctx context.Context) {
-		wctx, cancel := context.WithCancel(ctx)
-
-		// this might cause us to propagate an error (and abort)
-		// before the pipe is empty.
-
-		pipe.Handler().ReadAll(func(ctx context.Context) (zero T, _ error) {
-			value, err := pf(ctx)
-			if err != nil {
-				if opts.CanContinueOnError(err) {
-					return zero, ErrStreamContinue
-				}
-				return zero, io.EOF
-			}
-			return value, nil
-		}).Operation(func(err error) { ft.WhenCall(ers.IsTerminating(err), cancel) }).
-			StartGroup(wctx, opts.NumWorkers).
-			PostHook(cancel).
-			PostHook(pipe.Close).
-			Background(ctx)
-	}).Once()
 
 	return pipe.Receive().
 		Generator().
-		PreHook(init).
+		PreHook(Operation(func(ctx context.Context) {
+			wctx, cancel := context.WithCancel(ctx)
+
+			// this might cause us to propagate an error (and abort)
+			// before the pipe is empty.
+
+			pipe.Handler().ReadAll(func(ctx context.Context) (zero T, _ error) {
+				value, err := pf.Send(ctx)
+				if err != nil {
+					if opts.CanContinueOnError(err) {
+						return zero, ErrStreamContinue
+					}
+					return zero, io.EOF
+				}
+				return value, nil
+			}).Operation(func(err error) { ft.WhenCall(ers.IsTerminating(err), cancel) }).
+				StartGroup(wctx, opts.NumWorkers).
+				PostHook(cancel).
+				PostHook(pipe.Close).
+				Background(ctx)
+		}).Once()).
 		wrapErrorsWithErrorFuture(opts.ErrorResolver)
 }

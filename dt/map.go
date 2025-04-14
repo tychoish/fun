@@ -127,7 +127,7 @@ func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
 func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
-	pairs.Stream().Observe(m.AddPair).Ignore().Wait()
+	pairs.Stream().ReadAll2(m.AddPair).Ignore().Wait()
 }
 
 // ConsumeMap adds all the keys from the input map the map.
@@ -150,13 +150,13 @@ func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 // ConsumePairs adds items to the map from a Pairs object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ConsumePairs(pairs *Pairs[K, V]) {
-	pairs.Stream().Observe(m.AddPair).Ignore().Wait()
+	pairs.Stream().ReadAll2(m.AddPair).Ignore().Wait()
 }
 
 // ConsumeTuples adds items to the map from a Tuples object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ConsumeTuples(tuples *Tuples[K, V]) {
-	tuples.Stream().Observe(m.AddTuple).Ignore().Wait()
+	tuples.Stream().ReadAll2(m.AddTuple).Ignore().Wait()
 }
 
 // ConsumeStream adds items to the map. If a key already exists in the
@@ -164,7 +164,9 @@ func (m Map[K, V]) ConsumeTuples(tuples *Tuples[K, V]) {
 //
 // This operation is lazy, and returns a Worker (future) function that
 // must be excuted to process the stream.
-func (m Map[K, V]) ConsumeStream(it *fun.Stream[Pair[K, V]]) fun.Worker { return it.Observe(m.AddPair) }
+func (m Map[K, V]) ConsumeStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
+	return it.ReadAll2(m.AddPair)
+}
 
 // ConsumeValues adds items to the map, using the function to generate
 // the keys for the values. If a key already exists in the map, it
@@ -176,7 +178,7 @@ func (m Map[K, V]) ConsumeStream(it *fun.Stream[Pair[K, V]]) fun.Worker { return
 // This operation will panic (with an ErrInvariantValidation) if the
 // keyf panics.
 func (m Map[K, V]) ConsumeValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
-	return iter.Observe(func(in V) { m[keyf(in)] = in })
+	return iter.ReadAll2(func(in V) { m[keyf(in)] = in })
 }
 
 // Stream converts a map into a stream of dt.Pair objects. The

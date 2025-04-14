@@ -49,7 +49,7 @@ func (p *Pairs[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &Lis
 
 // Consume adds items from a stream of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) Consume(iter *fun.Stream[Pair[K, V]]) fun.Worker {
-	return iter.Observe(func(item Pair[K, V]) { p.Push(item) })
+	return iter.ReadAll2(func(item Pair[K, V]) { p.Push(item) })
 }
 
 // Stream return a stream over each key-value pairs.
@@ -210,7 +210,7 @@ func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
 }
 
 // ConsumeMap adds all of the items in a map to the Pairs object.
-func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Stream().Observe(p.Push).Ignore().Wait() }
+func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Stream().ReadAll2(p.Push).Ignore().Wait() }
 
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the

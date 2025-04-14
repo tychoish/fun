@@ -47,7 +47,7 @@ func Check(ec *Collector, fut fn.Future[error]) { ec.Add(fut.Resolve()) }
 // does not add a context cancellation error) or the error channel is
 // closed.
 func PopulateFromChannel(ctx context.Context, ec *Collector, errCh <-chan error) {
-	fun.ChannelStream(errCh).Observe(ec.Handler()).Operation(ec.Add).Run(ctx)
+	fun.ChannelStream(errCh).ReadAll2(ec.Handler()).Operation(ec.Add).Run(ctx)
 }
 
 // Collect produces a function that will collect the error from a

@@ -41,9 +41,12 @@ func WorkerPool[OP fun.Worker | fun.Operation](
 	iter *fun.Stream[OP],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) fun.Worker {
-	return iter.ProcessParallel(func(ctx context.Context, op OP) error {
+	return iter.ReadAllParallel(func(ctx context.Context, op OP) error {
 		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover().Run(ctx)
-	}, append(optp, fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}))...)
+	}, append(optp,
+		fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}),
+		fun.WorkerGroupConfWorkerPerCPU(),
+	)...)
 }
 
 // JSON takes a stream of line-oriented JSON and marshals those

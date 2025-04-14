@@ -204,7 +204,7 @@ func TestOperation(t *testing.T) {
 			counter++
 		}
 
-		wf := SliceStream(ops).Observe(of)
+		wf := SliceStream(ops).ReadAll2(of)
 
 		if len(seen) != 0 || counter != 0 {
 			t.Error("should be lazy execution", counter, seen)
@@ -335,7 +335,7 @@ func TestOperation(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op) })
 
-			err := SliceStream(jobs).ProcessParallel(MAKE.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
+			err := SliceStream(jobs).ReadAllParallel(MAKE.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 		})

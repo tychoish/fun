@@ -160,7 +160,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		wctx, cancel := context.WithCancel(ctx)
 		send := pipe.Send()
 
-		iters.Observe(func(iter *Stream[T]) {
+		iters.ReadAll2(func(iter *Stream[T]) {
 			send.Consume(iter).Operation(eh).Add(ctx, wg)
 		}).Operation(eh).Add(wctx, wg)
 
@@ -212,10 +212,10 @@ func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 
 				send := pipe.Send() // input end of the pipe
 
-				iters.Observe(func(in *Stream[T]) {
+				iters.ReadAll2(func(in *Stream[T]) {
 					// write the contents of the input stream
 					// to the input end of the pipe
-					in.Process(send.Write).Observe(ctx, eh)
+					in.ReadAll(send.Write).Observe(ctx, eh)
 				}).Observe(ctx, eh)
 			}).
 			Go().Once(),
@@ -336,6 +336,66 @@ func (st *Stream[T]) ReadOne(ctx context.Context) (out T, err error) {
 	}
 }
 
+// ReadAll provides a function consumes all items in the stream with
+// the provided processor function.
+//
+// All panics are converted to errors and propagated in the response
+// of the worker, and abort the processing. If the processor function
+// returns ErrStreamContinue, processing continues. All other errors
+// abort processing and are returned by the worker.
+func (st *Stream[T]) ReadAll(fn Handler[T]) Worker {
+
+	return func(ctx context.Context) (err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		for {
+			item, err := st.ReadOne(ctx)
+			if err != nil {
+				goto ERROR
+			}
+
+			err = fn(ctx, item)
+			if err != nil {
+				goto ERROR
+			}
+
+		ERROR:
+			switch {
+			case err == nil || errors.Is(err, ErrStreamContinue):
+				continue
+			case ers.IsTerminating(err):
+				return nil
+			case ers.IsExpiredContext(err):
+				return err
+			default:
+				return err
+			}
+		}
+	}
+}
+
+func (st *Stream[T]) ReadAll2(fn fn.Handler[T]) Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover()), st.Close()) }()
+		for {
+			item, err := st.ReadOne(ctx)
+			switch {
+			case err == nil:
+				fn(item)
+			case ers.IsExpiredContext(err):
+				return err
+			case ers.IsTerminating(err):
+				return nil
+			default:
+				// this is (realistically) only context
+				// cancellation errors, because ReadOne puts
+				// all errors into the stream's
+				// Close() method.
+				return err
+			}
+		}
+	}
+}
+
 func (st *Stream[T]) ensureErrorHandler() { st.err.once.Do(st.setupDefaultErrorHandler) }
 func (st *Stream[T]) setupDefaultErrorHandler() {
 	st.err.handler, st.err.future = MAKE.ErrorCollector()
@@ -447,77 +507,6 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	return output
 }
 
-// Observe processes a stream calling the handler function for
-// every element in the stream and retruning when the stream is
-// exhausted. Take care to ensure that the handler function does not
-// block.
-//
-// The error returned captures any panics encountered as an error, as
-// well as the output of the Close() operation. Observe will not add a
-// context cancelation error to its error, though the observed
-// stream may return one in its close method.
-func (st *Stream[T]) Observe(fn fn.Handler[T]) Worker {
-	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover()), st.Close()) }()
-		for {
-			item, err := st.ReadOne(ctx)
-			switch {
-			case err == nil:
-				fn(item)
-			case ers.IsExpiredContext(err):
-				return err
-			case ers.IsTerminating(err):
-				return nil
-			default:
-				// this is (realistically) only context
-				// cancellation errors, because ReadOne puts
-				// all errors into the stream's
-				// Close() method.
-				return err
-			}
-		}
-	}
-}
-
-// Process provides a function consumes all items in the stream with
-// the provided processor function.
-//
-// All panics are converted to errors and propagated in the response
-// of the worker, and abort the processing. If the processor function
-// returns ErrStreamContinue, processing continues. All other errors
-// abort processing and are returned by the worker.
-func (st *Stream[T]) Process(fn Handler[T]) Worker {
-	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
-
-		for {
-			for {
-				item, err := st.ReadOne(ctx)
-				if err != nil {
-					goto ERROR
-				}
-
-				err = fn(ctx, item)
-				if err != nil {
-					goto ERROR
-				}
-			}
-
-		ERROR:
-			switch {
-			case errors.Is(err, ErrStreamContinue):
-				continue
-			case ers.IsTerminating(err):
-				return nil
-			case ers.IsExpiredContext(err):
-				return err
-			default:
-				return err
-			}
-		}
-	}
-}
-
 // Join merges multiple streams processing and producing their results
 // sequentially, and without starting any go routines. Otherwise
 // similar to Flatten (which processes each stream in parallel).
@@ -535,7 +524,7 @@ func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 // In the case of an error in the underlying stream the output slice
 // will have the values encountered before the error.
 func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
-	return out, st.Observe(func(in T) { out = append(out, in) }).Run(ctx)
+	return out, st.ReadAll2(func(in T) { out = append(out, in) }).Run(ctx)
 }
 
 // Channel proides access to the contents of the stream as a
@@ -615,7 +604,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-// ProcessParallel produces a worker that, when executed, will
+// ReadAllParallel produces a worker that, when executed, will
 // iteratively processes the contents of the stream. The options
 // control the error handling and parallelism semantics of the
 // operation.
@@ -623,7 +612,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 // This is the work-house operation of the package, and can be used as
 // the basis of worker pools, even processing, or message dispatching
 // for pubsub queues and related systems.
-func (st *Stream[T]) ProcessParallel(
+func (st *Stream[T]) ReadAllParallel(
 	fn Handler[T],
 	optp ...OptionProvider[*WorkerGroupConf],
 ) Worker {
@@ -642,7 +631,7 @@ func (st *Stream[T]) ProcessParallel(
 
 		wg := &WaitGroup{}
 
-		operation := fn.WithRecover().WithErrorFilter(func(err error) error {
+		handler := fn.WithRecover().WithErrorFilter(func(err error) error {
 			if opts.CanContinueOnError(err) {
 				return ErrStreamContinue
 			}
@@ -651,8 +640,8 @@ func (st *Stream[T]) ProcessParallel(
 
 		splits := st.Split(opts.NumWorkers)
 		for idx := range splits {
-			operation.ReadAll(splits[idx].Generator()).
-				Operation(func(err error) { ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), cancel) }).
+			handler.ReadAll(splits[idx].Generator()).
+				Operation(func(err error) { ft.WhenCall(ers.IsTerminating(err), cancel) }).
 				Add(ctx, wg)
 		}
 
@@ -688,7 +677,7 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 // consumer of the stream.
 func (st *Stream[T]) ParallelBuffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := st.ProcessParallel(buf.Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
+	pipe := st.ReadAllParallel(buf.Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
 	return buf.Generator().PreHook(pipe).Stream().WithHook(func(si *Stream[T]) { si.AddError(st.Close()) })
 }
 

@@ -85,7 +85,7 @@ func TestSmoke(t *testing.T) {
 				func(in int, value string) (string, error) {
 					seen[in] = struct{}{}
 					return fmt.Sprint(value, in), nil
-				}, "").Resolve(ctx)
+				}, "").Send(ctx)
 
 			if err != nil {
 				t.Fatal(err)
@@ -116,7 +116,7 @@ func TestSmoke(t *testing.T) {
 					return in + val, nil
 				},
 				0,
-			).Resolve(ctx)
+			).Send(ctx)
 
 			check.Equal(t, count, 1)
 			if err == nil {
@@ -144,7 +144,7 @@ func TestSmoke(t *testing.T) {
 						return 42, nil
 					}
 					return value, fun.ErrStreamContinue
-				}, 0).Resolve(ctx)
+				}, 0).Send(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 32)
@@ -162,7 +162,7 @@ func TestSmoke(t *testing.T) {
 						return 0, io.EOF
 					}
 					return 42, nil
-				}, 0).Resolve(ctx)
+				}, 0).Send(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 16)
@@ -173,7 +173,7 @@ func TestSmoke(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, fun.MAKE.Counter(size).Observe(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
+		check.NotError(t, fun.MAKE.Counter(size).ReadAll2(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -278,7 +278,7 @@ func TestDropZeros(t *testing.T) {
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).Observe(func(in string) { assert.Zero(t, in) }).Run(ctx))
+	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).ReadAll2(func(in string) { assert.Zero(t, in) }).Run(ctx))
 
 	all[45] = "49"
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
@@ -291,7 +291,7 @@ func TestIndexed(t *testing.T) {
 
 	iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 	count := 0
-	err := iter.Observe(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
+	err := iter.ReadAll2(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
 	check.NotError(t, err)
 	assert.Equal(t, count, 10)
 }
@@ -302,7 +302,7 @@ func TestMergeSlices(t *testing.T) {
 	t.Run("Streams", func(t *testing.T) {
 		iter := MergeSlices(fun.VariadicStream(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
 		count := 0
-		err := iter.Observe(func(in int) {
+		err := iter.ReadAll2(func(in int) {
 			count++
 			check.True(t, in >= 0 && in < 64)
 		}).Run(ctx)
@@ -317,7 +317,7 @@ func TestMergeSlices(t *testing.T) {
 			fun.SliceStream(makeIntSlice(64)),
 		)
 		count := 0
-		err := iter.Observe(func(in int) {
+		err := iter.ReadAll2(func(in int) {
 			count++
 			check.True(t, in >= 0 && in < 64)
 		}).Run(ctx)
@@ -340,7 +340,7 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Serial", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).Process(func(_ context.Context, in int) error {
+		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).ReadAll(func(_ context.Context, in int) error {
 			check.True(t, in >= 0)
 			check.True(t, in <= 100)
 			count.Add(1)
@@ -359,7 +359,7 @@ func TestRateLimit(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
 		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).
-			ProcessParallel(func(_ context.Context, in int) error {
+			ReadAllParallel(func(_ context.Context, in int) error {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)
@@ -382,7 +382,7 @@ func TestRateLimit(t *testing.T) {
 		go func() { time.Sleep(time.Second); cancel() }()
 		count := &intish.Atomic[int]{}
 		err := RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Second).
-			Process(func(_ context.Context, in int) error {
+			ReadAll(func(_ context.Context, in int) error {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)

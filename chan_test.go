@@ -33,11 +33,11 @@ func TestChannel(t *testing.T) {
 				defer cancel()
 
 				ch := make(chan int, 2)
-				err := Blocking(ch).Send().Handler().Run(ctx, 1)
+				err := Blocking(ch).Send().Handler().Read(ctx, 1)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 1)
 
-				err = NonBlocking(ch).Send().Handler().Run(ctx, 3)
+				err = NonBlocking(ch).Send().Handler().Read(ctx, 3)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
@@ -178,7 +178,7 @@ func TestChannel(t *testing.T) {
 				t.Run("Generator", func(t *testing.T) {
 					ch := make(chan string, 1)
 					ch <- "hello world"
-					val, err := Blocking(ch).Receive().Generator().Resolve(ctx)
+					val, err := Blocking(ch).Receive().Generator().Send(ctx)
 					assert.NotError(t, err)
 					assert.Equal(t, val, "hello world")
 				})
@@ -575,7 +575,7 @@ func TestChannel(t *testing.T) {
 				func(in int) bool { return in%2 == 0 && in != 0 },
 			).
 			Stream().
-			Observe(func(in int) {
+			ReadAll2(func(in int) {
 				count++
 				check.True(t, ft.Not(in == 0))
 				check.True(t, ft.Not(in%2 != 0))

@@ -83,13 +83,13 @@ func TestProcess(t *testing.T) {
 			return nil
 		})
 
-		check.NotError(t, pf.If(false).Run(ctx, 42))
+		check.NotError(t, pf.If(false).Read(ctx, 42))
 		check.Zero(t, called)
-		check.NotError(t, pf.If(true).Run(ctx, 42))
+		check.NotError(t, pf.If(true).Read(ctx, 42))
 		check.Equal(t, 1, called)
-		check.NotError(t, pf.If(true).Run(ctx, 42))
+		check.NotError(t, pf.If(true).Read(ctx, 42))
 		check.Equal(t, 2, called)
-		check.NotError(t, pf.If(false).Run(ctx, 42))
+		check.NotError(t, pf.If(false).Read(ctx, 42))
 		check.Equal(t, 2, called)
 		check.NotError(t, pf(ctx, 42))
 		check.Equal(t, 3, called)
@@ -104,13 +104,13 @@ func TestProcess(t *testing.T) {
 			return nil
 		})
 
-		check.NotError(t, pf.When(func() bool { return false }).Run(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return false }).Read(ctx, 42))
 		check.Zero(t, called)
-		check.NotError(t, pf.When(func() bool { return true }).Run(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return true }).Read(ctx, 42))
 		check.Equal(t, 1, called)
-		check.NotError(t, pf.When(func() bool { return true }).Run(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return true }).Read(ctx, 42))
 		check.Equal(t, 2, called)
-		check.NotError(t, pf.When(func() bool { return false }).Run(ctx, 42))
+		check.NotError(t, pf.When(func() bool { return false }).Read(ctx, 42))
 		check.Equal(t, 2, called)
 		check.NotError(t, pf(ctx, 42))
 		check.Equal(t, 3, called)
@@ -284,7 +284,7 @@ func TestProcess(t *testing.T) {
 				check.Equal(t, in, 42)
 				return nil
 			})
-			check.Panic(t, func() { assert.NotError(t, op.WithLock(nil).Run(ctx, 42)) })
+			check.Panic(t, func() { assert.NotError(t, op.WithLock(nil).Read(ctx, 42)) })
 			check.Equal(t, count, 0)
 		})
 		// the rest of the tests are really just "tempt the

@@ -225,7 +225,7 @@ func TestGenerator(t *testing.T) {
 				return 42, nil
 			})
 			check.Panic(t, func() {
-				v, err := op.WithLock(nil).Resolve(ctx)
+				v, err := op.WithLock(nil).Send(ctx)
 				check.Equal(t, v, 0)
 				check.Error(t, err)
 			})
@@ -304,7 +304,7 @@ func TestGenerator(t *testing.T) {
 
 			ft.DoTimes(128, func() { jobs = append(jobs, op.Background(ctx, obv)) })
 
-			err := SliceStream(jobs).ProcessParallel(MAKE.ProcessWorker(), WorkerGroupConfNumWorkers(4)).Run(ctx)
+			err := SliceStream(jobs).ReadAllParallel(MAKE.ProcessWorker(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 			check.Equal(t, obct, 128)
@@ -542,7 +542,7 @@ func TestGenerator(t *testing.T) {
 				assert.Zero(t, count)
 				count++
 				return 42, nil
-			}).SendOne(func(_ context.Context, in int) error {
+			}).ReadOne(func(_ context.Context, in int) error {
 				assert.Equal(t, count, 1)
 				assert.Equal(t, in, 42)
 				count++
@@ -562,7 +562,7 @@ func TestGenerator(t *testing.T) {
 				assert.Zero(t, count)
 				count++
 				return 42, root
-			}).SendOne(func(_ context.Context, _ int) error {
+			}).ReadOne(func(_ context.Context, _ int) error {
 				assert.Equal(t, "should not run", "")
 				return nil
 			})
@@ -586,7 +586,7 @@ func TestGenerator(t *testing.T) {
 				return -1, io.EOF
 			}
 			return count, nil
-		}).SendAll(func(_ context.Context, in int) error {
+		}).ReadAll2(func(_ context.Context, in int) error {
 			check.NotEqual(t, in, -1)
 			check.NotEqual(t, in, 0)
 			check.Equal(t, count, in)
@@ -903,7 +903,7 @@ func TestGenerator(t *testing.T) {
 					return 100, ers.ErrCurrentOpSkip
 				}
 				return 42, nil
-			}).Retry(5).Resolve(ctx)
+			}).Retry(5).Send(ctx)
 			assert.Equal(t, count.Get(), 2)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
@@ -914,7 +914,7 @@ func TestGenerator(t *testing.T) {
 			val, err := MakeGenerator(func() (int, error) {
 				defer count.Add(1)
 				return 42, nil
-			}).Retry(10).Resolve(ctx)
+			}).Retry(10).Send(ctx)
 			assert.Equal(t, count.Get(), 1)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
@@ -928,7 +928,7 @@ func TestGenerator(t *testing.T) {
 					return 100, errors.New("why not")
 				}
 				return 42, nil
-			}).Retry(10).Resolve(ctx)
+			}).Retry(10).Send(ctx)
 			assert.Equal(t, count.Get(), 4)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
@@ -940,7 +940,7 @@ func TestGenerator(t *testing.T) {
 			val, err := MakeGenerator(func() (int, error) {
 				defer count.Add(1)
 				return 100, exp
-			}).Retry(16).Resolve(ctx)
+			}).Retry(16).Send(ctx)
 			assert.Equal(t, count.Get(), 16)
 			assert.Error(t, err)
 			assert.Equal(t, val, 0)
@@ -962,7 +962,7 @@ func TestGenerator(t *testing.T) {
 					return 100, ers.Join(exp, ers.ErrCurrentOpAbort)
 				}
 				return 100, exp
-			}).Retry(16).Resolve(ctx)
+			}).Retry(16).Send(ctx)
 			assert.Equal(t, count.Get(), 12)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, exp)
@@ -979,7 +979,7 @@ func TestGenerator(t *testing.T) {
 					return 100, ers.Join(exp, context.Canceled)
 				}
 				return 100, exp
-			}).Retry(16).Resolve(ctx)
+			}).Retry(16).Send(ctx)
 			assert.Equal(t, count.Get(), 12)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, exp)
@@ -991,7 +991,7 @@ func TestGenerator(t *testing.T) {
 	t.Run("ErrorHanldingOptions", func(t *testing.T) {
 		g := MakeGenerator(func() (int, error) { panic(42) })
 		g = g.Parallel(WorkerGroupConfSet(&WorkerGroupConf{ErrorHandler: func(error) { panic(24) }}))
-		out, err := g.Resolve(t.Context())
+		out, err := g.Send(t.Context())
 		assert.Zero(t, out)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)

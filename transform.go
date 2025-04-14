@@ -103,10 +103,9 @@ func (mpf Transform[T, O]) ProcessParallel(
 		splits := iter.Split(opts.NumWorkers)
 		for idx := range splits {
 			// for each split, run a mapWorker
-			mf.mapPullProcess(output.Send().Write, opts).
-				ReadAll(splits[idx].Generator()).
+			splits[idx].ReadAll(mf.mapPullProcess(output.Send().Write, opts)).
 				Operation(func(err error) {
-					ft.WhenCall(ers.Is(err, io.EOF, ers.ErrCurrentOpAbort), wcancel)
+					ft.WhenCall(ers.IsTerminating(err), wcancel)
 				}).
 				Add(wctx, wg)
 		}

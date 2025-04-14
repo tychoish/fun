@@ -201,7 +201,7 @@ func TestMap(t *testing.T) {
 			keys := MapKeys(mp)
 
 			count := 0
-			err := keys.Observe(func(in string) {
+			err := keys.ReadAll2(func(in string) {
 				switch in {
 				case "big":
 					count++
@@ -225,7 +225,7 @@ func TestMap(t *testing.T) {
 			keys := MapValues(mp)
 
 			count := 0
-			err := keys.Observe(func(in int) {
+			err := keys.ReadAll2(func(in int) {
 				switch in {
 				case 42:
 					count++

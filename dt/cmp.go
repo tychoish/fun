@@ -23,7 +23,7 @@ type Heap[T any] struct {
 }
 
 func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.Process(fun.MakeHandler(h.Handler().Safe()))
+	return iter.ReadAll(fun.MakeHandler(h.Handler().Safe()))
 }
 
 func (h *Heap[T]) list() *List[T] {

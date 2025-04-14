@@ -49,7 +49,7 @@ func (p *Tuples[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &Li
 
 // Consume adds items from a stream of tuples to the current Tuples slice.
 func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
-	return iter.Observe(func(item Tuple[K, V]) { p.Push(item) })
+	return iter.ReadAll2(func(item Tuple[K, V]) { p.Push(item) })
 }
 
 // Seq returns a native go iterator function for tuples.

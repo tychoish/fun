@@ -789,7 +789,7 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.BlockingGeneratorFront().Resolve(ctx)
+			_, err := dq.BlockingGeneratorFront().Send(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
@@ -797,7 +797,7 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.BlockingGeneratorBack().Resolve(ctx)
+			_, err := dq.BlockingGeneratorBack().Send(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
@@ -817,7 +817,7 @@ func TestDeque(t *testing.T) {
 				}
 			}()
 
-			val, err := dq.BlockingGeneratorFront().Resolve(ctx)
+			val, err := dq.BlockingGeneratorFront().Send(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, "hello!")
 

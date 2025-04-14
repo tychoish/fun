@@ -97,7 +97,7 @@ func Transform[T any, O any](in Slice[T], op fun.Transform[T, O]) fun.Generator[
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
-		if err := op.Process(in.Stream()).Observe(out.Add).Run(ctx); err != nil {
+		if err := op.Process(in.Stream()).ReadAll2(out.Add).Run(ctx); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -295,11 +295,11 @@ func (s Slice[T]) Sparse() Slice[T] {
 // processor errors. io.EOF errors are not returned, but do abort
 // iteration early, while fun.ErrStreamContinue is respected.
 func (s Slice[T]) Process(pf fun.Handler[T]) fun.Worker {
-	return s.Stream().Process(pf)
+	return s.Stream().ReadAll(pf)
 }
 
 // Populate constructs an operation that adds all items from the
 // stream to the slice.
 func (s *Slice[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.Observe(s.Add)
+	return iter.ReadAll2(s.Add)
 }

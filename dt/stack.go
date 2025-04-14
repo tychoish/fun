@@ -26,7 +26,7 @@ func (s *Stack[T]) Append(items ...T) { ft.ApplyMany(s.Push, items) }
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
 func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.Process(fun.FromHandler(s.Push))
+	return iter.ReadAll(fun.FromHandler(s.Push))
 }
 
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }

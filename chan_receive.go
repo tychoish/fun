@@ -29,7 +29,7 @@ func (ro ChanReceive[T]) Filter(ctx context.Context, eh fn.Handler[error], filte
 	ro.Generator().
 		WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).
 		Filter(filter).
-		SendAll(out.Handler()).
+		ReadAll2(out.Handler()).
 		Background(ctx, eh)
 
 	return out.Receive()
