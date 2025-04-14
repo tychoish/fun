@@ -280,14 +280,12 @@ func TestGenerator(t *testing.T) {
 				count++
 				return 42, nil
 			})
-			wg := &WaitGroup{}
 			mu := &sync.Mutex{}
 			opct := &atomic.Int64{}
 			op.WithLock(mu).Operation(
 				func(in int) { opct.Add(1); check.Equal(t, in, 42) },
 				func(err error) { opct.Add(1); check.NotError(t, err) },
-			).StartGroup(ctx, wg, 128)
-			wg.Wait(ctx)
+			).StartGroup(ctx, 128).Run(ctx)
 			check.Equal(t, 2*128, opct.Load())
 			assert.Equal(t, count, 128)
 		})
@@ -311,23 +309,6 @@ func TestGenerator(t *testing.T) {
 			check.Equal(t, count, 128)
 			check.Equal(t, obct, 128)
 		})
-	})
-	t.Run("CheckBlock", func(t *testing.T) {
-		count := 0
-		var err error
-		var pf Generator[int] = func(context.Context) (int, error) {
-			count++
-			return 42, err
-		}
-		val, ok := pf.CheckForce()
-		check.True(t, ok)
-		check.Equal(t, 42, val)
-		err = ers.New("check should fail")
-
-		val, ok = pf.CheckForce()
-		check.True(t, !ok)
-		check.Equal(t, 42, val)
-
 	})
 	t.Run("WithoutErrors", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -617,37 +598,6 @@ func TestGenerator(t *testing.T) {
 		defer cancel()
 		check.NotError(t, worker(ctx))
 		check.Equal(t, 43, count)
-	})
-	t.Run("Future", func(t *testing.T) {
-		sig := make(chan struct{})
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		count := &atomic.Int64{}
-		errSignaled := ers.New("signaled")
-		var prod Generator[int] = func(ctx context.Context) (int, error) {
-			// that it started
-			count.Add(1)
-
-			// that it finished
-			defer count.Add(1)
-
-			// do the waiting
-			select {
-			case <-sig:
-				return 0, errSignaled
-			case <-ctx.Done():
-				return -1, ctx.Err()
-			}
-		}
-		resolver := prod.Launch(ctx)
-		time.Sleep(50 * time.Millisecond)
-		check.Equal(t, count.Load(), 1)
-
-		close(sig)
-		out, err := resolver(ctx)
-		check.Equal(t, count.Load(), 2)
-		check.Zero(t, out)
-		check.Error(t, err)
 	})
 	t.Run("ErrorCheck", func(t *testing.T) {
 		t.Run("ShortCircut", func(t *testing.T) {

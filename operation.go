@@ -75,7 +75,7 @@ func (wf Operation) Signal(ctx context.Context) <-chan struct{} {
 // underlying operation returns.
 func (wf Operation) Launch(ctx context.Context) Operation {
 	sig := wf.Signal(ctx)
-	return func(_ context.Context) { WaitChannel(sig) }
+	return func(context.Context) { WaitChannel(sig) }
 }
 
 // Background launches the operation in a go routine. There is no panic-safety
@@ -93,7 +93,20 @@ func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wg.Launch(ctx, wf)
 
 // StartGroup runs n operations, incrementing the WaitGroup to account
 // for the job. Callers must wait on the WaitGroup independently.
-func (wf Operation) StartGroup(ctx context.Context, wg *WaitGroup, n int) { wg.DoTimes(ctx, n, wf) }
+func (wf Operation) StartGroup(ctx context.Context, n int) Operation {
+	wg := &WaitGroup{}
+
+	wg.DoTimes(ctx, n, wf)
+
+	return wg.Operation()
+}
+
+// Group makes an operation that runs n copies of the underlying
+// worker, in different go routines. Work does not start until the
+// resulting worker is called.
+func (wf Operation) Group(n int) Operation {
+	return func(ctx context.Context) { wf.StartGroup(ctx, n).Run(ctx) }
+}
 
 // Interval runs the operation with a timer that resets to the
 // provided duration. The operation runs immediately, and then the

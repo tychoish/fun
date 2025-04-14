@@ -70,9 +70,6 @@ func PtrGenerator[T any](fn func() *T) Generator[T] {
 // function. The underlying Future's panics are converted to errors.
 func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.Safe()) }
 
-// Run executes the generator and returns the result
-func (pf Generator[T]) Resolve(ctx context.Context) (T, error) { return pf(ctx) }
-
 // Background constructs a worker that runs the provided Generator in a
 // background thread and passes the produced value to the observe.
 //
@@ -183,6 +180,8 @@ func (pf Generator[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Futu
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
+func (pf Generator[T]) Capture() fn.Future[T] { return pf.Force() }
+
 // Ignore creates a future that runs the generator and returns
 // the value, ignoring the error.
 func (pf Generator[T]) Ignore(ctx context.Context) fn.Future[T] {
@@ -192,7 +191,7 @@ func (pf Generator[T]) Ignore(ctx context.Context) fn.Future[T] {
 // Must returns a future that resolves the generator returning the
 // constructed value and panicing if the generator errors.
 func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
-	return func() T { return ft.Must(pf.Resolve(ctx)) }
+	return func() T { return ft.Must(pf.Send(ctx)) }
 }
 
 // Force combines the semantics of Must and Wait as a future: when the
@@ -206,21 +205,6 @@ func (pf Generator[T]) Wait() (T, error) { return pf(context.Background()) }
 // Check converts the error into a boolean, with true indicating
 // success and false indicating (but not propagating it.).
 func (pf Generator[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
-func (pf Generator[T]) CheckForce() (T, bool)               { o, e := pf.Wait(); return o, e == nil }
-
-// Launch runs the generator in the background, and returns a generator
-// that and returns a generator which, when called, blocks until the
-// original generator returns.
-func (pf Generator[T]) Launch(ctx context.Context) Generator[T] {
-	eh, ef := MAKE.ErrorCollector()
-	pipe := Blocking(make(chan T))
-	pipe.Send().Handler().
-		ReadAll(pf).
-		Operation(eh).
-		PostHook(pipe.Close).
-		Background(ctx)
-	return pipe.Generator().WithErrorCheck(ef)
-}
 
 // WithErrorCheck takes an error future, and checks it before
 // executing the generator function. If the error future returns an
@@ -228,15 +212,16 @@ func (pf Generator[T]) Launch(ctx context.Context) Generator[T] {
 // running the underying generator. Useful for injecting an abort into
 // an existing pipleine or chain.
 func (pf Generator[T]) WithErrorCheck(ef fn.Future[error]) Generator[T] {
-	var zero T
-	return func(ctx context.Context) (T, error) {
+	return func(ctx context.Context) (zero T, _ error) {
 		if err := ef(); err != nil {
 			return zero, err
 		}
-		out, err := pf.Resolve(ctx)
+
+		out, err := pf.Send(ctx)
 		if err = ers.Join(err, ef()); err != nil {
 			return zero, err
 		}
+
 		return out, nil
 	}
 }
@@ -319,6 +304,9 @@ func (pf Generator[T]) WithLock(mtx *sync.Mutex) Generator[T] {
 func (pf Generator[T]) WithLocker(mtx sync.Locker) Generator[T] {
 	return func(ctx context.Context) (T, error) { defer internal.WithL(internal.LockL(mtx)); return pf(ctx) }
 }
+
+// Send executes the generator and returns the result.
+func (pf Generator[T]) Send(ctx context.Context) (T, error) { return pf(ctx) }
 
 // SendOne makes a Worker function that, as a future, calls the
 // generator once and then passes the output, if there are no errors,
@@ -562,7 +550,6 @@ func (pf Generator[T]) Parallel(
 
 	init := Operation(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
-		wg := &WaitGroup{}
 
 		// this might cause us to propagate an error (and abort)
 		// before the pipe is empty.
@@ -576,15 +563,15 @@ func (pf Generator[T]) Parallel(
 				return zero, io.EOF
 			}
 			return value, nil
-		}).Operation(func(err error) {
-			ft.WhenCall(ers.IsTerminating(err), cancel)
-		}).StartGroup(wctx, wg, opts.NumWorkers)
-
-		// we "wait on the wg in the background", but really
-		// we're waiting on the pipe close, which happens when
-		// the waitgroup returns.
-		wg.Operation().PostHook(pipe.Close).PostHook(pipe.Close).Background(ctx)
+		}).Operation(func(err error) { ft.WhenCall(ers.IsTerminating(err), cancel) }).
+			StartGroup(wctx, opts.NumWorkers).
+			PostHook(cancel).
+			PostHook(pipe.Close).
+			Background(ctx)
 	}).Once()
 
-	return pipe.Receive().Generator().PreHook(init).wrapErrorsWithErrorFuture(opts.ErrorResolver)
+	return pipe.Receive().
+		Generator().
+		PreHook(init).
+		wrapErrorsWithErrorFuture(opts.ErrorResolver)
 }

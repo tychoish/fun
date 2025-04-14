@@ -490,24 +490,26 @@ func (st *Stream[T]) Process(fn Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
-	LOOP:
 		for {
-			item, err := st.ReadOne(ctx)
-			if err != nil {
-				goto HANDLE_ERROR
+			for {
+				item, err := st.ReadOne(ctx)
+				if err != nil {
+					break
+				}
+
+				err = fn(ctx, item)
+				if err != nil {
+					break
+				}
 			}
 
-			err = fn(ctx, item)
-			if err != nil {
-				goto HANDLE_ERROR
-			}
-
-		HANDLE_ERROR:
 			switch {
 			case err == nil || errors.Is(err, ErrStreamContinue):
-				continue LOOP
-			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
+				continue
+			case ers.IsTerminating(err):
 				return nil
+			case ers.IsExpiredContext(err):
+				return err
 			default:
 				return err
 			}

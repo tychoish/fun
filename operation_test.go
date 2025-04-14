@@ -303,10 +303,12 @@ func TestOperation(t *testing.T) {
 			defer cancel()
 
 			count := 0
-			op := Operation(func(context.Context) { count++ })
-			wg := &WaitGroup{}
-			op.Lock().StartGroup(ctx, wg, 128)
-			wg.Wait(ctx)
+
+			Operation(func(context.Context) { count++ }).
+				Lock().
+				StartGroup(ctx, 128).
+				Run(ctx)
+
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
@@ -315,10 +317,9 @@ func TestOperation(t *testing.T) {
 
 			count := 0
 			op := Operation(func(context.Context) { count++ })
-			wg := &WaitGroup{}
 			mu := &sync.Mutex{}
-			op.WithLock(mu).StartGroup(ctx, wg, 128)
-			wg.Wait(ctx)
+			op.WithLock(mu).StartGroup(ctx, 128).Run(ctx)
+
 			assert.Equal(t, count, 128)
 		})
 		t.Run("ForBackground", func(t *testing.T) {

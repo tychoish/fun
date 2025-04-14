@@ -53,13 +53,6 @@ func JoinHandlers[T any](pfs ...Handler[T]) Handler[T] {
 	return pf
 }
 
-// Run executes the Handlers but creates a context within the
-// function (decended from the context provided in the arguments,)
-// that is canceled when Run() returns to avoid leaking well behaved
-// resources outside of the scope of the function execution. Run can
-// also be passed as a Handler func.
-func (pf Handler[T]) Run(ctx context.Context, in T) error { return pf.Worker(in).Run(ctx) }
-
 // Add begins running the process in a different goroutine, using the
 // provided arguments to manage the operation.
 func (pf Handler[T]) Add(ctx context.Context, wg *WaitGroup, eh fn.Handler[error], op T) {
@@ -80,6 +73,8 @@ func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ct
 // Force processes the input, but discards the error and uses a
 // context that will not expire.
 func (pf Handler[T]) Force(in T) { pf.Worker(in).Ignore().Wait() }
+
+func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ctx, in)) }
 
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.
@@ -142,7 +137,7 @@ func (pf Handler[T]) Filter(fl func(T) bool) Handler[T] {
 		if !fl(in) {
 			return ers.ErrCurrentOpSkip
 		}
-		return pf.Run(ctx, in)
+		return pf.Read(ctx, in)
 	}
 }
 
@@ -162,7 +157,7 @@ func (pf Handler[T]) merge(next Handler[T]) Handler[T] {
 		if err := pf(ctx, in); err != nil {
 			return err
 		}
-		return next.If(ctx.Err() == nil).Run(ctx, in)
+		return next.If(ctx.Err() == nil).Read(ctx, in)
 	}
 }
 
@@ -309,6 +304,9 @@ func (pf Handler[T]) WithErrorCheck(ef fn.Future[error]) Handler[T] {
 	}
 }
 
+// Read executes the Handler once.
+func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) }
+
 // ReadOne returns a future (Worker) that calls the processor function
 // on the output of the provided producer function. ReadOne uses the
 // fun.Pipe() operation for the underlying implementation.
@@ -322,9 +320,9 @@ func (pf Handler[T]) ReadAll(prod Generator[T]) Worker {
 
 	LOOP:
 		for {
-			out, err := prod(ctx)
+			out, err := prod.Send(ctx)
 			if err == nil {
-				err = pf(ctx, out)
+				err = pf.Read(ctx, out)
 			}
 
 			switch {
@@ -367,3 +365,15 @@ func (pf Handler[T]) Parallel(ops ...T) Worker {
 // underlying operation, if the processor only returned
 // ErrStreamContinue values.
 func (pf Handler[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
+
+func (pf Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
+	return func(ctx context.Context, in T) error {
+		defer internal.WithL(internal.LockL(mtx))
+		return pf.Read(ctx, in)
+	}
+}
+
+func (pf Handler[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.Future[error]) Handler[T] {
+	Invariant.Ok(handler != nil && resolver != nil, "must cal WithErrorHandler with non-nil operators")
+	return func(ctx context.Context, in T) error { handler(pf.Read(ctx, in)); return resolver() }
+}

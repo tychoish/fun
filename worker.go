@@ -386,14 +386,14 @@ func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 
 	eh, ep := MAKE.ErrorCollector()
 
-	wf.Operation(eh).StartGroup(ctx, wg, n)
+	wg.DoTimes(ctx, n, wf.Operation(eh))
 
-	return func(ctx context.Context) (err error) { wg.Wait(ctx); return ep() }
+	return func(ctx context.Context) error { wg.Wait(ctx); return ep() }
 }
 
 // Group makes a worker that runs n copies of the underlying worker,
 // in different go routines and aggregates their output. Work does not
-// start until the resulting worker is called
+// start until the resulting worker is called.
 func (wf Worker) Group(n int) Worker {
 	return func(ctx context.Context) error { return wf.StartGroup(ctx, n).Run(ctx) }
 }
