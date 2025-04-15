@@ -50,7 +50,7 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 	return func(ctx context.Context) {
 		wg := &WaitGroup{}
 
-		wg.Launch(ctx, iter.ReadAll2(func(fn Operation) {
+		wg.Launch(ctx, iter.ReadAll(func(fn Operation) {
 			wg.Launch(ctx, fn)
 		}).Ignore())
 
@@ -74,7 +74,7 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 		ec, ef := MAKE.ErrorCollector()
 		wg := &WaitGroup{}
 
-		wg.Launch(ctx, iter.ReadAll2(func(fn Worker) {
+		wg.Launch(ctx, iter.ReadAll(func(fn Worker) {
 			wg.Launch(ctx, fn.Operation(ec))
 		}).Operation(ec))
 

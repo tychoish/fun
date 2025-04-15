@@ -158,7 +158,7 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 }
 
 // Populate adds all items encountered in the stream to the set.
-func (s *Set[T]) Populate(iter *fun.Stream[T]) { iter.ReadAll2(s.Add).Ignore().Wait() }
+func (s *Set[T]) Populate(iter *fun.Stream[T]) { iter.ReadAll(s.Add).Ignore().Wait() }
 
 // Extend adds the items of one set to this set.
 func (s *Set[T]) Extend(extra *Set[T]) { s.Populate(extra.Stream()) }

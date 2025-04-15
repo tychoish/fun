@@ -73,7 +73,7 @@ func TestStream(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			iter := SliceStream([]int{})
-			assert.NotError(t, iter.ReadAll2(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+			assert.NotError(t, iter.ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 
 			_, err := iter.ReadOne(ctx)
 			assert.ErrorIs(t, err, io.EOF)
@@ -82,7 +82,7 @@ func TestStream(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			called := 0
-			err := SliceStream([]int{1, 2, 34, 56}).ReadAll2(func(in int) {
+			err := SliceStream([]int{1, 2, 34, 56}).ReadAll(func(in int) {
 				called++
 				if in > 3 {
 					panic("eep!")
@@ -103,7 +103,7 @@ func TestStream(t *testing.T) {
 			cancel()
 			count := 0
 			assert.Error(t, ctx.Err())
-			err := SliceStream([]int{1, 2, 34, 56}).ReadAll2(func(int) {
+			err := SliceStream([]int{1, 2, 34, 56}).ReadAll(func(int) {
 				count++
 			}).Run(ctx)
 			t.Log(err)
@@ -150,7 +150,7 @@ func TestStream(t *testing.T) {
 			default:
 				return -1, ErrStreamContinue
 			}
-		}).Stream().ReadAll2(func(in int) {
+		}).Stream().ReadAll(func(in int) {
 			observes++
 
 			assert.True(t, in%5 == 0)
@@ -173,7 +173,7 @@ func TestStream(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, MAKE.Counter(size).ReadAll2(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
+		check.NotError(t, MAKE.Counter(size).ReadAll(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -192,7 +192,8 @@ func TestStream(t *testing.T) {
 
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; return nil }).Run(ctx)
+
+			err := iter.ReadAll(func(int) { count++ }).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
 		})
@@ -201,7 +202,7 @@ func TestStream(t *testing.T) {
 			defer cancel()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			op := iter.ReadAll(func(_ context.Context, _ int) error { count++; return nil })
+			op := iter.ReadAll(func(int) { count++ })
 			err := op(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count)
@@ -211,7 +212,7 @@ func TestStream(t *testing.T) {
 			defer cancel()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; return io.EOF }).Run(ctx)
+			err := NewHandler(func(_ context.Context, _ int) error { count++; return io.EOF }).ReadAll(iter).Run(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, 1, count)
 		})
@@ -220,7 +221,7 @@ func TestStream(t *testing.T) {
 			defer cancel()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
+			err := NewHandler(func(_ context.Context, _ int) error { count++; return ers.ErrLimitExceeded }).ReadAll(iter).Run(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrLimitExceeded)
 			assert.Equal(t, 1, count)
@@ -230,7 +231,7 @@ func TestStream(t *testing.T) {
 			defer cancel()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
+			err := NewHandler(func(_ context.Context, _ int) error { count++; panic(ers.ErrLimitExceeded) }).ReadAll(iter).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
@@ -241,7 +242,7 @@ func TestStream(t *testing.T) {
 
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
-			err := iter.ReadAll(func(ctx context.Context, _ int) error { count++; cancel(); return ctx.Err() }).Run(ctx)
+			err := NewHandler(func(ctx context.Context, _ int) error { count++; cancel(); return ctx.Err() }).ReadAll(iter).Run(ctx)
 			assert.Error(t, err)
 			check.Equal(t, 1, count)
 			check.ErrorIs(t, err, context.Canceled)
@@ -253,10 +254,10 @@ func TestStream(t *testing.T) {
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
 			err := iter.ReadAllParallel(
-				func(_ context.Context, _ int) error { count.Add(1); return nil },
+				func(_ context.Context, in int) error { count.Add(1); return nil },
 				WorkerGroupConfNumWorkers(2),
-				WorkerGroupConfContinueOnError(),
-				WorkerGroupConfContinueOnPanic(),
+				// WorkerGroupConfContinueOnError(),
+				// WorkerGroupConfContinueOnPanic(),
 			).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count.Load())
@@ -689,7 +690,7 @@ func TestAny(t *testing.T) {
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
 	count := 0
-	err := SliceStream(sl).Any().ReadAll2(func(in any) {
+	err := SliceStream(sl).Any().ReadAll(func(in any) {
 		count++
 		_, ok := in.(int)
 		check.True(t, ok)
@@ -706,9 +707,9 @@ func TestEmptyIteration(t *testing.T) {
 	close(ch)
 
 	t.Run("EmptyObserve", func(t *testing.T) {
-		assert.NotError(t, SliceStream([]int{}).ReadAll2(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
-		assert.NotError(t, VariadicStream[int]().ReadAll2(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
-		assert.NotError(t, ChannelStream(ch).ReadAll2(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, SliceStream([]int{}).ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, VariadicStream[int]().ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
+		assert.NotError(t, ChannelStream(ch).ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 	})
 
 }

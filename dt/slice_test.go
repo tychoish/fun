@@ -262,55 +262,6 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, s.Len(), 0)
 		check.True(t, s.IsEmpty())
 	})
-	t.Run("Process", func(t *testing.T) {
-		const batchSize = 100
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		t.Run("Full", func(t *testing.T) {
-			s := randomIntSlice(batchSize)
-			count := 0
-			worker := s.Process(func(_ context.Context, in int) error {
-				count++
-				check.NotZero(t, in)
-				return nil
-			})
-			err := worker(ctx)
-			assert.Equal(t, count, batchSize)
-			assert.NotError(t, err)
-		})
-		t.Run("SafeAbort", func(t *testing.T) {
-			s := randomIntSlice(batchSize)
-			count := 0
-			worker := s.Process(func(_ context.Context, in int) error {
-				count++
-				if count > batchSize/2 {
-					return io.EOF
-				}
-				check.NotZero(t, in)
-				return nil
-			})
-			err := worker(ctx)
-			check.Equal(t, count, batchSize/2+1)
-			check.NotError(t, err)
-		})
-		t.Run("PropogateError", func(t *testing.T) {
-			s := randomIntSlice(batchSize)
-			count := 0
-			worker := s.Process(func(_ context.Context, in int) error {
-				count++
-				if count == 64 {
-					return ers.ErrLimitExceeded
-				}
-				check.NotZero(t, in)
-				return nil
-			})
-			err := worker(ctx)
-			check.Equal(t, count, 64)
-			check.Error(t, err)
-			check.ErrorIs(t, err, ers.ErrLimitExceeded)
-		})
-	})
 	t.Run("When", func(t *testing.T) {
 		sl := Slice[int]{}
 		t.Run("Add", func(t *testing.T) {

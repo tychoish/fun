@@ -36,18 +36,17 @@ type That fn.Future[[]string]
 func And(ops ...That) That {
 	return func() []string {
 		out := dt.NewSlice(make([]string, 0, len(ops)+1))
-		dt.NewSlice(ops).Process(fun.MakeHandler(func(that That) error {
+		for _, that := range ops {
 			if that == nil {
 				out.Add("encountered nil is.That operation")
-				return ers.ErrCurrentOpAbort
+				break
 			}
 			if results := that(); len(results) > 0 {
 				out.Extend(results)
-				return ers.ErrCurrentOpAbort
+				break
 			}
-			return nil
+		}
 
-		})).Ignore().Wait()
 		return ft.WhenDo(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}
 }

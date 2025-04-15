@@ -571,11 +571,10 @@ func TestChannel(t *testing.T) {
 		count := 0
 		err := ch.Receive().
 			Filter(ctx,
-				func(err error) { check.NotError(t, err) },
 				func(in int) bool { return in%2 == 0 && in != 0 },
 			).
 			Stream().
-			ReadAll2(func(in int) {
+			ReadAll(func(in int) {
 				count++
 				check.True(t, ft.Not(in == 0))
 				check.True(t, ft.Not(in%2 != 0))

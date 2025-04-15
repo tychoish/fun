@@ -437,19 +437,6 @@ func TestProcess(t *testing.T) {
 			assert.Nil(t, pg)
 		})
 	})
-	t.Run("Group", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		count := &atomic.Int64{}
-		proc := MakeHandler(func(i int) error { count.Add(1); check.Equal(t, i, 42); return nil })
-		check.Equal(t, 0, count.Load())
-		worker := proc.Parallel(42, 42, 42, 42, 42, 42, 42, 42, 42, 42)
-		check.Equal(t, 0, count.Load())
-		err := worker(ctx)
-		check.NotError(t, err)
-		check.Equal(t, 10, count.Load())
-	})
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())

@@ -91,6 +91,6 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 func (sm ChanSend[T]) Consume(iter *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
-		return iter.ReadAll(sm.Handler()).Run(ctx)
+		return sm.Handler().ReadAll(iter).Run(ctx)
 	}
 }

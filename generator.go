@@ -326,14 +326,8 @@ func (pf Generator[T]) ReadOne(proc Handler[T]) Worker {
 // (Worker) that consumes the values of the generator with the
 // processor until either function returns an error. ReadAll respects
 // ErrStreamContinue and io.EOF.
-func (pf Generator[T]) ReadAll2(proc Handler[T]) Worker { return pf.Stream().ReadAll(proc) }
-
-// ReadAll provides a form of iteration, by construction a future
-// (Worker) that consumes the values of the generator with the
-// processor until either function returns an error. ReadAll respects
-// ErrStreamContinue and io.EOF.
 func (pf Generator[T]) ReadAll(proc fn.Handler[T]) Worker {
-	return pf.Stream().ReadAll(func(_ context.Context, in T) error { proc(in); return nil })
+	return pf.Stream().ReadAll(proc)
 }
 
 // WithCancel creates a Generator and a cancel function which will
@@ -562,30 +556,25 @@ func (pf Generator[T]) Parallel(
 	}
 
 	pipe := Blocking(make(chan T, opts.NumWorkers+1))
-	pf = pf.WithRecover()
+
+	st := pf.Lock().WithRecover().WithErrorFilter(func(err error) error {
+		switch {
+		case err == nil:
+			return nil
+		case opts.CanContinueOnError(err):
+			return ErrStreamContinue
+		default:
+			return err
+		}
+	}).Stream()
 
 	return pipe.Receive().
 		Generator().
 		PreHook(Operation(func(ctx context.Context) {
-			wctx, cancel := context.WithCancel(ctx)
-
-			// this might cause us to propagate an error (and abort)
-			// before the pipe is empty.
-
-			pipe.Handler().ReadAll(func(ctx context.Context) (zero T, _ error) {
-				value, err := pf.Send(ctx)
-				if err != nil {
-					if opts.CanContinueOnError(err) {
-						return zero, ErrStreamContinue
-					}
-					return zero, io.EOF
-				}
-				return value, nil
-			}).Operation(func(err error) { ft.WhenCall(ers.IsTerminating(err), cancel) }).
-				StartGroup(wctx, opts.NumWorkers).
-				PostHook(cancel).
+			pipe.Send().Consume(st).
+				StartGroup(ctx, opts.NumWorkers).
+				Ignore().
 				PostHook(pipe.Close).
-				Background(ctx)
-		}).Once()).
-		wrapErrorsWithErrorFuture(opts.ErrorResolver)
+				Run(ctx)
+		}).Go().Once()).wrapErrorsWithErrorFuture(opts.ErrorResolver)
 }

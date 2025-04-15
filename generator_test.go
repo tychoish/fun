@@ -586,12 +586,11 @@ func TestGenerator(t *testing.T) {
 				return -1, io.EOF
 			}
 			return count, nil
-		}).ReadAll2(func(_ context.Context, in int) error {
+		}).ReadAll(func(in int) {
 			check.NotEqual(t, in, -1)
 			check.NotEqual(t, in, 0)
 			check.Equal(t, count, in)
 			check.True(t, in <= num)
-			return nil
 		})
 		check.Equal(t, 0, count)
 		ctx, cancel := context.WithCancel(context.Background())

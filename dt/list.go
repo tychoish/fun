@@ -40,7 +40,7 @@ func (l *List[T]) Append(items ...T) {
 // list. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
-func (l *List[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll2(l.PushBack) }
+func (l *List[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
 
 // Len returns the length of the list. As the Append/Remove operations
 // track the length of the list, this is an O(1) operation.

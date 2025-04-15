@@ -2,6 +2,7 @@ package fun
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -77,7 +78,10 @@ func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ct
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.
 func (pf Handler[T]) WithRecover() Handler[T] {
-	return func(ctx context.Context, in T) error { return pf.Worker(in).WithRecover().Run(ctx) }
+	return func(ctx context.Context, in T) (err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		return pf(ctx, in)
+	}
 }
 
 // After produces a Handler that will execute after the provided
@@ -318,17 +322,34 @@ func (pf Handler[T]) ReadOne(prod Generator[T]) Worker {
 // ReadAll reads elements from the producer until an error is
 // encountered and passes them to a producer, until the first error is
 // encountered. The worker is blocking.
-func (pf Handler[T]) ReadAll(prod Generator[T]) Worker { return prod.Stream().ReadAll(pf) }
+func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		for {
+			item, err := st.ReadOne(ctx)
+			if err != nil {
+				goto ERROR
+			}
 
-// Parallel takes a variadic number of items and returns a worker that
-// processes them concurrently. All panics are converted to errors and
-// all errors are aggregated.
-func (pf Handler[T]) Parallel(ops ...T) Worker {
-	return SliceStream(ops).ReadAllParallel(pf,
-		WorkerGroupConfNumWorkers(len(ops)),
-		WorkerGroupConfContinueOnError(),
-		WorkerGroupConfContinueOnPanic(),
-	)
+			err = pf(ctx, item)
+			if err != nil {
+				goto ERROR
+			}
+		ERROR:
+			switch {
+			case err == nil:
+				continue
+			case errors.Is(err, ErrStreamContinue):
+				continue
+			case ers.IsTerminating(err):
+				return nil
+			case ers.IsExpiredContext(err):
+				return err
+			default:
+				return err
+			}
+		}
+	}
 }
 
 // Retry makes a worker function that takes runs the processor

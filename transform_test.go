@@ -131,7 +131,7 @@ func TestMapReduce(t *testing.T) {
 
 		var mf Transform[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
 		mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
-			ReadAll(Blocking(pipe).Receive().Generator()).
+			ReadAll(Blocking(pipe).Receive().Stream()).
 			Ignore().
 			Add(ctx, wg)
 
@@ -255,12 +255,16 @@ func TestParallelForEach(t *testing.T) {
 				count := &atomic.Int64{}
 
 				err := SliceStream(elems).ReadAllParallel(
-					func(_ context.Context, in int) error {
+					func(ctx context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
-						count.Add(1)
 
-						jitter := time.Duration(rand.Int63n(2 + abs*int64(time.Millisecond)))
-						time.Sleep(time.Millisecond + jitter)
+						count.Add(1)
+						time.Sleep(time.Duration(rand.Int63n(2 + abs*int64(time.Millisecond))))
+
+						if err := ctx.Err(); err != nil {
+							return err
+						}
+
 						seen.Add(int64(in))
 						return nil
 					},
@@ -382,6 +386,7 @@ func TestParallelForEach(t *testing.T) {
 
 		errs := ers.Unwind(err)
 		if len(errs) != 10 {
+			t.Log(errs)
 			t.Error(len(errs), "!= 10", errs)
 		}
 

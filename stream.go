@@ -160,7 +160,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		wctx, cancel := context.WithCancel(ctx)
 		send := pipe.Send()
 
-		iters.ReadAll2(func(iter *Stream[T]) {
+		iters.ReadAll(func(iter *Stream[T]) {
 			send.Consume(iter).Operation(eh).Add(ctx, wg)
 		}).Operation(eh).Add(wctx, wg)
 
@@ -212,10 +212,10 @@ func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 
 				send := pipe.Send() // input end of the pipe
 
-				iters.ReadAll2(func(in *Stream[T]) {
+				iters.ReadAll(func(in *Stream[T]) {
 					// write the contents of the input stream
 					// to the input end of the pipe
-					in.ReadAll(send.Write).Observe(ctx, eh)
+					send.Handler().ReadAll(in).Observe(ctx, eh)
 				}).Observe(ctx, eh)
 			}).
 			Go().Once(),
@@ -343,37 +343,7 @@ func (st *Stream[T]) ReadOne(ctx context.Context) (out T, err error) {
 // of the worker, and abort the processing. If the processor function
 // returns ErrStreamContinue, processing continues. All other errors
 // abort processing and are returned by the worker.
-func (st *Stream[T]) ReadAll(fn Handler[T]) Worker {
-
-	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
-		for {
-			item, err := st.ReadOne(ctx)
-			if err != nil {
-				goto ERROR
-			}
-
-			err = fn(ctx, item)
-			if err != nil {
-				goto ERROR
-			}
-
-		ERROR:
-			switch {
-			case err == nil || errors.Is(err, ErrStreamContinue):
-				continue
-			case ers.IsTerminating(err):
-				return nil
-			case ers.IsExpiredContext(err):
-				return err
-			default:
-				return err
-			}
-		}
-	}
-}
-
-func (st *Stream[T]) ReadAll2(fn fn.Handler[T]) Worker {
+func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover()), st.Close()) }()
 		for {
@@ -409,12 +379,15 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 	return NewGenerator(func(ctx context.Context) (out T, _ error) {
 		for {
 			item, err := st.ReadOne(ctx)
-			if err != nil {
+			switch {
+			case err == nil:
+				if check(item) {
+					return item, nil
+				}
+			case ers.Is(err, ErrStreamContinue):
+				continue
+			default:
 				return out, err
-			}
-
-			if check(item) {
-				return item, nil
 			}
 		}
 	}).Stream()
@@ -490,15 +463,9 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	if num <= 0 {
 		return nil
 	}
-
 	pipe := Blocking(make(chan T))
-	setup := pipe.Handler().
-		ReadAll(st.Generator()).
-		PostHook(pipe.Close).
-		Ignore().
-		Go().
-		Once()
 
+	setup := pipe.Send().Consume(st).PostHook(pipe.Close).Ignore().Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
 		output[idx] = pipe.Generator().PreHook(setup).Stream()
@@ -524,7 +491,7 @@ func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 // In the case of an error in the underlying stream the output slice
 // will have the values encountered before the error.
 func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
-	return out, st.ReadAll2(func(in T) { out = append(out, in) }).Run(ctx)
+	return out, st.ReadAll(func(in T) { out = append(out, in) }).Run(ctx)
 }
 
 // Channel proides access to the contents of the stream as a
@@ -538,7 +505,7 @@ func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
 
 	out.Handler().
-		ReadAll(st.Generator()).
+		ReadAll(st).
 		PostHook(out.Close).
 		Operation(st.AddError).
 		Launch(ctx)
@@ -616,39 +583,28 @@ func (st *Stream[T]) ReadAllParallel(
 	fn Handler[T],
 	optp ...OptionProvider[*WorkerGroupConf],
 ) Worker {
-	return func(ctx context.Context) (err error) {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
+	return func(ctx context.Context) error {
 		opts := &WorkerGroupConf{}
-		err = JoinOptionProviders(optp...).Apply(opts)
-
-		ft.WhenCall(err != nil, cancel)
-		if opts.ErrorHandler == nil {
-			opts.ErrorHandler = st.ErrorHandler().Lock()
-			opts.ErrorResolver = st.Close
-		}
-
-		wg := &WaitGroup{}
-
-		handler := fn.WithRecover().WithErrorFilter(func(err error) error {
-			if opts.CanContinueOnError(err) {
-				return ErrStreamContinue
-			}
+		if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
 			return err
-		})
-
-		splits := st.Split(opts.NumWorkers)
-		for idx := range splits {
-			handler.ReadAll(splits[idx].Generator()).
-				Operation(func(err error) { ft.WhenCall(ers.IsTerminating(err), cancel) }).
-				Add(ctx, wg)
 		}
 
-		// use the blocking wait because we want the workers
-		// to exit on their own: passing a context here would
-		// mean that this function would return too early.
-		wg.Operation().Wait()
+		if opts.ErrorHandler == nil {
+			opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
+		}
+		wst := st.Generator().WithRecover().Parallel(optp...).Stream()
+
+		fn.WithRecover().WithErrorFilter(func(err error) error {
+			switch {
+			case err == nil:
+				return nil
+			case opts.CanContinueOnError(err):
+				return ErrStreamContinue
+			default:
+				return err
+			}
+		}).ReadAll(wst).StartGroup(ctx, opts.NumWorkers).Run(ctx)
+
 		return opts.ErrorResolver()
 	}
 }

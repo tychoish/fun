@@ -7,7 +7,6 @@ import (
 	"iter"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -23,14 +22,13 @@ type ChanReceive[T any] struct {
 // Filter returns a channel that consumes the output of a channel and
 // returns a NEW channel that only contains elements that have
 // elements that the filter function returns true for.
-func (ro ChanReceive[T]) Filter(ctx context.Context, eh fn.Handler[error], filter func(T) bool) ChanReceive[T] {
+func (ro ChanReceive[T]) Filter(ctx context.Context, filter func(T) bool) ChanReceive[T] {
 	out := ChanOp[T]{ch: make(chan T), mode: ro.mode}
 
-	ro.Generator().
-		WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).
-		Filter(filter).
-		ReadAll2(out.Handler()).
-		Background(ctx, eh)
+	out.Handler().
+		ReadAll(ro.Generator().WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).Stream().Filter(filter)).
+		Ignore().
+		Background(ctx)
 
 	return out.Receive()
 }

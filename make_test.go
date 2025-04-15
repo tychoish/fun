@@ -260,7 +260,7 @@ func TestHandlers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		var prev string
-		check.NotError(t, MAKE.LinesWithSpaceTrimed(buf).ReadAll2(func(line string) {
+		check.NotError(t, MAKE.LinesWithSpaceTrimed(buf).ReadAll(func(line string) {
 			count++
 			assert.Equal(t, len(line), 64)
 			assert.NotEqual(t, prev, line)

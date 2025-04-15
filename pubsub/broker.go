@@ -228,7 +228,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 // Callers should avoid using a stream that will retain input
 // items in memory.
 func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.ReadAll(b.Handler)
+	return fun.NewHandler(b.Handler).ReadAll(iter)
 }
 
 // Stats provides introspection into the current state of the broker.
