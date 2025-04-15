@@ -544,18 +544,14 @@ func (pf Generator[T]) Parallel(
 	pipe := Blocking(make(chan T, intish.Abs(opts.NumWorkers*2)))
 
 	setup := Operation(func(ctx context.Context) {
-		wctx, cancel := context.WithCancel(ctx)
-
-		st := pf.WithRecover().WithErrorFilter(opts.ErrorFilter).Stream()
-
-		op := pipe.Handler().ReadAll(st).Operation(opts.ErrorHandler)
-
-		wg := &WaitGroup{}
-
-		wg.DoTimes(wctx, opts.NumWorkers, op)
-
-		wg.Operation().PostHook(pipe.Close).PostHook(cancel).Background(ctx)
-	}).Go().Once()
+		pipe.Handler().ReadAll(pf.WithRecover().
+			WithErrorFilter(opts.ErrorFilter).
+			Stream(),
+		).Operation(opts.ErrorHandler).
+			StartGroup(ctx, opts.NumWorkers).
+			PostHook(pipe.Close).
+			Background(ctx)
+	}).Once()
 
 	return pipe.Receive().
 		Generator().

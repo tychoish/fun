@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -88,8 +87,16 @@ func (mpf Transform[T, O]) ProcessParallel(
 	iter *Stream[T],
 	optp ...OptionProvider[*WorkerGroupConf],
 ) *Stream[O] {
-	output := Blocking(make(chan O))
 	opts := &WorkerGroupConf{}
+
+	if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
+		return MakeGenerator(func() (zero O, _ error) { return zero, err }).Stream()
+	}
+	if opts.ErrorHandler == nil {
+		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
+	}
+
+	output := Blocking(make(chan O))
 
 	// this operations starts the background thread for the
 	// mapper/stream, but doesn't run until the first
@@ -97,33 +104,19 @@ func (mpf Transform[T, O]) ProcessParallel(
 	// till later, and error handling gets much easier if we
 	// wait.
 	init := Operation(func(ctx context.Context) {
-		wctx, wcancel := context.WithCancel(ctx)
-		wg := &WaitGroup{}
-		mf := mpf.WithRecover()
-		splits := iter.Split(opts.NumWorkers)
-		for idx := range splits {
-			// for each split, run a mapWorker
-			mf.mapPullProcess(output.Handler(), opts).ReadAll(splits[idx]).
-				Operation(func(err error) {
-					ft.WhenCall(ers.IsTerminating(err), wcancel)
-				}).
-				Add(wctx, wg)
-		}
-
-		// start a background op that waits for the
-		// waitgroup and closes the channel
-		wg.Operation().PostHook(wcancel).PostHook(output.Close).Background(ctx)
+		mpf.WithRecover().mapPullProcess(output.Handler(), opts).
+			ReadAll(iter).
+			StartGroup(ctx, opts.NumWorkers).
+			PostHook(output.Close).
+			Operation(opts.ErrorHandler).
+			Background(ctx)
 	}).Once()
 
-	outputIter := output.Generator().PreHook(init).Stream().WithHook(func(out *Stream[O]) { out.AddError(iter.Close()) })
-
-	err := JoinOptionProviders(optp...).Apply(opts)
-	ft.WhenCall(opts.ErrorHandler == nil, func() { opts.ErrorHandler = outputIter.ErrorHandler().Lock() })
-
-	outputIter.AddError(err)
-
-	ft.WhenCall(err != nil, output.Close)
-	return outputIter
+	return output.Generator().PreHook(init).Stream().
+		WithHook(func(out *Stream[O]) {
+			out.AddError(iter.Close())
+			out.AddError(opts.ErrorResolver())
+		})
 }
 
 // Generator processes an input generator function with the Transform
