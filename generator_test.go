@@ -989,7 +989,7 @@ func TestGenerator(t *testing.T) {
 	})
 	t.Run("ErrorHanldingOptions", func(t *testing.T) {
 		g := MakeGenerator(func() (int, error) { panic(42) })
-		g = g.Parallel(WorkerGroupConfSet(&WorkerGroupConf{ErrorHandler: func(error) { panic(24) }}))
+		g = g.Paralell(WorkerGroupConfSet(&WorkerGroupConf{ErrorHandler: func(error) { panic(24) }}))
 		out, err := g.Send(t.Context())
 		assert.Zero(t, out)
 		assert.Error(t, err)

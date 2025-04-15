@@ -530,8 +530,8 @@ func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.F
 	}
 }
 
-// Parallel returns a wrapped generator that produces items until the
-// generator function returns io.EOF, or the context. Parallel
+// Paralell returns a wrapped generator that produces items until the
+// generator function returns io.EOF, or the context. Paralell
 // operation, continue on error/continue-on-panic semantics are
 // available and share configuration with the ParallelProcess and Map
 // operations.
@@ -542,7 +542,7 @@ func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.F
 // The operation returns results from a buffer that can hold a number
 // of items equal to the number of workers. Buffered items may not be
 // returned to the caller in the case of early termination.
-func (pf Generator[T]) Parallel(
+func (pf Generator[T]) Paralell(
 	optp ...OptionProvider[*WorkerGroupConf],
 ) Generator[T] {
 	opts := &WorkerGroupConf{}
@@ -555,26 +555,27 @@ func (pf Generator[T]) Parallel(
 		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 	}
 
-	pipe := Blocking(make(chan T, opts.NumWorkers+1))
+	pipe := Blocking(make(chan T, max(opts.NumWorkers*2+1)))
 
-	st := pf.Lock().WithRecover().WithErrorFilter(func(err error) error {
-		switch {
-		case err == nil:
-			return nil
-		case opts.CanContinueOnError(err):
-			return ErrStreamContinue
-		default:
-			return err
-		}
-	}).Stream()
+	setup := Operation(func(ctx context.Context) {
+		wctx, cancel := context.WithCancel(ctx)
+
+		st := pf.WithRecover().WithErrorFilter(opts.ErrorFilter).Stream()
+
+		op := pipe.Handler().ReadAll(st).Operation(func(err error) {
+			ft.WhenCall(ers.IsTerminating(err), cancel)
+		})
+
+		wg := &WaitGroup{}
+
+		wg.DoTimes(wctx, opts.NumWorkers, op)
+
+		wg.Operation().PostHook(pipe.Close).Background(ctx)
+
+	}).Go().Once()
 
 	return pipe.Receive().
 		Generator().
-		PreHook(Operation(func(ctx context.Context) {
-			pipe.Send().Consume(st).
-				StartGroup(ctx, opts.NumWorkers).
-				Ignore().
-				PostHook(pipe.Close).
-				Run(ctx)
-		}).Go().Once()).wrapErrorsWithErrorFuture(opts.ErrorResolver)
+		PreHook(setup).
+		wrapErrorsWithErrorFuture(opts.ErrorResolver)
 }

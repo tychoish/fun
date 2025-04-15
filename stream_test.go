@@ -256,8 +256,8 @@ func TestStream(t *testing.T) {
 			err := iter.ReadAllParallel(
 				func(_ context.Context, in int) error { count.Add(1); return nil },
 				WorkerGroupConfNumWorkers(2),
-				// WorkerGroupConfContinueOnError(),
-				// WorkerGroupConfContinueOnPanic(),
+				WorkerGroupConfContinueOnError(),
+				WorkerGroupConfContinueOnPanic(),
 			).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count.Load())

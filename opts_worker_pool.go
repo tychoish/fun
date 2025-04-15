@@ -102,6 +102,17 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	}
 }
 
+func (o WorkerGroupConf) ErrorFilter(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case o.CanContinueOnError(err):
+		return ErrStreamContinue
+	default:
+		return err
+	}
+}
+
 // WorkerGroupConfSet overrides the option with the provided option.
 func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
 	return func(o *WorkerGroupConf) error { *o = *opt; return nil }

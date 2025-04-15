@@ -353,7 +353,6 @@ func TestParallelForEach(t *testing.T) {
 			ReadAllParallel(
 				func(_ context.Context, in int) error {
 					if in == 4 {
-						cancel()
 						panic("gotcha")
 					}
 					return nil
@@ -799,7 +798,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).Parallel().Stream()
+							}).Paralell().Stream()
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -825,7 +824,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).Parallel(WorkerGroupConfNumWorkers(4)).Stream()
+							}).Paralell(WorkerGroupConfNumWorkers(4)).Stream()
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -845,7 +844,7 @@ func RunStreamStringAlgoTests(
 							defer cancel()
 							out := MakeGenerator(func() (string, error) {
 								panic("foo")
-							}).Parallel().Stream()
+							}).Paralell().Stream()
 
 							if out.Next(ctx) {
 								t.Fatal("should not iterate when panic")
@@ -874,7 +873,7 @@ func RunStreamStringAlgoTests(
 									}
 									return fmt.Sprint(count.Load()), nil
 								},
-							).Parallel(WorkerGroupConfContinueOnPanic()).Stream()
+							).Paralell(WorkerGroupConfContinueOnPanic()).Stream()
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
 								t.Log(err, output)
@@ -898,7 +897,7 @@ func RunStreamStringAlgoTests(
 									return "", expectedErr
 								}
 								return "foo", nil
-							}).Parallel().Stream()
+							}).Paralell().Stream()
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 5 {
@@ -928,7 +927,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return "foo", nil
-							}).Parallel(WorkerGroupConfContinueOnError()).Stream()
+							}).Paralell(WorkerGroupConfContinueOnError()).Stream()
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {

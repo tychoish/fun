@@ -108,13 +108,16 @@ func ChannelStream[T any](ch <-chan T) *Stream[T] { return BlockingReceive(ch).S
 // SliceStream provides Stream access to the elements in a slice.
 func SliceStream[T any](in []T) *Stream[T] {
 	s := in
-	var idx = -1
+	idx := atomic.Int64{}
+	idx.Store(-1)
+
 	return MakeStream(func(ctx context.Context) (out T, _ error) {
-		if len(s) <= idx+1 {
+		next := idx.Add(1)
+
+		if len(s) <= int(next) {
 			return out, io.EOF
 		}
-		idx++
-		return s[idx], ctx.Err()
+		return s[next], ctx.Err()
 	})
 }
 
@@ -592,18 +595,10 @@ func (st *Stream[T]) ReadAllParallel(
 		if opts.ErrorHandler == nil {
 			opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 		}
-		wst := st.Generator().WithRecover().Parallel(optp...).Stream()
 
-		fn.WithRecover().WithErrorFilter(func(err error) error {
-			switch {
-			case err == nil:
-				return nil
-			case opts.CanContinueOnError(err):
-				return ErrStreamContinue
-			default:
-				return err
-			}
-		}).ReadAll(wst).StartGroup(ctx, opts.NumWorkers).Run(ctx)
+		wst := st.Generator().WithRecover().Stream()
+
+		fn.WithRecover().WithErrorFilter(opts.ErrorFilter).ReadAll(wst).StartGroup(ctx, opts.NumWorkers).Run(ctx)
 
 		return opts.ErrorResolver()
 	}
@@ -619,7 +614,7 @@ func (st *Stream[T]) ReadAllParallel(
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
+	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Go().Once()
 	return buf.Generator().PreHook(pipe).Stream()
 }
 
@@ -633,7 +628,7 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 // consumer of the stream.
 func (st *Stream[T]) ParallelBuffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := st.ReadAllParallel(buf.Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Once().Go()
+	pipe := st.ReadAllParallel(buf.Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Go().Once()
 	return buf.Generator().PreHook(pipe).Stream().WithHook(func(si *Stream[T]) { si.AddError(st.Close()) })
 }
 
