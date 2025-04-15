@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/intish"
 )
 
 // Generator is a function type that is a failrly common
@@ -308,20 +309,6 @@ func (pf Generator[T]) WithLocker(mtx sync.Locker) Generator[T] {
 // Send executes the generator and returns the result.
 func (pf Generator[T]) Send(ctx context.Context) (T, error) { return pf(ctx) }
 
-// ReadOne makes a Worker function that, as a future, calls the
-// generator once and then passes the output, if there are no errors,
-// to the processor function. Provides the inverse operation of
-// Handler.ReadOne.
-func (pf Generator[T]) ReadOne(proc Handler[T]) Worker {
-	return func(ctx context.Context) error {
-		val, err := pf.Send(ctx)
-		if err != nil {
-			return err
-		}
-		return proc(ctx, val)
-	}
-}
-
 // ReadAll provides a form of iteration, by construction a future
 // (Worker) that consumes the values of the generator with the
 // processor until either function returns an error. ReadAll respects
@@ -530,8 +517,8 @@ func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.F
 	}
 }
 
-// Paralell returns a wrapped generator that produces items until the
-// generator function returns io.EOF, or the context. Paralell
+// Parallel returns a wrapped generator that produces items until the
+// generator function returns io.EOF, or the context. Parallel
 // operation, continue on error/continue-on-panic semantics are
 // available and share configuration with the ParallelProcess and Map
 // operations.
@@ -542,11 +529,10 @@ func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.F
 // The operation returns results from a buffer that can hold a number
 // of items equal to the number of workers. Buffered items may not be
 // returned to the caller in the case of early termination.
-func (pf Generator[T]) Paralell(
+func (pf Generator[T]) Parallel(
 	optp ...OptionProvider[*WorkerGroupConf],
 ) Generator[T] {
 	opts := &WorkerGroupConf{}
-
 	if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
 		return MakeGenerator(func() (zero T, _ error) { return zero, err })
 	}
@@ -555,23 +541,20 @@ func (pf Generator[T]) Paralell(
 		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 	}
 
-	pipe := Blocking(make(chan T, max(opts.NumWorkers*2+1)))
+	pipe := Blocking(make(chan T, intish.Abs(opts.NumWorkers*2)))
 
 	setup := Operation(func(ctx context.Context) {
 		wctx, cancel := context.WithCancel(ctx)
 
 		st := pf.WithRecover().WithErrorFilter(opts.ErrorFilter).Stream()
 
-		op := pipe.Handler().ReadAll(st).Operation(func(err error) {
-			ft.WhenCall(ers.IsTerminating(err), cancel)
-		})
+		op := pipe.Handler().ReadAll(st).Operation(opts.ErrorHandler)
 
 		wg := &WaitGroup{}
 
 		wg.DoTimes(wctx, opts.NumWorkers, op)
 
-		wg.Operation().PostHook(pipe.Close).Background(ctx)
-
+		wg.Operation().PostHook(pipe.Close).PostHook(cancel).Background(ctx)
 	}).Go().Once()
 
 	return pipe.Receive().

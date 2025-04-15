@@ -111,13 +111,15 @@ func SliceStream[T any](in []T) *Stream[T] {
 	idx := atomic.Int64{}
 	idx.Store(-1)
 
-	return MakeStream(func(ctx context.Context) (out T, _ error) {
+	// Stream.ReadOne should take care of context
+	// cancellation. There's no reason to cancel
+	return MakeStream(func(context.Context) (out T, _ error) {
 		next := idx.Add(1)
 
 		if len(s) <= int(next) {
 			return out, io.EOF
 		}
-		return s[next], ctx.Err()
+		return s[next], nil
 	})
 }
 
@@ -596,9 +598,11 @@ func (st *Stream[T]) ReadAllParallel(
 			opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 		}
 
-		wst := st.Generator().WithRecover().Stream()
+		op := fn.WithRecover().WithErrorFilter(opts.ErrorFilter).ReadAll(st).StartGroup(ctx, opts.NumWorkers).Ignore()
 
-		fn.WithRecover().WithErrorFilter(opts.ErrorFilter).ReadAll(wst).StartGroup(ctx, opts.NumWorkers).Run(ctx)
+		wg := &WaitGroup{}
+		wg.DoTimes(ctx, opts.NumWorkers, op)
+		wg.Wait(ctx)
 
 		return opts.ErrorResolver()
 	}
@@ -614,7 +618,7 @@ func (st *Stream[T]) ReadAllParallel(
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Go().Once()
+	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
 	return buf.Generator().PreHook(pipe).Stream()
 }
 
@@ -628,8 +632,11 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 // consumer of the stream.
 func (st *Stream[T]) ParallelBuffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := st.ReadAllParallel(buf.Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler().Lock()).PostHook(buf.Close).Go().Once()
-	return buf.Generator().PreHook(pipe).Stream().WithHook(func(si *Stream[T]) { si.AddError(st.Close()) })
+
+	init := st.ReadAllParallel(buf.Send().Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
+
+	gen := NewGenerator(func(ctx context.Context) (T, error) { init(ctx); return buf.Receive().Read(ctx) })
+	return gen.Stream()
 }
 
 // Seq converts a fun.Stream[T] into a native go iterator.

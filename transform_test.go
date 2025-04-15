@@ -330,14 +330,14 @@ func TestParallelForEach(t *testing.T) {
 					seenCount.Add(1)
 					return nil
 				},
-				WorkerGroupConfNumWorkers(8),
+				WorkerGroupConfNumWorkers(4),
 			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
 		}
 		check.True(t, paned.Load())
 		if seenCount.Load() != 9 {
-			t.Error("should have only seen", 9, "saw", seenCount.Load())
+			t.Error("should have seen", 9, "saw", seenCount.Load())
 		}
 		errs := ers.Unwind(err)
 		if len(errs) != 2 {
@@ -798,7 +798,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).Paralell().Stream()
+							}).Parallel().Stream()
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -824,7 +824,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return inputs[rand.Intn(511)], nil
-							}).Paralell(WorkerGroupConfNumWorkers(4)).Stream()
+							}).Parallel(WorkerGroupConfNumWorkers(4)).Stream()
 							sig := make(chan struct{})
 							go func() {
 								defer close(sig)
@@ -844,7 +844,7 @@ func RunStreamStringAlgoTests(
 							defer cancel()
 							out := MakeGenerator(func() (string, error) {
 								panic("foo")
-							}).Paralell().Stream()
+							}).Parallel().Stream()
 
 							if out.Next(ctx) {
 								t.Fatal("should not iterate when panic")
@@ -873,7 +873,7 @@ func RunStreamStringAlgoTests(
 									}
 									return fmt.Sprint(count.Load()), nil
 								},
-							).Paralell(WorkerGroupConfContinueOnPanic()).Stream()
+							).Parallel(WorkerGroupConfContinueOnPanic()).Stream()
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {
 								t.Log(err, output)
@@ -897,7 +897,7 @@ func RunStreamStringAlgoTests(
 									return "", expectedErr
 								}
 								return "foo", nil
-							}).Paralell().Stream()
+							}).Parallel().Stream()
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 5 {
@@ -927,7 +927,7 @@ func RunStreamStringAlgoTests(
 									return "", io.EOF
 								}
 								return "foo", nil
-							}).Paralell(WorkerGroupConfContinueOnError()).Stream()
+							}).Parallel(WorkerGroupConfContinueOnError()).Stream()
 
 							output, err := out.Slice(ctx)
 							if l := len(output); l != 3 {

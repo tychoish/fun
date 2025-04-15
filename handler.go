@@ -309,16 +309,6 @@ func (pf Handler[T]) WithErrorCheck(ef fn.Future[error]) Handler[T] {
 // Read executes the Handler once.
 func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) }
 
-// ReadOne returns a future (Worker) that calls the processor function
-// on the output of the provided producer function. ReadOne uses the
-// fun.Pipe() operation for the underlying implementation.
-func (pf Handler[T]) ReadOne(prod Generator[T]) Worker {
-	return func(ctx context.Context) error {
-		val, err := prod.Send(ctx)
-		return ers.Join(err, pf.Read(ctx, val))
-	}
-}
-
 // ReadAll reads elements from the producer until an error is
 // encountered and passes them to a producer, until the first error is
 // encountered. The worker is blocking.

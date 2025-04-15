@@ -535,46 +535,6 @@ func TestGenerator(t *testing.T) {
 			check.Equal(t, 2, count)
 		})
 	})
-	t.Run("Send", func(t *testing.T) {
-		t.Run("One", func(t *testing.T) {
-			count := 0
-			wf := Generator[int](func(_ context.Context) (int, error) {
-				assert.Zero(t, count)
-				count++
-				return 42, nil
-			}).ReadOne(func(_ context.Context, in int) error {
-				assert.Equal(t, count, 1)
-				assert.Equal(t, in, 42)
-				count++
-				return nil
-			})
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			check.NotError(t, wf(ctx))
-			check.Equal(t, 2, count)
-		})
-		t.Run("OneError", func(t *testing.T) {
-			count := 0
-			root := ers.New("hello")
-			wf := Generator[int](func(_ context.Context) (int, error) {
-				assert.Zero(t, count)
-				count++
-				return 42, root
-			}).ReadOne(func(_ context.Context, _ int) error {
-				assert.Equal(t, "should not run", "")
-				return nil
-			})
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := wf(ctx)
-			check.Error(t, err)
-			check.ErrorIs(t, err, root)
-			check.Equal(t, 1, count)
-		})
-	})
 	t.Run("SendAll", func(t *testing.T) {
 		// this is just and end to end test because it's
 		// essentially sugar
@@ -989,7 +949,7 @@ func TestGenerator(t *testing.T) {
 	})
 	t.Run("ErrorHanldingOptions", func(t *testing.T) {
 		g := MakeGenerator(func() (int, error) { panic(42) })
-		g = g.Paralell(WorkerGroupConfSet(&WorkerGroupConf{ErrorHandler: func(error) { panic(24) }}))
+		g = g.Parallel(WorkerGroupConfSet(&WorkerGroupConf{ErrorHandler: func(error) { panic(24) }}))
 		out, err := g.Send(t.Context())
 		assert.Zero(t, out)
 		assert.Error(t, err)

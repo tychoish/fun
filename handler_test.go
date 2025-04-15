@@ -342,18 +342,6 @@ func TestProcess(t *testing.T) {
 		assert.Error(t, pf(ctx, 42))
 		assert.Equal(t, count, 3)
 	})
-	t.Run("ReadOne", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		nopCt := 0
-		var nopProd Generator[string] = func(_ context.Context) (string, error) { nopCt++; return "nop", nil }
-		var nopProc Handler[string] = func(_ context.Context, in string) error { nopCt++; check.Equal(t, in, "nop"); return nil }
-		op := nopProc.ReadOne(nopProd)
-		check.Equal(t, nopCt, 0)
-		check.NotError(t, op(ctx))
-		check.Equal(t, nopCt, 2)
-	})
 	t.Run("Join", func(t *testing.T) {
 		onect, twoct := 0, 0
 		reset := func() { onect, twoct = 0, 0 }
