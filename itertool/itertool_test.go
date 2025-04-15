@@ -357,7 +357,7 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Parallel", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).
+		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(101)), 25, 5*time.Millisecond).
 			ReadAllParallel(fun.FromHandler(func(in int) {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
@@ -369,8 +369,8 @@ func TestRateLimit(t *testing.T) {
 
 		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
 
-		assert.True(t, dur >= 100*time.Millisecond)
-		assert.Equal(t, 100, count.Get())
+		assert.True(t, dur >= 5*time.Millisecond)
+		assert.Equal(t, 101, count.Get())
 	})
 	t.Run("Cancelation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

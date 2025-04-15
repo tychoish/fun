@@ -74,41 +74,39 @@ func Indexed[T any](iter *fun.Stream[T]) *fun.Stream[dt.Pair[int, T]] {
 // output stream will produce no more than <num> items in any given
 // <window>.
 func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.Stream[T] {
-	queue := &dt.List[time.Time]{}
-	timer := time.NewTimer(0)
-	var zero T
-
 	fun.Invariant.IsTrue(num > 0, "rate must be greater than zero")
 
-	return fun.NewGenerator(func(ctx context.Context) (T, error) {
+	timer := time.NewTimer(0)
+	queue := &dt.List[time.Time]{}
 
-	START:
-		now := time.Now()
+	return fun.NewGenerator(func(ctx context.Context) (zero T, _ error) {
+		for {
+			now := time.Now()
 
-		if queue.Len() < num {
-			queue.PushBack(now)
-			return iter.ReadOne(ctx)
+			if queue.Len() < num {
+				queue.PushBack(now)
+				return iter.ReadOne(ctx)
+			}
+
+			for queue.Len() > 0 && now.After(queue.Front().Value().Add(window)) {
+				queue.Front().Drop()
+			}
+
+			if queue.Len() < num {
+				queue.PushBack(now)
+				return iter.ReadOne(ctx)
+			}
+
+			sleepUntil := time.Until(queue.Front().Value().Add(window))
+			fun.Invariant.IsTrue(sleepUntil >= 0, "the next sleep must be in the future")
+
+			timer.Reset(sleepUntil)
+			select {
+			case <-timer.C:
+				continue
+			case <-ctx.Done():
+				return zero, ctx.Err()
+			}
 		}
-
-		for queue.Len() > 0 && now.After(queue.Front().Value().Add(window)) {
-			queue.Front().Drop()
-		}
-
-		if queue.Len() < num {
-			queue.PushBack(now)
-			return iter.ReadOne(ctx)
-		}
-
-		sleepUntil := time.Until(queue.Front().Value().Add(window))
-		fun.Invariant.IsTrue(sleepUntil >= 0, "the next sleep must be in the future")
-
-		timer.Reset(sleepUntil)
-		select {
-		case <-timer.C:
-			goto START
-		case <-ctx.Done():
-			return zero, ctx.Err()
-		}
-
 	}).Lock().PostHook(func() { timer.Stop() }).Stream()
 }

@@ -26,6 +26,24 @@ func FilterExclude(exclusions ...error) Filter {
 // FilterNoop produces a filter that always returns the original error.
 func FilterNoop() Filter { return func(err error) error { return err } }
 
+func FilterContext() Filter {
+	return func(err error) error {
+		if IsExpiredContext(err) {
+			return nil
+		}
+		return err
+	}
+}
+
+func FilterTerminating() Filter {
+	return func(err error) error {
+		if IsTerminating(err) {
+			return nil
+		}
+		return err
+	}
+}
+
 // FilterCheck is an error filter that returns nil when the check is
 // true, and false otherwise.
 func FilterCheck(ep func(error) bool) Filter {

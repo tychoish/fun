@@ -3,6 +3,7 @@ package srv
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
@@ -167,24 +167,11 @@ func ProcessStream[T any](
 // is canceled.) The timeout, when non-zero, is passed to the clean up
 // operation. Cleanup functions are dispatched in parallel.
 func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
-	// assume some reasonable defaults.
-	// copy the values out of the pipe so that we don't end up
-	// deadlocking or missing jobs. on shutdown.
-	cache := &dt.List[fun.Worker]{}
+	closer, waitForSignal := fun.MAKE.Signal()
 
 	return &Service{
-		Run: func(ctx context.Context) error {
-			iter := pipe.Distributor().Stream()
-
-			for {
-				item, err := iter.ReadOne(ctx)
-				if err != nil {
-					return nil
-				}
-				cache.PushBack(item)
-			}
-		},
-		Shutdown: func() error { return pipe.Close() },
+		Run:      waitForSignal.WithErrorFilter(ers.FilterContext()),
+		Shutdown: func() error { closer(); ; return pipe.Close() },
 		Cleanup: func() error {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -193,19 +180,15 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 				defer cancel()
 			}
 
-			ec := &erc.Collector{}
-
-			ec.Add(cache.StreamPopFront().ReadAllParallel(
-				func(ctx context.Context, wf fun.Worker) error {
-					ec.Add(wf.WithRecover().Run(ctx))
-					return nil
-				},
+			if err := pipe.Distributor().Stream().ReadAllParallel(
+				func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfContinueOnPanic(),
 				fun.WorkerGroupConfWorkerPerCPU(),
-			).Run(ctx))
-
-			return ec.Resolve()
+			).Run(ctx); err != nil {
+				return fmt.Errorf("hit timeout [%d], %w", timeout, err)
+			}
+			return nil
 		},
 	}
 }

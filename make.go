@@ -98,6 +98,20 @@ func (Constructors) ProcessOperation() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
 }
 
+func (Constructors) Signal() (func(), Worker) {
+	sig := make(chan struct{})
+	closer := sync.OnceFunc(func() { close(sig) })
+
+	return closer, func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+		case <-sig:
+		}
+		return ctx.Err()
+	}
+
+}
+
 // ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
 func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {

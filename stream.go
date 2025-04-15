@@ -116,7 +116,7 @@ func SliceStream[T any](in []T) *Stream[T] {
 	return MakeStream(func(context.Context) (out T, _ error) {
 		next := idx.Add(1)
 
-		if len(s) <= int(next) {
+		if int(next) >= len(s) {
 			return out, io.EOF
 		}
 		return s[next], nil
@@ -598,11 +598,10 @@ func (st *Stream[T]) ReadAllParallel(
 			opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 		}
 
-		op := fn.WithRecover().WithErrorFilter(opts.ErrorFilter).ReadAll(st).StartGroup(ctx, opts.NumWorkers).Ignore()
-
-		wg := &WaitGroup{}
-		wg.DoTimes(ctx, opts.NumWorkers, op)
-		wg.Wait(ctx)
+		fn.WithRecover().WithErrorFilter(opts.ErrorFilter).
+			ReadAll(st).
+			StartGroup(ctx, opts.NumWorkers).
+			Ignore().Run(ctx)
 
 		return opts.ErrorResolver()
 	}
@@ -633,10 +632,13 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 func (st *Stream[T]) ParallelBuffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 
-	init := st.ReadAllParallel(buf.Send().Handler(), WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-
-	gen := NewGenerator(func(ctx context.Context) (T, error) { init(ctx); return buf.Receive().Read(ctx) })
-	return gen.Stream()
+	return buf.Generator().PreHook(
+		st.ReadAllParallel(
+			buf.Send().Handler(),
+			WorkerGroupConfNumWorkers(n),
+		).Operation(st.ErrorHandler()).
+			PostHook(buf.Close).Go().Once(),
+	).Stream()
 }
 
 // Seq converts a fun.Stream[T] into a native go iterator.
