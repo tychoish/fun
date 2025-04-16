@@ -855,4 +855,38 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, 9, count)
 		assert.NotError(t, ctx.Err())
 	})
+	t.Run("ParallelInvalidConfig", func(t *testing.T) {
+		counter := 0
+		err := SliceStream([]int{1, 1, 1}).ReadAllParallel(MakeHandler(func(in int) error { counter += in; return nil }),
+			WorkerGroupConfErrorHandler(func(err error) { panic("should not execute") }),
+		).Run(t.Context())
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrInvalidInput)
+		assert.Zero(t, counter)
+	})
+	t.Run("Filter", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			out, err := SliceStream([]int{1, 1, 1, -1, -1, -1}).Filter(func(i int) bool { return i > 0 }).Slice(t.Context())
+			assert.NotError(t, err)
+			assert.EqualItems(t, out, []int{1, 1, 1})
+		})
+		t.Run("Continue", func(t *testing.T) {
+			count := 0
+			out, err := MakeGenerator(func() (int, error) {
+				count++
+				if count%2 == 0 {
+					return -1, ErrStreamContinue
+				}
+				if count > 10 {
+					return -2, io.EOF
+				}
+				return count, nil
+			}).Stream().Filter(func(in int) bool { return in != 5 }).Slice(t.Context())
+			assert.NotError(t, err)
+			t.Log(out)
+			assert.EqualItems(t, out, []int{1, 3, 7, 9})
+
+		})
+
+	})
 }

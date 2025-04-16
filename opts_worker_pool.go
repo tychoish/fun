@@ -60,14 +60,19 @@ type WorkerGroupConf struct {
 // error if there are impossible configurations
 func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = max(1, o.NumWorkers)
-	ehIsNotNil := o.ErrorHandler != nil
-	erIsNotNil := o.ErrorResolver != nil
+	ehIsNil := o.ErrorHandler == nil
+	erIsNil := o.ErrorResolver == nil
+	if ehIsNil != erIsNil {
+		return fmt.Errorf("must configure error handler and resolver, or neither, eh=%t er=%t; %w",
+			ehIsNil, erIsNil, ers.ErrInvalidInput)
+	}
 
-	return errors.Join(
-		ers.Whenf(ehIsNotNil != erIsNotNil,
-			"must configure error handler and resolver, or neither, eh=%t er=%t; %w",
-			ehIsNotNil, erIsNotNil, ers.ErrInvalidInput),
-	)
+	// set default
+	if ehIsNil {
+		o.ErrorHandler, o.ErrorResolver = MAKE.ErrorCollector()
+	}
+
+	return nil
 }
 
 // CanContinueOnError checks an error, collecting it as needed using

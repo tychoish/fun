@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun/ers"
@@ -58,54 +57,6 @@ func WorkerFuture(ch <-chan error) Worker {
 			return nil
 		}
 	}
-}
-
-// Pipe sends the output of a generator into the processor as if it
-// were a pipe. As a Worker this operation is delayed until the worker
-// is called.
-//
-// If both operations succeed, then the worker will return nil. If
-// either function returns an error, it is cached, and successive
-// calls to the worker will return the same error. The only limitation
-// is that there is no way to distinguish between an error encountered
-// by the Generator and one by the processor.
-//
-// If the generator returns ErrStreamContinue, it will be called again.
-//
-// Deprecated: use a Stream.
-func Pipe[T any](from Generator[T], to Handler[T]) Worker {
-	hasErrored := &atomic.Bool{}
-
-	var err error
-
-	return func(ctx context.Context) error {
-		if hasErrored.Load() {
-			return err
-		}
-
-		var val T
-
-	RETRY:
-		for {
-			val, err = from(ctx)
-			switch {
-			case err == nil:
-				break RETRY
-			case errors.Is(err, ErrStreamContinue):
-				continue
-			default:
-				hasErrored.Store(true)
-				return err
-			}
-		}
-
-		if err = to(ctx, val); err != nil {
-			hasErrored.Store(true)
-			return err
-		}
-		return nil
-	}
-
 }
 
 // Run is equivalent to calling the worker function directly.

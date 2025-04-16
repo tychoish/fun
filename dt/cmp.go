@@ -22,7 +22,8 @@ type Heap[T any] struct {
 	data *List[T]
 }
 
-func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(h.Push) }
+func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(h.Handler()) }
+func (h *Heap[T]) Handler() fn.Handler[T]                  { return h.Push }
 
 func (h *Heap[T]) list() *List[T] {
 	if h == nil || h.LT == nil {
@@ -34,8 +35,6 @@ func (h *Heap[T]) list() *List[T] {
 	}
 	return h.data
 }
-
-func (h *Heap[T]) Handler() fn.Handler[T] { return h.Push }
 
 // Push adds an item to the heap.
 func (h *Heap[T]) Push(t T) {

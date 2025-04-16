@@ -537,10 +537,6 @@ func (pf Generator[T]) Parallel(
 		return MakeGenerator(func() (zero T, _ error) { return zero, err })
 	}
 
-	if opts.ErrorHandler == nil {
-		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
-	}
-
 	pipe := Blocking(make(chan T, intish.Abs(opts.NumWorkers*2)))
 
 	setup := Operation(func(ctx context.Context) {

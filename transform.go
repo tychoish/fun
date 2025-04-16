@@ -88,12 +88,8 @@ func (mpf Transform[T, O]) ProcessParallel(
 	optp ...OptionProvider[*WorkerGroupConf],
 ) *Stream[O] {
 	opts := &WorkerGroupConf{}
-
 	if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
 		return MakeGenerator(func() (zero O, _ error) { return zero, err }).Stream()
-	}
-	if opts.ErrorHandler == nil {
-		opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 	}
 
 	output := Blocking(make(chan O))

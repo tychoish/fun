@@ -1355,5 +1355,16 @@ func TestTransformFunctions(t *testing.T) {
 		})
 
 	})
+	t.Run("ParallelProccesingInvalidConfig", func(t *testing.T) {
+		counter := 0
+		out, err := Converter(func(in int) string { counter++; return fmt.Sprint(in) }).ProcessParallel(
+			SliceStream([]int{42, 84, 21}),
+			WorkerGroupConfErrorHandler(func(err error) { panic("should not execute") }),
+		).Slice(t.Context())
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrInvalidInput)
+		assert.Zero(t, counter)
+		assert.Nil(t, out)
+	})
 
 }

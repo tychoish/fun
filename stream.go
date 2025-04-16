@@ -304,6 +304,13 @@ func (st *Stream[T]) Next(ctx context.Context) bool {
 	return false
 }
 
+func (st *Stream[T]) readOneHandleError(err error) error {
+	if err != nil {
+		return ers.Join(err, st.Close())
+	}
+	return nil
+}
+
 // ReadOne advances the stream and returns the value as a single
 // option. This operation IS safe for concurrent use.
 //
@@ -312,7 +319,7 @@ func (st *Stream[T]) Next(ctx context.Context) bool {
 // produced by the stream. All errors produced by ReadOne are
 // terminal and indicate that no further iteration is possible.
 func (st *Stream[T]) ReadOne(ctx context.Context) (out T, err error) {
-	defer func() { ft.WhenCall(err != nil, st.doClose) }()
+	defer func() { err = st.readOneHandleError(err) }()
 
 	if err = ctx.Err(); err != nil {
 		return out, err
@@ -372,6 +379,7 @@ func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
 }
 
 func (st *Stream[T]) ensureErrorHandler() { st.err.once.Do(st.setupDefaultErrorHandler) }
+
 func (st *Stream[T]) setupDefaultErrorHandler() {
 	st.err.handler, st.err.future = MAKE.ErrorCollector()
 }
@@ -381,21 +389,7 @@ func (st *Stream[T]) setupDefaultErrorHandler() {
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map()
 func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
-	return NewGenerator(func(ctx context.Context) (out T, _ error) {
-		for {
-			item, err := st.ReadOne(ctx)
-			switch {
-			case err == nil:
-				if check(item) {
-					return item, nil
-				}
-			case ers.Is(err, ErrStreamContinue):
-				continue
-			default:
-				return out, err
-			}
-		}
-	}).Stream()
+	return st.Generator().Filter(check).Stream()
 }
 
 // Any, as a special case of Transform converts a stream of any
@@ -592,10 +586,6 @@ func (st *Stream[T]) ReadAllParallel(
 		opts := &WorkerGroupConf{}
 		if err := JoinOptionProviders(optp...).Apply(opts); err != nil {
 			return err
-		}
-
-		if opts.ErrorHandler == nil {
-			opts.ErrorHandler, opts.ErrorResolver = MAKE.ErrorCollector()
 		}
 
 		fn.WithRecover().WithErrorFilter(opts.ErrorFilter).

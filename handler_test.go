@@ -731,5 +731,36 @@ func TestProcess(t *testing.T) {
 		})
 
 	})
+	t.Run("Must", func(t *testing.T) {
+		called := 0
+		assert.NotPanic(t, func() {
+			MakeHandler(func(in int) error {
+				called++
+				check.Equal(t, in, 42)
+				return nil
+			}).Must(t.Context(), 42)
+		})
+		assert.Equal(t, called, 1)
+
+		assert.Panic(t, func() {
+			MakeHandler(func(in int) error {
+				called++
+				check.Equal(t, in, 42)
+				return errors.New("beep")
+			}).Must(t.Context(), 42)
+		})
+		assert.Equal(t, called, 2)
+
+		err := ers.WithRecoverCall(func() {
+			MakeHandler(func(in int) error {
+				called++
+				check.Equal(t, in, 42)
+				return errors.New("beep")
+			}).Must(t.Context(), 42)
+		})
+		assert.Equal(t, called, 3)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+	})
 
 }

@@ -636,4 +636,10 @@ func TestOperation(t *testing.T) {
 			check.Equal(t, 2, count)
 		})
 	})
+	t.Run("Group", func(t *testing.T) {
+		count := &atomic.Int64{}
+		MakeOperation(func() { count.Add(1) }).Group(32).Run(t.Context())
+		assert.Equal(t, count.Load(), 32)
+	})
+
 }

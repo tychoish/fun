@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -312,6 +313,33 @@ func TestHandlers(t *testing.T) {
 			check.Equal(t, match, 1)
 		})
 
+	})
+	t.Run("Signal", func(t *testing.T) {
+		close, wait := MAKE.Signal()
+		trigger, signal := MAKE.Signal()
+
+		var count int
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			check.NotError(t, wait(t.Context()))
+			check.Equal(t, count, 1)
+			count++
+			trigger()
+		}()
+		go func() {
+			defer wg.Done()
+			count++
+			check.Equal(t, count, 1)
+			close()
+			check.NotError(t, signal(t.Context()))
+			check.Equal(t, count, 2)
+			count++
+		}()
+		wg.Wait()
+
+		assert.Equal(t, count, 3)
 	})
 
 }

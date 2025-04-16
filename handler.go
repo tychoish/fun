@@ -208,11 +208,18 @@ func (pf Handler[T]) Lock() Handler[T] { return pf.WithLock(&sync.Mutex{}) }
 
 // WithLock wraps the Handler and ensures that the mutex is always
 // held while the root Handler is called.
-func (pf Handler[T]) WithLock(mtx sync.Locker) Handler[T] {
+func (pf Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
 	return func(ctx context.Context, arg T) error {
 		mtx.Lock()
 		defer mtx.Unlock()
 		return pf(ctx, arg)
+	}
+}
+
+func (pf Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
+	return func(ctx context.Context, in T) error {
+		defer internal.WithL(internal.LockL(mtx))
+		return pf.Read(ctx, in)
 	}
 }
 
@@ -359,13 +366,6 @@ func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 // underlying operation, if the processor only returned
 // ErrStreamContinue values.
 func (pf Handler[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
-
-func (pf Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
-	return func(ctx context.Context, in T) error {
-		defer internal.WithL(internal.LockL(mtx))
-		return pf.Read(ctx, in)
-	}
-}
 
 func (pf Handler[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.Future[error]) Handler[T] {
 	Invariant.Ok(handler != nil && resolver != nil, "must cal WithErrorHandler with non-nil operators")

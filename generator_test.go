@@ -344,6 +344,19 @@ func TestGenerator(t *testing.T) {
 		err = nil
 		assert.Equal(t, 42, pf.Force().Resolve())
 	})
+	t.Run("Capture", func(t *testing.T) {
+		count := 0
+		var err = io.EOF
+		var pf = MakeGenerator(func() (int, error) { count++; return 42, err })
+		var out int
+
+		assert.NotPanic(t, func() { out = pf.Capture().Resolve() })
+		assert.Equal(t, out, 42)
+		assert.Equal(t, count, 1)
+		err = nil
+		assert.Equal(t, 42, pf.Capture().Resolve())
+
+	})
 	t.Run("Ignore", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
