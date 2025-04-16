@@ -217,11 +217,11 @@ func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 
 				send := pipe.Send() // input end of the pipe
 
-				iters.ReadAll(func(in *Stream[T]) {
+				eh(iters.ReadAll(func(in *Stream[T]) {
 					// write the contents of the input stream
 					// to the input end of the pipe
 					send.Handler().ReadAll(in).Observe(ctx, eh)
-				}).Observe(ctx, eh)
+				}).Run(ctx))
 			}).
 			Go().Once(),
 		).Stream().WithErrorCollector(eh, ep)
@@ -243,6 +243,8 @@ func (st *Stream[T]) doClose() {
 // during iteration. If the stream allocates resources, this
 // will typically release them, but close may not block until all
 // resources are released.
+//
+// Close is safe to call more than once and always resolves the error handler (e.g. AddError),
 func (st *Stream[T]) Close() error { st.doClose(); return st.err.future() }
 
 func (*Stream[T]) joinTwoErrs(e1, e2 error) error { return ers.Join(e1, e2) }
@@ -389,7 +391,7 @@ func (st *Stream[T]) setupDefaultErrorHandler() {
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map()
 func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
-	return st.Generator().Filter(check).Stream()
+	return st.Generator().Filter(check).Stream().WithHook(st.CloseHook())
 }
 
 // Any, as a special case of Transform converts a stream of any
@@ -409,9 +411,7 @@ func (st *Stream[T]) Any() *Stream[any] {
 //
 // The "previous" value for the first reduce option is the zero value
 // for the type T.
-func (st *Stream[T]) Reduce(
-	reducer func(T, T) (T, error),
-) Generator[T] {
+func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
 	var value T
 	return func(ctx context.Context) (_ T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
@@ -429,7 +429,7 @@ func (st *Stream[T]) Reduce(
 				continue
 			case errors.Is(err, ErrStreamContinue):
 				continue
-			case ers.Is(err, io.EOF, ers.ErrCurrentOpAbort):
+			case ers.IsTerminating(err):
 				return value, nil
 			default:
 				return value, err
@@ -464,13 +464,17 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	}
 	pipe := Blocking(make(chan T))
 
-	setup := pipe.Send().Consume(st).PostHook(pipe.Close).Ignore().Go().Once()
+	setup := pipe.Send().Consume(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
-		output[idx] = pipe.Generator().PreHook(setup).Stream()
+		output[idx] = pipe.Generator().PreHook(setup).Stream().WithHook(st.CloseHook())
 	}
 
 	return output
+}
+
+func (st *Stream[T]) CloseHook() func(*Stream[T]) {
+	return func(next *Stream[T]) { next.AddError(st.Close()) }
 }
 
 // Join merges multiple streams processing and producing their results
@@ -608,7 +612,7 @@ func (st *Stream[T]) ReadAllParallel(
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-	return buf.Generator().PreHook(pipe).Stream()
+	return buf.Generator().PreHook(pipe).Stream().WithHook(st.CloseHook())
 }
 
 // ParallelBuffer, like buffer, process the input queue and stores
@@ -628,7 +632,7 @@ func (st *Stream[T]) ParallelBuffer(n int) *Stream[T] {
 			WorkerGroupConfNumWorkers(n),
 		).Operation(st.ErrorHandler()).
 			PostHook(buf.Close).Go().Once(),
-	).Stream()
+	).Stream().WithHook(st.CloseHook())
 }
 
 // Seq converts a fun.Stream[T] into a native go iterator.

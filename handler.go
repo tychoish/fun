@@ -322,17 +322,13 @@ func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) 
 func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+
 		for {
 			item, err := st.ReadOne(ctx)
-			if err != nil {
-				goto ERROR
+			if err == nil {
+				err = pf(ctx, item)
 			}
 
-			err = pf(ctx, item)
-			if err != nil {
-				goto ERROR
-			}
-		ERROR:
 			switch {
 			case err == nil:
 				continue
