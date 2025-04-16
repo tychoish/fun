@@ -155,8 +155,8 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 // allocation.
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
 
-// Observe calls the observer function on every item in the slice.
-func (s Slice[T]) Observe(of fn.Handler[T]) {
+// ReadAll calls the observer function on every item in the slice.
+func (s Slice[T]) ReadAll(of fn.Handler[T]) {
 	for idx := range s {
 		of(s[idx])
 	}
@@ -166,7 +166,7 @@ func (s Slice[T]) Observe(of fn.Handler[T]) {
 // input slice. Items that the filter function returns true for are
 // included and others are skipped.
 func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
-	s.Observe(func(in T) { o.AddWhen(p(in), in) })
+	s.ReadAll(func(in T) { o.AddWhen(p(in), in) })
 	return
 }
 

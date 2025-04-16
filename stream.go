@@ -217,13 +217,13 @@ func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 			func(ctx context.Context) {
 				defer pipe.Close()
 
-				send := pipe.Send() // input end of the pipe
+				send := pipe.Send().Handler() // input end of the pipe
 
-				eh(iters.ReadAll(func(in *Stream[T]) {
+				iters.ReadAll(func(in *Stream[T]) {
 					// write the contents of the input stream
 					// to the input end of the pipe
-					send.Handler().ReadAll(in).Observe(ctx, eh)
-				}).Run(ctx))
+					send.ReadAll(in).Operation(eh).Run(ctx)
+				}).Operation(eh).Run(ctx)
 			}).
 			Go().Once(),
 		).

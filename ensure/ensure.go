@@ -147,7 +147,7 @@ func (a *Assertion) Run(t testing.TB) {
 	}
 
 	if result.Len() > 0 {
-		result.Observe(strlogger)
+		result.ReadAll(strlogger)
 
 		if a.continueOnError {
 			t.Fail()

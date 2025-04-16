@@ -21,7 +21,7 @@ type Worker func(context.Context) error
 // compatibility with tooling.
 func MakeWorker(fn func() error) Worker { return func(context.Context) error { return fn() } }
 
-// WorkerFuture constructs a worker from an error channel. The
+// ErrorChannelWorker constructs a worker from an error channel. The
 // resulting worker blocks until an error is produced in the error
 // channel, the error channel is closed, or the worker's context is
 // canceled. If the channel is closed, the worker will return a nil
@@ -33,15 +33,13 @@ func MakeWorker(fn func() error) Worker { return func(context.Context) error { r
 // are multiple errors produced or passed to the channel, they will be
 // propogated; however, after the channel is closed subsequent calls
 // to the worker function will return nil.
-func WorkerFuture(ch <-chan error) Worker {
+func (Constructors) ErrorChannelWorker(ch <-chan error) Worker {
 	pipe := BlockingReceive(ch)
 	return func(ctx context.Context) error {
 		if ch == nil || pipe.ch == nil {
 			return nil
 		}
 
-		// val and err cannot both be non-nil at the same
-		// time.
 		val, err := pipe.Read(ctx)
 		switch {
 		case errors.Is(err, io.EOF):
@@ -71,10 +69,6 @@ func (wf Worker) WithRecover() Worker {
 	}
 }
 
-// Observe runs the worker function, and observes the error (or nil
-// response). Panics are not caught.
-func (wf Worker) Observe(ctx context.Context, ob fn.Handler[error]) { ob(wf.Run(ctx)) }
-
 // Signal runs the worker function in a background goroutine and
 // returns the error in an error channel, that returns when the
 // worker function returns. If Signal is called with a canceled
@@ -96,7 +90,7 @@ func (wf Worker) Signal(ctx context.Context) <-chan error {
 // The underlying worker begins executing before future returns.
 func (wf Worker) Launch(ctx context.Context) Worker {
 	out := wf.Signal(ctx)
-	return WorkerFuture(out)
+	return MAKE.ErrorChannelWorker(out)
 }
 
 // Background starts the worker function in a go routine, passing the
@@ -117,11 +111,10 @@ func (wf Worker) Once() Worker {
 	}
 }
 
-// Operation converts a worker function into a wait function,
-// passing any error to the observer function. Only non-nil errors are
-// observed.
+// Operation converts a worker function into a wait function, passing
+// any error to the handler function.
 func (wf Worker) Operation(ob fn.Handler[error]) Operation {
-	return func(ctx context.Context) { wf.Observe(ctx, ob) }
+	return func(ctx context.Context) { ob(wf(ctx)) }
 }
 
 // Wait runs the worker with a background context and returns its

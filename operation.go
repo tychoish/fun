@@ -152,7 +152,8 @@ func (wf Operation) WithRecover() Worker {
 }
 
 // Worker converts a wait function into a fun.Worker. If the context
-// is canceled, the worker function returns the context's error.
+// is canceled, the worker function returns the context's error. Does
+// not handle panics, use WithRecover() to convert panics to errors
 func (wf Operation) Worker() Worker {
 	return func(ctx context.Context) (err error) { wf(ctx); return ctx.Err() }
 }

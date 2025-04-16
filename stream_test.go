@@ -68,7 +68,7 @@ func GenerateRandomStringSlice(size int) []string {
 }
 
 func TestStream(t *testing.T) {
-	t.Run("Observe", func(t *testing.T) {
+	t.Run("ReadAll", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -708,7 +708,7 @@ func TestEmptyIteration(t *testing.T) {
 	ch := make(chan int)
 	close(ch)
 
-	t.Run("EmptyObserve", func(t *testing.T) {
+	t.Run("EmptyReadAll", func(t *testing.T) {
 		assert.NotError(t, SliceStream([]int{}).ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 		assert.NotError(t, VariadicStream[int]().ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 		assert.NotError(t, ChannelStream(ch).ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))

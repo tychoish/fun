@@ -40,11 +40,11 @@ func TestWorker(t *testing.T) {
 			expected := errors.New("foo")
 			Worker(func(_ context.Context) error { called.Add(1); panic(expected) }).WithRecover().
 				Launch(ctx).
-				Observe(ctx, func(err error) {
+				Operation(func(err error) {
 					check.Error(t, err)
 					check.ErrorIs(t, err, expected)
 					called.Add(1)
-				})
+				}).Run(ctx)
 
 			for {
 				if called.Load() == 2 {
@@ -76,13 +76,15 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, wg.Num(), 0)
 			assert.Equal(t, count.Load(), 2)
 		})
-		t.Run("Observe", func(t *testing.T) {
+		t.Run("Operation/Run", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			t.Run("ObserveNilErrors", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
-				Worker(func(_ context.Context) error { called.Store(true); return nil }).Observe(ctx, func(error) { observed.Store(true) })
+				Worker(func(_ context.Context) error { called.Store(true); return nil }).
+					Operation(func(error) { observed.Store(true) }).
+					Run(ctx)
 				assert.True(t, called.Load())
 				assert.True(t, observed.Load())
 			})
@@ -93,10 +95,10 @@ func TestWorker(t *testing.T) {
 				Worker(func(_ context.Context) error {
 					called.Store(true)
 					return expected
-				}).Observe(ctx, func(err error) {
+				}).Operation(func(err error) {
 					observed.Store(true)
 					check.ErrorIs(t, err, expected)
-				})
+				}).Run(ctx)
 				assert.True(t, called.Load())
 				assert.True(t, observed.Load())
 			})
@@ -188,36 +190,36 @@ func TestWorker(t *testing.T) {
 			assert.True(t, called.Load())
 		})
 	})
-	t.Run("WorkerFuture", func(t *testing.T) {
+	t.Run("MAKE.ErrorChannelWorker", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		expected := errors.New("cat")
 		var ch chan error
 		t.Run("NilChannel", func(t *testing.T) {
-			assert.NotError(t, WorkerFuture(ch).Run(ctx))
+			assert.NotError(t, MAKE.ErrorChannelWorker(ch).Run(ctx))
 		})
 		t.Run("ClosedChannel", func(t *testing.T) {
 			ch = make(chan error)
 			close(ch)
-			assert.NotError(t, WorkerFuture(ch).Run(ctx))
+			assert.NotError(t, MAKE.ErrorChannelWorker(ch).Run(ctx))
 		})
 		t.Run("ContextCanceled", func(t *testing.T) {
 			nctx, cancel := context.WithCancel(context.Background())
 			cancel()
 			ch = make(chan error)
-			err := WorkerFuture(ch).Run(nctx)
+			err := MAKE.ErrorChannelWorker(ch).Run(nctx)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 		t.Run("Error", func(t *testing.T) {
 			ch = make(chan error, 1)
 			ch <- expected
-			err := WorkerFuture(ch).Run(ctx)
+			err := MAKE.ErrorChannelWorker(ch).Run(ctx)
 			assert.ErrorIs(t, err, expected)
 		})
 		t.Run("NilError", func(t *testing.T) {
 			ch = make(chan error, 1)
 			ch <- nil
-			err := WorkerFuture(ch).Run(ctx)
+			err := MAKE.ErrorChannelWorker(ch).Run(ctx)
 			assert.NotError(t, err)
 		})
 	})
@@ -750,11 +752,11 @@ func TestWorker(t *testing.T) {
 			})
 		})
 	})
-	t.Run("WorkerFuture", func(t *testing.T) {
+	t.Run("MAKE.ErrorChannelWorker", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		ch := make(chan error, 1)
-		wf := WorkerFuture(ch)
+		wf := MAKE.ErrorChannelWorker(ch)
 		root := ers.New("will-be-cached")
 		ch <- root
 		err := wf(ctx)

@@ -57,7 +57,7 @@ func And(ops ...That) That {
 func All(ops ...That) That {
 	return func() []string {
 		out := dt.NewSlice(make([]string, 0, len(ops)+1))
-		dt.NewSlice(ops).Observe(func(op That) {
+		dt.NewSlice(ops).ReadAll(func(op That) {
 			out.AppendWhen(op == nil, "encountered nil is.That operation")
 			out.Extend(ft.SafeDo(op))
 		})

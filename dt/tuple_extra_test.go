@@ -115,26 +115,6 @@ func TestTupleExtra(t *testing.T) {
 			check.Error(t, ps.UnmarshalJSON([]byte(`{"one":2}`)))
 		})
 	})
-	t.Run("Observe", func(t *testing.T) {
-		tp := &Tuples[string, int]{}
-		tp.Add("one", 1).Add("two", 2).Add("three", 3)
-		idx := 0
-		tp.Observe(func(tt Tuple[string, int]) {
-			switch idx {
-			case 0:
-				check.Equal(t, tt.One, "one")
-				check.Equal(t, tt.Two, 1)
-			case 1:
-				check.Equal(t, tt.One, "two")
-				check.Equal(t, tt.Two, 2)
-			case 2:
-				check.Equal(t, tt.One, "three")
-				check.Equal(t, tt.Two, 3)
-			}
-			idx++
-		})
-		check.Equal(t, idx, tp.Len())
-	})
 	t.Run("Copy", func(t *testing.T) {
 		tp := &Tuples[string, int]{}
 		tp.Add("one", 1).Add("two", 2).Add("three", 3)

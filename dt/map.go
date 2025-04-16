@@ -119,7 +119,7 @@ func (m Map[K, V]) AddPair(p Pair[K, V]) { m.Store(p.Key, p.Value) }
 func (m Map[K, V]) AddTuple(p Tuple[K, V]) { m.Add(p.One, p.Two) }
 
 // Append adds a sequence of Pair objects to the map.
-func (m Map[K, V]) Append(pairs ...Pair[K, V]) { NewSlice(pairs).Observe(m.AddPair) }
+func (m Map[K, V]) Append(pairs ...Pair[K, V]) { NewSlice(pairs).ReadAll(m.AddPair) }
 
 // Len returns the length. It is equivalent to len(Map), but is
 // provided for consistency.

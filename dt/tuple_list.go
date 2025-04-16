@@ -9,7 +9,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -109,14 +108,9 @@ func (p *Tuples[K, V]) SortQuick(c cmp.LessThan[Tuple[K, V]]) { p.init(); p.ll.S
 // Len returns the number of items in the tuples object.
 func (p *Tuples[K, V]) Len() int { p.init(); return p.ll.Len() }
 
-// Observe calls the handler function for every tuple in the container.
-func (p *Tuples[K, V]) Observe(hf fn.Handler[Tuple[K, V]]) {
-	p.Process(fun.FromHandler(hf)).Ignore().Wait()
-}
-
-// Process returns a worker, that when executed calls the processor
+// ReadAll returns a worker, that when executed calls the processor
 // function for every tuple in the container.
-func (p *Tuples[K, V]) Process(pf fun.Handler[Tuple[K, V]]) fun.Worker {
+func (p *Tuples[K, V]) ReadAll(pf fun.Handler[Tuple[K, V]]) fun.Worker {
 	return func(ctx context.Context) error {
 		p.init()
 		if p.ll.Len() == 0 {
@@ -159,7 +153,7 @@ func (p *Tuples[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteByte('[')
 
 	idx := 0
-	if err := p.Process(fun.MakeHandler(func(item Tuple[K, V]) error {
+	if err := p.ReadAll(fun.MakeHandler(func(item Tuple[K, V]) error {
 		if idx != 0 {
 			buf.WriteByte(',')
 		}
