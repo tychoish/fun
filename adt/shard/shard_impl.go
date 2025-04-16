@@ -35,9 +35,11 @@ func (sh *sh[K, V]) write() vmap[K, V]                 { sh.clock.Add(1); return
 func (sh *sh[K, V]) load(k K) (V, bool)                { v, ok := sh.read().Load(k); return v.Load(), ok }
 func (sh *sh[K, V]) keys() *fun.Stream[K]              { return sh.read().Keys() }
 func (sh *sh[K, V]) vvals() *fun.Stream[*Versioned[V]] { return sh.read().Values() }
-func (sh *sh[K, V]) values() *fun.Stream[V]            { return to(sh.inner).Process(sh.vvals()) }
+func (sh *sh[K, V]) values() *fun.Stream[V]            { return to(sh.inner).ReadAll(sh.vvals()) }
 func (*sh[K, V]) inner(vv *Versioned[V]) V             { return vv.Load() }
-func (sh *sh[K, V]) valsp(n int) *fun.Stream[V]        { return to(sh.inner).Map(sh.vvals(), poolOpts(n)) }
+func (sh *sh[K, V]) valsp(n int) *fun.Stream[V] {
+	return to(sh.inner).Parallel(sh.vvals(), poolOpts(n))
+}
 
 func (sh *sh[K, V]) store(k K, v V) {
 	mp := sh.write()

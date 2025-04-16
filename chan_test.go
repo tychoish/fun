@@ -178,7 +178,7 @@ func TestChannel(t *testing.T) {
 				t.Run("Generator", func(t *testing.T) {
 					ch := make(chan string, 1)
 					ch <- "hello world"
-					val, err := Blocking(ch).Receive().Generator().Send(ctx)
+					val, err := Blocking(ch).Receive().Generator().Read(ctx)
 					assert.NotError(t, err)
 					assert.Equal(t, val, "hello world")
 				})

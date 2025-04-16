@@ -107,6 +107,9 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	}
 }
 
+// ErrorFilter is a method which can be used as an ers.Filter
+// function, and used in worker pool implementations process as
+// configured.
 func (o WorkerGroupConf) ErrorFilter(err error) error {
 	switch {
 	case err == nil:

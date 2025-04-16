@@ -30,7 +30,7 @@ func Uniq[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
 func DropZeroValues[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
 	return fun.Generator[T](func(ctx context.Context) (out T, _ error) {
 		for {
-			item, err := iter.ReadOne(ctx)
+			item, err := iter.Read(ctx)
 			if err != nil {
 				return out, err
 			}
@@ -48,7 +48,7 @@ func DropZeroValues[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
 // after the first element that equals item, and false otherwise.
 func Contains[T comparable](ctx context.Context, item T, iter *fun.Stream[T]) bool {
 	for {
-		v, err := iter.ReadOne(ctx)
+		v, err := iter.Read(ctx)
 		if err != nil {
 			break
 		}

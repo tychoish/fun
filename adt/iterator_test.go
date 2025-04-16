@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -61,8 +60,8 @@ func TestStream(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for {
-					it, err := iter.ReadOne(ctx)
-					if ers.IsTerminating(err) {
+					it, err := iter.Read(ctx)
+					if err != nil {
 						return
 					}
 					count.Add(1)
@@ -95,7 +94,7 @@ func TestStream(t *testing.T) {
 				return int(val), nil
 			}).Lock().Stream()
 			for {
-				val, err := iter.ReadOne(ctx)
+				val, err := iter.Read(ctx)
 				testt.Log(t, err, val)
 				if err != nil {
 					assert.Equal(t, val, 0)
@@ -125,7 +124,7 @@ func TestStream(t *testing.T) {
 			}).Lock().Stream()
 
 			for {
-				val, err := iter.ReadOne(ctx)
+				val, err := iter.Read(ctx)
 				testt.Log(t, err, val)
 				if err != nil {
 					assert.Equal(t, val, 0)

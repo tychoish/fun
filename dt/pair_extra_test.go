@@ -132,7 +132,7 @@ func TestPairExtra(t *testing.T) {
 		num := 1000
 		seen := &Set[int]{}
 
-		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Send(ctx)
+		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Read(ctx)
 		assert.NotError(t, err)
 		ps.Observe(func(p Pair[int, int]) {
 			check.Equal(t, p.Key, p.Value)

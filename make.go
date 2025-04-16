@@ -98,6 +98,15 @@ func (Constructors) ProcessOperation() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
 }
 
+// Signal is a wrapper around the common pattern where signal channels
+// are closed to pass termination and blocking notifications between
+// go routines. The constructor returns two functions: a closer
+// operation--func()--and a Worker that waits for the closer to be
+// triggered.
+//
+// The closer is safe to call multiple times. The worker ALWAYS
+// returns the context cancellation error if its been canceled even if
+// the signal channel was closed.
 func (Constructors) Signal() (func(), Worker) {
 	sig := make(chan struct{})
 	closer := sync.OnceFunc(func() { close(sig) })
@@ -172,7 +181,7 @@ func (Constructors) ErrorHandlerWithoutTerminating(of fn.Handler[error]) fn.Hand
 // its component errors. All errors are processed by the provided
 // filter, and the transformer's context is not used. The error value
 // of the Transform function is always nil.
-func (Constructors) ErrorUnwindTransformer(filter ers.Filter) Transform[error, []error] {
+func (Constructors) ErrorUnwindTransformer(filter ers.Filter) Converter[error, []error] {
 	return func(_ context.Context, err error) ([]error, error) {
 		unwound := ers.Unwind(err)
 		out := make([]error, 0, len(unwound))
@@ -298,18 +307,18 @@ func (Constructors) Lines(reader io.Reader) *Stream[string] {
 // line-separated content of an io.Reader, line Lines(), but with the
 // leading and trailing space trimmed from each line.
 func (Constructors) LinesWithSpaceTrimed(reader io.Reader) *Stream[string] {
-	return MAKE.Lines(reader).Transform(Converter(strings.TrimSpace))
+	return MAKE.Lines(reader).Transform(MakeConverter(strings.TrimSpace))
 }
 
 // Itoa produces a Transform function that converts integers into
 // strings.
-func (Constructors) Itoa() Transform[int, string] {
-	return Converter(func(in int) string { return fmt.Sprint(in) })
+func (Constructors) Itoa() Converter[int, string] {
+	return MakeConverter(func(in int) string { return fmt.Sprint(in) })
 }
 
 // Atoi produces a Transform function that converts strings into
 // integers.
-func (Constructors) Atoi() Transform[string, int] { return ConverterErr(strconv.Atoi) }
+func (Constructors) Atoi() Converter[string, int] { return MakeConverterErr(strconv.Atoi) }
 
 // Counter produces a stream that, starting at 1, yields
 // monotonically increasing integers until the maximum is reached.

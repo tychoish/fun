@@ -26,18 +26,23 @@ func FilterExclude(exclusions ...error) Filter {
 // FilterNoop produces a filter that always returns the original error.
 func FilterNoop() Filter { return func(err error) error { return err } }
 
+// FilterContext returns nil for all nil and context cancellation
+// errors. Other errors are propagated.
 func FilterContext() Filter {
 	return func(err error) error {
-		if IsExpiredContext(err) {
+		if Ok(err) || IsExpiredContext(err) {
 			return nil
 		}
 		return err
 	}
 }
 
+// FilterTerminating returns nil for all nil and terminating errors
+// (e.g. io.EOF, ErrCurrentOpAbort, ErrContainerClosed). Other errors
+// are propagated.
 func FilterTerminating() Filter {
 	return func(err error) error {
-		if IsTerminating(err) {
+		if Ok(err) || IsTerminating(err) {
 			return nil
 		}
 		return err
@@ -48,7 +53,7 @@ func FilterTerminating() Filter {
 // true, and false otherwise.
 func FilterCheck(ep func(error) bool) Filter {
 	return func(err error) error {
-		if ep(err) {
+		if err == nil || ep(err) {
 			return nil
 		}
 		return err
@@ -63,6 +68,32 @@ func FilterConvert(output error) Filter {
 			return nil
 		}
 		return output
+	}
+}
+
+// FilterJoin combines a group of Filters into a single Filter. The
+// joined filter skips any nil input filters AND has short circut
+// logic: if the input error is nil, any of the filters return a nil
+// error, then the joined filter returns immediately, otherwise all
+// filters will be processed.
+func FilterJoin(filters ...Filter) Filter {
+	return func(err error) error {
+		if err == nil || len(filters) == 0 {
+			return nil
+		}
+
+		for _, filter := range filters {
+			if filter == nil {
+				continue
+			}
+
+			err = filter(err)
+			if err == nil {
+				return nil
+			}
+		}
+
+		return err
 	}
 }
 
@@ -115,13 +146,13 @@ func RemoveOk(errs []error) []error {
 
 // FilterToRoot produces a filter which always returns only the root/MOST
 // wrapped error present in an error object.
-func FilterToRoot() Filter { return findRoot }
+func FilterToRoot() Filter {
+	return func(err error) error {
+		errs := Unwind(err)
+		if len(errs) == 0 {
+			return nil
+		}
 
-func findRoot(err error) error {
-	errs := Unwind(err)
-	if len(errs) == 0 {
-		return nil
+		return errs[len(errs)-1]
 	}
-
-	return errs[len(errs)-1]
 }

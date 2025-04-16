@@ -85,7 +85,7 @@ func TestSmoke(t *testing.T) {
 				func(in int, value string) (string, error) {
 					seen[in] = struct{}{}
 					return fmt.Sprint(value, in), nil
-				}, "").Send(ctx)
+				}, "").Read(ctx)
 
 			if err != nil {
 				t.Fatal(err)
@@ -116,7 +116,7 @@ func TestSmoke(t *testing.T) {
 					return in + val, nil
 				},
 				0,
-			).Send(ctx)
+			).Read(ctx)
 
 			check.Equal(t, count, 1)
 			if err == nil {
@@ -144,7 +144,7 @@ func TestSmoke(t *testing.T) {
 						return 42, nil
 					}
 					return value, fun.ErrStreamContinue
-				}, 0).Send(ctx)
+				}, 0).Read(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 32)
@@ -162,7 +162,7 @@ func TestSmoke(t *testing.T) {
 						return 0, io.EOF
 					}
 					return 42, nil
-				}, 0).Send(ctx)
+				}, 0).Read(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
 			assert.Equal(t, count, 16)
@@ -357,8 +357,8 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Parallel", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(101)), 25, 5*time.Millisecond).
-			ReadAllParallel(fun.FromHandler(func(in int) {
+		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(101)), 10, 10*time.Millisecond).
+			Parallel(fun.FromHandler(func(in int) {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)

@@ -26,10 +26,10 @@ import (
 // not set.
 func Map[T any, O any](
 	input *fun.Stream[T],
-	mapFn fun.Transform[T, O],
+	mapFn fun.Converter[T, O],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *fun.Stream[O] {
-	return mapFn.Map(input, optp...)
+	return mapFn.Parallel(input, optp...)
 }
 
 // MapReduce combines the map and reduce operations to process an
@@ -45,7 +45,7 @@ func Map[T any, O any](
 // waits for the input stream to produce values.
 func MapReduce[T any, O any, R any](
 	input *fun.Stream[T],
-	mapFn fun.Transform[T, O],
+	mapFn fun.Converter[T, O],
 	reduceFn func(O, R) (R, error),
 	initialReduceValue R,
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
@@ -67,7 +67,7 @@ func Reduce[T any, O any](
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		value = initialReduceValue
 		for {
-			item, err := iter.ReadOne(ctx)
+			item, err := iter.Read(ctx)
 			if err != nil {
 				return value, nil
 			}

@@ -57,7 +57,14 @@ func TestErrors(t *testing.T) {
 		check.Equal(t, err, io.EOF)
 		err = FilterConvert(io.EOF).Run(nil)
 		check.NotError(t, err)
-
+	})
+	t.Run("FilterJoin", func(t *testing.T) {
+		endAndCancelFilter := FilterJoin(FilterContext(), FilterTerminating(), nil)
+		check.NotError(t, endAndCancelFilter(io.EOF))
+		check.NotError(t, endAndCancelFilter(nil))
+		check.NotError(t, endAndCancelFilter(context.Canceled))
+		check.Error(t, endAndCancelFilter(New("will error")))
+		// TODO write test that exercises short circuiting execution
 	})
 	t.Run("FilterToRoot", func(t *testing.T) {
 		filter := FilterToRoot()
@@ -205,5 +212,14 @@ func TestErrors(t *testing.T) {
 			check.ErrorIs(t, Whenf(true, "hello: %w", inner), inner)
 			check.NotEqual(t, Whenf(true, "hello: %w", inner).Error(), inner.Error())
 		})
+	})
+	t.Run("Check", func(t *testing.T) {
+		out, ok := Check(41, nil)
+		assert.Equal(t, out, 41)
+		assert.True(t, ok)
+
+		out, ok = Check(41, New("fail"))
+		assert.Equal(t, out, 41)
+		assert.True(t, !ok)
 	})
 }

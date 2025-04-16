@@ -125,7 +125,7 @@ func Wait(iter *fun.Stream[fun.Operation]) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
 			for {
-				value, err := iter.ReadOne(ctx)
+				value, err := iter.Read(ctx)
 				if err != nil {
 					break
 				}
@@ -156,7 +156,7 @@ func ProcessStream[T any](
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	return &Service{
-		Run:      iter.ReadAllParallel(processor, optp...),
+		Run:      iter.Parallel(processor, optp...),
 		Shutdown: iter.Close,
 	}
 }
@@ -180,7 +180,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 				defer cancel()
 			}
 
-			if err := pipe.Distributor().Stream().ReadAllParallel(
+			if err := pipe.Distributor().Stream().Parallel(
 				func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfContinueOnPanic(),
@@ -200,7 +200,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // propogated to the service's ywait function.
 func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
 	return &Service{
-		Run: workQueue.Distributor().Stream().ReadAllParallel(
+		Run: workQueue.Distributor().Stream().Parallel(
 			func(ctx context.Context, fn fun.Worker) error {
 				return fn.Run(ctx)
 			},
@@ -230,7 +230,7 @@ func HandlerWorkerPool(
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{
-		Run: workQueue.Distributor().Stream().ReadAllParallel(
+		Run: workQueue.Distributor().Stream().Parallel(
 			func(ctx context.Context, fn fun.Worker) error {
 				observer(fn.Run(ctx))
 				return nil

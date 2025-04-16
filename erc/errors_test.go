@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -258,7 +259,7 @@ func TestError(t *testing.T) {
 			assert.NotError(t, err)
 			assert.Error(t, err2)
 
-			assert.ErrorIs(t, err2, context.Canceled)
+			assert.ErrorIs(t, err2, io.EOF)
 		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}

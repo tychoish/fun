@@ -41,7 +41,7 @@ func WorkerPool[OP fun.Worker | fun.Operation](
 	iter *fun.Stream[OP],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) fun.Worker {
-	return iter.ReadAllParallel(func(ctx context.Context, op OP) error {
+	return iter.Parallel(func(ctx context.Context, op OP) error {
 		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover().Run(ctx)
 	}, append(optp,
 		fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}),
@@ -53,7 +53,7 @@ func WorkerPool[OP fun.Worker | fun.Operation](
 // documents into objects in the form of a stream.
 func JSON[T any](in io.Reader) *fun.Stream[T] {
 	var zero T
-	return fun.ConvertStream(fun.MAKE.LinesWithSpaceTrimed(in), fun.ConverterErr(func(in string) (out T, err error) {
+	return fun.ConvertStream(fun.MAKE.LinesWithSpaceTrimed(in), fun.MakeConverterErr(func(in string) (out T, err error) {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err
@@ -67,7 +67,7 @@ func JSON[T any](in io.Reader) *fun.Stream[T] {
 func Indexed[T any](iter *fun.Stream[T]) *fun.Stream[dt.Pair[int, T]] {
 	idx := &atomic.Int64{}
 	idx.Store(-1)
-	return fun.ConvertStream(iter, fun.Converter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }))
+	return fun.ConvertStream(iter, fun.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }))
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the
@@ -85,7 +85,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 
 			if queue.Len() < num {
 				queue.PushBack(now)
-				return iter.ReadOne(ctx)
+				return iter.Read(ctx)
 			}
 
 			for queue.Len() > 0 && now.After(queue.Front().Value().Add(window)) {
@@ -94,7 +94,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 
 			if queue.Len() < num {
 				queue.PushBack(now)
-				return iter.ReadOne(ctx)
+				return iter.Read(ctx)
 			}
 
 			sleepUntil := time.Until(queue.Front().Value().Add(window))

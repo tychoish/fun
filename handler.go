@@ -324,7 +324,7 @@ func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
 
 		for {
-			item, err := st.ReadOne(ctx)
+			item, err := st.Read(ctx)
 			if err == nil {
 				err = pf(ctx, item)
 			}
@@ -362,8 +362,3 @@ func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 // underlying operation, if the processor only returned
 // ErrStreamContinue values.
 func (pf Handler[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }
-
-func (pf Handler[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.Future[error]) Handler[T] {
-	Invariant.Ok(handler != nil && resolver != nil, "must cal WithErrorHandler with non-nil operators")
-	return func(ctx context.Context, in T) error { handler(pf.Read(ctx, in)); return resolver() }
-}

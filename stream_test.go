@@ -75,7 +75,7 @@ func TestStream(t *testing.T) {
 			iter := SliceStream([]int{})
 			assert.NotError(t, iter.ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 
-			_, err := iter.ReadOne(ctx)
+			_, err := iter.Read(ctx)
 			assert.ErrorIs(t, err, io.EOF)
 		})
 		t.Run("PanicSafety", func(t *testing.T) {
@@ -180,7 +180,7 @@ func TestStream(t *testing.T) {
 	t.Run("Transform", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		out, err := VariadicStream(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(Converter(func(in int) int { return in / 4 })).Slice(ctx)
+		out, err := VariadicStream(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(MakeConverter(func(in int) int { return in / 4 })).Slice(ctx)
 		check.NotError(t, err)
 
 		check.EqualItems(t, out, []int{1, 2, 4, 8, 16, 32, 64, 128, 256})
@@ -253,7 +253,7 @@ func TestStream(t *testing.T) {
 			defer cancel()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
-			err := iter.ReadAllParallel(
+			err := iter.Parallel(
 				func(_ context.Context, in int) error { count.Add(1); return nil },
 				WorkerGroupConfNumWorkers(2),
 				WorkerGroupConfContinueOnError(),
@@ -276,7 +276,7 @@ func TestStream(t *testing.T) {
 			calls := 0
 
 			out := ConvertStream(input,
-				ConverterOk(func(in string) (int, bool) {
+				MakeCovnerterOk(func(in string) (int, bool) {
 					calls++
 					return ers.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
 				}),
@@ -300,7 +300,7 @@ func TestStream(t *testing.T) {
 			})
 			calls := 0
 
-			out := ConvertStream(input, ConverterErr(func(in string) (int, error) {
+			out := ConvertStream(input, MakeConverterErr(func(in string) (int, error) {
 				if in == "2" {
 					return 0, ErrStreamContinue
 				}
@@ -326,7 +326,7 @@ func TestStream(t *testing.T) {
 			})
 			calls := 0
 
-			out := ConvertStream(input, ConverterErr(func(in string) (int, error) {
+			out := ConvertStream(input, MakeConverterErr(func(in string) (int, error) {
 				if in == "20" {
 					return 0, ers.ErrInvalidInput
 				}
@@ -480,7 +480,7 @@ func TestStream(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		input := SliceStream(GenerateRandomStringSlice(128))
-		buf := input.ParallelBuffer(256)
+		buf := input.BufferParallel(256)
 		out, err := buf.Slice(ctx)
 		check.NotError(t, err)
 		check.Equal(t, len(out), 128)
@@ -805,30 +805,6 @@ func TestJSON(t *testing.T) {
 
 		assert.True(t, ers.IsTerminating(err))
 	})
-	t.Run("JoinErrors", func(t *testing.T) {
-		t.Run("Nil", func(t *testing.T) {
-			assert.NotError(t, (&Stream[int]{}).joinTwoErrs(nil, nil))
-		})
-		t.Run("First", func(t *testing.T) {
-			err := (&Stream[int]{}).joinTwoErrs(io.EOF, nil)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, io.EOF)
-			assert.Equal(t, err, io.EOF)
-		})
-		t.Run("Second", func(t *testing.T) {
-			err := (&Stream[int]{}).joinTwoErrs(nil, io.EOF)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, io.EOF)
-			assert.Equal(t, err, io.EOF)
-		})
-		t.Run("Both", func(t *testing.T) {
-			err := (&Stream[int]{}).joinTwoErrs(ers.ErrInvariantViolation, io.EOF)
-			assert.Error(t, err)
-			assert.NotEqual(t, err, io.EOF)
-			assert.ErrorIs(t, err, io.EOF)
-			assert.ErrorIs(t, err, ers.ErrInvariantViolation)
-		})
-	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Millisecond)
@@ -857,7 +833,7 @@ func TestJSON(t *testing.T) {
 	})
 	t.Run("ParallelInvalidConfig", func(t *testing.T) {
 		counter := 0
-		err := SliceStream([]int{1, 1, 1}).ReadAllParallel(MakeHandler(func(in int) error { counter += in; return nil }),
+		err := SliceStream([]int{1, 1, 1}).Parallel(MakeHandler(func(in int) error { counter += in; return nil }),
 			WorkerGroupConfErrorHandler(func(err error) { panic("should not execute") }),
 		).Run(t.Context())
 		assert.Error(t, err)

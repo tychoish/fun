@@ -67,6 +67,16 @@ func Ignore(_ error) { return } //nolint
 // the value is not an error or is an error of a nil type.
 func Cast(e any) error { err, _ := e.(error); return err }
 
+// Check can wrap a the callsite of a function that returns a value
+// and an error, and returns (zero, false) if the error is non, nil,
+// and (value, true) if the error is nil.
+func Check[T any](value T, err error) (zero T, _ bool) {
+	if !Ok(err) {
+		return zero, false
+	}
+	return value, true
+}
+
 // Append adds one or more errors to the error slice, omitting all
 // nil errors.
 func Append(errs []error, es ...error) []error {
@@ -120,9 +130,7 @@ func IsExpiredContext(err error) bool { return Is(err, context.Canceled, context
 // errors used by fun (and other packages!) to indicate that
 // processing/iteration has terminated. (e.g. context expiration, or
 // io.EOF.)
-func IsTerminating(err error) bool {
-	return Is(err, io.EOF, ErrCurrentOpAbort, ErrContainerClosed)
-}
+func IsTerminating(err error) bool { return Is(err, io.EOF, ErrCurrentOpAbort, ErrContainerClosed) }
 
 // IsInvariantViolation returns true if the argument is or resolves to
 // ErrInvariantViolation.

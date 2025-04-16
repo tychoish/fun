@@ -16,8 +16,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 )
 
 func CheckSeenMap[T comparable](t *testing.T, elems []T, seen map[T]struct{}) {
@@ -129,7 +127,7 @@ func TestMapReduce(t *testing.T) {
 		wg := &WaitGroup{}
 		pipe <- t.Name()
 
-		var mf Transform[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
+		var mf Converter[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
 		mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
 			ReadAll(Blocking(pipe).Receive().Stream()).
 			Ignore().
@@ -254,7 +252,7 @@ func TestParallelForEach(t *testing.T) {
 				seen := &atomic.Int64{}
 				count := &atomic.Int64{}
 
-				err := SliceStream(elems).ReadAllParallel(
+				err := SliceStream(elems).Parallel(
 					func(ctx context.Context, in int) error {
 						abs := int64(math.Abs(float64(i)))
 
@@ -285,7 +283,7 @@ func TestParallelForEach(t *testing.T) {
 		count := &atomic.Int64{}
 		errCount := &atomic.Int64{}
 		err := SliceStream(makeIntSlice(200)).
-			ReadAllParallel(
+			Parallel(
 				func(_ context.Context, in int) error {
 					count.Add(1)
 					runtime.Gosched()
@@ -316,7 +314,7 @@ func TestParallelForEach(t *testing.T) {
 		paned := &atomic.Bool{}
 
 		err := SliceStream(makeIntSlice(10)).
-			ReadAllParallel(
+			Parallel(
 				func(_ context.Context, in int) error {
 					if in == 8 {
 						paned.Store(true)
@@ -350,7 +348,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceStream(makeIntSlice(10)).
-			ReadAllParallel(
+			Parallel(
 				func(_ context.Context, in int) error {
 					if in == 4 {
 						panic("gotcha")
@@ -369,7 +367,7 @@ func TestParallelForEach(t *testing.T) {
 		count := &atomic.Int64{}
 
 		err := SliceStream(makeIntSlice(10)).
-			ReadAllParallel(
+			Parallel(
 				func(_ context.Context, in int) error {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
@@ -395,7 +393,7 @@ func TestParallelForEach(t *testing.T) {
 		defer cancel()
 
 		err := SliceStream(makeIntSlice(100)).
-			ReadAllParallel(
+			Parallel(
 				func(_ context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
@@ -416,7 +414,7 @@ func TestParallelForEach(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := SliceStream(makeIntSlice(100)).ReadAllParallel(
+		err := SliceStream(makeIntSlice(100)).Parallel(
 			func(_ context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
@@ -438,7 +436,7 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceStream(makeIntSlice(2)).ReadAllParallel(
+			err := SliceStream(makeIntSlice(2)).Parallel(
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
@@ -452,7 +450,7 @@ func TestParallelForEach(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := SliceStream(makeIntSlice(2)).ReadAllParallel(
+			err := SliceStream(makeIntSlice(2)).Parallel(
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
@@ -952,7 +950,7 @@ func RunStreamStringAlgoTests(
 						sum, err := iter.Reduce(func(in string, value string) (string, error) {
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
-						}).Send(ctx)
+						}).Read(ctx)
 
 						if err != nil {
 							t.Fatal(err)
@@ -985,7 +983,7 @@ func RunStreamStringAlgoTests(
 								count++
 								return "", nil
 							},
-						).Send(ctx)
+						).Read(ctx)
 						check.Equal(t, count, 1)
 						if err == nil {
 							t.Fatal("expected error")
@@ -1011,7 +1009,7 @@ func RunStreamStringAlgoTests(
 								return 42, nil
 							}
 							return value, ErrStreamContinue
-						}).Send(ctx)
+						}).Read(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
@@ -1029,7 +1027,7 @@ func RunStreamStringAlgoTests(
 								return 300, io.EOF
 							}
 							return 42, nil
-						}).Send(ctx)
+						}).Read(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
@@ -1070,11 +1068,11 @@ func RunStreamStringAlgoTests(
 	t.Run("ConverterOK", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		tfrm := ConverterOk(func(in string) (string, bool) { return in, true })
+		tfrm := MakeCovnerterOk(func(in string) (string, bool) { return in, true })
 		out, err := tfrm(ctx, "hello")
 		check.Equal(t, out, "hello")
 		check.NotError(t, err)
-		tfrm = ConverterOk(func(in string) (string, bool) { return in, false })
+		tfrm = MakeCovnerterOk(func(in string) (string, bool) { return in, false })
 		out, err = tfrm(ctx, "bye")
 		check.Error(t, err)
 		check.ErrorIs(t, err, ErrStreamContinue)
@@ -1083,68 +1081,38 @@ func RunStreamStringAlgoTests(
 	t.Run("Block", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+			mpf := Converter[int, string](func(ctx context.Context, in int) (string, error) {
 				check.Equal(t, ctx, context.Background())
 				check.Equal(t, in, 42)
 				count++
 				return fmt.Sprint(in), nil
 			})
 
-			out, err := mpf.Wait()(42)
+			out, err := mpf.Wait(42)
 			check.Equal(t, "42", out)
 			check.NotError(t, err)
 			check.Equal(t, count, 1)
 		})
 		t.Run("Error", func(t *testing.T) {
 			count := 0
-			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
+			mpf := Converter[int, string](func(ctx context.Context, in int) (string, error) {
 				check.Equal(t, ctx, context.Background())
 				check.Equal(t, in, 42)
 				count++
 				return fmt.Sprint(in), io.EOF
 			})
 
-			out, err := mpf.Wait()(42)
+			out, err := mpf.Wait(42)
 			check.Equal(t, "42", out)
 			check.Error(t, err)
 			check.ErrorIs(t, err, io.EOF)
 			check.Equal(t, count, 1)
 		})
 	})
-	t.Run("BlockCheck", func(t *testing.T) {
-		t.Run("Basic", func(t *testing.T) {
-			count := 0
-			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
-				check.Equal(t, ctx, context.Background())
-				check.Equal(t, in, 42)
-				count++
-				return fmt.Sprint(in), nil
-			})
-
-			out, ok := mpf.CheckWait()(42)
-			check.Equal(t, "42", out)
-			check.True(t, ok)
-			check.Equal(t, count, 1)
-		})
-		t.Run("Error", func(t *testing.T) {
-			count := 0
-			mpf := Transform[int, string](func(ctx context.Context, in int) (string, error) {
-				check.Equal(t, ctx, context.Background())
-				check.Equal(t, in, 42)
-				count++
-				return fmt.Sprint(in), io.EOF
-			})
-
-			out, ok := mpf.CheckWait()(42)
-			check.Equal(t, "", out)
-			check.True(t, !ok)
-			check.Equal(t, count, 1)
-		})
-	})
 	t.Run("Lock", func(t *testing.T) {
 		count := &atomic.Int64{}
 
-		mpf := Transform[int, string](func(_ context.Context, in int) (string, error) {
+		mpf := Converter[int, string](func(_ context.Context, in int) (string, error) {
 			check.Equal(t, in, 42)
 			count.Add(1)
 			return fmt.Sprint(in), nil
@@ -1162,202 +1130,9 @@ func RunStreamStringAlgoTests(
 		wg.Wait(ctx)
 		check.Equal(t, count.Load(), 128)
 	})
-	t.Run("Pipe", func(t *testing.T) {
-		t.Run("Serial", func(t *testing.T) {
-			var root error
-			tfm := Transform[int, string](func(_ context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod := tfm.Pipe()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			for i := 0; i < 100; i++ {
-				assert.NotError(t, proc(ctx, i))
-				assert.Equal(t, fmt.Sprint(i), ft.Must(prod(ctx)))
-			}
-			root = io.EOF
-			for i := 0; i < 100; i++ {
-				assert.NotError(t, proc(ctx, i))
-				out, err := prod(ctx)
-				assert.ErrorIs(t, err, io.EOF)
-				assert.Zero(t, out)
-			}
-		})
-		t.Run("Parallel", func(t *testing.T) {
-			var root error
-			tfm := Transform[int, string](func(_ context.Context, in int) (string, error) { return fmt.Sprint(in), root })
-			proc, prod := tfm.Pipe()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			wg := &WaitGroup{}
-			wg.DoTimes(ctx, 100, func(ctx context.Context) {
-				assert.NotError(t, proc(ctx, 42))
-				assert.Equal(t, fmt.Sprint(42), ft.Must(prod(ctx)))
-			})
-			wg.Wait(ctx)
-		})
-	})
-	t.Run("Worker", func(t *testing.T) {
-		var tfmroot error
-		var prodroot error
-		var procroot error
-		var tfmcount int
-		var prodcount int
-		var proccount int
-		var maxIter int
-		reset := func() { tfmcount, prodcount, proccount = 0, 0, 0; prodroot, procroot = nil, nil; maxIter = 1 }
-		prod := Generator[int](func(_ context.Context) (int, error) {
-			if prodroot == nil && prodcount >= maxIter {
-				return -1, io.EOF
-			}
-			prodcount++
-			return 42, prodroot
-
-		})
-		proc := Handler[string](func(_ context.Context, in string) error {
-			if proccount >= maxIter && procroot == nil {
-				return io.EOF
-			}
-			proccount++
-			check.Equal(t, in, "42")
-			return procroot
-		})
-		tfm := Transform[int, string](func(_ context.Context, in int) (string, error) { tfmcount++; return fmt.Sprint(in), tfmroot })
-		worker := tfm.ProcessPipe(prod, proc)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		reset()
-
-		t.Run("HappyPath", func(t *testing.T) {
-			defer reset()
-			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 0)
-			check.NotError(t, worker(ctx))
-
-			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
-		})
-
-		t.Run("ProdError", func(t *testing.T) {
-			defer reset()
-			maxIter = 10
-			prodroot = context.Canceled
-			check.ErrorIs(t, worker(ctx), context.Canceled)
-			check.True(t, proccount == tfmcount && tfmcount == 0)
-			check.Equal(t, prodcount, 1)
-		})
-		t.Run("ProcError", func(t *testing.T) {
-			defer reset()
-
-			procroot = context.Canceled
-			check.ErrorIs(t, worker(ctx), context.Canceled)
-			check.True(t, prodcount == proccount && prodcount == tfmcount && tfmcount == 1)
-
-		})
-		t.Run("MapFails", func(t *testing.T) {
-			defer reset()
-			tfmroot = context.Canceled
-			check.ErrorIs(t, worker(ctx), context.Canceled)
-			check.True(t, prodcount == tfmcount && tfmcount == 1)
-			check.Equal(t, proccount, 0)
-		})
-	})
-}
-
-func TestTransformFunctions(t *testing.T) {
-	t.Run("SignleHelpers", func(t *testing.T) {
-		t.Run("Convert", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			count := 0
-			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
-			assert.Equal(t, count, 0)
-			prod := mpf.Convert(42)
-			assert.Equal(t, count, 0)
-			out := prod.Ignore(ctx)
-			assert.Equal(t, count, 0)
-			assert.Equal(t, "42", out())
-			assert.Equal(t, count, 1)
-		})
-		t.Run("ConvertFuture", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			count := 0
-			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
-			assert.Equal(t, count, 0)
-			prod := mpf.ConvertFuture(fn.AsFuture(42))
-			assert.Equal(t, count, 0)
-			out := prod.Ignore(ctx)
-			assert.Equal(t, count, 0)
-			assert.Equal(t, "42", out())
-			assert.Equal(t, count, 1)
-		})
-		t.Run("ConvertGenerator", func(t *testing.T) {
-			t.Run("Passes", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				count := 0
-				mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
-				check.Equal(t, count, 0)
-				prod := mpf.CovnertGenerator(FutureGenerator(fn.AsFuture(42)))
-				check.Equal(t, count, 0)
-				out := prod.Ignore(ctx)
-				check.Equal(t, count, 0)
-				check.Equal(t, "42", out())
-				check.Equal(t, count, 1)
-			})
-			t.Run("Fails", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				mcount := 0
-				pcount := 0
-				mpf := Converter(func(in int) string { mcount++; return fmt.Sprint(in) })
-				check.Equal(t, mcount, 0)
-				check.Equal(t, pcount, 0)
-				prod := mpf.CovnertGenerator(MakeGenerator(func() (int, error) { pcount++; return 42, ers.ErrInvalidInput }))
-				check.Equal(t, mcount, 0)
-				check.Equal(t, pcount, 0)
-				out, err := prod.Send(ctx)
-				check.Equal(t, mcount, 0)
-				check.Equal(t, pcount, 1)
-				check.Error(t, err)
-				check.ErrorIs(t, err, ers.ErrInvalidInput)
-				check.Equal(t, "", out)
-			})
-		})
-		t.Run("Worker", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			count := 0
-			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
-			assert.Equal(t, count, 0)
-			hcount := 0
-			wf := mpf.Worker(42, func(in string) { hcount++; assert.Equal(t, in, "42") })
-			assert.Equal(t, count, 0)
-			assert.Equal(t, hcount, 0)
-			assert.NotError(t, wf(ctx))
-			assert.Equal(t, count, 1)
-			assert.Equal(t, hcount, 1)
-		})
-		t.Run("WorkerFuture", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			count := 0
-			mpf := Converter(func(in int) string { count++; return fmt.Sprint(in) })
-			assert.Equal(t, count, 0)
-			hcount := 0
-			wf := mpf.WorkerFuture(
-				func() int { return 42 },
-				func(in string) { hcount++; assert.Equal(t, in, "42") },
-			)
-			assert.Equal(t, count, 0)
-			assert.Equal(t, hcount, 0)
-			assert.NotError(t, wf(ctx))
-			assert.Equal(t, count, 1)
-			assert.Equal(t, hcount, 1)
-		})
-
-	})
 	t.Run("ParallelProccesingInvalidConfig", func(t *testing.T) {
 		counter := 0
-		out, err := Converter(func(in int) string { counter++; return fmt.Sprint(in) }).ProcessParallel(
+		out, err := MakeConverter(func(in int) string { counter++; return fmt.Sprint(in) }).Parallel(
 			SliceStream([]int{42, 84, 21}),
 			WorkerGroupConfErrorHandler(func(err error) { panic("should not execute") }),
 		).Slice(t.Context())
@@ -1366,5 +1141,4 @@ func TestTransformFunctions(t *testing.T) {
 		assert.Zero(t, counter)
 		assert.Nil(t, out)
 	})
-
 }

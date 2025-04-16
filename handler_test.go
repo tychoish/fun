@@ -321,6 +321,36 @@ func TestProcess(t *testing.T) {
 			assert.NotError(t, wf(ctx))
 			assert.Equal(t, count, 128)
 		})
+		t.Run("Locker", func(t *testing.T) {
+			t.Run("Mutex", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				count := 0
+				op := NewHandler(func(_ context.Context, in int) error {
+					count++
+					check.Equal(t, in, 42)
+					return nil
+				})
+				mu := &sync.Mutex{}
+				wf := op.WithLocker(mu).Worker(42).Group(128)
+				assert.NotError(t, wf(ctx))
+				assert.Equal(t, count, 128)
+			})
+			t.Run("RWMutex", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				count := 0
+				op := NewHandler(func(_ context.Context, in int) error {
+					count++
+					check.Equal(t, in, 42)
+					return nil
+				})
+				mu := &sync.RWMutex{}
+				wf := op.WithLocker(mu).Worker(42).Group(128)
+				assert.NotError(t, wf(ctx))
+				assert.Equal(t, count, 128)
+			})
+		})
 	})
 	t.Run("WithoutErrors", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

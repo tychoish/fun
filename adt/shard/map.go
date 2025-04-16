@@ -93,19 +93,19 @@ func (m *Map[K, V]) defaultShards() []sh[K, V]                      { return m.i
 func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                     { return m.sh.Call(m.defaultShards) }
 func (m *Map[K, V]) shard(key K) *sh[K, V]                          { return m.shards().Ptr(int(m.shardID(key))) }
 func (m *Map[K, V]) inc() *Map[K, V]                                { m.clock.Add(1); return m }
-func to[T, O any](in func(T) O) fun.Transform[T, O]                 { return fun.Converter(in) }
-func (m *Map[K, V]) s2ks() fun.Transform[*sh[K, V], *fun.Stream[K]] { return to(m.shKeys) }
-func (m *Map[K, V]) s2vs() fun.Transform[*sh[K, V], *fun.Stream[V]] { return to(m.shValues) }
-func (m *Map[K, V]) vp() fun.Transform[*sh[K, V], *fun.Stream[V]]   { return to(m.shValsp) }
-func (m *Map[K, V]) keyToItem() fun.Transform[K, MapItem[K, V]]     { return to(m.Fetch) }
+func to[T, O any](in func(T) O) fun.Converter[T, O]                 { return fun.MakeConverter(in) }
+func (m *Map[K, V]) s2ks() fun.Converter[*sh[K, V], *fun.Stream[K]] { return to(m.shKeys) }
+func (m *Map[K, V]) s2vs() fun.Converter[*sh[K, V], *fun.Stream[V]] { return to(m.shValues) }
+func (m *Map[K, V]) vp() fun.Converter[*sh[K, V], *fun.Stream[V]]   { return to(m.shValsp) }
+func (m *Map[K, V]) keyToItem() fun.Converter[K, MapItem[K, V]]     { return to(m.Fetch) }
 func (*Map[K, V]) shKeys(sh *sh[K, V]) *fun.Stream[K]               { return sh.keys() }
 func (*Map[K, V]) shValues(sh *sh[K, V]) *fun.Stream[V]             { return sh.values() }
 func (m *Map[K, V]) shValsp(sh *sh[K, V]) *fun.Stream[V]            { return sh.valsp(int(m.num)) }
 func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                    { return m.shards().Ptrs() }
 func (m *Map[K, V]) shIter() *fun.Stream[*sh[K, V]]                 { return m.shPtrs().Stream() }
-func (m *Map[K, V]) keyItr() *fun.Stream[*fun.Stream[K]]            { return m.s2ks().Process(m.shIter()) }
-func (m *Map[K, V]) valItr() *fun.Stream[*fun.Stream[V]]            { return m.s2vs().Process(m.shIter()) }
-func (m *Map[K, V]) valItrp() *fun.Stream[*fun.Stream[V]]           { return m.vp().Process(m.shIter()) }
+func (m *Map[K, V]) keyItr() *fun.Stream[*fun.Stream[K]]            { return m.s2ks().ReadAll(m.shIter()) }
+func (m *Map[K, V]) valItr() *fun.Stream[*fun.Stream[V]]            { return m.s2vs().ReadAll(m.shIter()) }
+func (m *Map[K, V]) valItrp() *fun.Stream[*fun.Stream[V]]           { return m.vp().ReadAll(m.shIter()) }
 func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf] { return poolOpts(int(m.num)) }
 
 func (m *Map[K, V]) shardID(key K) uint64 {
@@ -153,7 +153,7 @@ func (m *Map[K, V]) Values() *fun.Stream[V] { return fun.FlattenStreams(m.valItr
 // MapItem type captures the version information and information about
 // the sharded configuration.
 func (m *Map[K, V]) Stream() *fun.Stream[MapItem[K, V]] {
-	return m.keyToItem().Process(m.Keys()).Filter(m.filter)
+	return m.keyToItem().ReadAll(m.Keys()).Filter(m.filter)
 }
 
 func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }
@@ -165,7 +165,7 @@ func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }
 // possible that the stream could return some items where
 // MapItem.Exists is false if items are deleted during iteration.
 func (m *Map[K, V]) ParallelStream() *fun.Stream[MapItem[K, V]] {
-	return m.keyToItem().Map(m.Keys(), m.popt()).Filter(m.filter)
+	return m.keyToItem().Parallel(m.Keys(), m.popt()).Filter(m.filter)
 }
 
 // ParallelValues returns a stream over all values in the sharded map. Because items are processed
