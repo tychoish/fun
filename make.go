@@ -24,19 +24,6 @@ var MAKE = Constructors{}
 // this package.
 type Constructors struct{}
 
-// ProcessWorker constructs a Handler function for running Worker
-// functions. Use in combination with Process and ProcessParallel, and
-// to build worker pools.
-//
-// The Handlers type serves to namespace these constructors, for
-// interface clarity purposes. Use the HF variable to access this
-// method as in:
-//
-//	fun.MAKE.ProcessWorker()
-func (Constructors) ProcessWorker() Handler[Worker] {
-	return func(ctx context.Context, wf Worker) error { return wf(ctx) }
-}
-
 // OperationPool returns a Operation that, when called, processes the
 // incoming stream of Operations, starts a go routine for running
 // each element in the stream, (without any throttling or rate

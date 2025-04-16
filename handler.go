@@ -52,15 +52,9 @@ func JoinHandlers[T any](pfs ...Handler[T]) Handler[T] {
 	return pf
 }
 
-// Add begins running the process in a different goroutine, using the
-// provided arguments to manage the operation.
-func (pf Handler[T]) Add(ctx context.Context, wg *WaitGroup, eh fn.Handler[error], op T) {
-	pf.Operation(eh, op).Add(ctx, wg)
-}
-
 // Wait runs the Handler with a context that will never be
 // canceled.
-func (pf Handler[T]) Wait(in T) error { return pf.Worker(in).Wait() }
+func (pf Handler[T]) Wait(in T) error { return pf(context.Background(), in) }
 
 // Ignore runs the process function and discards the error.
 func (pf Handler[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in)) }
@@ -71,7 +65,7 @@ func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ct
 
 // Force processes the input, but discards the error and uses a
 // context that will not expire.
-func (pf Handler[T]) Force(in T) { pf.Worker(in).Ignore().Wait() }
+func (pf Handler[T]) Force(in T) { ft.Ignore(pf.Wait(in)) }
 
 func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ctx, in)) }
 
@@ -163,33 +157,14 @@ func (pf Handler[T]) merge(next Handler[T]) Handler[T] {
 	}
 }
 
-// Background processes an item in a separate goroutine and returns a
-// worker that will block until the underlying operation is complete.
-func (pf Handler[T]) Background(ctx context.Context, op T) Worker {
-	return pf.Worker(op).Launch(ctx)
-}
-
 // Capture creates a handler function that like, Handler.Force,
 // passes a background context and ignores the processors error.
 func (pf Handler[T]) Capture() fn.Handler[T] { return pf.Force }
-
-// Operation converts a processor into a worker that will process the input
-// provided when executed.
-func (pf Handler[T]) Operation(of fn.Handler[error], in T) Operation {
-	return pf.Worker(in).Operation(of)
-}
 
 // Handler converts a processor into an observer, handling the error
 // with the error observer and using the provided context.
 func (pf Handler[T]) Handler(ctx context.Context, oe fn.Handler[error]) fn.Handler[T] {
 	return func(in T) { oe(pf(ctx, in)) }
-}
-
-// Worker converts the processor into a worker, passing the provide
-// input into the root processor function. The Handler is not run
-// until the worker is called.
-func (pf Handler[T]) Worker(in T) Worker {
-	return func(ctx context.Context) error { return pf(ctx, in) }
 }
 
 // Once make a processor that can only run once. Subsequent calls to
@@ -344,21 +319,3 @@ func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 		}
 	}
 }
-
-// Retry makes a worker function that takes runs the processor
-// function with the provied input until the return value is nil, or
-// it encounters a terminating error (io.EOF, ers.ErrAbortCurrentOp,
-// or context cancellation.)
-//
-// Context cancellation errors are returned to the caller, other
-// terminating errors are not, with any other errors encountered
-// during retries. ErrStreamContinue is always ignored and notfun.Mfun.M
-// aggregated. All errors are discarded if the retry operation
-// succeeds in the provided number of retries.
-//
-// Except for ErrStreamContinue, which is ignored, all other errors are
-// aggregated and returned to the caller only if the retry fails. It's
-// possible to return a nil error without successfully completing the
-// underlying operation, if the processor only returned
-// ErrStreamContinue values.
-func (pf Handler[T]) Retry(n int, in T) Worker { return pf.Worker(in).Retry(n) }

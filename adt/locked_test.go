@@ -104,13 +104,14 @@ func TestLocked(t *testing.T) {
 			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
 			mget, mset := AccessorsWithLock(getter, setter)
 			start := time.Now()
-			sw := fun.MakeHandler(mset.Safe()).Worker(267).Launch(ctx)
+			sw := func() { go check.NotError(t, fun.MakeHandler(mset.Safe()).Read(ctx, 267)) }
+			go sw()
 			runtime.Gosched()
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
 				check.MinRuntime(t, 100*time.Millisecond, func() { check.Equal(t, 42, mget()) })
-				check.NotError(t, sw(ctx))
+				sw()
 				if time.Since(start) < 100*time.Millisecond {
 					t.Log(time.Since(start))
 				}
@@ -133,13 +134,16 @@ func TestLocked(t *testing.T) {
 			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
 			mget, mset := AccessorsWithReadLock(getter, setter)
 			start := time.Now()
-			sw := fun.MakeHandler(mset.Safe()).Worker(267).Launch(ctx)
+
+			sw := func() { go check.NotError(t, fun.MakeHandler(mset.Safe()).Read(ctx, 267)) }
+			go sw()
+
 			runtime.Gosched()
 			wg := &sync.WaitGroup{}
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				check.NotError(t, sw(ctx))
+				sw()
 				if time.Since(start) < 100*time.Millisecond {
 					t.Log(time.Since(start))
 				}

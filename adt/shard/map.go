@@ -103,9 +103,9 @@ func (*Map[K, V]) shValues(sh *sh[K, V]) *fun.Stream[V]             { return sh.
 func (m *Map[K, V]) shValsp(sh *sh[K, V]) *fun.Stream[V]            { return sh.valsp(int(m.num)) }
 func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                    { return m.shards().Ptrs() }
 func (m *Map[K, V]) shIter() *fun.Stream[*sh[K, V]]                 { return m.shPtrs().Stream() }
-func (m *Map[K, V]) keyItr() *fun.Stream[*fun.Stream[K]]            { return m.s2ks().ReadAll(m.shIter()) }
-func (m *Map[K, V]) valItr() *fun.Stream[*fun.Stream[V]]            { return m.s2vs().ReadAll(m.shIter()) }
-func (m *Map[K, V]) valItrp() *fun.Stream[*fun.Stream[V]]           { return m.vp().ReadAll(m.shIter()) }
+func (m *Map[K, V]) keyItr() *fun.Stream[*fun.Stream[K]]            { return m.s2ks().Stream(m.shIter()) }
+func (m *Map[K, V]) valItr() *fun.Stream[*fun.Stream[V]]            { return m.s2vs().Stream(m.shIter()) }
+func (m *Map[K, V]) valItrp() *fun.Stream[*fun.Stream[V]]           { return m.vp().Stream(m.shIter()) }
 func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf] { return poolOpts(int(m.num)) }
 
 func (m *Map[K, V]) shardID(key K) uint64 {
@@ -153,7 +153,7 @@ func (m *Map[K, V]) Values() *fun.Stream[V] { return fun.FlattenStreams(m.valItr
 // MapItem type captures the version information and information about
 // the sharded configuration.
 func (m *Map[K, V]) Stream() *fun.Stream[MapItem[K, V]] {
-	return m.keyToItem().ReadAll(m.Keys()).Filter(m.filter)
+	return m.keyToItem().Stream(m.Keys()).Filter(m.filter)
 }
 
 func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }

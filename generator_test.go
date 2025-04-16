@@ -244,14 +244,20 @@ func TestGenerator(t *testing.T) {
 
 			opct := &atomic.Int64{}
 			wg := &WaitGroup{}
-			future := op.Lock().Worker(
-				func(in int) { opct.Add(1); check.Equal(t, in, 42) },
-			).StartGroup(ctx, 128)
+			future := op.Lock()
+
+			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+				out, err := future(ctx)
+				opct.Add(1)
+				check.Equal(t, out, 42)
+				assert.NotError(t, err)
+			})
 
 			wg.Wait(ctx)
-			check.NotError(t, future(ctx))
+
 			check.Equal(t, 128, opct.Load())
 			assert.Equal(t, count, 128)
+
 		})
 		t.Run("Locker", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -264,50 +270,45 @@ func TestGenerator(t *testing.T) {
 
 			opct := &atomic.Int64{}
 			mtx := &sync.RWMutex{}
-			future := op.WithLocker(mtx).Worker(
-				func(in int) { opct.Add(1); check.Equal(t, in, 42) },
-			).StartGroup(ctx, 128)
+			future := op.WithLocker(mtx)
+			wg := &WaitGroup{}
 
-			check.NotError(t, future(ctx))
+			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+				out, err := future(ctx)
+				opct.Add(1)
+				check.Equal(t, out, 42)
+				assert.NotError(t, err)
+			})
+			wg.Wait(ctx)
+
 			check.Equal(t, 128, opct.Load())
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			count := 0
-			op := Generator[int](func(context.Context) (int, error) {
-				count++
-				return 42, nil
-			})
 			mu := &sync.Mutex{}
 			opct := &atomic.Int64{}
-			op.WithLock(mu).Operation(
-				func(in int) { opct.Add(1); check.Equal(t, in, 42) },
-				func(err error) { opct.Add(1); check.NotError(t, err) },
-			).StartGroup(ctx, 128).Run(ctx)
-			check.Equal(t, 2*128, opct.Load())
-			assert.Equal(t, count, 128)
-		})
-		t.Run("ForBackground", func(t *testing.T) {
+			wg := &WaitGroup{}
+
 			count := 0
 			op := Generator[int](func(context.Context) (int, error) {
 				count++
 				return 42, nil
-			}).Lock()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			}).WithLock(mu)
 
-			obct := 0
-			obv := fn.NewHandler(func(in int) { obct++; check.Equal(t, in, 42) }).Lock()
-			jobs := []Worker{}
+			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+				out, err := op(ctx)
+				opct.Add(1)
+				check.Equal(t, out, 42)
+				opct.Add(1)
+				check.NotError(t, err)
+			})
 
-			ft.DoTimes(128, func() { jobs = append(jobs, op.Background(ctx, obv)) })
+			wg.Wait(ctx)
 
-			err := SliceStream(jobs).Parallel(MAKE.ProcessWorker(), WorkerGroupConfNumWorkers(4)).Run(ctx)
-			assert.NotError(t, err)
-			check.Equal(t, count, 128)
-			check.Equal(t, obct, 128)
+			check.Equal(t, 2*128, opct.Load())
+			assert.Equal(t, count, 128)
 		})
 	})
 	t.Run("WithoutErrors", func(t *testing.T) {

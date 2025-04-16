@@ -71,28 +71,6 @@ func PtrGenerator[T any](fn func() *T) Generator[T] {
 // function. The underlying Future's panics are converted to errors.
 func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.Safe()) }
 
-// Background constructs a worker that runs the provided Generator in a
-// background thread and passes the produced value to the observe.
-//
-// The worker function's return value captures the procuder's error,
-// and will block until the generator has completed.
-func (pf Generator[T]) Background(ctx context.Context, of fn.Handler[T]) Worker {
-	return pf.Worker(of).Launch(ctx)
-}
-
-// Worker passes the produced value to an observer and returns a
-// worker that runs the generator, calls the observer, and returns the
-// error.
-func (pf Generator[T]) Worker(of fn.Handler[T]) Worker {
-	return func(ctx context.Context) error { o, e := pf(ctx); of(o); return e }
-}
-
-// Operation produces a wait function, using two observers to handle the
-// output of the Generator.
-func (pf Generator[T]) Operation(of fn.Handler[T], eo fn.Handler[error]) Operation {
-	return func(ctx context.Context) { o, e := pf(ctx); of(o); eo(e) }
-}
-
 // WithRecover returns a wrapped generator with a panic handler that converts
 // any panic to an error.
 func (pf Generator[T]) WithRecover() Generator[T] {

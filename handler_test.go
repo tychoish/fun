@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 func TestProcess(t *testing.T) {
@@ -59,18 +58,6 @@ func TestProcess(t *testing.T) {
 				check.NotError(t, wf(ctx, 42))
 			})
 		})
-	})
-	t.Run("Add", func(t *testing.T) {
-		count := &atomic.Int64{}
-		pf := MakeHandler(func(i int) error { check.Equal(t, i, 54); count.Add(1); return nil })
-		wg := &WaitGroup{}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		pf.Add(ctx, wg, func(error) {}, 54)
-		wg.Operation().Wait()
-		check.Equal(t, count.Load(), 1)
 	})
 	t.Run("If", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -128,23 +115,6 @@ func TestProcess(t *testing.T) {
 			assert.NotError(t, pf(ctx, 42))
 		}
 		check.Equal(t, called, 1)
-	})
-	t.Run("Operation", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		called := 0
-		root := ers.New("foo")
-		pf := NewHandler(func(_ context.Context, n int) error {
-			check.Equal(t, 42, n)
-			called++
-			return root
-		})
-		of := func(err error) { called++; check.ErrorIs(t, err, root) }
-		obv := pf.Operation(of, 42)
-		check.Equal(t, called, 0)
-		obv(ctx)
-		check.Equal(t, called, 2)
-
 	})
 	t.Run("Handler", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -241,39 +211,6 @@ func TestProcess(t *testing.T) {
 			check.NotErrorIs(t, e, io.EOF)
 		})
 	})
-	t.Run("Worker", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		called := 0
-		root := ers.New("foo")
-		pf := NewHandler(func(_ context.Context, n int) error {
-			check.Equal(t, 42, n)
-			called++
-			return root
-		})
-		check.Equal(t, called, 0)
-		wf := pf.Worker(42)
-		check.Equal(t, called, 0)
-		check.Error(t, wf(ctx))
-		check.Equal(t, called, 1)
-	})
-	t.Run("Future", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		called := 0
-		root := ers.New("foo")
-		pf := NewHandler(func(_ context.Context, n int) error {
-			time.Sleep(250 * time.Millisecond)
-			check.Equal(t, 42, n)
-			called++
-			return root
-		})
-		check.Equal(t, called, 0)
-		wf := pf.Background(ctx, 42)
-		check.Equal(t, called, 0)
-		check.ErrorIs(t, wf(ctx), root)
-		check.Equal(t, called, 1)
-	})
 	t.Run("Lock", func(t *testing.T) {
 		t.Run("NilLockPanics", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -303,8 +240,8 @@ func TestProcess(t *testing.T) {
 			oe := MAKE.ErrorHandler(func(err error) { Invariant.Must(err) })
 			op = op.Lock()
 
-			ft.DoTimes(128, func() { op.Operation(oe, 42).Add(ctx, wg) })
-			wg.Operation().Wait()
+			ft.DoTimes(128, func() { oe(op(ctx, 42)) })
+			wg.Wait(ctx)
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
@@ -317,8 +254,13 @@ func TestProcess(t *testing.T) {
 				return nil
 			})
 			mu := &sync.Mutex{}
-			wf := op.WithLock(mu).Worker(42).Group(128)
-			assert.NotError(t, wf(ctx))
+			wf := op.WithLock(mu)
+			wg := &WaitGroup{}
+			wg.DoTimes(ctx, 128, func(context.Context) {
+				assert.NotError(t, wf(ctx, 42))
+			})
+			wg.Wait(ctx)
+
 			assert.Equal(t, count, 128)
 		})
 		t.Run("Locker", func(t *testing.T) {
@@ -332,9 +274,15 @@ func TestProcess(t *testing.T) {
 					return nil
 				})
 				mu := &sync.Mutex{}
-				wf := op.WithLocker(mu).Worker(42).Group(128)
-				assert.NotError(t, wf(ctx))
+				wf := op.WithLocker(mu)
+				wg := &WaitGroup{}
+				wg.DoTimes(ctx, 128, func(context.Context) {
+					assert.NotError(t, wf(ctx, 42))
+				})
+				wg.Wait(ctx)
+
 				assert.Equal(t, count, 128)
+
 			})
 			t.Run("RWMutex", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -346,8 +294,13 @@ func TestProcess(t *testing.T) {
 					return nil
 				})
 				mu := &sync.RWMutex{}
-				wf := op.WithLocker(mu).Worker(42).Group(128)
-				assert.NotError(t, wf(ctx))
+				wf := op.WithLocker(mu)
+				wg := &WaitGroup{}
+				wg.DoTimes(ctx, 128, func(context.Context) {
+					assert.NotError(t, wf(ctx, 42))
+				})
+				wg.Wait(ctx)
+
 				assert.Equal(t, count, 128)
 			})
 		})
@@ -698,22 +651,6 @@ func TestProcess(t *testing.T) {
 
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
-	})
-	t.Run("Retry", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		count := &intish.Atomic[int]{}
-		err := MakeHandler(func(in int) error {
-			defer count.Add(1)
-			assert.Equal(t, in, 42)
-			if count.Get() < 8 {
-				return ers.ErrCurrentOpSkip
-			}
-
-			return nil
-		}).Retry(32, 42).Run(ctx)
-		assert.NotError(t, err)
 	})
 	t.Run("Filter", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

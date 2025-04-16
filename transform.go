@@ -73,7 +73,7 @@ func (mpf Converter[T, O]) Lock() Converter[T, O] {
 func (mpf Converter[T, O]) WithLock(mu *sync.Mutex) Converter[T, O] {
 	return func(ctx context.Context, val T) (O, error) {
 		defer internal.With(internal.Lock(mu))
-		return mpf.Run(ctx, val)
+		return mpf.Convert(ctx, val)
 	}
 }
 
@@ -88,15 +88,43 @@ func (mpf Converter[T, O]) WithRecover() Converter[T, O] {
 }
 
 // Wait calls the transform function passing a context that cannot expire.
-func (mpf Converter[T, O]) Wait(in T) (O, error) { return mpf.Run(context.Background(), in) }
+func (mpf Converter[T, O]) Wait(in T) (O, error) { return mpf.Convert(context.Background(), in) }
 
-// ReadAll takes a stream and runs the transformer over every item,
-// Run executes the transform function with the provided output.
-func (mpf Converter[T, O]) Run(ctx context.Context, in T) (O, error) { return mpf(ctx, in) }
+// Convert uses the converter function to transform a value from one
+// type (T) to another (O).
+func (mpf Converter[T, O]) Convert(ctx context.Context, in T) (O, error) { return mpf(ctx, in) }
 
-// producing a new stream with the output values. The processing is
-// performed serially and lazily and respects ErrStreamContinue.
-func (mpf Converter[T, O]) ReadAll(iter *Stream[T]) *Stream[O] {
+// Generator processes an input generator function with the Transform
+// function. Each call to the output generator returns one value from
+// the input generator after processing the item with the transform
+// function applied. The output generator returns any error encountered
+// during these operations (input, transform, output) to its caller
+// *except* ErrStreamContinue, which is respected.
+func (mpf Converter[T, O]) Generator(prod Generator[T]) Generator[O] {
+	return func(ctx context.Context) (out O, _ error) {
+		for {
+			item, err := prod(ctx)
+			if err == nil {
+				out, err = mpf.Convert(ctx, item)
+				if err == nil {
+					return out, nil
+				}
+			}
+
+			switch {
+			case errors.Is(err, ErrStreamContinue):
+				continue
+			default:
+				return mpf.zeroOut(), err
+			}
+		}
+	}
+}
+
+// Stream takes an input stream of one type and converts it to a
+// stream of the another type. All errors from the original stream are
+// propagated to the output stream.
+func (mpf Converter[T, O]) Stream(iter *Stream[T]) *Stream[O] {
 	return mpf.Generator(iter.Read).
 		Stream().
 		WithHook(func(st *Stream[O]) { st.AddError(iter.Close()) })
@@ -139,33 +167,6 @@ func (mpf Converter[T, O]) Parallel(
 			out.AddError(iter.Close())
 			out.AddError(conf.ErrorResolver())
 		})
-}
-
-// Generator processes an input generator function with the Transform
-// function. Each call to the output generator returns one value from
-// the input generator after processing the item with the transform
-// function applied. The output generator returns any error encountered
-// during these operations (input, transform, output) to its caller
-// *except* ErrStreamContinue, which is respected.
-func (mpf Converter[T, O]) Generator(prod Generator[T]) Generator[O] {
-	return func(ctx context.Context) (out O, _ error) {
-		for {
-			item, err := prod(ctx)
-			if err == nil {
-				out, err = mpf.Run(ctx, item)
-				if err == nil {
-					return out, nil
-				}
-			}
-
-			switch {
-			case errors.Is(err, ErrStreamContinue):
-				continue
-			default:
-				return mpf.zeroOut(), err
-			}
-		}
-	}
 }
 
 func (Converter[T, O]) zeroOut() (out O) { return }

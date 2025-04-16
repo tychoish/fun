@@ -128,13 +128,13 @@ func SliceStream[T any](in []T) *Stream[T] {
 // will continue producing values as long as the input stream
 // produces values, the context isn't canceled, or exhausted.
 func ConvertStream[T, O any](iter *Stream[T], op Converter[T, O]) *Stream[O] {
-	return op.ReadAll(iter)
+	return op.Stream(iter)
 }
 
 // Transform processes a stream passing each element through a
 // transform function. The type of the stream is the same for the
 // output. Use Convert stream to change the type of the value.
-func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.ReadAll(st) }
+func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream(st) }
 
 // MergeStreams takes a collection of streams of the same type of
 // objects and provides a single stream over these items.
@@ -422,7 +422,7 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 // type and converts it to a stream of any (e.g. interface{})
 // values.
 func (st *Stream[T]) Any() *Stream[any] {
-	return MakeConverter(func(in T) any { return any(in) }).ReadAll(st)
+	return MakeConverter(func(in T) any { return any(in) }).Stream(st)
 }
 
 // Reduce processes a stream with a reducer function. The output

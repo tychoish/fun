@@ -97,7 +97,7 @@ func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Generator[
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
-		if err := op.ReadAll(in.Stream()).ReadAll(out.Add).Run(ctx); err != nil {
+		if err := op.Stream(in.Stream()).ReadAll(out.Add).Run(ctx); err != nil {
 			return nil, err
 		}
 		return out, nil

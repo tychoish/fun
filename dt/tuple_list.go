@@ -81,13 +81,13 @@ func (p *Tuples[K, V]) Stream() *fun.Stream[Tuple[K, V]] { p.init(); return p.ll
 // Ones returns a stream over only the first item from a sequence of
 // tuples.
 func (p *Tuples[K, V]) Ones() *fun.Stream[K] {
-	return fun.MakeConverter(func(p Tuple[K, V]) K { return p.One }).ReadAll(p.Stream())
+	return fun.MakeConverter(func(p Tuple[K, V]) K { return p.One }).Stream(p.Stream())
 }
 
 // Twos returns a stream over only the second item from a sequence of
 // tuples.
 func (p *Tuples[K, V]) Twos() *fun.Stream[V] {
-	return fun.MakeConverter(func(p Tuple[K, V]) V { return p.Two }).ReadAll(p.Stream())
+	return fun.MakeConverter(func(p Tuple[K, V]) V { return p.Two }).Stream(p.Stream())
 }
 
 // Slice creates a new slice of all the Tuple objects.

@@ -219,7 +219,7 @@ func TestErrors(t *testing.T) {
 		assert.True(t, ok)
 
 		out, ok = Check(41, New("fail"))
-		assert.Equal(t, out, 41)
+		assert.Zero(t, out)
 		assert.True(t, !ok)
 	})
 }

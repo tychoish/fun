@@ -58,13 +58,13 @@ func (p *Pairs[K, V]) Stream() *fun.Stream[Pair[K, V]] { p.init(); return p.ll.S
 // Keys returns a stream over only the keys in a sequence of
 // iterator items.
 func (p *Pairs[K, V]) Keys() *fun.Stream[K] {
-	return fun.MakeConverter(func(p Pair[K, V]) K { return p.Key }).ReadAll(p.Stream())
+	return fun.MakeConverter(func(p Pair[K, V]) K { return p.Key }).Stream(p.Stream())
 }
 
 // Values returns a stream over only the values in a sequence of
 // iterator pairs.
 func (p *Pairs[K, V]) Values() *fun.Stream[V] {
-	return fun.MakeConverter(func(p Pair[K, V]) V { return p.Value }).ReadAll(p.Stream())
+	return fun.MakeConverter(func(p Pair[K, V]) V { return p.Value }).Stream(p.Stream())
 }
 
 // Slice creates a new slice of all the Pair objects.
@@ -200,7 +200,7 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 // ConsumeValues adds all of the values from the input stream,
 // generating the keys using the function provided.
 func (p *Pairs[K, V]) ConsumeValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
-	return p.Consume(fun.MakeConverter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).ReadAll(iter))
+	return p.Consume(fun.MakeConverter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Stream(iter))
 }
 
 // ConsumeSlice adds all the values from the input slice to the Pairs
