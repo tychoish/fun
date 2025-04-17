@@ -83,7 +83,7 @@ func (o *Optional[T]) Handler() fn.Handler[T] { return o.Set }
 // Ok returns true when the optional
 func (o Optional[T]) Ok() bool { return o.defined }
 
-// Scan implements the sql Scanner interface. This is invalid if the
+// Scan implements the sql.Scanner interface. This is invalid if the
 // type of the optional value is not a primitive value type.
 func (o *Optional[T]) Scan(src any) (err error) {
 	if src == nil {
@@ -161,12 +161,12 @@ func (o Optional[T]) MarshalText() ([]byte, error) {
 	switch vt := any(o.v).(type) {
 	case encoding.TextMarshaler:
 		return vt.MarshalText()
+	case json.Marshaler:
+		return vt.MarshalJSON()
 	case interface{ MarshalYAML() ([]byte, error) }:
 		return vt.MarshalYAML()
 	case interface{ Marshal() ([]byte, error) }:
 		return vt.Marshal()
-	case json.Marshaler:
-		return vt.MarshalJSON()
 	case string:
 		return []byte(vt), nil
 	case []byte:
@@ -212,12 +212,12 @@ func (o *Optional[T]) UnmarshalText(in []byte) (err error) {
 // passed through.
 func (o Optional[T]) MarshalBinary() ([]byte, error) {
 	switch vt := any(o.v).(type) {
-	case interface{ MarshalBSON() ([]byte, error) }:
-		return vt.MarshalBSON()
-	case interface{ Marshal() ([]byte, error) }:
-		return vt.Marshal()
 	case encoding.BinaryMarshaler:
 		return vt.MarshalBinary()
+	case interface{ Marshal() ([]byte, error) }:
+		return vt.Marshal()
+	case interface{ MarshalBSON() ([]byte, error) }:
+		return vt.MarshalBSON()
 	case []byte:
 		return vt, nil
 	default:
@@ -233,12 +233,12 @@ func (o *Optional[T]) UnmarshalBinary(in []byte) (err error) {
 
 	o.init()
 	switch vt := any(o.v).(type) {
-	case interface{ UnmarshalBSON([]byte) error }:
-		return vt.UnmarshalBSON(in)
-	case interface{ Unmarshal([]byte) error }:
-		return vt.Unmarshal(in)
 	case encoding.BinaryUnmarshaler:
 		return vt.UnmarshalBinary(in)
+	case interface{ Unmarshal([]byte) error }:
+		return vt.Unmarshal(in)
+	case interface{ UnmarshalBSON([]byte) error }:
+		return vt.UnmarshalBSON(in)
 	case []byte:
 		o.v = any(in).(T)
 		return nil

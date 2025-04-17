@@ -128,7 +128,7 @@ func (r *Ring[T]) LIFO() *fun.Stream[T] { r.init(); return r.iterate(r.before(r.
 
 // PopFIFO returns a FIFO stream that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
-// through all elements. When the buffer is
+// through all elements. The stream is exhusted when the buffer is empty.
 func (r *Ring[T]) PopFIFO() *fun.Stream[T] { return fun.PtrGenerator(r.Pop).Stream() }
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Stream[T] {
