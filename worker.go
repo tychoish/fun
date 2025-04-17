@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -316,8 +317,8 @@ func (wf Worker) WithErrorHook(ef fn.Future[error]) Worker {
 // worker, that cancels the context on when it sees an error.
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	wg := &WaitGroup{}
-	eh, ep := MAKE.ErrorCollector()
-	return wg.StartGroup(ctx, n, wf.Operation(eh)).WithErrorHook(ep)
+	ec := &erc.Collector{}
+	return wg.StartGroup(ctx, n, wf.Operation(ec.Handler())).WithErrorHook(ec.Future())
 }
 
 // Group makes a worker that runs n copies of the underlying worker,

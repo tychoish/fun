@@ -15,6 +15,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -299,7 +300,7 @@ func TestParallelForEach(t *testing.T) {
 				},
 				WorkerGroupConfNumWorkers(3),
 				WorkerGroupConfContinueOnPanic(),
-				WorkerGroupConfWithErrorCollector(&Collector{}),
+				WorkerGroupConfWithErrorCollector(&erc.Collector{}),
 			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -768,7 +769,7 @@ func RunStreamStringAlgoTests(
 
 						vals, err := out.Slice(t.Context())
 						if err != nil {
-							t.Error(err, vals)
+							t.Error(err, len(vals))
 						}
 						longString := strings.Join(vals, "")
 						count := 0
@@ -1135,7 +1136,7 @@ func RunStreamStringAlgoTests(
 		counter := 0
 		out, err := MakeConverter(func(in int) string { counter++; return fmt.Sprint(in) }).Parallel(
 			SliceStream([]int{42, 84, 21}),
-			WorkerGroupConfErrorHandler(func(err error) { panic("should not execute") }),
+			WorkerGroupConfWithErrorCollector(nil),
 		).Slice(t.Context())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)

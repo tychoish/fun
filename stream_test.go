@@ -834,7 +834,7 @@ func TestJSON(t *testing.T) {
 	t.Run("ParallelInvalidConfig", func(t *testing.T) {
 		counter := 0
 		err := SliceStream([]int{1, 1, 1}).Parallel(MakeHandler(func(in int) error { counter += in; return nil }),
-			WorkerGroupConfErrorHandler(func(err error) { panic("should not execute") }),
+			WorkerGroupConfWithErrorCollector(nil),
 		).Run(t.Context())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)

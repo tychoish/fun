@@ -137,7 +137,7 @@ func (mpf Converter[T, O]) Parallel(
 		ReadAll(iter).
 		Group(conf.NumWorkers).
 		PostHook(output.Close).
-		Operation(conf.ErrorHandler).
+		Operation(conf.ErrorCollector.Handler()).
 		Go().
 		Once()
 
@@ -146,7 +146,7 @@ func (mpf Converter[T, O]) Parallel(
 		Stream().
 		WithHook(func(out *Stream[O]) {
 			out.AddError(iter.Close())
-			out.AddError(conf.ErrorResolver())
+			out.AddError(conf.ErrorCollector.Resolve())
 		})
 }
 

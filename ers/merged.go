@@ -53,12 +53,6 @@ func AsStack(err error) *Stack {
 	return nil
 }
 
-// Join takes a slice of errors and converts it into an *erc.Stack
-// typed error. This operation has several advantages relative to
-// using errors.Join(): if you call ers.Join repeatedly on the same
-// error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := Stack{}; st.Add(errs...); return st.Resolve() }
-
 // Len returns the depth of the stack beneath the current level. This
 // value isn't updated as additional errors are pushed onto the stack.
 func (e *Stack) Len() int {
@@ -91,10 +85,10 @@ func (e *Stack) Push(err error) {
 		// do stack separately, so we don't build the list and
 		// can merge more effectively (we do throw away the
 		// Stack wrapper objects for consistency with counts.)
-		serr := werr
-		for serr != nil {
-			e.Push(serr.err)
-			serr = serr.next
+
+		for werr != nil {
+			e.Push(werr.err)
+			werr = werr.next
 		}
 	case interface{ Unwind() []error }:
 		// unwind over unwrap, given that Unwind is our
@@ -262,3 +256,9 @@ func Strings(errs []error) []string {
 
 	return out
 }
+
+// Join takes a slice of errors and converts it into an *erc.Stack
+// typed error. This operation has several advantages relative to
+// using errors.Join(): if you call ers.Join repeatedly on the same
+// error set of errors the resulting error is convertable
+func Join(errs ...error) error { st := Stack{}; st.Add(errs...); return st.Resolve() }

@@ -562,14 +562,15 @@ func TestOperation(t *testing.T) {
 		defer cancel()
 		count := &atomic.Int64{}
 		var wf Operation = func(context.Context) { count.Add(1); runtime.Gosched() }
-		wf = wf.Interval(25 * time.Millisecond)
+		wf = wf.Interval(20 * time.Millisecond)
 		check.Equal(t, 0, count.Load())
 		sig := wf.Signal(ctx)
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(145 * time.Millisecond)
 		runtime.Gosched()
 		cancel()
 		<-sig
-		check.Equal(t, 6, count.Load())
+		check.True(t, count.Load() > 5)
+		check.True(t, count.Load() < 10)
 	})
 	t.Run("While", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

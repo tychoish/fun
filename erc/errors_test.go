@@ -4,15 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/testt"
 )
 
 func catcherIsEmpty(t *testing.T, catcher *Collector) {
@@ -64,25 +62,6 @@ func collect[T any](t testing.TB, prod func() (T, bool)) []T {
 	return out
 }
 
-func collectIter[T any](ctx context.Context, t testing.TB, iter *fun.Stream[T]) []T {
-	t.Helper()
-
-	out := []T{}
-	for iter.Next(ctx) {
-		out = append(out, iter.Value())
-	}
-
-	if err := iter.Close(); err != nil {
-		t.Error(err)
-	}
-
-	if len(out) == 0 {
-		return nil
-	}
-
-	return out
-}
-
 func TestError(t *testing.T) {
 	t.Parallel()
 	const errval = "ERRO=42"
@@ -129,14 +108,23 @@ func TestError(t *testing.T) {
 		})
 		t.Run("Generator", func(t *testing.T) {
 			ec := &Collector{}
+			handler := ec.Handler()
 			for i := 0; i < 100; i++ {
-				ec.Add(fmt.Errorf("%d", i))
+				handler(fmt.Errorf("%d", i))
 			}
-			err := ec.Future().Resolve()
-			assert.Error(t, err)
-			errs := ers.Unwind(err)
-			if len(errs) != 100 {
-				t.Log(len(errs), ec.Len(), errs)
+			genertor := ec.Generator()
+			count := 0
+			for {
+				err, ok := genertor()
+				if !ok {
+					break
+				}
+				assert.Error(t, err)
+				count++
+			}
+
+			if count != 100 {
+				t.Log(ec.Len(), ec.Future().Resolve())
 			}
 		})
 		t.Run("PanicRecovery", func(t *testing.T) {
@@ -148,7 +136,7 @@ func TestError(t *testing.T) {
 				panic("boop")
 			}()
 			<-sig
-			if err := es.Resolve(); err == nil {
+			if err := es.Future().Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
 			err := &es.stack
@@ -222,44 +210,6 @@ func TestError(t *testing.T) {
 			if !errors.Is(es.Resolve(), err) {
 				t.Error(es.Resolve(), "error not propogated")
 			}
-		})
-		t.Run("Stream", func(t *testing.T) {
-			ctx := testt.Context(t)
-			es := &Collector{}
-			for i := 0; i < 10; i++ {
-				es.Add(errors.New(errval))
-			}
-			if err := es.Resolve(); err == nil {
-				t.Error("should have seen errors")
-			}
-
-			errs := collectIter(ctx, t, es.Stream())
-			if len(errs) != 10 {
-				t.Error("stream was incomplete", len(errs))
-			}
-		})
-		t.Run("NilStream", func(t *testing.T) {
-			ctx := testt.Context(t)
-			es := &Collector{}
-			errs := collectIter(ctx, t, es.Stream())
-			assert.Zero(t, len(errs))
-		})
-		t.Run("GeneratorCanceled", func(t *testing.T) {
-			es := &Collector{}
-			es.Add(errors.New("hello"))
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			prod := fun.CheckedGenerator(es.stack.Generator())
-
-			err, err2 := prod(ctx)
-			assert.Error(t, err)
-			assert.NotError(t, err2)
-
-			err, err2 = prod(ctx)
-			assert.NotError(t, err)
-			assert.Error(t, err2)
-
-			assert.ErrorIs(t, err2, io.EOF)
 		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
@@ -382,7 +332,7 @@ func TestError(t *testing.T) {
 		defer func() { t.Log(time.Since(startAt)) }()
 		fixtureTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		wg := &fun.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		catcher := &Collector{}
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
@@ -428,9 +378,7 @@ func TestError(t *testing.T) {
 				}
 			}(i)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		wg.Wait(ctx)
+		wg.Wait()
 	})
 	t.Run("Unwind", func(t *testing.T) {
 		t.Run("NoErrors", func(t *testing.T) {

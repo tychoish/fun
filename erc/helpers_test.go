@@ -1,16 +1,12 @@
 package erc
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"io"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/testt"
 )
 
 type errorTest struct {
@@ -49,8 +45,13 @@ func TestCollections(t *testing.T) {
 		t.Run("FirstOnly", func(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
 			err := ers.Join(e1, nil)
-			testt.Log(t, err)
-			testt.Logf(t, "%T", err)
+
+			t.Cleanup(func() {
+				if t.Failed() {
+					t.Log(err)
+					t.Logf("%T", err)
+				}
+			})
 
 			assert.ErrorIs(t, err, e1)
 		})
@@ -95,27 +96,6 @@ func TestCollections(t *testing.T) {
 			}
 		})
 	})
-	t.Run("StreamHook", func(t *testing.T) {
-		ec := &Collector{}
-		count := 0
-		op := fun.Generator[int](func(context.Context) (int, error) {
-			ec.Add(ers.Error("hi"))
-			if count >= 32 {
-				return 0, io.EOF
-			}
-			count++
-			return count, nil
-		})
-
-		iter := op.Stream().WithHook(StreamHook[int](ec))
-		assert.Equal(t, iter.Count(testt.Context(t)), 32)
-		testt.Log(t, ers.Unwind(ec.Resolve()))
-		assert.Equal(t, len(ers.Unwind(ec.Resolve())), 33)
-		testt.Logf(t, "%T", iter.Close())
-		testt.Log(t, ers.Unwind(iter.Close()))
-		assert.Equal(t, len(ers.Unwind(iter.Close())), 33)
-		assert.Equal(t, len(ers.Unwind(iter.Close())), 33)
-	})
 	t.Run("RecoverHookErrorSlice", func(t *testing.T) {
 		ec := new(Collector)
 		assert.NotPanic(t, func() {
@@ -129,50 +109,6 @@ func TestCollections(t *testing.T) {
 		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 		assert.Equal(t, len(ers.Unwind(err)), 3)
 	})
-	t.Run("Stream", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		t.Run("Base", func(t *testing.T) {
-			t.Run("Empty", func(t *testing.T) {
-				ch := make(chan error)
-				close(ch)
-				ec := New()
-				PopulateFromChannel(ctx, ec, ch)
-				assert.NotError(t, ec.Resolve())
-			})
-			t.Run("One", func(t *testing.T) {
-				ch := getPopulatedErrChan(1)
-				close(ch)
-				ec := New()
-				PopulateFromChannel(ctx, ec, ch)
-				err := ec.Resolve()
-				if err == nil {
-					t.Logf("%T", err)
-					t.Error("nil expected", err)
-				}
-				errs := ers.Unwind(err)
-				if len(errs) != 1 {
-					t.Error(errs, len(errs))
-				}
-			})
-			t.Run("Many", func(t *testing.T) {
-				ch := getPopulatedErrChan(10)
-				close(ch)
-				fun.Invariant.IsTrue(len(ch) == 10)
-				ec := New()
-				PopulateFromChannel(ctx, ec, ch)
-				err := ec.Resolve()
-				if err == nil {
-					t.Logf("%T", err)
-					t.Error("nil expected", err)
-				}
-				errs := ers.Unwind(err)
-				if len(errs) != 10 {
-					t.Error(errs)
-				}
-			})
-		})
-	})
 	t.Run("Collect", func(t *testing.T) {
 		ec := &Collector{}
 		collect := Collect[int](ec)
@@ -182,13 +118,4 @@ func TestCollections(t *testing.T) {
 		assert.Error(t, ec.Resolve())
 		assert.Equal(t, ec.Resolve().Error(), "kip")
 	})
-}
-
-func getPopulatedErrChan(size int) chan error {
-	out := make(chan error, size)
-
-	for i := 0; i < size; i++ {
-		out <- fmt.Errorf("mock err %d", i)
-	}
-	return out
 }

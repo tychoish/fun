@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -72,11 +73,13 @@ type Stream[T any] struct {
 	operation Generator[T]
 	value     T
 
-	err struct {
-		once    sync.Once
-		handler fn.Handler[error]
-		future  fn.Future[error]
-	}
+	erc erc.Collector
+
+	// err struct {
+	// 	once    sync.Once
+	// 	handler fn.Handler[error]
+	// 	future  fn.Future[error]
+	// }
 
 	closer struct {
 		state atomic.Bool
@@ -154,9 +157,8 @@ func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream
 // important. Use FlattenStream for larger numbers of streams.
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := Blocking(make(chan T))
-
-	eh, ep := MAKE.ErrorCollector()
-	eh = MAKE.ErrorHandlerWithoutTerminating(eh)
+	ec := &erc.Collector{}
+	eh := MAKE.ErrorHandlerWithoutTerminating(ec.Handler())
 
 	wg := &WaitGroup{}
 	init := Operation(func(ctx context.Context) {
@@ -179,7 +181,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		Generator().
 		PreHook(init).
 		Stream().
-		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ep()) })
+		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
 }
 
 // JoinStreams takes a sequence of streams and produces a combined
@@ -195,12 +197,8 @@ func JoinStreams[T any](iters ...*Stream[T]) *Stream[T] { return new(Stream[T]).
 
 func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
-		st.ensureErrorHandler()
-
 		st.closer.state.Store(true)
-
 		fn.JoinHandlers(st.closer.hooks).Handle(st)
-
 		ft.Call(ft.Join(st.closer.ops))
 	})
 }
@@ -211,7 +209,7 @@ func (st *Stream[T]) doClose() {
 // resources are released.
 //
 // Close is safe to call more than once and always resolves the error handler (e.g. AddError),
-func (st *Stream[T]) Close() error { st.doClose(); return st.err.future() }
+func (st *Stream[T]) Close() error { st.doClose(); return st.erc.Resolve() }
 
 // WithHook constructs a stream from the generator. The
 // provided hook function will run during the Stream's Close()
@@ -226,13 +224,10 @@ func (st *Stream[T]) WithHook(hook fn.Handler[*Stream[T]]) *Stream[T] {
 //
 // AddError is not safe for concurrent use (with regards to other
 // AddError calls or Close).
-func (st *Stream[T]) AddError(e error) {
-	st.ensureErrorHandler()
-	st.err.handler(e)
-}
+func (st *Stream[T]) AddError(e error) { st.erc.Add(e) }
 
 // ErrorHandler provides access to the AddError method as an error observer.
-func (st *Stream[T]) ErrorHandler() fn.Handler[error] { st.ensureErrorHandler(); return st.err.handler }
+func (st *Stream[T]) ErrorHandler() fn.Handler[error] { return st.erc.Handler() }
 
 // Generator provides access to the contents of the stream as a
 // Generator function.
@@ -362,14 +357,8 @@ func (st *Stream[T]) Parallel(
 			Ignore().
 			Run(ctx)
 
-		return conf.ErrorResolver()
+		return conf.ErrorCollector.Resolve()
 	}
-}
-
-func (st *Stream[T]) ensureErrorHandler() { st.err.once.Do(st.setupDefaultErrorHandler) }
-
-func (st *Stream[T]) setupDefaultErrorHandler() {
-	st.err.handler, st.err.future = MAKE.ErrorCollector()
 }
 
 // Filter passes every item in the stream and, if the check function

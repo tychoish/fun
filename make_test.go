@@ -21,30 +21,6 @@ import (
 func TestHandlers(t *testing.T) {
 	t.Parallel()
 	const root ers.Error = ers.Error("root-error")
-	t.Run("ErrorHandlerSingle", func(t *testing.T) {
-		hf, ef := MAKE.ErrorHandlerSingle()
-
-		t.Run("NoopsOnZero", func(t *testing.T) {
-			ft.DoTimes(100, func() {
-				hf(nil)
-				assert.NotError(t, ef())
-			})
-		})
-
-		t.Run("OnceStatic", func(t *testing.T) {
-			hf(root)
-			assert.ErrorIs(t, ef(), root)
-			ft.DoTimes(100, func() {
-				hf(nil)
-				assert.ErrorIs(t, ef(), root)
-			})
-		})
-
-		t.Run("OtherErrors", func(t *testing.T) {
-			hf(ers.Error("hello"))
-			assert.ErrorIs(t, ef(), root)
-		})
-	})
 	t.Run("ErrorHandlerAbort", func(t *testing.T) {
 		count := 0
 		eh := MAKE.ErrorHandlerWithAbort(func() { count++ })
@@ -87,7 +63,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorHandler", func(t *testing.T) {
 		count := 0
-		proc, fut := MAKE.ErrorCollector()
+		proc, fut := MAKE.ErrorStackHandler()
 		proc = proc.Join(func(err error) { count++ })
 
 		proc(nil)
@@ -228,7 +204,7 @@ func TestHandlers(t *testing.T) {
 		})
 	})
 	t.Run("ErrorCollector", func(t *testing.T) {
-		ob, prod := MAKE.ErrorCollector()
+		ob, prod := MAKE.ErrorStackHandler()
 		ft.DoTimes(128, func() { ob(nil) })
 		check.Equal(t, 0, len(internal.Unwind(prod.Resolve())))
 		ft.DoTimes(128, func() { ob(ers.Error("test")) })

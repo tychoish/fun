@@ -519,7 +519,7 @@ func (pf Generator[T]) Parallel(
 		pipe.Handler().ReadAll(pf.WithRecover().
 			WithErrorFilter(conf.ErrorFilter).
 			Stream(),
-		).Operation(conf.ErrorHandler).
+		).Operation(conf.ErrorCollector.Handler()).
 			StartGroup(ctx, conf.NumWorkers).
 			PostHook(pipe.Close).
 			Background(ctx)
@@ -528,5 +528,5 @@ func (pf Generator[T]) Parallel(
 	return pipe.Receive().
 		Generator().
 		PreHook(setup).
-		wrapErrorWith(conf.ErrorResolver)
+		wrapErrorWith(conf.ErrorCollector.Future())
 }

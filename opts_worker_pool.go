@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -42,34 +41,18 @@ type WorkerGroupConf struct {
 	// output. ers.ErrRecoveredPanic is always included and io.EOF
 	// is never included.
 	ExcludedErrors []error
-	// ErrorHandler is used to collect and aggregate errors in
-	// the collector. For operations with shorter runtime
-	// `erc.Collector.Add` is a good choice, though different
-	// strategies may make sense in different
-	// cases. (erc.Collector has a mutex and stories collected
-	// errors in memory.)
-	ErrorHandler fn.Handler[error]
-	// ErrorResolver should return an aggregated error collected
-	// during the execution of worker
-	// threads. `erc.Collector.Resolve` suffices when collecting
-	// with an erc.Collector.
-	ErrorResolver fn.Future[error]
+	// ErrorCollector provides a way to connect an existing error
+	// collector to a worker group.
+	ErrorCollector *erc.Collector
 }
 
 // Validate ensures that the configuration is valid, and returns an
 // error if there are impossible configurations
 func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = max(1, o.NumWorkers)
-	ehIsNil := o.ErrorHandler == nil
-	erIsNil := o.ErrorResolver == nil
-	if ehIsNil != erIsNil {
-		return fmt.Errorf("must configure error handler and resolver, or neither, eh=%t er=%t; %w",
-			ehIsNil, erIsNil, ers.ErrInvalidInput)
-	}
 
-	// set default
-	if ehIsNil {
-		o.ErrorHandler, o.ErrorResolver = MAKE.ErrorCollector()
+	if o.ErrorCollector == nil {
+		o.ErrorCollector = &erc.Collector{}
 	}
 
 	return nil
@@ -94,15 +77,13 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 	case ers.IsTerminating(err):
 		return false
 	case errors.Is(err, ers.ErrRecoveredPanic):
-		ft.SafeApply(o.ErrorHandler, err)
+		o.ErrorCollector.Add(err)
 		return o.ContinueOnPanic
 	case ers.IsExpiredContext(err):
-		if o.IncludeContextExpirationErrors {
-			ft.SafeApply(o.ErrorHandler, err)
-		}
+		erc.When(o.ErrorCollector, o.IncludeContextExpirationErrors, err)
 		return false
 	default:
-		ft.SafeApply(o.ErrorHandler, err)
+		o.ErrorCollector.Add(err)
 		return o.ContinueOnError
 	}
 }
@@ -172,21 +153,6 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.NumWorkers = max(1, num); return nil }
 }
 
-// WorkerGroupConfErrorHandler saves an error observer to the
-// configuration. Typically implementations will provide some default
-// error collection tool, and will only call the observer for non-nil
-// errors. ErrorHandlers should be safe for concurrent use.
-func WorkerGroupConfErrorHandler(observer fn.Handler[error]) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error { opts.ErrorHandler = observer; return nil }
-}
-
-// WorkerGroupConfErrorResolver reports the errors collected by the
-// observer. If the ErrorHandler is not set the resolver may be
-// overridden. ErrorHandlers should be safe for concurrent use.
-func WorkerGroupConfErrorResolver(resolver func() error) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) error { opts.ErrorResolver = resolver; return nil }
-}
-
 // WorkerGroupConfWithErrorCollector sets an error collector implementation for later
 // use in the WorkerGroupOptions. The resulting function will only
 // error if the collector is nil, however, this method will override
@@ -197,31 +163,12 @@ func WorkerGroupConfErrorResolver(resolver func() error) OptionProvider[*WorkerG
 //
 // ErrorCollectors are used by some operations to collect, aggregate, and
 // distribute errors from operations to the caller.
-func WorkerGroupConfWithErrorCollector(
-	ec interface {
-		Add(error)
-		Resolve() error
-	},
-) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfWithErrorCollector(ec *erc.Collector) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		if ec == nil {
-			return errors.New("cannot use a nil error collector")
+			return ers.Wrap(ers.ErrInvalidInput, "cannot use a nil error collector")
 		}
-		return ers.Join(
-			WorkerGroupConfErrorHandler(ec.Add)(opts),
-			WorkerGroupConfErrorResolver(ec.Resolve)(opts),
-		)
-	}
-}
-
-// WorkerGroupConfErrorCollectorPair uses an Handler/Generator pair to
-// collect errors. A basic implementation, accessible via
-// fun.MAKE.ErrorCollector() is suitable for this purpose.
-func WorkerGroupConfErrorCollectorPair(ob fn.Handler[error], resolver fn.Future[error]) OptionProvider[*WorkerGroupConf] {
-	return func(opts *WorkerGroupConf) (err error) {
-		return ers.Join(
-			WorkerGroupConfErrorHandler(ob)(opts),
-			WorkerGroupConfErrorResolver(resolver)(opts),
-		)
+		opts.ErrorCollector = ec
+		return nil
 	}
 }

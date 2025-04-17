@@ -1,9 +1,6 @@
 package erc
 
 import (
-	"context"
-
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 )
@@ -42,14 +39,6 @@ func RecoverHook(ec *Collector, hook func()) { ec.AddWithHook(ers.ParsePanic(rec
 // it to the collector, primarily for use in defer statements.
 func Check(ec *Collector, fut fn.Future[error]) { ec.Add(fut.Resolve()) }
 
-// PopulateFromChannel collects all errors from an error channel, and returns the
-// aggregated error. PopulateFromChannel blocks until the context expires (but
-// does not add a context cancellation error) or the error channel is
-// closed.
-func PopulateFromChannel(ctx context.Context, ec *Collector, errCh <-chan error) {
-	fun.ChannelStream(errCh).ReadAll(ec.Handler()).Operation(ec.Add).Run(ctx)
-}
-
 // Collect produces a function that will collect the error from a
 // function and add it to the collector returning the result. Use
 // this, like risky.Force to delay handling an error while also avoiding
@@ -67,14 +56,4 @@ func PopulateFromChannel(ctx context.Context, ec *Collector, errCh <-chan error)
 //	}
 func Collect[T any](ec *Collector) func(T, error) T {
 	return func(out T, err error) T { ec.Add(err); return out }
-}
-
-// StreamHook adds errors to the Stream's error collector from the
-// provided Collector when the stream closes.
-//
-//	ec := &Collector{}
-//	stream := fun.Stream[int]
-//	stream.WithHook(erc.StreamHook(ec))
-func StreamHook[T any](ec *Collector) fn.Handler[*fun.Stream[T]] {
-	return func(it *fun.Stream[T]) { it.AddError(ec.Resolve()) }
 }

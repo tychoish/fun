@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -58,20 +59,24 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 // Worker functions.
 func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 	return func(ctx context.Context) error {
-		ec, ef := MAKE.ErrorCollector()
-		ec = MAKE.ErrorHandlerWithoutTerminating(ec)
+		ec := &erc.Collector{}
+		eh := MAKE.ErrorHandlerWithoutTerminating(ec.Handler())
 
 		wg := &WaitGroup{}
 
 		wg.Launch(ctx, iter.ReadAll(func(fn Worker) {
-			wg.Launch(ctx, fn.Operation(ec))
-		}).Operation(ec))
+			wg.Launch(ctx, fn.Operation(eh))
+		}).Operation(eh))
 
 		wg.Wait(ctx)
-		ec(ctx.Err())
+		ec.Add(ctx.Err())
 
-		return ef()
+		return ec.Resolve()
 	}
+}
+
+func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] {
+	return CheckedGenerator(ec.Generator()).Stream()
 }
 
 // ProcessOperation constructs a Handler function for running Worker
@@ -135,11 +140,11 @@ func (Constructors) ErrorStackGenerator(s *ers.Stack) Generator[error] {
 	return CheckedGenerator(s.Generator())
 }
 
-// ErrorCollector provides a basic error aggregation facility around
+// ErrorStackHandler provides a basic error aggregation facility around
 // ers.Stack (as with ErrorStackHandler, though this is an
-// implementation detail.) ErrorCollector does use a mutex to guard
+// implementation detail.) ErrorStackHandler does use a mutex to guard
 // these objects.
-func (Constructors) ErrorCollector() (fn.Handler[error], fn.Future[error]) {
+func (Constructors) ErrorStackHandler() (fn.Handler[error], fn.Future[error]) {
 	mtx := &sync.Mutex{}
 	s := MAKE.ErrorStack()
 	var hf fn.Handler[error] = s.Handler()
@@ -181,33 +186,6 @@ func (Constructors) ErrorUnwindTransformer(filter ers.Filter) Converter[error, [
 		}
 		return out, nil
 	}
-}
-
-// ErrorHandlerSingle creates an Handler/Future pair for errors that
-// that, with a lightweight concurrency control, captures the first
-// non-nil error it encounters.
-func (Constructors) ErrorHandlerSingle() (fn.Handler[error], fn.Future[error]) {
-	var latch = &atomic.Bool{}
-	var setter = &sync.Once{}
-	var cache error
-
-	return func(err error) {
-			if err == nil {
-				return
-			}
-
-			if latch.CompareAndSwap(false, true) {
-				setter.Do(func() { cache = err })
-			}
-		},
-		func() error {
-			if !latch.Load() {
-				return nil
-			}
-			// must wait for setter to resolve
-			setter.Do(func() {})
-			return cache
-		}
 }
 
 // ErrorHandlerWithAbort creates a new error handler that--ignoring

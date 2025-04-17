@@ -1,12 +1,12 @@
 package fun
 
 import (
-	"context"
 	"errors"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -44,7 +44,7 @@ func TestOptionProvider(t *testing.T) {
 	t.Run("Collector", func(t *testing.T) {
 		opt := &WorkerGroupConf{}
 		check.Error(t, WorkerGroupConfWithErrorCollector(nil)(opt))
-		check.NotError(t, WorkerGroupConfWithErrorCollector(&Collector{})(opt))
+		check.NotError(t, WorkerGroupConfWithErrorCollector(&erc.Collector{})(opt))
 	})
 	t.Run("Build", func(t *testing.T) {
 		opt := &WorkerGroupConf{}
@@ -58,52 +58,17 @@ func TestOptionProvider(t *testing.T) {
 		assert.True(t, n == nil)
 
 	})
-	t.Run("ErrorHandler", func(t *testing.T) {
-		t.Run("Configuration", func(t *testing.T) {
-			opt := &WorkerGroupConf{}
-			check.True(t, opt.ErrorHandler == nil)
-			check.True(t, opt.ErrorResolver == nil)
-			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
-			check.True(t, opt.ErrorHandler != nil)
-			check.True(t, opt.ErrorResolver != nil)
-			check.NotError(t, opt.Validate())
-		})
-		t.Run("CollectionRoundTrip", func(t *testing.T) {
-			opt := &WorkerGroupConf{}
-			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
-			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 0)
-			opt.ErrorHandler(ers.New("hello"))
-			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 1)
-		})
-		t.Run("LoadTest", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			opt := &WorkerGroupConf{}
-			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
-
-			wg := &WaitGroup{}
-			wg.Group(128, func(_ context.Context) {
-				opt.ErrorHandler(ers.New("hello"))
-			}).Run(ctx)
-			wg.Operation().Wait()
-			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 128)
-		})
-	})
 	t.Run("HandleErrorEdgecases", func(t *testing.T) {
 		opt := &WorkerGroupConf{}
 		t.Run("NilError", func(t *testing.T) {
-			called := 0
-			opt.ErrorHandler = func(_ error) { called++ }
-
+			opt.ErrorCollector = &erc.Collector{}
 			check.True(t, opt.CanContinueOnError(nil))
-			check.Equal(t, 0, called)
+			check.Equal(t, 0, opt.ErrorCollector.Len())
 		})
 		t.Run("Continue", func(t *testing.T) {
-			called := 0
-			opt.ErrorHandler = func(_ error) { called++ }
+			opt.ErrorCollector = &erc.Collector{}
 			check.True(t, opt.CanContinueOnError(ErrStreamContinue))
-			check.Equal(t, 0, called)
+			check.Equal(t, 0, opt.ErrorCollector.Len())
 		})
 	})
 }

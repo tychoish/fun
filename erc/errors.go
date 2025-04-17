@@ -8,7 +8,6 @@ package erc
 import (
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -24,10 +23,6 @@ type Collector struct {
 	mu    sync.Mutex
 	stack ers.Stack
 }
-
-// New constructs an empty Collector. Collectors can be used without
-// any special construction, but this function is shorter.
-func New() *Collector { return &Collector{} }
 
 // Add collects an error if that error is non-nil.
 func (ec *Collector) Add(err error) {
@@ -57,6 +52,17 @@ func (ec *Collector) Handler() fn.Handler[error] { return ec.Add }
 // slice of errors, rather than the ers.Stack object.
 func (ec *Collector) Future() fn.Future[error] { return ec.Resolve }
 
+// Future returns a function that is generally equivalent to
+// Collector.Resolve(); however, the errors are returned as an unwound
+// slice of errors, rather than the ers.Stack object.
+func (ec *Collector) Generator() func() (error, bool) {
+	next := ec.stack.Generator()
+	return func() (error, bool) {
+		defer internal.With(internal.Lock(&ec.mu))
+		return next()
+	}
+}
+
 // Len reports on the total number of non-nil errors collected. The
 // count tracks a cached size of the *erc.Stack, giving Len() stable
 // performance characteristics; however, because the Collector unwrap
@@ -64,15 +70,6 @@ func (ec *Collector) Future() fn.Future[error] { return ec.Resolve }
 // updated beyond the current level. In this way Len really reports
 // "height," but this is the same for the top level.
 func (ec *Collector) Len() int { defer internal.With(internal.Lock(&ec.mu)); return ec.stack.Len() }
-
-// Stream produces a stream for all errors present in the
-// collector. The stream proceeds from the current error to the
-// oldest error, and will not observe new errors added to the
-// collector.
-func (ec *Collector) Stream() *fun.Stream[error] {
-	defer internal.With(internal.Lock(&ec.mu))
-	return fun.CheckedGenerator(ec.stack.Generator()).Stream()
-}
 
 // Resolve returns an error of type *erc.Stack, or nil if there have
 // been no errors added. The error stack respects errors.Is and
