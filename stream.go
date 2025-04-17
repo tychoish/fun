@@ -154,34 +154,32 @@ func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream
 // important. Use FlattenStream for larger numbers of streams.
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := Blocking(make(chan T))
-	es := &ers.Stack{}
-	mu := &sync.Mutex{}
 
-	eh := MAKE.ErrorHandlerWithoutTerminating(es.Handler()).WithLock(mu)
-	ep := fn.MakeFuture(es.Future()).WithLock(mu)
+	eh, ep := MAKE.ErrorCollector()
+	eh = MAKE.ErrorHandlerWithoutTerminating(eh)
 
+	wg := &WaitGroup{}
 	init := Operation(func(ctx context.Context) {
-		wg := &WaitGroup{}
-		wctx, cancel := context.WithCancel(ctx)
 		send := pipe.Send()
 
 		iters.ReadAll(func(iter *Stream[T]) {
 			// start a thread for reading this
 			// sub-iterator.
-			send.Consume(iter).Operation(eh).Add(ctx, wg)
-		}).Operation(eh).Add(wctx, wg)
+			send.Consume(iter).
+				Operation(eh).
+				PostHook(func() { eh(iter.Close()) }).
+				Add(ctx, wg)
 
-		wg.Operation().
-			PostHook(cancel).
-			PostHook(pipe.Close).
-			Background(ctx)
+		}).Operation(eh).Add(ctx, wg)
+
+		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
 	return pipe.Receive().
 		Generator().
 		PreHook(init).
 		Stream().
-		WithHook(func(st *Stream[T]) { st.AddError(ep()) })
+		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ep()) })
 }
 
 // JoinStreams takes a sequence of streams and produces a combined
@@ -195,42 +193,6 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 // when producing an item takes a non-trivial amount of time.
 func JoinStreams[T any](iters ...*Stream[T]) *Stream[T] { return new(Stream[T]).Join(iters...) }
 
-// FlattenStreams combines input streams into a single output stream.
-//
-// There is no buffering of the flattened stream, but elements in
-// the output stream are drawn from the input streams sequentially
-// and in order: both order of the input stream and the items in all
-// constituent streams are reflected in the output.
-//
-// Use FlattenStreams or ChainStreams if order is important. Use
-// FlattenStream for larger numbers of streams. Use MergeStreams
-// when producing an item takes a non-trivial amount of time.
-func FlattenStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
-	pipe := Blocking(make(chan T))
-
-	eh, ep := MAKE.ErrorCollector()
-	eh = MAKE.ErrorHandlerWithoutTerminating(eh)
-
-	return pipe.
-		Generator().
-		PreHook(Operation(
-			func(ctx context.Context) {
-				defer pipe.Close()
-
-				send := pipe.Send().Handler() // input end of the pipe
-
-				iters.ReadAll(func(in *Stream[T]) {
-					// write the contents of the input stream
-					// to the input end of the pipe
-					send.ReadAll(in).Operation(eh).Run(ctx)
-				}).Operation(eh).Run(ctx)
-			}).
-			Go().Once(),
-		).
-		Stream().
-		WithHook(func(st *Stream[T]) { st.AddError(ep()) })
-}
-
 func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
 		st.ensureErrorHandler()
@@ -239,7 +201,7 @@ func (st *Stream[T]) doClose() {
 
 		fn.JoinHandlers(st.closer.hooks).Handle(st)
 
-		ft.Call(ft.JoinFuture(st.closer.ops))
+		ft.Call(ft.Join(st.closer.ops))
 	})
 }
 

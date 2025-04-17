@@ -291,34 +291,21 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 // before running the underlying worker. If the hook function panics
 // it is converted to an error and aggregated with the worker's
 // error.
-func (wf Worker) PreHook(op Operation) Worker {
-	return func(ctx context.Context) error { return ers.Join(ers.WithRecoverCall(func() { op(ctx) }), wf(ctx)) }
+func (wf Worker) PreHook(pre Operation) Worker {
+	return func(ctx context.Context) error { return ers.Join(pre.WithRecover().Run(ctx), wf(ctx)) }
 }
 
 // PostHook runs hook operation  after the worker function
 // completes. If the hook panics it is converted to an error and
 // aggregated with workers's error.
-func (wf Worker) PostHook(op func()) Worker {
-	return func(ctx context.Context) error { return ers.Join(ft.Flip(wf(ctx), ers.WithRecoverCall(op))) }
-}
+func (wf Worker) PostHook(post func()) Worker { return wf.WithErrorHook(ers.WrapRecoverCall(post)) }
 
-// WithErrorCheck takes an error future, and checks it before
-// executing the worker function. If the error future returns an
-// error (any error), the worker propagates that error, rather than
-// running the underying generator. Useful for injecting an abort into
-// an existing pipleine or chain.
-//
-// The error future is called before running the underlying worker,
-// to short circuit the operation, and also a second time when
-// worker has returned in case an error has occurred during the
-// operation of the worker.
-func (wf Worker) WithErrorCheck(ef fn.Future[error]) Worker {
-	return func(ctx context.Context) error {
-		if err := ef(); err != nil {
-			return err
-		}
-		return ers.Join(wf.Run(ctx), ef())
-	}
+// WithErrorHook runs the worker, potentially catching a panic and
+// joining that with the error produced by the error future. Both the
+// worker and the error future always execute, and both errors are
+// returned in aggregated form.
+func (wf Worker) WithErrorHook(ef fn.Future[error]) Worker {
+	return func(ctx context.Context) error { return ers.Join(wf.WithRecover().Run(ctx), ef()) }
 }
 
 // StartGroup starts n copies of the worker operation and returns a
@@ -329,12 +316,8 @@ func (wf Worker) WithErrorCheck(ef fn.Future[error]) Worker {
 // worker, that cancels the context on when it sees an error.
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	wg := &WaitGroup{}
-
 	eh, ep := MAKE.ErrorCollector()
-
-	wg.DoTimes(ctx, n, wf.Operation(eh))
-
-	return func(ctx context.Context) error { wg.Wait(ctx); return ep() }
+	return wg.StartGroup(ctx, n, wf.Operation(eh)).WithErrorHook(ep)
 }
 
 // Group makes a worker that runs n copies of the underlying worker,

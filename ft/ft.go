@@ -279,10 +279,10 @@ func Wrap[T any](in T) func() T { return func() T { return in } }
 // function is not nil.
 func SafeApply[T any](fn func(T), arg T) { WhenApply(fn != nil, fn, arg) }
 
-// JoinFuture creates a function that iterates over all of the input
+// Join creates a function that iterates over all of the input
 // functions and calls all non-nil functions sequentially. Nil
 // functions are ignored.
-func JoinFuture(fns []func()) func() { return func() { CallMany(fns) } }
+func Join(fns []func()) func() { return func() { CallMany(fns) } }
 
 // Call executes the provided function.
 func Call(op func()) { op() }

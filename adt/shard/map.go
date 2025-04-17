@@ -140,14 +140,14 @@ func (m *Map[K, V]) Clocks() []uint64 {
 // are randomized within the shard. The keys are NOT captured in a
 // snapshot, so keys reflecting different logical moments will appear
 // in the stream. No key will appear more than once.
-func (m *Map[K, V]) Keys() *fun.Stream[K] { return fun.FlattenStreams(m.keyItr()) }
+func (m *Map[K, V]) Keys() *fun.Stream[K] { return fun.MergeStreams(m.keyItr()) }
 
 // Values returns a stream for all of the keys in the map. Values
 // are provided from shards sequentially, and always in the same
 // sequences, but randomized within each shard. The values are NOT
 // captured in a snapshot, so values reflecting different logical
 // moments will appear in the stream.
-func (m *Map[K, V]) Values() *fun.Stream[V] { return fun.FlattenStreams(m.valItr()) }
+func (m *Map[K, V]) Values() *fun.Stream[V] { return fun.MergeStreams(m.valItr()) }
 
 // Stream provides a stream over all items in the map. The
 // MapItem type captures the version information and information about

@@ -10,25 +10,6 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Map provides an orthodox functional map implementation based around
-// fun.Stream. Operates in asynchronous/streaming manner, so that
-// the output Stream must be consumed. The zero values of Options
-// provide reasonable defaults for abort-on-error and single-threaded
-// map operation.
-//
-// If the mapper function errors, the result isn't included, but the
-// errors would be aggregated and propagated to the `Close()` method
-// of the resulting stream. The mapping operation respects the
-// fun.ErrIterationSkip error, If there are more than one error (as is
-// the case with a panic or with ContinueOnError semantics,) the error
-// can be unwrapped or converted to a slice with the fun.Unwind
-// function. Panics in the map function are converted to errors and
-// always collected but may abort the operation if ContinueOnPanic is
-// not set.
-func Map[T any, O any](it *Stream[T], mpf Converter[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Stream[O] {
-	return mpf.Parallel(it, optp...)
-}
-
 // Converter is a function type that converts T objects int objects of
 // type O.
 type Converter[T any, O any] func(context.Context, T) (O, error)

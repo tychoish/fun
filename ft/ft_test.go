@@ -521,13 +521,13 @@ func TestContexts(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		assert.NotPanic(t, func() { JoinFuture(Slice[func()]()) })
-		assert.NotPanic(t, func() { JoinFuture(Slice[func()](nil, nil)) })
+		assert.NotPanic(t, func() { Join(Slice[func()]()) })
+		assert.NotPanic(t, func() { Join(Slice[func()](nil, nil)) })
 	})
 	t.Run("Called", func(t *testing.T) {
 		count := 0
 		fn := func() { count++ }
-		JoinFuture(Slice(fn, fn, nil, fn, fn))()
+		Join(Slice(fn, fn, nil, fn, fn))()
 		assert.Equal(t, count, 4)
 	})
 }

@@ -108,5 +108,5 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 				return zero, ctx.Err()
 			}
 		}
-	}).Lock().PostHook(func() { timer.Stop() }).Stream()
+	}).PostHook(func() { timer.Stop() }).Lock().Stream()
 }

@@ -469,69 +469,6 @@ func TestWorker(t *testing.T) {
 
 		})
 	})
-	t.Run("ErrorCheck", func(t *testing.T) {
-		t.Run("ShortCircut", func(t *testing.T) {
-			err := errors.New("test error")
-			var hf fn.Future[error] = func() error { return err }
-			called := 0
-			wf := Worker(func(_ context.Context) error { called++; return nil })
-			ecpf := wf.WithErrorCheck(hf)
-			e := ecpf.Wait()
-			check.Error(t, e)
-			check.ErrorIs(t, e, err)
-			check.Equal(t, 0, called)
-
-		})
-		t.Run("Noop", func(t *testing.T) {
-			var hf fn.Future[error] = func() error { return nil }
-			called := 0
-			wf := Worker(func(_ context.Context) error { called++; return nil })
-			ecpf := wf.WithErrorCheck(hf)
-			e := ecpf.Wait()
-			check.NotError(t, e)
-			check.Equal(t, 1, called)
-		})
-		t.Run("Multi", func(t *testing.T) {
-			called := 0
-			hfcall := 0
-			var hf fn.Future[error] = func() error {
-				hfcall++
-				switch hfcall {
-				case 1, 2, 3:
-					return nil
-				case 4, 5:
-					return ers.ErrCurrentOpAbort
-				}
-				return errors.New("unexpected error")
-			}
-			wf := Worker(func(_ context.Context) error {
-				called++
-				if hfcall == 3 {
-					return io.EOF
-				}
-				return nil
-			})
-			ecpf := wf.WithErrorCheck(hf)
-			e := ecpf.Wait()
-			check.NotError(t, e)
-			check.Equal(t, 1, called)
-			check.Equal(t, 2, hfcall)
-
-			e = ecpf.Wait()
-			check.Error(t, e)
-			check.Equal(t, 2, called)
-			check.Equal(t, 4, hfcall)
-			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
-			check.ErrorIs(t, e, io.EOF)
-
-			e = ecpf.Wait()
-			check.Error(t, e)
-			check.Equal(t, 2, called)
-			check.Equal(t, 5, hfcall)
-			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
-			check.NotErrorIs(t, e, io.EOF)
-		})
-	})
 	t.Run("Delay", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

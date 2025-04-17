@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -95,10 +96,7 @@ func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wg.Launch(ctx, wf)
 // for the job. Callers must wait on the WaitGroup independently.
 func (wf Operation) StartGroup(ctx context.Context, n int) Operation {
 	wg := &WaitGroup{}
-
-	wg.DoTimes(ctx, n, wf)
-
-	return wg.Operation()
+	return wg.StartGroup(ctx, n, wf)
 }
 
 // Group makes an operation that runs n copies of the underlying
@@ -148,7 +146,7 @@ func (wf Operation) Wait() { wf(context.Background()) }
 // WithRecover converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.
 func (wf Operation) WithRecover() Worker {
-	return func(ctx context.Context) error { return ers.WithRecoverCall(func() { wf(ctx) }) }
+	return func(ctx context.Context) error { return ers.WithRecoverApply(wf, ctx) }
 }
 
 // Worker converts a wait function into a fun.Worker. If the context
@@ -156,6 +154,13 @@ func (wf Operation) WithRecover() Worker {
 // not handle panics, use WithRecover() to convert panics to errors
 func (wf Operation) Worker() Worker {
 	return func(ctx context.Context) (err error) { wf(ctx); return ctx.Err() }
+}
+
+// WithErrorHook runs the operation--potentially catching a panic and
+// converting it to an error--and then aggretaging that with the
+// output of the error future. The error future is always called.
+func (wf Operation) WithErrorHook(ef fn.Future[error]) Worker {
+	return func(ctx context.Context) error { return ers.Join(wf.WithRecover().Run(ctx), ef()) }
 }
 
 // Jitter wraps a Operation that runs the jitter function (jf) once

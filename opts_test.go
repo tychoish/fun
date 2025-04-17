@@ -83,9 +83,9 @@ func TestOptionProvider(t *testing.T) {
 			check.NotError(t, WorkerGroupConfErrorCollectorPair(MAKE.ErrorCollector())(opt))
 
 			wg := &WaitGroup{}
-			wg.DoTimes(ctx, 128, func(_ context.Context) {
+			wg.Group(128, func(_ context.Context) {
 				opt.ErrorHandler(ers.New("hello"))
-			})
+			}).Run(ctx)
 			wg.Operation().Wait()
 			check.Equal(t, len(ers.Unwind(opt.ErrorResolver())), 128)
 		})

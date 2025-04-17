@@ -18,6 +18,10 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
+func Map[T any, O any](it *Stream[T], mpf Converter[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Stream[O] {
+	return mpf.Parallel(it, optp...)
+}
+
 func CheckSeenMap[T comparable](t *testing.T, elems []T, seen map[T]struct{}) {
 	t.Helper()
 	if len(seen) != len(elems) {
@@ -751,9 +755,6 @@ func RunStreamStringAlgoTests(
 						check.EqualItems(t, elems, vals)
 					})
 					t.Run("ParallelMap", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
-
 						out := Map(
 							MergeStreams(VariadicStream(builder(), builder(), builder())),
 							func(_ context.Context, str string) (string, error) {
@@ -765,9 +766,9 @@ func RunStreamStringAlgoTests(
 							WorkerGroupConfNumWorkers(4),
 						)
 
-						vals, err := out.Slice(ctx)
+						vals, err := out.Slice(t.Context())
 						if err != nil {
-							t.Fatal(err)
+							t.Error(err, vals)
 						}
 						longString := strings.Join(vals, "")
 						count := 0
@@ -1122,11 +1123,11 @@ func RunStreamStringAlgoTests(
 		wg := &WaitGroup{}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		wg.DoTimes(ctx, 128, func(ctx context.Context) {
+		wg.Group(128, func(ctx context.Context) {
 			out, err := mpf(ctx, 42)
 			check.Equal(t, out, "42")
 			check.NotError(t, err)
-		})
+		}).Run(ctx)
 		wg.Wait(ctx)
 		check.Equal(t, count.Load(), 128)
 	})

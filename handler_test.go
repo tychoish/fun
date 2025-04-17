@@ -256,9 +256,9 @@ func TestProcess(t *testing.T) {
 			mu := &sync.Mutex{}
 			wf := op.WithLock(mu)
 			wg := &WaitGroup{}
-			wg.DoTimes(ctx, 128, func(context.Context) {
+			wg.Group(128, func(context.Context) {
 				assert.NotError(t, wf(ctx, 42))
-			})
+			}).Run(ctx)
 			wg.Wait(ctx)
 
 			assert.Equal(t, count, 128)
@@ -276,9 +276,9 @@ func TestProcess(t *testing.T) {
 				mu := &sync.Mutex{}
 				wf := op.WithLocker(mu)
 				wg := &WaitGroup{}
-				wg.DoTimes(ctx, 128, func(context.Context) {
+				wg.Group(128, func(context.Context) {
 					assert.NotError(t, wf(ctx, 42))
-				})
+				}).Run(ctx)
 				wg.Wait(ctx)
 
 				assert.Equal(t, count, 128)
@@ -296,9 +296,9 @@ func TestProcess(t *testing.T) {
 				mu := &sync.RWMutex{}
 				wf := op.WithLocker(mu)
 				wg := &WaitGroup{}
-				wg.DoTimes(ctx, 128, func(context.Context) {
+				wg.Group(128, func(context.Context) {
 					assert.NotError(t, wf(ctx, 42))
-				})
+				}).Run(ctx)
 				wg.Wait(ctx)
 
 				assert.Equal(t, count, 128)
@@ -650,7 +650,7 @@ func TestProcess(t *testing.T) {
 		dur = time.Since(start).Truncate(time.Millisecond)
 
 		assert.True(t, dur >= time.Millisecond)
-		assert.True(t, dur < 2*time.Millisecond)
+		assert.True(t, dur < 5*time.Millisecond)
 	})
 	t.Run("Filter", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

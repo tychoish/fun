@@ -635,7 +635,7 @@ func TestStream(t *testing.T) {
 		defer cancel()
 		elems := GenerateRandomStringSlice(100)
 
-		iter := FlattenStreams(
+		iter := MergeStreams(
 			VariadicStream(
 				SliceStream(elems),
 				SliceStream(elems),

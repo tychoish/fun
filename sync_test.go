@@ -154,9 +154,9 @@ func TestWaitGroup(t *testing.T) {
 
 		// tempt the race detector.
 		wg := &WaitGroup{}
-		wg.DoTimes(ctx, 128, func(context.Context) {
+		wg.Group(128, func(context.Context) {
 			check.Equal(t, thunk(), 42)
-		})
+		}).Run(ctx)
 		wg.Wait(ctx)
 
 		check.Equal(t, count, 128)
@@ -170,9 +170,9 @@ func TestWaitGroup(t *testing.T) {
 
 		// tempt the race detector.
 		wg := &WaitGroup{}
-		wg.DoTimes(ctx, 128, func(context.Context) {
+		wg.Group(128, func(context.Context) {
 			check.Equal(t, thunk(), 42)
-		})
+		}).Run(ctx)
 
 		wg.Wait(ctx)
 		check.Equal(t, count, 128)

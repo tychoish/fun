@@ -65,11 +65,7 @@ func TestMap(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for {
-					if ctx.Err() != nil || passed.Load() {
-						return
-					}
-
+				for ctx.Err() == nil && !passed.Load() {
 					for i := 0; i < 100; i++ {
 						mp.Store(fmt.Sprint(i), rand.Int())
 					}
@@ -79,17 +75,14 @@ func TestMap(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for {
-					if ctx.Err() != nil || passed.Load() {
-						return
-					}
+				for ctx.Err() == nil && !passed.Load() {
 					size := mp.Len()
-
 					if size == 100 {
 						passed.Store(true)
 						cancel()
 						return
 					}
+					runtime.Gosched()
 				}
 			}()
 		}

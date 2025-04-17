@@ -91,9 +91,10 @@ func (e *Stack) Push(err error) {
 		// do stack separately, so we don't build the list and
 		// can merge more effectively (we do throw away the
 		// Stack wrapper objects for consistency with counts.)
-		for werr != nil {
-			e.Push(werr.err)
-			werr = werr.next
+		serr := werr
+		for serr != nil {
+			e.Push(serr.err)
+			serr = serr.next
 		}
 	case interface{ Unwind() []error }:
 		// unwind over unwrap, given that Unwind is our

@@ -59,6 +59,8 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 	return func(ctx context.Context) error {
 		ec, ef := MAKE.ErrorCollector()
+		ec = MAKE.ErrorHandlerWithoutTerminating(ec)
+
 		wg := &WaitGroup{}
 
 		wg.Launch(ctx, iter.ReadAll(func(fn Worker) {

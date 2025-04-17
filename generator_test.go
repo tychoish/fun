@@ -246,12 +246,12 @@ func TestGenerator(t *testing.T) {
 			wg := &WaitGroup{}
 			future := op.Lock()
 
-			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+			wg.Group(128, func(ctx context.Context) {
 				out, err := future(ctx)
 				opct.Add(1)
 				check.Equal(t, out, 42)
 				assert.NotError(t, err)
-			})
+			}).Run(ctx)
 
 			wg.Wait(ctx)
 
@@ -273,12 +273,12 @@ func TestGenerator(t *testing.T) {
 			future := op.WithLocker(mtx)
 			wg := &WaitGroup{}
 
-			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+			wg.Group(128, func(ctx context.Context) {
 				out, err := future(ctx)
 				opct.Add(1)
 				check.Equal(t, out, 42)
 				assert.NotError(t, err)
-			})
+			}).Run(ctx)
 			wg.Wait(ctx)
 
 			check.Equal(t, 128, opct.Load())
@@ -297,13 +297,13 @@ func TestGenerator(t *testing.T) {
 				return 42, nil
 			}).WithLock(mu)
 
-			wg.DoTimes(ctx, 128, func(ctx context.Context) {
+			wg.Group(128, func(ctx context.Context) {
 				out, err := op(ctx)
 				opct.Add(1)
 				check.Equal(t, out, 42)
 				opct.Add(1)
 				check.NotError(t, err)
-			})
+			}).Run(ctx)
 
 			wg.Wait(ctx)
 

@@ -70,17 +70,26 @@ func (wg *WaitGroup) IsDone() bool {
 // Operation returns with WaitGroups Wait method as a Operation.
 func (wg *WaitGroup) Operation() Operation { return wg.Wait }
 
-// DoTimes uses the WaitGroup to launch an operation in a worker pool
-// of the specified size, and does not block until the operation returns.
-func (wg *WaitGroup) DoTimes(ctx context.Context, n int, op Operation) {
-	ft.DoTimes(n, func() { wg.Launch(ctx, op) })
-}
-
 // Launch increments the WaitGroup and starts the operation in a go
 // routine.
 func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
 	wg.Inc()
 	op.PostHook(wg.Done).Background(ctx)
+}
+
+// Group returns an operation that, when executed, starts <n> copies
+// of the operation and blocks until all have finished.
+func (wg *WaitGroup) Group(n int, op Operation) Operation {
+	return func(ctx context.Context) { wg.StartGroup(ctx, n, op).Run(ctx) }
+}
+
+// StartGroup starts <n> copies of the operation in separate threads
+// and returns an operation that waits on the wait group.
+func (wg *WaitGroup) StartGroup(ctx context.Context, n int, op Operation) Operation {
+	for range n {
+		wg.Launch(ctx, op)
+	}
+	return wg.Operation()
 }
 
 // Worker returns a worker that will block on the wait group

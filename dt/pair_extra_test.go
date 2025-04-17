@@ -135,11 +135,12 @@ func TestPairExtra(t *testing.T) {
 
 		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Read(ctx)
 		assert.NotError(t, err)
-		ps.ReadAll(fun.FromHandler(func(p Pair[int, int]) {
+		err = ps.ReadAll(fun.FromHandler(func(p Pair[int, int]) {
 			check.Equal(t, p.Key, p.Value)
 			check.True(t, ft.Not(seen.Check(p.Key)))
 			seen.Add(p.Key)
 		})).Run(ctx)
+		assert.NotError(t, err)
 		check.Equal(t, seen.Len(), num)
 	})
 	t.Run("Consume", func(t *testing.T) {
