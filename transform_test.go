@@ -767,7 +767,7 @@ func RunStreamStringAlgoTests(
 							WorkerGroupConfNumWorkers(4),
 						)
 
-						vals, err := out.Slice(t.Context())
+						vals, err := out.Slice(context.Background())
 						if err != nil {
 							t.Error(err, len(vals))
 						}

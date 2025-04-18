@@ -3,9 +3,13 @@ package ers
 import (
 	"bytes"
 	"errors"
-
-	"github.com/tychoish/fun/internal"
 )
+
+// Join takes a slice of errors and converts it into an *erc.Stack
+// typed error. This operation has several advantages relative to
+// using errors.Join(): if you call ers.Join repeatedly on the same
+// error set of errors the resulting error is convertable
+func Join(errs ...error) error { st := &Stack{}; st.Add(errs...); return st.Resolve() }
 
 // Stack represents the error type returned by an ErrorCollector
 // when it has more than one error. The implementation provides
@@ -221,34 +225,3 @@ func (e *Stack) Generator() func() (error, bool) {
 		return iter.err, true
 	}
 }
-
-// Unwind assembles the full "unwrapped" list of all component
-// errors. Supports error implementations where the Unwrap() method
-// returns either error or []error.
-//
-// Unwind provides a special case of the dt.Unwind operation.
-//
-// If an error type implements interface{ Unwind() []error }, this
-// takes precedence over Unwrap when unwinding errors, to better
-// support the Stack type and others where the original error is
-// nested within the unwrapped error objects.
-func Unwind(in error) []error { return internal.Unwind(in) }
-
-// Strings renders (using the Error() method) a slice of errors into a
-// slice of their string values.
-func Strings(errs []error) []string {
-	out := make([]string, 0, len(errs))
-	for idx := range errs {
-		if !Ok(errs[idx]) {
-			out = append(out, errs[idx].Error())
-		}
-	}
-
-	return out
-}
-
-// Join takes a slice of errors and converts it into an *erc.Stack
-// typed error. This operation has several advantages relative to
-// using errors.Join(): if you call ers.Join repeatedly on the same
-// error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := &Stack{}; st.Add(errs...); return st.Resolve() }

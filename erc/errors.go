@@ -93,3 +93,43 @@ func (ec *Collector) HasErrors() bool { return ec.Len() != 0 }
 // Ok returns true if there are any underlying errors, and
 // false otherwise.
 func (ec *Collector) Ok() bool { return ec.Len() == 0 }
+
+///////////////////////////////////////////////////////////////////////
+//
+// Helpers
+//
+///////////////////////////////////////////////////////////////////////
+
+// When is a helper function, typically useful for improving the
+// readability of validation code. If the condition is true, then When
+// creates an error with the string value and adds it to the Collector.
+func (ec *Collector) When(cond bool, val any) { ec.Add(ers.When(cond, val)) }
+
+// Whenf conditionally creates and adds an error to the collector, as
+// When, and with a similar use case, but permits Sprintf/Errorf
+// formating.
+func (ec *Collector) Whenf(cond bool, val string, args ...any) { ec.Add(ers.Whenf(cond, val, args...)) }
+
+// Check executes a simple function and if it returns an error, adds
+// it to the collector, primarily for use in defer statements.
+func (ec *Collector) Check(fut fn.Future[error]) { ec.Add(fut.Resolve()) }
+
+// WithRecover calls the provided function and adds any errors it may
+// encounter to the collector.
+func (ec *Collector) WithRecover(fn func()) { defer Recover(ec); fn() }
+
+///////////////////////////////////////////////////////////////////////
+//
+// Panic helpers
+//
+///////////////////////////////////////////////////////////////////////
+
+// Recover calls the builtin recover() function and converts it to an
+// error that is populated in the collector. Run RecoverHook in defer
+// statements.
+func Recover(ec *Collector) { ec.Add(ers.ParsePanic(recover())) }
+
+// RecoverHook runs adds the output of recover() to the error
+// collector, and runs the specified hook if. If there was no panic,
+// this function is a noop. Run RecoverHook in defer statements.
+func RecoverHook(ec *Collector, hook func()) { ec.AddWithHook(ers.ParsePanic(recover()), hook) }

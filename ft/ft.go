@@ -354,6 +354,19 @@ func Must[T any](arg T, err error) T {
 	return arg
 }
 
+// Check can wrap a the callsite of a function that returns a value
+// and an error, and returns (zero, false) if the error is non, nil,
+// and (value, true) if the error is nil.
+func Check[T any](value T, err error) (zero T, _ bool) {
+	if err != nil {
+		return zero, false
+	}
+	return value, true
+}
+
+// IgnoreError discards an error.
+func IgnoreError(_ error) { return } //nolint
+
 // WithTimeout runs the function, which is the same type as
 // fun.Operation, with a new context that expires after the specified duration.
 func WithTimeout(dur time.Duration, op func(context.Context)) {

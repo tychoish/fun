@@ -1,5 +1,11 @@
 package ers
 
+import (
+	"context"
+	"errors"
+	"io"
+)
+
 // ErrImmutabilityViolation is an returned by some operations or
 // invariant violations when an operation attempts to modify logically
 // immutable value.
@@ -48,3 +54,26 @@ const ErrInvalidInput Error = Error("invalid input")
 // ErrInvariantViolation is the root error of the error object that is
 // the content of all panics produced by the Invariant helper.
 const ErrInvariantViolation Error = Error("invariant violation")
+
+// IsExpiredContext checks an error to see if it, or any of it's parent
+// contexts signal that a context has expired. This covers both
+// canceled contexts and ones which have exceeded their deadlines.
+func IsExpiredContext(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
+
+// IsTerminating returns true if the error is one of the sentinel
+// errors used by fun (and other packages!) to indicate that
+// processing/iteration has terminated. (e.g. context expiration, or
+// io.EOF.)
+func IsTerminating(err error) bool { return Is(err, io.EOF, ErrCurrentOpAbort, ErrContainerClosed) }
+
+// IsInvariantViolation returns true if the argument is or resolves to
+// ErrInvariantViolation.
+func IsInvariantViolation(r any) bool {
+	err, _ := r.(error)
+
+	if r == nil || Ok(err) {
+		return false
+	}
+
+	return errors.Is(err, ErrInvariantViolation)
+}

@@ -57,7 +57,7 @@ func JoinHandlers[T any](pfs ...Handler[T]) Handler[T] {
 func (pf Handler[T]) Wait(in T) error { return pf(context.Background(), in) }
 
 // Ignore runs the process function and discards the error.
-func (pf Handler[T]) Ignore(ctx context.Context, in T) { ers.Ignore(pf(ctx, in)) }
+func (pf Handler[T]) Ignore(ctx context.Context, in T) { ft.IgnoreError(pf(ctx, in)) }
 
 // Check processes the input and returns true when the error is nil,
 // and false when there was an error.

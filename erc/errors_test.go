@@ -95,7 +95,7 @@ func TestError(t *testing.T) {
 		t.Run("Check", func(t *testing.T) {
 			catcher := &Collector{}
 			serr := errors.New(errval)
-			Check(catcher, func() error { return serr })
+			catcher.Check(func() error { return serr })
 			catcherHasErrors(t, 1, catcher)
 			err := catcher.Resolve()
 			if !errors.Is(err, serr) {
@@ -213,10 +213,10 @@ func TestError(t *testing.T) {
 		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
-			When(ec, false, "no error")
+			ec.When(false, "no error")
 			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
-			When(ec, true, errval)
+			ec.When(true, errval)
 			check.NotZero(t, ec.stack) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
@@ -226,11 +226,11 @@ func TestError(t *testing.T) {
 		})
 		t.Run("WhenBasicError", func(t *testing.T) {
 			ec := &Collector{}
-			When(ec, false, "no error")
+			ec.When(false, "no error")
 			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
 			ex := errors.New(errval)
-			When(ec, true, ex)
+			ec.When(true, ex)
 			check.NotZero(t, ec.stack) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
@@ -241,10 +241,10 @@ func TestError(t *testing.T) {
 		})
 		t.Run("WhenBasicWeirdType", func(t *testing.T) {
 			ec := &Collector{}
-			When(ec, false, 54)
+			ec.When(false, 54)
 			assert.True(t, !ec.HasErrors())
 			assert.NotError(t, ec.Resolve())
-			When(ec, true, 50000)
+			ec.When(true, 50000)
 			check.NotZero(t, ec.stack) // nil is zero
 			err := ec.Resolve()
 			if err == nil {
@@ -257,13 +257,13 @@ func TestError(t *testing.T) {
 		t.Run("WhenWrapping", func(t *testing.T) {
 			serr := errors.New(errval)
 			ec := &Collector{}
-			Whenf(ec, false, "no error %w", serr)
+			ec.Whenf(false, "no error %w", serr)
 			assert.True(t, !ec.HasErrors())
 			if err := ec.Resolve(); err != nil {
 				t.Fatal(err)
 			}
 
-			Whenf(ec, true, "no error: %w", serr)
+			ec.Whenf(true, "no error: %w", serr)
 			assert.True(t, ec.HasErrors())
 
 			if err := ec.Resolve(); err == nil {
@@ -297,26 +297,10 @@ func TestError(t *testing.T) {
 			}
 		})
 
-		t.Run("RecoverDo", func(t *testing.T) {
-			ec := &Collector{}
-
-			out := WithRecoverDo(ec, func() string { panic("foo") })
-			if !ec.HasErrors() {
-				t.Fatal("empty collector")
-			}
-			err := ec.Resolve()
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			assert.Substring(t, err.Error(), "foo")
-
-			if out != "" {
-				t.Fatal("output:", out)
-			}
-		})
 		t.Run("RecoverCall", func(t *testing.T) {
 			ec := &Collector{}
 
-			WithRecoverCall(ec, func() { panic("foo") })
+			ec.WithRecover(func() { panic("foo") })
 			if !ec.HasErrors() {
 				t.Fatal("empty collector")
 			}

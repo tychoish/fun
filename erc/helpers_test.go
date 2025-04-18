@@ -109,13 +109,4 @@ func TestCollections(t *testing.T) {
 		assert.ErrorIs(t, err, ers.ErrImmutabilityViolation)
 		assert.Equal(t, len(ers.Unwind(err)), 3)
 	})
-	t.Run("Collect", func(t *testing.T) {
-		ec := &Collector{}
-		collect := Collect[int](ec)
-		operation := func() (int, error) { return 42, errors.New("kip") }
-		out := collect(operation())
-		assert.Equal(t, out, 42)
-		assert.Error(t, ec.Resolve())
-		assert.Equal(t, ec.Resolve().Error(), "kip")
-	})
 }

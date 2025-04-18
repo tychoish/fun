@@ -207,9 +207,7 @@ func (s *Service) Close() {
 // an erc.ErrorStack object that contains the errors encountered when
 // running the service, the shutdown hook, and any panics encountered
 // during the service's execution.
-func (s *Service) Wait() error {
-	return s.waitFor(context.Background())
-}
+func (s *Service) Wait() error { return s.waitFor(context.Background()) }
 
 func (s *Service) waitFor(ctx context.Context) error {
 	if s.isFinished.Load() {

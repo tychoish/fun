@@ -129,7 +129,7 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
-func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ers.Ignore(wf(ctx)) } }
+func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.IgnoreError(wf(ctx)) } }
 
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed

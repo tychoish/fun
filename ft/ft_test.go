@@ -531,3 +531,20 @@ func TestJoin(t *testing.T) {
 		assert.Equal(t, count, 4)
 	})
 }
+
+func TestError(t *testing.T) {
+	t.Run("Check", func(t *testing.T) {
+		out, ok := Check(41, nil)
+		assert.Equal(t, out, 41)
+		assert.True(t, ok)
+
+		out, ok = Check(41, errors.New("fail"))
+		assert.Zero(t, out)
+		assert.True(t, !ok)
+	})
+
+	t.Run("Ignore", func(t *testing.T) {
+		check.NotPanic(t, func() { IgnoreError(errors.New("new")) })
+		check.NotPanic(t, func() { IgnoreError(nil) })
+	})
+}

@@ -156,10 +156,6 @@ func TestErrors(t *testing.T) {
 		check.Equal(t, 1, len(RemoveOk([]error{nil, io.EOF, nil})))
 		check.Equal(t, 3, len(RemoveOk([]error{Error("one"), io.EOF, New("two")})))
 	})
-	t.Run("Ignore", func(t *testing.T) {
-		check.NotPanic(t, func() { Ignore(Error("new")) })
-		check.NotPanic(t, func() { Ignore(nil) })
-	})
 	t.Run("When", func(t *testing.T) {
 		t.Run("Bypass", func(t *testing.T) {
 			check.NotError(t, When(false, "hello"))
@@ -212,14 +208,5 @@ func TestErrors(t *testing.T) {
 			check.ErrorIs(t, Whenf(true, "hello: %w", inner), inner)
 			check.NotEqual(t, Whenf(true, "hello: %w", inner).Error(), inner.Error())
 		})
-	})
-	t.Run("Check", func(t *testing.T) {
-		out, ok := Check(41, nil)
-		assert.Equal(t, out, 41)
-		assert.True(t, ok)
-
-		out, ok = Check(41, New("fail"))
-		assert.Zero(t, out)
-		assert.True(t, !ok)
 	})
 }

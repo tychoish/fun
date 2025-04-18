@@ -80,7 +80,7 @@ func (o WorkerGroupConf) CanContinueOnError(err error) bool {
 		o.ErrorCollector.Add(err)
 		return o.ContinueOnPanic
 	case ers.IsExpiredContext(err):
-		erc.When(o.ErrorCollector, o.IncludeContextExpirationErrors, err)
+		o.ErrorCollector.When(o.IncludeContextExpirationErrors, err)
 		return false
 	default:
 		o.ErrorCollector.Add(err)
