@@ -96,8 +96,7 @@ func (e *Stack) Push(err error) {
 		// everything else includes normal unwrapped errors
 		// and singly wrapped errors (e.g. with fmt.Errorf and
 		// %w).
-		e.next = &Stack{next: e.next, err: e.err}
-		e.err = err
+		e.next, e.err = &Stack{next: e.next, err: e.err}, err
 		e.count++
 	}
 

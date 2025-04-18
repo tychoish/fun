@@ -10,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -38,7 +37,9 @@ func (ec *Collector) AddWithHook(err error, hook func()) {
 	if err != nil {
 		defer internal.With(internal.Lock(&ec.mu))
 		ec.stack.Push(err)
-		ft.SafeCall(hook)
+		if hook != nil {
+			hook()
+		}
 	}
 }
 
