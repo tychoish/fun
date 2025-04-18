@@ -104,9 +104,9 @@ func TestCollections(t *testing.T) {
 		})
 		err := ec.Resolve()
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ers.ErrImmutabilityViolation)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
 		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+		assert.ErrorIs(t, err, ers.ErrImmutabilityViolation)
 		assert.Equal(t, len(ers.Unwind(err)), 3)
 	})
 	t.Run("Collect", func(t *testing.T) {

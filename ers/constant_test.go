@@ -15,13 +15,13 @@ func TestConstant(t *testing.T) {
 		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
 		const expected Error = "hello"
 		err := Wrap(expected, "hello")
-		assert.Equal(t, err.Error(), "hello: hello")
-		assert.ErrorIs(t, err, expected)
-		assert.ErrorIs(t, err, expected.Err())
+		check.Equal(t, err.Error(), "hello: hello")
+		check.ErrorIs(t, err, expected)
+		check.ErrorIs(t, err, expected.Err())
 
 		err = Wrapf(expected, "hello %s", "world")
-		assert.Equal(t, err.Error(), "hello world: hello")
-		assert.ErrorIs(t, err, expected)
+		check.Equal(t, err.Error(), "hello world: hello")
+		check.ErrorIs(t, err, expected)
 	})
 	t.Run("Is", func(t *testing.T) {
 		const ErrForTest Error = "for-test"

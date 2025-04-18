@@ -63,8 +63,11 @@ func TestStack(t *testing.T) {
 		assert.Equal(t, 2, es.Len())
 	})
 	t.Run("StackErrorStack", func(t *testing.T) {
-		es := &Stack{err: errors.New("outer")}
-		es.Push(&Stack{err: errors.New("inner")})
+		es := &Stack{}
+		es.Push(errors.New("outer"))
+		nst := &Stack{}
+		nst.err = errors.New("inner")
+		es.Push(nst)
 		if l := collect(t, es.Generator()); len(l) != 2 || l == nil {
 			t.Log(es.count, es)
 			t.Log(es.Error())

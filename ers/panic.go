@@ -1,8 +1,6 @@
 package ers
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // Recover catches a panic, turns it into an error and passes it to
 // the provided observer function.
@@ -19,7 +17,7 @@ func ParsePanic(r any) error {
 		case string:
 			return Join(New(err), ErrRecoveredPanic)
 		case []error:
-			st := Stack{}
+			st := &Stack{}
 			st.Add(err...)
 			st.Add(ErrRecoveredPanic)
 			return st.Resolve()

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
@@ -317,7 +318,19 @@ func TestHandlers(t *testing.T) {
 
 		assert.Equal(t, count, 3)
 	})
+	t.Run("ErrorStream", func(t *testing.T) {
+		ec := &erc.Collector{}
+		ec.Add(ers.ErrContainerClosed)
+		ec.Add(ers.ErrCurrentOpAbort)
+		ec.Add(io.EOF)
 
+		errs, err := MAKE.ErrorStream(ec).Slice(t.Context())
+		assert.NotError(t, err)
+		assert.Equal(t, len(errs), 3)
+		assert.ErrorIs(t, errs[0], io.EOF)
+		assert.ErrorIs(t, errs[1], ers.ErrCurrentOpAbort)
+		assert.ErrorIs(t, errs[2], ers.ErrContainerClosed)
+	})
 }
 
 func (Constructors) String() string { return "Handlers<>" }

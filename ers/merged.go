@@ -28,7 +28,7 @@ type Stack struct {
 func AsStack(err error) *Stack {
 	switch et := err.(type) {
 	case nil:
-		break
+		return nil
 	case *Stack:
 		return et
 	case interface{ Unwind() []error }:
@@ -49,7 +49,6 @@ func AsStack(err error) *Stack {
 		return st
 	}
 
-	// there's a nil error if
 	return nil
 }
 
@@ -82,25 +81,17 @@ func (e *Stack) Push(err error) {
 	case nil:
 		return
 	case *Stack:
-		// do stack separately, so we don't build the list and
-		// can merge more effectively (we do throw away the
-		// Stack wrapper objects for consistency with counts.)
-
-		for werr != nil {
-			e.Push(werr.err)
-			werr = werr.next
+		iter := werr.Generator()
+		for err, ok := iter(); ok; err, ok = iter() {
+			e.Push(err)
 		}
 	case interface{ Unwind() []error }:
 		// unwind over unwrap, given that Unwind is our
 		// interface and unwrap is the stdlib and some folks
 		// may implement both with different semantics.
-		for _, err := range werr.Unwind() {
-			e.Push(err)
-		}
+		e.Add(werr.Unwind()...)
 	case interface{ Unwrap() []error }:
-		for _, err := range werr.Unwrap() {
-			e.Push(err)
-		}
+		e.Add(werr.Unwrap()...)
 	default:
 		// everything else includes normal unwrapped errors
 		// and singly wrapped errors (e.g. with fmt.Errorf and
@@ -131,7 +122,7 @@ func (e *Stack) Resolve() error {
 	switch {
 	case e == nil || e.count == 0:
 		return nil
-	case e.count == 1:
+	case e.count == 1 && e.err != nil:
 		return e.err
 	default:
 		return e
@@ -171,11 +162,10 @@ func (e *Stack) Error() string {
 
 	prod := e.Generator()
 
-	for err, ok := prod(); ok; err, ok = prod() {
+	for err, ok := prod(); ok && err != nil; err, ok = prod() {
 		if buf.Len() > 0 {
 			buf.WriteString(": ")
 		}
-
 		buf.WriteString(err.Error())
 	}
 
@@ -222,6 +212,7 @@ func (e *Stack) Unwind() []error {
 // in the stack.
 func (e *Stack) Generator() func() (error, bool) {
 	iter := &Stack{next: e}
+
 	return func() (error, bool) {
 		if iter.next == nil || iter.next.err == nil {
 			return nil, false
@@ -261,4 +252,4 @@ func Strings(errs []error) []string {
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call ers.Join repeatedly on the same
 // error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := Stack{}; st.Add(errs...); return st.Resolve() }
+func Join(errs ...error) error { st := &Stack{}; st.Add(errs...); return st.Resolve() }

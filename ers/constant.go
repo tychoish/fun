@@ -11,9 +11,7 @@
 // differences.
 package ers
 
-import (
-	"errors"
-)
+import "errors"
 
 // Error is a type alias for building/declaring sentinel errors
 // as constants.
