@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
 	"sync"
@@ -371,16 +372,20 @@ func (st *Stream[T]) Parallel(
 ) Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
+		fmt.Printf("BEFORE %d: %+v\n", len(opts), conf)
 		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
 			return err
 		}
 
+		fmt.Printf("AFTER  %d: %+v\n", len(opts), conf)
+
 		fn.WithRecover().WithErrorFilter(conf.ErrorFilter).
 			ReadAll(st).
 			StartGroup(ctx, conf.NumWorkers).
-			Ignore().
 			Run(ctx)
 
+		fmt.Println("--->", conf.ErrorCollector.Len(), conf.ErrorCollector.Resolve())
+		fmt.Println("----")
 		return conf.ErrorCollector.Resolve()
 	}
 }

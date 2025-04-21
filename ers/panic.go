@@ -21,7 +21,7 @@ func ParsePanic(r any) error {
 			copy(out, err)
 			return Join(append(out, ErrRecoveredPanic)...)
 		default:
-			return Join(fmt.Errorf("[%T]: %v", err, err), ErrRecoveredPanic)
+			return fmt.Errorf("[%T]: %v: %w", err, err, ErrRecoveredPanic)
 		}
 	}
 	return nil
@@ -42,7 +42,7 @@ func NewInvariantViolation(args ...any) error {
 		case func() error:
 			return Join(ei(), ErrInvariantViolation)
 		default:
-			return Join(fmt.Errorf("%v", args[0]), ErrInvariantViolation)
+			return fmt.Errorf("%v: %w", args[0], ErrInvariantViolation)
 		}
 	default:
 		return extractAndJoin(args, ErrInvariantViolation)

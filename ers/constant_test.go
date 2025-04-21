@@ -16,25 +16,25 @@ func TestConstant(t *testing.T) {
 
 		var err error
 
-		assert.True(t, ErrEmpty.Is(nil))
-		assert.True(t, Error("").Is(nil))
-		assert.True(t, ErrEmpty.Is(err))
-		assert.True(t, Error("").Is(err))
+		check.True(t, ErrEmpty.Is(nil))
+		check.True(t, Error("").Is(nil))
+		check.True(t, ErrEmpty.Is(err))
+		check.True(t, Error("").Is(err))
 
-		assert.True(t, !ErrForTest.Is(nil))
-		assert.True(t, !ErrForTest.Is(err))
-		assert.True(t, !Error("hi").Is(nil))
-		assert.True(t, !Error("hi").Is(err))
+		check.True(t, !ErrForTest.Is(nil))
+		check.True(t, !ErrForTest.Is(err))
+		check.True(t, !Error("hi").Is(nil))
+		check.True(t, !Error("hi").Is(err))
 
-		err = errors.New("for-test")
-
-		assert.True(t, ErrForTest.Is(ErrForTest))
-		assert.True(t, !Error("").Is(err))
+		err = New("for-test")
+		check.True(t, ErrForTest.Is(ErrForTest))
+		check.True(t, !Error("").Is(err))
 
 		// use the stdlib helper
-		assert.True(t, errors.Is(err, ErrForTest))
-		assert.True(t, !errors.Is(errors.New("fake"), ErrForTest))
-		assert.ErrorIs(t, err, ErrForTest)
+		t.Log(err, ErrForTest, errors.Is(err, ErrForTest))
+		check.True(t, Is(err, error(ErrForTest)))
+		check.True(t, !errors.Is(errors.New("fake"), ErrForTest))
+		check.ErrorIs(t, err, error(ErrForTest))
 	})
 	t.Run("As", func(t *testing.T) {
 

@@ -3,6 +3,7 @@ package erc
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"iter"
 
 	"github.com/tychoish/fun/ers"
@@ -77,20 +78,34 @@ func (eel *list) root() *element {
 }
 
 func (eel *list) Push(err error) {
+	defer func() {
+		if err == nil {
+			return
+		}
+		fmt.Println("EEL.PUSH.DEFER", eel.num, eel.Len(), err)
+	}()
+
 	switch werr := err.(type) {
 	case *list:
-		for elem := eel.root().Next(); elem.Ok(); elem.Next() {
+		fmt.Println("EEL.PUSH.LIST")
+		for elem := werr.root().Next(); elem.Ok(); elem.Next() {
 			eel.PushBack(elem.Err())
 		}
 	case *element:
+		fmt.Println("EEL.PUSH.ELEMENT")
 		for elem := werr; elem.Ok(); elem.Next() {
 			eel.PushBack(elem.Err())
 		}
 	case interface{ Unwind() []error }:
+		fmt.Println("EEL.PUSH.UNWIND")
 		eel.Add(werr.Unwind()...)
 	case interface{ Unwrap() []error }:
+		fmt.Println("EEL.PUSH.UNWRAP")
 		eel.Add(werr.Unwrap()...)
+	case nil:
+		return
 	default:
+		fmt.Println("EEL.PUSH.DEFAULT", eel.Len(), err)
 		eel.PushBack(err)
 	}
 }

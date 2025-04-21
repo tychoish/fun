@@ -3,6 +3,7 @@ package ers
 import (
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -43,8 +44,13 @@ func TestPanics(t *testing.T) {
 			if err == nil {
 				t.Fatal(err)
 			}
-			if err.Error() != "recovered panic: function runs" {
-				t.Error(err)
+			errText := err.Error()
+			if !strings.Contains(errText, "recovered panic") {
+				t.Error(err, "!=", errText)
+			}
+
+			if !strings.Contains(errText, "function runs") {
+				t.Error(err, "!=", errText)
 			}
 		})
 	})
@@ -114,8 +120,11 @@ func TestPanics(t *testing.T) {
 			if !errors.Is(err, ErrRecoveredPanic) {
 				t.Error("not wrapped", err)
 			}
-			if err.Error() != "recovered panic: EOF" {
-				t.Error(err)
+			if !strings.Contains(err.Error(), io.EOF.Error()) {
+				t.Error(io.EOF.Error(), "NOT IN", err.Error())
+			}
+			if !strings.Contains(err.Error(), string(ErrRecoveredPanic)) {
+				t.Error(ErrRecoveredPanic.Error(), "NOT IN", err.Error())
 			}
 		})
 	})

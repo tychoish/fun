@@ -1,7 +1,6 @@
 package ers
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tychoish/fun/internal"
@@ -43,7 +42,7 @@ func Wrap(err error, annotation ...any) error {
 	if Ok(err) {
 		return nil
 	}
-	return Join(err, errors.New(fmt.Sprintln(annotation...)))
+	return fmt.Errorf("%w: %s", err, fmt.Sprintln(annotation...))
 }
 
 // Wrapf produces a wrapped error, if the error is non-nil, with a
@@ -56,8 +55,7 @@ func Wrapf(err error, tmpl string, args ...any) error {
 	if Ok(err) {
 		return nil
 	}
-
-	return Join(err, fmt.Errorf(tmpl, args...))
+	return fmt.Errorf("%w: %w", err, fmt.Errorf(tmpl, args...))
 }
 
 // Unwind assembles the full "unwrapped" list of all component

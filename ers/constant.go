@@ -13,6 +13,7 @@ package ers
 
 import (
 	"errors"
+	"slices"
 )
 
 // Error is a type alias for building/declaring sentinel errors
@@ -47,7 +48,7 @@ func (e Error) Is(err error) bool {
 	}
 }
 
-func Join(errs ...error) error { return errors.Join(errs...) }
+func Join(errs ...error) error { slices.Reverse(errs); return errors.Join(errs...) }
 
 // New constructs an error object that uses the Error as the
 // underlying type.

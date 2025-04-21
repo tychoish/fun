@@ -6,6 +6,7 @@
 package erc
 
 import (
+	"fmt"
 	"iter"
 	"sync"
 
@@ -29,6 +30,7 @@ func (ec *Collector) Add(err error) {
 	if err != nil {
 		defer internal.With(internal.Lock(&ec.mu))
 		ec.list.Push(err)
+		fmt.Println("PUSH", ec.list.Len(), err)
 	}
 }
 

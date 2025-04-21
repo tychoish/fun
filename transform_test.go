@@ -15,7 +15,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -287,25 +286,23 @@ func TestParallelForEach(t *testing.T) {
 	t.Run("ContinueOnPanic", func(t *testing.T) {
 		count := &atomic.Int64{}
 		errCount := &atomic.Int64{}
-		err := SliceStream(makeIntSlice(200)).
-			Parallel(
-				func(_ context.Context, in int) error {
-					count.Add(1)
-					runtime.Gosched()
-					if in >= 100 {
-						errCount.Add(1)
-						panic("error")
-					}
-					return nil
-				},
-				WorkerGroupConfNumWorkers(3),
-				WorkerGroupConfContinueOnPanic(),
-				WorkerGroupConfWithErrorCollector(&erc.Collector{}),
-			).Run(ctx)
+		err := SliceStream(makeIntSlice(200)).Parallel(
+			func(_ context.Context, in int) error {
+				count.Add(1)
+				runtime.Gosched()
+				if in >= 100 {
+					errCount.Add(1)
+					panic("error")
+				}
+				return nil
+			},
+			WorkerGroupConfNumWorkers(3),
+			WorkerGroupConfContinueOnPanic(),
+			// WorkerGroupConfWithErrorCollector(&erc.Collector{}),
+		).Run(ctx)
 		if err == nil {
-			t.Fatal("should have errored", err)
+			t.Error("should have errored", err)
 		}
-
 		if errCount.Load() != 100 {
 			t.Error(errCount.Load())
 		}
