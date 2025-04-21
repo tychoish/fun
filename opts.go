@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -30,7 +31,7 @@ func (op OptionProvider[T]) Apply(in T) error {
 	err := op(in)
 	switch validator := any(in).(type) {
 	case interface{ Validate() error }:
-		err = ers.Join(validator.Validate(), err)
+		err = erc.Join(validator.Validate(), err)
 	}
 	return err
 }
@@ -51,12 +52,12 @@ func (op OptionProvider[T]) Build(conf T) (out T, err error) {
 func (op OptionProvider[T]) Join(opps ...OptionProvider[T]) OptionProvider[T] {
 	opps = append([]OptionProvider[T]{op}, opps...)
 	return func(option T) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 		for idx := range opps {
 			if opps[idx] == nil {
 				continue
 			}
-			err = ers.Join(opps[idx](option), err)
+			err = erc.Join(opps[idx](option), err)
 		}
 
 		return err

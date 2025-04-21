@@ -17,13 +17,12 @@ your project.
 
 ## Usecases and Highlights
 
-- Error Handling tools. The `erc.Collector` and `ers.Stack` types
-  allow you to wrap, annotate, and aggregate errors. This makes
-  continue-on-error patterns simple to implement. Because
-  `erc.Collector` can be used concurrently, handling errors in Go
-  routines, becomes much less of a headache. In addition the
-  `ers.Error` type, as a string alias, permits `const` definition of
-  errors.
+- Error Handling tools. The `erc.Collector` type allow you to wrap,
+  annotate, and aggregate errors. This makes continue-on-error
+  patterns simple to implement. Because `erc.Collector` can be used
+  concurrently, handling errors in Go routines, becomes much less of a
+  headache. In addition, the `ers.Error` type, as a string alias,
+  permits `const` definition of errors.
 
 - Service Management. `srv.Service` handles the lifecycle of
   "background" processes inside of an application. You can now start

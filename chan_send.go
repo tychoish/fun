@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -90,7 +91,7 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 // from the stream into the channel.
 func (sm ChanSend[T]) Consume(iter *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
 		return sm.Handler().ReadAll(iter).Run(ctx)
 	}
 }

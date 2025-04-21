@@ -50,7 +50,7 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 // functions, for simple and short total-duration operations. Every
 // worker in the pool runs in it's own go routine, and there are no
 // limits or throttling on the number of go routines. All errors are
-// aggregated and in a single collector (ers.Stack) which is returned
+// aggregated and in a single collector (erc.Stack) which is returned
 // by the worker when the operation ends (if many Worker's error this
 // may create memory pressure) and there's no special handling of panics.
 //
@@ -76,7 +76,7 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 }
 
 func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] {
-	return CheckedGenerator(ec.Generator()).Stream()
+	return SeqStream(ec.Generator())
 }
 
 // ProcessOperation constructs a Handler function for running Worker
@@ -125,23 +125,23 @@ func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 // the provided observer function.
 func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
-// ErrorStack constructs an empty &ers.Stack{} value.
-func (Constructors) ErrorStack() *ers.Stack { return &ers.Stack{} }
+// ErrorStack constructs an empty &erc.Stack{} value.
+func (Constructors) ErrorStack() *erc.Stack { return &erc.Stack{} }
 
 // ErrorStackStream creates a stream object to view the contents
-// of a ers.Stack object (error collection).
-func (Constructors) ErrorStackStream(s *ers.Stack) *Stream[error] {
+// of a erc.Stack object (error collection).
+func (Constructors) ErrorStackStream(s *erc.Stack) *Stream[error] {
 	return MAKE.ErrorStackGenerator(s).Stream()
 }
 
 // ErrorStackGenerator creates an generator function to yield the
-// contents of a ers.Stack object (error collection).
-func (Constructors) ErrorStackGenerator(s *ers.Stack) Generator[error] {
+// contents of a erc.Stack object (error collection).
+func (Constructors) ErrorStackGenerator(s *erc.Stack) Generator[error] {
 	return CheckedGenerator(s.Generator())
 }
 
 // ErrorStackHandler provides a basic error aggregation facility around
-// ers.Stack (as with ErrorStackHandler, though this is an
+// erc.Stack (as with ErrorStackHandler, though this is an
 // implementation detail.) ErrorStackHandler does use a mutex to guard
 // these objects.
 func (Constructors) ErrorStackHandler() (fn.Handler[error], fn.Future[error]) {

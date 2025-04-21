@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -73,7 +74,7 @@ func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ct
 // itself a processor.
 func (pf Handler[T]) WithRecover() Handler[T] {
 	return func(ctx context.Context, in T) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 		return pf(ctx, in)
 	}
 }
@@ -242,7 +243,7 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 // before a processor is called the first time.
 func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		return ers.Join(ers.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
+		return erc.Join(ers.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
 	}
 }
 
@@ -253,7 +254,7 @@ func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 // case of a processor panic.)
 func (pf Handler[T]) PostHook(op func()) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		return ers.Join(ft.Flip(pf(ctx, in), ers.WithRecoverCall(op)))
+		return erc.Join(ft.Flip(pf(ctx, in), ers.WithRecoverCall(op)))
 	}
 }
 
@@ -284,7 +285,7 @@ func (pf Handler[T]) WithErrorCheck(ef fn.Future[error]) Handler[T] {
 		if err := ef(); err != nil {
 			return err
 		}
-		return ers.Join(pf(ctx, in), ef())
+		return erc.Join(pf(ctx, in), ef())
 	}
 }
 
@@ -296,7 +297,7 @@ func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) 
 // encountered. The worker is blocking.
 func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 
 		for {
 			item, err := st.Read(ctx)

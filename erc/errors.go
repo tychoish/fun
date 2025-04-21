@@ -6,6 +6,7 @@
 package erc
 
 import (
+	"iter"
 	"sync"
 
 	"github.com/tychoish/fun/ers"
@@ -19,15 +20,15 @@ import (
 // constituent errors (and flattened, in the case of wrapped errors),
 // are an *erc.Stack object, which can be introspected as needed.
 type Collector struct {
-	mu    sync.Mutex
-	stack ers.Stack
+	mu   sync.Mutex
+	list list
 }
 
 // Add collects an error if that error is non-nil.
 func (ec *Collector) Add(err error) {
 	if err != nil {
 		defer internal.With(internal.Lock(&ec.mu))
-		ec.stack.Push(err)
+		ec.list.Push(err)
 	}
 }
 
@@ -36,7 +37,7 @@ func (ec *Collector) Add(err error) {
 func (ec *Collector) AddWithHook(err error, hook func()) {
 	if err != nil {
 		defer internal.With(internal.Lock(&ec.mu))
-		ec.stack.Push(err)
+		ec.list.Push(err)
 		if hook != nil {
 			hook()
 		}
@@ -50,19 +51,13 @@ func (ec *Collector) Handler() fn.Handler[error] { return ec.Add }
 
 // Future returns a function that is generally equivalent to
 // Collector.Resolve(); however, the errors are returned as an unwound
-// slice of errors, rather than the ers.Stack object.
+// slice of errors, rather than the erc.Stack object.
 func (ec *Collector) Future() fn.Future[error] { return ec.Resolve }
 
 // Future returns a function that is generally equivalent to
 // Collector.Resolve(); however, the errors are returned as an unwound
-// slice of errors, rather than the ers.Stack object.
-func (ec *Collector) Generator() func() (error, bool) {
-	next := ec.stack.Generator()
-	return func() (error, bool) {
-		defer internal.With(internal.Lock(&ec.mu))
-		return next()
-	}
-}
+// slice of errors, rather than the erc.Stack object.
+func (ec *Collector) Generator() iter.Seq[error] { return ec.list.FIFO() }
 
 // Len reports on the total number of non-nil errors collected. The
 // count tracks a cached size of the *erc.Stack, giving Len() stable
@@ -70,7 +65,7 @@ func (ec *Collector) Generator() func() (error, bool) {
 // and merge Stack and other { Unwrap() []error } errors, Len is not
 // updated beyond the current level. In this way Len really reports
 // "height," but this is the same for the top level.
-func (ec *Collector) Len() int { defer internal.With(internal.Lock(&ec.mu)); return ec.stack.Len() }
+func (ec *Collector) Len() int { defer internal.With(internal.Lock(&ec.mu)); return ec.list.Len() }
 
 // Resolve returns an error of type *erc.Stack, or nil if there have
 // been no errors added. The error stack respects errors.Is and
@@ -79,11 +74,11 @@ func (ec *Collector) Len() int { defer internal.With(internal.Lock(&ec.mu)); ret
 func (ec *Collector) Resolve() error {
 	defer internal.With(internal.Lock(&ec.mu))
 
-	if ec.stack.Len() == 0 {
+	if ec.list.Len() == 0 {
 		return nil
 	}
 
-	return &ec.stack
+	return &ec.list
 }
 
 // HasErrors returns true if there are any underlying errors, and
@@ -114,20 +109,17 @@ func (ec *Collector) Whenf(cond bool, val string, args ...any) { ec.Add(ers.When
 // it to the collector, primarily for use in defer statements.
 func (ec *Collector) Check(fut fn.Future[error]) { ec.Add(fut.Resolve()) }
 
-// WithRecover calls the provided function and adds any errors it may
-// encounter to the collector.
-func (ec *Collector) WithRecover(fn func()) { defer Recover(ec); fn() }
+// WithRecover calls the provided function, collecting any
+func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
+
+// Recover can be used in a defer to collect a panic and add it to the collector.
+func (ec *Collector) Recover() { ec.Add(ers.ParsePanic(recover())) }
 
 ///////////////////////////////////////////////////////////////////////
 //
 // Panic helpers
 //
 ///////////////////////////////////////////////////////////////////////
-
-// Recover calls the builtin recover() function and converts it to an
-// error that is populated in the collector. Run RecoverHook in defer
-// statements.
-func Recover(ec *Collector) { ec.Add(ers.ParsePanic(recover())) }
 
 // RecoverHook runs adds the output of recover() to the error
 // collector, and runs the specified hook if. If there was no panic,

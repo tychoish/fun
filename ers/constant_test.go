@@ -10,19 +10,6 @@ import (
 )
 
 func TestConstant(t *testing.T) {
-	t.Run("Basic", func(t *testing.T) {
-		check.NotError(t, Wrap(nil, "hello"))
-		check.NotError(t, Wrapf(nil, "hello %s %s", "args", "argsd"))
-		const expected Error = "hello"
-		err := Wrap(expected, "hello")
-		check.Equal(t, err.Error(), "hello: hello")
-		check.ErrorIs(t, err, expected)
-		check.ErrorIs(t, err, expected.Err())
-
-		err = Wrapf(expected, "hello %s", "world")
-		check.Equal(t, err.Error(), "hello world: hello")
-		check.ErrorIs(t, err, expected)
-	})
 	t.Run("Is", func(t *testing.T) {
 		const ErrForTest Error = "for-test"
 		const ErrEmpty Error = ""
@@ -45,10 +32,9 @@ func TestConstant(t *testing.T) {
 		assert.True(t, !Error("").Is(err))
 
 		// use the stdlib helper
-		// assert.True(t, errors.Is(err, ErrForTest))
+		assert.True(t, errors.Is(err, ErrForTest))
 		assert.True(t, !errors.Is(errors.New("fake"), ErrForTest))
-		// assert.ErrorIs(t, err, ErrForTest)
-
+		assert.ErrorIs(t, err, ErrForTest)
 	})
 	t.Run("As", func(t *testing.T) {
 

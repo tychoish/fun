@@ -17,10 +17,9 @@ func ParsePanic(r any) error {
 		case string:
 			return Join(New(err), ErrRecoveredPanic)
 		case []error:
-			st := &Stack{}
-			st.Add(err...)
-			st.Add(ErrRecoveredPanic)
-			return st.Resolve()
+			out := make([]error, len(err), len(err)+1)
+			copy(out, err)
+			return Join(append(out, ErrRecoveredPanic)...)
 		default:
 			return Join(fmt.Errorf("[%T]: %v", err, err), ErrRecoveredPanic)
 		}

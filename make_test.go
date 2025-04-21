@@ -263,17 +263,17 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorStack", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			assert.Equal(t, 0, MAKE.ErrorStackStream(&ers.Stack{}).Count(context.Background()))
+			assert.Equal(t, 0, MAKE.ErrorStackStream(&erc.Stack{}).Count(context.Background()))
 		})
 		t.Run("Number", func(t *testing.T) {
-			errs := &ers.Stack{}
+			errs := &erc.Stack{}
 			errs.Add(ers.New("foof"), ers.New("boop"))
 			assert.Equal(t, 2, MAKE.ErrorStackStream(errs).Count(context.Background()))
 		})
 
 		t.Run("Is", func(t *testing.T) {
 			const err ers.Error = "foo"
-			errs := &ers.Stack{}
+			errs := &erc.Stack{}
 			errs.Add(err)
 			errs.Add(ers.Error("bar"))
 			errs.Add(ers.Error("baz"))
@@ -325,11 +325,12 @@ func TestHandlers(t *testing.T) {
 		ec.Add(io.EOF)
 
 		errs, err := MAKE.ErrorStream(ec).Slice(t.Context())
-		assert.NotError(t, err)
-		assert.Equal(t, len(errs), 3)
-		assert.ErrorIs(t, errs[0], io.EOF)
-		assert.ErrorIs(t, errs[1], ers.ErrCurrentOpAbort)
-		assert.ErrorIs(t, errs[2], ers.ErrContainerClosed)
+		check.NotError(t, err)
+		t.Log(err, len(errs), errs)
+		check.Equal(t, len(errs), 3)
+		check.ErrorIs(t, errs[0], io.EOF)
+		check.ErrorIs(t, errs[1], ers.ErrCurrentOpAbort)
+		check.ErrorIs(t, errs[2], ers.ErrContainerClosed)
 	})
 }
 

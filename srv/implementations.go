@@ -37,7 +37,7 @@ func Group(services *fun.Stream[*Service]) *Service {
 			for services.Next(ctx) {
 				wg.Add(1)
 				go func(s *Service) {
-					defer erc.Recover(ec)
+					defer ec.Recover()
 					defer wg.Done()
 					defer func() { fun.Invariant.IsTrue(waiters.Add(s.Wait) == nil) }()
 					ec.Add(s.Start(ctx))
@@ -48,7 +48,7 @@ func Group(services *fun.Stream[*Service]) *Service {
 			return nil
 		},
 		Cleanup: func() error {
-			defer erc.Recover(ec)
+			defer ec.Recover()
 			// we're calling each service's wait() here, which
 			// might be a recipe for deadlocks, but it gives us
 			// the chance to collect all errors from the contained
@@ -64,7 +64,7 @@ func Group(services *fun.Stream[*Service]) *Service {
 			for iter.Next(ctx) {
 				wg.Add(1)
 				go func(wait func() error) {
-					defer erc.Recover(ec)
+					defer ec.Recover()
 					defer wg.Done()
 					ec.Add(wait())
 				}(iter.Value())
@@ -132,7 +132,7 @@ func Wait(iter *fun.Stream[fun.Operation]) *Service {
 
 				wg.Add(1)
 				go func(fn fun.Operation) {
-					defer erc.Recover(ec)
+					defer ec.Recover()
 					defer wg.Done()
 					fn(ctx)
 				}(value)

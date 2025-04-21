@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/internal"
 )
 
 func TestPanics(t *testing.T) {
@@ -54,8 +55,8 @@ func TestPanics(t *testing.T) {
 			err := ers.NewInvariantViolation("", nil, nil, "")
 			check.Error(t, err)
 			check.ErrorIs(t, err, ers.ErrInvariantViolation)
-			es := ers.AsStack(err)
-			check.Equal(t, es.Len(), 1)
+			es := internal.Unwind(err)
+			check.Equal(t, len(es), 1)
 		})
 		t.Run("Future", func(t *testing.T) {
 			t.Run("Single", func(t *testing.T) {

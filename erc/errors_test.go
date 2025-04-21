@@ -13,55 +13,6 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
-func catcherIsEmpty(t *testing.T, catcher *Collector) {
-	t.Helper()
-
-	if catcher == nil {
-		t.Fatal("test issue")
-	}
-
-	if catcher.HasErrors() {
-		t.Error("should not have errors")
-	}
-	if err := catcher.Resolve(); err != nil {
-		t.Error("should produce nil error", err)
-	}
-	check.Zero(t, catcher.Len())
-}
-
-func catcherHasErrors(t *testing.T, expectedNum int, catcher *Collector) {
-	t.Helper()
-
-	if catcher == nil || expectedNum <= 0 {
-		t.Fatal("test issue", catcher, expectedNum)
-	}
-
-	if actual := catcher.stack.Len(); actual != expectedNum {
-		t.Error("should have expected number of errors", expectedNum, actual)
-		t.Log(catcher.Resolve())
-	}
-	if catcher.Ok() {
-		t.Error("should have errors")
-	}
-	if catcher.Resolve() == nil {
-		t.Error("should produce an error")
-	}
-	check.Equal(t, expectedNum, catcher.Len())
-}
-
-func collect[T any](t testing.TB, prod func() (T, bool)) []T {
-	t.Helper()
-
-	assert.True(t, prod != nil)
-
-	var out []T
-
-	for v, ok := prod(); ok; v, ok = prod() {
-		out = append(out, v)
-	}
-	return out
-}
-
 func TestError(t *testing.T) {
 	t.Parallel()
 	const errval = "ERRO=42"
@@ -112,13 +63,8 @@ func TestError(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				handler(fmt.Errorf("%d", i))
 			}
-			genertor := ec.Generator()
 			count := 0
-			for {
-				err, ok := genertor()
-				if !ok {
-					break
-				}
+			for err := range ec.Generator() {
 				assert.Error(t, err)
 				count++
 			}
@@ -132,14 +78,14 @@ func TestError(t *testing.T) {
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
-				defer Recover(es)
+				defer es.Recover()
 				panic("boop")
 			}()
 			<-sig
 			if err := es.Future().Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
-			err := &es.stack
+			err := &es.list
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "boop")
 		})
@@ -150,7 +96,7 @@ func TestError(t *testing.T) {
 			err := errors.New("kip")
 			go func() {
 				defer close(sig)
-				defer Recover(es)
+				defer es.Recover()
 				panic(err)
 			}()
 			<-sig
@@ -217,7 +163,7 @@ func TestError(t *testing.T) {
 			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
 			ec.When(true, errval)
-			check.NotZero(t, ec.stack) // nil is zero
+			check.NotZero(t, ec.list) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
 			} else if err.Error() != errval {
@@ -231,7 +177,7 @@ func TestError(t *testing.T) {
 			assert.NotError(t, ec.Resolve())
 			ex := errors.New(errval)
 			ec.When(true, ex)
-			check.NotZero(t, ec.stack) // nil is zero
+			check.NotZero(t, ec.list) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
 			} else if err.Error() != errval {
@@ -245,7 +191,7 @@ func TestError(t *testing.T) {
 			assert.True(t, !ec.HasErrors())
 			assert.NotError(t, ec.Resolve())
 			ec.When(true, 50000)
-			check.NotZero(t, ec.stack) // nil is zero
+			check.NotZero(t, ec.list) // nil is zero
 			err := ec.Resolve()
 			if err == nil {
 				t.Fatal(err)
@@ -355,7 +301,7 @@ func TestError(t *testing.T) {
 							if count > 10 {
 								t.Error("should have one by now")
 							}
-						} else if _, ok := err.(*ers.Stack); !ok {
+						} else if _, ok := err.(*list); !ok {
 							t.Error("should be an error stack")
 						}
 					}
@@ -413,7 +359,7 @@ func BenchmarkErrorStack(b *testing.B) {
 
 	b.Run("Reporting", func(b *testing.B) {
 		b.Run("StackError", func(b *testing.B) {
-			es := &ers.Stack{}
+			es := &Stack{}
 			for i := 0; i < count; i++ {
 				es.Push(errors.New("foo"))
 			}
@@ -431,7 +377,7 @@ func BenchmarkErrorStack(b *testing.B) {
 			}
 		})
 		b.Run("StackStream", func(b *testing.B) {
-			es := &ers.Stack{}
+			es := &Stack{}
 			for i := 0; i < count; i++ {
 				es.Push(errors.New("foo"))
 			}

@@ -1,15 +1,9 @@
-package ers
+package erc
 
 import (
 	"bytes"
 	"errors"
 )
-
-// Join takes a slice of errors and converts it into an *erc.Stack
-// typed error. This operation has several advantages relative to
-// using errors.Join(): if you call ers.Join repeatedly on the same
-// error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := &Stack{}; st.Add(errs...); return st.Resolve() }
 
 // Stack represents the error type returned by an ErrorCollector
 // when it has more than one error. The implementation provides
@@ -23,7 +17,7 @@ type Stack struct {
 }
 
 // AsStack takes an error and converts it to a stack if possible, if
-// the error is an ers.Stack then this is a passthrough, and errors
+// the error is an erc.Stack then this is a passthrough, and errors
 // that implement {Unwind() []error} or {Unwrap() []error}, though
 // preferring Unwind, are added individually to the stack.
 //
@@ -141,7 +135,7 @@ func (e *Stack) Ok() bool { return e == nil || (e.err == nil && e.next == nil) }
 //
 // This leads to a curios, semantic: using the Unwrap() method (and
 // casting; but not the unwind method!), the values returned for each
-// layer are also *ers.Stack values: if you were to call Add any of
+// layer are also *erc.Stack values: if you were to call Add any of
 // these objects, you would end up with sort of tree-like assortment
 // of objects which may yield surprising result. At the same time, if
 // you have a reference to one of these stack objects, future calls to

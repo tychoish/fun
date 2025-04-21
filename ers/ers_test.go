@@ -11,6 +11,12 @@ import (
 	"github.com/tychoish/fun/assert/check"
 )
 
+type errorTest struct {
+	val int
+}
+
+func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }
+
 func TestErrors(t *testing.T) {
 	t.Run("Predicates", func(t *testing.T) {
 		check.True(t, IsTerminating(io.EOF))
@@ -100,6 +106,7 @@ func TestErrors(t *testing.T) {
 		assert.True(t, !IsInvariantViolation(9001))
 		assert.True(t, !IsInvariantViolation(io.EOF))
 	})
+
 	t.Run("Wrapped", func(t *testing.T) {
 		err := errors.New("base")
 		for i := 0; i < 100; i++ {

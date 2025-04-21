@@ -303,7 +303,7 @@ func TestParallelForEach(t *testing.T) {
 				WorkerGroupConfWithErrorCollector(&erc.Collector{}),
 			).Run(ctx)
 		if err == nil {
-			t.Fatal("should not have errored", err)
+			t.Fatal("should have errored", err)
 		}
 
 		if errCount.Load() != 100 {
@@ -527,17 +527,14 @@ func RunStreamImplementationTests[T comparable](
 								},
 							).Slice(ctx)
 
-							if err == nil {
-								t.Error("expected error")
-							}
-
+							check.Error(t, err)
 							check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 
 							if len(out) != 0 {
-								t.Fatal("unexpected output", out)
+								t.Error("unexpected output", out)
 							}
 						})
-						t.Run("ParallelMap", func(t *testing.T) {
+						t.Run("ParallelMeap", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
 
@@ -599,7 +596,7 @@ func RunStreamIntegerAlgoTests(
 								WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
-								t.Fatal("expected error")
+								t.Fatal("expected error", out)
 							}
 							if err.Error() != "whoop" {
 								t.Error(err)

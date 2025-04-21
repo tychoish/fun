@@ -2,18 +2,11 @@ package erc
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/ers"
 )
-
-type errorTest struct {
-	val int
-}
-
-func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }
 
 func TestCollections(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
@@ -21,24 +14,29 @@ func TestCollections(t *testing.T) {
 			e1 := &errorTest{val: 100}
 			e2 := &errorTest{val: 200}
 
-			err := ers.Join(e1, e2)
+			err := Join(e1, e2)
 
 			if err == nil {
-				t.Fatal("should be an error")
+				t.Error("should be an error")
 			}
-			if !errors.Is(err, e1) {
-				t.Error("shold be er1", err, e1)
+			if !ers.Is(err, e1) {
+				t.Error("err IS er1")
+				t.Log("err:", err)
+				t.Log("er1:", e1)
 			}
 
 			if !errors.Is(err, e2) {
-				t.Error("shold be er2", err, e2)
+				t.Error("shold be er2", err, "=<=>=", e2)
 			}
 			cp := &errorTest{}
 			if !errors.As(err, &cp) {
+				t.Logf("%T, %s", cp, cp)
+				t.Logf("%T, %s", err, err)
+				t.Error(cp, "<=<=>=>", err)
 				t.Error("should err as", err, cp)
 			}
 			if cp.val != e2.val {
-				t.Error(cp.val, e1.val)
+				t.Error(cp.val, "=<=>=", e1.val)
 				t.Log(cp)
 			}
 		})

@@ -126,6 +126,30 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
+func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
+	next, stop := iter.Pull(it)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	return CheckedGenerator[T](func() (zero T, _ bool) {
+		val, ok := next()
+		if ok {
+			return val, true
+		}
+		stop()
+		cancel()
+		return zero, false
+	}).PreHook(
+		Operation(func(cc context.Context) {
+			select {
+			case <-ctx.Done():
+			case <-cc.Done():
+				cancel()
+			}
+			stop()
+		}).Go().Once(),
+	).Stream()
+}
+
 // ConvertStream processes the input stream of type T into an
 // output stream of type O. It's implementation uses the Generator,
 // will continue producing values as long as the input stream
@@ -261,7 +285,7 @@ func (st *Stream[T]) Next(ctx context.Context) bool {
 
 func (st *Stream[T]) readOneHandleError(err error) error {
 	if err != nil {
-		return ers.Join(err, st.Close())
+		return erc.Join(err, st.Close())
 	}
 	return nil
 }
@@ -312,7 +336,7 @@ func (st *Stream[T]) Read(ctx context.Context) (out T, err error) {
 // abort processing and are returned by the worker.
 func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover()), st.Close()) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover()), st.Close()) }()
 		for {
 			item, err := st.Read(ctx)
 			switch {
@@ -389,7 +413,7 @@ func (st *Stream[T]) Any() *Stream[any] {
 func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
 	var value T
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 
 		for {
 			item, err := st.Read(ctx)

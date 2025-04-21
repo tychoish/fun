@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -835,9 +836,10 @@ func TestGenerator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := ers.Join(ers.ErrInvariantViolation, ers.ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
-		stack := &ers.Stack{}
-		assert.True(t, errors.As(err, &stack))
+		ss := &erc.Stack{}
+		ss.Add(ers.ErrInvariantViolation, ers.ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
+		stack := &erc.Stack{}
+		assert.True(t, errors.As(ss.Resolve(), &stack))
 		errs := ft.Must(CheckedGenerator(stack.Generator()).Stream().Slice(ctx))
 		assert.Equal(t, 5, len(errs))
 	})

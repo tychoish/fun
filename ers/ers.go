@@ -43,7 +43,7 @@ func Wrap(err error, annotation ...any) error {
 	if Ok(err) {
 		return nil
 	}
-	return Join(err, errors.New(fmt.Sprint(annotation...)))
+	return Join(err, errors.New(fmt.Sprintln(annotation...)))
 }
 
 // Wrapf produces a wrapped error, if the error is non-nil, with a

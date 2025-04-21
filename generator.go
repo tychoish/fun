@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -75,7 +76,7 @@ func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(
 // any panic to an error.
 func (pf Generator[T]) WithRecover() Generator[T] {
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 		return pf(ctx)
 	}
 }
@@ -197,7 +198,7 @@ func (pf Generator[T]) WithErrorCheck(ef fn.Future[error]) Generator[T] {
 		}
 
 		out, err := pf.Read(ctx)
-		if err = ers.Join(err, ef()); err != nil {
+		if err = erc.Join(err, ef()); err != nil {
 			return zero, err
 		}
 
@@ -341,14 +342,14 @@ func (pf Generator[T]) Retry(n int) Generator[T] {
 			case attemptErr == nil:
 				return value, nil
 			case ers.IsTerminating(attemptErr):
-				return zero, ers.Join(attemptErr, err)
+				return zero, erc.Join(attemptErr, err)
 			case ers.IsExpiredContext(attemptErr):
-				return zero, ers.Join(attemptErr, err)
+				return zero, erc.Join(attemptErr, err)
 			case errors.Is(attemptErr, ErrStreamContinue):
 				i--
 				continue
 			default:
-				err = ers.Join(attemptErr, err)
+				err = erc.Join(attemptErr, err)
 			}
 
 		}
@@ -383,7 +384,7 @@ func (pf Generator[T]) PreHook(op Operation) Generator[T] {
 	return func(ctx context.Context) (out T, err error) {
 		e := ers.WithRecoverCall(func() { op(ctx) })
 		out, err = pf(ctx)
-		return out, ers.Join(err, e)
+		return out, erc.Join(err, e)
 	}
 }
 
@@ -396,7 +397,7 @@ func (pf Generator[T]) PreHook(op Operation) Generator[T] {
 func (pf Generator[T]) PostHook(op func()) Generator[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
-		e = ers.Join(ers.WithRecoverCall(op), e)
+		e = erc.Join(ers.WithRecoverCall(op), e)
 		return
 	}
 }
@@ -482,11 +483,11 @@ func (pf Generator[T]) wrapErrorWith(ef fn.Future[error]) Generator[T] {
 			// if there's a real substantive error,
 			// encountered when there was an terminating
 			// error, then let's just return that.
-			return zero, ers.Join(ferr, perr)
+			return zero, erc.Join(ferr, perr)
 		}
 
 		// otherwise, merge everything (potentially)
-		return zero, ers.Join(err, ferr, perr)
+		return zero, erc.Join(err, ferr, perr)
 	}
 }
 

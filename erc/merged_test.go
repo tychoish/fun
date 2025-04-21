@@ -1,4 +1,4 @@
-package ers
+package erc
 
 import (
 	"context"
@@ -10,13 +10,9 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 )
 
-type errorTest struct {
-	val int
-}
-
-func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }
 func TestStack(t *testing.T) {
 	const errval = "ERRO=42"
 
@@ -81,10 +77,10 @@ func TestStack(t *testing.T) {
 		check.Equal(t, es.Len(), 0)
 		hf(nil)
 		check.Equal(t, es.Len(), 0)
-		hf(ErrInvalidInput)
+		hf(ers.ErrInvalidInput)
 		check.Equal(t, es.Len(), 1)
 		check.True(t, !es.Ok())
-		check.ErrorIs(t, es, ErrInvalidInput)
+		check.ErrorIs(t, es, ers.ErrInvalidInput)
 	})
 	t.Run("NilErrorStillErrors", func(t *testing.T) {
 		es := &Stack{}
@@ -96,11 +92,12 @@ func TestStack(t *testing.T) {
 		es := &Stack{}
 		future := es.Future()
 		check.NotError(t, future())
-		es.Push(ErrInvalidInput)
-		es.Push(ErrImmutabilityViolation)
+		es.Push(ers.ErrInvalidInput)
+		es.Push(ers.ErrImmutabilityViolation)
 		check.Error(t, future())
-		check.ErrorIs(t, future(), ErrInvalidInput)
-		check.ErrorIs(t, future(), ErrImmutabilityViolation)
+		check.ErrorIs(t, future(), ers.ErrInvalidInput)
+
+		check.ErrorIs(t, future(), ers.ErrImmutabilityViolation)
 		st := AsStack(future())
 		check.Equal(t, st, es)
 	})
@@ -179,18 +176,18 @@ func TestStack(t *testing.T) {
 			check.NilPtr(t, es)
 		})
 		t.Run("Error", func(t *testing.T) {
-			es := AsStack(ErrInvalidInput)
+			es := AsStack(ers.ErrInvalidInput)
 			assert.NotNilPtr(t, es)
 			check.Equal(t, es.Len(), 1)
-			check.ErrorIs(t, es, ErrInvalidInput)
+			check.ErrorIs(t, es, ers.ErrInvalidInput)
 		})
 		t.Run("Stack", func(t *testing.T) {
-			err := Join(ErrInvalidInput, ErrImmutabilityViolation, ErrInvariantViolation)
+			err := Join(ers.ErrInvalidInput, ers.ErrImmutabilityViolation, ers.ErrInvariantViolation)
 			es := AsStack(err)
 			assert.NotNilPtr(t, es)
 			check.Equal(t, es.Len(), 3)
-			check.ErrorIs(t, es, ErrInvalidInput)
-			check.ErrorIs(t, es, ErrInvariantViolation)
+			check.ErrorIs(t, es, ers.ErrInvalidInput)
+			check.ErrorIs(t, es, ers.ErrInvariantViolation)
 		})
 		t.Run("Unwinder", func(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
@@ -199,7 +196,7 @@ func TestStack(t *testing.T) {
 
 			})
 			t.Run("Populated", func(t *testing.T) {
-				es := AsStack(&slwind{out: []error{ErrInvalidInput}})
+				es := AsStack(&slwind{out: []error{ers.ErrInvalidInput}})
 				assert.NotNilPtr(t, es)
 				check.Equal(t, es.Len(), 1)
 			})
@@ -211,7 +208,7 @@ func TestStack(t *testing.T) {
 
 			})
 			t.Run("Populated", func(t *testing.T) {
-				es := AsStack(&slwrap{out: []error{ErrInvalidInput}})
+				es := AsStack(&slwrap{out: []error{ers.ErrInvalidInput}})
 				assert.NotNilPtr(t, es)
 				check.Equal(t, es.Len(), 1)
 			})
@@ -295,22 +292,22 @@ func TestMergeLegacy(t *testing.T) {
 		})
 	})
 	t.Run("Splice", func(t *testing.T) {
-		errs := []error{io.EOF, ErrRecoveredPanic, fmt.Errorf("hello world")}
+		errs := []error{io.EOF, ers.ErrRecoveredPanic, fmt.Errorf("hello world")}
 		err := Join(errs...)
 
 		assert.Error(t, err)
-		assert.True(t, Is(err, errs...))
-		assert.Equal(t, len(errs), len(Unwind(err)))
+		assert.True(t, ers.Is(err, errs...))
+		assert.Equal(t, len(errs), len(ers.Unwind(err)))
 	})
 	t.Run("SpliceOne", func(t *testing.T) {
-		root := Error("root-error")
+		root := ers.Error("root-error")
 		err := Join(root)
 		assert.Equal(t, err.Error(), root.Error())
 	})
 	t.Run("Many", func(t *testing.T) {
 		t.Run("Formatting", func(t *testing.T) {
-			jerr := Join(Error("one"), Error("two"), Error("three"), Error("four"), Error("five"), Error("six"), Error("seven"), Error("eight"))
-			errs := Unwind(jerr)
+			jerr := Join(ers.Error("one"), ers.Error("two"), ers.Error("three"), ers.Error("four"), ers.Error("five"), ers.Error("six"), ers.Error("seven"), ers.Error("eight"))
+			errs := ers.Unwind(jerr)
 			t.Log(errs)
 			check.Equal(t, len(errs), 8)
 			check.Equal(t, jerr.Error(), "eight: seven: six: five: four: three: two: one")
@@ -323,63 +320,24 @@ func TestMergeLegacy(t *testing.T) {
 		})
 	})
 	t.Run("UnwindingPush", func(t *testing.T) {
-		err := slwind{out: []error{io.EOF, context.Canceled, ErrLimitExceeded}}
+		err := slwind{out: []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}}
 		s := &Stack{}
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})
 	t.Run("UnwrappingPush", func(t *testing.T) {
-		err := slwrap{out: []error{io.EOF, context.Canceled, ErrLimitExceeded}}
+		err := slwrap{out: []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}}
 		s := &Stack{}
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})
 	t.Run("Strings", func(t *testing.T) {
-		sl := []error{io.EOF, context.Canceled, ErrLimitExceeded}
-		strs := Strings(sl)
+		sl := []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}
+		strs := ers.Strings(sl)
 		merged := strings.Join(strs, ": ")
 		check.Substring(t, merged, "EOF")
 		check.Substring(t, merged, "context canceled")
 		check.Substring(t, merged, "limit exceeded")
 	})
 
-}
-
-type slwind struct{ out []error }
-
-func (s slwind) Unwind() []error { return s.out }
-func (s slwind) Error() string   { return fmt.Sprint("wind error:", len(s.out), s.out) }
-
-type slwrap struct{ out []error }
-
-func (s slwrap) Unwrap() []error { return s.out }
-func (s slwrap) Error() string   { return fmt.Sprint("wrap error:", len(s.out), s.out) }
-
-func unwind[T any](in T) (out []T) {
-	if us, ok := any(in).(interface{ Unwrap() []T }); ok {
-		return us.Unwrap()
-	}
-
-	for {
-		out = append(out, in)
-		u, ok := any(in).(interface{ Unwrap() T })
-		if ok {
-			in = u.Unwrap()
-			continue
-		}
-		return
-	}
-}
-
-func collect[T any](t *testing.T, prod func() (T, bool)) []T {
-	t.Helper()
-
-	assert.True(t, prod != nil)
-
-	var out []T
-
-	for v, ok := prod(); ok; v, ok = prod() {
-		out = append(out, v)
-	}
-	return out
 }

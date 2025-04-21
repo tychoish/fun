@@ -127,12 +127,12 @@ func (s *Service) Start(ctx context.Context) error {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
-			defer erc.Recover(ec)
+			defer ec.Recover()
 			<-mainSignal
 			<-ehSignal
 			eh := s.ErrorHandler.Get()
 			if eh != nil {
-				defer erc.Recover(ec)
+				defer ec.Recover()
 				if err := ec.Resolve(); err != nil {
 					eh(err)
 				}
@@ -149,7 +149,7 @@ func (s *Service) Start(ctx context.Context) error {
 			go func() {
 				defer s.wg.Done()
 				defer close(shutdownSignal)
-				defer erc.Recover(ec)
+				defer ec.Recover()
 				<-ctx.Done()
 				s.ec.Add(shutdown())
 			}()
@@ -158,7 +158,7 @@ func (s *Service) Start(ctx context.Context) error {
 			go func() {
 				defer s.wg.Done()
 				defer close(shutdownSignal)
-				defer erc.Recover(ec)
+				defer ec.Recover()
 				<-ctx.Done()
 			}()
 		}
@@ -172,13 +172,13 @@ func (s *Service) Start(ctx context.Context) error {
 			if s.Cleanup != nil {
 				cleanup := s.Cleanup
 				// this catches a panic during shutdown
-				defer erc.Recover(ec)
+				defer ec.Recover()
 				defer func() { ec.Add(cleanup()) }()
 			}
 			defer func() { defer close(ehSignal); <-shutdownSignal }()
 			// this catches a panic in the execution of
 			// the startup/op hook
-			defer erc.Recover(ec)
+			defer ec.Recover()
 
 			defer s.cancel()
 			ec.Add(s.Run(ctx))

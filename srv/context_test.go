@@ -24,7 +24,7 @@ func TestContext(t *testing.T) {
 		t.Run("Panics", func(t *testing.T) {
 			ec := &erc.Collector{}
 			func() {
-				defer erc.Recover(ec)
+				defer ec.Recover()
 				GetOrchestrator(context.Background())
 			}()
 			err := ec.Resolve()
