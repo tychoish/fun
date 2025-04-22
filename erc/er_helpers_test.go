@@ -100,7 +100,7 @@ func TestCollections(t *testing.T) {
 	t.Run("RecoverHookErrorSlice", func(t *testing.T) {
 		ec := new(Collector)
 		assert.NotPanic(t, func() {
-			defer RecoverHook(ec, nil)
+			defer ec.WithRecoverHook(nil)
 			panic([]error{ers.ErrImmutabilityViolation, ers.ErrInvalidInput})
 		})
 		err := ec.Resolve()

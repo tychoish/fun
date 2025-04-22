@@ -52,18 +52,6 @@ func (ec *Collector) Join(errs ...error) {
 
 }
 
-// AddWithHook adds a non-nill error and runs the provided hook
-// function.
-func (ec *Collector) AddWithHook(err error, hook func()) {
-	if err != nil {
-		defer internal.With(internal.Lock(&ec.mu))
-		ec.list.Push(err)
-		if hook != nil {
-			hook()
-		}
-	}
-}
-
 // Handler returns the collector's Add method as a
 // fn.Handler[error] object for integration and use with the
 // function types.
@@ -124,7 +112,7 @@ func (ec *Collector) Ok() bool { return ec.Len() == 0 }
 
 ///////////////////////////////////////////////////////////////////////
 //
-// Helpers
+// Collector Helpers
 //
 ///////////////////////////////////////////////////////////////////////
 
@@ -142,22 +130,32 @@ func (ec *Collector) Whenf(cond bool, val string, args ...any) { ec.Add(ers.When
 // it to the collector, primarily for use in defer statements.
 func (ec *Collector) Check(fut fn.Future[error]) { ec.Add(fut.Resolve()) }
 
-// WithRecover calls the provided function, collecting any
-func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
-
 // Recover can be used in a defer to collect a panic and add it to the collector.
 func (ec *Collector) Recover() { ec.Add(ers.ParsePanic(recover())) }
 
-///////////////////////////////////////////////////////////////////////
-//
-// Haelpers
-//
-///////////////////////////////////////////////////////////////////////
+// WithRecover calls the provided function, collecting any
+func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
 
-// RecoverHook runs adds the output of recover() to the error
-// collector, and runs the specified hook if. If there was no panic,
-// this function is a noop. Run RecoverHook in defer statements.
-func RecoverHook(ec *Collector, hook func()) { ec.AddWithHook(ers.ParsePanic(recover()), hook) }
+// WithRecoverHook catches a panic and adds it to the error collector
+// and THEN runs the specified hook if. If there was no panic, this
+// function is a noop, and the hook never executes. Nil hooks are also
+// a noop. Run WithRecoverHook in defer statements.
+func (ec *Collector) WithRecoverHook(hook func()) {
+	defer ec.Recover()
+	if err := ers.ParsePanic(recover()); err != nil {
+		defer internal.With(internal.Lock(&ec.mu))
+		ec.list.Push(err)
+		if hook != nil {
+			hook()
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////
+//
+// Function Helpers
+//
+///////////////////////////////////////////////////////////////////////
 
 // Wrap produces a wrapped error if the err is non-nil, wrapping the
 // error with the provided annotation. When the error is nil, Wrap
