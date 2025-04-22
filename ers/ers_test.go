@@ -71,6 +71,11 @@ func TestErrors(t *testing.T) {
 		check.True(t, !IsError(Unwrap(New("hello"))))
 		check.True(t, IsError(Unwrap(werr)))
 	})
+	t.Run("Unwind", func(t *testing.T) {
+		werr := fmt.Errorf("hi: %w", io.EOF)
+		check.Equal(t, 1, len(Unwind(New("hello"))))
+		check.Equal(t, 2, len(Unwind(werr)))
+	})
 	t.Run("As", func(t *testing.T) {
 		var err error = &errorTest{val: 100}
 

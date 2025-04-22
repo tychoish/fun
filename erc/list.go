@@ -13,26 +13,26 @@ import (
 //
 // For errors that provide the Unwind/Unwrap method, if these methods
 // return empty slices of errors, then AsList will return nil.
-func AsList(err error) *List {
+func AsList(err error) *list {
 	switch et := err.(type) {
 	case nil:
 		return nil
-	case *List:
+	case *list:
 		return et
 	case interface{ Unwind() []error }:
 		if errs := et.Unwind(); len(errs) > 0 {
-			st := &List{}
+			st := &list{}
 			st.Add(errs...)
 			return st
 		}
 	case interface{ Unwrap() []error }:
 		if errs := et.Unwrap(); len(errs) > 0 {
-			st := &List{}
+			st := &list{}
 			st.Add(errs...)
 			return st
 		}
 	default:
-		st := &List{}
+		st := &list{}
 		st.Push(err)
 		return st
 	}
@@ -40,14 +40,14 @@ func AsList(err error) *List {
 	return nil
 }
 
-type List struct {
+type list struct {
 	num int
 	elm element
 }
 
-func (eel *List) front() *element { return eel.root().next }
-func (eel *List) back() *element  { return eel.root().prev }
-func (eel *List) root() *element {
+func (eel *list) Front() *element { return eel.root().next }
+func (eel *list) Back() *element  { return eel.root().prev }
+func (eel *list) root() *element {
 	if eel.elm.next == nil {
 		eel.elm.next = &eel.elm
 	}
@@ -60,7 +60,7 @@ func (eel *List) root() *element {
 	return &eel.elm
 }
 
-func (eel *List) Error() string {
+func (eel *list) Error() string {
 	if eel.num == 0 {
 		return "<nil>"
 	}
@@ -78,22 +78,22 @@ func (eel *List) Error() string {
 	return buf.String()
 }
 
-func (eel *List) Resolve() error { return eel.Err() }
+func (eel *list) Resolve() error { return eel.Err() }
 
-func (eel *List) Err() error {
+func (eel *list) Err() error {
 	switch {
 	case eel == nil || eel.num == 0:
 		return nil
 	case eel.num == 1:
-		return eel.front().Err()
+		return eel.Front().Err()
 	default:
 		return eel
 	}
 }
 
-func (eel *List) In(elm *element) bool { return elm.list == eel }
-func (elm *element) In(eel *List) bool { return elm.list == eel }
-func (eel *List) Len() int {
+func (eel *list) In(elm *element) bool { return elm.list == eel }
+func (elm *element) In(eel *list) bool { return elm.list == eel }
+func (eel *list) Len() int {
 	if eel == nil {
 		return 0
 	}
@@ -103,19 +103,19 @@ func (eel *List) Len() int {
 
 // Ok returns true if the Stack object contains no errors and false
 // otherwise.
-func (eel *List) Ok() bool { return eel == nil || eel.elm.Ok() }
+func (eel *list) Ok() bool { return eel == nil || eel.elm.Ok() }
 
 // Handler provides a fn.Handler[error] typed function (though
 // because ers is upstream of the root-fun package, it is not
 // explicitly typed as such.) which will Add errors to the stack.
-func (eel *List) Handler() func(err error) { return eel.Push }
+func (eel *list) Handler() func(err error) { return eel.Push }
 
 // Future provides a fn.Future[error] typed function (though
 // because ers is upstream of the root-fun package, it is not
 // explicitly typed as such.) which will resolve the stack.
-func (eel *List) Future() func() error { return eel.Resolve }
+func (eel *list) Future() func() error { return eel.Resolve }
 
-func (eel *List) Unwrap() error {
+func (eel *list) Unwrap() error {
 	if eel.Ok() {
 		return nil
 	}
@@ -123,11 +123,11 @@ func (eel *List) Unwrap() error {
 	return eel.root().Err()
 }
 
-func (eel *List) Unwind() []error {
+func (eel *list) Unwind() []error {
 	out := make([]error, eel.num)
 
 	idx := 0
-	for elem := eel.front(); elem.Ok(); elem = elem.Next() {
+	for elem := eel.Front(); elem.Ok(); elem = elem.Next() {
 		out[idx] = elem.err
 		idx++
 	}
@@ -135,7 +135,7 @@ func (eel *List) Unwind() []error {
 	return out
 }
 
-func (eel *List) Is(target error) (ok bool) {
+func (eel *list) Is(target error) (ok bool) {
 	for err := range eel.FIFO() {
 		if ok = errors.Is(err, target); ok {
 			break
@@ -144,7 +144,7 @@ func (eel *List) Is(target error) (ok bool) {
 	return
 }
 
-func (eel *List) As(target any) (ok bool) {
+func (eel *list) As(target any) (ok bool) {
 	for err := range eel.FIFO() {
 		if ok = errors.As(err, target); ok {
 			break
@@ -153,12 +153,12 @@ func (eel *List) As(target any) (ok bool) {
 	return
 }
 
-func (eel *List) Push(err error) {
+func (eel *list) Push(err error) {
 	switch werr := err.(type) {
 	case nil:
 		return
-	case *List:
-		for elem := werr.front(); elem.Ok(); elem = elem.Next() {
+	case *list:
+		for elem := werr.Front(); elem.Ok(); elem = elem.Next() {
 			eel.PushBack(elem.Err())
 		}
 	case *element:
@@ -179,13 +179,13 @@ func (eel *List) Push(err error) {
 	}
 }
 
-func (eel *List) Add(errs ...error) {
+func (eel *list) Add(errs ...error) {
 	for _, err := range errs {
 		eel.Push(err)
 	}
 }
 
-func (eel *List) PushBack(err error) {
+func (eel *list) PushBack(err error) {
 	if err != nil {
 		eel.num++
 		head := eel.root()
@@ -201,7 +201,7 @@ func (eel *List) PushBack(err error) {
 
 }
 
-func (eel *List) PushFront(err error) {
+func (eel *list) PushFront(err error) {
 	if err != nil {
 		eel.num++
 		head := eel.root()
@@ -216,9 +216,9 @@ func (eel *List) PushFront(err error) {
 	}
 }
 
-func (eel *List) FIFO() iter.Seq[error] {
+func (eel *list) FIFO() iter.Seq[error] {
 	return func(yield func(err error) bool) {
-		for elem := eel.back(); elem.Ok(); elem = elem.Previous() {
+		for elem := eel.Back(); elem.Ok(); elem = elem.Previous() {
 			if !yield(elem) {
 				return
 			}
@@ -226,9 +226,9 @@ func (eel *List) FIFO() iter.Seq[error] {
 	}
 }
 
-func (eel *List) LIFO() iter.Seq[error] {
+func (eel *list) LIFO() iter.Seq[error] {
 	return func(yield func(err error) bool) {
-		for elem := eel.front(); elem.Ok(); elem = elem.Next() {
+		for elem := eel.Front(); elem.Ok(); elem = elem.Next() {
 			if !yield(elem) {
 				return
 			}
@@ -237,7 +237,7 @@ func (eel *List) LIFO() iter.Seq[error] {
 }
 
 type element struct {
-	list *List
+	list *list
 	next *element
 	prev *element
 	err  error

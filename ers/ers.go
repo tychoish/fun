@@ -54,29 +54,3 @@ func IsExpiredContext(err error) bool { return Is(err, context.Canceled, context
 // processing/iteration has terminated. (e.g. context expiration, or
 // io.EOF.)
 func IsTerminating(err error) bool { return Is(err, io.EOF, ErrCurrentOpAbort, ErrContainerClosed) }
-
-// ExtractErrors iterates through a list of untyped objects and removes the
-// errors from the list, returning both the errors and the remaining
-// items.
-func ExtractErrors(in []any) (rest []any, errs []error) {
-	for idx := range in {
-		switch val := in[idx].(type) {
-		case nil:
-			continue
-		case error:
-			errs = append(errs, val)
-		case func() error:
-			if e := val(); e != nil {
-				errs = append(errs, e)
-			}
-		case string:
-			if val == "" {
-				continue
-			}
-			rest = append(rest, val)
-		default:
-			rest = append(rest, val)
-		}
-	}
-	return
-}

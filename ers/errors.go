@@ -2,7 +2,6 @@ package ers
 
 import (
 	"errors"
-	"slices"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -18,8 +17,6 @@ import (
 // support the Stack type and others where the original error is
 // nested within the unwrapped error objects.
 func Unwind(in error) []error { return internal.Unwind(in) }
-
-func Join(errs ...error) error { slices.Reverse(errs); return errors.Join(errs...) }
 
 // New constructs an error object that uses the Error as the
 // underlying type.

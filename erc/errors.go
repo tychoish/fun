@@ -21,7 +21,7 @@ import (
 // are an *erc.List object, which can be introspected as needed.
 type Collector struct {
 	mu   sync.Mutex
-	list List
+	list list
 }
 
 // Join takes a slice of errors and converts it into an *erc.List

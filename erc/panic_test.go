@@ -84,11 +84,11 @@ func TestPanics(t *testing.T) {
 		}
 	})
 	t.Run("ExtractErrors", func(t *testing.T) {
-		args, errs := ers.ExtractErrors([]any{nil, ers.Error("hi"), 1, true})
+		args, errs := extractErrors([]any{nil, ers.Error("hi"), 1, true})
 		check.Equal(t, len(errs), 1)
 		check.Equal(t, len(args), 2)
 		var nerr error
-		args, errs = ers.ExtractErrors([]any{nil, ers.Error("hi"), func() error { return nil }(), nerr, 2, false})
+		args, errs = extractErrors([]any{nil, ers.Error("hi"), func() error { return nil }(), nerr, 2, false})
 		check.Equal(t, len(errs), 1)
 		check.Equal(t, len(args), 2)
 	})

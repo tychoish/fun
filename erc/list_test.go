@@ -18,20 +18,20 @@ func TestList(t *testing.T) {
 
 	t.Parallel()
 	t.Run("Nil", func(t *testing.T) {
-		var es *List
+		var es *list
 		if es.Len() != 0 {
 			t.Fatal("defensive nil for length")
 		}
 		check.True(t, es.Ok())
 	})
 	t.Run("UnwrapEmpty", func(t *testing.T) {
-		var es *List
+		var es *list
 		if err := es.Unwrap(); err != nil {
 			t.Fatal("unexpected unwrap to be nil", err)
 		}
 	})
 	t.Run("UnwrapList", func(t *testing.T) {
-		es := &List{}
+		es := &list{}
 		if err := es.Unwrap(); err != nil {
 			t.Fatal("unexpected unwrap empty", err)
 		}
@@ -39,70 +39,70 @@ func TestList(t *testing.T) {
 	t.Run("PushElements", func(t *testing.T) {
 		t.Run("Detached", func(t *testing.T) {
 			exp := errors.New("test")
-			es := &List{}
+			es := &list{}
 			elem := &element{err: exp}
 			assert.Equal(t, es.Len(), 0)
 			assert.True(t, !es.In(elem))
 			assert.True(t, !elem.In(es))
 			es.Push(elem)
 			assert.Equal(t, es.Len(), 1)
-			assert.NotEqual(t, es.back(), elem)
+			assert.NotEqual(t, es.Back(), elem)
 		})
 		t.Run("Reflexive", func(t *testing.T) {
 			exp := errors.New("test")
-			es := &List{}
+			es := &list{}
 			es.Push(exp)
 			assert.Equal(t, es.Len(), 1)
-			assert.True(t, es.back().Ok())
-			es.Push(es.back())
+			assert.True(t, es.Back().Ok())
+			es.Push(es.Back())
 			assert.Equal(t, es.Len(), 1)
 		})
 		t.Run("MergeListsSingleElement", func(t *testing.T) {
 			exp := errors.New("test")
-			es := &List{}
-			ee := &List{}
+			es := &list{}
+			ee := &list{}
 			es.Push(exp)
 			ee.Push(exp)
-			es.Push(ee.back())
+			es.Push(ee.Back())
 			assert.Equal(t, 1, ee.Len())
 			assert.Equal(t, 2, es.Len())
 		})
 		t.Run("MergeListsManyElements", func(t *testing.T) {
 			exp := errors.New("test")
-			es := &List{}
-			ee := &List{}
+			es := &list{}
+			ee := &list{}
 			es.Push(exp)
 			ee.Push(exp)
 			ee.Push(exp)
 			ee.Push(exp)
 			assert.Equal(t, 3, ee.Len())
 			assert.Equal(t, 1, es.Len())
-			es.Push(ee.front())
+			es.Push(ee.Front())
 			assert.Equal(t, 3, ee.Len())
 			assert.Equal(t, 4, es.Len())
 		})
 	})
 	t.Run("Membership", func(t *testing.T) {
 		exp := errors.New("test")
-		es := &List{}
+		es := &list{}
 		es.Push(exp)
-		elm := es.back()
+		elm := es.Back()
 		assert.True(t, es.In(elm))
 		assert.True(t, elm.In(es))
 	})
 	t.Run("PushFront", func(t *testing.T) {
 		ferr := errors.New("front-err")
 		berr := errors.New("back-err")
-		es := &List{}
+		es := &list{}
 		es.PushFront(berr)
 		assert.Equal(t, es.Len(), 1)
 		es.PushFront(ferr)
 		assert.Equal(t, es.Len(), 2)
-		assert.Equal(t, es.back().err, berr)
-		assert.Equal(t, es.front().err, ferr)
+		assert.Equal(t, es.Back().err, berr)
+		assert.Equal(t, es.Front().err, ferr)
 	})
 	t.Run("Handler", func(t *testing.T) {
-		es := &List{}
+		es := &list{}
 		check.Equal(t, es.Len(), 0)
 		hf := es.Handler()
 		check.Equal(t, es.Len(), 0)
@@ -114,13 +114,13 @@ func TestList(t *testing.T) {
 		check.ErrorIs(t, es, ers.ErrInvalidInput)
 	})
 	t.Run("NilErrorStillErrors", func(t *testing.T) {
-		es := &List{}
+		es := &list{}
 		if e := es.Error(); e == "" {
 			t.Error("every non-nil error list should have an error")
 		}
 	})
 	t.Run("Future", func(t *testing.T) {
-		es := &List{}
+		es := &list{}
 		future := es.Future()
 		check.NotError(t, future())
 		es.Push(ers.ErrInvalidInput)
@@ -133,7 +133,7 @@ func TestList(t *testing.T) {
 		check.Equal(t, st, es)
 	})
 	t.Run("CacheCorrectness", func(t *testing.T) {
-		es := &List{}
+		es := &list{}
 		es.Add(errors.New(errval))
 		er1 := es.Error()
 		es.Add(errors.New(errval))
@@ -143,14 +143,14 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("Merge", func(t *testing.T) {
-		es1 := &List{}
+		es1 := &list{}
 		es1.Add(errors.New(errval))
 		es1.Add(errors.New(errval))
 		if l := es1.Len(); l != 2 {
 			t.Fatal("es1 unexpected length", l)
 		}
 
-		es2 := &List{}
+		es2 := &list{}
 		es2.Add(errors.New(errval))
 		es2.Add(errors.New(errval))
 
@@ -165,7 +165,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("ConventionalWrap", func(t *testing.T) {
 		err := fmt.Errorf("foo: %w", errors.New("bar"))
-		es := &List{}
+		es := &list{}
 		es.Push(err)
 		if l := es.Len(); l != 1 {
 			t.Fatalf("%d, %+v", l, es)
@@ -175,7 +175,7 @@ func TestList(t *testing.T) {
 		err1 := errors.New("foo")
 		err2 := errors.New("bar")
 
-		es := &List{}
+		es := &list{}
 		es.Push(err1)
 		es.Push(err2)
 		if !errors.Is(es, err1) {
@@ -183,7 +183,7 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("OutputOrderedLogically", func(t *testing.T) {
-		es := &List{}
+		es := &list{}
 		es.Push(errors.New("one"))
 		es.Push(errors.New("two"))
 		es.Push(errors.New("three"))
@@ -354,13 +354,13 @@ func TestMergeLegacy(t *testing.T) {
 	})
 	t.Run("UnwindingPush", func(t *testing.T) {
 		err := slwind{out: []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}}
-		s := &List{}
+		s := &list{}
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})
 	t.Run("UnwrappingPush", func(t *testing.T) {
 		err := slwrap{out: []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}}
-		s := &List{}
+		s := &list{}
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})

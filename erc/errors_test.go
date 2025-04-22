@@ -270,7 +270,7 @@ func TestError(t *testing.T) {
 							if count > 10 {
 								t.Error("should have one by now")
 							}
-						} else if _, ok := err.(*List); !ok {
+						} else if _, ok := err.(*list); !ok {
 							t.Error("should be an error stack")
 						}
 					}
@@ -349,7 +349,7 @@ func BenchmarkErrorList(b *testing.B) {
 
 	b.Run("Reporting", func(b *testing.B) {
 		b.Run("ListError", func(b *testing.B) {
-			es := &List{}
+			es := &list{}
 			for i := 0; i < count; i++ {
 				es.Push(errors.New("foo"))
 			}
