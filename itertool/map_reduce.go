@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -65,7 +64,7 @@ func Reduce[T any, O any](
 	// TODO: add emitter function
 
 	return func(ctx context.Context) (value O, err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		value = initialReduceValue
 		for {
 			item, err := iter.Read(ctx)

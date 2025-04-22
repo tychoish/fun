@@ -123,7 +123,7 @@ func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 
 // Recover catches a panic, turns it into an error and passes it to
 // the provided observer function.
-func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
+func (Constructors) Recover(ob fn.Handler[error]) { ob(erc.ParsePanic(recover())) }
 
 // ErrorHandlerWithoutCancelation wraps and returns an error handler
 // that filters all nil errors and errors that are rooted in context

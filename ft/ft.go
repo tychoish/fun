@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
@@ -400,7 +401,7 @@ func MustBeOk[T any](out T, ok bool) T {
 // produce an error and, if the function panics, converts it into an
 // error.
 func WithRecoverCall(fn func()) (err error) {
-	defer func() { err = ers.ParsePanic(recover()) }()
+	defer func() { err = erc.ParsePanic(recover()) }()
 	fn()
 	return
 }
@@ -414,14 +415,14 @@ func WrapRecoverCall(fn func()) func() error { return func() error { return With
 // WithRecoverDo runs a function with a panic handler that converts
 // the panic to an error.
 func WithRecoverDo[T any](fn func() T) (_ T, err error) {
-	defer func() { err = ers.ParsePanic(recover()) }()
+	defer func() { err = erc.ParsePanic(recover()) }()
 	return fn(), nil
 }
 
 // WithRecoverApply runs a function with a panic handler that converts
 // the panic to an error.
 func WithRecoverApply[T any](op func(T), in T) (err error) {
-	defer func() { err = ers.ParsePanic(recover()) }()
+	defer func() { err = erc.ParsePanic(recover()) }()
 	op(in)
 	return
 }
@@ -429,7 +430,7 @@ func WithRecoverApply[T any](op func(T), in T) (err error) {
 // WithRecoverOk runs a function and returns true if there are no errors and
 // no panics the bool output value is true, otherwise it is false.
 func WithRecoverOk[T any](fn func() (T, error)) (zero T, ok bool) {
-	defer func() { ok = ers.IsOk(ers.ParsePanic(recover())) && ok }()
+	defer func() { ok = ers.IsOk(erc.ParsePanic(recover())) && ok }()
 	if value, err := fn(); ers.IsOk(err) {
 		return value, ers.IsOk(err)
 	}

@@ -332,7 +332,7 @@ func (st *Stream[T]) Read(ctx context.Context) (out T, err error) {
 // abort processing and are returned by the worker.
 func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover()), st.Close()) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover()), st.Close()) }()
 		for {
 			item, err := st.Read(ctx)
 			switch {
@@ -409,7 +409,7 @@ func (st *Stream[T]) Any() *Stream[any] {
 func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
 	var value T
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 
 		for {
 			item, err := st.Read(ctx)

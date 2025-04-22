@@ -58,14 +58,6 @@ func TestErrors(t *testing.T) {
 		err = errors.New("hi")
 		check.True(t, !IsOk(err))
 	})
-	t.Run("InvariantViolation", func(t *testing.T) {
-		assert.True(t, IsInvariantViolation(ErrInvariantViolation))
-		assert.True(t, IsInvariantViolation(errors.Join(io.EOF, Error("hello"), ErrInvariantViolation)))
-		assert.True(t, !IsInvariantViolation(nil))
-		assert.True(t, !IsInvariantViolation(9001))
-		assert.True(t, !IsInvariantViolation(io.EOF))
-	})
-
 	t.Run("IsError", func(t *testing.T) {
 		check.True(t, !IsError(nil))
 		check.True(t, IsError(New("error")))

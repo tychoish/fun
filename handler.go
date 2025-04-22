@@ -74,7 +74,7 @@ func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ct
 // itself a processor.
 func (pf Handler[T]) WithRecover() Handler[T] {
 	return func(ctx context.Context, in T) (err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		return pf(ctx, in)
 	}
 }
@@ -297,7 +297,7 @@ func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) 
 // encountered. The worker is blocking.
 func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(err, st.Close(), ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, st.Close(), erc.ParsePanic(recover())) }()
 
 		for {
 			item, err := st.Read(ctx)

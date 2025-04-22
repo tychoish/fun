@@ -117,10 +117,10 @@ func (ec *Collector) Whenf(cond bool, val string, args ...any) {
 
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
-func (ec *Collector) Check(fut func() error) { ec.Push(fut.Resolve()) }
+func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
 
 // Recover can be used in a defer to collect a panic and add it to the collector.
-func (ec *Collector) Recover() { ec.Push(ers.ParsePanic(recover())) }
+func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
 // WithRecover calls the provided function, collecting any
 func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
@@ -131,7 +131,7 @@ func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); 
 // a noop. Run WithRecoverHook in defer statements.
 func (ec *Collector) WithRecoverHook(hook func()) {
 	defer ec.Recover()
-	if err := ers.ParsePanic(recover()); err != nil {
+	if err := ParsePanic(recover()); err != nil {
 		defer internal.With(internal.Lock(&ec.mu))
 		ec.list.Push(err)
 		if hook != nil {

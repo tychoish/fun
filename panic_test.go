@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -42,7 +43,7 @@ func TestPanics(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrInvariantViolation)
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			assert.True(t, ers.IsInvariantViolation(err))
+			assert.True(t, erc.IsInvariantViolation(err))
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
@@ -78,10 +79,10 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("CheckError", func(t *testing.T) {
-			if ers.IsInvariantViolation(nil) {
+			if erc.IsInvariantViolation(nil) {
 				t.Error("nil error shouldn't read as invariant")
 			}
-			if ers.IsInvariantViolation(errors.New("foo")) {
+			if erc.IsInvariantViolation(errors.New("foo")) {
 				t.Error("arbitrary errors are not invariants")
 			}
 		})

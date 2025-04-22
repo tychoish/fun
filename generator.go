@@ -76,7 +76,7 @@ func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(
 // any panic to an error.
 func (pf Generator[T]) WithRecover() Generator[T] {
 	return func(ctx context.Context) (_ T, err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		return pf(ctx)
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -64,7 +63,7 @@ func (mpf Converter[T, O]) WithLock(mu *sync.Mutex) Converter[T, O] {
 // the Transform function's error.
 func (mpf Converter[T, O]) WithRecover() Converter[T, O] {
 	return func(ctx context.Context, val T) (_ O, err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		return mpf(ctx, val)
 	}
 }

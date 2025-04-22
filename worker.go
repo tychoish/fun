@@ -65,7 +65,7 @@ func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 // panics to errors.
 func (wf Worker) WithRecover() Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		return wf(ctx)
 	}
 }

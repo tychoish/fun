@@ -2,7 +2,6 @@ package fun
 
 import (
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 )
 
 // OptionProvider is a function type for building functional
@@ -52,7 +51,7 @@ func (op OptionProvider[T]) Build(conf T) (out T, err error) {
 func (op OptionProvider[T]) Join(opps ...OptionProvider[T]) OptionProvider[T] {
 	opps = append([]OptionProvider[T]{op}, opps...)
 	return func(option T) (err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		for idx := range opps {
 			if opps[idx] == nil {
 				continue

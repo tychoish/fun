@@ -45,7 +45,7 @@ func (RuntimeInvariant) Failure(args ...any) { Invariant.Ok(false, args...) }
 // rooted in InvariantViolation. Otherwise the operation is a noop.
 func (RuntimeInvariant) Ok(cond bool, args ...any) {
 	if !cond {
-		panic(ers.NewInvariantViolation(args...))
+		panic(erc.NewInvariantViolation(args...))
 	}
 }
 

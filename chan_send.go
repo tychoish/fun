@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 )
 
 // ChanSend provides access to channel send operations, and is
@@ -91,7 +90,7 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 // from the stream into the channel.
 func (sm ChanSend[T]) Consume(iter *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(iter.Close(), err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(iter.Close(), err, erc.ParsePanic(recover())) }()
 		return sm.Handler().ReadAll(iter).Run(ctx)
 	}
 }
