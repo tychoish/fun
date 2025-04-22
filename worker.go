@@ -299,7 +299,7 @@ func (wf Worker) PreHook(pre Operation) Worker {
 // PostHook runs hook operation  after the worker function
 // completes. If the hook panics it is converted to an error and
 // aggregated with workers's error.
-func (wf Worker) PostHook(post func()) Worker { return wf.WithErrorHook(ers.WrapRecoverCall(post)) }
+func (wf Worker) PostHook(post func()) Worker { return wf.WithErrorHook(ft.WrapRecoverCall(post)) }
 
 // WithErrorHook runs the worker, potentially catching a panic and
 // joining that with the error produced by the error future. Both the
@@ -335,7 +335,7 @@ func (wf Worker) Group(n int) Worker {
 // function in the following form works:
 //
 //	func(error) error
-func (wf Worker) WithErrorFilter(ef ers.Filter) Worker {
+func (wf Worker) WithErrorFilter(ef erc.Filter) Worker {
 	return func(ctx context.Context) error { return ef(wf(ctx)) }
 }
 
@@ -343,7 +343,7 @@ func (wf Worker) WithErrorFilter(ef ers.Filter) Worker {
 // returned by the worker is one of the errors passed to
 // WithoutErrors.
 func (wf Worker) WithoutErrors(errs ...error) Worker {
-	filter := ers.FilterExclude(errs...)
+	filter := erc.FilterExclude(errs...)
 	return func(ctx context.Context) error { return filter(wf(ctx)) }
 }
 

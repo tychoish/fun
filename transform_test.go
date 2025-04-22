@@ -1059,10 +1059,10 @@ func RunStreamStringAlgoTests(
 
 		err := ec.Resolve()
 		check.Error(t, err)
-		check.Error(t, ers.FilterExclude(io.EOF, context.DeadlineExceeded).Run(err))
-		check.NotError(t, ers.FilterExclude(context.Canceled).Run(err))
+		check.Error(t, erc.FilterExclude(io.EOF, context.DeadlineExceeded).Run(err))
+		check.NotError(t, erc.FilterExclude(context.Canceled).Run(err))
 
-		check.NotError(t, ers.FilterExclude(ErrCountMeOut).Run(err))
+		check.NotError(t, erc.FilterExclude(ErrCountMeOut).Run(err))
 		check.ErrorIs(t, err, ErrCountMeOut)
 	})
 	t.Run("ConverterOK", func(t *testing.T) {

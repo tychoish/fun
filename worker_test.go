@@ -127,7 +127,7 @@ func TestWorker(t *testing.T) {
 			})
 			t.Run("Must", func(t *testing.T) {
 				expected := errors.New("buddy")
-				err := ers.WithRecoverCall(func() {
+				err := ft.WithRecoverCall(func() {
 					wf := Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
@@ -139,7 +139,7 @@ func TestWorker(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				err = ers.WithRecoverCall(func() {
+				err = ft.WithRecoverCall(func() {
 					wf := Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()

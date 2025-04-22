@@ -25,6 +25,19 @@ type okErrTest struct {
 func (e *okErrTest) Error() string { return fmt.Sprint("errno", e.val) }
 func (e *okErrTest) Ok() bool      { return e == nil || e.val <= 0 }
 
+// Strings renders (using the Error() method) a slice of errors into a
+// slice of their string values.
+func Strings(errs []error) []string {
+	out := make([]string, 0, len(errs))
+	for idx := range errs {
+		if !IsOk(errs[idx]) {
+			out = append(out, errs[idx].Error())
+		}
+	}
+
+	return out
+}
+
 func TestErrors(t *testing.T) {
 	t.Run("Predicates", func(t *testing.T) {
 		check.True(t, IsTerminating(io.EOF))
@@ -41,44 +54,9 @@ func TestErrors(t *testing.T) {
 	})
 	t.Run("Ok", func(t *testing.T) {
 		var err error
-		check.True(t, Ok(err))
+		check.True(t, IsOk(err))
 		err = errors.New("hi")
-		check.True(t, !Ok(err))
-	})
-	t.Run("Filter", func(t *testing.T) {
-		err := errors.Join(Error("beep"), context.Canceled)
-		check.Error(t, err)
-		check.NotError(t, FilterExclude(context.Canceled).Run(err))
-		check.NotError(t, FilterExclude(context.Canceled, io.EOF).Run(err))
-		check.Error(t, FilterExclude(io.EOF).Run(err))
-		check.Error(t, FilterExclude(nil).Run(io.EOF))
-		check.Error(t, FilterExclude().Run(err))
-		check.Error(t, FilterExclude().Run(io.EOF))
-		check.NotError(t, FilterExclude(io.EOF).Run(nil))
-		check.NotError(t, FilterExclude(nil).Run(nil))
-		check.NotError(t, FilterExclude().Run(nil))
-		check.NotError(t, FilterNoop().Run(nil))
-		check.Error(t, FilterNoop().Run(io.EOF))
-		check.Error(t, FilterNoop().Run(context.Canceled))
-		err = errors.Join(Error("beep"), io.EOF)
-		check.Error(t, err)
-		check.Error(t, FilterExclude(context.Canceled).Run(err))
-		check.NotError(t, FilterExclude(io.EOF).Run(err))
-		check.NotError(t, FilterExclude(io.EOF, context.DeadlineExceeded).Run(err))
-
-		err = Error("boop")
-		err = FilterConvert(io.EOF).Run(err)
-		check.Equal(t, err, io.EOF)
-		err = FilterConvert(io.EOF).Run(nil)
-		check.NotError(t, err)
-	})
-	t.Run("FilterJoin", func(t *testing.T) {
-		endAndCancelFilter := FilterJoin(FilterContext(), FilterTerminating(), nil)
-		check.NotError(t, endAndCancelFilter(io.EOF))
-		check.NotError(t, endAndCancelFilter(nil))
-		check.NotError(t, endAndCancelFilter(context.Canceled))
-		check.Error(t, endAndCancelFilter(New("will error")))
-		// TODO write test that exercises short circuiting execution
+		check.True(t, !IsOk(err))
 	})
 	t.Run("InvariantViolation", func(t *testing.T) {
 		assert.True(t, IsInvariantViolation(ErrInvariantViolation))
@@ -109,48 +87,25 @@ func TestErrors(t *testing.T) {
 		check.True(t, As(err, &out))
 		check.Equal(t, out.val, 100)
 	})
-	t.Run("Append", func(t *testing.T) {
-		check.Equal(t, 0, len(Append([]error{}, nil, nil, nil)))
-		check.Equal(t, 1, len(Append([]error{}, nil, Error("one"), nil)))
-		check.Equal(t, 2, len(Append([]error{Error("hi")}, nil, Error("one"), nil)))
-	})
 	t.Run("Strings", func(t *testing.T) {
 		strs := Strings([]error{Error("hi"), nil, Error("from"), Error("the"), nil, Error("other"), nil, Error("world"), nil})
 		check.Equal(t, len(strs), 5)
 		check.Equal(t, "hi from the other world", strings.Join(strs, " "))
 	})
-	t.Run("RemoveOK", func(t *testing.T) {
-		check.Equal(t, 0, len(RemoveOk([]error{nil, nil, nil})))
-		check.Equal(t, 3, cap(RemoveOk([]error{nil, nil, nil})))
-		check.Equal(t, 1, len(RemoveOk([]error{nil, io.EOF, nil})))
-		check.Equal(t, 3, len(RemoveOk([]error{Error("one"), io.EOF, New("two")})))
-	})
 	t.Run("OkCheck", func(t *testing.T) {
 		var err *okErrTest
 		_ = error(err) // compile time interface compliance test
 
-		assert.True(t, Ok(err))
+		assert.True(t, IsOk(err))
 		assert.True(t, err == nil)
 		err = &okErrTest{}
 
-		assert.True(t, Ok(err))
+		assert.True(t, IsOk(err))
 		assert.True(t, err != nil)
 		err.val = 41
-		assert.True(t, !Ok(err))
+		assert.True(t, !IsOk(err))
 	})
 	t.Run("When", func(t *testing.T) {
-		t.Run("Bypass", func(t *testing.T) {
-			check.NotError(t, When(false, "hello"))
-			check.True(t, When(false, "hello") == nil)
-		})
-		t.Run("True", func(t *testing.T) {
-			check.Error(t, When(true, "hello"))
-			check.ErrorIs(t, When(true, "hello"), Error("hello"))
-
-			_, ok := When(true, "hello").(Error)
-			check.True(t, ok)
-		})
-
 		const errval Error = "ERRO=42"
 
 		t.Run("BasicString", func(t *testing.T) {
@@ -159,19 +114,9 @@ func TestErrors(t *testing.T) {
 			err = When(true, errval)
 			check.Error(t, err)
 		})
-		t.Run("WhenBasicWeirdType", func(t *testing.T) {
-			err := When(false, 54)
-			assert.NotError(t, err)
-			err = When(true, 50000)
-			check.Error(t, err)
-
-			check.Substring(t, err.Error(), "50000")
-			check.Substring(t, err.Error(), "int")
-		})
-
 		t.Run("Wrapping", func(t *testing.T) {
 			err := Whenf(false, "no error %w", errval)
-			assert.True(t, Ok(err))
+			assert.True(t, IsOk(err))
 
 			err = Whenf(true, "no error: %w", errval)
 			assert.Error(t, err)
@@ -190,5 +135,13 @@ func TestErrors(t *testing.T) {
 			check.ErrorIs(t, Whenf(true, "hello: %w", inner), inner)
 			check.NotEqual(t, Whenf(true, "hello: %w", inner).Error(), inner.Error())
 		})
+	})
+	t.Run("Strings", func(t *testing.T) {
+		sl := []error{io.EOF, context.Canceled, ErrLimitExceeded}
+		strs := Strings(sl)
+		merged := strings.Join(strs, ": ")
+		check.Substring(t, merged, "EOF")
+		check.Substring(t, merged, "context canceled")
+		check.Substring(t, merged, "limit exceeded")
 	})
 }

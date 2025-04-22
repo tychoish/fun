@@ -169,7 +169,7 @@ func (Constructors) ErrorHandlerWithoutTerminating(of fn.Handler[error]) fn.Hand
 // its component errors. All errors are processed by the provided
 // filter, and the transformer's context is not used. The error value
 // of the Transform function is always nil.
-func (Constructors) ErrorUnwindTransformer(filter ers.Filter) Converter[error, []error] {
+func (Constructors) ErrorUnwindTransformer(filter erc.Filter) Converter[error, []error] {
 	return func(_ context.Context, err error) ([]error, error) {
 		unwound := ers.Unwind(err)
 		out := make([]error, 0, len(unwound))
@@ -196,6 +196,20 @@ func (Constructors) ErrorHandlerWithAbort(cancel context.CancelFunc) fn.Handler[
 
 		cancel()
 	}
+}
+
+func (Constructors) ConvertErrorsToStrings() Converter[[]error, []string] {
+	return MakeConverter(func(errs []error) []string {
+		out := make([]string, 0, len(errs))
+		for idx := range errs {
+			if !ers.IsOk(errs[idx]) {
+				out = append(out, errs[idx].Error())
+			}
+		}
+
+		return out
+	})
+
 }
 
 // Sprintln constructs a future that calls fmt.Sprintln over the given

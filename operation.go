@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
@@ -147,7 +146,7 @@ func (wf Operation) Wait() { wf(context.Background()) }
 // WithRecover converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.
 func (wf Operation) WithRecover() Worker {
-	return func(ctx context.Context) error { return ers.WithRecoverApply(wf, ctx) }
+	return func(ctx context.Context) error { return ft.WithRecoverApply(wf, ctx) }
 }
 
 // Worker converts a wait function into a fun.Worker. If the context

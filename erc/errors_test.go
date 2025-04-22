@@ -160,45 +160,16 @@ func TestError(t *testing.T) {
 		})
 		t.Run("WhenBasicString", func(t *testing.T) {
 			ec := &Collector{}
-			ec.When(false, "no error")
+			ec.When(false, ers.Error("no error"))
 			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
-			ec.When(true, errval)
+			ec.When(true, ers.Error(errval))
 			check.NotZero(t, ec.list) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
 			} else if err.Error() != errval {
 				t.Fatal(err)
 			}
-		})
-		t.Run("WhenBasicError", func(t *testing.T) {
-			ec := &Collector{}
-			ec.When(false, "no error")
-			assert.True(t, ec.Ok())
-			assert.NotError(t, ec.Resolve())
-			ex := errors.New(errval)
-			ec.When(true, ex)
-			check.NotZero(t, ec.list) // nil is zero
-			if err := ec.Resolve(); err == nil {
-				t.Fatal(err)
-			} else if err.Error() != errval {
-				t.Fatal(err)
-			}
-			assert.ErrorIs(t, ec.Resolve(), ex)
-		})
-		t.Run("WhenBasicWeirdType", func(t *testing.T) {
-			ec := &Collector{}
-			ec.When(false, 54)
-			assert.True(t, !ec.HasErrors())
-			assert.NotError(t, ec.Resolve())
-			ec.When(true, 50000)
-			check.NotZero(t, ec.list) // nil is zero
-			err := ec.Resolve()
-			if err == nil {
-				t.Fatal(err)
-			}
-			check.Substring(t, err.Error(), "50000")
-			check.Substring(t, err.Error(), "int")
 		})
 		t.Run("WhenWrapping", func(t *testing.T) {
 			serr := errors.New(errval)
@@ -371,6 +342,12 @@ func TestError(t *testing.T) {
 		ec.Add(io.EOF)
 
 		check.Equal(t, 6, ec.Len())
+	})
+	t.Run("RemoveOK", func(t *testing.T) {
+		check.Equal(t, 0, len(RemoveOk([]error{nil, nil, nil})))
+		check.Equal(t, 3, cap(RemoveOk([]error{nil, nil, nil})))
+		check.Equal(t, 1, len(RemoveOk([]error{nil, io.EOF, nil})))
+		check.Equal(t, 3, len(RemoveOk([]error{ers.Error("one"), io.EOF, ers.New("two")})))
 	})
 }
 

@@ -62,7 +62,7 @@ func (pf Handler[T]) Ignore(ctx context.Context, in T) { ft.IgnoreError(pf(ctx, 
 
 // Check processes the input and returns true when the error is nil,
 // and false when there was an error.
-func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.Ok(pf(ctx, in)) }
+func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.IsOk(pf(ctx, in)) }
 
 // Force processes the input, but discards the error and uses a
 // context that will not expire.
@@ -243,7 +243,7 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 // before a processor is called the first time.
 func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		return erc.Join(ers.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
+		return erc.Join(ft.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
 	}
 }
 
@@ -254,20 +254,20 @@ func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 // case of a processor panic.)
 func (pf Handler[T]) PostHook(op func()) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		return erc.Join(ft.Flip(pf(ctx, in), ers.WithRecoverCall(op)))
+		return erc.Join(ft.Flip(pf(ctx, in), ft.WithRecoverCall(op)))
 	}
 }
 
-// WithErrorFilter uses an ers.Filter to process the error respose from
+// WithErrorFilter uses an erc.Filter to process the error respose from
 // the processor.
-func (pf Handler[T]) WithErrorFilter(ef ers.Filter) Handler[T] {
+func (pf Handler[T]) WithErrorFilter(ef erc.Filter) Handler[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }
 
 // WithoutErrors returns a producer that will convert a non-nil error
 // of the provided types to a nil error.
 func (pf Handler[T]) WithoutErrors(errs ...error) Handler[T] {
-	return pf.WithErrorFilter(ers.FilterExclude(errs...))
+	return pf.WithErrorFilter(erc.FilterExclude(errs...))
 }
 
 // WithErrorCheck takes an error future, and checks it before

@@ -42,7 +42,7 @@ func TestList(t *testing.T) {
 		assert.Zero(t, l.Len())
 	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-		ok, err := ers.WithRecoverDo(func() bool {
+		ok, err := ft.WithRecoverDo(func() bool {
 			var list *List[string]
 			list.PushBack("hi")
 			return true

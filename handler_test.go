@@ -718,7 +718,7 @@ func TestProcess(t *testing.T) {
 		})
 		assert.Equal(t, called, 2)
 
-		err := ers.WithRecoverCall(func() {
+		err := ft.WithRecoverCall(func() {
 			MakeHandler(func(in int) error {
 				called++
 				check.Equal(t, in, 42)

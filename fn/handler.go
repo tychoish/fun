@@ -3,7 +3,6 @@ package fn
 import (
 	"sync"
 
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -50,7 +49,7 @@ func (of Handler[T]) WithRecover(oe Handler[error]) Handler[T] {
 
 // RecoverPanic runs the handler function with a panic handler and converts
 // a possible panic to an error.
-func (of Handler[T]) RecoverPanic(in T) error { return ers.WithRecoverCall(of.Capture(in)) }
+func (of Handler[T]) RecoverPanic(in T) error { return ft.WithRecoverCall(of.Capture(in)) }
 
 // If returns an handler that only executes the root handler if the
 // condition is true.

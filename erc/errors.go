@@ -131,7 +131,7 @@ func (ec *Collector) Ok() bool { return ec.Len() == 0 }
 // When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
-func (ec *Collector) When(cond bool, val any) { ec.Add(ers.When(cond, val)) }
+func (ec *Collector) When(cond bool, val error) { ec.Add(ers.When(cond, val)) }
 
 // Whenf conditionally creates and adds an error to the collector, as
 // When, and with a similar use case, but permits Sprintf/Errorf
@@ -166,7 +166,7 @@ func RecoverHook(ec *Collector, hook func()) { ec.AddWithHook(ers.ParsePanic(rec
 // This, roughly mirrors the usage "github/pkg/errors.Wrap" but
 // taking advantage of newer standard library error wrapping.
 func Wrap(err error, annotation ...any) error {
-	if ers.Ok(err) {
+	if ers.IsOk(err) {
 		return nil
 	}
 
@@ -180,7 +180,7 @@ func Wrap(err error, annotation ...any) error {
 // This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
 // taking advantage of newer standard library error wrapping.
 func Wrapf(err error, tmpl string, args ...any) error {
-	if ers.Ok(err) {
+	if ers.IsOk(err) {
 		return nil
 	}
 	return Join(err, fmt.Errorf(tmpl, args...))

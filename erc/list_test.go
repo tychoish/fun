@@ -364,13 +364,4 @@ func TestMergeLegacy(t *testing.T) {
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})
-	t.Run("Strings", func(t *testing.T) {
-		sl := []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}
-		strs := ers.Strings(sl)
-		merged := strings.Join(strs, ": ")
-		check.Substring(t, merged, "EOF")
-		check.Substring(t, merged, "context canceled")
-		check.Substring(t, merged, "limit exceeded")
-	})
-
 }

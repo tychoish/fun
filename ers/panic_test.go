@@ -11,13 +11,6 @@ import (
 )
 
 func TestPanics(t *testing.T) {
-	t.Run("SafeWithPanic", func(t *testing.T) {
-		ok, err := WithRecoverDo(func() bool {
-			panic(errors.New("error"))
-		})
-		assert.Error(t, err)
-		check.True(t, !ok)
-	})
 	t.Run("Recover", func(t *testing.T) {
 		var called bool
 		ob := func(err error) {
@@ -31,45 +24,6 @@ func TestPanics(t *testing.T) {
 			panic("hi")
 		})
 		assert.True(t, called)
-	})
-	t.Run("Check", func(t *testing.T) {
-		t.Run("NoError", func(t *testing.T) {
-			err := WithRecoverCall(func() { t.Log("function runs") })
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-		t.Run("WithPanic", func(t *testing.T) {
-			err := WithRecoverCall(func() { panic("function runs") })
-			if err == nil {
-				t.Fatal(err)
-			}
-			errText := err.Error()
-			if !strings.Contains(errText, "recovered panic") {
-				t.Error(err, "!=", errText)
-			}
-
-			if !strings.Contains(errText, "function runs") {
-				t.Error(err, "!=", errText)
-			}
-		})
-	})
-	t.Run("Apply", func(t *testing.T) {
-		if err := WithRecoverApply(nil, 123); err == nil {
-			t.Error("expected error")
-		}
-
-		if err := WithRecoverApply(func(in int) { panic(in) }, 123); err == nil {
-			t.Error("expected error")
-		}
-
-		if err := WithRecoverApply(func(in int) {
-			if in != 123 {
-				t.Fatal(in)
-			}
-		}, 123); err != nil {
-			t.Error(err)
-		}
 	})
 	t.Run("ParsePanic", func(t *testing.T) {
 		t.Run("NilInput", func(t *testing.T) {
@@ -128,18 +82,6 @@ func TestPanics(t *testing.T) {
 			}
 		})
 	})
-	t.Run("SafeOK", func(t *testing.T) {
-		t.Run("Not", func(t *testing.T) {
-			num, ok := WithRecoverOk(func() (int, error) { return 42, io.EOF })
-			assert.True(t, !ok)
-			assert.Zero(t, num)
-		})
-		t.Run("Passes", func(t *testing.T) {
-			num, ok := WithRecoverOk(func() (int, error) { return 42, nil })
-			assert.True(t, ok)
-			assert.Equal(t, 42, num)
-		})
-	})
 	t.Run("ExtractErrors", func(t *testing.T) {
 		args, errs := ExtractErrors([]any{nil, Error("hi"), 1, true})
 		check.Equal(t, len(errs), 1)
@@ -148,46 +90,6 @@ func TestPanics(t *testing.T) {
 		args, errs = ExtractErrors([]any{nil, Error("hi"), func() error { return nil }(), nerr, 2, false})
 		check.Equal(t, len(errs), 1)
 		check.Equal(t, len(args), 2)
-	})
-	t.Run("WrapRecover", func(t *testing.T) {
-		const perr Error = "panic error"
-
-		t.Run("Call", func(t *testing.T) {
-			fn := func() { panic(perr) }
-			assert.NotPanic(t, func() {
-				assert.Error(t, WrapRecoverCall(fn)())
-				assert.ErrorIs(t, WrapRecoverCall(fn)(), perr)
-			})
-		})
-		t.Run("Do", func(t *testing.T) {
-			fn := func() int { panic(perr) }
-			assert.NotPanic(t, func() {
-				out, err := WrapRecoverDo(fn)()
-				assert.Error(t, err)
-				assert.Zero(t, out)
-				assert.ErrorIs(t, err, perr)
-			})
-		})
-		t.Run("OK", func(t *testing.T) {
-			fn := func() (int, error) { panic(perr) }
-			assert.NotPanic(t, func() {
-				out, ok := WrapRecoverOk(fn)()
-				assert.True(t, !ok)
-				assert.Zero(t, out)
-			})
-		})
-		t.Run("Happy", func(t *testing.T) {
-			assert.NotPanic(t, func() {
-				assert.NotError(t, WrapRecoverCall(func() {})())
-				out, err := WrapRecoverDo(func() int { return 42 })()
-				assert.Equal(t, out, 42)
-				assert.NotError(t, err)
-				out, ok := WrapRecoverOk(func() (int, error) { return 12, nil })()
-				assert.Equal(t, out, 12)
-				assert.True(t, ok)
-			})
-		})
-
 	})
 
 }

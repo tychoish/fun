@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -188,7 +189,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("Unwinder", func(t *testing.T) {
 		t.Run("BasicUnwind", func(t *testing.T) {
-			unwinder := MAKE.ErrorUnwindTransformer(ers.FilterNoop())
+			unwinder := MAKE.ErrorUnwindTransformer(erc.FilterNoop())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			errs, err := unwinder(ctx, erc.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ers.ErrInvariantViolation))
@@ -196,7 +197,7 @@ func TestHandlers(t *testing.T) {
 			check.Equal(t, len(errs), 3)
 		})
 		t.Run("Empty", func(t *testing.T) {
-			unwinder := MAKE.ErrorUnwindTransformer(ers.FilterNoop())
+			unwinder := MAKE.ErrorUnwindTransformer(erc.FilterNoop())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			errs, err := unwinder(ctx, nil)
@@ -332,6 +333,15 @@ func TestHandlers(t *testing.T) {
 		check.ErrorIs(t, errs[1], ers.ErrCurrentOpAbort)
 		check.ErrorIs(t, errs[2], io.EOF)
 	})
+	t.Run("Strings", func(t *testing.T) {
+		sl := []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}
+		strs := ft.Must(MAKE.ConvertErrorsToStrings().Wait(sl))
+		merged := strings.Join(strs, ": ")
+		check.Substring(t, merged, "EOF")
+		check.Substring(t, merged, "context canceled")
+		check.Substring(t, merged, "limit exceeded")
+	})
+
 }
 
 func (Constructors) String() string { return "Handlers<>" }

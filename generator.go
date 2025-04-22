@@ -382,7 +382,7 @@ func (pf Generator[T]) TTL(dur time.Duration) Generator[T] {
 // returned with the generator's output.
 func (pf Generator[T]) PreHook(op Operation) Generator[T] {
 	return func(ctx context.Context) (out T, err error) {
-		e := ers.WithRecoverCall(func() { op(ctx) })
+		e := ft.WithRecoverCall(func() { op(ctx) })
 		out, err = pf(ctx)
 		return out, erc.Join(err, e)
 	}
@@ -397,7 +397,7 @@ func (pf Generator[T]) PreHook(op Operation) Generator[T] {
 func (pf Generator[T]) PostHook(op func()) Generator[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
-		e = erc.Join(ers.WithRecoverCall(op), e)
+		e = erc.Join(ft.WithRecoverCall(op), e)
 		return
 	}
 }
@@ -408,12 +408,12 @@ func (pf Generator[T]) PostHook(op func()) Generator[T] {
 // list. The produced value in these cases is almost always the zero
 // value for the type.
 func (pf Generator[T]) WithoutErrors(errs ...error) Generator[T] {
-	return pf.WithErrorFilter(ers.FilterExclude(errs...))
+	return pf.WithErrorFilter(erc.FilterExclude(errs...))
 }
 
 // WithErrorFilter passes the error of the root Generator function with
-// the ers.Filter.
-func (pf Generator[T]) WithErrorFilter(ef ers.Filter) Generator[T] {
+// the erc.Filter.
+func (pf Generator[T]) WithErrorFilter(ef erc.Filter) Generator[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
 }
 

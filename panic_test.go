@@ -22,7 +22,7 @@ func TestPanics(t *testing.T) {
 		assert.True(t, ok)
 	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
-		ok, err := ers.WithRecoverDo(func() bool {
+		ok, err := ft.WithRecoverDo(func() bool {
 			return ft.Must(func() (bool, error) {
 				return true, nil
 			}())
@@ -36,7 +36,7 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("Invariant", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
-			err := ers.WithRecoverCall(func() {
+			err := ft.WithRecoverCall(func() {
 				Invariant.Ok(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
@@ -46,13 +46,13 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ers.WithRecoverCall(func() { Invariant.IsTrue(false, err) })
+			se := ft.WithRecoverCall(func() { Invariant.IsTrue(false, err) })
 
 			assert.ErrorIs(t, se, err)
 		})
 		t.Run("ErrorPlus", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ers.WithRecoverCall(func() { Invariant.Ok(false, err, 42) })
+			se := ft.WithRecoverCall(func() { Invariant.Ok(false, err, 42) })
 			if !errors.Is(se, err) {
 				t.Log("se", se)
 				t.Log("err", err)
@@ -63,13 +63,13 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("NoError", func(t *testing.T) {
-			err := ers.WithRecoverCall(func() { Invariant.IsTrue(false, 42) })
+			err := ft.WithRecoverCall(func() { Invariant.IsTrue(false, 42) })
 			if !strings.Contains(err.Error(), "42") {
 				t.Error(err)
 			}
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
-			err := ers.WithRecoverCall(func() { Invariant.IsTrue(1 == 2) })
+			err := ft.WithRecoverCall(func() { Invariant.IsTrue(1 == 2) })
 			if !errors.Is(err, ers.ErrInvariantViolation) {
 				t.Fatal(err)
 			}
@@ -86,7 +86,7 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("LongInvariant", func(t *testing.T) {
-			err := ers.WithRecoverCall(func() {
+			err := ft.WithRecoverCall(func() {
 				Invariant.IsTrue(1 == 2,
 					"math is a construct",
 					"1 == 2",
@@ -102,21 +102,21 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("InvariantMust", func(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
-			err := ers.WithRecoverCall(func() { Invariant.Must(nil, "hello") })
+			err := ft.WithRecoverCall(func() { Invariant.Must(nil, "hello") })
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 		t.Run("Expected", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ers.WithRecoverCall(func() { Invariant.Must(root, "hello") })
+			err := ft.WithRecoverCall(func() { Invariant.Must(root, "hello") })
 			if err == nil {
 				t.Fatal("expected error")
 			}
 		})
 		t.Run("Panic", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ers.WithRecoverCall(func() { Invariant.Must(root) })
+			err := ft.WithRecoverCall(func() { Invariant.Must(root) })
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -125,7 +125,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Propagate", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ers.WithRecoverCall(func() {
+			err := ft.WithRecoverCall(func() {
 				Invariant.Must(root, "annotate")
 			})
 			if err == nil {
@@ -143,7 +143,7 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("Nil", func(t *testing.T) {
-			err := ers.WithRecoverCall(func() {
+			err := ft.WithRecoverCall(func() {
 				Invariant.Must(nil, "annotate")
 			})
 			if err != nil {

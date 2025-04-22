@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -279,7 +280,7 @@ func TestStream(t *testing.T) {
 			out := ConvertStream(input,
 				MakeCovnerterOk(func(in string) (int, bool) {
 					calls++
-					return ers.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
+					return ft.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
 				}),
 			)
 			sum := 0

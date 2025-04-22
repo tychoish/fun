@@ -1,4 +1,6 @@
-package ers
+package erc
+
+import "github.com/tychoish/fun/ers"
 
 // Filter provides a way to process error messages, either to remove
 // errors, reformulate,  or annotate errors.
@@ -15,7 +17,7 @@ func FilterExclude(exclusions ...error) Filter {
 	if len(exclusions) == 0 {
 		return FilterNoop()
 	}
-	return FilterCheck(func(err error) bool { return Ok(err) || Is(err, exclusions...) })
+	return FilterCheck(func(err error) bool { return ers.IsOk(err) || ers.Is(err, exclusions...) })
 }
 
 // FilterNoop produces a filter that always returns the original error.
@@ -25,7 +27,7 @@ func FilterNoop() Filter { return func(err error) error { return err } }
 // errors. Other errors are propagated.
 func FilterContext() Filter {
 	return func(err error) error {
-		if Ok(err) || IsExpiredContext(err) {
+		if ers.IsOk(err) || ers.IsExpiredContext(err) {
 			return nil
 		}
 		return err
@@ -37,7 +39,7 @@ func FilterContext() Filter {
 // are propagated.
 func FilterTerminating() Filter {
 	return func(err error) error {
-		if Ok(err) || IsTerminating(err) {
+		if ers.IsOk(err) || ers.IsTerminating(err) {
 			return nil
 		}
 		return err
@@ -59,7 +61,7 @@ func FilterCheck(ep func(error) bool) Filter {
 // errors, and returns nil otherwise.
 func FilterConvert(output error) Filter {
 	return func(err error) error {
-		if Ok(err) {
+		if ers.IsOk(err) {
 			return nil
 		}
 		return output
@@ -92,38 +94,12 @@ func FilterJoin(filters ...Filter) Filter {
 	}
 }
 
-// ExtractErrors iterates through a list of untyped objects and removes the
-// errors from the list, returning both the errors and the remaining
-// items.
-func ExtractErrors(in []any) (rest []any, errs []error) {
-	for idx := range in {
-		switch val := in[idx].(type) {
-		case nil:
-			continue
-		case error:
-			errs = append(errs, val)
-		case func() error:
-			if e := val(); e != nil {
-				errs = append(errs, e)
-			}
-		case string:
-			if val == "" {
-				continue
-			}
-			rest = append(rest, val)
-		default:
-			rest = append(rest, val)
-		}
-	}
-	return
-}
-
 // RemoveOk removes all nil errors from a slice of errors, returning
 // the consolidated slice.
 func RemoveOk(errs []error) []error {
 	out := make([]error, 0, len(errs))
 	for idx := range errs {
-		if IsError(errs[idx]) {
+		if ers.IsError(errs[idx]) {
 			out = append(out, errs[idx])
 		}
 	}
