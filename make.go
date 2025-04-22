@@ -60,7 +60,7 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 	return func(ctx context.Context) error {
 		ec := &erc.Collector{}
-		eh := MAKE.ErrorHandlerWithoutTerminating(ec.Handler())
+		eh := MAKE.ErrorHandlerWithoutTerminating(ec.Push)
 
 		wg := &WaitGroup{}
 
@@ -69,7 +69,7 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 		}).Operation(eh))
 
 		wg.Wait(ctx)
-		ec.Add(ctx.Err())
+		ec.Push(ctx.Err())
 
 		return ec.Resolve()
 	}

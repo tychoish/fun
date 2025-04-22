@@ -258,9 +258,9 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorStream", func(t *testing.T) {
 		ec := &erc.Collector{}
-		ec.Add(ers.ErrContainerClosed)
-		ec.Add(ers.ErrCurrentOpAbort)
-		ec.Add(io.EOF)
+		ec.Push(ers.ErrContainerClosed)
+		ec.Push(ers.ErrCurrentOpAbort)
+		ec.Push(io.EOF)
 
 		errs, err := MAKE.ErrorStream(ec).Slice(t.Context())
 		check.NotError(t, err)

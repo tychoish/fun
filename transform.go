@@ -138,7 +138,7 @@ func (mpf Converter[T, O]) Parallel(
 		ReadAll(iter).
 		Group(conf.NumWorkers).
 		PostHook(output.Close).
-		Operation(conf.ErrorCollector.Handler()).
+		Operation(conf.ErrorCollector.Push).
 		Go().
 		Once()
 

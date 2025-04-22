@@ -178,7 +178,7 @@ func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := Blocking(make(chan T))
 	ec := &erc.Collector{}
-	eh := MAKE.ErrorHandlerWithoutTerminating(ec.Handler())
+	eh := MAKE.ErrorHandlerWithoutTerminating(ec.Push)
 
 	wg := &WaitGroup{}
 	init := Operation(func(ctx context.Context) {
@@ -244,10 +244,10 @@ func (st *Stream[T]) WithHook(hook fn.Handler[*Stream[T]]) *Stream[T] {
 //
 // AddError is not safe for concurrent use (with regards to other
 // AddError calls or Close).
-func (st *Stream[T]) AddError(e error) { st.erc.Add(e) }
+func (st *Stream[T]) AddError(e error) { st.erc.Push(e) }
 
 // ErrorHandler provides access to the AddError method as an error observer.
-func (st *Stream[T]) ErrorHandler() fn.Handler[error] { return st.erc.Handler() }
+func (st *Stream[T]) ErrorHandler() fn.Handler[error] { return st.erc.Push }
 
 // Generator provides access to the contents of the stream as a
 // Generator function.
@@ -372,7 +372,7 @@ func (st *Stream[T]) Parallel(
 		}
 
 		fn.WithRecover().WithErrorFilter(conf.ErrorFilter).
-			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Add(st.erc.Resolve()) })).
+			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) })).
 			StartGroup(ctx, conf.NumWorkers).
 			Ignore().
 			Run(ctx)

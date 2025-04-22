@@ -40,11 +40,11 @@ func Group(services *fun.Stream[*Service]) *Service {
 					defer ec.Recover()
 					defer wg.Done()
 					defer func() { fun.Invariant.IsTrue(waiters.Add(s.Wait) == nil) }()
-					ec.Add(s.Start(ctx))
+					ec.Push(s.Start(ctx))
 				}(services.Value())
 			}
 			wg.Wait(ctx)
-			ec.Add(waiters.Close())
+			ec.Push(waiters.Close())
 			return nil
 		},
 		Cleanup: func() error {
@@ -66,7 +66,7 @@ func Group(services *fun.Stream[*Service]) *Service {
 				go func(wait func() error) {
 					defer ec.Recover()
 					defer wg.Done()
-					ec.Add(wait())
+					ec.Push(wait())
 				}(iter.Value())
 			}
 
@@ -138,7 +138,7 @@ func Wait(iter *fun.Stream[fun.Operation]) *Service {
 				}(value)
 			}
 
-			ec.Add(iter.Close())
+			ec.Push(iter.Close())
 			wg.Wait()
 			return nil
 		},
@@ -372,7 +372,7 @@ func Daemon(s *Service, minInterval time.Duration) *Service {
 				if ers.IsExpiredContext(err) || ctx.Err() != nil {
 					return nil
 				}
-				ec.Add(err)
+				ec.Push(err)
 
 				timer.Reset(max(0, minInterval-time.Since(start)))
 

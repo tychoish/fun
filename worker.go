@@ -318,7 +318,7 @@ func (wf Worker) WithErrorHook(ef fn.Future[error]) Worker {
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	wg := &WaitGroup{}
 	ec := &erc.Collector{}
-	return wg.StartGroup(ctx, n, wf.Operation(ec.Handler())).WithErrorHook(ec.Future())
+	return wg.StartGroup(ctx, n, wf.Operation(ec.Push)).WithErrorHook(ec.Resolve)
 }
 
 // Group makes a worker that runs n copies of the underlying worker,

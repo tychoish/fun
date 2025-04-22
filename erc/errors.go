@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -29,22 +28,22 @@ type Collector struct {
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call erc.Join repeatedly on the same
 // error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Resolve() }
+func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.Resolve() }
 
-// Add collects an error if that error is non-nil.
-func (ec *Collector) Add(err error) {
+// Push collects an error if that error is non-nil.
+func (ec *Collector) Push(err error) {
 	if err != nil {
 		defer internal.With(internal.Lock(&ec.mu))
 		ec.list.Push(err)
 	}
 }
 
-func (ec *Collector) Join(errs ...error) {
+func (ec *Collector) Add(errs ...error) {
 	switch len(errs) {
 	case 0:
 		return
 	case 1:
-		ec.Add(errs[0])
+		ec.Push(errs[0])
 	default:
 		defer internal.With(internal.Lock(&ec.mu))
 		ec.list.Add(errs...)
@@ -52,19 +51,7 @@ func (ec *Collector) Join(errs ...error) {
 
 }
 
-// Handler returns the collector's Add method as a
-// fn.Handler[error] object for integration and use with the
-// function types.
-func (ec *Collector) Handler() fn.Handler[error] { return ec.Add }
-
-// Future returns a function that is generally equivalent to
-// Collector.Resolve(); however, the errors are returned as an unwound
-// slice of errors, rather than the erc.List object.
-func (ec *Collector) Future() fn.Future[error] { return ec.Resolve }
-
-// Future returns a function that is generally equivalent to
-// Collector.Resolve(); however, the errors are returned as an unwound
-// slice of errors, rather than the erc.List object.
+// Generator returns an iterator over the errors in the collector.
 func (ec *Collector) Generator() iter.Seq[error] {
 	return func(yield func(err error) bool) {
 		ec.mu.Lock()
@@ -119,19 +106,21 @@ func (ec *Collector) Ok() bool { return ec.Len() == 0 }
 // When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
-func (ec *Collector) When(cond bool, val error) { ec.Add(ers.When(cond, val)) }
+func (ec *Collector) When(cond bool, val error) { ec.Push(ers.When(cond, val)) }
 
 // Whenf conditionally creates and adds an error to the collector, as
 // When, and with a similar use case, but permits Sprintf/Errorf
 // formating.
-func (ec *Collector) Whenf(cond bool, val string, args ...any) { ec.Add(ers.Whenf(cond, val, args...)) }
+func (ec *Collector) Whenf(cond bool, val string, args ...any) {
+	ec.Push(ers.Whenf(cond, val, args...))
+}
 
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
-func (ec *Collector) Check(fut fn.Future[error]) { ec.Add(fut.Resolve()) }
+func (ec *Collector) Check(fut func() error) { ec.Push(fut.Resolve()) }
 
 // Recover can be used in a defer to collect a panic and add it to the collector.
-func (ec *Collector) Recover() { ec.Add(ers.ParsePanic(recover())) }
+func (ec *Collector) Recover() { ec.Push(ers.ParsePanic(recover())) }
 
 // WithRecover calls the provided function, collecting any
 func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }

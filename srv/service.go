@@ -151,7 +151,7 @@ func (s *Service) Start(ctx context.Context) error {
 				defer close(shutdownSignal)
 				defer ec.Recover()
 				<-ctx.Done()
-				s.ec.Add(shutdown())
+				s.ec.Push(shutdown())
 			}()
 		} else {
 			s.wg.Add(1)
@@ -173,7 +173,7 @@ func (s *Service) Start(ctx context.Context) error {
 				cleanup := s.Cleanup
 				// this catches a panic during shutdown
 				defer ec.Recover()
-				defer func() { ec.Add(cleanup()) }()
+				defer func() { ec.Push(cleanup()) }()
 			}
 			defer func() { defer close(ehSignal); <-shutdownSignal }()
 			// this catches a panic in the execution of
@@ -181,7 +181,7 @@ func (s *Service) Start(ctx context.Context) error {
 			defer ec.Recover()
 
 			defer s.cancel()
-			ec.Add(s.Run(ctx))
+			ec.Push(s.Run(ctx))
 		}()
 	})
 

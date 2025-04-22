@@ -77,13 +77,13 @@ func (o *WorkerGroupConf) CanContinueOnError(err error) (out bool) {
 	case ers.IsTerminating(err):
 		return false
 	case errors.Is(err, ers.ErrRecoveredPanic):
-		o.ErrorCollector.Add(err)
+		o.ErrorCollector.Push(err)
 		return o.ContinueOnPanic
 	case ers.IsExpiredContext(err):
 		o.ErrorCollector.When(o.IncludeContextExpirationErrors, err)
 		return false
 	default:
-		o.ErrorCollector.Add(err)
+		o.ErrorCollector.Push(err)
 		return o.ContinueOnError
 	}
 }

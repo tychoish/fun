@@ -27,17 +27,17 @@ func TestError(t *testing.T) {
 		})
 		t.Run("AddNilErrors", func(t *testing.T) {
 			catcher := &Collector{}
-			catcher.Add(nil)
+			catcher.Push(nil)
 			catcherIsEmpty(t, catcher)
 			var err error
-			catcher.Add(err)
+			catcher.Push(err)
 			catcherIsEmpty(t, catcher)
 			check.Equal(t, 0, catcher.Len())
 		})
 		t.Run("SingleError", func(t *testing.T) {
 			catcher := &Collector{}
 
-			catcher.Add(errors.New(errval))
+			catcher.Push(errors.New(errval))
 			catcherHasErrors(t, 1, catcher)
 
 			err := catcher.Resolve()
@@ -61,9 +61,8 @@ func TestError(t *testing.T) {
 		})
 		t.Run("Generator", func(t *testing.T) {
 			ec := &Collector{}
-			handler := ec.Handler()
 			for i := 0; i < 100; i++ {
-				handler(fmt.Errorf("%d", i))
+				ec.Push(fmt.Errorf("%d", i))
 			}
 			count := 0
 			for err := range ec.Generator() {
@@ -72,7 +71,7 @@ func TestError(t *testing.T) {
 			}
 
 			if count != 100 {
-				t.Log(ec.Len(), ec.Future().Resolve())
+				t.Log(ec.Len(), ec.Resolve())
 			}
 		})
 		t.Run("PanicRecovery", func(t *testing.T) {
@@ -84,7 +83,7 @@ func TestError(t *testing.T) {
 				panic("boop")
 			}()
 			<-sig
-			if err := es.Future().Resolve(); err == nil {
+			if err := es.Resolve(); err == nil {
 				t.Error("no panic recovered")
 			}
 			err := &es.list
@@ -191,24 +190,24 @@ func TestError(t *testing.T) {
 		})
 		t.Run("ContextHelper", func(t *testing.T) {
 			ec := &Collector{}
-			ec.Add(errors.New("foo"))
+			ec.Push(errors.New("foo"))
 			if ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
-			ec.Add(errors.New("foo"))
-			ec.Add(context.Canceled)
+			ec.Push(errors.New("foo"))
+			ec.Push(context.Canceled)
 			if !ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 			ec = &Collector{}
-			ec.Add(errors.New("foo"))
+			ec.Push(errors.New("foo"))
 			if ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
-			ec.Add(context.DeadlineExceeded)
-			ec.Add(errors.New("foo"))
+			ec.Push(context.DeadlineExceeded)
+			ec.Push(errors.New("foo"))
 			if !ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
@@ -245,7 +244,7 @@ func TestError(t *testing.T) {
 					case <-fixtureTimeout.Done():
 						return
 					case <-ticker.C:
-						catcher.Add(errors.New(errval))
+						catcher.Push(errors.New(errval))
 					}
 				}
 			}()
@@ -300,7 +299,7 @@ func TestError(t *testing.T) {
 		t.Run("Stack", func(t *testing.T) {
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
-				ec.Add(fmt.Errorf("%d", i))
+				ec.Push(fmt.Errorf("%d", i))
 			}
 			errs := ers.Unwind(ec.Resolve())
 			if len(errs) != 100 {
@@ -324,11 +323,11 @@ func TestError(t *testing.T) {
 	})
 	t.Run("LockingGenerator", func(t *testing.T) {
 		ec := &Collector{}
-		ec.Add(errors.New("ok,"))
-		ec.Add(errors.New("this"))
-		ec.Add(errors.New("is"))
-		ec.Add(errors.New("fine."))
-		ec.Add(io.EOF)
+		ec.Push(errors.New("ok,"))
+		ec.Push(errors.New("this"))
+		ec.Push(errors.New("is"))
+		ec.Push(errors.New("fine."))
+		ec.Push(io.EOF)
 
 		iterfunc := ec.Generator()
 		next, closer := iter.Pull(iterfunc)
@@ -339,7 +338,7 @@ func TestError(t *testing.T) {
 		check.ErrorIs(t, err, io.EOF)
 		check.Equal(t, "ok,", err.Error())
 
-		ec.Add(io.EOF)
+		ec.Push(io.EOF)
 
 		check.Equal(t, 6, ec.Len())
 	})
@@ -370,7 +369,7 @@ func BenchmarkErrorList(b *testing.B) {
 		b.Run("Collector", func(b *testing.B) {
 			ec := &Collector{}
 			for i := 0; i < count; i++ {
-				ec.Add(errors.New("foo"))
+				ec.Push(errors.New("foo"))
 			}
 			err := ec.Resolve().Error()
 			if err == "" {
@@ -391,7 +390,7 @@ func BenchmarkErrorList(b *testing.B) {
 				err := errors.New("foo")
 				for i := 0; i < b.N; i++ {
 					ec := &Collector{}
-					ec.Add(err)
+					ec.Push(err)
 				}
 			})
 		}
@@ -402,7 +401,7 @@ func BenchmarkErrorList(b *testing.B) {
 				err := errors.New("foo")
 				for i := 0; i < b.N; i++ {
 					ec := &Collector{}
-					ec.Add(err)
+					ec.Push(err)
 
 					str := ec.Resolve().Error()
 					if str == "" {

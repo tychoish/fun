@@ -121,13 +121,13 @@ func (or *Orchestrator) Service() *Service {
 					wg.Add(1)
 					go func(ss *Service) {
 						defer wg.Done()
-						ec.Add(ss.waitFor(ctx))
+						ec.Push(ss.waitFor(ctx))
 					}(s)
 					continue
 				}
 
 				if s.isFinished.Load() {
-					ec.Add(s.Wait())
+					ec.Push(s.Wait())
 					continue
 				}
 
@@ -135,8 +135,8 @@ func (or *Orchestrator) Service() *Service {
 				go func(ss *Service) {
 					defer wg.Done()
 
-					ec.Add(erc.Wrapf(ss.Start(ctx), "problem starting %s", ss.String()))
-					ec.Add(ss.Wait())
+					ec.Push(erc.Wrapf(ss.Start(ctx), "problem starting %s", ss.String()))
+					ec.Push(ss.Wait())
 				}(s)
 			}
 
