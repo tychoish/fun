@@ -125,27 +125,6 @@ func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 // the provided observer function.
 func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
-// ErrorList constructs an empty &erc.Stack{} value.
-func (Constructors) ErrorList() *erc.List { return &erc.List{} }
-
-// ErrorStackStream creates a stream object to view the contents
-// of a erc.Stack object (error collection).
-func (Constructors) ErrorStackStream(s *erc.List) *Stream[error] {
-	return SeqStream(s.FIFO())
-}
-
-// ErrorStackHandler provides a basic error aggregation facility around
-// erc.Stack (as with ErrorStackHandler, though this is an
-// implementation detail.) ErrorStackHandler does use a mutex to guard
-// these objects.
-func (Constructors) ErrorStackHandler() (fn.Handler[error], fn.Future[error]) {
-	mtx := &sync.Mutex{}
-	s := MAKE.ErrorList()
-	var hf fn.Handler[error] = s.Handler()
-	var ef fn.Future[error] = s.Future()
-	return hf.WithLock(mtx), ef.WithLock(mtx)
-}
-
 // ErrorHandlerWithoutCancelation wraps and returns an error handler
 // that filters all nil errors and errors that are rooted in context
 // Cancellation from the wrapped Handler.

@@ -343,12 +343,6 @@ func TestError(t *testing.T) {
 
 		check.Equal(t, 6, ec.Len())
 	})
-	t.Run("RemoveOK", func(t *testing.T) {
-		check.Equal(t, 0, len(RemoveOk([]error{nil, nil, nil})))
-		check.Equal(t, 3, cap(RemoveOk([]error{nil, nil, nil})))
-		check.Equal(t, 1, len(RemoveOk([]error{nil, io.EOF, nil})))
-		check.Equal(t, 3, len(RemoveOk([]error{ers.Error("one"), io.EOF, ers.New("two")})))
-	})
 }
 
 func BenchmarkErrorList(b *testing.B) {

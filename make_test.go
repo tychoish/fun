@@ -17,7 +17,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
 )
 
 func TestHandlers(t *testing.T) {
@@ -62,31 +61,6 @@ func TestHandlers(t *testing.T) {
 		eh(root)
 
 		check.Equal(t, count, 2)
-	})
-	t.Run("ErrorHandler", func(t *testing.T) {
-		count := 0
-		proc, fut := MAKE.ErrorStackHandler()
-		proc = proc.Join(func(err error) { count++ })
-
-		proc(nil)
-		check.NotError(t, fut())
-		check.Equal(t, count, 1)
-		check.Equal(t, len(ers.Unwind(fut())), 0)
-
-		proc(root)
-		check.ErrorIs(t, fut(), root)
-		check.Equal(t, len(ers.Unwind(fut())), 1)
-		check.Equal(t, count, 2) //
-
-		proc(io.EOF)
-		check.ErrorIs(t, fut(), io.EOF) //
-		check.ErrorIs(t, fut(), root)
-		check.Equal(t, len(ers.Unwind(fut())), 2)
-		check.Equal(t, count, 3) //
-
-		proc(nil)
-		check.Equal(t, count, 4) //
-		check.Equal(t, len(ers.Unwind(fut())), 2)
 	})
 	t.Run("Error", func(t *testing.T) {
 		called := 0
@@ -205,13 +179,6 @@ func TestHandlers(t *testing.T) {
 			check.Equal(t, len(errs), 0)
 		})
 	})
-	t.Run("ErrorCollector", func(t *testing.T) {
-		ob, prod := MAKE.ErrorStackHandler()
-		ft.DoTimes(128, func() { ob(nil) })
-		check.Equal(t, 0, len(internal.Unwind(prod.Resolve())))
-		ft.DoTimes(128, func() { ob(ers.Error("test")) })
-		check.Equal(t, 128, len(internal.Unwind(prod.Resolve())))
-	})
 	t.Run("StringFuture", func(t *testing.T) {
 		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprintf("%s:%d", "hi", 42)()) })
 		t.Run("Sprintln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Sprintln("hi", ":", 42)()) })
@@ -261,36 +228,6 @@ func TestHandlers(t *testing.T) {
 
 			check.EqualItems(t, out, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 		})
-	})
-	t.Run("ErrorStack", func(t *testing.T) {
-		t.Run("Empty", func(t *testing.T) {
-			assert.Equal(t, 0, MAKE.ErrorStackStream(&erc.List{}).Count(context.Background()))
-		})
-		t.Run("Number", func(t *testing.T) {
-			errs := &erc.List{}
-			errs.Add(ers.New("foof"), ers.New("boop"))
-			assert.Equal(t, 2, MAKE.ErrorStackStream(errs).Count(context.Background()))
-		})
-
-		t.Run("Is", func(t *testing.T) {
-			const err ers.Error = "foo"
-			errs := &erc.List{}
-			errs.Add(err)
-			errs.Add(ers.Error("bar"))
-			errs.Add(ers.Error("baz"))
-
-			var count int
-			var match int
-			for e := range MAKE.ErrorStackStream(errs).Seq(context.Background()) {
-				count++
-				if errors.Is(e, err) {
-					match++
-				}
-			}
-			check.Equal(t, count, 3)
-			check.Equal(t, match, 1)
-		})
-
 	})
 	t.Run("Signal", func(t *testing.T) {
 		close, wait := MAKE.Signal()

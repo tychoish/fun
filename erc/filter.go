@@ -93,15 +93,3 @@ func FilterJoin(filters ...Filter) Filter {
 		return err
 	}
 }
-
-// RemoveOk removes all nil errors from a slice of errors, returning
-// the consolidated slice.
-func RemoveOk(errs []error) []error {
-	out := make([]error, 0, len(errs))
-	for idx := range errs {
-		if ers.IsError(errs[idx]) {
-			out = append(out, errs[idx])
-		}
-	}
-	return out
-}

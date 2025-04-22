@@ -832,17 +832,6 @@ func TestGenerator(t *testing.T) {
 		assert.True(t, dur >= 10*time.Millisecond)
 		assert.True(t, dur < 20*time.Millisecond)
 	})
-	t.Run("CheckGenerator", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ss := &erc.List{}
-		ss.Add(ers.ErrInvariantViolation, ers.ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
-		stack := &erc.List{}
-		assert.True(t, errors.As(ss.Resolve(), &stack))
-		errs := ft.Must(SeqStream(stack.FIFO()).Slice(ctx))
-		assert.Equal(t, 5, len(errs))
-	})
 	t.Run("Retry", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
