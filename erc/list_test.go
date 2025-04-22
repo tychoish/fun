@@ -13,65 +13,96 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
-func TestStack(t *testing.T) {
+func TestList(t *testing.T) {
 	const errval = "ERRO=42"
 
 	t.Parallel()
 	t.Run("Nil", func(t *testing.T) {
-		var es *Stack
+		var es *List
 		if es.Len() != 0 {
 			t.Fatal("defensive nil for length")
 		}
 		check.True(t, es.Ok())
-		// if es.append(nil) != nil {
-		// 	t.Fatal("append nil errors should always be safe")
-		// }
-		// if err := es.append(&Stack{}); err == nil {
-		// 	t.Error("nil should append to something")
-		// }
-
 	})
-	t.Run("UnwrapNil", func(t *testing.T) {
-		es := &Stack{}
+	t.Run("UnwrapEmpty", func(t *testing.T) {
+		var es *List
+		if err := es.Unwrap(); err != nil {
+			t.Fatal("unexpected unwrap to be nil", err)
+		}
+	})
+	t.Run("UnwrapList", func(t *testing.T) {
+		es := &List{}
 		if err := es.Unwrap(); err != nil {
 			t.Fatal("unexpected unwrap empty", err)
 		}
 	})
-	t.Run("ErrorsReportEmpty", func(t *testing.T) {
-		es := &Stack{}
-		if es.Len() != 0 {
-			t.Fatal("unexpected empty length", es.Len())
-		}
-
-		if l := collect(t, es.Generator()); len(l) != 0 || l != nil {
-			t.Fatal("unexpected errors report", l)
-		}
-
+	t.Run("PushElements", func(t *testing.T) {
+		t.Run("Detached", func(t *testing.T) {
+			exp := errors.New("test")
+			es := &List{}
+			elem := &element{err: exp}
+			assert.Equal(t, es.Len(), 0)
+			assert.True(t, !es.In(elem))
+			assert.True(t, !elem.In(es))
+			es.Push(elem)
+			assert.Equal(t, es.Len(), 1)
+			assert.NotEqual(t, es.back(), elem)
+		})
+		t.Run("Reflexive", func(t *testing.T) {
+			exp := errors.New("test")
+			es := &List{}
+			es.Push(exp)
+			assert.Equal(t, es.Len(), 1)
+			assert.True(t, es.back().Ok())
+			es.Push(es.back())
+			assert.Equal(t, es.Len(), 1)
+		})
+		t.Run("MergeListsSingleElement", func(t *testing.T) {
+			exp := errors.New("test")
+			es := &List{}
+			ee := &List{}
+			es.Push(exp)
+			ee.Push(exp)
+			es.Push(ee.back())
+			assert.Equal(t, 1, ee.Len())
+			assert.Equal(t, 2, es.Len())
+		})
+		t.Run("MergeListsManyElements", func(t *testing.T) {
+			exp := errors.New("test")
+			es := &List{}
+			ee := &List{}
+			es.Push(exp)
+			ee.Push(exp)
+			ee.Push(exp)
+			ee.Push(exp)
+			assert.Equal(t, 3, ee.Len())
+			assert.Equal(t, 1, es.Len())
+			es.Push(ee.front())
+			assert.Equal(t, 3, ee.Len())
+			assert.Equal(t, 4, es.Len())
+		})
 	})
-	t.Run("ErrorsReportSingle", func(t *testing.T) {
-		es := &Stack{}
-		es.Push(errors.New(errval))
-		if l := collect(t, es.Generator()); len(l) != 1 || l == nil {
-			t.Fatal("unexpected errors report", l)
-		}
-		assert.Equal(t, 1, es.Len())
-		es.Push(errors.New(errval))
-		assert.Equal(t, 2, es.Len())
+	t.Run("Membership", func(t *testing.T) {
+		exp := errors.New("test")
+		es := &List{}
+		es.Push(exp)
+		elm := es.back()
+		assert.True(t, es.In(elm))
+		assert.True(t, elm.In(es))
 	})
-	t.Run("StackErrorStack", func(t *testing.T) {
-		es := &Stack{}
-		es.Push(errors.New("outer"))
-		nst := &Stack{}
-		nst.err = errors.New("inner")
-		es.Push(nst)
-		if l := collect(t, es.Generator()); len(l) != 2 || l == nil {
-			t.Log(es.count, es)
-			t.Log(es.Error())
-			t.Fatal("unexpected errors report", l)
-		}
+	t.Run("PushFront", func(t *testing.T) {
+		ferr := errors.New("front-err")
+		berr := errors.New("back-err")
+		es := &List{}
+		es.PushFront(berr)
+		assert.Equal(t, es.Len(), 1)
+		es.PushFront(ferr)
+		assert.Equal(t, es.Len(), 2)
+		assert.Equal(t, es.back().err, berr)
+		assert.Equal(t, es.front().err, ferr)
 	})
 	t.Run("Handler", func(t *testing.T) {
-		es := &Stack{}
+		es := &List{}
 		check.Equal(t, es.Len(), 0)
 		hf := es.Handler()
 		check.Equal(t, es.Len(), 0)
@@ -83,13 +114,13 @@ func TestStack(t *testing.T) {
 		check.ErrorIs(t, es, ers.ErrInvalidInput)
 	})
 	t.Run("NilErrorStillErrors", func(t *testing.T) {
-		es := &Stack{}
+		es := &List{}
 		if e := es.Error(); e == "" {
-			t.Error("every non-nil error stack should have an error")
+			t.Error("every non-nil error list should have an error")
 		}
 	})
 	t.Run("Future", func(t *testing.T) {
-		es := &Stack{}
+		es := &List{}
 		future := es.Future()
 		check.NotError(t, future())
 		es.Push(ers.ErrInvalidInput)
@@ -98,11 +129,11 @@ func TestStack(t *testing.T) {
 		check.ErrorIs(t, future(), ers.ErrInvalidInput)
 
 		check.ErrorIs(t, future(), ers.ErrImmutabilityViolation)
-		st := AsStack(future())
+		st := AsList(future())
 		check.Equal(t, st, es)
 	})
 	t.Run("CacheCorrectness", func(t *testing.T) {
-		es := &Stack{}
+		es := &List{}
 		es.Add(errors.New(errval))
 		er1 := es.Error()
 		es.Add(errors.New(errval))
@@ -112,14 +143,14 @@ func TestStack(t *testing.T) {
 		}
 	})
 	t.Run("Merge", func(t *testing.T) {
-		es1 := &Stack{}
+		es1 := &List{}
 		es1.Add(errors.New(errval))
 		es1.Add(errors.New(errval))
 		if l := es1.Len(); l != 2 {
 			t.Fatal("es1 unexpected length", l)
 		}
 
-		es2 := &Stack{}
+		es2 := &List{}
 		es2.Add(errors.New(errval))
 		es2.Add(errors.New(errval))
 
@@ -134,7 +165,7 @@ func TestStack(t *testing.T) {
 	})
 	t.Run("ConventionalWrap", func(t *testing.T) {
 		err := fmt.Errorf("foo: %w", errors.New("bar"))
-		es := &Stack{}
+		es := &List{}
 		es.Push(err)
 		if l := es.Len(); l != 1 {
 			t.Fatalf("%d, %+v", l, es)
@@ -144,7 +175,7 @@ func TestStack(t *testing.T) {
 		err1 := errors.New("foo")
 		err2 := errors.New("bar")
 
-		es := &Stack{}
+		es := &List{}
 		es.Push(err1)
 		es.Push(err2)
 		if !errors.Is(es, err1) {
@@ -152,7 +183,7 @@ func TestStack(t *testing.T) {
 		}
 	})
 	t.Run("OutputOrderedLogically", func(t *testing.T) {
-		es := &Stack{}
+		es := &List{}
 		es.Push(errors.New("one"))
 		es.Push(errors.New("two"))
 		es.Push(errors.New("three"))
@@ -163,27 +194,27 @@ func TestStack(t *testing.T) {
 			t.Error(output, "!=", expected)
 		}
 	})
-	t.Run("AsStack", func(t *testing.T) {
+	t.Run("AsList", func(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
-			es := AsStack(nil)
+			es := AsList(nil)
 			check.NilPtr(t, es)
 		})
 		t.Run("ZeroValues", func(t *testing.T) {
 			var err error
-			es := AsStack(err)
+			es := AsList(err)
 			check.NilPtr(t, es)
-			es = AsStack(es)
+			es = AsList(es)
 			check.NilPtr(t, es)
 		})
 		t.Run("Error", func(t *testing.T) {
-			es := AsStack(ers.ErrInvalidInput)
+			es := AsList(ers.ErrInvalidInput)
 			assert.NotNilPtr(t, es)
 			check.Equal(t, es.Len(), 1)
 			check.ErrorIs(t, es, ers.ErrInvalidInput)
 		})
-		t.Run("Stack", func(t *testing.T) {
+		t.Run("List", func(t *testing.T) {
 			err := Join(ers.ErrInvalidInput, ers.ErrImmutabilityViolation, ers.ErrInvariantViolation)
-			es := AsStack(err)
+			es := AsList(err)
 			assert.NotNilPtr(t, es)
 			check.Equal(t, es.Len(), 3)
 			check.ErrorIs(t, es, ers.ErrInvalidInput)
@@ -191,24 +222,24 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Unwinder", func(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
-				es := AsStack(&slwind{})
+				es := AsList(&slwind{})
 				check.NilPtr(t, es)
 
 			})
 			t.Run("Populated", func(t *testing.T) {
-				es := AsStack(&slwind{out: []error{ers.ErrInvalidInput}})
+				es := AsList(&slwind{out: []error{ers.ErrInvalidInput}})
 				assert.NotNilPtr(t, es)
 				check.Equal(t, es.Len(), 1)
 			})
 		})
 		t.Run("Unwrapper", func(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
-				es := AsStack(&slwrap{})
+				es := AsList(&slwrap{})
 				check.NilPtr(t, es)
 
 			})
 			t.Run("Populated", func(t *testing.T) {
-				es := AsStack(&slwrap{out: []error{ers.ErrInvalidInput}})
+				es := AsList(&slwrap{out: []error{ers.ErrInvalidInput}})
 				assert.NotNilPtr(t, es)
 				check.Equal(t, es.Len(), 1)
 			})
@@ -273,6 +304,8 @@ func TestMergeLegacy(t *testing.T) {
 			e1 := error(&errorTest{val: 100})
 			err := Join(e1, nil)
 			if err != e1 {
+				t.Logf("err %T", err)
+				t.Logf("e1 %T", e1)
 				t.Error(err, e1)
 			}
 		})
@@ -321,13 +354,13 @@ func TestMergeLegacy(t *testing.T) {
 	})
 	t.Run("UnwindingPush", func(t *testing.T) {
 		err := slwind{out: []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}}
-		s := &Stack{}
+		s := &List{}
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})
 	t.Run("UnwrappingPush", func(t *testing.T) {
 		err := slwrap{out: []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}}
-		s := &Stack{}
+		s := &List{}
 		s.Push(err)
 		check.Equal(t, s.Len(), 3)
 	})

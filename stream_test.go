@@ -14,6 +14,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
@@ -34,7 +35,7 @@ func (c *Collector) Add(err error) {
 
 	defer internal.With(internal.Lock(&c.mtx))
 	c.num++
-	c.err = ers.Join(err, c.err)
+	c.err = erc.Join(err, c.err)
 }
 
 type none struct{}

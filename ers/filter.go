@@ -1,10 +1,5 @@
 package ers
 
-import (
-	"errors"
-	"fmt"
-)
-
 // Filter provides a way to process error messages, either to remove
 // errors, reformulate,  or annotate errors.
 type Filter func(error) error
@@ -123,15 +118,6 @@ func ExtractErrors(in []any) (rest []any, errs []error) {
 	return
 }
 
-func extractAndJoin(in []any, withErrs ...error) error {
-	args, errs := ExtractErrors(in)
-	out := append(make([]error, 0, len(errs)+1+len(withErrs)), withErrs...)
-	if len(args) > 0 {
-		out = append(out, errors.New(fmt.Sprintln(args...)))
-	}
-	return Join(append(out, errs...)...)
-}
-
 // RemoveOk removes all nil errors from a slice of errors, returning
 // the consolidated slice.
 func RemoveOk(errs []error) []error {
@@ -142,17 +128,4 @@ func RemoveOk(errs []error) []error {
 		}
 	}
 	return out
-}
-
-// FilterToRoot produces a filter which always returns only the root/MOST
-// wrapped error present in an error object.
-func FilterToRoot() Filter {
-	return func(err error) error {
-		errs := Unwind(err)
-		if len(errs) == 0 {
-			return nil
-		}
-
-		return errs[len(errs)-1]
-	}
 }

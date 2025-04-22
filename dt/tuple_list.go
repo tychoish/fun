@@ -8,7 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -159,7 +159,7 @@ func (p *Tuples[K, V]) MarshalJSON() ([]byte, error) {
 		}
 		idx++
 		if err := enc.Encode(item); err != nil {
-			return ers.Wrapf(err, "tuple at index %d", idx)
+			return erc.Wrapf(err, "tuple at index %d", idx)
 		}
 
 		return nil
@@ -185,7 +185,7 @@ func (p *Tuples[K, V]) UnmarshalJSON(in []byte) error {
 		tuple := Tuple[K, V]{}
 
 		if err := json.Unmarshal(item, &tuple); err != nil {
-			return ers.Wrapf(err, "tuple at index %d", idx)
+			return erc.Wrapf(err, "tuple at index %d", idx)
 		}
 		p.ll.PushBack(tuple)
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -26,7 +27,7 @@ func (*sh[K, V]) makeVmap(impl MapType) vmap[K, V] {
 	case MapTypeMutex:
 		return &mtxMap[K, *Versioned[V]]{d: dt.Map[K, *Versioned[V]]{}}
 	default:
-		panic(ers.Join(ers.ErrInvalidInput, fmt.Errorf("map<%d> is does not exist", impl)))
+		panic(erc.Join(ers.ErrInvalidInput, fmt.Errorf("map<%d> is does not exist", impl)))
 	}
 }
 

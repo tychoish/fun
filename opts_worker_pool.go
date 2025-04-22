@@ -70,16 +70,14 @@ func (o *WorkerGroupConf) CanContinueOnError(err error) (out bool) {
 	if err == nil {
 		return true
 	}
-	defer func() { fmt.Println("INNER.FILTER:", out, err, o.ErrorCollector.Len()) }()
+
 	switch {
 	case errors.Is(err, ErrStreamContinue):
 		return true
 	case ers.IsTerminating(err):
 		return false
 	case errors.Is(err, ers.ErrRecoveredPanic):
-		fmt.Println("INNER.FILTER.BEFORE", err == nil, o.ContinueOnPanic, err, o.ErrorCollector.Len())
 		o.ErrorCollector.Add(err)
-		fmt.Println("INNER.FILTER.AFTER", err == nil, o.ContinueOnPanic, err, o.ErrorCollector.Len())
 		return o.ContinueOnPanic
 	case ers.IsExpiredContext(err):
 		o.ErrorCollector.When(o.IncludeContextExpirationErrors, err)
@@ -94,17 +92,11 @@ func (o *WorkerGroupConf) CanContinueOnError(err error) (out bool) {
 // function, and used in worker pool implementations process as
 // configured.
 func (o *WorkerGroupConf) ErrorFilter(err error) error {
-	defer func() {
-		if err == nil {
-			return
-		}
-		fmt.Println("OUTER.FILTER:", err == nil, err, o.ErrorCollector.Len())
-	}()
 	switch {
 	case err == nil:
 		return nil
 	case o.CanContinueOnError(err):
-		return nil
+		return ErrStreamContinue
 	default:
 		return err
 	}
@@ -174,7 +166,7 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 func WorkerGroupConfWithErrorCollector(ec *erc.Collector) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		if ec == nil {
-			return ers.Wrap(ers.ErrInvalidInput, "cannot use a nil error collector")
+			return erc.Wrap(ers.ErrInvalidInput, "cannot use a nil error collector")
 		}
 		opts.ErrorCollector = ec
 		return nil

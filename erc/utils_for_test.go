@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 )
 
@@ -38,19 +37,6 @@ func unwind[T any](in T) (out []T) {
 		}
 		return
 	}
-}
-
-func collect[T any](t testing.TB, prod func() (T, bool)) []T {
-	t.Helper()
-
-	assert.True(t, prod != nil)
-
-	var out []T
-
-	for v, ok := prod(); ok; v, ok = prod() {
-		out = append(out, v)
-	}
-	return out
 }
 
 func catcherIsEmpty(t *testing.T, catcher *Collector) {

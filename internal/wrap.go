@@ -10,11 +10,11 @@ func Unwind[T any](in T) []T {
 		switch wi := any(in).(type) {
 		case interface{ Unwind() []T }:
 			return append(out, sparse(buffer(buf, wi.Unwind()))...)
+		case interface{ Unwrap() []T }:
+			return append(out, sparse(buffer(buf, wi.Unwrap()))...)
 		case interface{ Unwrap() T }:
 			out = append(out, in)
 			in = wi.Unwrap()
-		case interface{ Unwrap() []T }:
-			return append(out, sparse(buffer(buf, wi.Unwrap()))...)
 		case nil:
 			return out
 		default:

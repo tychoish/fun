@@ -2,6 +2,8 @@ package ft
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"iter"
 	"slices"
 	"sync"
@@ -350,7 +352,7 @@ func ApplyFuture[T any](fn func(T), arg T) func() { return func() { Apply(fn, ar
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.
 func Must[T any](arg T, err error) T {
-	WhenCall(err != nil, func() { panic(ers.Join(err, ers.ErrInvariantViolation)) })
+	WhenCall(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
 	return arg
 }
 
@@ -390,6 +392,6 @@ func WithContext(op func(context.Context)) {
 //
 //	out := ft.MustBeOk(func() (string, bool) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T {
-	WhenCall(!ok, func() { panic(ers.Join(ers.New("check failed"), ers.ErrInvariantViolation)) })
+	WhenCall(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
 	return out
 }

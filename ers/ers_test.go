@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -17,19 +18,26 @@ type errorTest struct {
 
 func (e *errorTest) Error() string { return fmt.Sprint("error: ", e.val) }
 
+type okErrTest struct {
+	val uint
+}
+
+func (e *okErrTest) Error() string { return fmt.Sprint("errno", e.val) }
+func (e *okErrTest) Ok() bool      { return e == nil || e.val <= 0 }
+
 func TestErrors(t *testing.T) {
 	t.Run("Predicates", func(t *testing.T) {
 		check.True(t, IsTerminating(io.EOF))
 		check.True(t, !IsTerminating(Error("hello")))
-		check.True(t, IsTerminating(Join(Error("beep"), io.EOF)))
+		check.True(t, IsTerminating(errors.Join(Error("beep"), io.EOF)))
 
 		check.True(t, !IsExpiredContext(io.EOF))
-		check.True(t, !IsExpiredContext(Join(Error("beep"), io.EOF)))
+		check.True(t, !IsExpiredContext(errors.Join(Error("beep"), io.EOF)))
 
 		check.True(t, IsExpiredContext(context.Canceled))
 		check.True(t, IsExpiredContext(context.DeadlineExceeded))
-		check.True(t, IsExpiredContext(Join(Error("beep"), context.DeadlineExceeded)))
-		check.True(t, IsExpiredContext(Join(Error("beep"), context.Canceled)))
+		check.True(t, IsExpiredContext(errors.Join(Error("beep"), context.DeadlineExceeded)))
+		check.True(t, IsExpiredContext(errors.Join(Error("beep"), context.Canceled)))
 	})
 	t.Run("Ok", func(t *testing.T) {
 		var err error
@@ -38,7 +46,7 @@ func TestErrors(t *testing.T) {
 		check.True(t, !Ok(err))
 	})
 	t.Run("Filter", func(t *testing.T) {
-		err := Join(Error("beep"), context.Canceled)
+		err := errors.Join(Error("beep"), context.Canceled)
 		check.Error(t, err)
 		check.NotError(t, FilterExclude(context.Canceled).Run(err))
 		check.NotError(t, FilterExclude(context.Canceled, io.EOF).Run(err))
@@ -52,7 +60,7 @@ func TestErrors(t *testing.T) {
 		check.NotError(t, FilterNoop().Run(nil))
 		check.Error(t, FilterNoop().Run(io.EOF))
 		check.Error(t, FilterNoop().Run(context.Canceled))
-		err = Join(Error("beep"), io.EOF)
+		err = errors.Join(Error("beep"), io.EOF)
 		check.Error(t, err)
 		check.Error(t, FilterExclude(context.Canceled).Run(err))
 		check.NotError(t, FilterExclude(io.EOF).Run(err))
@@ -72,65 +80,14 @@ func TestErrors(t *testing.T) {
 		check.Error(t, endAndCancelFilter(New("will error")))
 		// TODO write test that exercises short circuiting execution
 	})
-	t.Run("FilterToRoot", func(t *testing.T) {
-		filter := FilterToRoot()
-		t.Run("Nil", func(t *testing.T) {
-			assert.Zero(t, filter(nil))
-		})
-		t.Run("WrappingDirection", func(t *testing.T) {
-			t.Run("Vector", func(t *testing.T) {
-				root := filter(errors.Join(Error("hello"), Error("this"), io.EOF))
-				assert.Equal(t, io.EOF, root)
-			})
-			t.Run("Stack", func(t *testing.T) {
-				root := filter(Join(io.EOF, Error("this"), Error("hello")))
-				assert.Equal(t, io.EOF, root)
-			})
-		})
-		t.Run("EmptyWrap", func(t *testing.T) {
-			list := Join()
-			root := filter(list)
-			assert.Equal(t, list, root)
-
-		})
-		t.Run("Stdlib", func(t *testing.T) {
-			err := fmt.Errorf("hello: %w", io.EOF)
-			root := filter(err)
-			assert.Equal(t, io.EOF, root)
-		})
-	})
 	t.Run("InvariantViolation", func(t *testing.T) {
 		assert.True(t, IsInvariantViolation(ErrInvariantViolation))
-		assert.True(t, IsInvariantViolation(Join(io.EOF, Error("hello"), ErrInvariantViolation)))
+		assert.True(t, IsInvariantViolation(errors.Join(io.EOF, Error("hello"), ErrInvariantViolation)))
 		assert.True(t, !IsInvariantViolation(nil))
 		assert.True(t, !IsInvariantViolation(9001))
 		assert.True(t, !IsInvariantViolation(io.EOF))
 	})
 
-	t.Run("Wrapped", func(t *testing.T) {
-		err := errors.New("base")
-		for i := 0; i < 100; i++ {
-			err = fmt.Errorf("wrap %d: %w", i, err)
-		}
-
-		errs := Unwind(err)
-		if len(errs) != 101 {
-			t.Error(len(errs))
-		}
-		if errs[100].Error() != "base" {
-			t.Error(errs[100])
-		}
-		check.Equal(t, 101, len(Unwind(err)))
-	})
-	t.Run("ExtractErrors", func(t *testing.T) {
-		args, errs := ExtractErrors([]any{nil, Error("hi"), 1, true})
-		check.Equal(t, len(errs), 1)
-		check.Equal(t, len(args), 2)
-		var nerr error
-		args, errs = ExtractErrors([]any{nil, Error("hi"), func() error { return nil }(), nerr, 2, false})
-		check.Equal(t, len(errs), 1)
-		check.Equal(t, len(args), 2)
-	})
 	t.Run("IsError", func(t *testing.T) {
 		check.True(t, !IsError(nil))
 		check.True(t, IsError(New("error")))
@@ -157,11 +114,29 @@ func TestErrors(t *testing.T) {
 		check.Equal(t, 1, len(Append([]error{}, nil, Error("one"), nil)))
 		check.Equal(t, 2, len(Append([]error{Error("hi")}, nil, Error("one"), nil)))
 	})
+	t.Run("Strings", func(t *testing.T) {
+		strs := Strings([]error{Error("hi"), nil, Error("from"), Error("the"), nil, Error("other"), nil, Error("world"), nil})
+		check.Equal(t, len(strs), 5)
+		check.Equal(t, "hi from the other world", strings.Join(strs, " "))
+	})
 	t.Run("RemoveOK", func(t *testing.T) {
 		check.Equal(t, 0, len(RemoveOk([]error{nil, nil, nil})))
 		check.Equal(t, 3, cap(RemoveOk([]error{nil, nil, nil})))
 		check.Equal(t, 1, len(RemoveOk([]error{nil, io.EOF, nil})))
 		check.Equal(t, 3, len(RemoveOk([]error{Error("one"), io.EOF, New("two")})))
+	})
+	t.Run("OkCheck", func(t *testing.T) {
+		var err *okErrTest
+		_ = error(err) // compile time interface compliance test
+
+		assert.True(t, Ok(err))
+		assert.True(t, err == nil)
+		err = &okErrTest{}
+
+		assert.True(t, Ok(err))
+		assert.True(t, err != nil)
+		err.val = 41
+		assert.True(t, !Ok(err))
 	})
 	t.Run("When", func(t *testing.T) {
 		t.Run("Bypass", func(t *testing.T) {

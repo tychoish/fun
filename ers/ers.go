@@ -1,7 +1,9 @@
 package ers
 
 import (
+	"context"
 	"fmt"
+	"io"
 
 	"github.com/tychoish/fun/internal"
 )
@@ -12,6 +14,7 @@ func When(cond bool, val any) error {
 	if !cond {
 		return nil
 	}
+
 	switch e := val.(type) {
 	case error:
 		return e
@@ -30,32 +33,6 @@ func Whenf(cond bool, tmpl string, args ...any) error {
 	}
 
 	return fmt.Errorf(tmpl, args...)
-}
-
-// Wrap produces a wrapped error if the err is non-nil, wrapping the
-// error with the provided annotation. When the error is nil, Wrap
-// returns nil.
-//
-// This, roughly mirrors the usage "github/pkg/errors.Wrap" but
-// taking advantage of newer standard library error wrapping.
-func Wrap(err error, annotation ...any) error {
-	if Ok(err) {
-		return nil
-	}
-	return fmt.Errorf("%w: %s", err, fmt.Sprintln(annotation...))
-}
-
-// Wrapf produces a wrapped error, if the error is non-nil, with a
-// formated wrap annotation. When the error is nil, Wrapf does not
-// build an error and returns nil.
-//
-// This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
-// taking advantage of newer standard library error wrapping.
-func Wrapf(err error, tmpl string, args ...any) error {
-	if Ok(err) {
-		return nil
-	}
-	return fmt.Errorf("%w: %w", err, fmt.Errorf(tmpl, args...))
 }
 
 // Unwind assembles the full "unwrapped" list of all component
@@ -111,3 +88,14 @@ func Ok(err error) bool {
 // IsError returns true when the error is non-nill. Provides the
 // inverse of Ok().
 func IsError(err error) bool { return !Ok(err) }
+
+// IsExpiredContext checks an error to see if it, or any of it's parent
+// contexts signal that a context has expired. This covers both
+// canceled contexts and ones which have exceeded their deadlines.
+func IsExpiredContext(err error) bool { return Is(err, context.Canceled, context.DeadlineExceeded) }
+
+// IsTerminating returns true if the error is one of the sentinel
+// errors used by fun (and other packages!) to indicate that
+// processing/iteration has terminated. (e.g. context expiration, or
+// io.EOF.)
+func IsTerminating(err error) bool { return Is(err, io.EOF, ErrCurrentOpAbort, ErrContainerClosed) }

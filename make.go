@@ -125,19 +125,13 @@ func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
 // the provided observer function.
 func (Constructors) Recover(ob fn.Handler[error]) { ob(ers.ParsePanic(recover())) }
 
-// ErrorStack constructs an empty &erc.Stack{} value.
-func (Constructors) ErrorStack() *erc.Stack { return &erc.Stack{} }
+// ErrorList constructs an empty &erc.Stack{} value.
+func (Constructors) ErrorList() *erc.List { return &erc.List{} }
 
 // ErrorStackStream creates a stream object to view the contents
 // of a erc.Stack object (error collection).
-func (Constructors) ErrorStackStream(s *erc.Stack) *Stream[error] {
-	return MAKE.ErrorStackGenerator(s).Stream()
-}
-
-// ErrorStackGenerator creates an generator function to yield the
-// contents of a erc.Stack object (error collection).
-func (Constructors) ErrorStackGenerator(s *erc.Stack) Generator[error] {
-	return CheckedGenerator(s.Generator())
+func (Constructors) ErrorStackStream(s *erc.List) *Stream[error] {
+	return SeqStream(s.FIFO())
 }
 
 // ErrorStackHandler provides a basic error aggregation facility around
@@ -146,7 +140,7 @@ func (Constructors) ErrorStackGenerator(s *erc.Stack) Generator[error] {
 // these objects.
 func (Constructors) ErrorStackHandler() (fn.Handler[error], fn.Future[error]) {
 	mtx := &sync.Mutex{}
-	s := MAKE.ErrorStack()
+	s := MAKE.ErrorList()
 	var hf fn.Handler[error] = s.Handler()
 	var ef fn.Future[error] = s.Future()
 	return hf.WithLock(mtx), ef.WithLock(mtx)
@@ -264,7 +258,7 @@ func (Constructors) Lines(reader io.Reader) *Stream[string] {
 	scanner := bufio.NewScanner(reader)
 	return MakeGenerator(func() (string, error) {
 		if !scanner.Scan() {
-			return "", ers.Join(io.EOF, scanner.Err())
+			return "", erc.Join(io.EOF, scanner.Err())
 		}
 		return scanner.Text(), nil
 	}).Stream()

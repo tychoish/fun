@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/erc"
 )
 
 // GENERATED FILE FROM PAIR IMPLEMENTATION
@@ -26,7 +26,7 @@ func MakeTuple[K any, V any](k K, v V) Tuple[K, V] { return Tuple[K, V]{One: k, 
 func (t Tuple[K, V]) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
-	err := ers.Join(
+	err := erc.Join(
 		buf.WriteByte('['),
 		enc.Encode(t.One),
 		buf.WriteByte(','),
@@ -49,12 +49,12 @@ func (t *Tuple[K, V]) UnmarshalJSON(in []byte) error {
 	}
 
 	if err := json.Unmarshal(rt[0], &t.One); err != nil {
-		return ers.Wrap(err, "tuple.One")
+		return erc.Wrap(err, "tuple.One")
 	}
 
 	if len(rt) == 2 {
 		if err := json.Unmarshal(rt[1], &t.Two); err != nil {
-			return ers.Wrap(err, "tuple.Two")
+			return erc.Wrap(err, "tuple.Two")
 
 		}
 	}

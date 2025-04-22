@@ -1,6 +1,7 @@
 package fun
 
 import (
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -52,5 +53,5 @@ func (RuntimeInvariant) Ok(cond bool, args ...any) {
 // of the panic is both--via wrapping--an ErrInvariantViolation and
 // the error itself.
 func (RuntimeInvariant) Must(err error, args ...any) {
-	Invariant.Ok(err == nil, func() error { return ers.Wrap(err, args...) })
+	Invariant.Ok(err == nil, func() error { return erc.Wrap(err, args...) })
 }

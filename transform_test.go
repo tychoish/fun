@@ -15,6 +15,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -298,7 +299,6 @@ func TestParallelForEach(t *testing.T) {
 			},
 			WorkerGroupConfNumWorkers(3),
 			WorkerGroupConfContinueOnPanic(),
-			// WorkerGroupConfWithErrorCollector(&erc.Collector{}),
 		).Run(ctx)
 		if err == nil {
 			t.Error("should have errored", err)
@@ -309,6 +309,7 @@ func TestParallelForEach(t *testing.T) {
 		if count.Load() != 200 {
 			t.Error(count.Load())
 		}
+		// panic recovery errors plus panics themselves
 		check.Equal(t, 200, len(ers.Unwind(err)))
 	})
 	t.Run("AbortOnPanic", func(t *testing.T) {
@@ -342,6 +343,7 @@ func TestParallelForEach(t *testing.T) {
 		errs := ers.Unwind(err)
 		if len(errs) != 2 {
 			// panic + expected
+			t.Log(errs)
 			t.Error(len(errs))
 		}
 	})
@@ -409,7 +411,8 @@ func TestParallelForEach(t *testing.T) {
 		// it's two and not one because each worker thread
 		// ran one task before aborting
 		if len(errs) > 2 {
-			t.Error(len(errs))
+			t.Log("errs", errs)
+			t.Error("num-errors", len(errs))
 		}
 	})
 	t.Run("CollectAllErrors/Cores", func(t *testing.T) {
@@ -430,7 +433,8 @@ func TestParallelForEach(t *testing.T) {
 		// it's two and not one because each worker thread
 		// ran one task before aborting
 		if len(errs) > runtime.NumCPU() {
-			t.Error(len(errs))
+			t.Log("num-workers", runtime.NumCPU())
+			t.Error("num-errors", len(errs))
 		}
 	})
 	t.Run("IncludeContextErrors", func(t *testing.T) {
@@ -763,7 +767,7 @@ func RunStreamStringAlgoTests(
 
 						vals, err := out.Slice(context.Background())
 						if err != nil {
-							t.Error(err, len(vals))
+							t.Error(len(vals), " >>:", err)
 						}
 						longString := strings.Join(vals, "")
 						count := 0
@@ -1041,7 +1045,7 @@ func RunStreamStringAlgoTests(
 		const ErrCountMeOut ers.Error = "countm-me-out"
 		op := func() error { return ErrCountMeOut }
 
-		ec.Add(ers.Join(ers.Error("beep"), context.Canceled))
+		ec.Add(erc.Join(ers.Error("beep"), context.Canceled))
 		check.True(t, ec.HasErrors())
 		check.Equal(t, 1, ec.Len())
 		ec.Add(op())

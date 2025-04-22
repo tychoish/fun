@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -115,7 +116,7 @@ func (o *Optional[T]) Scan(src any) (err error) {
 	case []byte:
 		return o.UnmarshalBinary(val)
 	default:
-		return ers.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
+		return erc.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
 			fmt.Errorf("%T can not be the value for Optional[%T]", src, o.v))
 	}
 }
@@ -146,7 +147,7 @@ func (o Optional[T]) Value() (driver.Value, error) {
 	case encoding.BinaryMarshaler:
 		return val.MarshalBinary()
 	default:
-		return nil, ers.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
+		return nil, erc.Join(ers.ErrInvalidRuntimeType, ers.ErrInvalidInput,
 			fmt.Errorf("%T cannot be cast to driver.Value", val))
 	}
 }

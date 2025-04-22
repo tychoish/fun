@@ -836,11 +836,11 @@ func TestGenerator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		ss := &erc.Stack{}
+		ss := &erc.List{}
 		ss.Add(ers.ErrInvariantViolation, ers.ErrRecoveredPanic, context.Canceled, io.EOF, ErrNonBlockingChannelOperationSkipped)
-		stack := &erc.Stack{}
+		stack := &erc.List{}
 		assert.True(t, errors.As(ss.Resolve(), &stack))
-		errs := ft.Must(CheckedGenerator(stack.Generator()).Stream().Slice(ctx))
+		errs := ft.Must(SeqStream(stack.FIFO()).Slice(ctx))
 		assert.Equal(t, 5, len(errs))
 	})
 	t.Run("Retry", func(t *testing.T) {
@@ -911,7 +911,7 @@ func TestGenerator(t *testing.T) {
 			val, err := MakeGenerator(func() (int, error) {
 				defer count.Add(1)
 				if count.Load() == 11 {
-					return 100, ers.Join(exp, ers.ErrCurrentOpAbort)
+					return 100, erc.Join(exp, ers.ErrCurrentOpAbort)
 				}
 				return 100, exp
 			}).Retry(16).Read(ctx)
@@ -928,7 +928,7 @@ func TestGenerator(t *testing.T) {
 			val, err := MakeGenerator(func() (int, error) {
 				defer count.Add(1)
 				if count.Load() == 11 {
-					return 100, ers.Join(exp, context.Canceled)
+					return 100, erc.Join(exp, context.Canceled)
 				}
 				return 100, exp
 			}).Retry(16).Read(ctx)

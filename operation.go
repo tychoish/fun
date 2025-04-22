@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -160,7 +161,7 @@ func (wf Operation) Worker() Worker {
 // converting it to an error--and then aggretaging that with the
 // output of the error future. The error future is always called.
 func (wf Operation) WithErrorHook(ef fn.Future[error]) Worker {
-	return func(ctx context.Context) error { return ers.Join(wf.WithRecover().Run(ctx), ef()) }
+	return func(ctx context.Context) error { return erc.Join(wf.WithRecover().Run(ctx), ef()) }
 }
 
 // Jitter wraps a Operation that runs the jitter function (jf) once

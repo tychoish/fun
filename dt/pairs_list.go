@@ -8,7 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -164,11 +164,11 @@ func (p *Pairs[K, V]) MarshalJSON() ([]byte, error) {
 		}
 		idx++
 		if err := enc.Encode(item.Key); err != nil {
-			return ers.Wrapf(err, "key at %d", idx)
+			return erc.Wrapf(err, "key at %d", idx)
 		}
 		buf.WriteByte(':')
 
-		return ers.Wrapf(enc.Encode(item.Value), "key at %d", idx)
+		return erc.Wrapf(enc.Encode(item.Value), "key at %d", idx)
 	})).Wait(); err != nil {
 		return nil, err
 	}

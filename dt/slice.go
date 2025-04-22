@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -84,7 +85,7 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 	case 2:
 		return make([]T, args[0], args[1])
 	default:
-		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
+		panic(erc.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
 	}
 }
 

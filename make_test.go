@@ -191,7 +191,7 @@ func TestHandlers(t *testing.T) {
 			unwinder := MAKE.ErrorUnwindTransformer(ers.FilterNoop())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			errs, err := unwinder(ctx, ers.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ers.ErrInvariantViolation))
+			errs, err := unwinder(ctx, erc.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ers.ErrInvariantViolation))
 			assert.NotError(t, err)
 			check.Equal(t, len(errs), 3)
 		})
@@ -263,17 +263,17 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("ErrorStack", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			assert.Equal(t, 0, MAKE.ErrorStackStream(&erc.Stack{}).Count(context.Background()))
+			assert.Equal(t, 0, MAKE.ErrorStackStream(&erc.List{}).Count(context.Background()))
 		})
 		t.Run("Number", func(t *testing.T) {
-			errs := &erc.Stack{}
+			errs := &erc.List{}
 			errs.Add(ers.New("foof"), ers.New("boop"))
 			assert.Equal(t, 2, MAKE.ErrorStackStream(errs).Count(context.Background()))
 		})
 
 		t.Run("Is", func(t *testing.T) {
 			const err ers.Error = "foo"
-			errs := &erc.Stack{}
+			errs := &erc.List{}
 			errs.Add(err)
 			errs.Add(ers.Error("bar"))
 			errs.Add(ers.Error("baz"))
@@ -328,9 +328,9 @@ func TestHandlers(t *testing.T) {
 		check.NotError(t, err)
 		t.Log(err, len(errs), errs)
 		check.Equal(t, len(errs), 3)
-		check.ErrorIs(t, errs[0], io.EOF)
+		check.ErrorIs(t, errs[0], ers.ErrContainerClosed)
 		check.ErrorIs(t, errs[1], ers.ErrCurrentOpAbort)
-		check.ErrorIs(t, errs[2], ers.ErrContainerClosed)
+		check.ErrorIs(t, errs[2], io.EOF)
 	})
 }
 

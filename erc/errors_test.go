@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"iter"
 	"sync"
 	"testing"
 	"time"
@@ -89,7 +91,6 @@ func TestError(t *testing.T) {
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "boop")
 		})
-
 		t.Run("PanicRecoveryWithError", func(t *testing.T) {
 			es := &Collector{}
 			sig := make(chan struct{})
@@ -199,7 +200,6 @@ func TestError(t *testing.T) {
 			check.Substring(t, err.Error(), "50000")
 			check.Substring(t, err.Error(), "int")
 		})
-
 		t.Run("WhenWrapping", func(t *testing.T) {
 			serr := errors.New(errval)
 			ec := &Collector{}
@@ -242,7 +242,6 @@ func TestError(t *testing.T) {
 				t.Fatal(ec.Resolve())
 			}
 		})
-
 		t.Run("RecoverCall", func(t *testing.T) {
 			ec := &Collector{}
 
@@ -301,7 +300,7 @@ func TestError(t *testing.T) {
 							if count > 10 {
 								t.Error("should have one by now")
 							}
-						} else if _, ok := err.(*list); !ok {
+						} else if _, ok := err.(*List); !ok {
 							t.Error("should be an error stack")
 						}
 					}
@@ -352,14 +351,35 @@ func TestError(t *testing.T) {
 			}
 		})
 	})
+	t.Run("LockingGenerator", func(t *testing.T) {
+		ec := &Collector{}
+		ec.Add(errors.New("ok,"))
+		ec.Add(errors.New("this"))
+		ec.Add(errors.New("is"))
+		ec.Add(errors.New("fine."))
+		ec.Add(io.EOF)
+
+		iterfunc := ec.Generator()
+		next, closer := iter.Pull(iterfunc)
+		defer closer()
+
+		err, ok := next()
+		check.True(t, ok)
+		check.ErrorIs(t, err, io.EOF)
+		check.Equal(t, "ok,", err.Error())
+
+		ec.Add(io.EOF)
+
+		check.Equal(t, 6, ec.Len())
+	})
 }
 
-func BenchmarkErrorStack(b *testing.B) {
+func BenchmarkErrorList(b *testing.B) {
 	const count int = 8
 
 	b.Run("Reporting", func(b *testing.B) {
-		b.Run("StackError", func(b *testing.B) {
-			es := &Stack{}
+		b.Run("ListError", func(b *testing.B) {
+			es := &List{}
 			for i := 0; i < count; i++ {
 				es.Push(errors.New("foo"))
 			}
@@ -374,25 +394,6 @@ func BenchmarkErrorStack(b *testing.B) {
 				if err = es.Error(); err == "" {
 					b.Fatal()
 				}
-			}
-		})
-		b.Run("StackStream", func(b *testing.B) {
-			es := &Stack{}
-			for i := 0; i < count; i++ {
-				es.Push(errors.New("foo"))
-			}
-			errs := collect(b, es.Generator())
-			if len(errs) != count {
-				b.Fatal(len(errs))
-			}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				errs = collect(b, es.Generator())
-				if len(errs) == 0 {
-					b.Fatal()
-				}
-
 			}
 		})
 		b.Run("Collector", func(b *testing.B) {

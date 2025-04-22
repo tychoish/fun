@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -34,7 +35,7 @@ func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
 	case 1:
 		return make(map[K]V, args[0])
 	default:
-		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a map"))
+		panic(erc.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a map"))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"iter"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -46,7 +47,7 @@ func Chan[T any](args ...int) ChanOp[T] {
 	case 1:
 		return Blocking(make(chan T, args[0]))
 	default:
-		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
+		panic(erc.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
 	}
 }
 

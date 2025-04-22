@@ -32,9 +32,9 @@ func TestConstant(t *testing.T) {
 
 		// use the stdlib helper
 		t.Log(err, ErrForTest, errors.Is(err, ErrForTest))
-		check.True(t, Is(err, error(ErrForTest)))
+		check.True(t, Is(err, ErrForTest.Err()))
 		check.True(t, !errors.Is(errors.New("fake"), ErrForTest))
-		check.ErrorIs(t, err, error(ErrForTest))
+		check.ErrorIs(t, err, ErrForTest.Err())
 	})
 	t.Run("As", func(t *testing.T) {
 

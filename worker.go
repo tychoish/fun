@@ -65,7 +65,7 @@ func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 // panics to errors.
 func (wf Worker) WithRecover() Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 		return wf(ctx)
 	}
 }
@@ -293,7 +293,7 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 // it is converted to an error and aggregated with the worker's
 // error.
 func (wf Worker) PreHook(pre Operation) Worker {
-	return func(ctx context.Context) error { return ers.Join(pre.WithRecover().Run(ctx), wf(ctx)) }
+	return func(ctx context.Context) error { return erc.Join(pre.WithRecover().Run(ctx), wf(ctx)) }
 }
 
 // PostHook runs hook operation  after the worker function
@@ -306,7 +306,7 @@ func (wf Worker) PostHook(post func()) Worker { return wf.WithErrorHook(ers.Wrap
 // worker and the error future always execute, and both errors are
 // returned in aggregated form.
 func (wf Worker) WithErrorHook(ef fn.Future[error]) Worker {
-	return func(ctx context.Context) error { return ers.Join(wf.WithRecover().Run(ctx), ef()) }
+	return func(ctx context.Context) error { return erc.Join(wf.WithRecover().Run(ctx), ef()) }
 }
 
 // StartGroup starts n copies of the worker operation and returns a
@@ -364,14 +364,14 @@ func (wf Worker) Retry(n int) Worker {
 			switch {
 			case attemptErr == nil:
 				return nil
-			case ers.IsExpiredContext(attemptErr):
-				return ers.Join(attemptErr, err)
 			case errors.Is(attemptErr, ErrStreamContinue):
 				continue
+			case ers.IsExpiredContext(attemptErr):
+				return erc.Join(attemptErr, err)
 			case ers.IsTerminating(attemptErr):
 				return nil
 			default:
-				err = ers.Join(attemptErr, err)
+				err = erc.Join(attemptErr, err)
 			}
 		}
 		return err

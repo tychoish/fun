@@ -54,7 +54,7 @@ func WorkerPool[OP fun.Worker | fun.Operation](
 func JSON[T any](in io.Reader) *fun.Stream[T] {
 	var zero T
 	return fun.ConvertStream(fun.MAKE.LinesWithSpaceTrimed(in), fun.MakeConverterErr(func(in string) (out T, err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err
 		}

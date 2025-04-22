@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/erc"
 )
 
 type slwrap struct {
@@ -19,7 +19,7 @@ func (s slwrap) Error() string   { return fmt.Sprint("error:", len(s.out), s.out
 
 func TestWrap(t *testing.T) {
 	t.Run("MergedSlice", func(t *testing.T) {
-		err := ers.Join(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
+		err := erc.Join(io.EOF, slwrap{out: []error{io.EOF, errors.New("basebase")}})
 
 		errs := Unwind(err)
 

@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"iter"
 	"sync"
@@ -132,23 +131,19 @@ func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	return CheckedGenerator[T](func() (zero T, _ bool) {
-		val, ok := next()
-		if ok {
+		if val, ok := next(); ok {
 			return val, true
 		}
 		stop()
 		cancel()
 		return zero, false
-	}).PreHook(
-		Operation(func(cc context.Context) {
-			select {
-			case <-ctx.Done():
-			case <-cc.Done():
-				cancel()
-			}
-			stop()
-		}).Go().Once(),
-	).Stream()
+	}).PreHook(Operation(func(cc context.Context) {
+		select {
+		case <-ctx.Done():
+		case <-cc.Done():
+		}
+		stop()
+	}).PostHook(cancel).Go().Once()).Stream()
 }
 
 // ConvertStream processes the input stream of type T into an
@@ -372,20 +367,16 @@ func (st *Stream[T]) Parallel(
 ) Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
-		fmt.Printf("BEFORE %d: %+v\n", len(opts), conf)
 		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
 			return err
 		}
 
-		fmt.Printf("AFTER  %d: %+v\n", len(opts), conf)
-
 		fn.WithRecover().WithErrorFilter(conf.ErrorFilter).
-			ReadAll(st).
+			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Add(st.erc.Resolve()) })).
 			StartGroup(ctx, conf.NumWorkers).
+			Ignore().
 			Run(ctx)
 
-		fmt.Println("--->", conf.ErrorCollector.Len(), conf.ErrorCollector.Resolve())
-		fmt.Println("----")
 		return conf.ErrorCollector.Resolve()
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"iter"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 )
@@ -175,7 +176,7 @@ func (ro ChanReceive[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
 // abort stream. io.EOF errors are not propagated to the caller.
 func (ro ChanReceive[T]) Consume(op Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = ers.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
 
 		var value T
 	LOOP:

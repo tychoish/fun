@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -848,7 +849,7 @@ func TestWorker(t *testing.T) {
 			err := MakeWorker(func() error {
 				defer count.Add(1)
 				if count.Load() == 11 {
-					return ers.Join(exp, ers.ErrCurrentOpAbort)
+					return erc.Join(exp, ers.ErrCurrentOpAbort)
 				}
 				return exp
 			}).Retry(16).Run(ctx)
@@ -861,7 +862,7 @@ func TestWorker(t *testing.T) {
 			err := MakeWorker(func() error {
 				defer count.Add(1)
 				if count.Load() == 11 {
-					return ers.Join(exp, context.Canceled)
+					return erc.Join(exp, context.Canceled)
 				}
 				return exp
 			}).Retry(16).Run(ctx)
@@ -870,6 +871,7 @@ func TestWorker(t *testing.T) {
 			assert.ErrorIs(t, err, context.Canceled)
 			assert.ErrorIs(t, err, exp)
 			errs := ers.Unwind(err)
+			t.Log(errs, len(errs))
 			assert.Equal(t, len(errs), 13)
 
 		})

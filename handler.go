@@ -297,7 +297,7 @@ func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) 
 // encountered. The worker is blocking.
 func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(err, ers.ParsePanic(recover())) }()
+		defer func() { err = erc.Join(err, st.Close(), ers.ParsePanic(recover())) }()
 
 		for {
 			item, err := st.Read(ctx)
