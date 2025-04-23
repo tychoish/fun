@@ -75,9 +75,9 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 	}
 }
 
-func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] {
-	return SeqStream(ec.Iterator())
-}
+// ErrorStream provides a stream that provides access to the error
+// collector.
+func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqStream(ec.Iterator()) }
 
 // ProcessOperation constructs a Handler function for running Worker
 // functions. Use in combination with Process and ProcessParallel, and
@@ -177,6 +177,8 @@ func (Constructors) ErrorHandlerWithAbort(cancel context.CancelFunc) fn.Handler[
 	}
 }
 
+// ConvertErrorsToStrings makes a Converter function that translates
+// slices of errors to slices of errors.
 func (Constructors) ConvertErrorsToStrings() Converter[[]error, []string] {
 	return MakeConverter(func(errs []error) []string {
 		out := make([]string, 0, len(errs))
@@ -188,7 +190,6 @@ func (Constructors) ConvertErrorsToStrings() Converter[[]error, []string] {
 
 		return out
 	})
-
 }
 
 // Sprintln constructs a future that calls fmt.Sprintln over the given

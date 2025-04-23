@@ -73,14 +73,7 @@ type Stream[T any] struct {
 	operation Generator[T]
 	value     T
 
-	erc erc.Collector
-
-	// err struct {
-	// 	once    sync.Once
-	// 	handler fn.Handler[error]
-	// 	future  fn.Future[error]
-	// }
-
+	erc    erc.Collector
 	closer struct {
 		state atomic.Bool
 		once  sync.Once
@@ -126,11 +119,12 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
+// SeqStream wraps a native go iterator to a fun.Stream[T].
 func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	return CheckedGenerator[T](func() (zero T, _ bool) {
+	return CheckedGenerator(func() (zero T, _ bool) {
 		if val, ok := next(); ok {
 			return val, true
 		}
