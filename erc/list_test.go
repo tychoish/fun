@@ -120,8 +120,8 @@ func TestList(t *testing.T) {
 		}
 	})
 	t.Run("Future", func(t *testing.T) {
-		es := &list{}
-		future := es.Future()
+		es := &Collector{}
+		future := es.Resolve
 		check.NotError(t, future())
 		es.Push(ers.ErrInvalidInput)
 		es.Push(ers.ErrImmutabilityViolation)
@@ -129,8 +129,8 @@ func TestList(t *testing.T) {
 		check.ErrorIs(t, future(), ers.ErrInvalidInput)
 
 		check.ErrorIs(t, future(), ers.ErrImmutabilityViolation)
-		st := AsList(future())
-		check.Equal(t, st, es)
+		st := AsCollector(future())
+		check.Equal(t, st.Error(), es.Error())
 	})
 	t.Run("CacheCorrectness", func(t *testing.T) {
 		es := &list{}
@@ -196,50 +196,50 @@ func TestList(t *testing.T) {
 	})
 	t.Run("AsList", func(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
-			es := AsList(nil)
+			es := AsCollector(nil)
 			check.NilPtr(t, es)
 		})
 		t.Run("ZeroValues", func(t *testing.T) {
 			var err error
-			es := AsList(err)
+			es := AsCollector(err)
 			check.NilPtr(t, es)
-			es = AsList(es)
+			es = AsCollector(es)
 			check.NilPtr(t, es)
 		})
 		t.Run("Error", func(t *testing.T) {
-			es := AsList(ers.ErrInvalidInput)
+			es := AsCollector(ers.ErrInvalidInput)
 			assert.NotNilPtr(t, es)
 			check.Equal(t, es.Len(), 1)
-			check.ErrorIs(t, es, ers.ErrInvalidInput)
+			check.ErrorIs(t, es.Resolve(), ers.ErrInvalidInput)
 		})
 		t.Run("List", func(t *testing.T) {
 			err := Join(ers.ErrInvalidInput, ers.ErrImmutabilityViolation, ers.ErrInvariantViolation)
-			es := AsList(err)
+			es := AsCollector(err)
 			assert.NotNilPtr(t, es)
 			check.Equal(t, es.Len(), 3)
-			check.ErrorIs(t, es, ers.ErrInvalidInput)
-			check.ErrorIs(t, es, ers.ErrInvariantViolation)
+			check.ErrorIs(t, es.Resolve(), ers.ErrInvalidInput)
+			check.ErrorIs(t, es.Resolve(), ers.ErrInvariantViolation)
 		})
 		t.Run("Unwinder", func(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
-				es := AsList(&slwind{})
+				es := AsCollector(&slwind{})
 				check.NilPtr(t, es)
 
 			})
 			t.Run("Populated", func(t *testing.T) {
-				es := AsList(&slwind{out: []error{ers.ErrInvalidInput}})
+				es := AsCollector(&slwind{out: []error{ers.ErrInvalidInput}})
 				assert.NotNilPtr(t, es)
 				check.Equal(t, es.Len(), 1)
 			})
 		})
 		t.Run("Unwrapper", func(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
-				es := AsList(&slwrap{})
+				es := AsCollector(&slwrap{})
 				check.NilPtr(t, es)
 
 			})
 			t.Run("Populated", func(t *testing.T) {
-				es := AsList(&slwrap{out: []error{ers.ErrInvalidInput}})
+				es := AsCollector(&slwrap{out: []error{ers.ErrInvalidInput}})
 				assert.NotNilPtr(t, es)
 				check.Equal(t, es.Len(), 1)
 			})

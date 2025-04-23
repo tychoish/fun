@@ -155,7 +155,7 @@ func Flip[A any, B any](first A, second B) (B, A) { return second, first }
 //
 //	_ = operation()
 //	ft.Ignore(operation())
-func Ignore[T any](_ T) { return } //nolint:staticcheck
+func Ignore[T any](_ T) {} //nolint:staticcheck
 
 // IgnoreFirst takes two arguments and returns only the second, for
 // use in wrapping functions that return two values.
@@ -396,6 +396,10 @@ func MustBeOk[T any](out T, ok bool) T {
 	WhenCall(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
 	return out
 }
+
+// Recover catches a panic, turns it into an error and passes it to
+// the provided observer function.
+func Recover(ob func(error)) { ob(erc.ParsePanic(recover())) }
 
 // WithRecoverCall runs a function without arguments that does not
 // produce an error and, if the function panics, converts it into an

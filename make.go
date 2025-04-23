@@ -76,7 +76,7 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 }
 
 func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] {
-	return SeqStream(ec.Generator())
+	return SeqStream(ec.Iterator())
 }
 
 // ProcessOperation constructs a Handler function for running Worker

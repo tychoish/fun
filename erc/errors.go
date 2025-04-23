@@ -24,6 +24,45 @@ type Collector struct {
 	list list
 }
 
+func (*Collector) with(m *sync.Mutex)   { internal.With(m) }
+func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
+
+// AsCollector takes an error and converts it to a list if possible, if
+// the error is an erc.List then this is a passthrough, and errors
+// that implement {Unwind() []error} or {Unwrap() []error}, though
+// preferring Unwind, are added individually to the list.
+//
+// For errors that provide the Unwind/Unwrap method, if these methods
+// return empty slices of errors, then AsCollector will return nil.
+func AsCollector(err error) *Collector {
+	switch et := err.(type) {
+	case nil:
+		return nil
+	case *Collector:
+		return et
+	case *list:
+		return &Collector{list: *et}
+	case interface{ Unwind() []error }:
+		if errs := et.Unwind(); len(errs) > 0 {
+			st := &Collector{}
+			st.Add(errs...)
+			return st
+		}
+		return nil
+	case interface{ Unwrap() []error }:
+		if errs := et.Unwrap(); len(errs) > 0 {
+			st := &Collector{}
+			st.Add(errs...)
+			return st
+		}
+		return nil
+	default:
+		st := &Collector{}
+		st.Push(err)
+		return st
+	}
+}
+
 // Join takes a slice of errors and converts it into an *erc.List
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call erc.Join repeatedly on the same
@@ -32,8 +71,8 @@ func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.
 
 // Push collects an error if that error is non-nil.
 func (ec *Collector) Push(err error) {
-	if err != nil {
-		defer internal.With(internal.Lock(&ec.mu))
+	if ers.IsError(err) {
+		defer ec.with(ec.lock())
 		ec.list.Push(err)
 	}
 }
@@ -45,14 +84,14 @@ func (ec *Collector) Add(errs ...error) {
 	case 1:
 		ec.Push(errs[0])
 	default:
-		defer internal.With(internal.Lock(&ec.mu))
+		defer ec.with(ec.lock())
 		ec.list.Add(errs...)
 	}
 
 }
 
-// Generator returns an iterator over the errors in the collector.
-func (ec *Collector) Generator() iter.Seq[error] {
+// Iterator returns an iterator over the errors in the collector.
+func (ec *Collector) Iterator() iter.Seq[error] {
 	return func(yield func(err error) bool) {
 		ec.mu.Lock()
 		for err := range ec.list.LIFO() {
@@ -73,21 +112,13 @@ func (ec *Collector) Generator() iter.Seq[error] {
 // and merge Stack and other { Unwrap() []error } errors, Len is not
 // updated beyond the current level. In this way Len really reports
 // "height," but this is the same for the top level.
-func (ec *Collector) Len() int { defer internal.With(internal.Lock(&ec.mu)); return ec.list.Len() }
+func (ec *Collector) Len() int { defer ec.with(ec.lock()); return ec.list.Len() }
 
 // Resolve returns an error of type *erc.List, or nil if there have
 // been no errors added. The error stack respects errors.Is and
 // errors.As, and can be iterated or used in combination with
 // ers.Unwind() to introspect the available errors.
-func (ec *Collector) Resolve() error {
-	defer internal.With(internal.Lock(&ec.mu))
-
-	if ec.list.Len() == 0 {
-		return nil
-	}
-
-	return ec.list.Resolve()
-}
+func (ec *Collector) Resolve() error { defer ec.with(ec.lock()); return ec.list.Resolve() }
 
 // HasErrors returns true if there are any underlying errors, and
 // false otherwise.
@@ -95,7 +126,12 @@ func (ec *Collector) HasErrors() bool { return ec.Len() != 0 }
 
 // Ok returns true if there are any underlying errors, and
 // false otherwise.
-func (ec *Collector) Ok() bool { return ec.Len() == 0 }
+func (ec *Collector) Ok() bool             { return ec.Len() == 0 }
+func (ec *Collector) Error() string        { defer ec.with(ec.lock()); return ec.list.Error() }
+func (ec *Collector) Is(target error) bool { defer ec.with(ec.lock()); return ec.list.Is(target) }
+func (ec *Collector) As(target any) bool   { defer ec.with(ec.lock()); return ec.list.As(target) }
+func (ec *Collector) Unwrap() error        { defer ec.with(ec.lock()); return ec.list.Unwrap() }
+func (ec *Collector) Unwind() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -132,7 +168,7 @@ func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); 
 func (ec *Collector) WithRecoverHook(hook func()) {
 	defer ec.Recover()
 	if err := ParsePanic(recover()); err != nil {
-		defer internal.With(internal.Lock(&ec.mu))
+		defer ec.with(ec.lock())
 		ec.list.Push(err)
 		if hook != nil {
 			hook()

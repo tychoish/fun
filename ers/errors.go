@@ -2,21 +2,7 @@ package ers
 
 import (
 	"errors"
-
-	"github.com/tychoish/fun/internal"
 )
-
-// Unwind assembles the full "unwrapped" list of all component
-// errors. Supports error implementations where the Unwrap() method
-// returns either error or []error.
-//
-// Unwind provides a special case of the dt.Unwind operation.
-//
-// If an error type implements interface{ Unwind() []error }, this
-// takes precedence over Unwrap when unwinding errors, to better
-// support the Stack type and others where the original error is
-// nested within the unwrapped error objects.
-func Unwind(in error) []error { return internal.Unwind(in) }
 
 // New constructs an error object that uses the Error as the
 // underlying type.

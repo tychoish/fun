@@ -65,7 +65,7 @@ func TestError(t *testing.T) {
 				ec.Push(fmt.Errorf("%d", i))
 			}
 			count := 0
-			for err := range ec.Generator() {
+			for err := range ec.Iterator() {
 				assert.Error(t, err)
 				count++
 			}
@@ -329,13 +329,13 @@ func TestError(t *testing.T) {
 		ec.Push(errors.New("fine."))
 		ec.Push(io.EOF)
 
-		iterfunc := ec.Generator()
+		iterfunc := ec.Iterator()
 		next, closer := iter.Pull(iterfunc)
 		defer closer()
 
 		err, ok := next()
 		check.True(t, ok)
-		check.ErrorIs(t, err, io.EOF)
+		check.ErrorIs(t, ec.Resolve(), io.EOF)
 		check.Equal(t, "ok,", err.Error())
 
 		ec.Push(io.EOF)

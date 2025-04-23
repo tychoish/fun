@@ -13,21 +13,6 @@ import (
 )
 
 func TestPanics(t *testing.T) {
-	t.Run("Recover", func(t *testing.T) {
-		var called bool
-		ob := func(err error) {
-			check.Error(t, err)
-			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			called = true
-		}
-		assert.NotPanic(t, func() {
-			defer Recover(ob)
-			assert.True(t, !called)
-			panic("hi")
-		})
-		assert.True(t, called)
-	})
-
 	t.Run("NilInput", func(t *testing.T) {
 		err := ParsePanic(nil)
 		if err != nil {
@@ -83,21 +68,12 @@ func TestPanics(t *testing.T) {
 			t.Error(ers.ErrRecoveredPanic.Error(), "NOT IN", err.Error())
 		}
 	})
-	t.Run("ExtractErrors", func(t *testing.T) {
-		args, errs := extractErrors([]any{nil, ers.Error("hi"), 1, true})
-		check.Equal(t, len(errs), 1)
-		check.Equal(t, len(args), 2)
-		var nerr error
-		args, errs = extractErrors([]any{nil, ers.Error("hi"), func() error { return nil }(), nerr, 2, false})
-		check.Equal(t, len(errs), 1)
-		check.Equal(t, len(args), 2)
-	})
 	t.Run("InvariantViolation", func(t *testing.T) {
-		assert.True(t, IsInvariantViolation(ers.ErrInvariantViolation))
-		assert.True(t, IsInvariantViolation(errors.Join(io.EOF, ers.Error("hello"), ers.ErrInvariantViolation)))
-		assert.True(t, !IsInvariantViolation(nil))
-		assert.True(t, !IsInvariantViolation(9001))
-		assert.True(t, !IsInvariantViolation(io.EOF))
+		assert.True(t, ers.IsInvariantViolation(ers.ErrInvariantViolation))
+		assert.True(t, ers.IsInvariantViolation(errors.Join(io.EOF, ers.Error("hello"), ers.ErrInvariantViolation)))
+		assert.True(t, !ers.IsInvariantViolation(nil))
+		assert.True(t, !ers.IsInvariantViolation(9001))
+		assert.True(t, !ers.IsInvariantViolation(io.EOF))
 	})
 
 }

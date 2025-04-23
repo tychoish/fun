@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
@@ -43,7 +44,7 @@ func TestPanics(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrInvariantViolation)
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			assert.True(t, erc.IsInvariantViolation(err))
+			assert.True(t, ers.IsInvariantViolation(err))
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
@@ -79,10 +80,10 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("CheckError", func(t *testing.T) {
-			if erc.IsInvariantViolation(nil) {
+			if ers.IsInvariantViolation(nil) {
 				t.Error("nil error shouldn't read as invariant")
 			}
-			if erc.IsInvariantViolation(errors.New("foo")) {
+			if ers.IsInvariantViolation(errors.New("foo")) {
 				t.Error("arbitrary errors are not invariants")
 			}
 		})
@@ -140,6 +141,7 @@ func TestPanics(t *testing.T) {
 			}
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			if !strings.Contains(err.Error(), "annotate") {
+				t.Log("-->", err.Error())
 				t.Error(err)
 			}
 		})
@@ -231,4 +233,15 @@ func TestPanics(t *testing.T) {
 			assert.Panic(t, func() { Invariant.Failure(nil) })
 		})
 	})
+	t.Run("ExtractErrors", func(t *testing.T) {
+		ec := &erc.Collector{}
+		extractErrors(ec, []any{nil, ers.Error("hi"), 1, true})
+		check.Equal(t, ec.Len(), 2)
+
+		var nerr error
+		ec = &erc.Collector{}
+		extractErrors(ec, []any{nil, ers.Error("hi"), func() error { return nil }(), nerr, 2, false})
+		check.Equal(t, ec.Len(), 2)
+	})
+
 }

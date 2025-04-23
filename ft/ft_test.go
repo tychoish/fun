@@ -651,5 +651,18 @@ func TestPanicProtection(t *testing.T) {
 			assert.Equal(t, 42, num)
 		})
 	})
-
+	t.Run("Recover", func(t *testing.T) {
+		var called bool
+		ob := func(err error) {
+			check.Error(t, err)
+			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
+			called = true
+		}
+		assert.NotPanic(t, func() {
+			defer Recover(ob)
+			assert.True(t, !called)
+			panic("hi")
+		})
+		assert.True(t, called)
+	})
 }

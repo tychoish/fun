@@ -6,40 +6,6 @@ import (
 	"iter"
 )
 
-// AsList takes an error and converts it to a list if possible, if
-// the error is an erc.List then this is a passthrough, and errors
-// that implement {Unwind() []error} or {Unwrap() []error}, though
-// preferring Unwind, are added individually to the list.
-//
-// For errors that provide the Unwind/Unwrap method, if these methods
-// return empty slices of errors, then AsList will return nil.
-func AsList(err error) *list {
-	switch et := err.(type) {
-	case nil:
-		return nil
-	case *list:
-		return et
-	case interface{ Unwind() []error }:
-		if errs := et.Unwind(); len(errs) > 0 {
-			st := &list{}
-			st.Add(errs...)
-			return st
-		}
-	case interface{ Unwrap() []error }:
-		if errs := et.Unwrap(); len(errs) > 0 {
-			st := &list{}
-			st.Add(errs...)
-			return st
-		}
-	default:
-		st := &list{}
-		st.Push(err)
-		return st
-	}
-
-	return nil
-}
-
 type list struct {
 	num int
 	elm element
@@ -78,19 +44,6 @@ func (eel *list) Error() string {
 	return buf.String()
 }
 
-func (eel *list) Resolve() error { return eel.Err() }
-
-func (eel *list) Err() error {
-	switch {
-	case eel == nil || eel.num == 0:
-		return nil
-	case eel.num == 1:
-		return eel.Front().Err()
-	default:
-		return eel
-	}
-}
-
 func (eel *list) In(elm *element) bool { return elm.list == eel }
 func (elm *element) In(eel *list) bool { return elm.list == eel }
 func (eel *list) Len() int {
@@ -114,6 +67,19 @@ func (eel *list) Handler() func(err error) { return eel.Push }
 // because ers is upstream of the root-fun package, it is not
 // explicitly typed as such.) which will resolve the stack.
 func (eel *list) Future() func() error { return eel.Resolve }
+
+func (eel *list) Resolve() error { return eel.Err() }
+
+func (eel *list) Err() error {
+	switch {
+	case eel == nil || eel.num == 0:
+		return nil
+	case eel.num == 1:
+		return eel.Front().Err()
+	default:
+		return eel
+	}
+}
 
 func (eel *list) Unwrap() error {
 	if eel.Ok() {
@@ -157,6 +123,9 @@ func (eel *list) Push(err error) {
 	switch werr := err.(type) {
 	case nil:
 		return
+	case *Collector:
+		defer werr.with(werr.lock())
+		eel.Push(&werr.list)
 	case *list:
 		for elem := werr.Front(); elem.Ok(); elem = elem.Next() {
 			eel.PushBack(elem.Err())
@@ -243,19 +212,12 @@ type element struct {
 	err  error
 }
 
-func (elm *element) Ok() bool      { return elm != nil && elm.list != nil && elm.err != nil }
-func (elm *element) Err() error    { return elm.err }
-func (elm *element) Error() string { return elm.err.Error() }
-func (elm *element) Unwrap() error {
-	if elm.Next().Ok() {
-		return elm.Next()
-	}
-
-	return nil
-}
-
+func (elm *element) Ok() bool             { return elm != nil && elm.list != nil && elm.err != nil }
+func (elm *element) Err() error           { return elm.err }
+func (elm *element) Error() string        { return elm.err.Error() }
 func (elm *element) Is(target error) bool { return errors.Is(elm.err, target) }
 func (elm *element) As(target any) bool   { return errors.As(elm.err, target) }
+
 func (elm *element) Next() *element {
 	if elm.Ok() && elm.next.Ok() {
 		return elm.next
