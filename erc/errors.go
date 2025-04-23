@@ -126,12 +126,8 @@ func (ec *Collector) HasErrors() bool { return ec.Len() != 0 }
 
 // Ok returns true if there are any underlying errors, and
 // false otherwise.
-func (ec *Collector) Ok() bool             { return ec.Len() == 0 }
-func (ec *Collector) Error() string        { defer ec.with(ec.lock()); return ec.list.Error() }
-func (ec *Collector) Is(target error) bool { defer ec.with(ec.lock()); return ec.list.Is(target) }
-func (ec *Collector) As(target any) bool   { defer ec.with(ec.lock()); return ec.list.As(target) }
-func (ec *Collector) Unwrap() error        { defer ec.with(ec.lock()); return ec.list.Unwrap() }
-func (ec *Collector) Unwind() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
+func (ec *Collector) Ok() bool      { return ec.Len() == 0 }
+func (ec *Collector) Error() string { defer ec.with(ec.lock()); return ec.list.Error() }
 
 ///////////////////////////////////////////////////////////////////////
 //

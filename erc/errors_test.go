@@ -59,6 +59,14 @@ func TestError(t *testing.T) {
 				t.Error("unexpected error from resolved catcher", err)
 			}
 		})
+		t.Run("Nested", func(t *testing.T) {
+			ec1 := &Collector{}
+			ec2 := &Collector{}
+			ec1.Add(io.EOF, context.Canceled)
+			ec2.Push(ec1)
+			assert.Equal(t, 2, ec2.Len())
+		})
+
 		t.Run("Generator", func(t *testing.T) {
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {

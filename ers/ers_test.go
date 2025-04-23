@@ -46,10 +46,14 @@ func TestErrors(t *testing.T) {
 
 		check.True(t, !IsExpiredContext(io.EOF))
 		check.True(t, !IsExpiredContext(errors.Join(Error("beep"), io.EOF)))
+		check.True(t, !IsInvariantViolation(Error("beep")))
+		check.True(t, !IsInvariantViolation(41))
 
 		check.True(t, IsExpiredContext(context.Canceled))
 		check.True(t, IsExpiredContext(context.DeadlineExceeded))
 		check.True(t, IsExpiredContext(errors.Join(Error("beep"), context.DeadlineExceeded)))
+		check.True(t, IsInvariantViolation(ErrInvariantViolation))
+		check.True(t, IsInvariantViolation(errors.Join(Error("boop"), ErrInvariantViolation)))
 		check.True(t, IsExpiredContext(errors.Join(Error("beep"), context.Canceled)))
 	})
 	t.Run("Ok", func(t *testing.T) {

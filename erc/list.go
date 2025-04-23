@@ -58,16 +58,6 @@ func (eel *list) Len() int {
 // otherwise.
 func (eel *list) Ok() bool { return eel == nil || eel.elm.Ok() }
 
-// Handler provides a fn.Handler[error] typed function (though
-// because ers is upstream of the root-fun package, it is not
-// explicitly typed as such.) which will Add errors to the stack.
-func (eel *list) Handler() func(err error) { return eel.Push }
-
-// Future provides a fn.Future[error] typed function (though
-// because ers is upstream of the root-fun package, it is not
-// explicitly typed as such.) which will resolve the stack.
-func (eel *list) Future() func() error { return eel.Resolve }
-
 func (eel *list) Resolve() error { return eel.Err() }
 
 func (eel *list) Err() error {

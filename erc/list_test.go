@@ -104,7 +104,7 @@ func TestList(t *testing.T) {
 	t.Run("Handler", func(t *testing.T) {
 		es := &list{}
 		check.Equal(t, es.Len(), 0)
-		hf := es.Handler()
+		hf := es.Add
 		check.Equal(t, es.Len(), 0)
 		hf(nil)
 		check.Equal(t, es.Len(), 0)
