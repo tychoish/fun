@@ -74,7 +74,7 @@ func TestSet(t *testing.T) {
 				check.NotError(t, err)
 				count := 0
 				rjson := string(data)
-				for item := range set.Seq() {
+				for item := range set.Iterator() {
 					count++
 					switch {
 					case strings.Contains(rjson, "hello"):

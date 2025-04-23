@@ -73,7 +73,7 @@ func TestShardedMap(t *testing.T) {
 
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
-					for item := range m.Stream().Seq(ctx) {
+					for item := range m.Stream().Iterator(ctx) {
 						ct++
 						check(t, item)
 					}
@@ -81,7 +81,7 @@ func TestShardedMap(t *testing.T) {
 				})
 				t.Run("Parallel", func(t *testing.T) {
 					ct := 0
-					for item := range m.ParallelStream().Seq(ctx) {
+					for item := range m.ParallelStream().Iterator(ctx) {
 						ct++
 						check(t, item)
 					}
@@ -146,7 +146,7 @@ func TestShardedMap(t *testing.T) {
 				keys := map[string]struct{}{"one": {}, "two": {}, "three": {}}
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
-					for item := range m.Keys().Seq(ctx) {
+					for item := range m.Keys().Iterator(ctx) {
 						ct++
 						_, ok := keys[item]
 						assert.True(t, ok)
@@ -166,7 +166,7 @@ func TestShardedMap(t *testing.T) {
 				obsum := 0
 				ct := 0
 				ctx := testt.Context(t)
-				for val := range m.Values().Seq(ctx) {
+				for val := range m.Values().Iterator(ctx) {
 					obsum += val
 					ct++
 				}
@@ -185,7 +185,7 @@ func TestShardedMap(t *testing.T) {
 				obsum := 0
 				ct := 0
 				ctx := testt.Context(t)
-				for val := range m.ParallelValues().Seq(ctx) {
+				for val := range m.ParallelValues().Iterator(ctx) {
 					obsum += val
 					ct++
 				}

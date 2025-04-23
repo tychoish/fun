@@ -146,7 +146,7 @@ func (mp *Map[K, V]) Len() int {
 // the map is being modified while being marshaled: keys will only
 // appear at most once but order or which version of a value is not
 // defined.
-func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Seq2()(fn) }
+func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Iterator()(fn) }
 
 // Stream returns a stream that produces a sequence of pair
 // objects.
@@ -157,8 +157,8 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Seq2()(fn) }
 // reflect any particular atomic of the underlying map.
 func (mp *Map[K, V]) Stream() *fun.Stream[dt.Pair[K, V]] { return makeMapStream(mp, dt.MakePair) }
 
-// Seq2 returns a new-style stream for a fun/dt.Map object.
-func (mp *Map[K, V]) Seq2() iter.Seq2[K, V] {
+// Iterator returns a native go iterator for a fun/dt.Map object.
+func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
 	return func(fn func(K, V) bool) {
 		mp.mp.Range(func(ak, av any) bool { return fn(ak.(K), av.(V)) })
 	}
@@ -170,9 +170,7 @@ func (mp *Map[K, V]) Seq2() iter.Seq2[K, V] {
 // advances lazily through the Range operation as callers advance the
 // stream. Be aware that this produces a stream that does not reflect
 // any particular atomic of the underlying map.
-func (mp *Map[K, V]) Keys() *fun.Stream[K] {
-	return makeMapStream(mp, func(k K, _ V) K { return k })
-}
+func (mp *Map[K, V]) Keys() *fun.Stream[K] { return makeMapStream(mp, func(k K, _ V) K { return k }) }
 
 // Values returns a stream that renders all of the values in the
 // map.
@@ -181,9 +179,7 @@ func (mp *Map[K, V]) Keys() *fun.Stream[K] {
 // advances lazily through the Range operation as callers advance the
 // stream. Be aware that this produces a stream that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Values() *fun.Stream[V] {
-	return makeMapStream(mp, func(_ K, v V) V { return v })
-}
+func (mp *Map[K, V]) Values() *fun.Stream[V] { return makeMapStream(mp, func(_ K, v V) V { return v }) }
 
 func makeMapStream[K comparable, V any, O any](
 	mp *Map[K, V],

@@ -184,7 +184,7 @@ func TestHandlers(t *testing.T) {
 		t.Run("Sprintln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Sprintln("hi", ":", 42)()) })
 		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprint("hi:", 42)()) })
 		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprint("hi:", "42")()) })
-		t.Run("Stringer", func(t *testing.T) { check.Equal(t, "Handlers<>", MAKE.Stringer(MAKE)()) })
+		t.Run("Stringer", func(t *testing.T) { check.Equal(t, "Constructors<>", MAKE.Stringer(MAKE)()) })
 		t.Run("Str", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Str([]any{"hi:", 42})()) })
 		t.Run("Strf", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Strf("%s:%d", []any{"hi", 42})()) })
 		t.Run("Strln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Strln([]any{"hi", ":", 42})()) })
@@ -281,4 +281,4 @@ func TestHandlers(t *testing.T) {
 
 }
 
-func (Constructors) String() string { return "Handlers<>" }
+func (Constructors) String() string { return "Constructors<>" }

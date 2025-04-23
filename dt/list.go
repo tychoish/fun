@@ -168,6 +168,12 @@ func (l *List[T]) GeneratorPopBack() fun.Generator[T] {
 	}
 }
 
+// Slice exports the contents of the list to a slice.
+func (l *List[T]) Slice() Slice[T] { return risky.BlockForceOp(l.StreamFront().Slice) }
+
+// Iterator returns a native go stream function for the items in a list.
+func (l *List[T]) Iterator() iter.Seq[T] { return risky.Block(l.StreamFront().Iterator) }
+
 // StreamFront returns a stream over the values in the list in
 // front-to-back order. The Stream is not synchronized with the
 // values in the list, and will be exhausted when you reach the end of
@@ -224,12 +230,6 @@ func (l *List[T]) Copy() *List[T] {
 
 	return out
 }
-
-// Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() Slice[T] { return risky.BlockForceOp(l.StreamFront().Slice) }
-
-// Seq returns a native go stream function for the items in a list.
-func (l *List[T]) Seq() iter.Seq[T] { return risky.Block(l.StreamFront().Seq) }
 
 func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != nil }
 

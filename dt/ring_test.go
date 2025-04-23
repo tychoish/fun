@@ -192,7 +192,7 @@ func TestRing(t *testing.T) {
 		assert.Equal(t, int(ring.Total()), 2*defaultRingSize)
 
 		count := 0
-		for value := range ring.PopFIFO().Seq(t.Context()) {
+		for value := range ring.PopFIFO().Iterator(t.Context()) {
 			count++
 			assert.True(t, value >= count)
 		}

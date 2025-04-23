@@ -54,7 +54,7 @@ func TestPairs(t *testing.T) {
 		assert.Equal(t, ps.Len(), 128)
 
 		var idx int
-		for k, v := range ps.Seq2() {
+		for k, v := range ps.Iterator2() {
 			check.Equal(t, idx, k)
 			check.Equal(t, idx, v)
 			idx++
@@ -71,7 +71,7 @@ func TestPairs(t *testing.T) {
 		assert.Equal(t, ps.Len(), 128)
 
 		var idx int
-		for k, v := range ps.Seq2() {
+		for k, v := range ps.Iterator2() {
 			check.Equal(t, idx, k)
 			check.Equal(t, idx, v)
 			idx++

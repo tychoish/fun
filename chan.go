@@ -116,8 +116,10 @@ func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mo
 // more accessible in some contexts.
 func (op ChanOp[T]) Stream() *Stream[T] { return op.Receive().Generator().Stream() }
 
-func (op ChanOp[T]) Seq(ctx context.Context) iter.Seq[T]        { return op.Receive().Seq(ctx) }
-func (op ChanOp[T]) Seq2(ctx context.Context) iter.Seq2[int, T] { return op.Receive().Seq2(ctx) }
+func (op ChanOp[T]) Iterator(ctx context.Context) iter.Seq[T] { return op.Receive().Iterator(ctx) }
+func (op ChanOp[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
+	return op.Receive().IteratorIndexed(ctx)
+}
 
 // Handler exposes the "send" aspect of the channel as a Handler function.
 func (op ChanOp[T]) Handler() Handler[T] { return op.Send().Handler() }

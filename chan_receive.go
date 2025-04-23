@@ -142,19 +142,21 @@ func (ro ChanReceive[T]) Generator() Generator[T] { return ro.Read }
 // canceled or the channel is closed.
 func (ro ChanReceive[T]) Stream() *Stream[T] { return ro.Generator().Stream() }
 
-// Seq provides access to the contents of the channel as a
+// Iterator provides access to the contents of the channel as a
 // new-style standard library stream. For ChanRecieve objects in
 // non-blocking mode, iteration ends when there are no items in the
 // channel. In blocking mode, iteration ends when the context is
 // canceled or the channel is closed.
-func (ro ChanReceive[T]) Seq(ctx context.Context) iter.Seq[T] { return ro.Stream().Seq(ctx) }
+func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.Stream().Iterator(ctx) }
 
-// Seq2 provides access to the contents of the channel as a
+// IteratorIndexed provides access to the contents of the channel as a
 // new-style standard library stream. For ChanRecieve objects in
 // non-blocking mode, iteration ends when there are no items in the
 // channel. In blocking mode, iteration ends when the context is
 // canceled or the channel is closed.
-func (ro ChanReceive[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
+//
+// The number is the index/counter of the items in the interator
+func (ro ChanReceive[T]) IteratorIndexed(ctx context.Context) iter.Seq2[int, T] {
 	var idx int
 
 	return func(yield func(idx int, val T) bool) {
@@ -169,12 +171,12 @@ func (ro ChanReceive[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
 	}
 }
 
-// Consume returns a Worker function that processes the output of data
+// Handle returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor
 // function returns ErrStreamContinue, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) Consume(op Handler[T]) Worker {
+func (ro ChanReceive[T]) Handle(op Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 

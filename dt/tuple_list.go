@@ -51,8 +51,8 @@ func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
 	return iter.ReadAll(func(item Tuple[K, V]) { p.Push(item) })
 }
 
-// Seq returns a native go iterator function for tuples.
-func (p *Tuples[K, V]) Seq() iter.Seq[Tuple[K, V]] {
+// Iterator returns a native go iterator function for tuples.
+func (p *Tuples[K, V]) Iterator() iter.Seq[Tuple[K, V]] {
 	return func(yield func(value Tuple[K, V]) bool) {
 		p.init()
 		for item := p.ll.Front(); item.Ok(); item = item.Next() {
@@ -63,10 +63,10 @@ func (p *Tuples[K, V]) Seq() iter.Seq[Tuple[K, V]] {
 	}
 }
 
-// Seq2 returns a native go iterator over the items in a collections of tuples.
-func (p *Tuples[K, V]) Seq2() iter.Seq2[K, V] {
+// Iterator2 returns a native go iterator over the items in a collections of tuples.
+func (p *Tuples[K, V]) Iterator2() iter.Seq2[K, V] {
 	return func(yield func(key K, value V) bool) {
-		for item := range p.Seq() {
+		for item := range p.Iterator() {
 			if !yield(item.One, item.Two) {
 				return
 			}
@@ -117,7 +117,7 @@ func (p *Tuples[K, V]) ReadAll(pf fun.Handler[Tuple[K, V]]) fun.Worker {
 			return nil
 		}
 
-		for item := range p.Seq() {
+		for item := range p.Iterator() {
 			if err := pf(ctx, item); err != nil {
 				return err
 			}

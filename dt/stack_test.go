@@ -423,7 +423,7 @@ func TestStack(t *testing.T) {
 		assert.NotError(t, err)
 
 		last := 1 // initialize to one to avoid dividing by zero
-		for item := range stack.Seq() {
+		for item := range stack.Iterator() {
 			check.True(t, item%last == 0)
 			if t.Failed() {
 				t.Log(item, last, item%last, item%last == 0)

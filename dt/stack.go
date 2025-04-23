@@ -91,8 +91,8 @@ func (s *Stack[T]) GeneratorPop() fun.Generator[T] {
 // during iteration.
 func (s *Stack[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
-// Seq returns a native go iterator function for the items in a set.
-func (s *Stack[T]) Seq() iter.Seq[T] { return s.Stream().Seq(context.Background()) }
+// Iterator returns a native go iterator function for the items in a set.
+func (s *Stack[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
 
 // StreamPop returns a destructive stream over the Items in a
 // stack. StreamPop will not observe new items added to the

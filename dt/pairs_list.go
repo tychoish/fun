@@ -94,7 +94,7 @@ func (p *Pairs[K, V]) ReadAll(pf fun.Handler[Pair[K, V]]) fun.Worker {
 			return nil
 		}
 
-		for val := range p.Seq() {
+		for val := range p.Iterator() {
 			if err := pf(ctx, val); err != nil {
 				return err
 			}
@@ -121,8 +121,8 @@ func (p *Pairs[K, V]) Append(vals ...Pair[K, V]) { p.init(); p.ll.Append(vals...
 // modifying the donating object.
 func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
 
-// Seq returns a native go iterator function for pair items.
-func (p *Pairs[K, V]) Seq() iter.Seq[Pair[K, V]] {
+// Iterator returns a native go iterator function for pair items.
+func (p *Pairs[K, V]) Iterator() iter.Seq[Pair[K, V]] {
 	return func(yield func(value Pair[K, V]) bool) {
 		p.init()
 		for item := p.ll.Front(); item.Ok(); item = item.Next() {
@@ -133,11 +133,11 @@ func (p *Pairs[K, V]) Seq() iter.Seq[Pair[K, V]] {
 	}
 }
 
-// Seq2 returns a native go iterator function for the items in a pairs
+// Iterator2 returns a native go iterator function for the items in a pairs
 // sequence.
-func (p *Pairs[K, V]) Seq2() iter.Seq2[K, V] {
+func (p *Pairs[K, V]) Iterator2() iter.Seq2[K, V] {
 	return func(yield func(key K, value V) bool) {
-		for item := range p.Seq() {
+		for item := range p.Iterator() {
 			if !yield(item.Key, item.Value) {
 				return
 			}

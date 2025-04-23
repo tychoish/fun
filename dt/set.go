@@ -117,8 +117,8 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 // set. Provides items in iteration order if the set is ordered.
 func (s *Set[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
-// Seq returns a new-style native Go iterator for the items in the set.
-func (s *Set[T]) Seq() iter.Seq[T] { return s.Stream().Seq(context.Background()) }
+// Iterator returns a new-style native Go iterator for the items in the set.
+func (s *Set[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
 
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise

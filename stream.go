@@ -502,7 +502,7 @@ func (st *Stream[T]) MarshalJSON() ([]byte, error) {
 	// stream or not care
 	ctx := context.TODO()
 
-	for val := range st.Seq(ctx) {
+	for val := range st.Iterator(ctx) {
 		if first {
 			first = false
 		} else {
@@ -597,8 +597,8 @@ func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	return out.Channel()
 }
 
-// Seq converts a fun.Stream[T] into a native go iterator.
-func (st *Stream[T]) Seq(ctx context.Context) iter.Seq[T] {
+// Iterator converts a fun.Stream[T] into a native go iterator.
+func (st *Stream[T]) Iterator(ctx context.Context) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for {
 			item, err := st.Read(ctx)

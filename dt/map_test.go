@@ -184,7 +184,7 @@ func TestMap(t *testing.T) {
 		target := NewMap(map[string]int{})
 		assert.NotError(t, target.ConsumeStream(source.Stream()).Run(t.Context()))
 		assert.Equal(t, source.Len(), target.Len())
-		for pair := range source.Stream().Seq(t.Context()) {
+		for pair := range source.Stream().Iterator(t.Context()) {
 			assert.True(t, target.Check(pair.Key))
 			assert.Equal(t, pair.Value, target.Get(pair.Key))
 		}
