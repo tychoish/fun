@@ -267,7 +267,7 @@ func (pf Handler[T]) WithErrorFilter(ef erc.Filter) Handler[T] {
 // WithoutErrors returns a producer that will convert a non-nil error
 // of the provided types to a nil error.
 func (pf Handler[T]) WithoutErrors(errs ...error) Handler[T] {
-	return pf.WithErrorFilter(erc.FilterExclude(errs...))
+	return pf.WithErrorFilter(erc.NewFilter().Without(errs...))
 }
 
 // WithErrorCheck takes an error future, and checks it before

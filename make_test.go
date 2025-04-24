@@ -163,7 +163,7 @@ func TestHandlers(t *testing.T) {
 	})
 	t.Run("Unwinder", func(t *testing.T) {
 		t.Run("BasicUnwind", func(t *testing.T) {
-			unwinder := MAKE.ErrorUnwindTransformer(erc.FilterNoop())
+			unwinder := MAKE.ErrorUnwindTransformer(erc.NewFilter())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			errs, err := unwinder(ctx, erc.Join(io.EOF, ErrNonBlockingChannelOperationSkipped, ers.ErrInvariantViolation))
@@ -171,7 +171,7 @@ func TestHandlers(t *testing.T) {
 			check.Equal(t, len(errs), 3)
 		})
 		t.Run("Empty", func(t *testing.T) {
-			unwinder := MAKE.ErrorUnwindTransformer(erc.FilterNoop())
+			unwinder := MAKE.ErrorUnwindTransformer(erc.NewFilter())
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			errs, err := unwinder(ctx, nil)

@@ -343,7 +343,7 @@ func (wf Worker) WithErrorFilter(ef erc.Filter) Worker {
 // returned by the worker is one of the errors passed to
 // WithoutErrors.
 func (wf Worker) WithoutErrors(errs ...error) Worker {
-	filter := erc.FilterExclude(errs...)
+	filter := erc.NewFilter().Without(errs...)
 	return func(ctx context.Context) error { return filter(wf(ctx)) }
 }
 

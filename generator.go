@@ -408,7 +408,7 @@ func (pf Generator[T]) PostHook(op func()) Generator[T] {
 // list. The produced value in these cases is almost always the zero
 // value for the type.
 func (pf Generator[T]) WithoutErrors(errs ...error) Generator[T] {
-	return pf.WithErrorFilter(erc.FilterExclude(errs...))
+	return pf.WithErrorFilter(erc.NewFilter().Without(errs...))
 }
 
 // WithErrorFilter passes the error of the root Generator function with

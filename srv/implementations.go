@@ -170,7 +170,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 	closer, waitForSignal := fun.MAKE.Signal()
 
 	return &Service{
-		Run:      waitForSignal.WithErrorFilter(erc.FilterContext()),
+		Run:      waitForSignal.WithErrorFilter(erc.NewFilter().WithoutContext()),
 		Shutdown: func() error { closer(); ; return pipe.Close() },
 		Cleanup: func() error {
 			ctx, cancel := context.WithCancel(context.Background())
