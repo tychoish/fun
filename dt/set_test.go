@@ -423,9 +423,9 @@ func TestSet(t *testing.T) {
 		set2 := NewSetFromMap(mp)
 		check.Equal(t, 100, set2.Len())
 
-		set.Extend(set2)
+		set.AppendSet(set2)
 		check.Equal(t, 100, set.Len())
-		set.Extend(NewSetFromMap(makeMap(100)))
+		set.AppendSet(NewSetFromMap(makeMap(100)))
 		check.Equal(t, 200, set.Len())
 	})
 }

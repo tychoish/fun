@@ -32,7 +32,6 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp.Stream().Count(ctx), 100)
 		check.Equal(t, mp.Keys().Count(ctx), 100)
 		check.Equal(t, mp.Values().Count(ctx), 100)
-		check.Equal(t, MapStream(mp).Count(ctx), 100)
 	})
 	t.Run("Extend", func(t *testing.T) {
 		mp := makeMap(100)
@@ -58,16 +57,6 @@ func TestMap(t *testing.T) {
 		// works because different keys, probably
 		mp.Append(ft.Must(makeMap(100).Stream().Slice(ctx))...)
 		check.Equal(t, mp.Len(), 200)
-	})
-	t.Run("Merge", func(t *testing.T) {
-		mp := makeMap(100)
-
-		mp.ConsumeMap(mp)
-		check.Equal(t, mp.Len(), 100)
-
-		mp.ConsumeMap(makeMap(100))
-		check.Equal(t, mp.Len(), 200)
-
 	})
 	t.Run("Canceled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -113,42 +102,19 @@ func TestMap(t *testing.T) {
 		assert.True(t, ok)
 	})
 	t.Run("Consume", func(t *testing.T) {
-		t.Run("Slice", func(t *testing.T) {
-			mp := Map[string, int]{}
-			mp.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
-			check.Equal(t, mp["1"], 1)
-			check.Equal(t, mp["2"], 2)
-			check.Equal(t, mp["3"], 3)
-		})
-		t.Run("Prine", func(t *testing.T) {
-			orig := Map[string, int]{
-				"1": 1,
-				"2": 2,
-				"3": 3,
-			}
-			mp := Map[string, int]{}
-			assert.Equal(t, len(orig), 3)
-			assert.Equal(t, len(mp), 0)
-			mp.ConsumePairs(orig.Pairs())
-			check.Equal(t, mp["1"], 1)
-			check.Equal(t, mp["2"], 2)
-			check.Equal(t, mp["3"], 3)
+		orig := Map[string, int]{
+			"1": 1,
+			"2": 2,
+			"3": 3,
+		}
+		mp := Map[string, int]{}
+		assert.Equal(t, len(orig), 3)
+		assert.Equal(t, len(mp), 0)
+		mp.ExtendWithPairs(orig.Pairs())
+		check.Equal(t, mp["1"], 1)
+		check.Equal(t, mp["2"], 2)
+		check.Equal(t, mp["3"], 3)
 
-		})
-		t.Run("Values", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			mp := Map[string, int]{}
-			err := mp.ConsumeValues(
-				NewSlice([]int{1, 2, 3}).Stream(),
-				func(in int) string { return fmt.Sprint(in) },
-			).Run(ctx)
-			check.NotError(t, err)
-			check.Equal(t, mp["1"], 1)
-			check.Equal(t, mp["2"], 2)
-			check.Equal(t, mp["3"], 3)
-		})
 	})
 	t.Run("MapConverter", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -182,7 +148,7 @@ func TestMap(t *testing.T) {
 	t.Run("ConsumeStream", func(t *testing.T) {
 		source := makeMap(300)
 		target := NewMap(map[string]int{})
-		assert.NotError(t, target.ConsumeStream(source.Stream()).Run(t.Context()))
+		assert.NotError(t, target.ExtendWithStream(source.Stream()).Run(t.Context()))
 		assert.Equal(t, source.Len(), target.Len())
 		for pair := range source.Stream().Iterator(t.Context()) {
 			assert.True(t, target.Check(pair.Key))
@@ -198,7 +164,7 @@ func TestMap(t *testing.T) {
 			mp.Add("big", 42)
 			mp.Add("small", 4)
 			mp.Add("orange", 400)
-			keys := MapKeys(mp)
+			keys := mp.Keys()
 
 			count := 0
 			err := keys.ReadAll(func(in string) {
@@ -216,13 +182,13 @@ func TestMap(t *testing.T) {
 			assert.Equal(t, 3, count)
 			assert.NotError(t, err)
 		})
-		t.Run("MapKeys", func(t *testing.T) {
+		t.Run("MapValues", func(t *testing.T) {
 			mp := Map[string, int]{}
 			mp.Add("big", 42)
 			mp.Add("small", 4)
 			mp.Add("orange", 400)
 
-			keys := MapValues(mp)
+			keys := mp.Values()
 
 			count := 0
 			err := keys.ReadAll(func(in int) {

@@ -23,7 +23,7 @@ type Set[T comparable] struct {
 // slice to the new set.
 func NewSetFromSlice[T comparable](in []T) *Set[T] {
 	out := &Set[T]{}
-	out.Populate(fun.SliceStream(in))
+	out.AppendStream(fun.SliceStream(in))
 	return out
 }
 
@@ -33,7 +33,7 @@ func NewSetFromSlice[T comparable](in []T) *Set[T] {
 // of the map, and may not therefore roundtrip.
 func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 	out := &Set[Pair[K, V]]{}
-	out.Populate(MapStream(in))
+	out.AppendStream(NewMap(in).Stream())
 	return out
 }
 
@@ -157,11 +157,11 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 	return
 }
 
-// Populate adds all items encountered in the stream to the set.
-func (s *Set[T]) Populate(iter *fun.Stream[T]) { iter.ReadAll(s.Add).Ignore().Wait() }
+// AppendStream adds all items encountered in the stream to the set.
+func (s *Set[T]) AppendStream(iter *fun.Stream[T]) { iter.ReadAll(s.Add).Ignore().Wait() }
 
-// Extend adds the items of one set to this set.
-func (s *Set[T]) Extend(extra *Set[T]) { s.Populate(extra.Stream()) }
+// AppendSet adds the items of one set to this set.
+func (s *Set[T]) AppendSet(extra *Set[T]) { s.AppendStream(extra.Stream()) }
 
 func (s *Set[T]) unsafeStream() *fun.Stream[T] {
 	if s.list != nil {
@@ -226,6 +226,6 @@ func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Stream().MarshalJSON()
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	iter := NewSlice([]T{}).Stream()
 	iter.AddError(iter.UnmarshalJSON(in))
-	s.Populate(iter)
+	s.AppendStream(iter)
 	return iter.Close()
 }

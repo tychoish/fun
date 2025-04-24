@@ -29,7 +29,6 @@ func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAl
 
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
 func (*Stack[T]) zero() (o T)       { return }
-
 func (s *Stack[T]) root() *Item[T] {
 	fun.Invariant.Ok(s != nil, ErrUninitializedContainer)
 	ft.WhenCall(s.head == nil, s.uncheckedSetup)

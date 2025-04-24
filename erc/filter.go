@@ -84,7 +84,9 @@ func (erf Filter) Without(exclusions ...error) Filter {
 	return erf.Remove(func(err error) bool { return ers.Is(err, exclusions...) })
 }
 
-// Only takes the output
+// Only takes filters errors, propagating only errors that are (in the
+// sense of errors.Is) in the inclusion list. All other errors are
+// returned as nil and are not propagated.
 func (erf Filter) Only(inclusions ...error) Filter {
 	if len(inclusions) == 0 {
 		return erf
@@ -93,6 +95,8 @@ func (erf Filter) Only(inclusions ...error) Filter {
 	return erf.Remove(func(err error) bool { return !ers.Is(err, inclusions...) })
 }
 
+// WithoutContext removes only context cancellation and deadline
+// exceeded/timeout errors. All other errors are propagated.
 func (erf Filter) WithoutContext() Filter { return erf.Remove(ers.IsExpiredContext) }
 
 // WithoutTerminating removes all terminating errors (e.g. io.EOF,

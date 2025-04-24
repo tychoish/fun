@@ -209,4 +209,4 @@ func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Stream().ReadAll(p.Pus
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.
-func (p *Pairs[K, V]) Map() Map[K, V] { m := NewMap(map[K]V{}); m.ConsumePairs(p); return m }
+func (p *Pairs[K, V]) Map() Map[K, V] { m := NewMap(map[K]V{}); m.ExtendWithPairs(p); return m }

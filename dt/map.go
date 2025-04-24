@@ -38,30 +38,6 @@ func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
 	}
 }
 
-// MapStream converts a map into a stream of dt.Pair objects. The
-// stream is panic-safe, and uses one go routine to track the
-// progress through the map. As a result you should always, either
-// exhaust the stream, cancel the context that you pass to the
-// stream OR call stream.Close().
-//
-// To use this stream the items in the map are not copied, and the
-// iteration order is randomized following the convention in go.
-//
-// Use in combination with other stream processing tools
-// (generators, observers, transformers, etc.) to limit the number of
-// times a collection of data must be coppied.
-func MapStream[K comparable, V any](in map[K]V) *fun.Stream[Pair[K, V]] {
-	return NewMap(in).Stream()
-}
-
-// MapKeys takes an arbitrary map and produces a stream over only
-// the keys.
-func MapKeys[K comparable, V any](in map[K]V) *fun.Stream[K] { return NewMap(in).Keys() }
-
-// MapValues takes an arbitrary map and produces a stream over only
-// the values.
-func MapValues[K comparable, V any](in map[K]V) *fun.Stream[V] { return NewMap(in).Values() }
-
 // NewMap provides a constructor that will produce a fun.Map without
 // specifying types.
 func NewMap[K comparable, V any](in map[K]V) Map[K, V] { return in }
@@ -130,55 +106,25 @@ func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
 	pairs.Stream().ReadAll(m.AddPair).Ignore().Wait()
 }
 
-// ConsumeMap adds all the keys from the input map the map.
-func (m Map[K, V]) ConsumeMap(in Map[K, V]) {
-	for k, v := range in {
-		m[k] = v
-	}
-}
-
-// ConsumeSlice adds a slice of values to the map, using the provided
-// function to generate the key for the value. Existing values in the
-// map are overridden.
-func (m Map[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
-	for idx := range in {
-		value := in[idx]
-		m[keyf(value)] = value
-	}
-}
-
-// ConsumePairs adds items to the map from a Pairs object. Existing
+// ExtendWithPairs adds items to the map from a Pairs object. Existing
 // values for K are always overwritten.
-func (m Map[K, V]) ConsumePairs(pairs *Pairs[K, V]) {
+func (m Map[K, V]) ExtendWithPairs(pairs *Pairs[K, V]) {
 	pairs.Stream().ReadAll(m.AddPair).Ignore().Wait()
 }
 
-// ConsumeTuples adds items to the map from a Tuples object. Existing
+// ExtendWithTuples adds items to the map from a Tuples object. Existing
 // values for K are always overwritten.
-func (m Map[K, V]) ConsumeTuples(tuples *Tuples[K, V]) {
+func (m Map[K, V]) ExtendWithTuples(tuples *Tuples[K, V]) {
 	tuples.Stream().ReadAll(m.AddTuple).Ignore().Wait()
 }
 
-// ConsumeStream adds items to the map. If a key already exists in the
+// ExtendWithStream adds items to the map. If a key already exists in the
 // map, it will be overwritten for subsequent appearances of that key.
 //
 // This operation is lazy, and returns a Worker (future) function that
 // must be excuted to process the stream.
-func (m Map[K, V]) ConsumeStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
+func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
 	return it.ReadAll(m.AddPair)
-}
-
-// ConsumeValues adds items to the map, using the function to generate
-// the keys for the values. If a key already exists in the map, it
-// will be overwritten for subsequent appearances of that key.
-//
-// This operation is lazy, and returns a Worker (future) function that
-// must be excuted to process the stream.
-//
-// This operation will panic (with an ErrInvariantValidation) if the
-// keyf panics.
-func (m Map[K, V]) ConsumeValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
-	return iter.ReadAll(func(in V) { m[keyf(in)] = in })
 }
 
 // Stream converts a map into a stream of dt.Pair objects. The

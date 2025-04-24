@@ -84,15 +84,15 @@ func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
 // "height," but this is the same for the top level.
 func (ec *Collector) Len() int { defer ec.with(ec.lock()); return ec.list.Len() }
 
-// Resolve returns an error of type *erc.Collector, or nil if there have
-// been no errors added. As a special case, single errors are
+// Resolve returns an error of type *erc.Collector, or nil if there
+// have been no errors added. As a special case, single errors are
 // unwrapped and returned directly.
 func (ec *Collector) Resolve() error { return ec.Err() }
 
-// Err, like Resolve(), returns the contents of the collector, as an
-// error. The underlying error is of type *erc.Collector, or nil if
-// there have been no errors added. As a special case, single errors
-// are unwrapped and returned directly.
+// Err returns the contents of the collector, as an error. Provides
+// the same functionality as Resolve(). The underlying error is of
+// type *erc.Collector, or nil if there have been no errors added. As
+// a special case, single errors are unwrapped and returned directly.
 func (ec *Collector) Err() error {
 	defer ec.with(ec.lock())
 	switch ec.list.Len() {
@@ -113,7 +113,6 @@ func (ec *Collector) Ok() bool { return ec.Len() == 0 }
 // that includes all of the constituent errors.
 func (ec *Collector) Error() string        { defer ec.with(ec.lock()); return ec.list.Error() }
 func (ec *Collector) Unwrap() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
-func (ec *Collector) Unwind() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
 func (ec *Collector) Is(target error) bool { defer ec.with(ec.lock()); return ec.list.Is(target) }
 func (ec *Collector) As(target any) bool   { defer ec.with(ec.lock()); return ec.list.As(target) }
 

@@ -21,7 +21,7 @@ func TestTuples(t *testing.T) {
 		ps.Add("in", "out")
 		ps.Push(MakeTuple("in", "in"))
 		mp := Map[string, string]{}
-		mp.ConsumeTuples(ps)
+		mp.ExtendWithTuples(ps)
 		assert.Equal(t, len(mp), 1)
 		assert.Equal(t, ps.Len(), 5)
 		assert.Equal(t, mp["in"], "in") // first value wins
@@ -103,7 +103,7 @@ func TestTuples(t *testing.T) {
 		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
-		mp.ConsumeTuples(&ps)
+		mp.ExtendWithTuples(&ps)
 		assert.Equal(t, len(mp), 128)
 	})
 	t.Run("ConsumeTuples", func(t *testing.T) {

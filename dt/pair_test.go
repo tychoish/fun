@@ -20,7 +20,7 @@ func TestPairs(t *testing.T) {
 		ps.Add("in", "out")
 		ps.Push(MakePair("in", "in"))
 		mp := Map[string, string]{}
-		mp.ConsumePairs(ps)
+		mp.ExtendWithPairs(ps)
 		assert.Equal(t, len(mp), 1)
 		assert.Equal(t, ps.Len(), 5)
 		assert.Equal(t, mp["in"], "in") // first value wins
@@ -103,7 +103,7 @@ func TestPairs(t *testing.T) {
 		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
-		mp.ConsumePairs(&ps)
+		mp.ExtendWithPairs(&ps)
 		assert.Equal(t, len(mp), 128)
 	})
 	t.Run("ConsumePairs", func(t *testing.T) {

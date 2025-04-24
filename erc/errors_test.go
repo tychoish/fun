@@ -372,7 +372,7 @@ func TestError(t *testing.T) {
 		ec.Push(errors.New("ok,"))
 		ec.Push(errors.New("this"))
 		ec.Push(errors.New("is"))
-		ec.Push(errors.New("fine."))
+		ec.Push(errors.New("fine"))
 		ec.Push(io.EOF)
 
 		iterfunc := ec.Iterator()
