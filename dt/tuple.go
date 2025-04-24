@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 // GENERATED FILE FROM PAIR IMPLEMENTATION
@@ -49,12 +50,12 @@ func (t *Tuple[K, V]) UnmarshalJSON(in []byte) error {
 	}
 
 	if err := json.Unmarshal(rt[0], &t.One); err != nil {
-		return erc.Wrap(err, "tuple.One")
+		return ers.Wrap(err, "tuple.One")
 	}
 
 	if len(rt) == 2 {
 		if err := json.Unmarshal(rt[1], &t.Two); err != nil {
-			return erc.Wrap(err, "tuple.Two")
+			return ers.Wrap(err, "tuple.Two")
 
 		}
 	}

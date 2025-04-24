@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -240,31 +241,34 @@ func TestError(t *testing.T) {
 			assert.Substring(t, err.Error(), "foo")
 		})
 		t.Run("Wrap", func(t *testing.T) {
-			t.Run("SingleAnnotation", func(t *testing.T) {
-				ec := &Collector{}
+			ec := &Collector{}
 
-				ec.Wrap(nil, "bar")
-				assert.Equal(t, ec.Len(), 0)
-				assert.True(t, ec.Ok())
-				ec.Wrap(errors.New("foo"), "bar")
-				assert.True(t, !ec.Ok())
-				assert.Equal(t, ec.Len(), 2)
-				assert.Equal(t, "foo: bar", ec.Error())
-				ec = &Collector{}
-				exp := errors.New("foo")
-				ec.Wrap(exp)
-				assert.Equal(t, ec.Len(), 1)
-				assert.Equal(t, "foo", ec.Error())
-				out := ec.Resolve()
-				assert.Equal(t, out, exp)
-			})
-			t.Run("LongerAnnotations", func(t *testing.T) {
-				ec := &Collector{}
-				ec.Wrap(errors.New("foo"), "bar", "baz")
-				assert.True(t, !ec.Ok())
-				assert.Equal(t, ec.Len(), 2)
-				assert.Equal(t, "foo: bar baz", ec.Error())
-			})
+			ec.Wrap(nil, "bar")
+			assert.Equal(t, ec.Len(), 0)
+			assert.True(t, ec.Ok())
+			exp := errors.New("foo")
+			ec.Wrap(exp, "bar")
+			assert.True(t, !ec.Ok())
+			assert.Equal(t, ec.Len(), 1)
+			assert.Equal(t, "foo: bar", ec.Error())
+			assert.NotEqual(t, ec.Err().Error(), exp.Error())
+			assert.True(t, strings.HasPrefix(ec.Error(), exp.Error()))
+			assert.ErrorIs(t, ec.Err(), exp)
+		})
+		t.Run("Wrapf", func(t *testing.T) {
+			ec := &Collector{}
+
+			ec.Wrapf(nil, "bar %d", 1)
+			assert.Equal(t, ec.Len(), 0)
+			assert.True(t, ec.Ok())
+			exp := errors.New("foo")
+			ec.Wrapf(exp, "bar %d", 2)
+			assert.True(t, !ec.Ok())
+			assert.Equal(t, ec.Len(), 1)
+			assert.Equal(t, "foo: bar 2", ec.Error())
+			assert.NotEqual(t, ec.Err().Error(), exp.Error())
+			assert.True(t, strings.HasPrefix(ec.Error(), exp.Error()))
+			assert.ErrorIs(t, ec.Err(), exp)
 		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {

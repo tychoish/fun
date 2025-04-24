@@ -224,22 +224,34 @@ func (Constructors) Strf(tmpl string, args []any) fn.Future[string] {
 // arguments.
 func (Constructors) Strln(args []any) fn.Future[string] { return MAKE.Sprintln(args...) }
 
+// StrJoin like Strln and Sprintln create a concatenated string
+// representation of a sequence of values, however StrJoin omits the
+// final new line character that Sprintln adds. This is similar in
+// functionality MAKE.Sprint() or MAKE.Str() but ALWAYS adds a space
+// between elements.
+func (Constructors) StrJoin(args []any) fn.Future[string] {
+	return func() string {
+		out := fmt.Sprintln(args...)
+		return out[:max(0, len(out)-1)]
+	}
+}
+
 // StrConcatinate produces a future that joins a variadic sequence of
 // strings into a single string.
 func (Constructors) StrConcatinate(strs ...string) fn.Future[string] {
-	return MAKE.StrJoin(strs, "")
-}
-
-// StrJoin produces a future that combines a slice of strings into a
-// single string, joined with the separator.
-func (Constructors) StrJoin(strs []string, sep string) fn.Future[string] {
-	return func() string { return strings.Join(strs, sep) }
+	return MAKE.StrSliceConcatinate(strs)
 }
 
 // StrSliceConcatinate produces a future for strings.Join(), concatenating the
 // elements in the input slice with the provided separator.
 func (Constructors) StrSliceConcatinate(input []string) fn.Future[string] {
-	return MAKE.StrJoin(input, "")
+	return MAKE.StringsJoin(input, "")
+}
+
+// StringsJoin produces a future that combines a slice of strings into a
+// single string, joined with the separator.
+func (Constructors) StringsJoin(strs []string, sep string) fn.Future[string] {
+	return func() string { return strings.Join(strs, sep) }
 }
 
 // Stringer converts a fmt.Stringer object/method call into a

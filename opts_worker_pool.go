@@ -166,7 +166,7 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 func WorkerGroupConfWithErrorCollector(ec *erc.Collector) OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		if ec == nil {
-			return erc.Wrap(ers.ErrInvalidInput, "cannot use a nil error collector")
+			return ers.Wrap(ers.ErrInvalidInput, "cannot use a nil error collector")
 		}
 		opts.ErrorCollector = ec
 		return nil

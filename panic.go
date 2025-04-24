@@ -67,7 +67,7 @@ func (RuntimeInvariant) Ok(cond bool, args ...any) {
 // of the panic is both--via wrapping--an ErrInvariantViolation and
 // the error itself.
 func (RuntimeInvariant) Must(err error, args ...any) {
-	Invariant.Ok(err == nil, func() error { return erc.Wrap(err, args...) })
+	Invariant.Ok(err == nil, func() error { return ers.Wrap(err, MAKE.StrJoin(args).Resolve()) })
 }
 
 // IsTrue provides a runtime assertion that the condition is true, and

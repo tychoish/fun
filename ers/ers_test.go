@@ -10,6 +10,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/internal"
 )
 
 type errorTest struct {
@@ -144,5 +145,64 @@ func TestErrors(t *testing.T) {
 		check.Substring(t, merged, "EOF")
 		check.Substring(t, merged, "context canceled")
 		check.Substring(t, merged, "limit exceeded")
+	})
+	t.Run("Wrapped", func(t *testing.T) {
+		t.Run("Errorf", func(t *testing.T) {
+			err := errors.New("base")
+			for i := 0; i < 100; i++ {
+				err = fmt.Errorf("wrap %d: %w", i, err)
+			}
+
+			errs := internal.Unwind(err)
+			if len(errs) != 101 {
+				t.Error(len(errs))
+			}
+			if errs[100].Error() != "base" {
+				t.Error(errs[100])
+			}
+			check.Equal(t, 101, len(internal.Unwind(err)))
+		})
+		t.Run("Wrapf", func(t *testing.T) {
+			base := errors.New("base")
+			err := base
+			for i := 0; i < 100; i++ {
+				err = Wrapf(err, "iter=%d", i)
+			}
+
+			errs := internal.Unwind(err)
+			if len(errs) != 101 {
+				t.Fatal(len(errs), err)
+			}
+			if errs[100].Error() != "base" {
+				t.Error(errs[100])
+			}
+			check.Equal(t, 101, len(internal.Unwind(err)))
+		})
+		t.Run("Wrap", func(t *testing.T) {
+			base := errors.New("base")
+			err := base
+			for i := 0; i < 100; i++ {
+				err = Wrap(err, "annotation")
+			}
+
+			assert.ErrorIs(t, err, base)
+			assert.True(t, strings.HasPrefix(err.Error(), "base: annotation: annotation"))
+
+			errs := internal.Unwind(err)
+			if len(errs) != 101 {
+				t.Error(len(errs))
+			}
+			if errs[100].Error() != "base" {
+				t.Error(errs[100])
+			}
+			check.Equal(t, 101, len(internal.Unwind(err)))
+
+		})
+		t.Run("WrapfNil", func(t *testing.T) {
+			assert.NotError(t, Wrapf(nil, "foo %s", "bar"))
+		})
+		t.Run("WrapNil", func(t *testing.T) {
+			assert.NotError(t, Wrap(nil, "foo"))
+		})
 	})
 }

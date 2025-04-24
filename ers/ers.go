@@ -79,3 +79,31 @@ func Whenf(cond bool, tmpl string, args ...any) error {
 
 	return fmt.Errorf(tmpl, args...)
 }
+
+// Wrap returns an annotated error if the input error is non-nil, and
+// returns nil otherwise.
+//
+// This, roughly mirrors the api "github/pkg/errors.Wrap" but takes
+// advantage of newer standard library error wrapping tools.
+func Wrap(err error, annotation string) error {
+	if IsError(err) {
+		return fmt.Errorf("%w: %s", err, annotation)
+	}
+	return nil
+}
+
+// Wrapf returns an annotated error using the given sprintf-style
+// template and arguments, and returns nil otherwise.
+//
+// This, roughly mirrors the api "github/pkg/errors.Wrapf" but takes
+// advantage of newer standard library error wrapping tools.
+func Wrapf(err error, tmpl string, args ...any) error {
+	if IsError(err) {
+		return fmt.Errorf(
+			fmt.Sprint("%w: ", tmpl),
+			append([]any{err}, args...)...,
+		)
+	}
+	return nil
+
+}

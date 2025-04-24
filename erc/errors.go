@@ -6,7 +6,6 @@
 package erc
 
 import (
-	"fmt"
 	"iter"
 	"sync"
 
@@ -65,39 +64,6 @@ func AsCollector(err error) *Collector {
 // using errors.Join(): if you call erc.Join repeatedly on the same
 // error set of errors the resulting error is convertable
 func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.Err() }
-
-// Wrap produces a wrapped error if the err is non-nil, wrapping the
-// error with the provided annotation. When the error is nil, Wrap
-// returns nil.
-//
-// This, roughly mirrors the usage "github/pkg/errors.Wrap" but
-// taking advantage of newer standard library error wrapping.
-func Wrap(err error, annotation ...any) error {
-	if ers.IsOk(err) {
-		return nil
-	}
-	// return Join(err, ers.New(fmt.Sprint(annotation...)))
-
-	ec := &Collector{}
-	ec.Wrap(err, annotation...)
-	return ec.Err()
-}
-
-// Wrapf produces a wrapped error, if the error is non-nil, with a
-// formated wrap annotation. When the error is nil, Wrapf does not
-// build an error and returns nil.
-//
-// This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
-// taking advantage of newer standard library error wrapping.
-func Wrapf(err error, tmpl string, args ...any) error {
-	if ers.IsOk(err) {
-		return nil
-	}
-	// return Join(err, fmt.Errorf(tmpl, args...))
-	ec := &Collector{}
-	ec.Wrapf(err, tmpl, args...)
-	return ec.Err()
-}
 
 // with/lock are internal helpers to avoid twiddling the pointer to
 // the mutex.
@@ -210,27 +176,19 @@ func (ec *Collector) Whenf(cond bool, val string, args ...any) {
 	ec.Push(ers.Whenf(cond, val, args...))
 }
 
-// Wrap adds a single error to the collector
-func (ec *Collector) Wrap(err error, annotation ...any) {
-	if ers.IsError(err) {
-		defer ec.with(ec.lock())
-		if len(annotation) == 0 {
-			ec.list.PushBack(err)
-			return
-		}
-
-		ec.list.PushBack(err)
-		msg := fmt.Sprintln(annotation...)
-		ec.list.PushBack(ers.New(msg[:max(0, len(msg)-1)]))
-	}
+// Wrap adds an annotated error to the Collector, IF the wrapped
+// error is non-nil: nil errors are always a noop. If there is no
+// annotation, the error is added directly. Errors are annotated using
+// fmt.Errorf and the %w token.
+func (ec *Collector) Wrap(err error, annotation string) {
+	ec.Push(ers.Wrap(err, annotation))
 }
 
+// Wrapf adds an annotated error to the collector IF the error is
+// non-nil: nil errors make Wrapf a noop. Errors are annotated using
+// fmt.Errorf and the %w token.
 func (ec *Collector) Wrapf(err error, tmpl string, args ...any) {
-	if ers.IsError(err) {
-		defer ec.with(ec.lock())
-		ec.list.PushBack(err)
-		ec.list.PushBack(fmt.Errorf(tmpl, args...))
-	}
+	ec.Push(ers.Wrapf(err, tmpl, args...))
 }
 
 // Check executes a simple function and if it returns an error, adds
