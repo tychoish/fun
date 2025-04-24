@@ -46,7 +46,7 @@ func catcherIsEmpty(t *testing.T, catcher *Collector) {
 		t.Fatal("test issue")
 	}
 
-	if catcher.HasErrors() {
+	if !catcher.Ok() {
 		t.Error("should not have errors")
 	}
 	if err := catcher.Resolve(); err != nil {

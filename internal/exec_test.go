@@ -68,7 +68,7 @@ func TestLimitingResolvers(t *testing.T) {
 				panic(err)
 			}
 			for range 500 {
-				time.Sleep(25 * time.Millisecond)
+				time.Sleep(30 * time.Millisecond)
 				if out := resolver(func() int { count++; return 42 }); out != 42 {
 					t.Fatal("expected 42, got", out)
 				}

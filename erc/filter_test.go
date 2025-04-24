@@ -6,7 +6,6 @@ import (
 	"io"
 	"testing"
 
-	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 )
@@ -42,20 +41,31 @@ func TestFilter(t *testing.T) {
 		check.NotError(t, endAndCancelFilter(nil))
 		check.NotError(t, endAndCancelFilter(context.Canceled))
 		check.Error(t, endAndCancelFilter(ers.New("will error")))
-		// TODO write test that exercises short circuiting execution
 	})
 	t.Run("WithEmptyList", func(t *testing.T) {
 		var count int
 		filter := Filter(func(err error) error { count++; return err })
-		filter = filter.Without().Then(filter)
-		assert.Error(t, filter(io.EOF))
-		assert.Equal(t, count, 2)
+		filter = filter.Without().Only().Then(filter)
+		check.Error(t, filter(io.EOF))
+		check.Equal(t, count, 2)
 
 		filter = filter.Only(io.EOF).Then(filter)
-		assert.Error(t, filter(io.EOF))
-		assert.Equal(t, count, 8)
-		assert.NotError(t, filter(ers.New("foo")))
-		assert.Equal(t, count, 10)
+		check.Error(t, filter(io.EOF))
+		check.Equal(t, count, 6)
+		check.NotError(t, filter(ers.New("foo")))
+		check.Equal(t, count, 8)
+	})
+	t.Run("Next", func(t *testing.T) {
+		var erf Filter
+		t.Run("Direct/Error", func(t *testing.T) { check.Panic(t, func() { _ = erf(io.EOF) }) })
+		t.Run("Direct/Nil", func(t *testing.T) { check.Panic(t, func() { _ = erf(nil) }) })
+		t.Run("NillNextWithError", func(t *testing.T) { check.Panic(t, func() { _ = NewFilter().Next(erf)(io.EOF) }) })
+		t.Run("NillNextWithNilError", func(t *testing.T) { check.Panic(t, func() { _ = NewFilter().Next(erf)(nil) }) })
+		t.Run("Passthrough", func(t *testing.T) { check.NotPanic(t, func() { check.NotError(t, NewFilter()(nil)) }) })
+
+		t.Run("WithApply", func(t *testing.T) {
+			check.Panic(t, func() { check.ErrorIs(t, NewFilter().Next(erf).Apply(io.EOF), io.EOF) })
+		})
 
 	})
 

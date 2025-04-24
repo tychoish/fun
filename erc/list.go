@@ -58,19 +58,6 @@ func (eel *list) Len() int {
 // otherwise.
 func (eel *list) Ok() bool { return eel == nil || eel.elm.Ok() }
 
-func (eel *list) Resolve() error { return eel.Err() }
-
-func (eel *list) Err() error {
-	switch {
-	case eel == nil || eel.num == 0:
-		return nil
-	case eel.num == 1:
-		return eel.Front().Err()
-	default:
-		return eel
-	}
-}
-
 func (eel *list) Unwrap() error {
 	if eel.Ok() {
 		return nil
@@ -82,17 +69,15 @@ func (eel *list) Unwrap() error {
 func (eel *list) Unwind() []error {
 	out := make([]error, eel.num)
 
-	idx := 0
-	for elem := eel.Front(); elem.Ok(); elem = elem.Next() {
+	for elem, idx := eel.Front(), 0; elem.Ok(); elem, idx = elem.Next(), idx+1 {
 		out[idx] = elem.err
-		idx++
 	}
 
 	return out
 }
 
 func (eel *list) Is(target error) (ok bool) {
-	for err := range eel.FIFO() {
+	for err := range eel.LIFO() {
 		if ok = errors.Is(err, target); ok {
 			break
 		}
@@ -101,7 +86,7 @@ func (eel *list) Is(target error) (ok bool) {
 }
 
 func (eel *list) As(target any) (ok bool) {
-	for err := range eel.FIFO() {
+	for err := range eel.LIFO() {
 		if ok = errors.As(err, target); ok {
 			break
 		}
@@ -130,15 +115,15 @@ func (eel *list) Push(err error) {
 			}
 		}
 	case interface{ Unwind() []error }:
-		eel.Add(werr.Unwind()...)
+		eel.Add(werr.Unwind())
 	case interface{ Unwrap() []error }:
-		eel.Add(werr.Unwrap()...)
+		eel.Add(werr.Unwrap())
 	default:
 		eel.PushBack(err)
 	}
 }
 
-func (eel *list) Add(errs ...error) {
+func (eel *list) Add(errs []error) {
 	for _, err := range errs {
 		eel.Push(err)
 	}
@@ -177,7 +162,7 @@ func (eel *list) PushFront(err error) {
 
 func (eel *list) FIFO() iter.Seq[error] {
 	return func(yield func(err error) bool) {
-		for elem := eel.Back(); elem.Ok(); elem = elem.Previous() {
+		for elem := eel.Front(); elem.Ok(); elem = elem.Next() {
 			if !yield(elem) {
 				return
 			}
@@ -187,7 +172,7 @@ func (eel *list) FIFO() iter.Seq[error] {
 
 func (eel *list) LIFO() iter.Seq[error] {
 	return func(yield func(err error) bool) {
-		for elem := eel.Front(); elem.Ok(); elem = elem.Next() {
+		for elem := eel.Back(); elem.Ok(); elem = elem.Previous() {
 			if !yield(elem) {
 				return
 			}

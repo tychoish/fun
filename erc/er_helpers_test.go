@@ -3,6 +3,7 @@ package erc
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -39,8 +40,8 @@ func TestCollections(t *testing.T) {
 				t.Error("should err as", err, cp)
 			}
 			if cp.val != e2.val {
-				t.Error(cp.val, "=<=>=", e1.val)
-				t.Log(cp)
+				t.Error("cp.val", cp.val, "e1.val", e1.val, "e2", e2.val)
+				t.Log(cp, cp.val == e2.val)
 			}
 		})
 		t.Run("FirstOnly", func(t *testing.T) {
@@ -128,39 +129,27 @@ func TestCollections(t *testing.T) {
 			check.Equal(t, 101, len(internal.Unwind(err)))
 		})
 		t.Run("Wrapf", func(t *testing.T) {
-			err := errors.New("base")
+			base := errors.New("base")
+			err := base
 			for i := 0; i < 100; i++ {
 				err = Wrapf(err, "iter=%d", i)
+				t.Log(err)
+				assert.Equal(t, err.(*Collector).Len(), 2)
 			}
 
-			errs := ers.Unwind(err)
-			if len(errs) != 101 {
-				t.Log(errs)
-				t.Error(len(errs))
-			}
-			if err := errs[0]; err.Error() != "base" {
-				t.Error(err, len(errs))
-			}
-			check.Equal(t, 101, len(internal.Unwind(err)))
-
+			assert.ErrorIs(t, err, base)
+			assert.True(t, strings.HasPrefix(err.Error(), "base: iter=0: iter=1"))
 		})
 		t.Run("Wrap", func(t *testing.T) {
-			err := errors.New("base")
+			base := errors.New("base")
+			err := base
 			for i := 0; i < 100; i++ {
 				err = Wrap(err, "annotation")
+				assert.Equal(t, err.(*Collector).Len(), 2)
 			}
 
-			errs := ers.Unwind(err)
-			if len(errs) != 101 {
-				t.Log(errs)
-				t.Error(len(errs))
-			}
-			if errs[0].Error() != "base" {
-				t.Log(errs)
-				t.Error(errs[0])
-			}
-			check.Equal(t, 101, len(internal.Unwind(err)))
-
+			assert.ErrorIs(t, err, base)
+			assert.True(t, strings.HasPrefix(err.Error(), "base: annotation: annotation"))
 		})
 		t.Run("WrapfNil", func(t *testing.T) {
 			assert.NotError(t, Wrapf(nil, "foo %s", "bar"))

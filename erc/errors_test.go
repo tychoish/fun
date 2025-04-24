@@ -45,6 +45,14 @@ func TestError(t *testing.T) {
 				t.Error("unexpected error value:", err)
 			}
 		})
+		t.Run("AsCollectorList", func(t *testing.T) {
+			lst := &list{}
+			lst.Push(errors.New("foo"))
+			es := AsCollector(lst)
+			assert.Error(t, es.Err())
+			assert.Equal(t, 1, es.Len())
+			assert.Equal(t, "foo", es.Error())
+		})
 		t.Run("Check", func(t *testing.T) {
 			catcher := &Collector{}
 			serr := errors.New(errval)
@@ -66,7 +74,6 @@ func TestError(t *testing.T) {
 			ec2.Push(ec1)
 			assert.Equal(t, 2, ec2.Len())
 		})
-
 		t.Run("Generator", func(t *testing.T) {
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
@@ -182,13 +189,13 @@ func TestError(t *testing.T) {
 			serr := errors.New(errval)
 			ec := &Collector{}
 			ec.Whenf(false, "no error %w", serr)
-			assert.True(t, !ec.HasErrors())
+			assert.True(t, ec.Ok())
 			if err := ec.Resolve(); err != nil {
 				t.Fatal(err)
 			}
 
 			ec.Whenf(true, "no error: %w", serr)
-			assert.True(t, ec.HasErrors())
+			assert.True(t, !ec.Ok())
 
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
@@ -224,13 +231,40 @@ func TestError(t *testing.T) {
 			ec := &Collector{}
 
 			ec.WithRecover(func() { panic("foo") })
-			if !ec.HasErrors() {
-				t.Fatal("empty collector")
+			if ec.Ok() {
+				t.Fatal("unexpectedly empty collector")
 			}
 			err := ec.Resolve()
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Substring(t, err.Error(), "foo")
+		})
+		t.Run("Wrap", func(t *testing.T) {
+			t.Run("SingleAnnotation", func(t *testing.T) {
+				ec := &Collector{}
+
+				ec.Wrap(nil, "bar")
+				assert.Equal(t, ec.Len(), 0)
+				assert.True(t, ec.Ok())
+				ec.Wrap(errors.New("foo"), "bar")
+				assert.True(t, !ec.Ok())
+				assert.Equal(t, ec.Len(), 2)
+				assert.Equal(t, "foo: bar", ec.Error())
+				ec = &Collector{}
+				exp := errors.New("foo")
+				ec.Wrap(exp)
+				assert.Equal(t, ec.Len(), 1)
+				assert.Equal(t, "foo", ec.Error())
+				out := ec.Resolve()
+				assert.Equal(t, out, exp)
+			})
+			t.Run("LongerAnnotations", func(t *testing.T) {
+				ec := &Collector{}
+				ec.Wrap(errors.New("foo"), "bar", "baz")
+				assert.True(t, !ec.Ok())
+				assert.Equal(t, ec.Len(), 2)
+				assert.Equal(t, "foo: bar baz", ec.Error())
+			})
 		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {
@@ -278,8 +312,8 @@ func TestError(t *testing.T) {
 							if count > 10 {
 								t.Error("should have one by now")
 							}
-						} else if _, ok := err.(*list); !ok {
-							t.Error("should be an error stack")
+						} else if _, ok := err.(*Collector); !ok {
+							t.Errorf("should be an error stack: %T", err)
 						}
 					}
 				}

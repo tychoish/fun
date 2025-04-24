@@ -754,7 +754,7 @@ func RunStreamStringAlgoTests(
 						check.EqualItems(t, elems, vals)
 					})
 					t.Run("ParallelMap", func(t *testing.T) {
-						out := Map(
+						vals, err := Map(
 							MergeStreams(VariadicStream(builder(), builder(), builder())),
 							func(_ context.Context, str string) (string, error) {
 								for _, c := range []string{"a", "e", "i", "o", "u"} {
@@ -763,9 +763,8 @@ func RunStreamStringAlgoTests(
 								return strings.TrimSpace(str), nil
 							},
 							WorkerGroupConfNumWorkers(4),
-						)
+						).Slice(t.Context())
 
-						vals, err := out.Slice(context.Background())
 						if err != nil {
 							t.Error(len(vals), " >>:", err)
 						}

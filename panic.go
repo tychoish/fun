@@ -112,5 +112,4 @@ func extractErrors(ec *erc.Collector, in []any) {
 	if len(args) > 0 {
 		ec.Push(errors.New(strings.TrimSpace(fmt.Sprintln(args...))))
 	}
-
 }

@@ -104,7 +104,7 @@ func TestList(t *testing.T) {
 	t.Run("Handler", func(t *testing.T) {
 		es := &list{}
 		check.Equal(t, es.Len(), 0)
-		hf := es.Add
+		hf := es.Push
 		check.Equal(t, es.Len(), 0)
 		hf(nil)
 		check.Equal(t, es.Len(), 0)
@@ -134,9 +134,9 @@ func TestList(t *testing.T) {
 	})
 	t.Run("CacheCorrectness", func(t *testing.T) {
 		es := &list{}
-		es.Add(errors.New(errval))
+		es.Push(errors.New(errval))
 		er1 := es.Error()
-		es.Add(errors.New(errval))
+		es.Push(errors.New(errval))
 		er2 := es.Error()
 		if er1 == er2 {
 			t.Error("errors should be different", er1, er2)
@@ -144,21 +144,21 @@ func TestList(t *testing.T) {
 	})
 	t.Run("Merge", func(t *testing.T) {
 		es1 := &list{}
-		es1.Add(errors.New(errval))
-		es1.Add(errors.New(errval))
+		es1.Push(errors.New(errval))
+		es1.Push(errors.New(errval))
 		if l := es1.Len(); l != 2 {
 			t.Fatal("es1 unexpected length", l)
 		}
 
 		es2 := &list{}
-		es2.Add(errors.New(errval))
-		es2.Add(errors.New(errval))
+		es2.Push(errors.New(errval))
+		es2.Push(errors.New(errval))
 
 		if l := es2.Len(); l != 2 {
 			t.Fatal("es2 unexpected length", l)
 		}
 
-		es1.Add(es2)
+		es1.Push(es2)
 		if l := es1.Len(); l != 4 {
 			t.Fatal("merged unexpected length", l)
 		}
@@ -189,7 +189,7 @@ func TestList(t *testing.T) {
 		es.Push(errors.New("three"))
 
 		output := es.Error()
-		const expected = "three: two: one"
+		const expected = "one: two: three"
 		if output != expected {
 			t.Error(output, "!=", expected)
 		}
@@ -297,6 +297,8 @@ func TestMergeLegacy(t *testing.T) {
 				t.Error("should err as", err, cp)
 			}
 			if cp.val != e2.val {
+				t.Logf("%T %T", cp.val, e2.val)
+				t.Log(cp.val, e2.val)
 				t.Error(cp.val)
 			}
 		})
@@ -343,7 +345,7 @@ func TestMergeLegacy(t *testing.T) {
 			errs := ers.Unwind(jerr)
 			t.Log(errs)
 			check.Equal(t, len(errs), 8)
-			check.Equal(t, jerr.Error(), "eight: seven: six: five: four: three: two: one")
+			check.Equal(t, jerr.Error(), "one: two: three: four: five: six: seven: eight")
 		})
 		t.Run("ChainUnwrapping", func(t *testing.T) {
 			jerr := fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w",

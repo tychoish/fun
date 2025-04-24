@@ -24,9 +24,6 @@ type Collector struct {
 	list list
 }
 
-func (*Collector) with(m *sync.Mutex)   { internal.With(m) }
-func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
-
 // AsCollector takes an error and converts it to a list if possible, if
 // the error is an erc.List then this is a passthrough, and errors
 // that implement {Unwind() []error} or {Unwrap() []error}, though
@@ -67,34 +64,100 @@ func AsCollector(err error) *Collector {
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call erc.Join repeatedly on the same
 // error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.Resolve() }
+func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.Err() }
 
-// Push collects an error if that error is non-nil.
-func (ec *Collector) Push(err error) {
-	if ers.IsError(err) {
-		defer ec.with(ec.lock())
-		ec.list.Push(err)
+// Wrap produces a wrapped error if the err is non-nil, wrapping the
+// error with the provided annotation. When the error is nil, Wrap
+// returns nil.
+//
+// This, roughly mirrors the usage "github/pkg/errors.Wrap" but
+// taking advantage of newer standard library error wrapping.
+func Wrap(err error, annotation ...any) error {
+	if ers.IsOk(err) {
+		return nil
 	}
+	// return Join(err, ers.New(fmt.Sprint(annotation...)))
+
+	ec := &Collector{}
+	ec.Wrap(err, annotation...)
+	return ec.Err()
 }
 
-func (ec *Collector) Add(errs ...error) {
-	switch len(errs) {
+// Wrapf produces a wrapped error, if the error is non-nil, with a
+// formated wrap annotation. When the error is nil, Wrapf does not
+// build an error and returns nil.
+//
+// This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
+// taking advantage of newer standard library error wrapping.
+func Wrapf(err error, tmpl string, args ...any) error {
+	if ers.IsOk(err) {
+		return nil
+	}
+	// return Join(err, fmt.Errorf(tmpl, args...))
+	ec := &Collector{}
+	ec.Wrapf(err, tmpl, args...)
+	return ec.Err()
+}
+
+// with/lock are internal helpers to avoid twiddling the pointer to
+// the mutex.
+func (*Collector) with(m *sync.Mutex)   { internal.With(m) }
+func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
+
+///////////////////////////////////////////////////////////////////////
+//
+// Collector error rendering and introspection methods
+//
+///////////////////////////////////////////////////////////////////////
+
+// Len reports on the total number of non-nil errors collected. The
+// count tracks a cached size of the *erc.List, giving Len() stable
+// performance characteristics; however, because the Collector unwrap
+// and merge Stack and other { Unwrap() []error } errors, Len is not
+// updated beyond the current level. In this way Len really reports
+// "height," but this is the same for the top level.
+func (ec *Collector) Len() int { defer ec.with(ec.lock()); return ec.list.Len() }
+
+// Resolve returns an error of type *erc.Collector, or nil if there have
+// been no errors added. As a special case, single errors are
+// unwrapped and returned directly.
+func (ec *Collector) Resolve() error { return ec.Err() }
+
+// Err, like Resolve(), returns the contents of the collector, as an
+// error. The underlying error is of type *erc.Collector, or nil if
+// there have been no errors added. As a special case, single errors
+// are unwrapped and returned directly.
+func (ec *Collector) Err() error {
+	defer ec.with(ec.lock())
+	switch ec.list.Len() {
 	case 0:
-		return
+		return nil
 	case 1:
-		ec.Push(errs[0])
+		return ec.list.Front().Err()
 	default:
-		defer ec.with(ec.lock())
-		ec.list.Add(errs...)
+		return ec
 	}
-
 }
 
-// Iterator returns an iterator over the errors in the collector.
+// Ok returns true if there are any underlying errors, and
+// false otherwise.
+func (ec *Collector) Ok() bool { return ec.Len() == 0 }
+
+// Error implements the error interface, and renders an error message
+// that includes all of the constituent errors.
+func (ec *Collector) Error() string        { defer ec.with(ec.lock()); return ec.list.Error() }
+func (ec *Collector) Unwrap() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
+func (ec *Collector) Unwind() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
+func (ec *Collector) Is(target error) bool { defer ec.with(ec.lock()); return ec.list.Is(target) }
+func (ec *Collector) As(target any) bool   { defer ec.with(ec.lock()); return ec.list.As(target) }
+
+// Iterator returns an iterator over the errors in the
+// collector. The oldest or earliest errors collected appear first in
+// the iteration order.
 func (ec *Collector) Iterator() iter.Seq[error] {
 	return func(yield func(err error) bool) {
 		ec.mu.Lock()
-		for err := range ec.list.LIFO() {
+		for err := range ec.list.FIFO() {
 			ec.mu.Unlock()
 			if !yield(err) {
 				return
@@ -106,34 +169,34 @@ func (ec *Collector) Iterator() iter.Seq[error] {
 
 }
 
-// Len reports on the total number of non-nil errors collected. The
-// count tracks a cached size of the *erc.List, giving Len() stable
-// performance characteristics; however, because the Collector unwrap
-// and merge Stack and other { Unwrap() []error } errors, Len is not
-// updated beyond the current level. In this way Len really reports
-// "height," but this is the same for the top level.
-func (ec *Collector) Len() int { defer ec.with(ec.lock()); return ec.list.Len() }
-
-// Resolve returns an error of type *erc.List, or nil if there have
-// been no errors added. The error stack respects errors.Is and
-// errors.As, and can be iterated or used in combination with
-// ers.Unwind() to introspect the available errors.
-func (ec *Collector) Resolve() error { defer ec.with(ec.lock()); return ec.list.Resolve() }
-
-// HasErrors returns true if there are any underlying errors, and
-// false otherwise.
-func (ec *Collector) HasErrors() bool { return ec.Len() != 0 }
-
-// Ok returns true if there are any underlying errors, and
-// false otherwise.
-func (ec *Collector) Ok() bool      { return ec.Len() == 0 }
-func (ec *Collector) Error() string { defer ec.with(ec.lock()); return ec.list.Error() }
-
 ///////////////////////////////////////////////////////////////////////
 //
-// Collector Helpers
+// Collection methods
 //
 ///////////////////////////////////////////////////////////////////////
+
+// Push collects an error if that error is non-nil.
+func (ec *Collector) Push(err error) {
+	if ers.IsError(err) {
+		defer ec.with(ec.lock())
+		ec.list.Push(err)
+	}
+}
+
+// Add appends one or more errors to the collectors. Nil errors are
+// always omitted from the collector.
+func (ec *Collector) Add(errs ...error) {
+	switch len(errs) {
+	case 0:
+		return
+	case 1:
+		ec.Push(errs[0])
+	default:
+		defer ec.with(ec.lock())
+		ec.list.Add(errs)
+	}
+
+}
 
 // When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
@@ -145,6 +208,29 @@ func (ec *Collector) When(cond bool, val error) { ec.Push(ers.When(cond, val)) }
 // formating.
 func (ec *Collector) Whenf(cond bool, val string, args ...any) {
 	ec.Push(ers.Whenf(cond, val, args...))
+}
+
+// Wrap adds a single error to the collector
+func (ec *Collector) Wrap(err error, annotation ...any) {
+	if ers.IsError(err) {
+		defer ec.with(ec.lock())
+		if len(annotation) == 0 {
+			ec.list.PushBack(err)
+			return
+		}
+
+		ec.list.PushBack(err)
+		msg := fmt.Sprintln(annotation...)
+		ec.list.PushBack(ers.New(msg[:max(0, len(msg)-1)]))
+	}
+}
+
+func (ec *Collector) Wrapf(err error, tmpl string, args ...any) {
+	if ers.IsError(err) {
+		defer ec.with(ec.lock())
+		ec.list.PushBack(err)
+		ec.list.PushBack(fmt.Errorf(tmpl, args...))
+	}
 }
 
 // Check executes a simple function and if it returns an error, adds
@@ -170,37 +256,4 @@ func (ec *Collector) WithRecoverHook(hook func()) {
 			hook()
 		}
 	}
-}
-
-///////////////////////////////////////////////////////////////////////
-//
-// Function Helpers
-//
-///////////////////////////////////////////////////////////////////////
-
-// Wrap produces a wrapped error if the err is non-nil, wrapping the
-// error with the provided annotation. When the error is nil, Wrap
-// returns nil.
-//
-// This, roughly mirrors the usage "github/pkg/errors.Wrap" but
-// taking advantage of newer standard library error wrapping.
-func Wrap(err error, annotation ...any) error {
-	if ers.IsOk(err) {
-		return nil
-	}
-
-	return Join(err, ers.New(fmt.Sprint(annotation...)))
-}
-
-// Wrapf produces a wrapped error, if the error is non-nil, with a
-// formated wrap annotation. When the error is nil, Wrapf does not
-// build an error and returns nil.
-//
-// This, roughly mirrors the usage "github/pkg/errors.Wrapf" but
-// taking advantage of newer standard library error wrapping.
-func Wrapf(err error, tmpl string, args ...any) error {
-	if ers.IsOk(err) {
-		return nil
-	}
-	return Join(err, fmt.Errorf(tmpl, args...))
 }
