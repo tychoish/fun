@@ -179,12 +179,20 @@ func TestError(t *testing.T) {
 			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
 			ec.When(true, ers.Error(errval))
-			check.NotZero(t, ec.list) // nil is zero
+			check.NotZero(t, ec.list.elm) // nil is zero
+			check.NotZero(t, ec.list.num) // nil is zero
 			if err := ec.Resolve(); err == nil {
 				t.Fatal(err)
 			} else if err.Error() != errval {
 				t.Fatal(err)
 			}
+		})
+		t.Run("Filter", func(t *testing.T) {
+			ec := &Collector{}
+			count := 0
+			ec.SetFilter(func(err error) error { count++; return err })
+			ec.Push(ers.New("error"))
+			assert.Equal(t, count, 1)
 		})
 		t.Run("WhenWrapping", func(t *testing.T) {
 			serr := errors.New(errval)

@@ -7,8 +7,9 @@ import (
 )
 
 type list struct {
-	num int
-	elm element
+	num    int
+	elm    element
+	filter Filter
 }
 
 func (eel *list) Front() *element { return eel.root().next }
@@ -95,7 +96,7 @@ func (eel *list) As(target any) (ok bool) {
 }
 
 func (eel *list) Push(err error) {
-	switch werr := err.(type) {
+	switch werr := eel.filter.Apply(err).(type) {
 	case nil:
 		return
 	case *Collector:

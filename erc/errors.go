@@ -62,6 +62,12 @@ func AsCollector(err error) *Collector {
 	}
 }
 
+///////////////////////////////////////////////////////////////////////
+//
+// Collector constructors and setup methods
+//
+///////////////////////////////////////////////////////////////////////
+
 // Join takes a slice of errors and converts it into an *erc.List
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call erc.Join repeatedly on the same
@@ -72,6 +78,15 @@ func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.
 // the mutex.
 func (*Collector) with(m *sync.Mutex)   { internal.With(m) }
 func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
+
+// SetFilter sets (or overrides) the current filter on the
+// collector. Errors errors collected by the filter are passed to the
+// filter function. Filters can observe nil errors, as in the case of
+// the Add()
+func (ec *Collector) SetFilter(erf Filter) {
+	defer ec.with(ec.lock())
+	ec.list.filter = erf
+}
 
 ///////////////////////////////////////////////////////////////////////
 //
