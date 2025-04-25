@@ -130,7 +130,13 @@ func (a *Assertion) Run(t testing.TB) {
 	})
 
 	result := &dt.Slice[string]{}
-	result.AddWhen(!a.check.Defined() && a.subtests.Len() == 0, "no tests defined")
+
+	ft.WhenApply(
+		!a.check.Defined() && a.subtests.Len() == 0,
+		result.Add,
+		"no tests defined",
+	)
+
 	result.Extend(a.check.Resolve())
 
 	for sub := a.subtests.Front(); sub.Ok(); sub = sub.Next() {

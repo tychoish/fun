@@ -36,17 +36,11 @@ func NewOptional[T any](in T) Optional[T] { return Optional[T]{v: in, defined: t
 
 // Default sets value of the optional to the provided value if it is
 // not already been defined.
-func (o *Optional[T]) Default(in T) { o.SetWhen(!o.Ok(), in) }
+func (o *Optional[T]) Default(in T) { ft.WhenApply(!o.Ok(), o.Set, in) }
 
 // DefaultFuture resolves the future if the optional has not yet been
 // set.
-func (o *Optional[T]) DefaultFuture(in fn.Future[T]) { o.SetWhenFuture(!o.Ok(), in) }
-
-// Set changes the value of the, only when the boolean cond value is positive.
-func (o *Optional[T]) SetWhen(cond bool, v T) { ft.WhenApply(cond, o.Set, v) }
-
-// SetWhenFuture resolves the future only when
-func (o *Optional[T]) SetWhenFuture(cond bool, v fn.Future[T]) { ft.WhenApplyFuture(cond, o.Set, v) }
+func (o *Optional[T]) DefaultFuture(in fn.Future[T]) { ft.WhenApplyFuture(!o.Ok(), o.Set, in) }
 
 // Set marks the optional value as defined, and sets the optional
 // value. You can set an optional to the zero value for type T. To

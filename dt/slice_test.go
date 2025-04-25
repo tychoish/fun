@@ -262,31 +262,6 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, s.Len(), 0)
 		check.True(t, s.IsEmpty())
 	})
-	t.Run("When", func(t *testing.T) {
-		sl := Slice[int]{}
-		t.Run("Add", func(t *testing.T) {
-			sl.AddWhen(true, 1)
-			check.Equal(t, len(sl), 1)
-			sl.AddWhen(false, 100)
-			check.Equal(t, len(sl), 1)
-		})
-		sl.Reset()
-
-		t.Run("Append", func(t *testing.T) {
-			sl.AppendWhen(true, 1, 100, 1000)
-			check.Equal(t, len(sl), 3)
-			sl.AppendWhen(false, 42, 420, 4200)
-			check.Equal(t, len(sl), 3)
-		})
-		sl.Reset()
-
-		t.Run("Extend", func(t *testing.T) {
-			sl.ExtendWhen(true, Slice[int]{1, 100, 1000})
-			check.Equal(t, len(sl), 3)
-			sl.ExtendWhen(false, Slice[int]{42, 420, 4200})
-			check.Equal(t, len(sl), 3)
-		})
-	})
 	t.Run("Filter", func(t *testing.T) {
 		sl := Slice[int]{100, 100, 40, 42}
 		check.Equal(t, sl.Len(), 4)

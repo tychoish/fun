@@ -118,26 +118,14 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 // Add adds a single item to the end of the slice.
 func (s *Slice[T]) Add(in T) { *s = append(*s, in) }
 
-// AddWhen embeds a conditional check in the Add, and only adds the item to the
-// slice when the condition is true.
-func (s *Slice[T]) AddWhen(cond bool, in T) { ft.WhenCall(cond, func() { s.Add(in) }) }
-
 // Append adds all of the items to the end of the slice.
 func (s *Slice[T]) Append(in ...T) { s.Extend(in) }
 
 // Prepend adds the items to beginning of the slice.
 func (s *Slice[T]) Prepend(in ...T) { *s = append(in, *s...) }
 
-// AppendWhen embeds a conditional check in the Append operation, and
-// only adds the items to the slice when the condition is true.
-func (s *Slice[T]) AppendWhen(cond bool, in ...T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
-
 // Extend adds the items from the input slice to the root slice.
 func (s *Slice[T]) Extend(in []T) { *s = append(*s, in...) }
-
-// ExtendWhen embeds a conditional check in the Extend operatio and
-// only adds the items to the slice when the condition is true.
-func (s *Slice[T]) ExtendWhen(cond bool, in []T) { ft.WhenCall(cond, func() { s.Extend(in) }) }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }
@@ -166,7 +154,7 @@ func (s Slice[T]) ReadAll(of fn.Handler[T]) {
 // input slice. Items that the filter function returns true for are
 // included and others are skipped.
 func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
-	s.ReadAll(func(in T) { o.AddWhen(p(in), in) })
+	s.ReadAll(func(in T) { ft.WhenApply(p(in), o.Add, in) })
 	return
 }
 

@@ -39,20 +39,6 @@ func TestOptional(t *testing.T) {
 		opt.Set(300)
 		check.Equal(t, 300, opt.Resolve())
 	})
-	t.Run("SetWhenFuture", func(t *testing.T) {
-		opt := &Optional[int]{}
-		count := 0
-		future := func() int { count++; return 42 }
-		opt.SetWhenFuture(false, future)
-		check.Equal(t, count, 0)
-		check.True(t, ft.Not(opt.Ok()))
-		check.Equal(t, opt.Resolve(), 0)
-
-		opt.SetWhenFuture(true, future)
-		check.Equal(t, count, 1)
-		check.True(t, opt.Ok())
-		check.Equal(t, opt.Resolve(), 42)
-	})
 	t.Run("Constructor", func(t *testing.T) {
 		opt := NewOptional("hello")
 		check.True(t, opt.Ok())
