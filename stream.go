@@ -337,10 +337,6 @@ func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
 			case ers.IsTerminating(err):
 				return nil
 			default:
-				// this is (realistically) only context
-				// cancellation errors, because ReadOne puts
-				// all errors into the stream's
-				// Close() method.
 				return err
 			}
 		}
