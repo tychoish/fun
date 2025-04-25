@@ -88,10 +88,10 @@ func (o *WorkerGroupConf) CanContinueOnError(err error) (out bool) {
 	}
 }
 
-// ErrorFilter is a method which can be used as an erc.Filter
+// errorFilter is a method which can be used as an erc.Filter
 // function, and used in worker pool implementations process as
 // configured.
-func (o *WorkerGroupConf) ErrorFilter(err error) error {
+func (o *WorkerGroupConf) errorFilter(err error) error {
 	switch {
 	case err == nil:
 		return nil

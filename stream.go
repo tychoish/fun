@@ -365,7 +365,7 @@ func (st *Stream[T]) Parallel(
 			return err
 		}
 
-		fn.WithRecover().WithErrorFilter(conf.ErrorFilter).
+		fn.WithRecover().WithErrorFilter(conf.errorFilter).
 			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) })).
 			StartGroup(ctx, conf.NumWorkers).
 			Ignore().

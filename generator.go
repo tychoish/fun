@@ -518,7 +518,7 @@ func (pf Generator[T]) Parallel(
 
 	setup := Operation(func(ctx context.Context) {
 		pipe.Handler().ReadAll(pf.WithRecover().
-			WithErrorFilter(conf.ErrorFilter).
+			WithErrorFilter(conf.errorFilter).
 			Stream(),
 		).Operation(conf.ErrorCollector.Push).
 			StartGroup(ctx, conf.NumWorkers).
