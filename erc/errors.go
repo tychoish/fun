@@ -18,6 +18,9 @@ import (
 // aggregates errors which can be resolved as a single error. The
 // constituent errors (and flattened, in the case of wrapped errors),
 // are an *erc.List object, which can be introspected as needed.
+//
+// Internally Collectors use a linked-list implementation to avoid
+// pre-allocation concerns and limitations.
 type Collector struct {
 	mu   sync.Mutex
 	list list
@@ -111,10 +114,24 @@ func (ec *Collector) Ok() bool { return ec.Len() == 0 }
 
 // Error implements the error interface, and renders an error message
 // that includes all of the constituent errors.
-func (ec *Collector) Error() string        { defer ec.with(ec.lock()); return ec.list.Error() }
-func (ec *Collector) Unwrap() []error      { defer ec.with(ec.lock()); return ec.list.Unwind() }
+func (ec *Collector) Error() string { defer ec.with(ec.lock()); return ec.list.Error() }
+
+// Unwrap returns all of the constituent errors held by the
+// collector. The implementation of errors.Is and errors.As mean that
+// this method is not called for either of those functions, you can
+// use this director or with ers.Unwind() to get all errors in a
+// slice.
+//
+// Internally collectors use a linked list implementation, so Unwrap()
+// requires building the slice.
+func (ec *Collector) Unwrap() []error { defer ec.with(ec.lock()); return ec.list.Unwind() }
+
+// Is supports the errors.Is() function and returns true if any of the
+// errors in the collector OR their ancestors are the target error.
 func (ec *Collector) Is(target error) bool { defer ec.with(ec.lock()); return ec.list.Is(target) }
-func (ec *Collector) As(target any) bool   { defer ec.with(ec.lock()); return ec.list.As(target) }
+
+// As supports the errors.As() operation to access
+func (ec *Collector) As(target any) bool { defer ec.with(ec.lock()); return ec.list.As(target) }
 
 // Iterator returns an iterator over the errors in the
 // collector. The oldest or earliest errors collected appear first in
