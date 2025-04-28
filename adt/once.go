@@ -7,20 +7,6 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// Mnemonize provides a way to lazily resolve and cache a value, like
-// adt.Once or sync.OnceFunc. Mnemonize takes an input function that
-// returns a type and returns a function of the same signature. When
-// the function is called the first time it caches the value and
-// returns it henceforth.
-//
-// While the function produced by Mnemonize is safe to use
-// concurrently, there is no provision for protecting mutable types
-// returned by the function and concurrent modification of mutable
-// returned values is a race.
-//
-// Deprecated: Use sync.OnceValue from the standard library. Be aware that this will have slightly different around panic handling.
-func Mnemonize[T any](in func() T) func() T { return ft.OnceDo(in) }
-
 // Once provides a mnemonic form of sync.Once, caching and returning a
 // value after the Do() function is called.
 //
@@ -67,7 +53,7 @@ func (o *Once[T]) Call(ctor func() T) T { o.Do(ctor); return o.comp }
 func (o *Once[T]) Resolve() T { o.once.Do(o.populate); return o.comp }
 
 func (o *Once[T]) populate() {
-	ft.WhenCall(o.called.CompareAndSwap(false, true), func() { o.comp = ft.SafeDo(o.ctor.Get()); o.ctor.Set(nil) })
+	ft.CallWhen(o.called.CompareAndSwap(false, true), func() { o.comp = ft.DoSafe(o.ctor.Get()); o.ctor.Set(nil) })
 }
 
 // Set sets the constrctor/operation for the Once object, but does not
@@ -75,7 +61,7 @@ func (o *Once[T]) populate() {
 // operation has completed, will not reset the operation or the cached
 // value.
 func (o *Once[T]) Set(constr func() T) {
-	ft.WhenCall(!o.Called(), func() { o.defined.Store(true); o.ctor.Set(constr) })
+	ft.CallWhen(!o.Called(), func() { o.defined.Store(true); o.ctor.Set(constr) })
 }
 
 // Called returns true if the Once object has been called or is

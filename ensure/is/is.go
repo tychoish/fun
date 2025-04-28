@@ -47,7 +47,7 @@ func And(ops ...That) That {
 			}
 		}
 
-		return ft.WhenDo(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
+		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}
 }
 
@@ -58,12 +58,12 @@ func All(ops ...That) That {
 	return func() []string {
 		out := dt.NewSlice(make([]string, 0, len(ops)+1))
 		dt.NewSlice(ops).ReadAll(func(op That) {
-			ft.WhenApply(op == nil, out.Add,
+			ft.ApplyWhen(op == nil, out.Add,
 				"encountered nil is.That operation",
 			)
-			out.Extend(ft.SafeDo(op))
+			out.Extend(ft.DoSafe(op))
 		})
-		return ft.WhenDo(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
+		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}
 }
 

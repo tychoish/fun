@@ -58,7 +58,7 @@ func (p *Pool[T]) FinalizeSetup() { p.init(); p.locked.Store(true) }
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
 	fun.Invariant.IsFalse(p.locked.Load(), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
-	ft.WhenApply(in != nil, p.hook.Set, in)
+	ft.ApplyWhen(in != nil, p.hook.Set, in)
 }
 
 // SetConstructor overrides the default constructor (which makes an
@@ -66,7 +66,7 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
 	fun.Invariant.IsFalse(p.locked.Load(), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
-	ft.WhenApply(in != nil, p.constructor.Set, in)
+	ft.ApplyWhen(in != nil, p.constructor.Set, in)
 }
 
 // Get returns an object from the pool or constructs a default object

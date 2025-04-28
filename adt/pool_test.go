@@ -171,13 +171,13 @@ func TestPool(t *testing.T) {
 	t.Run("Finalize", func(t *testing.T) {
 		p := &Pool[int]{}
 
-		ft.DoTimes(100, func() { p.SetConstructor(rand.Int) })
+		ft.CallTimes(100, func() { p.SetConstructor(rand.Int) })
 		p.SetConstructor(nil)
 		assert.NotNil(t, p.constructor.Load())
 		p.SetCleanupHook(nil)
 		assert.NotNil(t, p.hook.Load())
 
-		ft.DoTimes(100, p.FinalizeSetup)
+		ft.CallTimes(100, p.FinalizeSetup)
 		check.Panic(t, func() { p.SetConstructor(rand.Int) })
 		check.Panic(t, func() { p.SetCleanupHook(func(int) int { return 0 }) })
 		check.Panic(t, func() { p.SetConstructor(nil) })
@@ -192,7 +192,7 @@ func TestPool(t *testing.T) {
 		var count int64
 		for start := time.Now(); time.Since(start) < 2*time.Second; {
 			count++
-			ft.DoTimes(2048, func() { buf.WriteByte('!') })
+			ft.CallTimes(2048, func() { buf.WriteByte('!') })
 			bp.Put(buf)
 			buf = bp.Get()
 			check.Equal(t, buf.Len(), 0)

@@ -333,7 +333,7 @@ func TestOperation(t *testing.T) {
 
 			jobs := []Operation{}
 
-			ft.DoTimes(128, func() { jobs = append(jobs, op) })
+			ft.CallTimes(128, func() { jobs = append(jobs, op) })
 
 			err := SliceStream(jobs).Parallel(MAKE.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
@@ -445,7 +445,7 @@ func TestOperation(t *testing.T) {
 			assert.Equal(t, count, 10)
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ft.DoTimes(32, func() {
+			ft.CallTimes(32, func() {
 				t.Run("Iteration", func(t *testing.T) {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()

@@ -44,7 +44,7 @@ func ConsumePairs[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fun.Generat
 }
 
 func (p *Pairs[K, V]) init()     { p.setup.Do(p.initImpl) }
-func (p *Pairs[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} }) }
+func (p *Pairs[K, V]) initImpl() { ft.CallWhen(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} }) }
 
 // Consume adds items from a stream of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) Consume(iter *fun.Stream[Pair[K, V]]) fun.Worker {

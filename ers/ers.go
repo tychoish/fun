@@ -27,6 +27,9 @@ func IsOk(err error) bool {
 // inverse of Ok().
 func IsError(err error) bool { return !IsOk(err) }
 
+// Cast returns e if e is an error and otherwise returns nil
+func Cast(e any) error { err, _ := e.(error); return err }
+
 // IsExpiredContext checks an error to see if it, or any of it's parent
 // contexts signal that a context has expired. This covers both
 // canceled contexts and ones which have exceeded their deadlines.
@@ -41,7 +44,7 @@ func IsTerminating(err error) bool { return Is(err, io.EOF, ErrCurrentOpAbort, E
 // IsInvariantViolation returns true if the argument is or resolves to
 // ers.ErrInvariantViolation.
 func IsInvariantViolation(r any) bool {
-	if err, _ := r.(error); r != nil && IsError(err) {
+	if err := Cast(r); IsError(err) {
 		return errors.Is(err, ErrInvariantViolation)
 	}
 

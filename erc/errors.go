@@ -81,8 +81,7 @@ func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
 
 // SetFilter sets (or overrides) the current filter on the
 // collector. Errors errors collected by the filter are passed to the
-// filter function. Filters can observe nil errors, as in the case of
-// the Add()
+// filter function. Filters will not receive nil errors.
 func (ec *Collector) SetFilter(erf Filter) {
 	defer ec.with(ec.lock())
 	ec.list.filter = erf

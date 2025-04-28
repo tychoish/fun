@@ -30,16 +30,6 @@ func Abs[T Signed](in T) T {
 	return in
 }
 
-// Min returns the lowest value.
-//
-// Deprecated: use the built in min() function from the standard library.
-func Min[T Numbers](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // Range orders two numbers and returns the pair as (lower, higher).
 func Range[T Numbers](a, b T) (start T, end T) { return min(a, b), max(a, b) }
 
@@ -59,16 +49,6 @@ func AbsMax[T Signed](a, b T) T { return max(Abs(a), Abs(b)) }
 // AbsMin resolves the absolute value of both arguments and returns
 // the smaller value.
 func AbsMin[T Signed](a, b T) T { return min(Abs(a), Abs(b)) }
-
-// Max returns the highest value.
-//
-// Deprecated: use the built in max() function from the standard library.
-func Max[T Numbers](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 // Diff returns the absolute value of the difference between two values.
 func Diff[T Numbers](a, b T) T { return max(a, b) - min(a, b) }

@@ -22,8 +22,8 @@ func (vv *Versioned[T]) innerLoad() T         { return vv.value.Load() }
 func (vv *Versioned[T]) innerVersion() uint64 { return vv.clock.Load() }
 
 func (vv *Versioned[T]) Ok() bool        { return vv != nil }
-func (vv *Versioned[T]) Version() uint64 { return ft.WhenDo(vv != nil, vv.innerVersion) }
-func (vv *Versioned[T]) Load() T         { return ft.WhenDo(vv != nil, vv.innerLoad) }
+func (vv *Versioned[T]) Version() uint64 { return ft.DoWhen(vv != nil, vv.innerVersion) }
+func (vv *Versioned[T]) Load() T         { return ft.DoWhen(vv != nil, vv.innerLoad) }
 func (vv *Versioned[T]) Set(newValue T)  { vv.clock.Add(1); vv.value.Store(newValue) }
 
 func (vv *Versioned[T]) Fetch() (T, uint64) {

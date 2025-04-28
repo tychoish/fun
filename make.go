@@ -118,7 +118,7 @@ func (Constructors) Signal() (func(), Worker) {
 // ErrorHandler constructs an error observer that only calls the
 // wrapped observer when the error passed is non-nil.
 func (Constructors) ErrorHandler(of fn.Handler[error]) fn.Handler[error] {
-	return func(err error) { ft.WhenApply(err != nil, of, err) }
+	return func(err error) { ft.ApplyWhen(err != nil, of, err) }
 }
 
 // Recover catches a panic, turns it into an error and passes it to

@@ -126,7 +126,9 @@ func (eel *list) Push(err error) {
 
 func (eel *list) Add(errs []error) {
 	for _, err := range errs {
-		eel.Push(err)
+		if err != nil {
+			eel.Push(err)
+		}
 	}
 }
 

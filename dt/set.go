@@ -60,7 +60,7 @@ func (s *Set[T]) Order() {
 // method on a populated but unordered set.
 func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
 	defer s.with(s.lock())
-	ft.WhenCall(s.list == nil, s.forceSetupOrdered)
+	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
 	s.list.SortQuick(lt)
 }
 
@@ -70,7 +70,7 @@ func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
 // populated but unordered set.
 func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
 	defer s.with(s.lock())
-	ft.WhenCall(s.list == nil, s.forceSetupOrdered)
+	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
 	s.list.SortMerge(lt)
 }
 
@@ -93,11 +93,11 @@ func (s *Set[T]) WithLock(mtx *sync.Mutex) {
 func (s *Set[T]) isOrdered() bool { return s.list != nil }
 
 func (s *Set[T]) init()            { s.hash = Map[T, *Element[T]]{} }
-func (*Set[T]) with(m *sync.Mutex) { ft.WhenCall(m != nil, m.Unlock) }
+func (*Set[T]) with(m *sync.Mutex) { ft.CallWhen(m != nil, m.Unlock) }
 func (s *Set[T]) lock() *sync.Mutex {
 	m := s.mtx.Get()
-	ft.WhenCall(m != nil, m.Lock)
-	ft.WhenCall(s.hash == nil, s.init)
+	ft.CallWhen(m != nil, m.Lock)
+	ft.CallWhen(s.hash == nil, s.init)
 	return m
 }
 
@@ -131,7 +131,7 @@ func (s *Set[T]) DeleteCheck(in T) bool {
 		return false
 	}
 
-	ft.WhenDo(e != nil, e.Remove)
+	ft.DoWhen(e != nil, e.Remove)
 	return true
 }
 
@@ -176,7 +176,7 @@ func (s *Set[T]) unsafeStream() *fun.Stream[T] {
 // the Set's lock when called.
 func (s *Set[T]) Generator() (out fun.Generator[T]) {
 	defer s.with(s.lock())
-	defer func() { mu := s.mtx.Get(); ft.WhenDo(mu != nil, func() fun.Generator[T] { return out.WithLock(mu) }) }()
+	defer func() { mu := s.mtx.Get(); ft.DoWhen(mu != nil, func() fun.Generator[T] { return out.WithLock(mu) }) }()
 
 	if s.list != nil {
 		return s.list.GeneratorFront()

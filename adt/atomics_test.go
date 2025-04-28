@@ -222,31 +222,6 @@ func TestAtomics(t *testing.T) {
 	})
 }
 
-func TestMnemonize(t *testing.T) {
-	const value string = "val"
-	counter := 0
-	op := func() string { counter++; return value }
-
-	foo := Mnemonize(op)
-	if counter != 0 {
-		t.Error("should not call yet", counter)
-	}
-	if out := foo(); out != value {
-		t.Error("wrong value", out, value)
-	}
-	if counter != 1 {
-		t.Error("should call only once", counter)
-	}
-	for i := 0; i < 128; i++ {
-		if out := foo(); out != value {
-			t.Error("wrong value", out, value)
-		}
-		if counter != 1 {
-			t.Error("should call only once", counter)
-		}
-	}
-}
-
 func IsOk[T any](t testing.TB) func(T, bool) T {
 	return func(in T, ok bool) T {
 		t.Helper()

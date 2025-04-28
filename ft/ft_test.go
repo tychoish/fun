@@ -3,14 +3,12 @@ package ft
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,51 +19,37 @@ import (
 
 func TestWhen(t *testing.T) {
 	t.Run("Do", func(t *testing.T) {
-		out := WhenDo(true, func() int { return 100 })
+		out := DoWhen(true, func() int { return 100 })
 		check.Equal(t, out, 100)
 
-		out = WhenDo(false, func() int { return 100 })
+		out = DoWhen(false, func() int { return 100 })
 		check.Equal(t, out, 0)
 	})
 	t.Run("Call", func(t *testing.T) {
 		called := false
-		WhenCall(true, func() { called = true })
+		CallWhen(true, func() { called = true })
 		check.True(t, called)
 
 		called = false
-		WhenCall(false, func() { called = true })
+		CallWhen(false, func() { called = true })
 		check.True(t, !called)
 	})
 	t.Run("Apply", func(t *testing.T) {
 		called := false
-		WhenApply(true, func(in int) { called = true; check.Equal(t, in, 42) }, 42)
+		ApplyWhen(true, func(in int) { called = true; check.Equal(t, in, 42) }, 42)
 		check.True(t, called)
 
 		called = false
-		WhenApply(false, func(in int) { called = true; check.Equal(t, in, 42) }, 40)
+		ApplyWhen(false, func(in int) { called = true; check.Equal(t, in, 42) }, 40)
 		check.True(t, !called)
 	})
-	t.Run("ApplyFuture", func(t *testing.T) {
-		called := false
-		futureCalled := false
-		WhenApplyFuture(true, func(in int) { called = true; check.Equal(t, in, 42) }, func() int { futureCalled = true; return 42 })
-		check.True(t, called)
-		check.True(t, futureCalled)
-
-		called = false
-		futureCalled = false
-		WhenApplyFuture(false, func(in int) { called = true; check.Equal(t, in, 42) }, func() int { futureCalled = true; return 42 })
-		check.True(t, Not(called))
-		check.True(t, Not(futureCalled))
-	})
-
 	t.Run("Not", func(t *testing.T) {
 		check.True(t, !Not(true))
 		check.True(t, Not(false))
 	})
 	t.Run("Ternary", func(t *testing.T) {
-		check.Equal(t, 100, IfValue(true, 100, 900))
-		check.Equal(t, 900, IfValue(false, 100, 900))
+		check.Equal(t, 100, IfElse(true, 100, 900))
+		check.Equal(t, 900, IfElse(false, 100, 900))
 	})
 }
 
@@ -74,15 +58,6 @@ func TestMust(t *testing.T) {
 	assert.Panic(t, func() { MustBeOk("32", false) })
 	assert.NotPanic(t, func() { check.Equal(t, "32", Must("32", nil)) })
 	assert.NotPanic(t, func() { check.Equal(t, "32", MustBeOk("32", true)) })
-}
-
-func TestContains(t *testing.T) {
-	t.Run("Exists", func(t *testing.T) {
-		assert.True(t, Contains(1, []int{12, 3, 44, 1}))
-	})
-	t.Run("NotExists", func(t *testing.T) {
-		assert.True(t, !Contains(1, []int{12, 3, 44}))
-	})
 }
 
 func TestPtr(t *testing.T) {
@@ -148,39 +123,31 @@ func TestDefault(t *testing.T) {
 func TestUnless(t *testing.T) {
 	t.Run("Do", func(t *testing.T) {
 		count := 0
-		check.Equal(t, 0, UnlessDo(true, func() int { count++; return count }))
-		check.Equal(t, 1, UnlessDo(false, func() int { count++; return count }))
-		check.Equal(t, 2, UnlessDo(false, func() int { count++; return count }))
-		check.Equal(t, 0, UnlessDo(true, func() int { count++; return count }))
+		check.Equal(t, 0, DoUnless(true, func() int { count++; return count }))
+		check.Equal(t, 1, DoUnless(false, func() int { count++; return count }))
+		check.Equal(t, 2, DoUnless(false, func() int { count++; return count }))
+		check.Equal(t, 0, DoUnless(true, func() int { count++; return count }))
 	})
 	t.Run("Call", func(t *testing.T) {
 		count := 0
-		UnlessCall(true, func() { count++ })
+		CallUnless(true, func() { count++ })
 		check.Equal(t, 0, count)
-		UnlessCall(false, func() { count++ })
+		CallUnless(false, func() { count++ })
 		check.Equal(t, 1, count)
-		UnlessCall(false, func() { count++ })
+		CallUnless(false, func() { count++ })
 		check.Equal(t, 2, count)
-		UnlessCall(true, func() { count++ })
+		CallUnless(true, func() { count++ })
 		check.Equal(t, 2, count)
 	})
-}
-
-func TestWhenHandle(t *testing.T) {
-	called := false
-	assert.True(t, !called)
-	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 100)
-	assert.True(t, !called)
-	WhenHandle(func(in int) bool { return in == 42 }, func(in int) { WhenCall(in == 42, func() { called = true }) }, 42)
-	assert.True(t, called)
-}
-
-func TestApply(t *testing.T) {
-	called := 0
-	out := ApplyFuture(func(n int) { called++; check.Equal(t, 42, n) }, 42)
-	check.Equal(t, 0, called)
-	out()
-	check.Equal(t, 1, called)
+	t.Run("Apply", func(t *testing.T) {
+		count := 0
+		ApplyUnless(true, func(in int) { check.Equal(t, in, 42); count++ }, 42)
+		check.Equal(t, 0, count)
+		ApplyUnless(false, func(in int) { check.Equal(t, in, 42); count++ }, 42)
+		check.Equal(t, 1, count)
+		ApplyUnless(true, func(in int) { check.Equal(t, in, 42); count++ }, 42)
+		check.Equal(t, 1, count)
+	})
 }
 
 func TestWrap(t *testing.T) {
@@ -238,31 +205,45 @@ func TestWrap(t *testing.T) {
 	t.Run("SafeCall", func(t *testing.T) {
 		count := 0
 		fn := func() { count++ }
-		assert.NotPanic(t, func() { SafeCall(nil) })
-		assert.NotPanic(t, func() { SafeCall(fn) })
-		assert.NotPanic(t, func() { SafeCall(nil) })
-		assert.NotPanic(t, func() { SafeCall(fn) })
+		assert.NotPanic(t, func() { CallSafe(nil) })
+		assert.NotPanic(t, func() { CallSafe(fn) })
+		assert.NotPanic(t, func() { CallSafe(nil) })
+		assert.NotPanic(t, func() { CallSafe(fn) })
 		check.Equal(t, count, 2)
 	})
-	t.Run("DoTimes", func(t *testing.T) {
+	t.Run("CallTimes", func(t *testing.T) {
 		count := 0
-		DoTimes(42, func() { count++ })
+		CallTimes(42, func() { count++ })
 		assert.Equal(t, count, 42)
 	})
-	t.Run("SafeWrap", func(t *testing.T) {
-		var f func()
-		assert.NotPanic(t, SafeWrap(f))
-		assert.Panic(t, f)
+	t.Run("DoTimes", func(t *testing.T) {
+		t.Run("Exhaust", func(t *testing.T) {
+			count := 0
 
-		var called bool
-		f = func() { called = true }
-		SafeWrap(f)()
-		assert.True(t, called)
+			for out := range DoTimes(42, func() int { count++; return 84 }) {
+				assert.Equal(t, out, 84)
+			}
+			assert.Equal(t, count, 42)
+		})
+		t.Run("Abort", func(t *testing.T) {
+			count := 0
+
+			sum := 0
+			for out := range DoTimes(32, func() int { count++; return 2 }) {
+				assert.Equal(t, out, 2)
+				sum += out
+				if sum == 32 {
+					break
+				}
+			}
+			assert.Equal(t, count, 16)
+		})
 	})
+
 	t.Run("Once", func(t *testing.T) {
 		count := 0
 		op := func() { count++ }
-		DoTimes(128, Once(op))
+		CallTimes(128, sync.OnceFunc(op))
 		assert.Equal(t, count, 1)
 	})
 	t.Run("Flip", func(t *testing.T) {
@@ -283,34 +264,11 @@ func TestWrap(t *testing.T) {
 		})
 	})
 	t.Run("SafeOK", func(t *testing.T) {
-		assert.True(t, !SafeDo[bool](nil))
-		assert.True(t, nil == SafeDo[*bool](nil))
-		assert.True(t, nil == SafeDo[*testing.T](nil))
-		assert.Equal(t, 1, SafeDo(func() int { return 1 }))
-		assert.Equal(t, 412, SafeDo(func() int { return 412 }))
-	})
-	t.Run("OnceDo", func(t *testing.T) {
-		t.Parallel()
-		count := &atomic.Int64{}
-		mfn := OnceDo(func() int { count.Add(1); return 42 })
-		wg := &sync.WaitGroup{}
-		for i := 0; i < 64; i++ {
-			wg.Add(1)
-			// this function panics rather than
-			// asserts because it's very likely to
-			// be correct, and to avoid testing.T
-			// mutexes.
-			go func() {
-				defer wg.Done()
-				for i := 0; i < 64; i++ {
-					if val := mfn(); val != 42 {
-						panic(fmt.Errorf("mnemonic function produced %d not 42", val))
-					}
-				}
-			}()
-		}
-		wg.Wait()
-		assert.Equal(t, count.Load(), 1)
+		assert.True(t, !DoSafe[bool](nil))
+		assert.True(t, nil == DoSafe[*bool](nil))
+		assert.True(t, nil == DoSafe[*testing.T](nil))
+		assert.Equal(t, 1, DoSafe(func() int { return 1 }))
+		assert.Equal(t, 412, DoSafe(func() int { return 412 }))
 	})
 	t.Run("SafeCast", func(t *testing.T) {
 		assert.Zero(t, SafeCast[int](any(0)))
@@ -482,10 +440,10 @@ func TestWrap(t *testing.T) {
 
 	})
 	t.Run("SafeApply", func(t *testing.T) {
-		assert.NotPanic(t, func() { SafeApply(nil, 4) })
-		assert.Panic(t, func() { SafeApply(func(int) { panic("here") }, 4) })
+		assert.NotPanic(t, func() { ApplySafe(nil, 4) })
+		assert.Panic(t, func() { ApplySafe(func(int) { panic("here") }, 4) })
 		var out int
-		SafeApply(func(in int) { out = in }, 42)
+		ApplySafe(func(in int) { out = in }, 42)
 		assert.Equal(t, out, 42)
 	})
 
@@ -494,7 +452,7 @@ func TestWrap(t *testing.T) {
 func TestContexts(t *testing.T) {
 	t.Run("Timeout", func(t *testing.T) {
 		var cc context.Context
-		WithTimeout(10*time.Millisecond, func(ctx context.Context) {
+		CallWithTimeout(10*time.Millisecond, func(ctx context.Context) {
 			assert.NotError(t, ctx.Err())
 			cc = ctx
 			time.Sleep(100 * time.Millisecond)
@@ -505,7 +463,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("ScopeTimeout", func(t *testing.T) {
 		var cc context.Context
-		WithTimeout(10*time.Millisecond, func(ctx context.Context) {
+		CallWithTimeout(10*time.Millisecond, func(ctx context.Context) {
 			cc = ctx
 			assert.NotError(t, ctx.Err())
 		})
@@ -513,12 +471,22 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("Scope", func(t *testing.T) {
 		var cc context.Context
-		WithContext(func(ctx context.Context) {
+		CallWithContext(func(ctx context.Context) {
 			cc = ctx
 			assert.NotError(t, ctx.Err())
 		})
 		assert.ErrorIs(t, cc.Err(), context.Canceled)
 	})
+	t.Run("Do", func(t *testing.T) {
+		var cc context.Context
+		assert.Equal(t, 42, DoWithContext(func(ctx context.Context) int {
+			cc = ctx
+			check.NotError(t, ctx.Err())
+			return 42
+		}))
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+
 }
 
 func TestJoin(t *testing.T) {

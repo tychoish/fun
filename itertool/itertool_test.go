@@ -296,36 +296,6 @@ func TestIndexed(t *testing.T) {
 	assert.Equal(t, count, 10)
 }
 
-func TestMergeSlices(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	t.Run("Streams", func(t *testing.T) {
-		iter := MergeSlices(fun.VariadicStream(makeIntSlice(64), makeIntSlice(64), makeIntSlice(64), makeIntSlice(64)))
-		count := 0
-		err := iter.ReadAll(func(in int) {
-			count++
-			check.True(t, in >= 0 && in < 64)
-		}).Run(ctx)
-		check.NotError(t, err)
-		assert.Equal(t, count, 256)
-	})
-	t.Run("Slice", func(t *testing.T) {
-		iter := fun.JoinStreams(
-			fun.SliceStream(makeIntSlice(64)),
-			fun.SliceStream(makeIntSlice(64)),
-			fun.SliceStream(makeIntSlice(64)),
-			fun.SliceStream(makeIntSlice(64)),
-		)
-		count := 0
-		err := iter.ReadAll(func(in int) {
-			count++
-			check.True(t, in >= 0 && in < 64)
-		}).Run(ctx)
-		check.NotError(t, err)
-		assert.Equal(t, count, 256)
-	})
-}
-
 func makeIntSlice(size int) []int {
 	out := make([]int, size)
 	for i := 0; i < size; i++ {

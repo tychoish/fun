@@ -144,7 +144,7 @@ func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrap(cond)) }
 // When worker functions may be called more than once, and will run
 // multiple times potentially.
 func (wf Worker) When(cond func() bool) Worker {
-	return func(ctx context.Context) error { return ft.WhenDo(cond(), wf.futureOp(ctx)) }
+	return func(ctx context.Context) error { return ft.DoWhen(cond(), wf.futureOp(ctx)) }
 }
 func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
@@ -285,7 +285,7 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
 		return wf(wctx)
-	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }
 
 // PreHook returns a Worker that runs an operatio unconditionally

@@ -10,7 +10,7 @@ import (
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.
 func Must[T any](arg T, err error) T {
-	WhenCall(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
+	CallWhen(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
 	return arg
 }
 
@@ -33,7 +33,7 @@ func IgnoreError(_ error) { return } //nolint
 //
 //	out := ft.MustBeOk(func() (string, bool) { return "hello world", true })
 func MustBeOk[T any](out T, ok bool) T {
-	WhenCall(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
+	CallWhen(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
 	return out
 }
 

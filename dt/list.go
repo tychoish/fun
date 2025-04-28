@@ -236,7 +236,7 @@ func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != 
 func (l *List[T]) root() *Element[T] {
 	fun.Invariant.Ok(l != nil, ErrUninitializedContainer)
 
-	ft.WhenCall(l.head == nil, l.uncheckedSetup)
+	ft.CallWhen(l.head == nil, l.uncheckedSetup)
 
 	return l.head
 }

@@ -578,8 +578,8 @@ func TestWorker(t *testing.T) {
 			etwo := errors.New("do errors")
 
 			whichErr := 2
-			one := func(context.Context) error { return ft.WhenDo(whichErr == 1, func() error { return eone }) }
-			two := func(context.Context) error { return ft.WhenDo(whichErr == 2, func() error { return etwo }) }
+			one := func(context.Context) error { return ft.DoWhen(whichErr == 1, func() error { return eone }) }
+			two := func(context.Context) error { return ft.DoWhen(whichErr == 2, func() error { return etwo }) }
 
 			if e, f := one(ctx), two(ctx); e == nil && f == nil {
 				t.Error("can't both be nil")
@@ -618,7 +618,7 @@ func TestWorker(t *testing.T) {
 			start := time.Now()
 			var wf Worker = func(_ context.Context) error {
 				time.Sleep(5 * time.Millisecond)
-				return ft.WhenDo(time.Since(start) > 50*time.Millisecond, func() error { return io.EOF })
+				return ft.DoWhen(time.Since(start) > 50*time.Millisecond, func() error { return io.EOF })
 			}
 			t.Run("Min", func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

@@ -119,19 +119,24 @@ func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
 func (a *Assertion) Run(t testing.TB) {
 	fun.Invariant.IsFalse(a.constructing, "cannot execute assertion during construction")
 	t.Helper()
-	strlogger := func(in string) { t.Helper(); t.Log(in) }
+	strlogger := func(in string) {
+		t.Helper()
+		if in != "" {
+			t.Log(in)
+		}
+	}
 	t.Cleanup(func() {
 		t.Helper()
 		if a.alwaysLog || t.Failed() {
 			for it := a.messages.Front(); it.Ok(); it = it.Next() {
-				ft.WhenHandle(ft.NotZero[string], strlogger, ft.SafeDo(it.Value()))
+				strlogger(ft.DoSafe(it.Value()))
 			}
 		}
 	})
 
 	result := &dt.Slice[string]{}
 
-	ft.WhenApply(
+	ft.ApplyWhen(
 		!a.check.Defined() && a.subtests.Len() == 0,
 		result.Add,
 		"no tests defined",

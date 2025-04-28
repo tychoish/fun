@@ -240,7 +240,7 @@ func TestProcess(t *testing.T) {
 			oe := MAKE.ErrorHandler(func(err error) { Invariant.Must(err) })
 			op = op.Lock()
 
-			ft.DoTimes(128, func() { oe(op(ctx, 42)) })
+			ft.CallTimes(128, func() { oe(op(ctx, 42)) })
 			wg.Wait(ctx)
 			assert.Equal(t, count, 128)
 		})

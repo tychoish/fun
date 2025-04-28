@@ -15,7 +15,7 @@ dependencies and _all_ of the code is well-tested. You can (and
 should!) always adopt the tools that make the most sense to use for
 your project.
 
-## Usecases and Highlights
+## Use Cases and Highlights
 
 - Error Handling tools. The `erc.Collector` type allow you to wrap,
   annotate, and aggregate errors. This makes continue-on-error
@@ -28,21 +28,26 @@ your project.
   "background" processes inside of an application. You can now start
   services like HTTP servers, background monitoring and workloads, and
   sub-processes, and ensure that they exit cleanly (at the right
-  time!) and that their errors propagate clearly.
+  time!) and that their errors propagate clearly back to the "main"
+  thread.
 
 - Streams. The `fun.Stream[T]` type provides a stream/iterator,
   interface and tool kit for developing Go applications that lean
   heavily into streaming data and message-passing patterns. The
-  associated `fun.Generator[T]` and `fun.Handler[T]` functions make
+  associated `fun.Generator[T]` and `fun.Handler[T]` functions
   provide a comfortable abstraction for interacting with these data.
 
-- Pubsub provides queue and message broker primitives to support
-  writing concurrent message passing tools within a single
-  application, including a one-to-many or many-to-many communication.
+- Pubsub. The `pubsub` package provides queue and message broker
+  primitives for concurrent applications to support writing
+  applications that use message-passing patterns inside of single
+  application. The `pubsub.Broker[T]` provides one-to-many or
+  many-to-many (e.g. broadcast) communication. The and deque and queue
+  structures provide configurable queue abstractions to provide
+  control for many workloads.
 
 - High-level data types: `dt` (data type) hosts a collection of
   wrappers and helpers, the `dt.Ring[T]` type provides a simple
-  ring-buffer, in addition singally (`dt.Stack[T]`)and doubly linked
+  ring-buffer, in addition singl-ly (`dt.Stack[T]`)and doubly linked
   lists (`dt.List[T]`). The `adt` package provides type-specific
   helpers and wrappers around Go's atomic/synchronization primitives,
   including the `adt.Pool[T]`, `adt.Map[T]` and `adt.Atomic[T]`
@@ -52,79 +57,57 @@ your project.
 
 ## Packages
 
-- [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error
-  collection utilites.)
-- [ers](https://pkg.go.dev/github.com/tychoish/fun/erc) (error and
-  panic handling utilites.)
-- [dt](https://pkg.go.dev/github.com/tychoish/fun/dt) (generic
-  container datatypes, including ordered and unordered sets, singly
-  and doubly linked list, as well as wrappers around maps and slices.)
-- [ft](https://pkg.go.dev/github.com/tychoish/fun/ft) function tools:
-  simple tools for handling function objects.
-- [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly typed
-  atomic data structures, wrappers, tools, and operations.)
-- [shard](https://pkg.go.dev/github.com/tychoish/fun/adt/shard) is a
-  "sharded map" to reduce contention for multi-threaded access of
-  synchronized maps.
-- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
-  (stream/iteration tools.)
-- [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
-  broker and concurrency-safe queue and deque.)
+- Errors: 
+  - [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error
+    collection, annotation, panic handling utilities for aggregating
+    errors and managing panics, in concurrent contexts.)
+  - [ers](https://pkg.go.dev/github.com/tychoish/fun/erc) (constant
+    errors and low level error primitives used throughout the package.)
+- Data Types and Functional Helpers
+  - [dt](https://pkg.go.dev/github.com/tychoish/fun/dt) (generic
+    container data-types, including ordered and unordered sets, singly
+    and doubly linked list, as well as wrappers around maps and slices.)
+  - [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly typed
+    atomic data structures, wrappers, tools, and operations.)
+  - [shard](https://pkg.go.dev/github.com/tychoish/fun/adt/shard) (a
+    "sharded map" to reduce contention for multi-threaded access of
+    synchronized maps.)
+  - [ft](https://pkg.go.dev/github.com/tychoish/fun/ft) function tools:
+    simple tools for handling function objects.
 - [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
   orchestration and management framework.)
-- [assert](https://pkg.go.dev/github.com/tychoish/fun/assert)
-  (minimal generic-based assertion library, in the tradition of
-  testify.) The assertions in `assert` abort the flow of the test while
-  [check](https://pkg.go.dev/github.com/tychoish/fun/assert/check),
-  provide non-critical assertions.
-- [testt](https://pkg.go.dev/github.com/tychoish/fun/testt) (testy)
-  are a collection of "nice to have" test helpers and utilities.
-- [ensure](https://pkg.go.dev/github.com/tychoish/fun/ensure) is an
-  experimental test harness and orchestration tool with more "natural"
-  assertions.
+- [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
+  broker and concurrency-safe queue and deque.)
+- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
+  (stream/iteration tools.)
+- Testing
+  - [assert](https://pkg.go.dev/github.com/tychoish/fun/assert)
+	(minimal generic-based assertion library, in the tradition of
+	testify.) The assertions in `assert` abort the flow of the test
+	while check](https://pkg.go.dev/github.com/tychoish/fun/assert/check),
+	provide non-critical assertions.
+  - [testt](https://pkg.go.dev/github.com/tychoish/fun/testt) (testy;
+    a collection of "nice to have" test helpers and utilities.)
+  - [ensure](https://pkg.go.dev/github.com/tychoish/fun/ensure) (an
+    experimental test harness and orchestration tool with more
+    "natural" assertions.)
 
-For more information, see the documentation, but of general interest:
+## Examples
 
-- The root `fun` package contains a few generic function types and
-  with a collection of methods for interacting and managing and
-  manipulating these operations. The `fun.Stream` provides a
-  framework for interacting with sequences, including some powerful
-  high-level parallel processing tools.
+(coming soon.)
 
-- In `itertools` and with `fun.Stream`, a stream framework and tools
-  for interacting with streams (iterators) and generators.
+## Version History
 
-- In `srv`, a service orchestration toolkit and lifecycle tools.
+There are no plans for a 1.0 release, though major backward breaking
+changes increment the second (major) release value, and limited
+maintenance releases are possible/considered for supported go
+versions.
 
-- In `ft` a number of low-level function-manipulation tools.
-
-- In `pubsub`, a channel-based message broker (for one-to-many channel
-  patterns), with several backend patterns for dealing with
-  load-shedding and message distribution patterns.
-
-- Queue and Deque implementations (in `pubsub`) that provide
-  thread-safe linked-list based implementations and `Wait` methods to
-  block until new items added.
-
-- In `dt` a collection of data types and tools for manipulating
-  different container types, as well as implementations of linked
-  lists and sets. `dt` also provides an `fun`-idiomatic wrappers around
-  generic slices and maps, which complement the tools in the `fun`
-  package.
-
-- In `adt`, a collection of Atomic/Pool/Map operations that use
-  generics to provide strongly typed interfaces for common operations.
-
-- In `erc`, an error collector implementation for threadsafe error
-  aggregation and introspection, particularly in worker-pool,
-  applications. `ers` provides related functionality.
-
-- `fun` includes a number of light weight testing tools:
-  - `assert` and `assert/check` provide "testify-style" assertions
-	with more simple output, leveraging generics.
-  - `testt` context, logging, and timer helpers for use in tests.
-  - `ensure` and `ensure/is` a somewhat experimental "chain"-centered
-	API for assertions.
+`v0.13.0`: Major API impacting release. 
+`v0.12.0`: go1.24 and greater.
+`v0.11.0`: go1.23 and greater.
+`v0.10.0`: go1.20 and greater.
+`v0.9.0`: go1.19 and greater.
 
 ## Contribution
 

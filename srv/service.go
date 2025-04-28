@@ -194,7 +194,7 @@ func (s *Service) Start(ctx context.Context) error {
 // multiple times.
 func (s *Service) Close() {
 	if s.isRunning.Load() {
-		ft.SafeCall(s.cancel)
+		ft.CallSafe(s.cancel)
 	}
 }
 

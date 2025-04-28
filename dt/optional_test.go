@@ -60,24 +60,6 @@ func TestOptional(t *testing.T) {
 		opt.Default("hello")
 		check.Equal(t, opt.Resolve(), "world")
 	})
-	t.Run("Default", func(t *testing.T) {
-		opt := NewOptional("hello")
-		count := 0
-		helloFuture := func() string { count++; return "hello" }
-		worldFuture := func() string { count++; return "world" }
-
-		opt.DefaultFuture(worldFuture)
-		check.Equal(t, opt.Resolve(), "hello")
-		check.Equal(t, count, 0)
-
-		opt.Reset()
-		assert.True(t, ft.Not(opt.Ok()))
-
-		opt.DefaultFuture(helloFuture)
-		check.Equal(t, opt.Resolve(), "hello")
-		opt.DefaultFuture(worldFuture)
-		check.Equal(t, opt.Resolve(), "hello")
-	})
 	t.Run("Swap", func(t *testing.T) {
 		opt := NewOptional(400)
 		check.Equal(t, 400, opt.Swap(200))

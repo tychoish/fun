@@ -44,7 +44,7 @@ func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*T
 }
 
 func (p *Tuples[K, V]) init()     { p.setup.Do(p.initImpl) }
-func (p *Tuples[K, V]) initImpl() { ft.WhenCall(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
+func (p *Tuples[K, V]) initImpl() { ft.CallWhen(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
 
 // Consume adds items from a stream of tuples to the current Tuples slice.
 func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {

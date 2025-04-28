@@ -31,7 +31,7 @@ func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.z
 func (*Stack[T]) zero() (o T)       { return }
 func (s *Stack[T]) root() *Item[T] {
 	fun.Invariant.Ok(s != nil, ErrUninitializedContainer)
-	ft.WhenCall(s.head == nil, s.uncheckedSetup)
+	ft.CallWhen(s.head == nil, s.uncheckedSetup)
 
 	return s.head
 }

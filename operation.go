@@ -53,7 +53,7 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant.IsTrue(wctx != nil, "must start the operation before calling cancel")
 		wf(wctx)
-	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }
 
 // Once produces an operation that will only execute the root

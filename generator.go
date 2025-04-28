@@ -299,7 +299,7 @@ func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
 		return pf(wctx)
-	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }
 
 // Limit runs the generator a specified number of times, and caches the

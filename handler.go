@@ -233,7 +233,7 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
 		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
 		return pf(wctx, in)
-	}, func() { once.Do(func() {}); ft.SafeCall(cancel) }
+	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }
 
 // PreHook creates an amalgamated Handler that runs the operation

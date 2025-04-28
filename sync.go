@@ -30,7 +30,7 @@ type WaitGroup struct {
 }
 
 func (wg *WaitGroup) initOp()            { wg.cond = sync.NewCond(&wg.mu) }
-func (wg *WaitGroup) init()              { ft.WhenCall(wg.cond == nil, wg.initOp) }
+func (wg *WaitGroup) init()              { ft.CallWhen(wg.cond == nil, wg.initOp) }
 func (wg *WaitGroup) mutex() *sync.Mutex { return &wg.mu }
 
 // Add modifies the internal counter. Raises an ErrInvariantViolation

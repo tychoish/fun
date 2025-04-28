@@ -42,7 +42,7 @@ func (f Future[T]) Ignore() func() { return func() { _ = f() } }
 // If produces a future that only runs when the condition value is
 // true. If the condition is false, the future will return the zero
 // value of T.
-func (f Future[T]) If(cond bool) Future[T] { return func() T { return ft.WhenDo(cond, f) } }
+func (f Future[T]) If(cond bool) Future[T] { return func() T { return ft.DoWhen(cond, f) } }
 
 // Not produces that only runs when the condition value is false. If
 // the condition is true, the future will return the zero value of T.
@@ -52,7 +52,7 @@ func (f Future[T]) Not(cond bool) Future[T] { return f.If(!cond) }
 // when the condition function returns true, returning the zero
 // value for T when the condition is false. The condition value is
 // checked every time the future is called.
-func (f Future[T]) When(c func() bool) Future[T] { return func() T { return ft.WhenDo(c(), f) } }
+func (f Future[T]) When(c func() bool) Future[T] { return func() T { return ft.DoWhen(c(), f) } }
 
 // Locked returns a wrapped future that ensure that all calls to the
 // future are protected by a mutex.
@@ -93,9 +93,9 @@ func (f Future[T]) Reduce(merge func(T, T) T, next Future[T]) Future[T] {
 // merge function MUST NOT be nil.
 func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 	return func() (out T) {
-		out = ft.SafeDo(f)
+		out = ft.DoSafe(f)
 		for idx := range ops {
-			out = merge(out, ft.SafeDo(ops[idx]))
+			out = merge(out, ft.DoSafe(ops[idx]))
 		}
 		return out
 	}

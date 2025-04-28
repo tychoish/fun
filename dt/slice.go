@@ -154,7 +154,7 @@ func (s Slice[T]) ReadAll(of fn.Handler[T]) {
 // input slice. Items that the filter function returns true for are
 // included and others are skipped.
 func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
-	s.ReadAll(func(in T) { ft.WhenApply(p(in), o.Add, in) })
+	s.ReadAll(func(in T) { ft.ApplyWhen(p(in), o.Add, in) })
 	return
 }
 

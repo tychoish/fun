@@ -17,42 +17,6 @@ func TestMath(t *testing.T) {
 			t.Error(v)
 		}
 	})
-	t.Run("Max", func(t *testing.T) {
-		if v := Max(0, 100); v != 100 {
-			t.Error(v)
-		}
-		if v := Max(-10, 100); v != 100 {
-			t.Error(v)
-		}
-
-		if v := Max(100, 0); v != 100 {
-			t.Error(v)
-		}
-		if v := Max(100, -10); v != 100 {
-			t.Error(v)
-		}
-	})
-	t.Run("Min", func(t *testing.T) {
-		if v := Min(-100, -10); v != -100 {
-			t.Error(v)
-		}
-		if v := Min(-100, 0); v != -100 {
-			t.Error(v)
-		}
-		if v := Min(-100, 100); v != -100 {
-			t.Error(v)
-		}
-
-		if v := Min(-10, -100); v != -100 {
-			t.Error(v)
-		}
-		if v := Min(0, -100); v != -100 {
-			t.Error(v)
-		}
-		if v := Min(100, -100); v != -100 {
-			t.Error(v)
-		}
-	})
 	t.Run("Rounding", func(t *testing.T) {
 		t.Run("Smallest", func(t *testing.T) {
 			if v := RoundToSmallestMultiple(35, 3); v != 33 {

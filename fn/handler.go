@@ -23,7 +23,7 @@ func NewHandler[T any](in func(T)) Handler[T] { return in }
 func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
 	return func(value T) {
 		for idx := range ops {
-			ft.SafeApply(ops[idx], value)
+			ft.ApplySafe(ops[idx], value)
 		}
 	}
 }
@@ -59,7 +59,7 @@ func (of Handler[T]) If(cond bool) Handler[T] { return of.When(ft.Wrap(cond)) }
 // function if the condition function returns true. The condition
 // function is run every time the handler function runs.
 func (of Handler[T]) When(cond func() bool) Handler[T] {
-	return func(in T) { ft.WhenCall(cond(), of.Capture(in)) }
+	return func(in T) { ft.CallWhen(cond(), of.Capture(in)) }
 }
 
 // Skip runs a check before passing the object to the obsever, when
@@ -67,7 +67,7 @@ func (of Handler[T]) When(cond func() bool) Handler[T] {
 // true, the underlying Handler is called, otherwise, the observation
 // is a noop.
 func (of Handler[T]) Skip(hook func(T) bool) Handler[T] {
-	return func(in T) { ft.WhenHandle(hook, of, in) }
+	return func(in T) { ft.ApplyWhen(hook != nil && hook(in), of, in) }
 }
 
 // Filter creates an handler that only executes the root handler Use

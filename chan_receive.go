@@ -27,7 +27,7 @@ func (ro ChanReceive[T]) Filter(ctx context.Context, filter func(T) bool) ChanRe
 	out := ChanOp[T]{ch: make(chan T), mode: ro.mode}
 
 	out.Handler().
-		ReadAll(ro.Generator().WithErrorFilter(func(err error) error { ft.WhenCall(err != nil, out.Close); return err }).Stream().Filter(filter)).
+		ReadAll(ro.Generator().WithErrorFilter(func(err error) error { ft.CallWhen(err != nil, out.Close); return err }).Stream().Filter(filter)).
 		Ignore().
 		Background(ctx)
 
