@@ -61,7 +61,7 @@ func (m *Map[K, V]) Setup(n int, mi MapType) { m.sh.Do(func() []sh[K, V] { retur
 func (m *Map[K, V]) init(n int, mi MapType) []sh[K, V] {
 	// ONLY called within the sync.Once scope.
 
-	m.num = ft.Default(max(0, uint64(n)), defaultSize)
+	m.num = ft.Default(uint64(max(0, n)), defaultSize)
 	m.imp = ft.Default(mi, MapTypeDefault)
 	return m.makeShards()
 }
