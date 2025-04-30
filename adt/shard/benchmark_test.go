@@ -39,8 +39,8 @@ func BenchmarkShardedMapTypeComparison(b *testing.B) {
 						wg.Add(1)
 						go func(n int) {
 							defer wg.Done()
-							for range i * 2 {
-								populateMap(mp, b.N*32)
+							for range i {
+								populateMap(mp, b.N*2)
 								runtime.Gosched()
 							}
 						}(i)
@@ -51,15 +51,15 @@ func BenchmarkShardedMapTypeComparison(b *testing.B) {
 			b.Run("Reads", func(b *testing.B) {
 				mp := &Map[string, int]{}
 				mp.Setup(-1, bench.MapType)
-				populateMap(mp, b.N*32)
+				populateMap(mp, b.N*2)
 				wg := &sync.WaitGroup{}
 				for i := 0; i < b.N; i++ {
 					for range i {
 						wg.Add(1)
 						go func(n int) {
 							defer wg.Done()
-							for range i * 2 {
-								checkMap(b, mp, b.N*32)
+							for range i {
+								checkMap(b, mp, b.N*2)
 								runtime.Gosched()
 							}
 						}(i)
@@ -82,6 +82,7 @@ func BenchmarkShardedMapTypeComparison(b *testing.B) {
 								runtime.Gosched()
 							}
 						}(i)
+						wg.Add(1)
 						go func(n int) {
 							defer wg.Done()
 							for range i {
