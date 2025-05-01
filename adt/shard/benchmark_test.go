@@ -15,10 +15,6 @@ func BenchmarkShardedMapTypeComparison(b *testing.B) {
 				Name    string
 				MapType MapType
 			}{
-				// {
-				// 	Name:    "Default",
-				// 	MapType: MapTypeDefault,
-				// },
 				{
 					Name:    "Mutex",
 					MapType: MapTypeMutex,
