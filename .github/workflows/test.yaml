@@ -1,17 +1,20 @@
 name: go test
 on:
+on:
   pull_request:
     paths:
       - "**.go"
     branches:
       - main
-      - next
+      - v0.11.x
+      - v0.12.x
   push:
     paths:
       - "**.go"
     branches:
       - main
-      - next
+      - v0.11.x
+      - v0.12.x
 
 jobs:
   tests:
@@ -19,15 +22,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
-        with:
-          go-version: "1.24"
       - uses: technote-space/get-diff-action@v6
         with:
           PATTERNS: |
             **/**.go
             go.mod
             go.sum
+      - uses: actions/setup-go@v3
+        if: env.GIT_DIFF
+        with:
+          go-version: "1.24"
       - name: go test
         if: env.GIT_DIFF
         run: |
