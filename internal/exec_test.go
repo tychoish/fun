@@ -63,12 +63,12 @@ func TestLimitingResolvers(t *testing.T) {
 		})
 		t.Run("Over", func(t *testing.T) {
 			count := 0
-			resolver, err := TTLExec[int](50 * time.Millisecond)
+			resolver, err := TTLExec[int](20 * time.Millisecond)
 			if err != nil {
 				panic(err)
 			}
 			for range 500 {
-				time.Sleep(30 * time.Millisecond)
+				time.Sleep(10 * time.Millisecond)
 				if out := resolver(func() int { count++; return 42 }); out != 42 {
 					t.Fatal("expected 42, got", out)
 				}
