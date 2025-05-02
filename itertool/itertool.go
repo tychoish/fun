@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"iter"
 	"sync/atomic"
 	"time"
 
@@ -69,19 +68,6 @@ func Indexed[T any](iter *fun.Stream[T]) *fun.Stream[dt.Pair[int, T]] {
 	idx.Store(-1)
 
 	return fun.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }).Stream(iter)
-}
-
-// Seq2 unpacks an indexed stream of pairs and returns it as native go
-// iterator.
-func Seq2[T any](ctx context.Context, st *fun.Stream[dt.Pair[int, T]]) iter.Seq2[int, T] {
-	return func(yield func(int, T) bool) {
-		for {
-			item, err := st.Read(ctx)
-			if err != nil || !yield(item.Key, item.Value) {
-				return
-			}
-		}
-	}
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the
