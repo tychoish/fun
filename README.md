@@ -99,15 +99,19 @@ your project.
 
 ## Version History
 
-There are no plans for a 1.0 release, though major backward breaking
+There are no plans for a 1.0 release, though major backward-breaking
 changes increment the second (major) release value, and limited
-maintenance releases are possible/considered for supported go
-versions.
+maintenance releases are possible/considered to maintain
+compatibility.
 
-- `v0.12.0`: go1.24 and greater. Major API impacting release.
+- `v0.12.0`: go1.24 and greater. Major API impacting
+  release. (current)
 - `v0.11.0`: go1.23 and greater. (maintained)
 - `v0.10.0`: go1.20 and greater. (maintained)
 - `v0.9.0`: go1.19 and greater.
+
+There may be small changes to exported APIs within a release series,
+although, major API changes will increment the major release value.
 
 ## Contribution
 
