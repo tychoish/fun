@@ -2,7 +2,6 @@ package itertool
 
 import (
 	"context"
-	"io"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
@@ -13,35 +12,16 @@ import (
 // in a map, returning the first instance of each equivalent object,
 // and skipping subsequent items
 func Uniq[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
-	set := dt.NewMap(map[T]struct{}{})
+	set := &dt.Set[T]{}
 
-	return fun.NewGenerator(func(ctx context.Context) (out T, _ error) {
-		for iter.Next(ctx) {
-			if val := iter.Value(); !set.Check(val) {
-				set.SetDefault(val)
-				return val, nil
-			}
-		}
-		return out, io.EOF
-	}).Stream().WithHook(func(out *fun.Stream[T]) { out.AddError(iter.Close()) })
+	return iter.Filter(func(in T) bool { return !set.AddCheck(in) })
 }
 
 // DropZeroValues processes a stream removing all zero values.
+//
+// Deprecated: use `fun.Stream[T].Filter(ft.NotZero)` instead
 func DropZeroValues[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
-	return fun.Generator[T](func(ctx context.Context) (out T, _ error) {
-		for {
-			item, err := iter.Read(ctx)
-			if err != nil {
-				return out, err
-			}
-
-			if !ft.IsZero(item) {
-				return item, nil
-			}
-		}
-	}).Stream().WithHook(func(stream *fun.Stream[T]) {
-		stream.AddError(iter.Close())
-	})
+	return iter.Filter(ft.NotZero)
 }
 
 // Contains processes a stream of compareable type returning true
@@ -50,12 +30,10 @@ func Contains[T comparable](ctx context.Context, item T, iter *fun.Stream[T]) bo
 	for {
 		v, err := iter.Read(ctx)
 		if err != nil {
-			break
+			return false
 		}
 		if v == item {
 			return true
 		}
 	}
-
-	return false
 }
