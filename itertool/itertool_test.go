@@ -286,14 +286,23 @@ func TestDropZeros(t *testing.T) {
 }
 
 func TestIndexed(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Run("Stream", func(t *testing.T) {
+		iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+		count := 0
+		err := iter.ReadAll(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(t.Context())
+		check.NotError(t, err)
+		assert.Equal(t, count, 10)
 
-	iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
-	count := 0
-	err := iter.ReadAll(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(ctx)
-	check.NotError(t, err)
-	assert.Equal(t, count, 10)
+	})
+	t.Run("Seq", func(t *testing.T) {
+		iter := Seq2(t.Context(), Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)))
+		count := 0
+		for id, val := range iter {
+			count++
+			check.Equal(t, id, val)
+		}
+		assert.Equal(t, count, 10)
+	})
 }
 
 func makeIntSlice(size int) []int {

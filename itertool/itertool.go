@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"iter"
 	"sync/atomic"
 	"time"
 
@@ -35,7 +36,7 @@ var _ interface{ WithRecover() fun.Worker } = new(fun.Operation)
 // synchronized, blocking, and destructive (e.g. so completed
 // workloads do not remain in memory) containers.
 //
-// WorkerPool is implemented using fun.Stream[T].ProcessParallel()
+// WorkerPool is implemented using fun.Stream[T].Parallel()
 func WorkerPool[OP fun.Worker | fun.Operation](
 	iter *fun.Stream[OP],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
@@ -52,13 +53,13 @@ func WorkerPool[OP fun.Worker | fun.Operation](
 // documents into objects in the form of a stream.
 func JSON[T any](in io.Reader) *fun.Stream[T] {
 	var zero T
-	return fun.ConvertStream(fun.MAKE.LinesWithSpaceTrimed(in), fun.MakeConverterErr(func(in string) (out T, err error) {
+	return fun.MakeConverterErr(func(in string) (out T, err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err
 		}
 		return out, err
-	}))
+	}).Stream(fun.MAKE.LinesWithSpaceTrimed(in))
 }
 
 // Indexed produces a stream that keeps track of and reports the
@@ -66,7 +67,21 @@ func JSON[T any](in io.Reader) *fun.Stream[T] {
 func Indexed[T any](iter *fun.Stream[T]) *fun.Stream[dt.Pair[int, T]] {
 	idx := &atomic.Int64{}
 	idx.Store(-1)
-	return fun.ConvertStream(iter, fun.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }))
+
+	return fun.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }).Stream(iter)
+}
+
+// Seq2 unpacks an indexed stream of pairs and returns it as native go
+// iterator.
+func Seq2[T any](ctx context.Context, st *fun.Stream[dt.Pair[int, T]]) iter.Seq2[int, T] {
+	return func(yield func(int, T) bool) {
+		for {
+			item, err := st.Read(ctx)
+			if err != nil || !yield(item.Key, item.Value) {
+				return
+			}
+		}
+	}
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the
