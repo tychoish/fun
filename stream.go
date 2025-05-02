@@ -140,14 +140,6 @@ func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	}).PostHook(cancel).Go().Once()).Stream()
 }
 
-// ConvertStream processes the input stream of type T into an
-// output stream of type O. It's implementation uses the Generator,
-// will continue producing values as long as the input stream
-// produces values, the context isn't canceled, or exhausted.
-func ConvertStream[T, O any](iter *Stream[T], op Converter[T, O]) *Stream[O] {
-	return op.Stream(iter)
-}
-
 // Transform processes a stream passing each element through a
 // transform function. The type of the stream is the same for the
 // output. Use Convert stream to change the type of the value.

@@ -217,14 +217,15 @@ func TestHandlers(t *testing.T) {
 		t.Run("Itoa", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			out, err := ConvertStream(MAKE.Counter(10), MAKE.Itoa()).Slice(ctx)
+			out, err := MAKE.Itoa().Stream(MAKE.Counter(10)).Slice(ctx)
 			check.NotError(t, err)
 			check.EqualItems(t, out, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
 		})
 		t.Run("Atoi", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			out := ft.Must(ConvertStream(SliceStream([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}), MAKE.Atoi()).Slice(ctx))
+			out, err := MAKE.Atoi().Stream(SliceStream([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"})).Slice(ctx)
+			assert.NotError(t, err)
 
 			check.EqualItems(t, out, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 		})

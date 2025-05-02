@@ -277,12 +277,10 @@ func TestStream(t *testing.T) {
 			})
 			calls := 0
 
-			out := ConvertStream(input,
-				MakeCovnerterOk(func(in string) (int, bool) {
-					calls++
-					return ft.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
-				}),
-			)
+			out := MakeCovnerterOk(func(in string) (int, bool) {
+				calls++
+				return ft.WithRecoverOk(func() (int, error) { return strconv.Atoi(in) })
+			}).Stream(input)
 			sum := 0
 			for out.Next(ctx) {
 				sum += out.Value()
@@ -301,14 +299,14 @@ func TestStream(t *testing.T) {
 				fmt.Sprint(2),
 			})
 			calls := 0
-
-			out := ConvertStream(input, MakeConverterErr(func(in string) (int, error) {
+			out := MakeConverterErr(func(in string) (int, error) {
 				if in == "2" {
 					return 0, ErrStreamContinue
 				}
 				calls++
 				return strconv.Atoi(in)
-			}))
+			}).Stream(input)
+
 			sum := 0
 			for out.Next(ctx) {
 				sum += out.Value()
@@ -327,14 +325,14 @@ func TestStream(t *testing.T) {
 				fmt.Sprint(2),
 			})
 			calls := 0
-
-			out := ConvertStream(input, MakeConverterErr(func(in string) (int, error) {
+			out := MakeConverterErr(func(in string) (int, error) {
 				if in == "20" {
 					return 0, ers.ErrInvalidInput
 				}
 				calls++
 				return strconv.Atoi(in)
-			}))
+			}).Stream(input)
+
 			sum := 0
 			for out.Next(ctx) {
 				sum += out.Value()
