@@ -57,13 +57,7 @@ your project.
 
 ## Packages
 
-- Errors: 
-  - [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error
-    collection, annotation, panic handling utilities for aggregating
-    errors and managing panics, in concurrent contexts.)
-  - [ers](https://pkg.go.dev/github.com/tychoish/fun/erc) (constant
-    errors and low level error primitives used throughout the package.)
-- Data Types and Functional Helpers
+- Data Types and Function Tools:
   - [dt](https://pkg.go.dev/github.com/tychoish/fun/dt) (generic
     container data-types, including ordered and unordered sets, singly
     and doubly linked list, as well as wrappers around maps and slices.)
@@ -74,13 +68,20 @@ your project.
     synchronized maps.)
   - [ft](https://pkg.go.dev/github.com/tychoish/fun/ft) function tools:
     simple tools for handling function objects.
-- [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
-  orchestration and management framework.)
-- [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
-  broker and concurrency-safe queue and deque.)
-- [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
-  (stream/iteration tools.)
-- Testing
+  - [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
+    (stream/iteration tools and helpers.)
+- Service Architecture:
+  - [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
+    orchestration and management framework.)
+  - [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
+	broker and concurrency-safe queue and deque.)
+- Error Handling:
+  - [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error
+    collection, annotation, panic handling utilities for aggregating
+    errors and managing panics, in concurrent contexts.)
+  - [ers](https://pkg.go.dev/github.com/tychoish/fun/erc) (constant
+    errors and low level error primitives used throughout the package.)
+- Test Infrastructure:
   - [assert](https://pkg.go.dev/github.com/tychoish/fun/assert)
 	(minimal generic-based assertion library, in the tradition of
 	testify.) The assertions in `assert` abort the flow of the test
@@ -103,11 +104,10 @@ changes increment the second (major) release value, and limited
 maintenance releases are possible/considered for supported go
 versions.
 
-`v0.13.0`: Major API impacting release. 
-`v0.12.0`: go1.24 and greater.
-`v0.11.0`: go1.23 and greater.
-`v0.10.0`: go1.20 and greater.
-`v0.9.0`: go1.19 and greater.
+- `v0.12.0`: go1.24 and greater. Major API impacting release.
+- `v0.11.0`: go1.23 and greater. (maintained)
+- `v0.10.0`: go1.20 and greater. (maintained)
+- `v0.9.0`: go1.19 and greater.
 
 ## Contribution
 
