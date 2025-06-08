@@ -15,6 +15,9 @@ func Unwind[T any](in T) []T {
 		case interface{ Unwrap() T }:
 			out = append(out, in)
 			in = wi.Unwrap()
+		case interface{ Unwind() T }:
+			out = append(out, in)
+			in = wi.Unwind()
 		case nil:
 			return out
 		default:
