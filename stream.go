@@ -343,10 +343,7 @@ func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
 // This is the work-house operation of the package, and can be used as
 // the basis of worker pools, even processing, or message dispatching
 // for pubsub queues and related systems.
-func (st *Stream[T]) Parallel(
-	fn Handler[T],
-	opts ...OptionProvider[*WorkerGroupConf],
-) Worker {
+func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroupConf]) Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
 		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
