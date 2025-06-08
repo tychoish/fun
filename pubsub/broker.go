@@ -38,6 +38,7 @@ type Broker[T any] struct {
 type BrokerStats struct {
 	Subscriptions int
 	BufferDepth   int
+	MessageCount  uint64
 }
 
 // BrokerOptions configures the semantics of a broker. The zero-values
@@ -147,6 +148,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
+		var count uint64
 		for {
 			select {
 			case <-ctx.Done():
@@ -159,8 +161,10 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 				fn(BrokerStats{
 					Subscriptions: subs.Len(),
 					BufferDepth:   dist.Len(),
+					MessageCount:  count,
 				})
 			case msg := <-b.publishCh:
+				count++
 				if err := dist.Send(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
 					// result of user configuration (and we don't log anyway,) or
