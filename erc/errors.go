@@ -6,6 +6,7 @@
 package erc
 
 import (
+	"fmt"
 	"iter"
 	"sync"
 
@@ -44,14 +45,14 @@ func AsCollector(err error) *Collector {
 	case interface{ Unwind() []error }:
 		if errs := et.Unwind(); len(errs) > 0 {
 			st := &Collector{}
-			st.Add(errs...)
+			st.Join(errs...)
 			return st
 		}
 		return nil
 	case interface{ Unwrap() []error }:
 		if errs := et.Unwrap(); len(errs) > 0 {
 			st := &Collector{}
-			st.Add(errs...)
+			st.Join(errs...)
 			return st
 		}
 		return nil
@@ -72,7 +73,7 @@ func AsCollector(err error) *Collector {
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call erc.Join repeatedly on the same
 // error set of errors the resulting error is convertable
-func Join(errs ...error) error { st := &Collector{}; st.Add(errs...); return st.Err() }
+func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
 
 // with/lock are internal helpers to avoid twiddling the pointer to
 // the mutex.
@@ -179,9 +180,9 @@ func (ec *Collector) Push(err error) {
 	}
 }
 
-// Add appends one or more errors to the collectors. Nil errors are
+// Join appends one or more errors to the collectors. Nil errors are
 // always omitted from the collector.
-func (ec *Collector) Add(errs ...error) {
+func (ec *Collector) Join(errs ...error) {
 	switch len(errs) {
 	case 0:
 		return
@@ -197,7 +198,10 @@ func (ec *Collector) Add(errs ...error) {
 // When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
-func (ec *Collector) When(cond bool, val error) { ec.Push(ers.When(cond, val)) }
+func (ec *Collector) When(cond bool, val string)      { ec.Push(ers.When(cond, val)) }
+func (ec *Collector) If(cond bool, val error)         { ec.Push(ers.If(cond, val)) }
+func (ec *Collector) Errorf(tmpl string, args ...any) { ec.Push(fmt.Errorf(tmpl, args...)) }
+func (ec *Collector) New(val string)                  { ec.Push(ers.New(val)) }
 
 // Whenf conditionally creates and adds an error to the collector, as
 // When, and with a similar use case, but permits Sprintf/Errorf

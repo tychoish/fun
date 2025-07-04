@@ -112,7 +112,7 @@ func (or *Orchestrator) Service() *Service {
 					if err != nil {
 						// we only want to collect non-context
 						// cancelation and non queue-closed errors
-						ec.When((!errors.Is(err, pubsub.ErrQueueClosed) && !ers.IsExpiredContext(err)), err)
+						ec.If(!errors.Is(err, pubsub.ErrQueueClosed) && !ers.IsExpiredContext(err), err)
 						break
 					}
 				}

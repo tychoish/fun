@@ -63,14 +63,22 @@ func IsInvariantViolation(r any) bool {
 // nested within the unwrapped error objects.
 func Unwind(in error) []error { return internal.Unwind(in) }
 
-// When constructs an ers.Error-typed error value IF the conditional
+// If constructs an ers.Error-typed error value IF the conditional
 // is true, and returns nil otherwise.
-func When(cond bool, err error) error {
+func If(cond bool, err error) error {
 	if !cond {
 		return nil
 	}
 
 	return err
+}
+
+func When(cond bool, val string) error {
+	if !cond {
+		return nil
+	}
+
+	return New(val)
 }
 
 // Whenf constructs an error (using fmt.Errorf) IF the conditional is

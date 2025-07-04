@@ -335,7 +335,7 @@ func TestOperation(t *testing.T) {
 
 			ft.CallTimes(128, func() { jobs = append(jobs, op) })
 
-			err := SliceStream(jobs).Parallel(MAKE.ProcessOperation(), WorkerGroupConfNumWorkers(4)).Run(ctx)
+			err := SliceStream(jobs).Parallel(MAKE.OperationHandler(), WorkerGroupConfNumWorkers(4)).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, count, 128)
 		})

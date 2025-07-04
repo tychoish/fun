@@ -46,7 +46,7 @@ func (eel *list) Error() string {
 }
 
 func (eel *list) In(elm *element) bool { return elm.list == eel }
-func (elm *element) In(eel *list) bool { return elm.list == eel }
+
 func (eel *list) Len() int {
 	if eel == nil {
 		return 0
@@ -190,6 +190,7 @@ type element struct {
 	err  error
 }
 
+func (elm *element) In(eel *list) bool    { return eel.In(elm) }
 func (elm *element) Ok() bool             { return elm != nil && elm.list != nil && elm.err != nil }
 func (elm *element) Err() error           { return elm.err }
 func (elm *element) Error() string        { return elm.err.Error() }

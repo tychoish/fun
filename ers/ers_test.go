@@ -107,13 +107,13 @@ func TestErrors(t *testing.T) {
 		err.val = 41
 		assert.True(t, !IsOk(err))
 	})
-	t.Run("When", func(t *testing.T) {
+	t.Run("If", func(t *testing.T) {
 		const errval Error = "ERRO=42"
 
 		t.Run("BasicString", func(t *testing.T) {
-			err := When(false, errval)
+			err := If(false, errval)
 			assert.NotError(t, err)
-			err = When(true, errval)
+			err = If(true, errval)
 			check.Error(t, err)
 		})
 		t.Run("Wrapping", func(t *testing.T) {
@@ -124,6 +124,25 @@ func TestErrors(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, errval)
 			assert.True(t, err != errval)
+		})
+	})
+	t.Run("WHen", func(t *testing.T) {
+		const errval = "ERRO=42"
+
+		t.Run("BasicString", func(t *testing.T) {
+			err := When(false, errval)
+			assert.NotError(t, err)
+			err = When(true, errval)
+			check.Error(t, err)
+		})
+		t.Run("Wrapping", func(t *testing.T) {
+			err := Whenf(false, "no error %w", New(errval))
+			assert.True(t, IsOk(err))
+
+			err = Whenf(true, "no error: %w", New(errval))
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, New(errval))
+			assert.True(t, err != New(errval))
 		})
 	})
 	t.Run("Whenf", func(t *testing.T) {

@@ -71,14 +71,14 @@ func TestError(t *testing.T) {
 		t.Run("Nested", func(t *testing.T) {
 			ec1 := &Collector{}
 			ec2 := &Collector{}
-			ec1.Add(io.EOF, context.Canceled)
+			ec1.Join(io.EOF, context.Canceled)
 			ec2.Push(ec1)
 			assert.Equal(t, 2, ec2.Len())
 		})
 		t.Run("Generator", func(t *testing.T) {
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
-				ec.Push(fmt.Errorf("%d", i))
+				ec.Errorf("%d", i)
 			}
 			count := 0
 			for err := range ec.Iterator() {
@@ -173,12 +173,26 @@ func TestError(t *testing.T) {
 				t.Error(es.Resolve(), "error not propogated")
 			}
 		})
-		t.Run("WhenBasicString", func(t *testing.T) {
+		t.Run("IfBasicString", func(t *testing.T) {
 			ec := &Collector{}
-			ec.When(false, ers.Error("no error"))
+			ec.If(false, ers.Error("no error"))
 			assert.True(t, ec.Ok())
 			assert.NotError(t, ec.Resolve())
-			ec.When(true, ers.Error(errval))
+			ec.If(true, ers.Error(errval))
+			check.NotZero(t, ec.list.elm) // nil is zero
+			check.NotZero(t, ec.list.num) // nil is zero
+			if err := ec.Resolve(); err == nil {
+				t.Fatal(err)
+			} else if err.Error() != errval {
+				t.Fatal(err)
+			}
+		})
+		t.Run("WhenBasicString", func(t *testing.T) {
+			ec := &Collector{}
+			ec.When(false, "no error")
+			assert.True(t, ec.Ok())
+			assert.NotError(t, ec.Resolve())
+			ec.When(true, errval)
 			check.NotZero(t, ec.list.elm) // nil is zero
 			check.NotZero(t, ec.list.num) // nil is zero
 			if err := ec.Resolve(); err == nil {
@@ -191,7 +205,7 @@ func TestError(t *testing.T) {
 			ec := &Collector{}
 			count := 0
 			ec.SetFilter(func(err error) error { count++; return err })
-			ec.Push(ers.New("error"))
+			ec.New("error")
 			assert.Equal(t, count, 1)
 		})
 		t.Run("WhenWrapping", func(t *testing.T) {
@@ -214,24 +228,24 @@ func TestError(t *testing.T) {
 		})
 		t.Run("ContextHelper", func(t *testing.T) {
 			ec := &Collector{}
-			ec.Push(errors.New("foo"))
+			ec.New("foo")
 			if ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
-			ec.Push(errors.New("foo"))
+			ec.New("foo")
 			ec.Push(context.Canceled)
 			if !ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 			ec = &Collector{}
-			ec.Push(errors.New("foo"))
+			ec.New("foo")
 			if ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
 
 			ec.Push(context.DeadlineExceeded)
-			ec.Push(errors.New("foo"))
+			ec.New("foo")
 			if !ers.IsExpiredContext(ec.Resolve()) {
 				t.Fatal(ec.Resolve())
 			}
@@ -423,7 +437,7 @@ func BenchmarkErrorList(b *testing.B) {
 		b.Run("Collector", func(b *testing.B) {
 			ec := &Collector{}
 			for i := 0; i < count; i++ {
-				ec.Push(errors.New("foo"))
+				ec.New("foo")
 			}
 			err := ec.Resolve().Error()
 			if err == "" {
