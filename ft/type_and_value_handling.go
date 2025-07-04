@@ -60,7 +60,7 @@ func RefOk[T any](in *T) (value T, ok bool) {
 // IsPtr uses reflection to determine if an object is a pointer.
 func IsPtr(in any) bool { return internal.IsPtr(in) }
 
-// IsNil uses reflection to determine if an object is nil. ()
+// IsNil uses reflection to determine if an object is nil.
 func IsNil(in any) bool { return internal.IsNil(in) }
 
 // Default takes two values. if the first value is the zero value for
