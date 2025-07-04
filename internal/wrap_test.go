@@ -68,6 +68,13 @@ func TestUnwind(t *testing.T) {
 				t.Error(len(errs), 2, errs)
 			}
 		})
+		t.Run("Wind", func(t *testing.T) {
+			var err error = sluwind{out: errors.New("basebase")}
+			errs := Unwind(err)
+			if len(errs) != 2 {
+				t.Error(len(errs), 2, errs)
+			}
+		})
 	})
 	t.Run("WithNils", func(t *testing.T) {
 		var err error = slwrap{out: []error{io.EOF, nil, errors.New("basebase"), nil}}
@@ -91,6 +98,26 @@ func TestUnwind(t *testing.T) {
 		}
 
 		err = &oneWrap{out: &oneWrap{}}
+		errs = Unwind(err)
+		if len(errs) != 2 {
+			t.Error(len(errs), errs)
+		}
+	})
+	t.Run("UnwindMethod", func(t *testing.T) {
+		var err error
+		errs := Unwind(err)
+		if errs != nil || len(errs) != 0 {
+			t.Error(len(errs), errs)
+		}
+
+		err = &sluwind{}
+		errs = Unwind(err)
+
+		if len(errs) != 1 {
+			t.Error(len(errs), errs)
+		}
+
+		err = &sluwind{out: &sluwind{}}
 		errs = Unwind(err)
 		if len(errs) != 2 {
 			t.Error(len(errs), errs)
@@ -171,6 +198,11 @@ type slwind struct{ out []error }
 
 func (s slwind) Unwind() []error { return s.out }
 func (s slwind) Error() string   { return fmt.Sprint("wind error:", len(s.out), s.out) }
+
+type sluwind struct{ out error }
+
+func (s sluwind) Unwind() error { return s.out }
+func (s sluwind) Error() string { return fmt.Sprint("unwind error:", s.out) }
 
 type oneWrap struct{ out error }
 
