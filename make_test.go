@@ -257,6 +257,13 @@ func TestHandlers(t *testing.T) {
 
 		assert.Equal(t, count, 3)
 	})
+	t.Run("WorkerHandler", func(t *testing.T) {
+		count := 0
+		worker := Worker(func(ctx context.Context) error { assert.NotNil(t, ctx); count++; return nil })
+		wh := MAKE.WorkerHandler()
+		assert.NotError(t, wh.Read(t.Context(), worker))
+		assert.Equal(t, count, 1)
+	})
 	t.Run("ErrorStream", func(t *testing.T) {
 		ec := &erc.Collector{}
 		ec.Push(ers.ErrContainerClosed)

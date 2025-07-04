@@ -79,17 +79,33 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 // collector.
 func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqStream(ec.Iterator()) }
 
-// ProcessOperation constructs a Handler function for running Worker
-// functions. Use in combination with Process and ProcessParallel, and
-// to build worker pools.
+// OperationHandler constructs a Handler function for running Worker
+// functions. Use with streams to build worker pools.
 //
 // The Handlers type serves to namespace these constructors, for
-// interface clarity purposes. Use the HF variable to access this
+// interface clarity purposes. Use the MAKE variable to access this
 // method as in:
 //
-//	fun.MAKE.ProcessOperation()
-func (Constructors) ProcessOperation() Handler[Operation] {
+//	fun.MAKE.OperationHandler()
+//
+// The OperationHandler return an error if an operation panics. Nil
+// operations are always panics.
+func (Constructors) OperationHandler() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
+}
+
+// WorkerHandler constructs a Handler function for running Worker
+// functions. Use with streams to build worker pools.
+//
+// The Handlers type serves to namespace these constructors, for
+// interface clarity purposes. Use the MAKE variable to access this
+// method as in:
+//
+//	fun.MAKE.WorkerHandler()
+//
+// The WorkerHandler provides no panic protection.
+func (Constructors) WorkerHandler() Handler[Worker] {
+	return func(ctx context.Context, op Worker) error { return op.Run(ctx) }
 }
 
 // Signal is a wrapper around the common pattern where signal channels
