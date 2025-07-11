@@ -73,6 +73,8 @@ type Service struct {
 	// must return before the Cleanup function runs.
 	Shutdown func() error
 
+	Signal fun.Worker
+
 	// ErrorHandler functions, if specified, are called when the
 	// service returns, with the output of the Service's error
 	// output. This is always the result of an
@@ -139,29 +141,37 @@ func (s *Service) Start(ctx context.Context) error {
 			}
 		}()
 
+		var shutdown func() error
+		if s.Shutdown != nil {
+			shutdown = s.Shutdown
+		} else {
+			shutdown = func() error { return nil }
+		}
+
+		var signaler func()
 		ctx, s.cancel = context.WithCancel(ctx)
+		if s.Signal != nil {
+			signaler = func() {
+				defer ec.Recover()
+				select {
+				case err := <-s.Signal.Signal(GetBaseContext(ctx)):
+					ec.Push(err)
+				case <-ctx.Done():
+				}
+				ec.Push(shutdown())
+			}
+		} else {
+			signaler = func() { defer ec.Recover(); <-ctx.Done(); ec.Add(shutdown()) }
+		}
 
 		shutdownSignal := make(chan struct{})
-		if s.Shutdown != nil {
-			// capture it just to be safe.
-			shutdown := s.Shutdown
-			s.wg.Add(1)
-			go func() {
-				defer s.wg.Done()
-				defer close(shutdownSignal)
-				defer ec.Recover()
-				<-ctx.Done()
-				s.ec.Push(shutdown())
-			}()
-		} else {
-			s.wg.Add(1)
-			go func() {
-				defer s.wg.Done()
-				defer close(shutdownSignal)
-				defer ec.Recover()
-				<-ctx.Done()
-			}()
-		}
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			defer close(shutdownSignal)
+			defer ec.Recover()
+			signaler()
+		}()
 
 		s.wg.Add(1)
 		go func() {

@@ -23,7 +23,8 @@ const (
 
 	// ErrQueueClosed is returned by the Add method of a closed queue, and by
 	// the Wait method of a closed empty queue.
-	ErrQueueClosed = ers.ErrContainerClosed
+	ErrQueueClosed   = ers.ErrContainerClosed
+	ErrQueueDraining = ers.Error("the queue is shutting down")
 )
 
 var (
@@ -51,6 +52,7 @@ var (
 type Queue[T any] struct {
 	mu       sync.Mutex // protects the fields below
 	tracker  queueLimitTracker
+	draining bool
 	closed   bool
 	nempty   *sync.Cond
 	nupdates *sync.Cond
@@ -107,6 +109,10 @@ func (q *Queue[T]) Len() int {
 }
 
 func (q *Queue[T]) doAdd(item T) error {
+	if q.draining {
+		return ErrQueueDraining
+	}
+
 	if q.closed {
 		return ErrQueueClosed
 	}
@@ -135,6 +141,9 @@ func (q *Queue[T]) doAdd(item T) error {
 func (q *Queue[T]) BlockingAdd(ctx context.Context, item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if q.draining {
+		return ErrQueueDraining
+	}
 
 	if q.closed {
 		return ErrQueueClosed
@@ -185,16 +194,6 @@ func (q *Queue[T]) Wait(ctx context.Context) (out T, _ error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if err := q.unsafeWaitWhileEmpty(ctx); err != nil {
-		return out, err
-	}
-
-	return q.popFront(), nil
-}
-
-// caller must hold the lock, but this implements the wait behavior
-// without modifying the queue for use in the stream.
-func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 	// If the context terminates, wake the waiter.
 	ctx, cancel := context.WithCancel(ctx)
 	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
@@ -202,15 +201,38 @@ func (q *Queue[T]) unsafeWaitWhileEmpty(ctx context.Context) error {
 
 	for q.tracker.len() == 0 {
 		if q.closed {
-			return ErrQueueClosed
+			return out, ErrQueueClosed
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			q.nempty.Wait()
+
+		if err := ctx.Err(); err != nil {
+			return out, ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
 		}
+
+		q.nempty.Wait()
 	}
+	return q.popFront(), nil
+}
+
+func (q *Queue[T]) Drain(ctx context.Context) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.draining = true
+
+	if err := q.waitUntilEmpty(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (q *Queue[T]) waitUntilEmpty(ctx context.Context) error {
+	for q.tracker.len() > 0 {
+		if err := ctx.Err(); err != nil {
+			return ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
+		}
+		q.nempty.Wait()
+	}
+
 	return nil
 }
 
@@ -228,12 +250,12 @@ func (q *Queue[T]) waitForNew(ctx context.Context) error {
 		if q.closed {
 			return ErrQueueClosed
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			q.nupdates.Wait()
+
+		if err := ctx.Err(); err != nil {
+			return err
 		}
+
+		q.nupdates.Wait()
 	}
 
 	return nil
@@ -247,6 +269,23 @@ func (q *Queue[T]) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
+	q.nupdates.Broadcast()
+	q.nempty.Broadcast()
+	return nil
+}
+
+func (q *Queue[T]) Shutdown(ctx context.Context) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.draining = true
+
+	if err := q.waitUntilEmpty(ctx); err != nil {
+		return err
+	}
+
+	q.closed = true
+	q.draining = false
 	q.nupdates.Broadcast()
 	q.nempty.Broadcast()
 	return nil
@@ -373,6 +412,7 @@ func (q *Queue[T]) Generator() fun.Generator[T] {
 			}
 
 			q.mu.Unlock()
+
 			if err := q.waitForNew(ctx); err != nil {
 				return o, err
 			}

@@ -79,7 +79,7 @@ func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
 // collector.
 func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqStream(ec.Iterator()) }
 
-// ProcessOperation constructs a Handler function for running Worker
+// OperationHandler constructs a Handler function for running Worker
 // functions. Use in combination with Process and ProcessParallel, and
 // to build worker pools.
 //
@@ -87,9 +87,17 @@ func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqSt
 // interface clarity purposes. Use the HF variable to access this
 // method as in:
 //
-//	fun.MAKE.ProcessOperation()
-func (Constructors) ProcessOperation() Handler[Operation] {
+//	fun.MAKE.OperationHandler()
+func (Constructors) OperationHandler() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
+}
+
+func (Constructors) WorkerHandler() Handler[Worker] {
+	return func(ctx context.Context, f Worker) error { return f.Run(ctx) }
+}
+
+func (Constructors) ConvertOperationToWorker() Converter[Operation, Worker] {
+	return MakeConverter(func(o Operation) Worker { return o.WithRecover() })
 }
 
 // Signal is a wrapper around the common pattern where signal channels

@@ -28,6 +28,12 @@ func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
 	}
 }
 
+// ErrorHandler creates a function that can be used to wrap a function
+// call that returns a value and an error, to simplify some call sites.
+func ErrorHandler[T any](eh Handler[error]) func(T, error) T {
+	return func(v T, err error) T { eh(err); return v }
+}
+
 // Capture returns a function that handles the specified value,
 // but only when executed later.
 func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
