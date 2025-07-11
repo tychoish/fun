@@ -87,9 +87,6 @@ func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqSt
 // method as in:
 //
 //	fun.MAKE.OperationHandler()
-//
-// The OperationHandler return an error if an operation panics. Nil
-// operations are always panics.
 func (Constructors) OperationHandler() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
 }
@@ -106,7 +103,10 @@ func (Constructors) OperationHandler() Handler[Operation] {
 // The WorkerHandler provides no panic protection.
 func (Constructors) WorkerHandler() Handler[Worker] {
 	return func(ctx context.Context, op Worker) error { return op.Run(ctx) }
-}
+
+func (Constructors) ConvertOperationToWorker() Converter[Operation, Worker] {
+	return MakeConverter(func(o Operation) Worker { return o.WithRecover() })
+
 
 // Signal is a wrapper around the common pattern where signal channels
 // are closed to pass termination and blocking notifications between
