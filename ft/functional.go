@@ -16,6 +16,8 @@ func Do[T any](op func() T) T { return op() }
 // Apply calls the input function with the provided argument.
 func Apply[T any](fn func(T), arg T) { fn(arg) }
 
+func Filter[T any](fn func(T) T, arg T) T { return fn(arg) }
+
 // CallSafe only calls the operation when it's non-nil.
 func CallSafe(op func()) {
 	if op != nil {
@@ -34,7 +36,18 @@ func DoSafe[T any](op func() T) (out T) {
 
 // ApplySafe calls the function, fn, on the value, arg, only if the
 // function is not nil.
-func ApplySafe[T any](fn func(T), arg T) { ApplyWhen(fn != nil, fn, arg) }
+func ApplySafe[T any](fn func(T), arg T) {
+	if fn != nil {
+		fn(arg)
+	}
+}
+
+func FilterSafe[T any](fn func(T) T, arg T) T {
+	if fn != nil {
+		return fn(arg)
+	}
+	return arg
+}
 
 // CallMany calls each of the provided function, skipping any nil functions.
 func CallMany(ops []func()) {
