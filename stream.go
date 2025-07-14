@@ -459,8 +459,9 @@ func (st *Stream[T]) CloseHook() func(*Stream[T]) {
 // similar to Flatten (which processes each stream in parallel).
 func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 	proc := st.Generator()
+
 	for idx := range iters {
-		proc = proc.Join(iters[idx].Read)
+		proc = proc.Join(iters[idx].Read).wrapErrorWith(iters[idx].Close)
 	}
 	return proc.Stream()
 }
@@ -470,8 +471,15 @@ func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 //
 // In the case of an error in the underlying stream the output slice
 // will have the values encountered before the error.
-func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
-	return out, st.ReadAll(func(in T) { out = append(out, in) }).Run(ctx)
+func (st *Stream[T]) Slice(ctx context.Context) (out []T) {
+	return st.Collect(ctx).Resolve()
+}
+
+func (st *Stream[T]) Collect(ctx context.Context) fn.Future[[]T] {
+	return func() (out []T) {
+		st.AddError(st.ReadAll(func(in T) { out = append(out, in) }).Run(ctx))
+		return out
+	}
 }
 
 // MarshalJSON is useful for implementing json.Marshaler methods
