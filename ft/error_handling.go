@@ -24,6 +24,10 @@ func Check[T any](value T, err error) (zero T, _ bool) {
 	return value, true
 }
 
+func WrapCheck[T any](value T, err error) func() (T, bool) {
+	return func() (T, bool) { return Check(value, err) }
+}
+
 // IgnoreError discards an error.
 func IgnoreError(_ error) { return } //nolint
 

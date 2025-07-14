@@ -1,5 +1,16 @@
 package ft
 
+// IsOk returns only the second argument passed to it, given a
+// function that returns two values where the second value is a
+// boolean, you can use IsOk to discard the first value.
+func IsOk[T any](_ T, ok bool) bool { return ok }
+
+// Not inverts a boolean.
+func Not(p bool) bool { return !p }
+
+// Is is a verbose boolean.
+func Is(p bool) bool { return p }
+
 // IfElse provides a ternary-like operation as a complement to IfDo
 // and IfCall for values.
 func IfElse[T any](cond bool, ifVal T, elseVal T) T {
@@ -8,6 +19,9 @@ func IfElse[T any](cond bool, ifVal T, elseVal T) T {
 	}
 	return elseVal
 }
+
+func When[T any](cond bool, value T) (out T)   { return IfElse(cond, value, out) }
+func Unless[T any](cond bool, value T) (out T) { return IfElse(cond, out, value) }
 
 // CallIfElse is, effectively the if-form from (many) lisps: when the
 // condition is true, the first function is called, and otherwise the
@@ -32,16 +46,22 @@ func DoIfElse[T any](cond bool, doIf func() T, doElse func() T) T {
 	return DoSafe(doElse)
 }
 
-// IsOk returns only the second argument passed to it, given a
-// function that returns two values where the second value is a
-// boolean, you can use IsOk to discard the first value.
-func IsOk[T any](_ T, ok bool) bool { return ok }
+func ApplyIfElse[T any](cond bool, applyIf func(T), applyElse func(T), arg T) {
+	if Is(cond) {
+		ApplySafe(applyIf, arg)
+		return
+	}
 
-// Not inverts a boolean.
-func Not(p bool) bool { return !p }
+	ApplySafe(applyElse, arg)
+}
 
-// Is is a verbose boolean.
-func Is(p bool) bool { return p }
+func FilterIfElse[T any](cond bool, filterIf func(T) T, filterElse func(T) T, arg T) T {
+	if Is(cond) {
+		return FilterSafe(filterIf, arg)
+	}
+
+	return FilterSafe(filterElse, arg)
+}
 
 // CallWhen runs a function when condition is true, and is a noop
 // otherwise. Panics if the function is nil.
@@ -50,15 +70,13 @@ func CallWhen(cond bool, op func()) { CallIfElse(cond, op, nil) }
 // DoWhen calls the function when the condition is true, and returns
 // the result, or if the condition is false, the operation is a noop,
 // and returns zero-value for the type. Panics if the function is nil.
-func DoWhen[T any](cond bool, op func() T) (out T) { return DoIfElse(cond, op, nil) }
+func DoWhen[T any](cond bool, op func() T) T { return DoIfElse(cond, op, nil) }
 
 // ApplyWhen runs the function with the supplied argument only when
 // the condition is true. Panics if the function is nil.
-func ApplyWhen[T any](cond bool, op func(T), arg T) {
-	if Is(cond) {
-		op(arg)
-	}
-}
+func ApplyWhen[T any](cond bool, op func(T), arg T) { ApplyIfElse(cond, op, nil, arg) }
+
+func FilterWhen[T any](cond bool, op func(T) T, arg T) T { return FilterIfElse(cond, op, nil, arg) }
 
 // CallUnless is inverse form of CallWhen, calling the provided
 // function only when the conditional is false. Panics if the function
@@ -71,8 +89,6 @@ func DoUnless[T any](cond bool, op func() T) T { return DoIfElse(cond, nil, op) 
 
 // ApplyUnless runs the function with the supplied argument only when
 // the condition is true. Panics if the function is nil.
-func ApplyUnless[T any](cond bool, op func(T), arg T) {
-	if !cond {
-		op(arg)
-	}
-}
+func ApplyUnless[T any](cond bool, op func(T), arg T) { ApplyIfElse(cond, nil, op, arg) }
+
+func FilterUnless[T any](cond bool, op func(T) T, arg T) T { return FilterIfElse(cond, nil, op, arg) }

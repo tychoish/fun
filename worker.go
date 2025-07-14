@@ -131,6 +131,8 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant
 // produced by the worker.
 func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.IgnoreError(wf(ctx)) } }
 
+func (wf Worker) Force() { wf.Ignore().Wait() }
+
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed
 // functions may be called more than once, and will run multiple

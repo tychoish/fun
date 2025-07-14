@@ -119,7 +119,7 @@ func (p *Pairs[K, V]) Append(vals ...Pair[K, V]) { p.init(); p.ll.Append(vals...
 
 // Extend adds the items from a Pairs object (slice of Pair) without
 // modifying the donating object.
-func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
+func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.ExtendPop(toAdd.ll) }
 
 // Iterator returns a native go iterator function for pair items.
 func (p *Pairs[K, V]) Iterator() iter.Seq[Pair[K, V]] {

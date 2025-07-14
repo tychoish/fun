@@ -18,6 +18,8 @@ type Handler[T any] func(T)
 // NewHandler produces an Handler[T] function as a helper.
 func NewHandler[T any](in func(T)) Handler[T] { return in }
 
+func NewNoopHandler[T any]() Handler[T] { return func(T) {} }
+
 // JoinHandlers returns a function that combines a collection of
 // handlers.
 func JoinHandlers[T any](ops []Handler[T]) Handler[T] {

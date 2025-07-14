@@ -3,7 +3,6 @@ package ft
 import (
 	"context"
 	"errors"
-	"io"
 	"math/rand"
 	"slices"
 	"strconv"
@@ -523,39 +522,20 @@ func TestPanicProtection(t *testing.T) {
 	const perr ers.Error = "panic error"
 
 	t.Run("Wrap", func(t *testing.T) {
-		t.Run("Call", func(t *testing.T) {
+		t.Run("RecoverCall", func(t *testing.T) {
 			fn := func() { panic(perr) }
 			assert.NotPanic(t, func() {
 				assert.Error(t, WrapRecoverCall(fn)())
 				assert.ErrorIs(t, WrapRecoverCall(fn)(), perr)
 			})
 		})
-		t.Run("Do", func(t *testing.T) {
+		t.Run("RecoverDo", func(t *testing.T) {
 			fn := func() int { panic(perr) }
 			assert.NotPanic(t, func() {
 				out, err := WrapRecoverDo(fn)()
 				assert.Error(t, err)
 				assert.Zero(t, out)
 				assert.ErrorIs(t, err, perr)
-			})
-		})
-		t.Run("OK", func(t *testing.T) {
-			fn := func() (int, error) { panic(perr) }
-			assert.NotPanic(t, func() {
-				out, ok := WrapRecoverOk(fn)()
-				assert.True(t, !ok)
-				assert.Zero(t, out)
-			})
-		})
-		t.Run("Happy", func(t *testing.T) {
-			assert.NotPanic(t, func() {
-				assert.NotError(t, WrapRecoverCall(func() {})())
-				out, err := WrapRecoverDo(func() int { return 42 })()
-				assert.Equal(t, out, 42)
-				assert.NotError(t, err)
-				out, ok := WrapRecoverOk(func() (int, error) { return 12, nil })()
-				assert.Equal(t, out, 12)
-				assert.True(t, ok)
 			})
 		})
 	})
@@ -609,12 +589,12 @@ func TestPanicProtection(t *testing.T) {
 	})
 	t.Run("SafeOK", func(t *testing.T) {
 		t.Run("Not", func(t *testing.T) {
-			num, ok := WithRecoverOk(func() (int, error) { return 42, io.EOF })
+			num, ok := Check(WithRecoverDo(func() int { panic("error?") }))
 			assert.True(t, !ok)
 			assert.Zero(t, num)
 		})
 		t.Run("Passes", func(t *testing.T) {
-			num, ok := WithRecoverOk(func() (int, error) { return 42, nil })
+			num, ok := Check(WithRecoverDo(func() int { return 42 }))
 			assert.True(t, ok)
 			assert.Equal(t, 42, num)
 		})

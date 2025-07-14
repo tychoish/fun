@@ -141,7 +141,7 @@ func (p *Tuples[K, V]) Append(vals ...Tuple[K, V]) { p.init(); p.ll.Append(vals.
 
 // Extend adds the items from a Tuples object (slice of Tuple) without
 // modifying the donating object.
-func (p *Tuples[K, V]) Extend(toAdd *Tuples[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
+func (p *Tuples[K, V]) Extend(toAdd *Tuples[K, V]) { p.init(); p.ll.ExtendPop(toAdd.ll) }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
 // converting it to a map and then encoding that map as JSON. The JSON

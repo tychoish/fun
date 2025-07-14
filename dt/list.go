@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
@@ -29,18 +30,48 @@ type List[T any] struct {
 	meta *struct{ length int }
 }
 
-// Append adds a variadic sequence of items to the end of the list.
-func (l *List[T]) Append(items ...T) {
-	for idx := range items {
-		l.PushBack(items[idx])
-	}
-}
+func VariadicList[T any](elems ...T) *List[T]                     { return SliceList(elems) }
+func SliceList[T any](elems []T) *List[T]                         { l := new(List[T]); l.Append(elems...); return l }
+func MapList[K comparable, V any](mp Map[K, V]) *List[Pair[K, V]] { return StreamList(mp.Stream()) }
+func StreamList[T any](st *fun.Stream[T]) *List[T]                { l := &List[T]{}; l.Populate(st).Force(); return l }
 
 // Populate returns a worker that adds items from the stream to the
 // list. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
 func (l *List[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
+
+// Append adds a variadic sequence of items to the end of the list.
+func (l *List[T]) Append(items ...T) *List[T] { return l.AddSlice(items) }
+
+func (l *List[T]) AddSlice(sl []T) *List[T] {
+	for idx := range sl {
+		l.PushBack(sl[idx])
+	}
+	return l
+}
+
+func (l *List[T]) Extend(input *List[T]) {
+	for elem := input.Front(); elem.Ok(); elem = elem.Next() {
+		l.Back().Append(elem)
+	}
+
+}
+
+// ExtendPop removes items from the front of the input list, and appends
+// them to the end (back) of the current list.
+func (l *List[T]) ExtendPop(input *List[T]) {
+	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
+		l.Back().Append(elem)
+	}
+}
+
+func (l *List[T]) Reset() {
+	// remove all items so that they don't pass membership checks
+	l.GeneratorPopFront().Stream().ReadAll(fn.NewNoopHandler[T]()).Ignore().Wait()
+	// reset everything...
+	l.uncheckedSetup() // (maybe unnecessary?)
+}
 
 // Len returns the length of the list. As the Append/Remove operations
 // track the length of the list, this is an O(1) operation.
@@ -210,14 +241,6 @@ func (l *List[T]) StreamPopFront() *fun.Stream[T] { return l.GeneratorPopFront()
 // however, values added ahead of the stream, will be visible.
 func (l *List[T]) StreamPopBack() *fun.Stream[T] { return l.GeneratorPopBack().Stream() }
 
-// Extend removes items from the front of the input list, and appends
-// them to the end (back) of the current list.
-func (l *List[T]) Extend(input *List[T]) {
-	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
-		l.Back().Append(elem)
-	}
-}
-
 // Copy duplicates the list. The element objects in the list are
 // distinct, though if the Values are themselves references, the
 // values of both lists would be shared.
@@ -337,8 +360,8 @@ func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 			out.Back().Append(b.PopFront())
 		}
 	}
-	out.Extend(a)
-	out.Extend(b)
+	out.ExtendPop(a)
+	out.ExtendPop(b)
 
 	return out
 }

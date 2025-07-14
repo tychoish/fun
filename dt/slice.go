@@ -26,10 +26,13 @@ func Variadic[T any](in ...T) Slice[T] { return in }
 // values. This is a helper for NewSlice(in).Ptrs().
 func SlicePtrs[T any](in []T) Slice[*T] { return NewSlice(in).Ptrs() }
 
+func SliceWithCapacity[T any](n int) Slice[T] { return make([]T, 0, n) }
+
 // SliceSparseRefs converts a slice of pointers to a slice of objects,
 // dropping nil values. from the output slice.
 func SliceSparseRefs[T any](in []*T) Slice[T] {
-	out := make([]T, 0, len(in))
+	out := SliceWithCapacity[T](len(in))
+
 	for idx := range in {
 		if in[idx] == nil {
 			continue
@@ -43,7 +46,8 @@ func SliceSparseRefs[T any](in []*T) Slice[T] {
 // replacing all nil pointers with the zero type for that value.
 func SliceRefs[T any](in []*T) Slice[T] {
 	var zero T
-	out := make([]T, 0, len(in))
+	out := SliceWithCapacity[T](len(in))
+
 	for idx := range in {
 		if in[idx] == nil {
 			out = append(out, zero)
@@ -62,9 +66,10 @@ func MergeSlices[T any](sls ...[]T) Slice[T] {
 	for _, s := range sls {
 		size += len(s)
 	}
-	out := make([]T, 0, size)
+
+	out := SliceWithCapacity[T](size)
 	for idx := range sls {
-		out = append(out, sls[idx]...)
+		out.Extend(sls[idx])
 	}
 	return out
 }
