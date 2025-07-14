@@ -653,7 +653,7 @@ func TestList(t *testing.T) {
 			l2 := GetPopulatedList(t, 100)
 			l2tail := l2.Back()
 
-			l1.Extend(l2)
+			l1.ExtendPop(l2)
 			if l1.Len() != 200 {
 				t.Error(l1.Len())
 			}
@@ -680,7 +680,7 @@ func TestList(t *testing.T) {
 				t.Fatal("incorrect items")
 			}
 
-			lOne.Extend(lTwo)
+			lOne.ExtendPop(lTwo)
 			combined := append(itemsOne, itemsTwo...)
 			iter := lOne.StreamFront()
 			idx := 0

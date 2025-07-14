@@ -20,9 +20,10 @@ type Set[T comparable] struct {
 }
 
 // NewSetFromSlice constructs a map and adds all items from the input
-// slice to the new set.
+// slice to the new set. These sets are ordered.
 func NewSetFromSlice[T comparable](in []T) *Set[T] {
 	out := &Set[T]{}
+	out.Order()
 	out.AppendStream(fun.SliceStream(in))
 	return out
 }
@@ -119,6 +120,20 @@ func (s *Set[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
 // Iterator returns a new-style native Go iterator for the items in the set.
 func (s *Set[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
+
+func (s *Set[T]) List() *List[T] {
+	if s.list != nil {
+		return s.list.Copy()
+	}
+	return StreamList(s.Stream())
+}
+
+func (s *Set[T]) Slice() Slice[T] {
+	if s.list != nil {
+		return s.list.Slice()
+	}
+	return Slice[T]{}
+}
 
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise
