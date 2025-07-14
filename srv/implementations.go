@@ -206,7 +206,9 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 			},
 			optp...,
 		),
-		Shutdown: workQueue.Shutdown,
+		// TODO: have a shutdown methot that will block till
+		// the queue shutsdown.
+		Shutdown: workQueue.Close,
 	}
 }
 

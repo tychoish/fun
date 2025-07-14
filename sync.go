@@ -70,6 +70,12 @@ func (wg *WaitGroup) IsDone() bool {
 // Operation returns with WaitGroups Wait method as a Operation.
 func (wg *WaitGroup) Operation() Operation { return wg.Wait }
 
+// Worker returns a worker that will block on the wait group
+// returning and return the conbext's error if one exits.
+func (wg *WaitGroup) Worker() Worker {
+	return func(ctx context.Context) error { wg.Wait(ctx); return ctx.Err() }
+}
+
 // Launch increments the WaitGroup and starts the operation in a go
 // routine.
 func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
@@ -90,12 +96,6 @@ func (wg *WaitGroup) StartGroup(ctx context.Context, n int, op Operation) Operat
 		wg.Launch(ctx, op)
 	}
 	return wg.Operation()
-}
-
-// Worker returns a worker that will block on the wait group
-// returning and return the conbext's error if one exits.
-func (wg *WaitGroup) Worker() Worker {
-	return func(ctx context.Context) error { wg.Wait(ctx); return ctx.Err() }
 }
 
 // Wait blocks until either the context is canceled or all items have
