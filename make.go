@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
@@ -92,12 +93,35 @@ func (Constructors) OperationHandler() Handler[Operation] {
 	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
 }
 
+// WorkerHandler returns a handler function that will execute worker
+// functions .Use this
 func (Constructors) WorkerHandler() Handler[Worker] {
 	return func(ctx context.Context, f Worker) error { return f.Run(ctx) }
 }
 
+type ContextFuture fn.Future[context.Context]
+
+var _ context.Context = ContextFuture(nil)
+
+func (cf ContextFuture) Err() error                  { return cf().Err() }
+func (cf ContextFuture) Done() <-chan struct{}       { return cf().Done() }
+func (cf ContextFuture) Value(key any) any           { return cf().Value(key) }
+func (cf ContextFuture) Deadline() (time.Time, bool) { return cf().Deadline() }
+
+func (Constructors) SimpleWorkerHandler(ctx context.Context, eh fn.Handler[error]) fn.Handler[Worker] {
+	return func(f Worker) { ft.ApplySafe(eh, f.Run(ctx)) }
+}
+
+func (Constructors) SimpleWorkerHandlerForce() fn.Handler[Worker] {
+	return func(f Worker) { f.Ignore().Wait() }
+}
+
 func (Constructors) ConvertOperationToWorker() Converter[Operation, Worker] {
 	return MakeConverter(func(o Operation) Worker { return o.WithRecover() })
+}
+
+func (Constructors) ConvertWorkerToOperation(eh fn.Handler[error]) Converter[Worker, Operation] {
+	return MakeConverter(func(wf Worker) Operation { return wf.Operation(eh) })
 }
 
 // Signal is a wrapper around the common pattern where signal channels
