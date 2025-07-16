@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -75,6 +76,10 @@ func (wg *WaitGroup) Operation() Operation { return wg.Wait }
 func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
 	wg.Inc()
 	op.PostHook(wg.Done).Background(ctx)
+}
+
+func (wg *WaitGroup) LaunchOperationHandler() fn.Handler[Operation] {
+	return func(op Operation) { wg.Launch(ctx, op) }
 }
 
 // Group returns an operation that, when executed, starts <n> copies
