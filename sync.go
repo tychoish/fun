@@ -78,8 +78,19 @@ func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
 	op.PostHook(wg.Done).Background(ctx)
 }
 
-func (wg *WaitGroup) LaunchOperationHandler() fn.Handler[Operation] {
+// OperationHandler returns a handelr function that accepts new Operation
+// functions, starts them in their own Go routine, with the provided
+// context. These handler functions are reusable.
+func (wg *WaitGroup) OperationHandler(ctx context.Context) fn.Handler[Operation] {
 	return func(op Operation) { wg.Launch(ctx, op) }
+}
+
+// WorkerHandler returns a handelr function that accepts new Worker
+// functions, starts them in their own Go routine, with the provided
+// context. Errors are collected by the error handler,
+// eventually. These handler functions are reusable.
+func (wg *WaitGroup) WorkerHandler(ctx context.Context, eh fn.Handler[error]) fn.Handler[Worker] {
+	return func(op Worker) { wg.Launch(ctx, op.Operation(eh)) }
 }
 
 // Group returns an operation that, when executed, starts <n> copies
@@ -91,9 +102,7 @@ func (wg *WaitGroup) Group(n int, op Operation) Operation {
 // StartGroup starts <n> copies of the operation in separate threads
 // and returns an operation that waits on the wait group.
 func (wg *WaitGroup) StartGroup(ctx context.Context, n int, op Operation) Operation {
-	for range n {
-		wg.Launch(ctx, op)
-	}
+	ft.ApplyTimes(n, wg.OperationHandler(ctx), op)
 	return wg.Operation()
 }
 

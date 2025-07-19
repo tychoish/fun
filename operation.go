@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
@@ -54,6 +53,13 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 		Invariant.IsTrue(wctx != nil, "must start the operation before calling cancel")
 		wf(wctx)
 	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
+}
+
+// WithContextHook returns an wrapped operation where the provided
+// context hook intercepts the context that the worker function is
+// called with. This makes a kind of rudamentary middleware possible.
+func (wf Operation) WithContextHook(hook func(context.Context) context.Context) Operation {
+	return func(ctx context.Context) { wf(hook(ctx)) }
 }
 
 // Once produces an operation that will only execute the root
@@ -156,11 +162,13 @@ func (wf Operation) Worker() Worker {
 	return func(ctx context.Context) (err error) { wf(ctx); return ctx.Err() }
 }
 
-// WithErrorHook runs the operation--potentially catching a panic and
-// converting it to an error--and then aggretaging that with the
-// output of the error future. The error future is always called.
-func (wf Operation) WithErrorHook(ef fn.Future[error]) Worker {
-	return func(ctx context.Context) error { return erc.Join(wf.WithRecover().Run(ctx), ef()) }
+// WithErrorHook prodces a Worker function that runs the
+// operation--potentially catching a panic and converting it to an
+// error--and then passes that error to the error handler, before
+// returning the original error. These errors are either context
+// cancilations or error that were converted from panics.
+func (wf Operation) WithErrorHook(ef fn.Handler[error]) Worker {
+	return wf.WithRecover().WithErrorHook(ef)
 }
 
 // Jitter wraps a Operation that runs the jitter function (jf) once
