@@ -218,5 +218,4 @@ func TestFuture(t *testing.T) {
 
 		assert.Equal(t, count, 10)
 	})
-
 }
