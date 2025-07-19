@@ -633,4 +633,10 @@ func TestPanicProtection(t *testing.T) {
 		})
 		assert.True(t, called)
 	})
+	t.Run("ApplyTimes", func(t *testing.T) {
+		inc := 0
+		ApplyTimes(10, func(n int) { inc++; check.Equal(t, n, 42) }, 42)
+		assert.Equal(t, 10, inc)
+	})
+
 }

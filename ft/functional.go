@@ -88,6 +88,14 @@ func CallTimes(n int, op func()) {
 	}
 }
 
+// ApplyTimes runs the provided function and argument pair, the
+// specfied number of times.
+func ApplyTimes[T any](n int, fn func(T), arg T) {
+	for i := 0; i < n; i++ {
+		fn(arg)
+	}
+}
+
 // DoMany calls the provided functions n times and returns an iterator
 // of their results.
 func DoTimes[T any](n int, op func() T) iter.Seq[T] {

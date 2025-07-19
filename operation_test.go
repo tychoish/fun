@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
@@ -642,5 +643,22 @@ func TestOperation(t *testing.T) {
 		MakeOperation(func() { count.Add(1) }).Group(32).Run(t.Context())
 		assert.Equal(t, count.Load(), 32)
 	})
-
+	t.Run("WithErrorHook", func(t *testing.T) {
+		ec := &erc.Collector{}
+		MakeOperation(func() { panic(42) }).WithErrorHook(ec.Push).Run(t.Context())
+		check.True(t, !ec.Ok())
+		check.ErrorIs(t, ec.Resolve(), ErrRecoveredPanic)
+	})
+	t.Run("WithContextHook", func(t *testing.T) {
+		count := &atomic.Int64{}
+		Operation(func(ctx context.Context) {
+			assert.Nil(t, ctx)
+			assert.Equal(t, 1, count.Load())
+			count.Add(1)
+		}).WithContextHook(func(context.Context) context.Context {
+			assert.Equal(t, 0, count.Load())
+			count.Add(1)
+			return nil
+		}).Run(t.Context())
+	})
 }
