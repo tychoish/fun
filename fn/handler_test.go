@@ -257,4 +257,11 @@ func TestHandler(t *testing.T) {
 		})
 
 	})
+	t.Run("ErrorHandler", func(t *testing.T) {
+		var called bool
+		eh := func(err error) { called = true; check.Error(t, err); check.ErrorIs(t, err, io.EOF) }
+		out := ErrorHandler[int](eh)(42, io.EOF)
+		assert.Equal(t, 42, out)
+		assert.True(t, called)
+	})
 }
