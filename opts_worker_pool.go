@@ -102,6 +102,15 @@ func (o *WorkerGroupConf) errorFilter(err error) error {
 	}
 }
 
+// WorkerGroupConfDefaults sets the "continue-on-error" option and the
+// "number-of-worers-equals-numcpus" options.
+func WorkerGroupConfDefaults() OptionProvider[*WorkerGroupConf] {
+	return JoinOptionProviders(
+		WorkerGroupConfContinueOnError(),
+		WorkerGroupConfWorkerPerCPU(),
+	)
+}
+
 // WorkerGroupConfSet overrides the option with the provided option.
 func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
 	return func(o *WorkerGroupConf) error { *o = *opt; return nil }

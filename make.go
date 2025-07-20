@@ -33,17 +33,9 @@ type Constructors struct{}
 //
 // For more configuraable options, use the itertool.Worker() function
 // which provides more configurability and supports both Operation and
-// Worker functions.
-func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
-	return func(ctx context.Context) {
-		wg := &WaitGroup{}
-
-		wg.Launch(ctx, iter.ReadAll(func(fn Operation) {
-			wg.Launch(ctx, fn)
-		}).Ignore())
-
-		wg.Wait(ctx)
-	}
+// Worker functions.f
+func (Constructors) OperationPool(st *Stream[Operation]) Worker {
+	return st.Parallel(MAKE.OperationHandler(), WorkerGroupConfDefaults())
 }
 
 // WorkerPool creates a work that processes a stream of worker
@@ -57,22 +49,39 @@ func (Constructors) OperationPool(iter *Stream[Operation]) Operation {
 // For more configuraable options, use the itertool.Worker() function
 // which provides more configurability and supports both Operation and
 // Worker functions.
-func (Constructors) WorkerPool(iter *Stream[Worker]) Worker {
+func (Constructors) WorkerPool(st *Stream[Worker]) Worker {
+	return st.Parallel(MAKE.WorkerHandler(), WorkerGroupConfDefaults())
+}
+
+// RunAllWorkers returns a Worker function that will run all of the
+// Worker functions in the stream serially.
+func (Constructors) RunAllWorkers(st *Stream[Worker]) Worker {
 	return func(ctx context.Context) error {
-		ec := &erc.Collector{}
-		eh := MAKE.ErrorHandlerWithoutTerminating(ec.Push)
-
-		wg := &WaitGroup{}
-
-		wg.Launch(ctx, iter.ReadAll(func(fn Worker) {
-			wg.Launch(ctx, fn.Operation(eh))
-		}).Operation(eh))
-
-		wg.Wait(ctx)
-		ec.Push(ctx.Err())
-
-		return ec.Resolve()
+		return st.ReadAll(MAKE.SimpleWorkerHandler(ctx, st.AddError)).Run(ctx)
 	}
+}
+
+// ForceRunAllWorkers returns a Worker function that will run all of
+// the Worker functions in the stream serially ignoring all errors,
+// and using a background context. Panics are unhandled. The error
+// value holds any errors encountered by the stream and it the
+// stream's Close() method.
+func (Constructors) ForceRunAllWorkers(st *Stream[Worker]) error {
+	return st.ReadAll(MAKE.SimpleWorkerHandlerForce()).Wait()
+}
+
+// ForceRunAllOperations returns a Worker function that will run all of
+// the Operation functions in the stream serially. The error value
+// holds any errors encountered by the stream and it the stream's
+// Close() method.
+func (Constructors) ForceRunAllOperations(st *Stream[Operation]) error {
+	return st.ReadAll(MAKE.SimpleOperationHandlerForce()).Wait()
+}
+
+// RunAllOperations returns a worker function that will run all the
+// Operation functions  in the stream serially.
+func (Constructors) RunAllOperations(st *Stream[Operation]) Worker {
+	return func(ctx context.Context) error { return st.ReadAll(MAKE.SimpleOperationHandler(ctx)).Run(ctx) }
 }
 
 // ErrorStream provides a stream that provides access to the error
@@ -106,18 +115,33 @@ func (Constructors) WorkerHandler() Handler[Worker] {
 }
 
 // SimpleWorkerHandler produces an fn.Handler that will run Worker
-// functions: errors are passed to the error handler and the context
-// is. Use this with the Stream[T].ReadAll methods. If you pass a nil
-// Handler[error] the error is ignored.
+// functions: errors are passed to the error handler, and workers are
+// called with the provided context. Use this with the
+// Stream[T].ReadAll methods. If you pass a nil Handler[error] the
+// error is ignored.
 func (Constructors) SimpleWorkerHandler(ctx context.Context, eh fn.Handler[error]) fn.Handler[Worker] {
 	return func(f Worker) { ft.ApplySafe(eh, f.Run(ctx)) }
 }
 
-// SimpleWorkerHandlerForce returns a handler that runs all worker
+// SimpleOperationHandler produces an fn.Handler that will run Operation
+// functions. Operations are called with the provided context. Use this
+// with the Stream[T].ReadAll methods.
+func (Constructors) SimpleOperationHandler(ctx context.Context) fn.Handler[Operation] {
+	return func(op Operation) { op.Run(ctx) }
+}
+
+// SimpleWorkerHandlerForce returns a handler that runs all Worker
 // functions its passed. All errors are ignored, and the worker's
 // recieve a background context.
 func (Constructors) SimpleWorkerHandlerForce() fn.Handler[Worker] {
 	return func(f Worker) { f.Ignore().Wait() }
+}
+
+// SimpleOperationHandlerForce returns a handler that runs all
+// Operation functions its passed. Panics are not handled and the
+// operations receive a background context.
+func (Constructors) SimpleOperationHandlerForce() fn.Handler[Operation] {
+	return func(f Operation) { f.Wait() }
 }
 
 // ConvertOperationToWorker provides a converter function to produce
@@ -154,7 +178,6 @@ func (Constructors) Signal() (func(), Worker) {
 		}
 		return ctx.Err()
 	}
-
 }
 
 // ErrorHandler constructs an error observer that only calls the
