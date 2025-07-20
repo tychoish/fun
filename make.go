@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
@@ -104,28 +103,33 @@ func (Constructors) OperationHandler() Handler[Operation] {
 // The WorkerHandler provides no panic protection.
 func (Constructors) WorkerHandler() Handler[Worker] {
 	return func(ctx context.Context, op Worker) error { return op.Run(ctx) }
+}
 
-type ContextFuture fn.Future[context.Context]
-
-var _ context.Context = ContextFuture(nil)
-
-func (cf ContextFuture) Err() error                  { return cf().Err() }
-func (cf ContextFuture) Done() <-chan struct{}       { return cf().Done() }
-func (cf ContextFuture) Value(key any) any           { return cf().Value(key) }
-func (cf ContextFuture) Deadline() (time.Time, bool) { return cf().Deadline() }
-
+// SimpleWorkerHandler produces an fn.Handler that will run Worker
+// functions: errors are passed to the error handler and the context
+// is. Use this with the Stream[T].ReadAll methods. If you pass a nil
+// Handler[error] the error is ignored.
 func (Constructors) SimpleWorkerHandler(ctx context.Context, eh fn.Handler[error]) fn.Handler[Worker] {
 	return func(f Worker) { ft.ApplySafe(eh, f.Run(ctx)) }
 }
 
+// SimpleWorkerHandlerForce returns a handler that runs all worker
+// functions its passed. All errors are ignored, and the worker's
+// recieve a background context.
 func (Constructors) SimpleWorkerHandlerForce() fn.Handler[Worker] {
 	return func(f Worker) { f.Ignore().Wait() }
 }
 
+// ConvertOperationToWorker provides a converter function to produce
+// Worker functions from Operation functions. The errors produced by
+// the worker functions--if any--are the recovered panics from the
+// inner operation.
 func (Constructors) ConvertOperationToWorker() Converter[Operation, Worker] {
 	return MakeConverter(func(o Operation) Worker { return o.WithRecover() })
+}
 
-
+// ConvertWorkerToOperation converts Worker functions to Operation
+// function, capturing their errors with the provided error handler.
 func (Constructors) ConvertWorkerToOperation(eh fn.Handler[error]) Converter[Worker, Operation] {
 	return MakeConverter(func(wf Worker) Operation { return wf.Operation(eh) })
 }
