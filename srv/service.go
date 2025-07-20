@@ -161,7 +161,7 @@ func (s *Service) Start(ctx context.Context) error {
 				ec.Push(shutdown())
 			}
 		} else {
-			signaler = func() { defer ec.Recover(); <-ctx.Done(); ec.Add(shutdown()) }
+			signaler = func() { defer ec.Recover(); <-ctx.Done(); ec.Push(shutdown()) }
 		}
 
 		shutdownSignal := make(chan struct{})
