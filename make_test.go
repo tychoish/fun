@@ -287,6 +287,100 @@ func TestHandlers(t *testing.T) {
 		check.Substring(t, merged, "limit exceeded")
 	})
 
+	t.Run("WorkerPools", func(t *testing.T) {
+		t.Run("Serial", func(t *testing.T) {
+			// most of these depend on the race detector not hitting errors
+			t.Run("Basic", func(t *testing.T) {
+				t.Run("Workers", func(t *testing.T) {
+					count := 0
+					tctx := t.Context()
+					worker := Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; return nil })
+					check.NotError(t, MAKE.RunAllWorkers(VariadicStream(worker, worker, worker, worker, worker)).Run(tctx))
+					check.Equal(t, 5, count)
+				})
+
+				t.Run("Operations", func(t *testing.T) {
+					count := 0
+					tctx := t.Context()
+					op := Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++ })
+
+					check.NotError(t, MAKE.RunAllOperations(VariadicStream(op, op, op, op, op)).Run(tctx))
+					check.Equal(t, 5, count)
+				})
+			})
+			t.Run("Panic", func(t *testing.T) {
+				t.Run("Workers", func(t *testing.T) {
+					count := 0
+					tctx := t.Context()
+					worker := Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; panic("oops") })
+					check.NotPanic(t, func() {
+						check.Error(t, MAKE.RunAllWorkers(VariadicStream(worker, worker, worker, worker, worker)).Run(tctx))
+					})
+					check.Equal(t, 1, count)
+				})
+
+				t.Run("Operations", func(t *testing.T) {
+					count := 0
+					tctx := t.Context()
+					op := Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++; panic("oops") })
+
+					check.NotPanic(t, func() {
+						check.Error(t, MAKE.RunAllOperations(VariadicStream(op, op, op, op, op)).Run(tctx))
+					})
+
+					check.Equal(t, 1, count)
+				})
+			})
+			t.Run("Force", func(t *testing.T) {
+				t.Run("Workers", func(t *testing.T) {
+					count := 0
+					tctx := t.Context()
+					worker := Worker(func(ctx context.Context) error { check.True(t, ctx != tctx); count++; return nil })
+					check.NotError(t, MAKE.ForceRunAllWorkers(VariadicStream(worker, worker, worker, worker, worker)))
+					check.Equal(t, 5, count)
+				})
+
+				t.Run("Operations", func(t *testing.T) {
+					count := 0
+					tctx := t.Context()
+
+					check.NotError(t, MAKE.ForceRunAllOperations(VariadicStream(op, op, op, op, op)))
+					check.Equal(t, 5, count)
+				})
+			})
+			t.Run("Converter", func(t *testing.T) {
+				t.Run("WorkerToOp", func(t *testing.T) {
+					ec := &erc.Collector{}
+					converter := MAKE.ConvertWorkerToOperation(ec.Push)
+					tctx := t.Context()
+					count := 0
+					op, err := converter.Convert(tctx, Worker(func(ctx context.Context) error {
+						check.True(t, ctx != tctx)
+						count++
+						return io.EOF
+					}))
+					assert.NotError(t, err)
+					op(context.Background())
+					assert.Equal(t, 1, count)
+					err = ec.Resolve()
+					assert.Error(t, err)
+					assert.ErrorIs(t, err, io.EOF)
+				})
+				t.Run("OpToWorker", func(t *testing.T) {
+					converter := MAKE.ConvertOperationToWorker()
+					tctx := t.Context()
+					count := 0
+					worker, err := converter.Convert(tctx, Operation(func(ctx context.Context) {
+						check.True(t, ctx != tctx)
+						count++
+					}))
+					assert.NotError(t, err)
+					assert.NotError(t, worker(context.Background()))
+					assert.Equal(t, 1, count)
+				})
+			})
+		})
+	})
 }
 
 func (Constructors) String() string { return "Constructors<>" }

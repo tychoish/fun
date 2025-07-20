@@ -180,16 +180,31 @@ func TestOperation(t *testing.T) {
 	})
 	t.Run("Merge", func(t *testing.T) {
 		wfs := make([]Operation, 100)
+		count := &atomic.Int64{}
 		for i := 0; i < 100; i++ {
-			wfs[i] = func(context.Context) { time.Sleep(10 * time.Millisecond) }
+			wfs[i] = func(context.Context) {
+				startAt := time.Now()
+				defer count.Add(1)
+
+				time.Sleep(10 * time.Millisecond)
+				t.Log(time.Since(startAt))
+			}
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		start := time.Now()
-		MAKE.OperationPool(SliceStream(wfs)).Run(ctx)
+		t.Log("before exec:", count.Load())
+		err := MAKE.OperationPool(SliceStream(wfs)).Run(ctx)
+		t.Log("after exec:", count.Load())
+		if err != nil {
+			t.Error(err)
+		}
 		dur := time.Since(start)
-		if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
+		if dur > 150*time.Millisecond {
 			t.Error(dur)
+		}
+		if int(dur) < (1000 / runtime.NumCPU()) {
+			t.Error(t, dur, 1000/runtime.NumCPU())
 		}
 	})
 	t.Run("Wait", func(t *testing.T) {

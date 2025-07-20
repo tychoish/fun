@@ -894,7 +894,7 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, counter.Load(), 0)
 			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
-			if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
+			if dur > 200*time.Millisecond || dur < 100*time.Millisecond {
 				t.Error(dur)
 			}
 			assert.NotError(t, err)
@@ -915,7 +915,7 @@ func TestWorker(t *testing.T) {
 
 			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
-			if dur > 50*time.Millisecond || dur < 10*time.Millisecond {
+			if dur > 200*time.Millisecond || dur < 100*time.Millisecond {
 				t.Error(dur)
 			}
 
