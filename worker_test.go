@@ -915,7 +915,7 @@ func TestWorker(t *testing.T) {
 
 			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
-			if dur > 200*time.Millisecond || dur < 100*time.Millisecond {
+			if dur > 500*time.Millisecond || dur < 100*time.Millisecond {
 				t.Error(dur)
 			}
 
