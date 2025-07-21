@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -183,21 +184,21 @@ func TestWaitGroup(t *testing.T) {
 	t.Run("WorkerHandler", func(t *testing.T) {
 		wg := &WaitGroup{}
 		ctx := t.Context()
-		count := 0
-		op := MakeWorker(func() error { count++; return nil })
-		check.Equal(t, 0, count)
+		count := &atomic.Int64{}
+		op := MakeWorker(func() error { count.Add(1); return nil })
+		check.Equal(t, 0, count.Load())
 		ec := &erc.Collector{}
 		wh := wg.WorkerHandler(ctx, ec.Push)
-		check.Equal(t, 0, count)
+		check.Equal(t, 0, count.Load())
 		wh(op)
 		wg.Wait(ctx)
-		check.Equal(t, 1, count)
+		check.Equal(t, 1, count.Load())
 		for range 9 {
 			wh(op)
 		}
 		wg.Wait(ctx)
-		check.Equal(t, 10, count)
-		op = MakeWorker(func() error { count--; return io.EOF })
+		check.Equal(t, 10, count.Load())
+		op = MakeWorker(func() error { count.Add(1); return io.EOF })
 		for range 10 {
 			wh(op)
 		}
