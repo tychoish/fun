@@ -342,8 +342,8 @@ func TestHandlers(t *testing.T) {
 
 				t.Run("Operations", func(t *testing.T) {
 					count := 0
-					tctx := t.Context()
 
+					op := Operation(func(ctx context.Context) { check.True(t, ctx == context.Background()); count++ })
 					check.NotError(t, MAKE.ForceRunAllOperations(VariadicStream(op, op, op, op, op)))
 					check.Equal(t, 5, count)
 				})
