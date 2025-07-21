@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/ft"
 )
 
 func TestSet(t *testing.T) {
@@ -113,9 +114,10 @@ func TestSet(t *testing.T) {
 
 				ctx, cancel := context.WithCancel(context.Background())
 				before := runtime.NumGoroutine()
-				_, err := set.hash.GeneratorKeys().Read(ctx)
+				_, err := set.hash.Keys().Read(ctx)
 				assert.NotError(t, err)
-				_, err = set.hash.GeneratorValues().Read(ctx)
+
+				_, err = set.hash.Values().Read(ctx)
 				assert.NotError(t, err)
 
 				during := runtime.NumGoroutine()
@@ -128,7 +130,6 @@ func TestSet(t *testing.T) {
 				after := runtime.NumGoroutine()
 				assert.True(t, before >= after)
 			})
-
 			t.Run("Delete", func(t *testing.T) {
 				set := builder()
 				set.Add("abc")
@@ -176,15 +177,18 @@ func TestSet(t *testing.T) {
 						set.Add("opq")
 						set.Add("def")
 						set.Add("ghi")
+						ctx := t.Context()
 
-						getNextValue := set.Stream().Generator().Force()
+						st := set.Stream()
+						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						st = set.Stream()
+						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -201,16 +205,20 @@ func TestSet(t *testing.T) {
 						set.Add("abc")
 						set.Add("opq")
 						set.Add("def")
-						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						set.Add("ghi")
+						ctx := t.Context()
+
+						st := set.Stream()
+						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						st = set.Stream()
+						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -231,14 +239,17 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						ctx := t.Context()
+						st := set.Stream()
+						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						st = set.Stream()
+						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -257,14 +268,17 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						ctx := t.Context()
+						st := set.Stream()
+						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						st = set.Stream()
+						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())

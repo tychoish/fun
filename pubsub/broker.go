@@ -225,13 +225,13 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 
 }
 
-// Populate creates a fun.Worker function that publishes items from
+// ReadAll creates a fun.Worker function that publishes items from
 // the input stream to the broker, returning when its context
 // expires or the stream is closed (propagating its error).
 //
 // Callers should avoid using a stream that will retain input
 // items in memory.
-func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker {
+func (b *Broker[T]) ReadAll(iter *fun.Stream[T]) fun.Worker {
 	return fun.NewHandler(b.Handler).ReadAll(iter)
 }
 

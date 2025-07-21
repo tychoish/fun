@@ -340,7 +340,7 @@ func TestChannel(t *testing.T) {
 
 				ch := Chan[string]().Blocking()
 				var count int
-				sig := ch.Receive().Handle(func(_ context.Context, in string) error {
+				sig := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					switch count {
 					case 0:
@@ -373,7 +373,7 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, ch.Send().Zero(ctx))
 				assert.NotError(t, ch.Send().Write(ctx, "third"))
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					switch count {
 					case 0:
@@ -400,7 +400,7 @@ func TestChannel(t *testing.T) {
 				var count int
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					check.Equal(t, in, "beep")
 					return io.EOF
@@ -417,7 +417,7 @@ func TestChannel(t *testing.T) {
 				var count int
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 				ch.Close()
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					check.Equal(t, in, "beep")
 					return nil
@@ -436,7 +436,7 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 				ch.Close()
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					check.Equal(t, in, "beep")
 					if count == 1 {
@@ -481,7 +481,7 @@ func TestChannel(t *testing.T) {
 			check.NotError(t, ch.Send().Write(ctx, 84))
 			ch.Close()
 
-			for idx, num := range ch.Seq2(ctx) {
+			for idx, num := range ch.IteratorIndexed(ctx) {
 				switch idx {
 				case 0:
 					check.Equal(t, num, 42)

@@ -164,7 +164,7 @@ func TestSort(t *testing.T) {
 		t.Run("StreamConstructor", func(t *testing.T) {
 			iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Stream()
 			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
-			err := heap.Populate(iter).Run(ctx)
+			err := heap.ApppendStream(iter).Run(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, heap.Len(), 10)
 			assert.Equal(t, heap.data.Back().Value(), 9)

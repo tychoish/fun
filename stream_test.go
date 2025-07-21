@@ -759,7 +759,7 @@ func TestJSON(t *testing.T) {
 		}
 	})
 	t.Run("Unmarshal", func(t *testing.T) {
-		iter := SliceStream([]string{})
+		iter := new(Stream[string])
 		if err := iter.UnmarshalJSON([]byte(`["foo", "arg"]`)); err != nil {
 			t.Error(err)
 		}

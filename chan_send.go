@@ -86,9 +86,9 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 	}
 }
 
-// Consume returns a worker that, when executed, pushes the content
+// WriteAll returns a worker that, when executed, pushes the content
 // from the stream into the channel.
-func (sm ChanSend[T]) Consume(iter *Stream[T]) Worker {
+func (sm ChanSend[T]) WriteAll(iter *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(iter.Close(), err, erc.ParsePanic(recover())) }()
 		return sm.Handler().ReadAll(iter).Run(ctx)

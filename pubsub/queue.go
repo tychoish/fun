@@ -356,16 +356,6 @@ type entry[T any] struct {
 	link *entry[T]
 }
 
-// Stream produces a stream implementation that wraps the
-// underlying queue linked list. The stream respects the Queue's
-// mutex and is safe for concurrent access and current queue
-// operations, without additional locking. The stream does not
-// modify or remove items from the queue, and will only terminate when
-// the queue has been closed via the Close() method.
-//
-// To create a "consuming" stream, use a Distributor.
-func (q *Queue[T]) Stream() *fun.Stream[T] { return q.Generator().Stream() }
-
 // Distributor creates a object used to process the items in the
 // queue: items yielded by the Distributor's stream, are removed
 // from the queue.
@@ -384,12 +374,17 @@ func (q *Queue[T]) Distributor() Distributor[T] {
 	}
 }
 
-// Generator returns a function that produces items from the
-// queue, iteratively. It's not destructive, and has the same
-// semantics as the Stream.
-func (q *Queue[T]) Generator() fun.Generator[T] {
+// Stream produces a stream implementation that wraps the
+// underlying queue linked list. The stream respects the Queue's
+// mutex and is safe for concurrent access and current queue
+// operations, without additional locking. The stream does not
+// modify or remove items from the queue, and will only terminate when
+// the queue has been closed via the Close() method.
+//
+// To create a "consuming" stream, use a Distributor.
+func (q *Queue[T]) Stream() *fun.Stream[T] {
 	var next *entry[T]
-	return func(ctx context.Context) (o T, _ error) {
+	return fun.NewGenerator(func(ctx context.Context) (o T, _ error) {
 		if next == nil {
 			q.mu.Lock()
 			next = q.front
@@ -425,5 +420,5 @@ func (q *Queue[T]) Generator() fun.Generator[T] {
 		}
 
 		return next.item, nil
-	}
+	}).Stream()
 }

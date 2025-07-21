@@ -37,6 +37,16 @@ func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 	return out
 }
 
+func NewSetFromSeq[T comparable](in iter.Seq[T]) *Set[T] {
+	return NewSetFromStream(fun.SeqStream(in))
+}
+
+func NewSetFromStream[T comparable](in *fun.Stream[T]) *Set[T] {
+	out := &Set[T]{}
+	out.AppendStream(in)
+	return out
+}
+
 // Synchronize creates a mutex and enables its use in the Set. This
 // operation is safe to call more than once,
 func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
@@ -113,10 +123,6 @@ func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(
 // Delete attempts to remove the item from the set.
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 
-// Stream provides a way to iterate over the items in the
-// set. Provides items in iteration order if the set is ordered.
-func (s *Set[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
-
 // Iterator returns a new-style native Go iterator for the items in the set.
 func (s *Set[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
 
@@ -170,19 +176,16 @@ func (s *Set[T]) unsafeStream() *fun.Stream[T] {
 	return s.hash.Keys()
 }
 
-// Generator will produce each item from set on successive calls. If
-// the Set is ordered, then the generator produces items in the set's
-// order. If the Set is synchronize, then the Generator always holds
-// the Set's lock when called.
-func (s *Set[T]) Generator() (out fun.Generator[T]) {
+// Stream provides a way to iterate over the items in the
+// set. Provides items in iteration order if the set is ordered.
+func (s *Set[T]) Stream() *fun.Stream[T] {
 	defer s.with(s.lock())
-	defer func() { mu := s.mtx.Get(); ft.DoWhen(mu != nil, func() fun.Generator[T] { return out.WithLock(mu) }) }()
 
 	if s.list != nil {
-		return s.list.GeneratorFront()
+		return s.list.StreamFront()
 	}
 
-	return s.hash.GeneratorKeys()
+	return s.hash.Keys()
 }
 
 // Equal tests two sets, returning true if the items in the sets have

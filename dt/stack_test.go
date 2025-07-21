@@ -418,7 +418,7 @@ func TestStack(t *testing.T) {
 		defer cancel()
 
 		stack := &Stack[int]{}
-		err := stack.Populate(fun.VariadicStream(100_000, 10_000, 1_000, 100, 10, 1)).Run(ctx)
+		err := stack.AppendStream(fun.VariadicStream(100_000, 10_000, 1_000, 100, 10, 1)).Run(ctx)
 
 		assert.NotError(t, err)
 

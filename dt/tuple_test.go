@@ -21,7 +21,7 @@ func TestTuples(t *testing.T) {
 		ps.Add("in", "out")
 		ps.Push(MakeTuple("in", "in"))
 		mp := Map[string, string]{}
-		mp.ExtendWithTuples(ps)
+		mp.AppendTuples(ps)
 		assert.Equal(t, len(mp), 1)
 		assert.Equal(t, ps.Len(), 5)
 		assert.Equal(t, mp["in"], "in") // first value wins
@@ -85,7 +85,7 @@ func TestTuples(t *testing.T) {
 	})
 	t.Run("Extend", func(t *testing.T) {
 		ps := &Tuples[string, string]{}
-		ps.Extend(MakeTuples(MakeTuple("one", "1"), MakeTuple("two", "2")))
+		ps.AppendTuples(MakeTuples(MakeTuple("one", "1"), MakeTuple("two", "2")))
 		assert.Equal(t, ps.Len(), 2)
 		assert.Equal(t, ps.ll.Front().Value(), MakeTuple("one", "1"))
 	})
@@ -100,10 +100,10 @@ func TestTuples(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
+		assert.NotError(t, ps.AppendStream(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
-		mp.ExtendWithTuples(&ps)
+		mp.AppendTuples(&ps)
 		assert.Equal(t, len(mp), 128)
 	})
 	t.Run("ConsumeTuples", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestTuples(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumeTuples(iter).Read(ctx)
+			ps, err := TuplesFromStream(iter).Read(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, expected)
 			assert.True(t, ps == nil)
@@ -129,7 +129,7 @@ func TestTuples(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumeTuples(iter).Read(ctx)
+			ps, err := TuplesFromStream(iter).Read(ctx)
 			check.NotError(t, err)
 			assert.True(t, ps != nil)
 			check.Equal(t, ps.Len(), 6)

@@ -17,7 +17,7 @@ func TestPairExtra(t *testing.T) {
 	t.Run("Consume", func(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			p.AppendSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
 
 			ps := p.Slice()
 			for idx := range ps {
@@ -27,7 +27,7 @@ func TestPairExtra(t *testing.T) {
 		})
 		t.Run("List", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			p.AppendSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
 
 			pl := p.List()
 			check.NotEqual(t, pl, p.ll)
@@ -41,7 +41,7 @@ func TestPairExtra(t *testing.T) {
 		})
 		t.Run("Copy", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			p.AppendSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
 
 			pl := p.Copy()
 			check.NotEqual(t, pl, p)
@@ -58,7 +58,7 @@ func TestPairExtra(t *testing.T) {
 			defer cancel()
 
 			p := Pairs[string, int]{}
-			err := p.ConsumeValues(
+			err := p.AppendValues(
 				NewSlice([]int{1, 2, 3}).Stream(),
 				func(in int) string { return fmt.Sprint(in) },
 			).Run(ctx)
@@ -72,7 +72,7 @@ func TestPairExtra(t *testing.T) {
 		})
 		t.Run("Map", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeMap(map[string]int{
+			p.AppendMap(map[string]int{
 				"1": 1,
 				"2": 2,
 				"3": 3,
@@ -133,7 +133,7 @@ func TestPairExtra(t *testing.T) {
 		num := 1000
 		seen := &Set[int]{}
 
-		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Read(ctx)
+		ps, err := PairsFromStream(randNumPairListFixture(t, num).StreamPopFront()).Read(ctx)
 		assert.NotError(t, err)
 		err = ps.ReadAll(fun.FromHandler(func(p Pair[int, int]) {
 			check.Equal(t, p.Key, p.Value)
@@ -154,7 +154,7 @@ func TestPairExtra(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
+		assert.NotError(t, ps.AppendStream(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := ps.Map()
 		assert.Equal(t, len(mp), 128)

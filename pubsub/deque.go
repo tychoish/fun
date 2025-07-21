@@ -247,54 +247,39 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 // the back. When the stream reaches the beginning of the queue it
 // ends.
 func (dq *Deque[T]) StreamFront() *fun.Stream[T] {
-	return dq.GeneratorFront().Stream()
+	defer adt.With(adt.Lock(dq.mtx))
+	return dq.confGenerator(dqNext, false).WithLock(dq.mtx).Stream()
+
 }
 
 // StreamBack starts at the back of the queue and iterates
 // towards the front. When the stream reaches the end of the queue
 // it ends.
 func (dq *Deque[T]) StreamBack() *fun.Stream[T] {
-	return dq.GeneratorBack().Stream()
-}
-
-// GeneratorFront exposes the deque to a single-function interface for
-// iteration. The generator function operation will not modify the
-// contents of the Deque, but will produce elements from the deque,
-// front to back.
-func (dq *Deque[T]) GeneratorFront() fun.Generator[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confGenerator(dqNext, false).WithLock(dq.mtx)
+	return dq.confGenerator(dqPrev, false).WithLock(dq.mtx).Stream()
 }
 
-// BlockingGeneratorFront exposes the deque to a single-function interface
-// for iteration. The generator function operation will not modify the
+// BlockingStreamFront exposes the deque to a single-function interface
+// for iteration. Reading from the stream does not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back, and will block for a new element if the deque is
 // empty or the generator reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) BlockingGeneratorFront() fun.Generator[T] {
+func (dq *Deque[T]) BlockingStreamFront() *fun.Stream[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confGenerator(dqNext, true).WithLock(dq.mtx)
+	return dq.confGenerator(dqNext, true).WithLock(dq.mtx).Stream()
 }
 
-// GeneratorBack exposes the deque to a single-function interface for
-// iteration. The generator function operation will not modify the
-// contents of the Deque, but will produce elements from the deque,
-// back to front.
-func (dq *Deque[T]) GeneratorBack() fun.Generator[T] {
-	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confGenerator(dqPrev, false).WithLock(dq.mtx)
-}
-
-// BlockingGeneratorBack exposes the deque to a single-function interface
+// BlockingStreamBack exposes the deque to a single-function interface
 // for iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to fron, and will block for a new element if the deque is
 // empty or the generator reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) BlockingGeneratorBack() fun.Generator[T] {
+func (dq *Deque[T]) BlockingStreamBack() *fun.Stream[T] {
 	defer adt.With(adt.Lock(dq.mtx))
-	return dq.confGenerator(dqPrev, true).WithLock(dq.mtx)
+	return dq.confGenerator(dqPrev, true).WithLock(dq.mtx).Stream()
 }
 
 func (dq *Deque[T]) confGenerator(direction dqDirection, blocking bool) fun.Generator[T] {

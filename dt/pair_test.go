@@ -20,7 +20,7 @@ func TestPairs(t *testing.T) {
 		ps.Add("in", "out")
 		ps.Push(MakePair("in", "in"))
 		mp := Map[string, string]{}
-		mp.ExtendWithPairs(ps)
+		mp.AppendPairs(ps)
 		assert.Equal(t, len(mp), 1)
 		assert.Equal(t, ps.Len(), 5)
 		assert.Equal(t, mp["in"], "in") // first value wins
@@ -85,9 +85,17 @@ func TestPairs(t *testing.T) {
 
 	t.Run("Extend", func(t *testing.T) {
 		ps := &Pairs[string, string]{}
-		ps.Extend(MakePairs(MakePair("one", "1"), MakePair("two", "2")))
-		assert.Equal(t, ps.Len(), 2)
-		assert.Equal(t, ps.ll.Front().Value(), MakePair("one", "1"))
+		other := MakePairs(MakePair("one", "1"), MakePair("two", "2"))
+
+		check.Equal(t, ps.Len(), 0)
+		check.Equal(t, other.Len(), 2)
+
+		ps.AppendPairs(other)
+
+		check.Equal(t, ps.Len(), 2)
+		check.Equal(t, other.Len(), 2)
+
+		check.Equal(t, ps.ll.Front().Value(), MakePair("one", "1"))
 	})
 	t.Run("Consume", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -100,10 +108,10 @@ func TestPairs(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
+		assert.NotError(t, ps.AppendStream(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
-		mp.ExtendWithPairs(&ps)
+		mp.AppendPairs(&ps)
 		assert.Equal(t, len(mp), 128)
 	})
 	t.Run("ConsumePairs", func(t *testing.T) {
@@ -114,7 +122,7 @@ func TestPairs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumePairs(iter).Read(ctx)
+			ps, err := PairsFromStream(iter).Read(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, expected)
 			assert.True(t, ps == nil)
@@ -129,7 +137,7 @@ func TestPairs(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			ps, err := ConsumePairs(iter).Read(ctx)
+			ps, err := PairsFromStream(iter).Read(ctx)
 			check.NotError(t, err)
 			assert.True(t, ps != nil)
 			check.Equal(t, ps.Len(), 6)
