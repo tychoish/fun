@@ -932,7 +932,7 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("WithContextHook", func(t *testing.T) {
 		count := &atomic.Int64{}
-		Worker(func(ctx context.Context) error {
+		assert.NotError(t, Worker(func(ctx context.Context) error {
 			assert.Nil(t, ctx)
 			assert.Equal(t, 1, count.Load())
 			count.Add(1)
@@ -941,7 +941,9 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, 0, count.Load())
 			count.Add(1)
 			return nil
-		}).Run(t.Context())
+		}).Run(t.Context()))
+
+		assert.Equal(t, count.Load(), 2)
 	})
 
 }
