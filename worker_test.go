@@ -930,4 +930,20 @@ func TestWorker(t *testing.T) {
 			}
 		})
 	})
+	t.Run("WithContextHook", func(t *testing.T) {
+		count := &atomic.Int64{}
+		assert.NotError(t, Worker(func(ctx context.Context) error {
+			assert.Nil(t, ctx)
+			assert.Equal(t, 1, count.Load())
+			count.Add(1)
+			return nil
+		}).WithContextHook(func(context.Context) context.Context {
+			assert.Equal(t, 0, count.Load())
+			count.Add(1)
+			return nil
+		}).Run(t.Context()))
+
+		assert.Equal(t, count.Load(), 2)
+	})
+
 }

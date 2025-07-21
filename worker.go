@@ -254,7 +254,8 @@ func (wf Worker) Interval(dur time.Duration) Worker {
 
 // Join combines a sequence of workers, calling the workers in order,
 // as long as there is no error and the context does not
-// expire. Context expiration errors are not propagated.
+// expire. Context expiration errors are not propagated. Does not skip
+// nil workers.
 func (wf Worker) Join(wfs ...Worker) Worker {
 	for idx := range wfs {
 		wf = wf.merge(wfs[idx])
@@ -297,16 +298,31 @@ func (wf Worker) PreHook(pre Operation) Worker {
 }
 
 // PostHook runs hook operation  after the worker function
-// completes. If the hook panics it is converted to an error and
-// aggregated with workers's error.
-func (wf Worker) PostHook(post func()) Worker { return wf.WithErrorHook(ft.WrapRecoverCall(post)) }
+// completes. The Worker function's panics are converted to errors and
+// the hook will continue to run.
+func (wf Worker) PostHook(post func()) Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
+		defer post()
+		err = wf.WithRecover().Run(ctx)
+		return
+	}
+}
+
+// WithContextHook wraps the worker function, and passes the context
+// recieved by that function through the hook function before calling
+// the underlying worker.
+func (wf Worker) WithContextHook(hook func(context.Context) context.Context) Worker {
+	return func(ctx context.Context) error { return wf.Run(hook(ctx)) }
+}
 
 // WithErrorHook runs the worker, potentially catching a panic and
-// joining that with the error produced by the error future. Both the
-// worker and the error future always execute, and both errors are
-// returned in aggregated form.
-func (wf Worker) WithErrorHook(ef fn.Future[error]) Worker {
-	return func(ctx context.Context) error { return erc.Join(wf.WithRecover().Run(ctx), ef()) }
+// converting that to an error. The output of the worker function is
+// passed to the error hook (regardless of the test's error status)
+// before returning the original error. Panics in the error handler
+// are not handled.
+func (wf Worker) WithErrorHook(eh fn.Handler[error]) Worker {
+	return func(ctx context.Context) error { err := wf.Run(ctx); eh(err); return err }
 }
 
 // StartGroup starts n copies of the worker operation and returns a
@@ -318,7 +334,10 @@ func (wf Worker) WithErrorHook(ef fn.Future[error]) Worker {
 func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	wg := &WaitGroup{}
 	ec := &erc.Collector{}
-	return wg.StartGroup(ctx, n, wf.Operation(ec.Push)).WithErrorHook(ec.Resolve)
+
+	wg.StartGroup(ctx, n, wf.Operation(ec.Push))
+
+	return MakeWorker(ec.Resolve).PreHook(wg.Operation())
 }
 
 // Group makes a worker that runs n copies of the underlying worker,
