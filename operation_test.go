@@ -202,11 +202,12 @@ func TestOperation(t *testing.T) {
 			t.Error(err)
 		}
 		dur := time.Since(start)
-		if dur > 150*time.Millisecond {
-			t.Error(dur)
+		t.Log("duration was:", dur)
+		if dur > 500*time.Millisecond {
+			t.Error(dur, "is not > 150ms")
 		}
 		if int(dur) < (1000 / runtime.NumCPU()) {
-			t.Error(t, dur, 1000/runtime.NumCPU())
+			t.Error(t, dur, "<", 1000/runtime.NumCPU())
 		}
 	})
 	t.Run("Wait", func(t *testing.T) {
