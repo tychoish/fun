@@ -1,6 +1,5 @@
 name: go test
 on:
-on:
   pull_request:
     paths:
       - "**.go"
