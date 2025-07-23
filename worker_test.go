@@ -877,10 +877,12 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("WorkerPool", func(t *testing.T) {
+		var jobNum = int64(runtime.NumCPU() * 2)
+
 		t.Run("Basic", func(t *testing.T) {
 			counter := &atomic.Int64{}
-			wfs := make([]Worker, 100)
-			for i := 0; i < 100; i++ {
+			wfs := make([]Worker, jobNum)
+			for i := int64(0); i < jobNum; i++ {
 				wfs[i] = func(context.Context) error {
 					counter.Add(1)
 					time.Sleep(10 * time.Millisecond)
@@ -894,18 +896,18 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, counter.Load(), 0)
 			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
-			if dur > 500*time.Millisecond || dur < 100*time.Millisecond {
-				t.Error(dur)
+			if dur > 500*time.Millisecond || dur < 10*time.Millisecond*time.Duration(jobNum)/time.Duration(runtime.NumCPU()) {
+				t.Error(dur, time.Duration(runtime.NumCPU())*10*time.Millisecond)
 			}
 			assert.NotError(t, err)
-			assert.Equal(t, counter.Load(), 200)
+			assert.Equal(t, counter.Load(), jobNum*2)
 		})
 		t.Run("Errors", func(t *testing.T) {
 			const experr ers.Error = "expected error"
 
 			counter := &atomic.Int64{}
-			wfs := make([]Worker, 100)
-			for i := 0; i < 100; i++ {
+			wfs := make([]Worker, jobNum)
+			for i := int64(0); i < jobNum; i++ {
 				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(10 * time.Millisecond); return experr }
 			}
 			ctx, cancel := context.WithCancel(context.Background())
@@ -915,15 +917,15 @@ func TestWorker(t *testing.T) {
 
 			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
 			dur := time.Since(start)
-			if dur > 500*time.Millisecond || dur < 100*time.Millisecond {
+			if dur > 500*time.Millisecond || dur < 10*time.Millisecond*time.Duration(jobNum)/time.Duration(runtime.NumCPU()) {
 				t.Error(dur)
 			}
 
 			assert.Error(t, err)
 			errs := ers.Unwind(err)
 
-			assert.Equal(t, len(errs), 100)
-			assert.Equal(t, counter.Load(), 100)
+			assert.Equal(t, len(errs), int(jobNum))
+			assert.Equal(t, counter.Load(), jobNum)
 
 			for _, e := range errs {
 				assert.ErrorIs(t, e, experr)

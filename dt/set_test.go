@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestSet(t *testing.T) {
@@ -116,7 +116,6 @@ func TestSet(t *testing.T) {
 				before := runtime.NumGoroutine()
 				_, err := set.hash.Keys().Read(ctx)
 				assert.NotError(t, err)
-
 				_, err = set.hash.Values().Read(ctx)
 				assert.NotError(t, err)
 
@@ -130,6 +129,7 @@ func TestSet(t *testing.T) {
 				after := runtime.NumGoroutine()
 				assert.True(t, before >= after)
 			})
+
 			t.Run("Delete", func(t *testing.T) {
 				set := builder()
 				set.Add("abc")
@@ -177,18 +177,15 @@ func TestSet(t *testing.T) {
 						set.Add("opq")
 						set.Add("def")
 						set.Add("ghi")
-						ctx := t.Context()
 
-						st := set.Stream()
-						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue := fun.NewGenerator(set.Stream().Read).Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						st = set.Stream()
-						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue = fun.NewGenerator(set.Stream().Read).Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -205,20 +202,16 @@ func TestSet(t *testing.T) {
 						set.Add("abc")
 						set.Add("opq")
 						set.Add("def")
-
 						set.Add("ghi")
-						ctx := t.Context()
 
-						st := set.Stream()
-						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue := fun.NewGenerator(set.Stream().Read).Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						st = set.Stream()
-						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue = fun.NewGenerator(set.Stream().Read).Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -239,17 +232,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						ctx := t.Context()
-						st := set.Stream()
-						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue := fun.NewGenerator(set.Stream().Read).Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						st = set.Stream()
-						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue = fun.NewGenerator(set.Stream().Read).Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -268,17 +258,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						ctx := t.Context()
-						st := set.Stream()
-						getNextValue := func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue := fun.NewGenerator(set.Stream().Read).Force()
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						st = set.Stream()
-						getNextValue = func() string { t.Helper(); return ft.Must(st.Read(ctx)) }
+						getNextValue = fun.NewGenerator(set.Stream().Read).Force()
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())

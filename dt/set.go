@@ -227,8 +227,8 @@ func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Stream().MarshalJSON()
 // and then adds items from the array to existing set. Items that are
 // in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
-	iter := NewSlice([]T{}).Stream()
-	iter.AddError(iter.UnmarshalJSON(in))
-	s.AppendStream(iter)
-	return iter.Close()
+	st := new(fun.Stream[T])
+	st.AddError(st.UnmarshalJSON(in))
+	s.AppendStream(st)
+	return st.Close()
 }
