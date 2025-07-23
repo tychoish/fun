@@ -66,14 +66,10 @@ func (l *List[T]) newElem() *element[T]      { return &element[T]{list: l} }
 func (l *List[T]) makeElem(v *T) *element[T] { return l.newElem().Set(v) }
 func (l *List[T]) root() *element[T]         { return l.head.Call(l.init) }
 
-func (el *element[T]) mtx() *sync.Mutex          { return &el.mutx }
-func (el *element[T]) with(op func(*element[T])) { defer With(Lock(el.mtx())); op(el) }
-
+func (el *element[T]) mtx() *sync.Mutex  { return &el.mutx }
 func (el *element[T]) isRoot() bool      { return el.list.valid() && el.list.root() == el }
 func (el *element[T]) isDetatched() bool { return el.list == nil && el.next == nil && el.prev == nil }
 func (el *element[T]) isAttached() bool  { return el.list != nil && el.next != nil && el.prev != nil }
-func (el *element[T]) isCorrupt() bool   { return el.isAttached() == el.isDetatched() }
-func (el *element[T]) isValid() bool     { return el.isAttached() != el.isDetatched() }
 
 func (el *element[T]) Unset() (out *T, ok bool) {
 	defer With(Lock(el.mtx()))
