@@ -75,7 +75,7 @@ func (wf Worker) WithRecover() Worker {
 // worker function returns. If Signal is called with a canceled
 // context the worker is still executed (with that context.)
 //
-// A value, possibly nil, is always sent through the channel. Panics
+// A value, possibly nil, is always sent through the channel, context. Panics
 // are not caught or handled.
 func (wf Worker) Signal(ctx context.Context) <-chan error {
 	out := Blocking(make(chan error))
@@ -251,6 +251,14 @@ func (wf Worker) Interval(dur time.Duration) Worker {
 		}
 	}
 }
+
+func (Worker) noop() Worker    { return func(context.Context) error { return nil } }
+func (wf Worker) self() Worker { return wf }
+
+// Safe returns a noop worker if the Worker is nil, and otherwise, returns the underlying worker.
+func (wf Worker) Safe() Worker { return ft.DoIfElse(wf == nil, wf.noop, wf.self) }
+
+// TODO: add
 
 // Join combines a sequence of workers, calling the workers in order,
 // as long as there is no error and the context does not

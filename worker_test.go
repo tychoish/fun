@@ -948,4 +948,26 @@ func TestWorker(t *testing.T) {
 		assert.Equal(t, count.Load(), 2)
 	})
 
+	t.Run("Safe", func(t *testing.T) {
+		var wf Worker
+
+		assert.Panic(t, func() {
+			_ = wf.Run(t.Context())
+		})
+		assert.NotPanic(t, func() {
+			check.NotError(t, wf.Safe().Run(t.Context()))
+		})
+
+		var count int
+
+		wf = MakeWorker(func() error { count++; return nil })
+
+		assert.NotPanic(t, func() {
+			check.NotError(t, wf.Safe().Run(t.Context()))
+		})
+
+		assert.Equal(t, count, 1)
+
+	})
+
 }
