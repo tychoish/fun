@@ -167,25 +167,26 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	eh := MAKE.ErrorHandlerWithoutTerminating(ec.Push)
 
 	wg := &WaitGroup{}
-	init := Operation(func(ctx context.Context) {
-		send := pipe.Send()
-
-		iters.ReadAll(func(iter *Stream[T]) {
-			// start a thread for reading this
-			// sub-iterator.
-			send.WriteAll(iter).
-				Operation(eh).
-				PostHook(func() { eh(iter.Close()) }).
-				Add(ctx, wg)
-
-		}).Operation(eh).Add(ctx, wg)
-
-		wg.Operation().PostHook(pipe.Close).Background(ctx)
-	}).Once()
 
 	return pipe.Receive().
 		Generator().
-		PreHook(init).
+		PreHook(Operation(
+			func(ctx context.Context) {
+				send := pipe.Send()
+
+				iters.ReadAll(func(iter *Stream[T]) {
+					// start a thread for reading this
+					// sub-iterator.
+					send.WriteAll(iter).
+						Operation(eh).
+						PostHook(func() { eh(iter.Close()) }).
+						Add(ctx, wg)
+
+				}).Operation(eh).Add(ctx, wg)
+
+				wg.Operation().PostHook(pipe.Close).Background(ctx)
+			},
+		).Once()).
 		Stream().
 		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
 }
