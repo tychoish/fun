@@ -143,17 +143,18 @@ func (s *Service) Start(ctx context.Context) error {
 
 		ctx, s.cancel = context.WithCancel(ctx)
 		shutdownSignal := make(chan struct{})
+		shutdown := s.Shutdown
 		s.wg.Add(1)
 
 		go func() {
 			defer s.wg.Done()
 			defer close(shutdownSignal)
 			defer ec.Recover()
-			ec.Push(s.Signal.Safe().
-				WithErrorFilter(erc.NewFilter().WithoutContext()).
-				Run(ctx))
 
-			ec.Push(fun.MakeWorker(s.Shutdown).Safe().Run(ctx))
+			<-ctx.Done()
+			ec.Push(ft.DoSafe(shutdown))
+
+			// TODO: something with s.Signal here
 		}()
 
 		s.wg.Add(1)
