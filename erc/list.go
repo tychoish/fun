@@ -4,12 +4,29 @@ import (
 	"bytes"
 	"errors"
 	"iter"
+	"sync"
 )
 
 type list struct {
 	num    int
 	elm    element
 	filter Filter
+}
+
+var bufPool *sync.Pool
+
+func init() {
+	bufPool = &sync.Pool{New: func() any { return bytes.NewBuffer(make([]byte, 0, 1024)) }}
+}
+
+const maxBufSize = 64 * 1024
+
+func getBuf() *bytes.Buffer { return bufPool.Get().(*bytes.Buffer) }
+func putBuf(buf *bytes.Buffer) {
+	if buf.Cap() <= maxBufSize {
+		buf.Reset()
+		bufPool.Put(buf)
+	}
 }
 
 func (eel *list) Front() *element { return eel.root().next }
@@ -32,8 +49,8 @@ func (eel *list) Error() string {
 		return "<nil>"
 	}
 
-	// TODO: pool buffers.
-	buf := &bytes.Buffer{}
+	buf := getBuf()
+	defer putBuf(buf)
 
 	for elem := range eel.FIFO() {
 		if buf.Len() > 0 {
