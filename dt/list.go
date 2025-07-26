@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"context"
 	"io"
 	"iter"
 	"sort"
@@ -36,11 +35,27 @@ func (l *List[T]) Append(items ...T) {
 	}
 }
 
-// Populate returns a worker that adds items from the stream to the
+// Push reads items from the front of the input list, and appends them
+// to the end (back) of the current list. The input list is not
+// impacted by this operation.
+func (l *List[T]) AppendList(input *List[T]) {
+	for elem := input.Front(); elem.Ok(); elem = elem.Next() {
+		l.PushBack(elem.Value())
+	}
+
+}
+
+func (l *List[T]) extend(input *List[T]) {
+	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
+		l.Back().Append(elem)
+	}
+}
+
+// AppendStream returns a worker that adds items from the stream to the
 // list. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
-// the input stream is not called.
-func (l *List[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
+// the input stream is NOT called.
+func (l *List[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
 
 // Len returns the length of the list. As the Append/Remove operations
 // track the length of the list, this is an O(1) operation.
@@ -99,79 +114,11 @@ func (l *List[T]) Front() *Element[T] { return l.root().next }
 //	}
 func (l *List[T]) Back() *Element[T] { return l.root().prev }
 
-// GeneratorFront provides a generator function that iterates through the
-// contents of the list, front-to-back. When the generator has
-// fully iterated through the list, or iterates to an item that has
-// been removed (likely due to concurrent access,) the generator
-// returns io.EOF.
-//
-// The GeneratorFront starts at the front of the list and iterates in order.
-func (l *List[T]) GeneratorFront() fun.Generator[T] {
-	current := l.root()
-	return func(_ context.Context) (o T, _ error) {
-		current = current.Next()
-		if !current.Ok() || current.isDetatched() {
-			return o, io.EOF
-		}
-		return current.Value(), nil
-	}
-}
-
-// GeneratorPopFront provides a generator function that iterates through the
-// contents of the list, removing each item from the list as it
-// encounters it. When the generator reaches has fully iterated
-// through the list, or iterates to an item that has been removed
-// (likely due to concurrent access,) the generator returns io.EOF.
-//
-// In most cases, for destructive iteration, use the pubsub.Queue,
-// pubsub.Deque, or one of the pubsub.Distributor implementations.
-//
-// The generator starts at the front of the list and iterates in order.
-func (l *List[T]) GeneratorPopFront() fun.Generator[T] {
-	var current *Element[T]
-	return func(_ context.Context) (o T, _ error) {
-		current = l.PopFront()
-
-		if !current.Ok() {
-			return o, io.EOF
-		}
-
-		return current.item, nil
-	}
-}
-
-// GeneratorBack provides the same semantics and operation as the
-// Generator operation, but starts at the end/tail of the list and
-// works forward.
-func (l *List[T]) GeneratorBack() fun.Generator[T] {
-	current := l.root()
-	return func(_ context.Context) (o T, _ error) {
-		current = current.Previous()
-		if !current.Ok() || current.isDetatched() {
-			return o, io.EOF
-		}
-		return current.Value(), nil
-	}
-}
-
-// GeneratorPopBack provides the same semantics and operation as the
-// GeneratorPopBack operation, but starts at the end/tail of the list and
-// works forward.
-func (l *List[T]) GeneratorPopBack() fun.Generator[T] {
-	var current *Element[T]
-	return func(_ context.Context) (o T, _ error) {
-		current = l.PopBack()
-		if !current.Ok() {
-			return o, io.EOF
-		}
-		return current.item, nil
-	}
-}
-
 // Slice exports the contents of the list to a slice.
 func (l *List[T]) Slice() Slice[T] { return risky.BlockForceOp(l.StreamFront().Slice) }
 
-// Iterator returns a native go stream function for the items in a list.
+// Iterator returns a native go stream function for the items in the
+// list, reading from the front to the back.
 func (l *List[T]) Iterator() iter.Seq[T] { return risky.Block(l.StreamFront().Iterator) }
 
 // StreamFront returns a stream over the values in the list in
@@ -182,7 +129,16 @@ func (l *List[T]) Iterator() iter.Seq[T] { return risky.Block(l.StreamFront().It
 // If you add values to the list during iteration *behind* where the
 // stream is, these values will not be present in the stream;
 // however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamFront() *fun.Stream[T] { return l.GeneratorFront().Stream() }
+func (l *List[T]) StreamFront() *fun.Stream[T] {
+	current := l.root()
+	return fun.MakeGenerator(func() (o T, _ error) {
+		current = current.Next()
+		if !current.Ok() || current.isDetatched() {
+			return o, io.EOF
+		}
+		return current.Value(), nil
+	}).Stream()
+}
 
 // StreamBack returns a stream that produces elements from the list,
 // from the back to the front. The stream is not
@@ -192,15 +148,35 @@ func (l *List[T]) StreamFront() *fun.Stream[T] { return l.GeneratorFront().Strea
 // If you add values to the list during iteration *behind* where the
 // stream is, these values will not be present in the stream;
 // however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamBack() *fun.Stream[T] { return l.GeneratorBack().Stream() }
+func (l *List[T]) StreamBack() *fun.Stream[T] {
+	current := l.root()
+	return fun.MakeGenerator(func() (o T, _ error) {
+		current = current.Previous()
+		if !current.Ok() || current.isDetatched() {
+			return o, io.EOF
+		}
+		return current.Value(), nil
+	}).Stream()
+}
 
-// PopStream produces a stream that consumes elements from the
+// StreamPopFront produces a stream that consumes elements from the
 // list as it iterates, moving front-to-back.
 //
 // If you add values to the list during iteration *behind* where the
 // stream is, these values will not be present in the stream;
 // however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamPopFront() *fun.Stream[T] { return l.GeneratorPopFront().Stream() }
+func (l *List[T]) StreamPopFront() *fun.Stream[T] {
+	var current *Element[T]
+	return fun.MakeGenerator(func() (o T, _ error) {
+		current = l.PopFront()
+
+		if !current.Ok() {
+			return o, io.EOF
+		}
+
+		return current.item, nil
+	}).Stream()
+}
 
 // StreamPopBack produces a stream that consumes elements from the
 // list as it iterates, moving back-to-front.
@@ -208,14 +184,15 @@ func (l *List[T]) StreamPopFront() *fun.Stream[T] { return l.GeneratorPopFront()
 // If you add values to the list during iteration *behind* where the
 // stream is, these values will not be present in the stream;
 // however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamPopBack() *fun.Stream[T] { return l.GeneratorPopBack().Stream() }
-
-// Extend removes items from the front of the input list, and appends
-// them to the end (back) of the current list.
-func (l *List[T]) Extend(input *List[T]) {
-	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
-		l.Back().Append(elem)
-	}
+func (l *List[T]) StreamPopBack() *fun.Stream[T] {
+	var current *Element[T]
+	return fun.MakeGenerator(func() (o T, _ error) {
+		current = l.PopBack()
+		if !current.Ok() {
+			return o, io.EOF
+		}
+		return current.item, nil
+	}).Stream()
 }
 
 // Copy duplicates the list. The element objects in the list are
@@ -337,8 +314,9 @@ func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 			out.Back().Append(b.PopFront())
 		}
 	}
-	out.Extend(a)
-	out.Extend(b)
+
+	out.extend(a)
+	out.extend(b)
 
 	return out
 }

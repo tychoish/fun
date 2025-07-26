@@ -274,12 +274,12 @@ func (s Slice[T]) Sparse() Slice[T] {
 	}
 
 	out := NewSlice(make([]T, 0, buf.Len()))
-	out.Populate(buf.StreamPopFront()).Ignore().Wait()
+	out.AppendStream(buf.StreamPopFront()).Ignore().Wait()
 	return out
 }
 
-// Populate constructs an operation that adds all items from the
+// AppendStream constructs an operation that adds all items from the
 // stream to the slice.
-func (s *Slice[T]) Populate(iter *fun.Stream[T]) fun.Worker {
+func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fun.Worker {
 	return iter.ReadAll(s.Add)
 }

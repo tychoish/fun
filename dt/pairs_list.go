@@ -31,23 +31,32 @@ func MakePairs[K comparable, V any](in ...Pair[K, V]) *Pairs[K, V] {
 	return p
 }
 
-// ConsumePairs creates a *Pairs[K,V] object from a stream of
+// PairsFromStream creates a *Pairs[K,V] object from a stream of
 // Pair[K,V] objects.
-func ConsumePairs[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fun.Generator[*Pairs[K, V]] {
+func PairsFromStream[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fun.Generator[*Pairs[K, V]] {
 	return func(ctx context.Context) (*Pairs[K, V], error) {
 		p := &Pairs[K, V]{}
-		if err := p.Consume(iter).Run(ctx); err != nil {
+		if err := p.AppendStream(iter).Run(ctx); err != nil {
 			return nil, err
 		}
 		return p, nil
 	}
 }
 
+// PairsFromSeq2 materializes a Pairs list from an iterator.
+func PairsFromSeq2[K comparable, V any](it iter.Seq2[K, V]) *Pairs[K, V] {
+	p := &Pairs[K, V]{}
+	for k, v := range it {
+		p.Add(k, v)
+	}
+	return p
+}
+
 func (p *Pairs[K, V]) init()     { p.setup.Do(p.initImpl) }
 func (p *Pairs[K, V]) initImpl() { ft.CallWhen(p.ll == nil, func() { p.ll = &List[Pair[K, V]]{} }) }
 
-// Consume adds items from a stream of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) Consume(iter *fun.Stream[Pair[K, V]]) fun.Worker {
+// AppendStream adds items from a stream of pairs to the current Pairs slice.
+func (p *Pairs[K, V]) AppendStream(iter *fun.Stream[Pair[K, V]]) fun.Worker {
 	return iter.ReadAll(func(item Pair[K, V]) { p.Push(item) })
 }
 
@@ -117,9 +126,9 @@ func (p *Pairs[K, V]) Push(pair Pair[K, V]) { p.init(); p.ll.PushBack(pair) }
 // pairs.
 func (p *Pairs[K, V]) Append(vals ...Pair[K, V]) { p.init(); p.ll.Append(vals...) }
 
-// Extend adds the items from a Pairs object (slice of Pair) without
+// AppendPairs adds the items from a Pairs object (slice of Pair) without
 // modifying the donating object.
-func (p *Pairs[K, V]) Extend(toAdd *Pairs[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
+func (p *Pairs[K, V]) AppendPairs(toAdd *Pairs[K, V]) { p.init(); p.ll.AppendList(toAdd.ll) }
 
 // Iterator returns a native go iterator function for pair items.
 func (p *Pairs[K, V]) Iterator() iter.Seq[Pair[K, V]] {
@@ -187,26 +196,26 @@ func (p *Pairs[K, V]) UnmarshalJSON(in []byte) error {
 		return err
 	}
 
-	p.ConsumeMap(t)
+	p.AppendMap(t)
 	return nil
 }
 
-// ConsumeValues adds all of the values from the input stream,
+// AppendValues adds all of the values from the input stream,
 // generating the keys using the function provided.
-func (p *Pairs[K, V]) ConsumeValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
-	return p.Consume(fun.MakeConverter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Stream(iter))
+func (p *Pairs[K, V]) AppendValues(iter *fun.Stream[V], keyf func(V) K) fun.Worker {
+	return p.AppendStream(fun.MakeConverter(func(in V) Pair[K, V] { return MakePair(keyf(in), in) }).Stream(iter))
 }
 
-// ConsumeSlice adds all the values from the input slice to the Pairs
+// AppendSlice adds all the values from the input slice to the Pairs
 // object, creating the keys using the function provide.
-func (p *Pairs[K, V]) ConsumeSlice(in []V, keyf func(V) K) {
+func (p *Pairs[K, V]) AppendSlice(in []V, keyf func(V) K) {
 	NewSlice(in).ReadAll(func(value V) { p.Add(keyf(value), value) })
 }
 
-// ConsumeMap adds all of the items in a map to the Pairs object.
-func (p *Pairs[K, V]) ConsumeMap(in map[K]V) { NewMap(in).Stream().ReadAll(p.Push).Ignore().Wait() }
+// AppendMap adds all of the items in a map to the Pairs object.
+func (p *Pairs[K, V]) AppendMap(in map[K]V) { NewMap(in).Stream().ReadAll(p.Push).Ignore().Wait() }
 
 // Map converts a list of pairs to the equivalent map. If there are
 // duplicate keys in the Pairs list, only the first occurrence of the
 // key is retained.
-func (p *Pairs[K, V]) Map() Map[K, V] { m := NewMap(map[K]V{}); m.ExtendWithPairs(p); return m }
+func (p *Pairs[K, V]) Map() Map[K, V] { m := NewMap(map[K]V{}); m.AppendPairs(p); return m }

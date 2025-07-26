@@ -344,10 +344,11 @@ func Daemon(s *Service, minInterval time.Duration) *Service {
 	baseShutdown := s.Shutdown
 	baseCleanup := s.Cleanup
 	shouldShutdown := make(chan struct{})
+	closeShouldShutDown := sync.OnceFunc(func() { close(shouldShutdown) })
 
 	out := &Service{
 		Shutdown: func() error {
-			defer close(shouldShutdown)
+			defer closeShouldShutDown()
 			if baseShutdown != nil {
 				return baseShutdown()
 			}

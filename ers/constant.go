@@ -69,7 +69,7 @@ const ErrInvalidRuntimeType Error = Error("invalid type at runtime")
 
 // ErrCurrentOpAbort is used to signal that a retry function or other
 // looping operation that the loop should exit. ErrCurrentOpAbort
-// should be handled like "break", and should not be returned to
+// should be handled like "break", and should not be returned toq
 // callers or aggregated with other errors.
 const ErrCurrentOpAbort Error = Error("abort current operation")
 
@@ -97,3 +97,6 @@ const ErrInvalidInput Error = Error("invalid input")
 // ErrInvariantViolation is the root error of the error object that is
 // the content of all panics produced by the Invariant helper.
 const ErrInvariantViolation Error = Error("invariant violation")
+
+// ErrNotFound is a root error usable for a common class of errors.
+const ErrNotFound Error = Error("not found")

@@ -946,10 +946,10 @@ func RunStreamStringAlgoTests(
 
 						iter := builder()
 						seen := make(map[string]struct{}, len(elems))
-						sum, err := iter.Reduce(func(in string, value string) (string, error) {
+						sum, err := iter.Reduce(ctx, func(in string, value string) (string, error) {
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
-						}).Read(ctx)
+						})
 
 						if err != nil {
 							t.Fatal(err)
@@ -972,7 +972,7 @@ func RunStreamStringAlgoTests(
 						seen := map[string]none{}
 
 						count := 0
-						_, err := iter.Reduce(
+						_, err := iter.Reduce(ctx,
 							func(in string, val string) (string, error) {
 								check.Zero(t, val)
 								seen[in] = none{}
@@ -982,7 +982,7 @@ func RunStreamStringAlgoTests(
 								count++
 								return "", nil
 							},
-						).Read(ctx)
+						)
 						check.Equal(t, count, 1)
 						if err == nil {
 							t.Fatal("expected error")
@@ -1002,13 +1002,13 @@ func RunStreamStringAlgoTests(
 						elems := makeIntSlice(32)
 						iter := SliceStream(elems)
 						count := 0
-						sum, err := iter.Reduce(func(_ int, value int) (int, error) {
+						sum, err := iter.Reduce(ctx, func(_ int, value int) (int, error) {
 							count++
 							if count == 1 {
 								return 42, nil
 							}
 							return value, ErrStreamContinue
-						}).Read(ctx)
+						})
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 32)
@@ -1020,13 +1020,13 @@ func RunStreamStringAlgoTests(
 						elems := makeIntSlice(32)
 						iter := SliceStream(elems)
 						count := 0
-						sum, err := iter.Reduce(func(_ int, _ int) (int, error) {
+						sum, err := iter.Reduce(ctx, func(_ int, _ int) (int, error) {
 							count++
 							if count == 16 {
 								return 300, io.EOF
 							}
 							return 42, nil
-						}).Read(ctx)
+						})
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)

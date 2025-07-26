@@ -141,36 +141,20 @@ func (s *Service) Start(ctx context.Context) error {
 			}
 		}()
 
-		var shutdown func() error
-		if s.Shutdown != nil {
-			shutdown = s.Shutdown
-		} else {
-			shutdown = func() error { return nil }
-		}
-
-		var signaler func()
 		ctx, s.cancel = context.WithCancel(ctx)
-		if s.Signal != nil {
-			signaler = func() {
-				defer ec.Recover()
-				select {
-				case err := <-s.Signal.Signal(GetBaseContext(ctx)):
-					ec.Push(err)
-				case <-ctx.Done():
-				}
-				ec.Push(shutdown())
-			}
-		} else {
-			signaler = func() { defer ec.Recover(); <-ctx.Done(); ec.Push(shutdown()) }
-		}
-
 		shutdownSignal := make(chan struct{})
+		shutdown := s.Shutdown
 		s.wg.Add(1)
+
 		go func() {
 			defer s.wg.Done()
 			defer close(shutdownSignal)
 			defer ec.Recover()
-			signaler()
+
+			<-ctx.Done()
+			ec.Push(ft.DoSafe(shutdown))
+
+			// TODO: something with s.Signal here
 		}()
 
 		s.wg.Add(1)

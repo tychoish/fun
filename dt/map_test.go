@@ -37,11 +37,11 @@ func TestMap(t *testing.T) {
 		mp := makeMap(100)
 
 		// noop because same keys
-		mp.Extend(mp.Pairs())
+		mp.AppendPairs(mp.Pairs())
 		check.Equal(t, mp.Len(), 100)
 
 		// works because different keys, probably
-		mp.Extend(makeMap(100).Pairs())
+		mp.AppendPairs(makeMap(100).Pairs())
 		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("Append", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestMap(t *testing.T) {
 		mp := Map[string, int]{}
 		assert.Equal(t, len(orig), 3)
 		assert.Equal(t, len(mp), 0)
-		mp.ExtendWithPairs(orig.Pairs())
+		mp.AppendPairs(orig.Pairs())
 		check.Equal(t, mp["1"], 1)
 		check.Equal(t, mp["2"], 2)
 		check.Equal(t, mp["3"], 3)
@@ -148,7 +148,7 @@ func TestMap(t *testing.T) {
 	t.Run("ConsumeStream", func(t *testing.T) {
 		source := makeMap(300)
 		target := NewMap(map[string]int{})
-		assert.NotError(t, target.ExtendWithStream(source.Stream()).Run(t.Context()))
+		assert.NotError(t, target.AppendStream(source.Stream()).Run(t.Context()))
 		assert.Equal(t, source.Len(), target.Len())
 		for pair := range source.Stream().Iterator(t.Context()) {
 			assert.True(t, target.Check(pair.Key))

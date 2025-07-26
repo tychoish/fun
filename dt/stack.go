@@ -21,11 +21,11 @@ type Stack[T any] struct {
 // Append adds a variadic sequence of items to the list.
 func (s *Stack[T]) Append(items ...T) { ft.ApplyMany(s.Push, items) }
 
-// Populate returns a worker that adds items from the stream to the
+// AppendStream returns a worker that adds items from the stream to the
 // stack. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
-func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(s.Push) }
+func (s *Stack[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(s.Push) }
 
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
 func (*Stack[T]) zero() (o T)       { return }
@@ -63,32 +63,19 @@ func (s *Stack[T]) Pop() *Item[T] {
 	return out
 }
 
-func (s *Stack[T]) Generator() fun.Generator[T] {
+// Stream returns a non-destructive stream over the Items in a
+// stack. Stream will not observe new items added to the stack
+// during iteration.
+func (s *Stack[T]) Stream() *fun.Stream[T] {
 	item := &Item[T]{next: s.head}
-	return func(_ context.Context) (o T, _ error) {
+	return fun.MakeGenerator(func() (o T, _ error) {
 		item = item.Next()
 		if !item.Ok() {
 			return o, io.EOF
 		}
 		return item.Value(), nil
-	}
+	}).Stream()
 }
-
-func (s *Stack[T]) GeneratorPop() fun.Generator[T] {
-	var item *Item[T]
-	return func(_ context.Context) (out T, _ error) {
-		item = s.Pop()
-		if item == s.head {
-			return out, io.EOF
-		}
-		return item.Value(), nil
-	}
-}
-
-// Stream returns a non-destructive stream over the Items in a
-// stack. Stream will not observe new items added to the stack
-// during iteration.
-func (s *Stack[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
 // Iterator returns a native go iterator function for the items in a set.
 func (s *Stack[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
@@ -96,7 +83,16 @@ func (s *Stack[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.B
 // StreamPop returns a destructive stream over the Items in a
 // stack. StreamPop will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) StreamPop() *fun.Stream[T] { return s.GeneratorPop().Stream() }
+func (s *Stack[T]) StreamPop() *fun.Stream[T] {
+	var item *Item[T]
+	return fun.MakeGenerator(func() (out T, _ error) {
+		item = s.Pop()
+		if item == s.head {
+			return out, io.EOF
+		}
+		return item.Value(), nil
+	}).Stream()
+}
 
 ////////////////////////////////////////////////////////////////////////
 //

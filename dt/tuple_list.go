@@ -31,12 +31,12 @@ func MakeTuples[K any, V any](in ...Tuple[K, V]) *Tuples[K, V] {
 	return p
 }
 
-// ConsumeTuples creates a *Tuples[K,V] object from a stream of
+// TuplesFromStream creates a *Tuples[K,V] object from a stream of
 // Tuple[K,V] objects.
-func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*Tuples[K, V]] {
+func TuplesFromStream[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*Tuples[K, V]] {
 	return func(ctx context.Context) (*Tuples[K, V], error) {
 		p := &Tuples[K, V]{}
-		if err := p.Consume(iter).Run(ctx); err != nil {
+		if err := p.AppendStream(iter).Run(ctx); err != nil {
 			return nil, err
 		}
 		return p, nil
@@ -46,8 +46,8 @@ func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*T
 func (p *Tuples[K, V]) init()     { p.setup.Do(p.initImpl) }
 func (p *Tuples[K, V]) initImpl() { ft.CallWhen(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
 
-// Consume adds items from a stream of tuples to the current Tuples slice.
-func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
+// AppendStream adds items from a stream of tuples to the current Tuples slice.
+func (p *Tuples[K, V]) AppendStream(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
 	return iter.ReadAll(func(item Tuple[K, V]) { p.Push(item) })
 }
 
@@ -141,7 +141,7 @@ func (p *Tuples[K, V]) Append(vals ...Tuple[K, V]) { p.init(); p.ll.Append(vals.
 
 // Extend adds the items from a Tuples object (slice of Tuple) without
 // modifying the donating object.
-func (p *Tuples[K, V]) Extend(toAdd *Tuples[K, V]) { p.init(); p.ll.Extend(toAdd.ll) }
+func (p *Tuples[K, V]) AppendTuples(toAdd *Tuples[K, V]) { p.init(); p.ll.AppendList(toAdd.ll) }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
 // converting it to a map and then encoding that map as JSON. The JSON

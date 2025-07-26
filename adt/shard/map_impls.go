@@ -82,13 +82,13 @@ func (m *rmtxMap[K, V]) Check(k K) bool     { defer adt.WithR(adt.LockR(&m.mu));
 func (m *rmtxMap[K, V]) Keys() *fun.Stream[K] {
 	defer adt.WithR(adt.LockR(&m.mu))
 
-	return m.d.Keys().Generator().WithLocker(m.mu.RLocker()).Stream()
+	return fun.NewGenerator(m.d.Keys().Read).WithLocker(m.mu.RLocker()).Stream()
 }
 
 func (m *rmtxMap[K, V]) Values() *fun.Stream[V] {
 	defer adt.WithR(adt.LockR(&m.mu))
 
-	return m.d.Values().Generator().WithLocker(m.mu.RLocker()).Stream()
+	return fun.NewGenerator(m.d.Values().Read).WithLocker(m.mu.RLocker()).Stream()
 }
 
 type mtxMap[K comparable, V any] struct {
@@ -103,10 +103,10 @@ func (m *mtxMap[K, V]) Check(k K) bool     { defer adt.With(adt.Lock(&m.mu)); re
 
 func (m *mtxMap[K, V]) Keys() *fun.Stream[K] {
 	defer adt.With(adt.Lock(&m.mu))
-	return m.d.Keys().Generator().WithLock(&m.mu).Stream()
+	return fun.NewGenerator(m.d.Keys().Read).WithLock(&m.mu).Stream()
 }
 
 func (m *mtxMap[K, V]) Values() *fun.Stream[V] {
 	defer adt.With(adt.Lock(&m.mu))
-	return m.d.Values().Generator().WithLock(&m.mu).Stream()
+	return fun.NewGenerator(m.d.Values().Read).WithLock(&m.mu).Stream()
 }

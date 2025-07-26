@@ -598,8 +598,8 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		queue.front.link = queue.front
-		prod := queue.Generator()
-		out, err := prod(ctx)
+		st := queue.Stream()
+		out, err := st.Read(ctx)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, io.EOF)
 		assert.Zero(t, out)
@@ -608,7 +608,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		sig := make(chan struct{})
-		prod := queue.Generator()
+		prod := queue.Stream().Read
 		go func() {
 			defer close(sig)
 			v, err := prod(ctx)

@@ -351,7 +351,7 @@ func TestSlice(t *testing.T) {
 
 		sl := randomIntSlice(128)
 		ls := &List[int]{}
-		err := ls.Populate(sl.Stream()).Run(ctx)
+		err := ls.AppendStream(sl.Stream()).Run(ctx)
 
 		assert.NotError(t, err)
 

@@ -171,12 +171,12 @@ func (ro ChanReceive[T]) IteratorIndexed(ctx context.Context) iter.Seq2[int, T] 
 	}
 }
 
-// Handle returns a Worker function that processes the output of data
+// ReadAll returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor
 // function returns ErrStreamContinue, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) Handle(op Handler[T]) Worker {
+func (ro ChanReceive[T]) ReadAll(op Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 
