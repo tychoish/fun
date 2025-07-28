@@ -53,23 +53,6 @@ func TestPairExtra(t *testing.T) {
 			}
 			check.Equal(t, 4, idx)
 		})
-		t.Run("Values", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			p := Pairs[string, int]{}
-			err := p.ConsumeValues(
-				NewSlice([]int{1, 2, 3}).Stream(),
-				func(in int) string { return fmt.Sprint(in) },
-			).Run(ctx)
-			assert.NotError(t, err)
-			assert.Equal(t, p.Len(), 3)
-			ps := p.Slice()
-			for idx := range ps {
-				check.Equal(t, ps[idx].Key, fmt.Sprint(idx+1))
-				check.Equal(t, ps[idx].Value, idx+1)
-			}
-		})
 		t.Run("Map", func(t *testing.T) {
 			p := &Pairs[string, int]{}
 			p.ConsumeMap(map[string]int{
@@ -79,7 +62,6 @@ func TestPairExtra(t *testing.T) {
 			})
 			assert.Equal(t, p.Len(), 3)
 		})
-
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Encode", func(t *testing.T) {

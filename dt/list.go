@@ -51,18 +51,13 @@ func (l *List[T]) AddSlice(sl []T) *List[T] {
 	return l
 }
 
-func (l *List[T]) Extend(input *List[T]) {
-	for elem := input.Front(); elem.Ok(); elem = elem.Next() {
-		l.Back().Append(elem)
-	}
-}
-
-// ExtendPop removes items from the front of the input list, and appends
+// AppendList removes items from the front of the input list, and appends
 // them to the end (back) of the current list.
-func (l *List[T]) ExtendPop(input *List[T]) {
+func (l *List[T]) AppendList(input *List[T]) *List[T] {
 	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
 		l.Back().Append(elem)
 	}
+	return l
 }
 
 func (l *List[T]) Reset() {
@@ -331,8 +326,8 @@ func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 			out.Back().Append(b.PopFront())
 		}
 	}
-	out.ExtendPop(a)
-	out.ExtendPop(b)
+	out.AppendList(a)
+	out.AppendList(b)
 
 	return out
 }

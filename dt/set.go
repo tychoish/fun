@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/risky"
 )
 
 // Set provides a flexible generic set implementation, with optional
@@ -145,8 +146,8 @@ func (s *Set[T]) Slice() Slice[T] {
 	if s.list != nil {
 		return s.list.Slice()
 	}
-	s.hash.Keys()
-	return Slice[T]{}
+
+	return risky.BlockForceOp(s.hash.Keys().Slice)
 }
 
 // DeleteCheck removes the item from the set, return true when the

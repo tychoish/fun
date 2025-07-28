@@ -164,7 +164,7 @@ func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := Blocking(make(chan T))
 	ec := &erc.Collector{}
-	eh := MAKE.ErrorHandlerWithoutTerminating(ec.Push)
+	ec.SetFilter(erc.NewFilter().WithoutContext().WithoutTerminating())
 
 	wg := &WaitGroup{}
 	init := Operation(func(ctx context.Context) {
@@ -174,10 +174,10 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 			// start a thread for reading this
 			// sub-iterator.
 			send.Consume(iter).
-				Operation(eh).
-				PostHook(func() { eh(iter.Close()) }).
+				Operation(ec.Push).
+				PostHook(func() { ec.Push(iter.Close()) }).
 				Add(ctx, wg)
-		}).Operation(eh).Add(ctx, wg)
+		}).Operation(ec.Push).Add(ctx, wg)
 
 		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
@@ -367,7 +367,8 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 			return err
 		}
 
-		fn.WithRecover().WithErrorFilter(conf.errorFilter).
+		fn.WithRecover().
+			WithErrorFilter(conf.errorFilter).
 			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) })).
 			StartGroup(ctx, conf.NumWorkers).
 			Ignore().

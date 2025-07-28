@@ -20,8 +20,6 @@ type jsonMarshlerError struct{}
 func (jsonMarshlerError) MarshalJSON() ([]byte, error) { return nil, errors.New("always") }
 
 func TestList(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	defer runtime.GC()
 	t.Run("Constructor", func(t *testing.T) {
 		list := &List[int]{}
@@ -129,7 +127,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), ft.Must(list.StreamFront().Slice(ctx)))
+			t.Log(seen, list.Len(), ft.Must(list.StreamFront().Slice(t.Context())))
 			t.Error(seen, len(expected), expected)
 
 		}
@@ -160,7 +158,6 @@ func TestList(t *testing.T) {
 			if seen != list.Len() {
 				t.Error(seen, "!=", list.Len())
 			}
-
 		})
 		t.Run("Backwards", func(t *testing.T) {
 			seen := 0
@@ -249,7 +246,7 @@ func TestList(t *testing.T) {
 			ct := 0
 			assert.NotPanic(t, func() {
 				iter := list.StreamFront()
-				for iter.Next(ctx) {
+				for iter.Next(t.Context()) {
 					ct++
 				}
 				check.NotError(t, iter.Close())
@@ -270,7 +267,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(ctx) {
+			for iter.Next(t.Context()) {
 				if iter.Value() < 0 && iter.Value() > 100 {
 					t.Fatal(iter.Value())
 				}
@@ -299,7 +296,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := 0
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(ctx) {
+			for iter.Next(t.Context()) {
 				if iter.Value() < 0 && iter.Value() > 100 {
 					t.Fatal(iter.Value())
 				}
@@ -334,7 +331,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(ctx) {
+			for iter.Next(t.Context()) {
 				if iter.Value() < 0 && iter.Value() > 100 {
 					t.Fatal(iter.Value())
 				}
@@ -363,7 +360,7 @@ func TestList(t *testing.T) {
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(ctx) {
+			for iter.Next(t.Context()) {
 				if iter.Value() < 0 && iter.Value() > 100 {
 					t.Fatal(iter.Value())
 				}
@@ -391,19 +388,17 @@ func TestList(t *testing.T) {
 			}
 			iter := list.StreamFront()
 			for i := 0; i < 50; i++ {
-				if !iter.Next(ctx) {
+				if !iter.Next(t.Context()) {
 					t.Error("stream should be open", i)
 				}
 			}
 			fun.Invariant.IsTrue(iter.Close() == nil)
 			for i := 0; i < 50; i++ {
-				if iter.Next(ctx) {
+				if iter.Next(t.Context()) {
 					t.Error("stream should be closed", i)
 				}
 			}
-
 		})
-
 	})
 	t.Run("Element", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
@@ -554,14 +549,14 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 			// ["hello", "world"]
 			if list.Front().Value() != "hello" && list.Front().Next().Value() != "world" {
-				t.Fatal(list.StreamFront().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(t.Context()))
 			}
 			if !list.Front().Swap(list.Back()) {
-				t.Fatal(list.StreamFront().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(t.Context()))
 			}
 
 			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
-				t.Fatal(list.StreamFront().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(t.Context()))
 			}
 		})
 		t.Run("Self", func(t *testing.T) {
@@ -570,7 +565,7 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 
 			if list.Front().Swap(list.Front()) {
-				t.Fatal(list.StreamFront().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(t.Context()))
 			}
 		})
 		t.Run("NilList", func(t *testing.T) {
@@ -578,7 +573,7 @@ func TestList(t *testing.T) {
 			list.PushFront("hello")
 
 			if list.Front().Swap(NewElement("world")) {
-				t.Fatal(list.StreamFront().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(t.Context()))
 			}
 		})
 		t.Run("Root", func(t *testing.T) {
@@ -595,7 +590,6 @@ func TestList(t *testing.T) {
 			if list.Back().Value() != 42 {
 				t.Fatal("unexpected outcome back")
 			}
-
 		})
 		t.Run("NonAdjacent", func(t *testing.T) {
 			list := &List[int]{}
@@ -608,10 +602,10 @@ func TestList(t *testing.T) {
 
 			if !list.Back().Swap(list.Front().Next()) {
 				t.Log("should have swapped")
-				t.Fatal(list.StreamFront().Slice(ctx))
+				t.Fatal(list.StreamFront().Slice(t.Context()))
 			}
 			// expected: [42, 840, 420, 84]
-			slice := ft.Must(list.StreamFront().Slice(ctx))
+			slice := ft.Must(list.StreamFront().Slice(t.Context()))
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
@@ -619,7 +613,7 @@ func TestList(t *testing.T) {
 
 			idx := 0
 			iter := list.StreamFront()
-			for iter.Next(ctx) {
+			for iter.Next(t.Context()) {
 				if slice[idx] != iter.Value() {
 					t.Error(idx, slice[idx], iter.Value())
 				}
@@ -653,7 +647,7 @@ func TestList(t *testing.T) {
 			l2 := GetPopulatedList(t, 100)
 			l2tail := l2.Back()
 
-			l1.ExtendPop(l2)
+			l1.AppendList(l2)
 			if l1.Len() != 200 {
 				t.Error(l1.Len())
 			}
@@ -668,10 +662,10 @@ func TestList(t *testing.T) {
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := GetPopulatedList(t, 100)
-			itemsOne := ft.Must(lOne.StreamFront().Slice(ctx))
+			itemsOne := ft.Must(lOne.StreamFront().Slice(t.Context()))
 
 			lTwo := GetPopulatedList(t, 100)
-			itemsTwo := ft.Must(lTwo.StreamFront().Slice(ctx))
+			itemsTwo := ft.Must(lTwo.StreamFront().Slice(t.Context()))
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())
@@ -680,11 +674,11 @@ func TestList(t *testing.T) {
 				t.Fatal("incorrect items")
 			}
 
-			lOne.ExtendPop(lTwo)
+			lOne.AppendList(lTwo)
 			combined := append(itemsOne, itemsTwo...)
 			iter := lOne.StreamFront()
 			idx := 0
-			for iter.Next(ctx) {
+			for iter.Next(t.Context()) {
 				if combined[idx] != iter.Value() {
 					t.Error("missmatch", idx, combined[idx], iter.Value())
 				}
@@ -722,8 +716,7 @@ func TestList(t *testing.T) {
 			fun.Invariant.IsTrue(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
-			list := &List[int]{}
-			list.Append(400, 300, 42)
+			list := VariadicList(400, 300, 42)
 
 			out, err := list.MarshalJSON()
 			if err != nil {
@@ -843,7 +836,6 @@ func BenchmarkList(b *testing.B) {
 				}
 			}
 		})
-
 	})
 	b.Run("Prepend", func(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
@@ -927,7 +919,7 @@ func BenchmarkList(b *testing.B) {
 
 				b.ResetTimer()
 				iter := list.StreamFront()
-				var value = -1
+				value := -1
 				for j := 0; j < b.N; j++ {
 					idx := 0
 					for iter.Next(ctx) {
