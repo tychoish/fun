@@ -63,17 +63,10 @@ func (d Distributor[T]) Receive(ctx context.Context) (T, error) { return d.pop(c
 // distributor as a fun.Handler function.
 func (d Distributor[T]) Handler() fun.Handler[T] { return d.push }
 
-// Generator provides a convenient access to the "receive" side of the
-// as a fun.Generator function
-func (d Distributor[T]) Generator() fun.Generator[T] {
-	// TODO: make ErrQueueClosed an ers.TerminatingError
-	return d.pop //.WithErrorFilter(func(err error) error { return ft.IfValue(err == ErrQueueClosed, io.EOF, err) })
-}
-
 // Stream allows iterator-like access to a distributor. These streams
 // are blocking and destructive. The stream's close method does *not*
 // close the distributor's underlying structure.
-func (d Distributor[T]) Stream() *fun.Stream[T] { return d.Generator().Stream() }
+func (d Distributor[T]) Stream() *fun.Stream[T] { return fun.MakeStream(d.pop) }
 
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads

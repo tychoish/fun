@@ -131,6 +131,7 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant
 // produced by the worker.
 func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.IgnoreError(wf(ctx)) } }
 
+// Force runs the worker, ignoring the output with background context.
 func (wf Worker) Force() { wf.Ignore().Wait() }
 
 // If returns a Worker function that runs only if the condition is
@@ -380,7 +381,7 @@ func (wf Worker) WithoutErrors(errs ...error) Worker {
 // aggregated and returned to the caller only if the retry fails.
 func (wf Worker) Retry(n int) Worker {
 	return func(ctx context.Context) (err error) {
-		for i := 0; i < n; i++ {
+		for range n {
 			attemptErr := wf(ctx)
 			switch {
 			case attemptErr == nil:

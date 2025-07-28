@@ -134,7 +134,7 @@ func (Constructors) SimpleOperationHandler(ctx context.Context) fn.Handler[Opera
 // functions its passed. All errors are ignored, and the worker's
 // recieve a background context.
 func (Constructors) SimpleWorkerHandlerForce() fn.Handler[Worker] {
-	return func(f Worker) { f.Ignore().Wait() }
+	return func(f Worker) { f.Force() }
 }
 
 // SimpleOperationHandlerForce returns a handler that runs all
@@ -327,12 +327,12 @@ func (Constructors) Stringer(op fmt.Stringer) fn.Future[string] { return op.Stri
 // (presumably plaintext) io.Reader, using the bufio.Scanner.
 func (Constructors) Lines(reader io.Reader) *Stream[string] {
 	scanner := bufio.NewScanner(reader)
-	return MakeGenerator(func() (string, error) {
+	return MakeStream(MakeGenerator(func() (string, error) {
 		if !scanner.Scan() {
 			return "", erc.Join(io.EOF, scanner.Err())
 		}
 		return scanner.Text(), nil
-	}).Stream()
+	}))
 }
 
 // LinesWithSpaceTrimed provides a stream with access to the
@@ -356,11 +356,11 @@ func (Constructors) Atoi() Converter[string, int] { return MakeConverterErr(strc
 // monotonically increasing integers until the maximum is reached.
 func (Constructors) Counter(maxVal int) *Stream[int] {
 	state := &atomic.Int64{}
-	return MakeGenerator(func() (int, error) {
+	return MakeStream(MakeGenerator(func() (int, error) {
 		if prev := int(state.Add(1)); prev <= maxVal {
 			return prev, nil
 		}
 
 		return -1, io.EOF
-	}).Stream()
+	}))
 }

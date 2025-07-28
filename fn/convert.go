@@ -23,9 +23,11 @@ func (fl Filter[T]) Handler(hf Handler[T]) Handler[T]  { return func(in T) { hf(
 func (fl Filter[T]) WithLock(mu *sync.Mutex) Filter[T] {
 	return func(v T) T { defer priv.With(priv.Lock(mu)); return fl.Apply(v) }
 }
+
 func (fl Filter[T]) PreHook(op func()) Filter[T] {
 	return func(v T) T { ft.CallSafe(op); return fl.Apply(v) }
 }
+
 func (fl Filter[T]) PostHook(op func()) Filter[T] {
 	return func(v T) T { defer ft.CallSafe(op); return fl.Apply(v) }
 }
@@ -51,15 +53,13 @@ func MakeConverter[I, O any](f func(I) O) Converter[I, O]   { return f }
 func (Converter[I, O]) noop() Converter[I, O]               { return func(I) (out O) { return } }
 func (Converter[I, O]) zero() (zero O)                      { return zero }
 func (cf Converter[I, O]) Convert(in I) O                   { return cf(in) }
-func (cf Converter[I, O]) Future(in Future[I]) Future[O]    { return func() O { return cf(in()) } }
-func (cf Converter[I, O]) Handler(hf Handler[O]) Handler[I] { return func(i I) { hf(cf(i)) } }
 func (cf Converter[I, O]) Lock() Converter[I, O]            { return cf.WithLock(&sync.Mutex{}) }
 func (cf Converter[I, O]) Not(cond bool) Converter[I, O]    { return cf.If(ft.Not(cond)) }
 func (cf Converter[I, O]) If(cond bool) Converter[I, O]     { return cf.When(ft.Wrap(cond)) }
 func (cf Converter[I, O]) PreHook(h func()) Converter[I, O] { return func(i I) O { h(); return cf(i) } }
 
 func (cf Converter[I, O]) PostHook(h func()) Converter[I, O] {
-	return func(i I) O { defer h(); return cf(i) }
+	return func(i I) O { defer ft.CallSafe(h); return cf(i) }
 }
 
 func (cf Converter[I, O]) PreFilter(fl Filter[I]) Converter[I, O] {

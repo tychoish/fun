@@ -188,7 +188,6 @@ func getConstructors[T comparable]() []FixtureStreamConstructors[T] {
 			},
 		},
 	}
-
 }
 
 func TestStreamImplementations(t *testing.T) {
@@ -390,7 +389,6 @@ func TestParallelForEach(t *testing.T) {
 			t.Log(errs)
 			t.Error(len(errs), "!= 10", errs)
 		}
-
 	})
 	t.Run("CollectAllErrors/Double", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -764,7 +762,6 @@ func RunStreamStringAlgoTests(
 							},
 							WorkerGroupConfNumWorkers(4),
 						).Slice(t.Context())
-
 						if err != nil {
 							t.Error(len(vals), " >>:", err)
 						}
@@ -782,163 +779,6 @@ func RunStreamStringAlgoTests(
 							t.Error("unexpected result", count)
 						}
 					})
-					t.Run("Generate", func(t *testing.T) {
-						t.Run("Basic", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							inputs := GenerateRandomStringSlice(512)
-							count := &atomic.Int32{}
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if int(count.Load()) > len(inputs) {
-									return "", io.EOF
-								}
-								return inputs[rand.Intn(511)], nil
-							}).Parallel().Stream()
-							sig := make(chan struct{})
-							go func() {
-								defer close(sig)
-								vals, err := out.Slice(ctx)
-								if err != nil {
-									t.Error(err)
-								}
-								if len(vals) != len(inputs) {
-									t.Error("unexpected result", count.Load(), len(vals), len(inputs))
-								}
-							}()
-							<-sig
-						})
-						t.Run("GenerateParallel", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							inputs := GenerateRandomStringSlice(512)
-							count := &atomic.Int32{}
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if int(count.Load()) > len(inputs) {
-									return "", io.EOF
-								}
-								return inputs[rand.Intn(511)], nil
-							}).Parallel(WorkerGroupConfNumWorkers(4)).Stream()
-							sig := make(chan struct{})
-							go func() {
-								defer close(sig)
-								vals, err := out.Slice(ctx)
-								if err != nil {
-									t.Error(err)
-								}
-								// aborting may not happen at the same moment, given this locking model
-								if len(vals)+16 < len(inputs) {
-									t.Error("unexpected result", len(vals), len(inputs))
-								}
-							}()
-							<-sig
-						})
-						t.Run("PanicSafety", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-							out := MakeGenerator(func() (string, error) {
-								panic("foo")
-							}).Parallel().Stream()
-
-							if out.Next(ctx) {
-								t.Fatal("should not iterate when panic")
-							}
-
-							err := out.Close()
-
-							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-							assert.Substring(t, err.Error(), "foo")
-						})
-						t.Run("ContinueOnPanic", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							count := &atomic.Int64{}
-							out := Generator[string](
-								func(_ context.Context) (string, error) {
-									count.Add(1)
-
-									if count.Load()%3 == 0 {
-										panic("foo")
-									}
-
-									if count.Load()%5 == 0 {
-										return "", ers.ErrCurrentOpAbort
-									}
-									return fmt.Sprint(count.Load()), nil
-								},
-							).Parallel(WorkerGroupConfContinueOnPanic()).Stream()
-							output, err := out.Slice(ctx)
-							if l := len(output); l != 3 {
-								t.Log(err, output)
-								t.Error(l)
-							}
-							if err == nil {
-								t.Fatal("should have errored", count.Load())
-							}
-							assert.Substring(t, err.Error(), "foo")
-							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-						})
-						t.Run("ArbitraryErrorAborts", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							count := &atomic.Int64{}
-							expectedErr := errors.New("beep")
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if count.Load() > 5 {
-									return "", expectedErr
-								}
-								return "foo", nil
-							}).Parallel().Stream()
-
-							output, err := out.Slice(ctx)
-							if l := len(output); l != 5 {
-								t.Error(l, output)
-							}
-
-							check.Error(t, err)
-							t.Log(err, out.Close())
-
-							// because it's parallel we collect both
-							if !ers.Is(err, expectedErr) && !ers.Is(err, io.EOF) {
-								t.Log(len(ers.Unwind(err)))
-								t.Errorf("unexpected panic '%v'", err)
-							}
-						})
-						t.Run("ContinueOnError", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-							count := &atomic.Int64{}
-							expectedErr := errors.New("beep")
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if count.Load() == 3 {
-									return "", expectedErr
-								}
-								if count.Load() >= 5 {
-									return "", io.EOF
-								}
-								return "foo", nil
-							}).Parallel(WorkerGroupConfContinueOnError()).Stream()
-
-							output, err := out.Slice(ctx)
-							if l := len(output); l != 3 {
-								t.Error(l, output)
-							}
-							if err == nil {
-								t.Error("should have errored")
-							}
-							// because it's parallel we collect both
-							if !ers.Is(err, expectedErr) && !ers.Is(err, io.EOF) {
-								t.Errorf("unexpected error '%v'", err)
-							}
-						})
-					})
 
 					t.Run("Reduce", func(t *testing.T) {
 						ctx, cancel := context.WithCancel(context.Background())
@@ -950,7 +790,6 @@ func RunStreamStringAlgoTests(
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
 						}).Read(ctx)
-
 						if err != nil {
 							t.Fatal(err)
 						}
@@ -1031,7 +870,6 @@ func RunStreamStringAlgoTests(
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
 					})
-
 				})
 			}
 		})

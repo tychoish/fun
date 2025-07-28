@@ -26,8 +26,13 @@ type ChanReceive[T any] struct {
 func (ro ChanReceive[T]) Filter(ctx context.Context, filter func(T) bool) ChanReceive[T] {
 	out := ChanOp[T]{ch: make(chan T), mode: ro.mode}
 
-	out.Handler().
-		ReadAll(ro.Generator().WithErrorFilter(func(err error) error { ft.CallWhen(err != nil, out.Close); return err }).Stream().Filter(filter)).
+	MakeStream(ro.Read).
+		WithHook(func(*Stream[T]) { out.Close() }).
+		Filter(filter).
+		Parallel(out.Send().Write,
+			WorkerGroupConfNumWorkers(1),
+			WorkerGroupConfIncludeContextErrors(),
+		).
 		Ignore().
 		Background(ctx)
 
@@ -140,7 +145,7 @@ func (ro ChanReceive[T]) Generator() Generator[T] { return ro.Read }
 // non-blocking mode, iteration ends when there are no items in the
 // channel. In blocking mode, iteration ends when the context is
 // canceled or the channel is closed.
-func (ro ChanReceive[T]) Stream() *Stream[T] { return ro.Generator().Stream() }
+func (ro ChanReceive[T]) Stream() *Stream[T] { return MakeStream(ro.Read) }
 
 // Iterator provides access to the contents of the channel as a
 // new-style standard library stream. For ChanRecieve objects in
@@ -167,7 +172,6 @@ func (ro ChanReceive[T]) IteratorIndexed(ctx context.Context) iter.Seq2[int, T] 
 			}
 			idx++
 		}
-
 	}
 }
 

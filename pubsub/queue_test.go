@@ -588,7 +588,6 @@ func TestQueueStream(t *testing.T) {
 				}
 				if time.Since(start)-time.Since(end) < 100*time.Millisecond {
 					t.Error(time.Since(end) - time.Since(start))
-
 				}
 				return
 			}
@@ -598,7 +597,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		queue.front.link = queue.front
-		prod := queue.Generator()
+		prod := queue.Stream().Read
 		out, err := prod(ctx)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, io.EOF)
@@ -608,7 +607,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		sig := make(chan struct{})
-		prod := queue.Generator()
+		prod := queue.Stream().Read
 		go func() {
 			defer close(sig)
 			v, err := prod(ctx)
@@ -619,5 +618,4 @@ func TestQueueStream(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		assert.NotError(t, queue.Close())
 	})
-
 }

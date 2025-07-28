@@ -63,32 +63,19 @@ func (s *Stack[T]) Pop() *Item[T] {
 	return out
 }
 
-func (s *Stack[T]) Generator() fun.Generator[T] {
+// Stream returns a non-destructive stream over the Items in a
+// stack. Stream will not observe new items added to the stack
+// during iteration.
+func (s *Stack[T]) Stream() *fun.Stream[T] {
 	item := &Item[T]{next: s.head}
-	return func(_ context.Context) (o T, _ error) {
+	return fun.MakeStream(func(context.Context) (o T, _ error) {
 		item = item.Next()
 		if !item.Ok() {
 			return o, io.EOF
 		}
 		return item.Value(), nil
-	}
+	})
 }
-
-func (s *Stack[T]) GeneratorPop() fun.Generator[T] {
-	var item *Item[T]
-	return func(_ context.Context) (out T, _ error) {
-		item = s.Pop()
-		if item == s.head {
-			return out, io.EOF
-		}
-		return item.Value(), nil
-	}
-}
-
-// Stream returns a non-destructive stream over the Items in a
-// stack. Stream will not observe new items added to the stack
-// during iteration.
-func (s *Stack[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
 
 // Iterator returns a native go iterator function for the items in a set.
 func (s *Stack[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
@@ -96,7 +83,16 @@ func (s *Stack[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.B
 // StreamPop returns a destructive stream over the Items in a
 // stack. StreamPop will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) StreamPop() *fun.Stream[T] { return s.GeneratorPop().Stream() }
+func (s *Stack[T]) StreamPop() *fun.Stream[T] {
+	var item *Item[T]
+	return fun.MakeStream(func(context.Context) (out T, _ error) {
+		item = s.Pop()
+		if item == s.head {
+			return out, io.EOF
+		}
+		return item.Value(), nil
+	})
+}
 
 ////////////////////////////////////////////////////////////////////////
 //

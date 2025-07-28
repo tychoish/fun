@@ -139,18 +139,7 @@ func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
 // Use in combination with other stream processing tools
 // (generators, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] { return m.Generator().Stream() }
-
-// Keys provides a stream over just the keys in the map.
-func (m Map[K, V]) Keys() *fun.Stream[K] { return m.GeneratorKeys().Stream() }
-
-// Values provides a stream over just the values in the map.
-func (m Map[K, V]) Values() *fun.Stream[V] { return m.GeneratorValues().Stream() }
-
-// Generator constructs a fun.Generator function for the pairs in the
-// map. The operation starts a goroutine on the first iteration that
-// tracks the state of the stream. Iteration order is randomized.
-func (m Map[K, V]) Generator() fun.Generator[Pair[K, V]] {
+func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -163,13 +152,11 @@ func (m Map[K, V]) Generator() fun.Generator[Pair[K, V]] {
 		}
 	}).Go().Once()
 
-	return pipe.Receive().Generator().PreHook(init)
+	return fun.MakeStream(pipe.Receive().Generator().PreHook(init))
 }
 
-// GeneratorKeys returns a generator that generates the keys of the
-// map. The operation requires a goroutine to keep track of the state
-// of the iteration, but does not buffer or cache keys.
-func (m Map[K, V]) GeneratorKeys() fun.Generator[K] {
+// Keys provides a stream over just the keys in the map.
+func (m Map[K, V]) Keys() *fun.Stream[K] {
 	pipe := fun.Blocking(make(chan K))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -182,13 +169,11 @@ func (m Map[K, V]) GeneratorKeys() fun.Generator[K] {
 		}
 	}).Go().Once()
 
-	return pipe.Receive().Generator().PreHook(init)
+	return fun.MakeStream(pipe.Receive().Generator().PreHook(init))
 }
 
-// GeneratorValues returns a generator that generates the values of the
-// map. The operation requires a goroutine to keep track of the state
-// of the iteration, but does not buffer or cache values.
-func (m Map[K, V]) GeneratorValues() fun.Generator[V] {
+// Values provides a stream over just the values in the map.
+func (m Map[K, V]) Values() *fun.Stream[V] {
 	pipe := fun.Blocking(make(chan V))
 
 	init := fun.Operation(func(ctx context.Context) {
@@ -201,5 +186,5 @@ func (m Map[K, V]) GeneratorValues() fun.Generator[V] {
 		}
 	}).Go().Once()
 
-	return pipe.Receive().Generator().PreHook(init)
+	return fun.MakeStream(pipe.Receive().Generator().PreHook(init))
 }
