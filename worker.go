@@ -58,6 +58,10 @@ func (Constructors) ErrorChannelWorker(ch <-chan error) Worker {
 	}
 }
 
+func (Constructors) ContextChannelWorker(ctx context.Context) Worker {
+	return MAKE.ErrorChannelWorker(ft.ContextErrorChannel(ctx))
+}
+
 // Run is equivalent to calling the worker function directly.
 func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 

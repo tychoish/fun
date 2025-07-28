@@ -341,7 +341,9 @@ func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.Wo
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
-	attach(GetOrchestrator(ctx))
+	orca := GetOrchestrator(ctx)
+
+	attach(orca)
 	return context.WithValue(ctx, workerPoolNameCtxKey(key), queue)
 }
 

@@ -258,7 +258,6 @@ func TestCmd(t *testing.T) {
 						check.Error(t, s.Wait())
 					})
 				})
-
 			})
 
 			t.Run("RunningStartedErrors", func(t *testing.T) {
@@ -275,6 +274,7 @@ func TestCmd(t *testing.T) {
 			})
 			t.Run("ForceSigKILL", func(t *testing.T) {
 				ctx := testt.Context(t)
+				ctx = SetBaseContext(ctx)
 				cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
 				out := &bytes.Buffer{}
 				cmd.Stdout = out
@@ -315,6 +315,8 @@ func TestDaemon(t *testing.T) {
 			},
 		}
 		ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
+		ctx = SetBaseContext(ctx)
+
 		ds := Daemon(baseService, 10*time.Millisecond)
 		check.MinRuntime(t, 100*time.Millisecond, func() {
 			check.NotError(t, ds.Start(ctx))
@@ -431,8 +433,12 @@ func TestDaemon(t *testing.T) {
 func TestCleanup(t *testing.T) {
 	t.Parallel()
 	t.Run("Basic", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
+		var cancel context.CancelFunc
+		ctx := context.Background()
+
+		ctx, cancel = context.WithCancel(ctx)
 		defer cancel()
+		ctx = SetBaseContext(ctx)
 
 		pipe := pubsub.NewUnlimitedQueue[fun.Worker]()
 
