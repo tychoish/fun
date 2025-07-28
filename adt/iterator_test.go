@@ -81,7 +81,7 @@ func TestStream(t *testing.T) {
 
 			counter := &atomic.Int64{}
 
-			iter := fun.Generator[int](func(ctx context.Context) (int, error) {
+			iter := fun.MakeStream(func(ctx context.Context) (int, error) {
 				if err := ctx.Err(); err != nil {
 					return 0, err
 				}
@@ -92,7 +92,7 @@ func TestStream(t *testing.T) {
 				}
 
 				return int(val), nil
-			}).Lock().Stream()
+			}).Lock()
 			for {
 				val, err := iter.Read(ctx)
 				testt.Log(t, err, val)
@@ -111,7 +111,7 @@ func TestStream(t *testing.T) {
 
 			counter := &atomic.Int64{}
 
-			iter := fun.Generator[int](func(ctx context.Context) (int, error) {
+			iter := fun.MakeStream(func(ctx context.Context) (int, error) {
 				if err := ctx.Err(); err != nil {
 					return 0, err
 				}
@@ -120,8 +120,7 @@ func TestStream(t *testing.T) {
 					return 0, io.EOF
 				}
 				return int(val), nil
-
-			}).Lock().Stream()
+			}).Lock()
 
 			for {
 				val, err := iter.Read(ctx)
@@ -134,7 +133,6 @@ func TestStream(t *testing.T) {
 				assert.True(t, val >= 1 && val < 65)
 			}
 			assert.True(t, counter.Load() == 0)
-
 		})
 	})
 }

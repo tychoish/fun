@@ -50,14 +50,13 @@ func testIntIter(t *testing.T, size int) *Stream[int] {
 		check.Equal(t, count, size)
 	})
 
-	return MakeGenerator(func() (int, error) {
+	return MakeStream(MakeGenerator(func() (int, error) {
 		if count >= size {
 			return 0, io.EOF
 		}
 		count++
 		return count - 1, nil
-	}).Stream()
-
+	}))
 }
 
 func GenerateRandomStringSlice(size int) []string {
@@ -120,7 +119,7 @@ func TestStream(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		count := 0
-		iter := NewGenerator(func(_ context.Context) (int, error) {
+		iter := MakeStream(func(context.Context) (int, error) {
 			count++
 			switch {
 			case count > 128:
@@ -131,7 +130,7 @@ func TestStream(t *testing.T) {
 			default:
 				return -1, ErrStreamContinue
 			}
-		}).Stream()
+		})
 		ints, err := iter.Slice(ctx)
 		check.NotError(t, err)
 		check.Equal(t, len(ints), 64)
@@ -141,7 +140,7 @@ func TestStream(t *testing.T) {
 		count := 0
 		observes := 0
 		sum := 0
-		err := MakeGenerator(func() (int, error) {
+		err := MakeStream(MakeGenerator(func() (int, error) {
 			count++
 			switch count {
 			case 25, 50, 75:
@@ -151,7 +150,7 @@ func TestStream(t *testing.T) {
 			default:
 				return -1, ErrStreamContinue
 			}
-		}).Stream().ReadAll(func(in int) {
+		})).ReadAll(func(in int) {
 			observes++
 
 			assert.True(t, in%5 == 0)
@@ -341,16 +340,15 @@ func TestStream(t *testing.T) {
 
 			assert.Equal(t, 20, sum)
 			assert.Equal(t, calls, 2)
-
 		})
 	})
 	t.Run("Generator", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		t.Run("BasicOperation", func(t *testing.T) {
-			iter := NewGenerator(func(context.Context) (int, error) {
+			iter := MakeStream(func(context.Context) (int, error) {
 				return 1, nil
-			}).Stream()
+			})
 
 			if iter.Value() != 0 {
 				t.Error("should initialize to zero")
@@ -367,13 +365,13 @@ func TestStream(t *testing.T) {
 		})
 		t.Run("RespectEOF", func(t *testing.T) {
 			count := 0
-			iter := NewGenerator(func(context.Context) (int, error) {
+			iter := MakeStream(func(context.Context) (int, error) {
 				count++
 				if count > 10 {
 					return 1000, io.EOF
 				}
 				return count, nil
-			}).Stream()
+			})
 
 			seen := 0
 			for iter.Next(ctx) {
@@ -391,14 +389,14 @@ func TestStream(t *testing.T) {
 			count := 0
 			expected := errors.New("kip")
 			returned := false
-			iter := NewGenerator(func(context.Context) (int, error) {
+			iter := MakeStream(func(context.Context) (int, error) {
 				count++
 				if count > 10 {
 					returned = true
 					return 1000, expected
 				}
 				return count, nil
-			}).Stream()
+			})
 
 			seen := 0
 			for iter.Next(ctx) {
@@ -455,7 +453,6 @@ func TestStream(t *testing.T) {
 				for it.Next(ctx) {
 					count.Add(1)
 				}
-
 			}(iter)
 
 		}
@@ -523,7 +520,6 @@ func TestStream(t *testing.T) {
 					if iter.Close() != nil {
 						t.Error(iter.Close())
 					}
-
 				},
 			}
 		})
@@ -559,7 +555,6 @@ func TestStream(t *testing.T) {
 		}
 		if !seenCondition {
 			t.Error("should have observed a context canceled")
-
 		}
 	})
 	t.Run("ReadOneEOF", func(t *testing.T) {
@@ -682,7 +677,6 @@ func TestStream(t *testing.T) {
 			t.Error("no iteration", iter.Value())
 		}
 	})
-
 }
 
 func TestAny(t *testing.T) {
@@ -712,7 +706,6 @@ func TestEmptyIteration(t *testing.T) {
 		assert.NotError(t, VariadicStream[int]().ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 		assert.NotError(t, ChannelStream(ch).ReadAll(func(_ int) { t.Fatal("should not be called") }).Run(ctx))
 	})
-
 }
 
 func TestChain(t *testing.T) {
@@ -847,7 +840,7 @@ func TestJSON(t *testing.T) {
 		})
 		t.Run("Continue", func(t *testing.T) {
 			count := 0
-			out, err := MakeGenerator(func() (int, error) {
+			out, err := MakeStream(MakeGenerator(func() (int, error) {
 				count++
 				if count%2 == 0 {
 					return -1, ErrStreamContinue
@@ -856,12 +849,10 @@ func TestJSON(t *testing.T) {
 					return -2, io.EOF
 				}
 				return count, nil
-			}).Stream().Filter(func(in int) bool { return in != 5 }).Slice(t.Context())
+			})).Filter(func(in int) bool { return in != 5 }).Slice(t.Context())
 			assert.NotError(t, err)
 			t.Log(out)
 			assert.EqualItems(t, out, []int{1, 3, 7, 9})
-
 		})
-
 	})
 }

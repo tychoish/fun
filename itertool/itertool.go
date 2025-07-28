@@ -18,8 +18,10 @@ import (
 
 // compile-time assertions that both worker types support the "safe"
 // interface needed for the Worker() tool.
-var _ interface{ WithRecover() fun.Worker } = new(fun.Worker)
-var _ interface{ WithRecover() fun.Worker } = new(fun.Operation)
+var (
+	_ interface{ WithRecover() fun.Worker } = new(fun.Worker)
+	_ interface{ WithRecover() fun.Worker } = new(fun.Operation)
+)
 
 // WorkerPool takes streams of fun.WorkerPool or fun.Operation lambdas
 // and processes them in according to the configuration.
@@ -79,7 +81,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}
 
-	return fun.NewGenerator(func(ctx context.Context) (zero T, _ error) {
+	return fun.MakeStream(func(ctx context.Context) (zero T, _ error) {
 		for {
 			now := time.Now()
 
@@ -108,5 +110,5 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 				return zero, ctx.Err()
 			}
 		}
-	}).PostHook(func() { timer.Stop() }).Lock().Stream()
+	}).WithHook(func(*fun.Stream[T]) { timer.Stop() }).Lock()
 }

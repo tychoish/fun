@@ -186,10 +186,10 @@ func makeMapStream[K comparable, V any, O any](
 	rf func(K, V) O,
 ) *fun.Stream[O] {
 	pipe := fun.Blocking(make(chan O))
-	return pipe.Generator().PreHook(fun.Operation(func(ctx context.Context) {
+	return fun.MakeStream(pipe.Generator().PreHook(fun.Operation(func(ctx context.Context) {
 		send := pipe.Send()
 		mp.Range(func(key K, value V) bool {
 			return send.Check(ctx, rf(key, value))
 		})
-	}).PostHook(pipe.Close).Go().Once()).Stream()
+	}).PostHook(pipe.Close).Go().Once()))
 }

@@ -56,22 +56,6 @@ func TestSmoke(t *testing.T) {
 		assert.NotError(t, err)
 		assert.Equal(t, value, 2047)
 	})
-	t.Run("Generate", func(t *testing.T) {
-		atom := &atomic.Int64{}
-		atom.Store(16)
-		iter := fun.MakeGenerator(func() (int64, error) {
-			prev := atom.Add(-1)
-			if prev < 0 {
-				return 0, io.EOF
-			}
-			return prev, nil
-		}).Parallel().Stream()
-
-		ctx := testt.Context(t)
-		sl, err := iter.Slice(ctx)
-		assert.NotError(t, err)
-		assert.Equal(t, len(sl), 16)
-	})
 	t.Run("LegacyReduce", func(t *testing.T) {
 		type none struct{}
 		t.Run("Reduce", func(t *testing.T) {
@@ -86,7 +70,6 @@ func TestSmoke(t *testing.T) {
 					seen[in] = struct{}{}
 					return fmt.Sprint(value, in), nil
 				}, "").Read(ctx)
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -363,5 +346,4 @@ func TestRateLimit(t *testing.T) {
 		assert.Equal(t, 10, count.Get())
 		assert.True(t, dur >= time.Second)
 	})
-
 }

@@ -364,32 +364,9 @@ type entry[T any] struct {
 // the queue has been closed via the Close() method.
 //
 // To create a "consuming" stream, use a Distributor.
-func (q *Queue[T]) Stream() *fun.Stream[T] { return q.Generator().Stream() }
-
-// Distributor creates a object used to process the items in the
-// queue: items yielded by the Distributor's stream, are removed
-// from the queue.
-func (q *Queue[T]) Distributor() Distributor[T] {
-	return Distributor[T]{
-		push: fun.MakeHandler(q.Add),
-		pop: func(ctx context.Context) (_ T, err error) {
-			msg, ok := q.Remove()
-			if ok {
-				return msg, nil
-			}
-			msg, err = q.Wait(ctx)
-			return msg, err
-		},
-		size: q.tracker.len,
-	}
-}
-
-// Generator returns a function that produces items from the
-// queue, iteratively. It's not destructive, and has the same
-// semantics as the Stream.
-func (q *Queue[T]) Generator() fun.Generator[T] {
+func (q *Queue[T]) Stream() *fun.Stream[T] {
 	var next *entry[T]
-	return func(ctx context.Context) (o T, _ error) {
+	return fun.MakeStream(func(ctx context.Context) (o T, _ error) {
 		if next == nil {
 			q.mu.Lock()
 			next = q.front
@@ -425,5 +402,23 @@ func (q *Queue[T]) Generator() fun.Generator[T] {
 		}
 
 		return next.item, nil
+	})
+}
+
+// Distributor creates a object used to process the items in the
+// queue: items yielded by the Distributor's stream, are removed
+// from the queue.
+func (q *Queue[T]) Distributor() Distributor[T] {
+	return Distributor[T]{
+		push: fun.MakeHandler(q.Add),
+		pop: func(ctx context.Context) (_ T, err error) {
+			msg, ok := q.Remove()
+			if ok {
+				return msg, nil
+			}
+			msg, err = q.Wait(ctx)
+			return msg, err
+		},
+		size: q.tracker.len,
 	}
 }

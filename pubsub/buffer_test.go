@@ -146,7 +146,6 @@ func TestDistributor(t *testing.T) {
 			check.NotError(t, err)
 			check.Equal(t, count, 49)
 		})
-
 	})
 
 	t.Run("Table", func(t *testing.T) {
@@ -322,7 +321,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 				seen := &dt.Set[T]{}
 				seen.Synchronize()
 				wg := &sync.WaitGroup{}
-				receive := d.Generator()
+				receive := d.pop
 				for i := 0; i < 8; i++ {
 					wg.Add(1)
 					go func() {

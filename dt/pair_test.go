@@ -109,7 +109,7 @@ func TestPairs(t *testing.T) {
 	t.Run("ConsumePairs", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			expected := errors.New("hi")
-			iter := fun.StaticGenerator(MakePair("1", 1), expected).Stream()
+			iter := fun.MakeStream(fun.StaticGenerator(MakePair("1", 1), expected))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -134,7 +134,6 @@ func TestPairs(t *testing.T) {
 			assert.True(t, ps != nil)
 			check.Equal(t, ps.Len(), 6)
 		})
-
 	})
 	t.Run("Sorts", func(t *testing.T) {
 		cmp := func(a, b Pair[int, int]) bool {

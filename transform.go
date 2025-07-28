@@ -106,8 +106,7 @@ func (mpf Converter[T, O]) Generator(prod Generator[T]) Generator[O] {
 // stream of the another type. All errors from the original stream are
 // propagated to the output stream.
 func (mpf Converter[T, O]) Stream(iter *Stream[T]) *Stream[O] {
-	return mpf.Generator(iter.Read).
-		Stream().
+	return MakeStream(mpf.Generator(iter.Read)).
 		WithHook(func(st *Stream[O]) { st.AddError(iter.Close()) })
 }
 
@@ -122,7 +121,7 @@ func (mpf Converter[T, O]) Parallel(
 ) *Stream[O] {
 	conf := &WorkerGroupConf{}
 	if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
-		return makeErrorGenerator[O](err).Stream()
+		return MakeStream(makeErrorGenerator[O](err))
 	}
 
 	output := Blocking(make(chan O))
@@ -141,9 +140,8 @@ func (mpf Converter[T, O]) Parallel(
 		Go().
 		Once()
 
-	return output.Generator().
-		PreHook(setup).
-		Stream().
+	return MakeStream(output.Generator().
+		PreHook(setup)).
 		WithHook(func(out *Stream[O]) {
 			out.AddError(iter.Close())
 			out.AddError(conf.ErrorCollector.Resolve())
