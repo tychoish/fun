@@ -62,9 +62,10 @@ func (l *List[T]) AppendList(input *List[T]) *List[T] {
 
 func (l *List[T]) Reset() {
 	// remove all items so that they don't pass membership checks
-	l.StreamPopFront().ReadAll(fn.NewNoopHandler[T]()).Ignore().Wait()
-	// reset everything...
-	l.uncheckedSetup() // (maybe unnecessary?)
+	l.StreamPopFront().
+		ReadAll(fn.NewNoopHandler[T]()).
+		PostHook(l.uncheckedSetup). // reset everything...
+		Ignore().Wait()
 }
 
 // Len returns the length of the list. As the Append/Remove operations

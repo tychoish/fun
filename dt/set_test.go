@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -434,6 +435,78 @@ func TestSet(t *testing.T) {
 		check.Equal(t, 100, set.Len())
 		set.AppendSet(NewSetFromMap(makeMap(100)))
 		check.Equal(t, 200, set.Len())
+	})
+	t.Run("List", func(t *testing.T) {
+		t.Run("Ordered", func(t *testing.T) {
+			ls := &List[int]{}
+
+			st := &Set[int]{}
+			st.Order()
+
+			for v := range 42 {
+				ls.PushBack(v)
+				st.Add(v)
+			}
+
+			assert.Equal(t, ls.Len(), 42)
+			assert.Equal(t, st.Len(), ls.Len())
+
+			setls := st.List()
+
+			count := 0
+			for elemL, elemS := ls.Front(), setls.Front(); elemL.Ok() && elemS.Ok(); elemL, elemS = elemL.Next(), elemS.Next() {
+				count++
+				check.Equal(t, elemL.Value(), elemS.Value())
+			}
+			assert.Equal(t, count, 42)
+		})
+		t.Run("Undordered", func(t *testing.T) {
+			ls := &List[int]{}
+
+			st := &Set[int]{}
+
+			for v := range 42 {
+				ls.PushBack(v)
+				st.Add(v)
+			}
+
+			setls := st.List()
+
+			assert.Equal(t, ls.Len(), 42)
+			assert.Equal(t, st.Len(), ls.Len())
+			assert.Equal(t, st.Len(), setls.Len())
+
+			checker := Map[int, int]{}
+			for v := range setls.Iterator() {
+				if checker.Check(v) {
+					t.Errorf("duplicate value, %d", v)
+				}
+				checker.SetDefault(v)
+				check.True(t, v <= 42)
+			}
+			assert.Equal(t, 42, len(checker))
+		})
+	})
+	t.Run("Slice", func(t *testing.T) {
+		t.Run("Ordered", func(t *testing.T) {
+			in := []int{1, 2, 3, 4, 5, 6}
+			st := &Set[int]{}
+			st.Order()
+			st.AppendStream(NewSlice(in).Stream())
+			assert.Equal(t, st.Len(), 6)
+			assert.True(t, slices.Equal(in, st.Slice()))
+		})
+		t.Run("Unordered", func(t *testing.T) {
+			in := []int{1, 2, 3, 4, 5, 6}
+			st := &Set[int]{}
+			st.AppendStream(NewSlice(in).Stream())
+			assert.Equal(t, st.Len(), 6)
+			out := st.Slice()
+			assert.Equal(t, len(out), 6)
+			for v := range slices.Values(out) {
+				check.True(t, v <= 6 && v >= 1)
+			}
+		})
 	})
 }
 
