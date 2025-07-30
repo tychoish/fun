@@ -766,6 +766,34 @@ func TestList(t *testing.T) {
 			check.Equal(t, string(out), "42")
 		})
 	})
+	t.Run("Rest", func(t *testing.T) {
+		list := &List[int]{}
+		list.PushBack(4)
+		list.PushBack(8)
+		list.PushBack(16)
+		list.PushBack(32)
+		list.PushBack(64)
+		list.PushBack(128)
+		list.PushBack(256)
+		list.PushFront(0)
+
+		check.Equal(t, list.Len(), 8)
+		check.Equal(t, list.Front().Value(), 0)
+		check.Equal(t, list.Back().Value(), 256)
+
+		elem := list.Back().Previous().Previous()
+
+		check.NotNil(t, elem)
+		check.Equal(t, elem.Value(), 64)
+		check.True(t, elem.Ok())
+
+		list.Reset()
+
+		check.Equal(t, list.Len(), 0)
+		check.NotNil(t, elem)
+		check.Equal(t, elem.Value(), 64)
+		check.True(t, elem.list == nil)
+	})
 }
 
 func BenchmarkList(b *testing.B) {
