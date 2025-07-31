@@ -179,7 +179,7 @@ func TestSet(t *testing.T) {
 						set.Add("ghi")
 
 						setst := set.Stream()
-						getNextValue := func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
@@ -187,7 +187,7 @@ func TestSet(t *testing.T) {
 						set.SortQuick(cmp.LessThanNative[string])
 
 						setst = set.Stream()
-						getNextValue = func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -207,7 +207,7 @@ func TestSet(t *testing.T) {
 						set.Add("ghi")
 
 						setst := set.Stream()
-						getNextValue := func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
@@ -215,7 +215,7 @@ func TestSet(t *testing.T) {
 						set.SortQuick(cmp.LessThanNative[string])
 
 						setst = set.Stream()
-						getNextValue = func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -237,7 +237,7 @@ func TestSet(t *testing.T) {
 						set.Add("ghi")
 
 						setst := set.Stream()
-						getNextValue := func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
@@ -245,7 +245,7 @@ func TestSet(t *testing.T) {
 						set.SortMerge(cmp.LessThanNative[string])
 
 						setst = set.Stream()
-						getNextValue = func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -265,7 +265,7 @@ func TestSet(t *testing.T) {
 						set.Add("ghi")
 
 						setst := set.Stream()
-						getNextValue := func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
@@ -273,7 +273,7 @@ func TestSet(t *testing.T) {
 						set.SortMerge(cmp.LessThanNative[string])
 
 						setst = set.Stream()
-						getNextValue = func() string { return risky.BlockForceOp(setst.Read) }
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())

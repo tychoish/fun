@@ -133,7 +133,7 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
-func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.IgnoreError(wf(ctx)) } }
+func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.Ignore(wf(ctx)) } }
 
 // Force runs the worker, ignoring the output with background context.
 func (wf Worker) Force() { wf.Ignore().Wait() }

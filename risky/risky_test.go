@@ -14,7 +14,7 @@ func TestOperations(t *testing.T) {
 	t.Run("Ignore", func(t *testing.T) {
 		t.Run("SwallowError", func(t *testing.T) {
 			called := &atomic.Bool{}
-			Ignore(func(in string) error {
+			WithRecover(func(in string) error {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				return errors.New("exists")
@@ -23,7 +23,7 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("IndifferentError", func(t *testing.T) {
 			called := &atomic.Bool{}
-			Ignore(func(in string) error {
+			WithRecover(func(in string) error {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				return nil
@@ -32,19 +32,18 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
-			Ignore(func(in string) error {
+			WithRecover(func(in string) error {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				panic("hello")
 			}, "hello world")
 			assert.True(t, called.Load())
 		})
-
 	})
 	t.Run("IgnoreMust", func(t *testing.T) {
 		t.Run("SwallowError", func(t *testing.T) {
 			called := &atomic.Bool{}
-			output := IgnoreMust(func(in string) (int, error) {
+			output := Apply(func(in string) (int, error) {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				return 100, errors.New("exists")
@@ -54,7 +53,7 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("IndifferentError", func(t *testing.T) {
 			called := &atomic.Bool{}
-			output := IgnoreMust(func(in string) (int, error) {
+			output := Apply(func(in string) (int, error) {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				return 100, nil
@@ -64,7 +63,7 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("IndifferentValue", func(t *testing.T) {
 			called := &atomic.Bool{}
-			output := IgnoreMust(func(in string) (*int, error) {
+			output := Apply(func(in string) (*int, error) {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				return nil, errors.New("hello")
@@ -74,7 +73,7 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
-			output := IgnoreMust(func(in string) (int, error) {
+			output := Apply(func(in string) (int, error) {
 				called.Store(true)
 				check.Equal(t, "hello world", in)
 				panic("hello")
@@ -84,7 +83,7 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("PanicDefault", func(t *testing.T) {
 			called := &atomic.Bool{}
-			output := IgnoreMust(func(in string) (val int, _ error) {
+			output := Apply(func(in string) (val int, _ error) {
 				defer func() { val = 100 }()
 				called.Store(true)
 				check.Equal(t, "hello world", in)
@@ -96,7 +95,7 @@ func TestOperations(t *testing.T) {
 		})
 		t.Run("DefersRun", func(t *testing.T) {
 			called := &atomic.Bool{}
-			output := IgnoreMust(func(in string) (val int, _ error) {
+			output := Apply(func(in string) (val int, _ error) {
 				defer func() { val = 100 }()
 				defer func() { called.Store(true) }()
 				defer func() { _ = recover() }()
@@ -124,7 +123,7 @@ func TestOperations(t *testing.T) {
 		check.Equal(t, 100, value)
 	})
 	t.Run("Block", func(t *testing.T) {
-		out := Block(func(ctx context.Context) int {
+		out := BlockForce(func(ctx context.Context) int {
 			check.True(t, ctx != nil)
 			check.NotError(t, ctx.Err())
 			return 42
@@ -132,34 +131,34 @@ func TestOperations(t *testing.T) {
 		assert.Equal(t, out, 42)
 	})
 	t.Run("ForceOp", func(t *testing.T) {
-		assert.Zero(t, ForceOp(func() (out int, err error) {
+		assert.Zero(t, ForceCall(func() (out int, err error) {
 			out = 100 //nolint
 			panic("hi")
 		}))
-		assert.Equal(t, 100, ForceOp(func() (int, error) {
+		assert.Equal(t, 100, ForceCall(func() (int, error) {
 			return 100, nil
 		}))
-		assert.Equal(t, 100, ForceOp(func() (int, error) {
+		assert.Equal(t, 100, ForceCall(func() (int, error) {
 			return 100, errors.New("foo")
 		}))
 	})
 	t.Run("BlockForceOp", func(t *testing.T) {
-		assert.Zero(t, BlockForceOp(func(_ context.Context) (out int, err error) {
+		assert.Zero(t, BlockForceIgnore(func(_ context.Context) (out int, err error) {
 			out = 100 //nolint
 			panic("hi")
 		}))
-		assert.Equal(t, 100, BlockForceOp(func(ctx context.Context) (int, error) {
+		assert.Equal(t, 100, BlockForceIgnore(func(ctx context.Context) (int, error) {
 			check.True(t, ctx != nil)
 			check.NotError(t, ctx.Err())
 			return 100, nil
 		}))
-		assert.Equal(t, 100, BlockForceOp(func(_ context.Context) (int, error) {
+		assert.Equal(t, 100, BlockForceIgnore(func(_ context.Context) (int, error) {
 			return 100, errors.New("foo")
 		}))
 	})
 	t.Run("Try", func(t *testing.T) {
-		assert.Equal(t, 100, Try(func(_ int) (int, error) { return 0, errors.New("foo") }, 100))
-		assert.Equal(t, 42, Try(func(i int) (int, error) { check.Equal(t, i, 100); return 42, nil }, 100))
+		assert.Equal(t, 100, ApplyDefault(func(_ int) (int, error) { return 0, errors.New("foo") }, 100))
+		assert.Equal(t, 42, ApplyDefault(func(i int) (int, error) { check.Equal(t, i, 100); return 42, nil }, 100))
 	})
 	t.Run("Cast", func(t *testing.T) {
 		assert.NotPanic(t, func() { Cast[int](100) })
@@ -167,11 +166,16 @@ func TestOperations(t *testing.T) {
 		assert.Equal(t, Cast[int](100), 100)
 		assert.Equal(t, Cast[string]("bond"), "bond")
 	})
+
+	t.Run("Ignore", func(t *testing.T) {
+		check.NotPanic(t, func() { Ignore(errors.New("new")) })
+		check.NotPanic(t, func() { Ignore(nil) })
+	})
 }
 
 func TestApply(t *testing.T) {
 	primes := []int{1, 3, 5, 7, 9, 11, 17, 19}
-	magnitutde := Apply(func(in int) int { return in * 10 }, primes)
+	magnitutde := ApplyAll(func(in int) int { return in * 10 }, primes)
 	assert.Equal(t, len(primes), len(magnitutde))
 	assert.Equal(t, len(primes), 8)
 
@@ -181,7 +185,5 @@ func TestApply(t *testing.T) {
 		assert.Equal(t, magnitutde[idx]/10, primes[idx])
 	}
 	t.Run("Lazy", func(_ *testing.T) {
-
 	})
-
 }

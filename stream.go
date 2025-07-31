@@ -396,16 +396,22 @@ func (st *Stream[T]) Any() *Stream[any] {
 // Reduce processes a stream with a reducer function. The output
 // function is a Generator operation which runs synchronously, and no
 // processing happens before generator is called. If the reducer
-// function returns, ErrStreamContinue, the output value is ignored, and
-// the reducer operation continues. io.EOR errors are not propagated
-// to the caller, and in all situations, the last value produced by
-// the reducer is returned with an error.
+// function returns ErrStreamContinue, the output value is ignored,
+// and the reducer operation continues.
+//
+// If the underlying stream returns an error, it's returned by the
+// close method of this the new stream. If the reducer function
+// returns an error, that error is returned either by the Read or
+// Close methods of the stream. If the underlying stream terminates
+// cleanly, then the reducer will return it's last value without
+// error. Otherwise any error returned by the Reduce method, other
+// than ErrStreamContinue, is propagated to the caller.
 //
 // The "previous" value for the first reduce option is the zero value
 // for the type T.
-func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
+func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 	var value T
-	return func(ctx context.Context) (_ T, err error) {
+	return MakeStream(func(ctx context.Context) (_ T, err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 
 		for {
@@ -419,15 +425,13 @@ func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
 			case err == nil:
 				value = out
 				continue
-			case errors.Is(err, ErrStreamContinue):
+			case ers.Is(err, ErrStreamContinue):
 				continue
-			case ers.IsTerminating(err):
-				return value, nil
 			default:
 				return value, err
 			}
 		}
-	}
+	}).WithHook(st.CloseHook())
 }
 
 // Count returns the number of items observed by the stream. Callers

@@ -439,14 +439,5 @@ func makeErrorGenerator[T any](err error) Generator[T] {
 	return MakeGenerator(func() (zero T, _ error) { return zero, err })
 }
 
-func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.Future[error]) Generator[T] {
-	Invariant.Ok(handler != nil && resolver != nil, "must cal WithErrorHandler with non-nil operators")
-	return func(ctx context.Context) (T, error) {
-		out, err := pf(ctx)
-		handler(err)
-		return out, resolver()
-	}
-}
-
 // Read executes the generator and returns the result.
 func (pf Generator[T]) Read(ctx context.Context) (T, error) { return pf(ctx) }

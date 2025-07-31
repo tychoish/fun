@@ -60,7 +60,7 @@ func CallMany(ops []func()) {
 // of their results.
 func DoMany[T any](ops []func() T) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		for idx := 0; idx < len(ops); idx++ {
+		for idx := range ops {
 			if op := ops[idx]; op == nil {
 				continue
 			} else if !yield(op()) {
@@ -74,7 +74,7 @@ func DoMany[T any](ops []func() T) iter.Seq[T] {
 // of their results.
 func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
-		for idx := 0; idx < len(ops); idx++ {
+		for idx := range ops {
 			if op := ops[idx]; op == nil {
 				continue
 			} else if !yield(op()) {
@@ -96,7 +96,7 @@ func ApplyMany[T any](fn func(T), args []T) {
 
 // CallTimes runs the specified option n times.
 func CallTimes(n int, op func()) {
-	for i := 0; i < n; i++ {
+	for range n {
 		op()
 	}
 }
@@ -104,7 +104,7 @@ func CallTimes(n int, op func()) {
 // ApplyTimes runs the provided function and argument pair, the
 // specfied number of times.
 func ApplyTimes[T any](n int, fn func(T), arg T) {
-	for i := 0; i < n; i++ {
+	for range n {
 		fn(arg)
 	}
 }
@@ -113,7 +113,7 @@ func ApplyTimes[T any](n int, fn func(T), arg T) {
 // of their results.
 func DoTimes[T any](n int, op func() T) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		for i := 0; i < n; i++ {
+		for range n {
 			if op == nil || !yield(op()) {
 				return
 			}

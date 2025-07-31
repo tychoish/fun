@@ -147,7 +147,7 @@ func (s *Set[T]) Slice() Slice[T] {
 		return s.list.Slice()
 	}
 
-	return risky.BlockForceOp(s.hash.Keys().Slice)
+	return risky.BlockForceIgnore(s.hash.Keys().Slice)
 }
 
 // DeleteCheck removes the item from the set, return true when the
