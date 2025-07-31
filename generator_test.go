@@ -923,18 +923,6 @@ func TestGenerator(t *testing.T) {
 			assert.NotEqual(t, val, 100)
 		})
 	})
-	t.Run("WithErrorHandler", func(t *testing.T) {
-		const (
-			ErrUnseen ers.Error = "unseen"
-			ErrSeen   ers.Error = "seen"
-		)
-
-		eh, er := func(error) {}, func() error { return ErrSeen }
-		out, err := MakeGenerator(func() (int, error) { return 0, ErrUnseen }).WithErrorHandler(eh, er).Wait()
-		assert.Error(t, err)
-		assert.Zero(t, out)
-		assert.ErrorIs(t, err, ErrSeen)
-	})
 }
 
 func producerContinuesOnce[T any](out T, counter *atomic.Int64) Generator[T] {

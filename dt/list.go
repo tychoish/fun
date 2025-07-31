@@ -126,10 +126,10 @@ func (l *List[T]) Front() *Element[T] { return l.root().next }
 func (l *List[T]) Back() *Element[T] { return l.root().prev }
 
 // Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() Slice[T] { return risky.BlockForceOp(l.StreamFront().Slice) }
+func (l *List[T]) Slice() Slice[T] { return risky.BlockForceIgnore(l.StreamFront().Slice) }
 
 // Iterator returns a native go stream function for the items in a list.
-func (l *List[T]) Iterator() iter.Seq[T] { return risky.Block(l.StreamFront().Iterator) }
+func (l *List[T]) Iterator() iter.Seq[T] { return risky.BlockForce(l.StreamFront().Iterator) }
 
 // StreamFront returns a stream over the values in the list in
 // front-to-back order. The Stream is not synchronized with the

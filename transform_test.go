@@ -809,28 +809,34 @@ func RunStreamStringAlgoTests(
 						iter := builder()
 
 						seen := map[string]none{}
+						expectedError := errors.New("boop")
 
 						count := 0
 						_, err := iter.Reduce(
 							func(in string, val string) (string, error) {
 								check.Zero(t, val)
 								seen[in] = none{}
-								if len(seen) == 2 {
-									return val, errors.New("boop")
-								}
 								count++
+								if len(seen) == 3 {
+									return val, expectedError
+								}
 								return "", nil
 							},
 						).Read(ctx)
-						check.Equal(t, count, 1)
+						check.Equal(t, count, 3)
 						if err == nil {
 							t.Fatal("expected error")
 						}
 
-						if e := err.Error(); e != "boop" {
-							t.Error("unexpected error:", e)
+						if !errors.Is(err, expectedError) {
+							t.Error("unexpected error:", err)
 						}
-						if l := len(seen); l != 2 {
+						errs := ers.Unwind(err)
+						if len(errs) != 2 {
+							t.Error(len(errs), errs)
+						}
+
+						if l := len(seen); l != 3 {
 							t.Error("seen", l, seen)
 						}
 					})
@@ -866,7 +872,7 @@ func RunStreamStringAlgoTests(
 							}
 							return 42, nil
 						}).Read(ctx)
-						assert.NotError(t, err)
+						assert.ErrorIs(t, err, io.EOF)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
 					})

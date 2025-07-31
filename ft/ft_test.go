@@ -252,16 +252,6 @@ func TestWrap(t *testing.T) {
 		check.Equal(t, 42, num)
 		ok, num = Flip(op()) //nolint
 	})
-	t.Run("Ignore", func(t *testing.T) {
-		const first int = 42
-		const second bool = true
-		t.Run("First", func(t *testing.T) {
-			assert.Equal(t, second, IgnoreFirst(func() (int, bool) { return first, second }()))
-		})
-		t.Run("Second", func(t *testing.T) {
-			assert.Equal(t, first, IgnoreSecond(func() (int, bool) { return first, second }()))
-		})
-	})
 	t.Run("SafeOK", func(t *testing.T) {
 		assert.True(t, !DoSafe[bool](nil))
 		assert.True(t, nil == DoSafe[*bool](nil))
@@ -276,15 +266,10 @@ func TestWrap(t *testing.T) {
 		assert.Equal(t, "hello world", SafeCast[string](any("hello world")))
 		assert.NotZero(t, SafeCast[time.Time](time.Now()))
 
-		var foo = "foo"
+		foo := "foo"
 		var tt testing.TB
 		assert.NotZero(t, SafeCast[*string](&foo))
 		assert.Zero(t, SafeCast[*testing.T](tt))
-	})
-	t.Run("Ignore", func(t *testing.T) {
-		called := 0
-		Ignore(func() int { called++; return 1 }())
-		assert.Equal(t, called, 1)
 	})
 	t.Run("Ref", func(t *testing.T) {
 		var strptr *string
@@ -328,7 +313,6 @@ func TestWrap(t *testing.T) {
 	t.Run("Do", func(t *testing.T) {
 		assert.Panic(t, func() { Do[int](nil) })
 		assert.Panic(t, func() { Do(func() int { panic("here") }) })
-
 	})
 	t.Run("DoMany", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
@@ -436,7 +420,6 @@ func TestWrap(t *testing.T) {
 			assert.Equal(t, count, 2)
 			assert.Equal(t, total, 4)
 		})
-
 	})
 	t.Run("SafeApply", func(t *testing.T) {
 		assert.NotPanic(t, func() { ApplySafe(nil, 4) })
@@ -445,7 +428,6 @@ func TestWrap(t *testing.T) {
 		ApplySafe(func(in int) { out = in }, 42)
 		assert.Equal(t, out, 42)
 	})
-
 }
 
 func TestContexts(t *testing.T) {
@@ -485,7 +467,6 @@ func TestContexts(t *testing.T) {
 		}))
 		assert.ErrorIs(t, cc.Err(), context.Canceled)
 	})
-
 }
 
 func TestJoin(t *testing.T) {
@@ -510,11 +491,6 @@ func TestError(t *testing.T) {
 		out, ok = Check(41, errors.New("fail"))
 		assert.Zero(t, out)
 		assert.True(t, !ok)
-	})
-
-	t.Run("Ignore", func(t *testing.T) {
-		check.NotPanic(t, func() { IgnoreError(errors.New("new")) })
-		check.NotPanic(t, func() { IgnoreError(nil) })
 	})
 }
 
@@ -619,4 +595,21 @@ func TestPanicProtection(t *testing.T) {
 		assert.Equal(t, 10, inc)
 	})
 
+	t.Run("Ignore", func(t *testing.T) {
+		t.Run("FirstAndSecond", func(t *testing.T) {
+			const first int = 42
+			const second bool = true
+			t.Run("First", func(t *testing.T) {
+				assert.Equal(t, second, IgnoreFirst(func() (int, bool) { return first, second }()))
+			})
+			t.Run("Second", func(t *testing.T) {
+				assert.Equal(t, first, IgnoreSecond(func() (int, bool) { return first, second }()))
+			})
+		})
+		t.Run("Single", func(t *testing.T) {
+			called := 0
+			Ignore(func() int { called++; return 1 }())
+			assert.Equal(t, called, 1)
+		})
+	})
 }
