@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"context"
 	"encoding/json"
 	"iter"
 	"sync"
@@ -27,29 +26,12 @@ type Tuples[K any, V any] struct {
 // To build Tuples objects from other types, use the Consume methods.
 func MakeTuples[K any, V any](in ...Tuple[K, V]) *Tuples[K, V] {
 	p := &Tuples[K, V]{}
-	p.Append(in...)
+	p.PushMany(in...)
 	return p
-}
-
-// ConsumeTuples creates a *Tuples[K,V] object from a stream of
-// Tuple[K,V] objects.
-func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*Tuples[K, V]] {
-	return func(ctx context.Context) (*Tuples[K, V], error) {
-		p := &Tuples[K, V]{}
-		if err := p.Consume(iter).Run(ctx); err != nil {
-			return nil, err
-		}
-		return p, nil
-	}
 }
 
 func (p *Tuples[K, V]) init()     { p.setup.Do(p.initImpl) }
 func (p *Tuples[K, V]) initImpl() { ft.CallWhen(p.ll == nil, func() { p.ll = &List[Tuple[K, V]]{} }) }
-
-// Consume adds items from a stream of tuples to the current Tuples slice.
-func (p *Tuples[K, V]) Consume(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
-	return iter.ReadAll(func(item Tuple[K, V]) { p.Push(item) })
-}
 
 // Iterator returns a native go iterator function for tuples.
 func (p *Tuples[K, V]) Iterator() iter.Seq[Tuple[K, V]] {
@@ -108,24 +90,6 @@ func (p *Tuples[K, V]) SortQuick(c cmp.LessThan[Tuple[K, V]]) { p.init(); p.ll.S
 // Len returns the number of items in the tuples object.
 func (p *Tuples[K, V]) Len() int { p.init(); return p.ll.Len() }
 
-// ReadAll returns a worker, that when executed calls the processor
-// function for every tuple in the container.
-func (p *Tuples[K, V]) ReadAll(pf fun.Handler[Tuple[K, V]]) fun.Worker {
-	return func(ctx context.Context) error {
-		p.init()
-		if p.ll.Len() == 0 {
-			return nil
-		}
-
-		for item := range p.Iterator() {
-			if err := pf(ctx, item); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
 // Add adds a new value to the underlying slice. This may add a
 // duplicate key. The return value is provided to support chaining
 // Add() operations
@@ -135,13 +99,18 @@ func (p *Tuples[K, V]) Add(k K, v V) *Tuples[K, V] { p.Push(Tuple[K, V]{One: k, 
 // duplicate key.
 func (p *Tuples[K, V]) Push(tuple Tuple[K, V]) { p.init(); p.ll.PushBack(tuple) }
 
-// Append as a collection of tuples to the collection of key/value
+// PushMany as a collection of tuples to the collection of key/value
 // tuples.
-func (p *Tuples[K, V]) Append(vals ...Tuple[K, V]) { p.init(); p.ll.Append(vals...) }
+func (p *Tuples[K, V]) PushMany(vals ...Tuple[K, V]) { p.init(); p.ll.Append(vals...) }
 
-// Extend adds the items from a Tuples object (slice of Tuple) without
+// AppendTuples adds the items from a Tuples object (slice of Tuple) without
 // modifying the donating object.
-func (p *Tuples[K, V]) Extend(toAdd *Tuples[K, V]) { p.init(); p.ll.AppendList(toAdd.ll) }
+func (p *Tuples[K, V]) AppendTuples(toAdd *Tuples[K, V]) { p.init(); p.ll.AppendList(toAdd.ll) }
+
+// AppendStream adds items from a stream of tuples to the current Tuples slice.
+func (p *Tuples[K, V]) AppendStream(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
+	return iter.ReadAll(func(item Tuple[K, V]) { p.Push(item) })
+}
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first
 // converting it to a map and then encoding that map as JSON. The JSON
@@ -149,22 +118,19 @@ func (p *Tuples[K, V]) Extend(toAdd *Tuples[K, V]) { p.init(); p.ll.AppendList(t
 // object.
 func (p *Tuples[K, V]) MarshalJSON() ([]byte, error) {
 	buf := &internal.IgnoreNewLinesBuffer{}
-	enc := json.NewEncoder(buf)
 	buf.WriteByte('[')
 
 	idx := 0
-	if err := p.ReadAll(fun.MakeHandler(func(item Tuple[K, V]) error {
+	for tp := range p.Iterator() {
 		if idx != 0 {
 			buf.WriteByte(',')
 		}
 		idx++
-		if err := enc.Encode(item); err != nil {
-			return ers.Wrapf(err, "tuple at index %d", idx)
+		out, err := tp.MarshalJSON()
+		if err != nil {
+			return nil, err
 		}
-
-		return nil
-	})).Wait(); err != nil {
-		return nil, err
+		_, _ = buf.Write(out)
 	}
 
 	buf.WriteByte(']')

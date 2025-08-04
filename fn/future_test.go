@@ -1,7 +1,6 @@
 package fn
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -115,16 +114,6 @@ func TestFuture(t *testing.T) {
 		assert.Equal(t, sl[0], 42)
 		check.Equal(t, count, 1)
 	})
-	t.Run("Translate", func(t *testing.T) {
-		count := 0
-		thunk := MakeFuture(func() int { count++; return 42 })
-		think := Translate(thunk, func(in int) string { return fmt.Sprint(in) })
-		check.Equal(t, count, 0)
-		check.Equal(t, think(), "42")
-		check.Equal(t, count, 1)
-		check.Equal(t, thunk(), 42)
-		check.Equal(t, count, 2)
-	})
 	t.Run("Limit", func(t *testing.T) {
 		count := 0
 		thunk := MakeFuture(func() int { count++; return 42 }).Limit(100)
@@ -158,16 +147,13 @@ func TestFuture(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Zero(t, out)
-
 		})
 		t.Run("Wrapper", func(t *testing.T) {
 			out, err := MakeFuture(func() int { panic("foo") }).Safe()()
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.Zero(t, out)
-
 		})
-
 	})
 	t.Run("Lock", func(t *testing.T) {
 		// this is mostly just tempting the race detecor

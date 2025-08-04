@@ -40,6 +40,11 @@ func StaticGenerator[T any](val T, err error) Generator[T] {
 // provided value, and a nill error.
 func ValueGenerator[T any](val T) Generator[T] { return StaticGenerator(val, nil) }
 
+func errorGenerator[T any](err error) Generator[T] {
+	Invariant.Ok(err != nil, "cannot create error generator without an error")
+	return MakeGenerator(func() (zero T, _ error) { return zero, err })
+}
+
 // CheckedGenerator wraps a function object that uses the second ("OK")
 // value to indicate that no more values will be produced. Errors
 // returned from the resulting produce are always either the context
@@ -159,8 +164,6 @@ func (pf Generator[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Futu
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
-func (pf Generator[T]) Capture() fn.Future[T] { return pf.Force() }
-
 // Ignore creates a future that runs the generator and returns
 // the value, ignoring the error.
 func (pf Generator[T]) Ignore(ctx context.Context) fn.Future[T] {
@@ -177,6 +180,8 @@ func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
 // future is resolved, the generator executes with a context that never
 // expires and panics in the case of an error.
 func (pf Generator[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
+
+func (pf Generator[T]) Resolve() T { return ft.Do(pf.Force()) }
 
 // Wait runs the generator with a context that will ever expire.
 func (pf Generator[T]) Wait() (T, error) { return pf(context.Background()) }
@@ -432,11 +437,6 @@ func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
 		}
 		return val, nil
 	}
-}
-
-func makeErrorGenerator[T any](err error) Generator[T] {
-	Invariant.Ok(err != nil, "cannot create error generator without an error")
-	return MakeGenerator(func() (zero T, _ error) { return zero, err })
 }
 
 // Read executes the generator and returns the result.

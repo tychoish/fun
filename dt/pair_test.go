@@ -12,6 +12,18 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+// ConsumePairs creates a *Pairs[K,V] object from a stream of
+// Pair[K,V] objects.
+func ConsumePairs[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fun.Generator[*Pairs[K, V]] {
+	return func(ctx context.Context) (*Pairs[K, V], error) {
+		p := &Pairs[K, V]{}
+		if err := p.AppendStream(iter).Run(ctx); err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+}
+
 func TestPairs(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		ps := NewMap(map[string]string{"in": "out"}).Pairs()
@@ -85,7 +97,7 @@ func TestPairs(t *testing.T) {
 
 	t.Run("Extend", func(t *testing.T) {
 		ps := &Pairs[string, string]{}
-		ps.Extend(MakePairs(MakePair("one", "1"), MakePair("two", "2")))
+		ps.AppendPairs(MakePairs(MakePair("one", "1"), MakePair("two", "2")))
 		assert.Equal(t, ps.Len(), 2)
 		assert.Equal(t, ps.ll.Front().Value(), MakePair("one", "1"))
 	})
@@ -100,7 +112,7 @@ func TestPairs(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
+		assert.NotError(t, ps.AppendStream(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
 		mp.ExtendWithPairs(&ps)

@@ -29,7 +29,9 @@ func MakeHandler[T any](fn func(T) error) Handler[T] {
 // function that doesn't return an error or take a context,) into a
 // fun.Handler. the underlying function runs with a panic handler (so
 // fn.Handler panics are converted to errors.)
-func FromHandler[T any](f fn.Handler[T]) Handler[T] { return MakeHandler(f.Safe()) }
+func FromHandler[T any](f fn.Handler[T]) Handler[T] {
+	return MakeHandler(func(in T) error { f(in); return nil })
+}
 
 // NewHandler returns a Handler Function. This is a convenience
 // function to avoid the extra cast when creating new function
@@ -268,25 +270,6 @@ func (pf Handler[T]) WithErrorFilter(ef erc.Filter) Handler[T] {
 // of the provided types to a nil error.
 func (pf Handler[T]) WithoutErrors(errs ...error) Handler[T] {
 	return pf.WithErrorFilter(erc.NewFilter().Without(errs...))
-}
-
-// WithErrorCheck takes an error future, and checks it before
-// executing the processor operation. If the error future returns an
-// error (any error), the processor propagates that error, rather than
-// running the underying processor. Useful for injecting an abort into
-// an existing pipleine or chain.
-//
-// The error future is called before running the underlying processor,
-// to short circuit the operation, and also a second time when
-// processor has returned in case an error has occurred during the
-// operation of the processor.
-func (pf Handler[T]) WithErrorCheck(ef fn.Future[error]) Handler[T] {
-	return func(ctx context.Context, in T) error {
-		if err := ef(); err != nil {
-			return err
-		}
-		return erc.Join(pf(ctx, in), ef())
-	}
 }
 
 // Read executes the Handler once.

@@ -119,7 +119,7 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
-// SeqStream wraps a native go iterator to a fun.Stream[T].
+// SeqStream wraps a native go iterator to a Stream[T].
 func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 
@@ -173,7 +173,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		iters.ReadAll(func(iter *Stream[T]) {
 			// start a thread for reading this
 			// sub-iterator.
-			send.Consume(iter).
+			send.WriteAll(iter).
 				Operation(ec.Push).
 				PostHook(func() { ec.Push(iter.Close()) }).
 				Add(ctx, wg)
@@ -214,29 +214,6 @@ func (st *Stream[T]) doClose() {
 //
 // Close is safe to call more than once and always resolves the error handler (e.g. AddError),
 func (st *Stream[T]) Close() error { st.doClose(); return st.erc.Resolve() }
-
-func (st *Stream[T]) Lock() *Stream[T] {
-	mu := &sync.Mutex{}
-	return st.WithMutex(mu)
-}
-
-func (st *Stream[T]) WithMutex(mu *sync.Mutex) *Stream[T] {
-	prev := st.operation
-	st.operation = func(ctx context.Context) (T, error) {
-		defer internal.With(internal.Lock(mu))
-		return prev(ctx)
-	}
-	return st
-}
-
-func (st *Stream[T]) WithLocker(mu sync.Locker) *Stream[T] {
-	prev := st.operation
-	st.operation = func(ctx context.Context) (T, error) {
-		defer internal.WithL(internal.LockL(mu))
-		return prev(ctx)
-	}
-	return st
-}
 
 // WithHook constructs a stream from the generator. The
 // provided hook function will run during the Stream's Close()
@@ -386,13 +363,6 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 	return MakeStream(NewGenerator(st.operation).Filter(check)).WithHook(st.CloseHook())
 }
 
-// Any, as a special case of Transform converts a stream of any
-// type and converts it to a stream of any (e.g. interface{})
-// values.
-func (st *Stream[T]) Any() *Stream[any] {
-	return MakeConverter(func(in T) any { return any(in) }).Stream(st)
-}
-
 // Reduce processes a stream with a reducer function. The output
 // function is a Generator operation which runs synchronously, and no
 // processing happens before generator is called. If the reducer
@@ -458,10 +428,10 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	}
 	pipe := Blocking(make(chan T))
 
-	setup := pipe.Send().Consume(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
+	setup := pipe.Send().WriteAll(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
-		output[idx] = MakeStream(pipe.Generator().PreHook(setup)).WithHook(st.CloseHook())
+		output[idx] = MakeStream(NewGenerator(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
 	}
 
 	return output
@@ -560,8 +530,8 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-	return MakeStream(buf.Generator().PreHook(pipe))
+	pipe := buf.Send().WriteAll(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
+	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(pipe))
 }
 
 // BufferParallel, like buffer, process the input queue and stores
@@ -575,9 +545,9 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 func (st *Stream[T]) BufferParallel(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 
-	return MakeStream(buf.Generator().PreHook(
+	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(
 		st.Parallel(
-			buf.Send().Handler(),
+			buf.Send().Write,
 			WorkerGroupConfNumWorkers(n),
 		).Operation(st.ErrorHandler()).
 			PostHook(buf.Close).Go().Once(),
@@ -594,7 +564,7 @@ func (st *Stream[T]) Channel(ctx context.Context) <-chan T { return st.BufferedC
 func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
 
-	out.Handler().
+	NewHandler(out.Send().Write).
 		ReadAll(st).
 		PostHook(out.Close).
 		Operation(st.AddError).

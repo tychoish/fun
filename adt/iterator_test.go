@@ -92,7 +92,7 @@ func TestStream(t *testing.T) {
 				}
 
 				return int(val), nil
-			}).Lock()
+			})
 			for {
 				val, err := iter.Read(ctx)
 				testt.Log(t, err, val)
@@ -120,7 +120,7 @@ func TestStream(t *testing.T) {
 					return 0, io.EOF
 				}
 				return int(val), nil
-			}).Lock()
+			})
 
 			for {
 				val, err := iter.Read(ctx)

@@ -21,11 +21,6 @@ func MakeFuture[T any](f func() T) Future[T] { return f }
 // called, will return the provided value.
 func AsFuture[T any](in T) Future[T] { return ft.Wrap(in) }
 
-// Translate converts a future from one type to another.
-func Translate[T any, O any](in Future[T], tfn func(T) O) Future[O] {
-	return func() O { return tfn(in()) }
-}
-
 // Resolve executes the future and returns its value.
 func (f Future[T]) Resolve() T               { return f() }
 func (f Future[T]) Safe() func() (T, error)  { return f.RecoverPanic }

@@ -562,6 +562,7 @@ func TestWorker(t *testing.T) {
 		check.NotError(t, wf(ctx))
 		dur = time.Since(start).Truncate(time.Millisecond)
 
+		t.Log(dur)
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
 	})
@@ -938,5 +939,13 @@ func TestWorker(t *testing.T) {
 		}).Run(t.Context()))
 
 		assert.Equal(t, count.Load(), 2)
+	})
+	t.Run("ContextChannelWorker", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		err := MAKE.ContextChannelWorker(ctx).Run(t.Context())
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.True(t, t.Context().Err() == nil)
 	})
 }

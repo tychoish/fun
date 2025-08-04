@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
@@ -17,7 +16,7 @@ func TestPairExtra(t *testing.T) {
 	t.Run("Consume", func(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			p.PushMany(MakePair("1", 1), MakePair("2", 2), MakePair("3", 3))
 
 			ps := p.Slice()
 			for idx := range ps {
@@ -27,7 +26,7 @@ func TestPairExtra(t *testing.T) {
 		})
 		t.Run("List", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			p.PushMany(MakePair("1", 1), MakePair("2", 2), MakePair("3", 3))
 
 			pl := p.List()
 			check.NotEqual(t, pl, p.ll)
@@ -41,7 +40,7 @@ func TestPairExtra(t *testing.T) {
 		})
 		t.Run("Copy", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeSlice([]int{1, 2, 3}, func(in int) string { return fmt.Sprint(in) })
+			p.PushMany(MakePair("1", 1), MakePair("2", 2), MakePair("3", 3))
 
 			pl := p.Copy()
 			check.NotEqual(t, pl, p)
@@ -55,7 +54,7 @@ func TestPairExtra(t *testing.T) {
 		})
 		t.Run("Map", func(t *testing.T) {
 			p := &Pairs[string, int]{}
-			p.ConsumeMap(map[string]int{
+			p.AppendMap(map[string]int{
 				"1": 1,
 				"2": 2,
 				"3": 3,
@@ -98,36 +97,34 @@ func TestPairExtra(t *testing.T) {
 			assert.Equal(t, string(out), "{}")
 		})
 		t.Run("ImpossibleValue", func(t *testing.T) {
-			ps := MakePairs[string, context.CancelFunc](Pair[string, context.CancelFunc]{"hi", func() {}})
+			ps := MakePairs(Pair[string, context.CancelFunc]{"hi", func() {}})
 			_, err := ps.MarshalJSON()
 			assert.Error(t, err)
 		})
 		t.Run("ImpossibleKey", func(t *testing.T) {
-			ps := MakePairs[badKey, string](Pair[badKey, string]{"hi", "hi"})
+			ps := MakePairs(Pair[badKey, string]{"hi", "hi"})
 			_, err := ps.MarshalJSON()
 			assert.Error(t, err)
 		})
 	})
 	t.Run("FunctionalStreams", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		num := 1000
 		seen := &Set[int]{}
 
 		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Read(ctx)
 		assert.NotError(t, err)
-		err = ps.ReadAll(fun.FromHandler(func(p Pair[int, int]) {
+		err = ps.Stream().ReadAll(func(p Pair[int, int]) {
 			check.Equal(t, p.Key, p.Value)
 			check.True(t, ft.Not(seen.Check(p.Key)))
 			seen.Add(p.Key)
-		})).Run(ctx)
+		}).Run(ctx)
 		assert.NotError(t, err)
 		check.Equal(t, seen.Len(), num)
 	})
 	t.Run("Consume", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		ps := Pairs[int, int]{}
 		sp := Pairs[int, int]{}
@@ -136,7 +133,7 @@ func TestPairExtra(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
+		assert.NotError(t, ps.AppendStream(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := ps.Map()
 		assert.Equal(t, len(mp), 128)

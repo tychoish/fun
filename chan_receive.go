@@ -154,33 +154,12 @@ func (ro ChanReceive[T]) Stream() *Stream[T] { return MakeStream(ro.Read) }
 // canceled or the channel is closed.
 func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.Stream().Iterator(ctx) }
 
-// IteratorIndexed provides access to the contents of the channel as a
-// new-style standard library stream. For ChanRecieve objects in
-// non-blocking mode, iteration ends when there are no items in the
-// channel. In blocking mode, iteration ends when the context is
-// canceled or the channel is closed.
-//
-// The number is the index/counter of the items in the interator
-func (ro ChanReceive[T]) IteratorIndexed(ctx context.Context) iter.Seq2[int, T] {
-	var idx int
-
-	return func(yield func(idx int, val T) bool) {
-		for {
-			item, err := ro.Read(ctx)
-			if err != nil || !yield(idx, item) {
-				return
-			}
-			idx++
-		}
-	}
-}
-
-// Handle returns a Worker function that processes the output of data
+// ReadAll returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor
 // function returns ErrStreamContinue, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) Handle(op Handler[T]) Worker {
+func (ro ChanReceive[T]) ReadAll(op Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 

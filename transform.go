@@ -20,6 +20,10 @@ func MakeConverter[T any, O any](op func(T) O) Converter[T, O] {
 	return func(_ context.Context, in T) (O, error) { return op(in), nil }
 }
 
+func MakeConverterToAny[T any]() Converter[T, any] {
+	return MakeConverter(func(in T) any { return any(in) })
+}
+
 // MakeCovnerterOk builds a Transform function from a function that
 // converts between types T and O, but that returns a boolean/check
 // value. When the converter function returns false the
@@ -82,25 +86,26 @@ func (mpf Converter[T, O]) Stream(iter *Stream[T]) *Stream[O] {
 	return MakeStream(func(ctx context.Context) (out O, _ error) {
 		for {
 			item, err := iter.Read(ctx)
+			if err != nil {
+				// you'd think that you'd need to
+				// filter out Continue and other
+				// signals here, but the Read method
+				// on the stream will do that making
+				// these unreachable.
+				return mpf.zeroOut(), err
+			}
+
+			out, err = mpf.Convert(ctx, item)
 			switch {
 			case err == nil:
-				out, err = mpf.Convert(ctx, item)
-				switch {
-				case err == nil:
-					return out, nil
-				case errors.Is(err, ErrStreamContinue):
-					continue
-				default:
-					return mpf.zeroOut(), err
-				}
+				return out, nil
 			case errors.Is(err, ErrStreamContinue):
 				continue
 			default:
 				return mpf.zeroOut(), err
 			}
 		}
-	}).
-		WithHook(func(st *Stream[O]) { st.AddError(iter.Close()) })
+	}).WithHook(func(st *Stream[O]) { st.AddError(iter.Close()) })
 }
 
 // Parallel runs the input stream through the transform
@@ -114,7 +119,7 @@ func (mpf Converter[T, O]) Parallel(
 ) *Stream[O] {
 	conf := &WorkerGroupConf{}
 	if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
-		return MakeStream(makeErrorGenerator[O](err))
+		return MakeStream(errorGenerator[O](err))
 	}
 
 	output := Blocking(make(chan O))
@@ -125,7 +130,7 @@ func (mpf Converter[T, O]) Parallel(
 	// till later, and error handling gets much easier if we
 	// wait.
 	setup := mpf.WithRecover().
-		mapPullProcess(output.Handler(), conf).
+		mapPullProcess(output.Send().Write, conf).
 		ReadAll(iter).
 		Group(conf.NumWorkers).
 		PostHook(output.Close).
@@ -133,7 +138,7 @@ func (mpf Converter[T, O]) Parallel(
 		Go().
 		Once()
 
-	return MakeStream(output.Generator().
+	return MakeStream(NewGenerator(output.Receive().Read).
 		PreHook(setup)).
 		WithHook(func(out *Stream[O]) {
 			out.AddError(iter.Close())
