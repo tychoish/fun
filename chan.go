@@ -113,19 +113,5 @@ func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mo
 // Stream returns the "receive" aspect of the channel as an
 // stream. This is equivalent to fun.ChannelStream(), but may be
 // more accessible in some contexts.
-func (op ChanOp[T]) Stream() *Stream[T] { return op.Receive().Stream() }
-
+func (op ChanOp[T]) Stream() *Stream[T]                       { return op.Receive().Stream() }
 func (op ChanOp[T]) Iterator(ctx context.Context) iter.Seq[T] { return op.Receive().Iterator(ctx) }
-func (op ChanOp[T]) Seq2(ctx context.Context) iter.Seq2[int, T] {
-	return op.Receive().IteratorIndexed(ctx)
-}
-
-// Handler exposes the "send" aspect of the channel as a Handler function.
-func (op ChanOp[T]) Handler() Handler[T] { return op.Send().Handler() }
-
-// Generator expoess the "receive" aspect of the channel as a Generator function.
-func (op ChanOp[T]) Generator() Generator[T] { return op.Receive().Generator() }
-
-// Pipe creates a linked pair of functions for transmitting data via
-// these interfaces.
-func (op ChanOp[T]) Pipe() (Handler[T], Generator[T]) { return op.Handler(), op.Generator() }

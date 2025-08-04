@@ -267,7 +267,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.Distributor()
-				send := out.Handler()
+				send := out.Send
 				go func() {
 					defer func() { _ = queue.Close() }()
 					for input.Next(ctx) {

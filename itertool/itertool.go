@@ -81,7 +81,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}
 
-	return fun.MakeStream(func(ctx context.Context) (zero T, _ error) {
+	return fun.MakeStream(fun.NewGenerator(func(ctx context.Context) (zero T, _ error) {
 		for {
 			now := time.Now()
 
@@ -110,5 +110,5 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 				return zero, ctx.Err()
 			}
 		}
-	}).WithHook(func(*fun.Stream[T]) { timer.Stop() }).Lock()
+	}).Lock()).WithHook(func(*fun.Stream[T]) { timer.Stop() })
 }

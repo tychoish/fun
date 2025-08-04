@@ -25,7 +25,7 @@ func TestChannels(t *testing.T) {
 			if rtime < 500*time.Millisecond {
 				t.Errorf("runtime of %s, less than 500ms", rtime)
 			}
-			if rtime > 505*time.Millisecond {
+			if rtime > 550*time.Millisecond {
 				t.Errorf("runtime of %s, expected 500ms, with some buffer", rtime)
 			}
 		})

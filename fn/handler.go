@@ -36,14 +36,11 @@ func ErrorHandler[T any](eh Handler[error]) func(T, error) T {
 	return func(v T, err error) T { eh(err); return v }
 }
 
-// Capture returns a function that handles the specified value,
-// but only when executed later.
-func (of Handler[T]) Capture(in T) func() { return func() { of(in) } }
-
 // Safe returns a function that will execute the underlying Handler
-// function. Any panics in the underlying handler are converted to
-// errors.
-func (of Handler[T]) Safe() func(T) error { return of.RecoverPanic }
+// function, only when the function is non-nil. Use WithRecover and
+// RecoverPanic to handle panics.
+func (of Handler[T]) Safe() Handler[T] { return of.callSafe }
+func (of Handler[T]) callSafe(in T)    { ft.ApplyWhen(of != nil, of, in) }
 
 // Handler provides a more expository operation to call a handler
 // function.
@@ -57,7 +54,7 @@ func (of Handler[T]) WithRecover(oe Handler[error]) Handler[T] {
 
 // RecoverPanic runs the handler function with a panic handler and converts
 // a possible panic to an error.
-func (of Handler[T]) RecoverPanic(in T) error { return ft.WithRecoverCall(of.Capture(in)) }
+func (of Handler[T]) RecoverPanic(in T) error { return ft.WithRecoverApply(of, in) }
 
 // If returns an handler that only executes the root handler if the
 // condition is true.
@@ -67,7 +64,7 @@ func (of Handler[T]) If(cond bool) Handler[T] { return of.When(ft.Wrap(cond)) }
 // function if the condition function returns true. The condition
 // function is run every time the handler function runs.
 func (of Handler[T]) When(cond func() bool) Handler[T] {
-	return func(in T) { ft.CallWhen(cond(), of.Capture(in)) }
+	return func(in T) { ft.ApplyWhen(cond(), of, in) }
 }
 
 // Skip runs a check before passing the object to the obsever, when

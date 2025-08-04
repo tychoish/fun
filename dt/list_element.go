@@ -29,10 +29,15 @@ type Element[T any] struct {
 func NewElement[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 
 // String returns the string form of the value of the element.
-func (e *Element[T]) String() string { return fmt.Sprint(e.item) }
+func (e *Element[T]) String() string { return fmt.Sprint(e.Value()) }
 
 // Value accesses the element's value.
-func (e *Element[T]) Value() T { return e.item }
+func (e *Element[T]) Value() (out T) {
+	if e != nil {
+		out = e.item
+	}
+	return
+}
 
 // Next produces the next element. This is always non-nil, *unless*
 // the element is not a member of a list. At the ends of a list, the

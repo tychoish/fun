@@ -59,10 +59,6 @@ func (d Distributor[T]) Send(ctx context.Context, in T) error { return d.push(ct
 // Receive pulls an object from the distributor.
 func (d Distributor[T]) Receive(ctx context.Context) (T, error) { return d.pop(ctx) }
 
-// Handler provides convienet access to the "send" side of the
-// distributor as a fun.Handler function.
-func (d Distributor[T]) Handler() fun.Handler[T] { return d.push }
-
 // Stream allows iterator-like access to a distributor. These streams
 // are blocking and destructive. The stream's close method does *not*
 // close the distributor's underlying structure.
@@ -77,5 +73,5 @@ func DistributorChannel[T any](ch chan T) Distributor[T] { return DistributorCha
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions
 func DistributorChanOp[T any](ch fun.ChanOp[T]) Distributor[T] {
-	return MakeDistributor(ch.Send().Handler(), ch.Receive().Generator(), ch.Len)
+	return MakeDistributor(ch.Send().Write, ch.Receive().Read, ch.Len)
 }

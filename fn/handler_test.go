@@ -15,7 +15,6 @@ func TestHandler(t *testing.T) {
 	t.Run("Check", func(t *testing.T) {
 		var ob Handler[int] = func(_ int) {
 			panic(io.EOF)
-
 		}
 		assert.ErrorIs(t, ob.RecoverPanic(100), io.EOF)
 	})
@@ -30,7 +29,6 @@ func TestHandler(t *testing.T) {
 
 		var ob Handler[int] = func(_ int) {
 			panic(io.EOF)
-
 		}
 		ob.WithRecover(oe).Handle(100)
 		assert.Equal(t, 1, count)
@@ -211,18 +209,9 @@ func TestHandler(t *testing.T) {
 		check.Equal(t, count, 2)
 	})
 	t.Run("Panics", func(t *testing.T) {
-		t.Run("Direct", func(t *testing.T) {
-			err := NewHandler(func(in int) { assert.Equal(t, in, 33); panic("foo") }).RecoverPanic(33)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-		})
-		t.Run("Wrap", func(t *testing.T) {
-			err := NewHandler(func(in int) { assert.Equal(t, in, 33); panic("foo") }).Safe()(33)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-
-		})
-
+		err := NewHandler(func(in int) { assert.Equal(t, in, 33); panic("foo") }).RecoverPanic(33)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 	})
 	t.Run("JoinHandlers", func(t *testing.T) {
 		count := 0
@@ -255,7 +244,6 @@ func TestHandler(t *testing.T) {
 			assert.Equal(t, sum, 16)
 			assert.Equal(t, count, 4)
 		})
-
 	})
 	t.Run("ErrorHandler", func(t *testing.T) {
 		var called bool

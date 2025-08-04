@@ -685,7 +685,8 @@ func TestAny(t *testing.T) {
 
 	sl := []int{1, 1, 2, 3, 5, 8, 9, 5}
 	count := 0
-	err := SliceStream(sl).Any().ReadAll(func(in any) {
+
+	err := MakeConverterToAny[int]().Stream(SliceStream(sl)).ReadAll(func(in any) {
 		count++
 		_, ok := in.(int)
 		check.True(t, ok)
@@ -854,5 +855,12 @@ func TestJSON(t *testing.T) {
 			t.Log(out)
 			assert.EqualItems(t, out, []int{1, 3, 7, 9})
 		})
+	})
+	t.Run("PanicReadCoverage", func(t *testing.T) {
+		str := MakeStream(func(context.Context) (int, error) { return 7, ers.ErrRecoveredPanic })
+		num, err := str.Read(t.Context())
+		check.Equal(t, num, 7)
+		check.Error(t, err)
+		check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 	})
 }

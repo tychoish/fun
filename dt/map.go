@@ -70,15 +70,6 @@ func (m Map[K, V]) Pairs() *Pairs[K, V] {
 	return p
 }
 
-// Tuples exports a map a Pairs object, containing the contents of the map.
-func (m Map[K, V]) Tuples() *Tuples[K, V] {
-	tp := MakeTuples[K, V]()
-	for k, v := range m {
-		tp.Add(k, v)
-	}
-	return tp
-}
-
 // Add adds a key value pair directly to the map.
 func (m Map[K, V]) Add(k K, v V) { m[k] = v }
 

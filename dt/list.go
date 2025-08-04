@@ -33,18 +33,23 @@ type List[T any] struct {
 func VariadicList[T any](elems ...T) *List[T]                     { return SliceList(elems) }
 func SliceList[T any](elems []T) *List[T]                         { l := new(List[T]); l.Append(elems...); return l }
 func MapList[K comparable, V any](mp Map[K, V]) *List[Pair[K, V]] { return StreamList(mp.Stream()) }
-func StreamList[T any](st *fun.Stream[T]) *List[T]                { l := &List[T]{}; l.Populate(st).Force(); return l }
+func IteratorList[T any](in iter.Seq[T]) *List[T]                 { l := new(List[T]); l.AppendIterator(in); return l }
+func StreamList[T any](st *fun.Stream[T]) *List[T] {
+	l := new(List[T])
+	l.AppendStream(st).Force()
+	return l
+}
 
-// Populate returns a worker that adds items from the stream to the
+// AppendStream returns a worker that adds items from the stream to the
 // list. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
-func (l *List[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
+func (l *List[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
 
 // Append adds a variadic sequence of items to the end of the list.
-func (l *List[T]) Append(items ...T) *List[T] { return l.AddSlice(items) }
+func (l *List[T]) Append(items ...T) *List[T] { return l.AppendSlice(items) }
 
-func (l *List[T]) AddSlice(sl []T) *List[T] {
+func (l *List[T]) AppendSlice(sl []T) *List[T] {
 	for idx := range sl {
 		l.PushBack(sl[idx])
 	}
@@ -56,6 +61,13 @@ func (l *List[T]) AddSlice(sl []T) *List[T] {
 func (l *List[T]) AppendList(input *List[T]) *List[T] {
 	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
 		l.Back().Append(elem)
+	}
+	return l
+}
+
+func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
+	for val := range input {
+		l.PushBack(val)
 	}
 	return l
 }

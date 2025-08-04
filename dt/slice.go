@@ -2,6 +2,8 @@ package dt
 
 import (
 	"context"
+	"iter"
+	"slices"
 	"sort"
 
 	"github.com/tychoish/fun"
@@ -69,7 +71,7 @@ func MergeSlices[T any](sls ...[]T) Slice[T] {
 
 	out := SliceWithCapacity[T](size)
 	for idx := range sls {
-		out.Extend(sls[idx])
+		out.AppendSlice(sls[idx])
 	}
 	return out
 }
@@ -102,7 +104,7 @@ func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Generator[
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
-		if err := op.Stream(in.Stream()).ReadAll(out.Add).Run(ctx); err != nil {
+		if err := op.Stream(in.Stream()).ReadAll(out.Push).Run(ctx); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -112,6 +114,7 @@ func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Generator[
 // Stream returns a stream to the items of the slice the range
 // keyword also works for these slices.
 func (s Slice[T]) Stream() *fun.Stream[T] { return fun.SliceStream(s) }
+func (s Slice[T]) Iterator() iter.Seq[T]  { return slices.Values(s) }
 
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false
@@ -120,17 +123,21 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 	sort.Slice(s, func(i, j int) bool { return cp(s[i], s[j]) })
 }
 
-// Add adds a single item to the end of the slice.
-func (s *Slice[T]) Add(in T) { *s = append(*s, in) }
+// Push adds a single item to the end of the slice.
+func (s *Slice[T]) Push(in T) { *s = append(*s, in) }
 
-// Append adds all of the items to the end of the slice.
-func (s *Slice[T]) Append(in ...T) { s.Extend(in) }
+// PushMany adds all of the items to the end of the slice.
+func (s *Slice[T]) PushMany(in ...T) { s.AppendSlice(in) }
 
 // Prepend adds the items to beginning of the slice.
 func (s *Slice[T]) Prepend(in ...T) { *s = append(in, *s...) }
 
-// Extend adds the items from the input slice to the root slice.
-func (s *Slice[T]) Extend(in []T) { *s = append(*s, in...) }
+// AppendSlice adds the items from the input slice to the root slice.
+func (s *Slice[T]) AppendSlice(in []T) { *s = append(*s, in...) }
+
+// Populate constructs an operation that adds all items from the
+// stream to the slice.
+func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(s.Push) }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }
@@ -159,7 +166,7 @@ func (s Slice[T]) ReadAll(of fn.Handler[T]) {
 // input slice. Items that the filter function returns true for are
 // included and others are skipped.
 func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
-	s.ReadAll(func(in T) { ft.ApplyWhen(p(in), o.Add, in) })
+	s.ReadAll(func(in T) { ft.ApplyWhen(p(in), o.Push, in) })
 	return
 }
 
@@ -279,12 +286,6 @@ func (s Slice[T]) Sparse() Slice[T] {
 	}
 
 	out := NewSlice(make([]T, 0, buf.Len()))
-	out.Populate(buf.StreamPopFront()).Ignore().Wait()
+	out.AppendStream(buf.StreamPopFront()).Ignore().Wait()
 	return out
-}
-
-// Populate constructs an operation that adds all items from the
-// stream to the slice.
-func (s *Slice[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return iter.ReadAll(s.Add)
 }

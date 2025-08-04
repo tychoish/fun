@@ -188,7 +188,7 @@ func TestPanics(t *testing.T) {
 			}
 
 			assert.NotPanic(t, func() {
-				err := of.Safe()("hi")
+				err := of.RecoverPanic("hi")
 
 				assert.ErrorIs(t, err, io.EOF)
 				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
@@ -212,7 +212,6 @@ func TestPanics(t *testing.T) {
 			}
 			if seen != "hello" {
 				t.Errorf("unexpected value%q", seen)
-
 			}
 		})
 		t.Run("Wait", func(t *testing.T) {
@@ -222,9 +221,20 @@ func TestPanics(t *testing.T) {
 				panic("hi")
 			}
 
-			assert.NotPanic(t, func() { ts := of.Safe(); assert.Error(t, ts("hi")) })
+			assert.Panic(t, func() { ts := of.Safe(); ts("hi") })
 			assert.True(t, called)
 		})
+		t.Run("Wait", func(t *testing.T) {
+			var called bool
+			of = func(string) {
+				called = true
+				panic("hi")
+			}
+
+			assert.NotPanic(t, func() { ts := of.RecoverPanic; check.Error(t, ts("hi")) })
+			assert.True(t, called)
+		})
+
 		t.Run("Failure", func(t *testing.T) {
 			assert.Panic(t, func() { Invariant.Failure() })
 			assert.Panic(t, func() { Invariant.Failure("this") })
@@ -243,5 +253,4 @@ func TestPanics(t *testing.T) {
 		extractErrors(ec, []any{nil, ers.Error("hi"), func() error { return nil }(), nerr, 2, false})
 		check.Equal(t, ec.Len(), 2)
 	})
-
 }

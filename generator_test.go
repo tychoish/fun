@@ -351,11 +351,11 @@ func TestGenerator(t *testing.T) {
 		pf := MakeGenerator(func() (int, error) { count++; return 42, err })
 		var out int
 
-		assert.NotPanic(t, func() { out = pf.Capture().Resolve() })
+		assert.NotPanic(t, func() { out = pf.Force().Resolve() })
 		assert.Equal(t, out, 42)
 		assert.Equal(t, count, 1)
 		err = nil
-		assert.Equal(t, 42, pf.Capture().Resolve())
+		assert.Equal(t, 42, pf.Resolve())
 	})
 	t.Run("Ignore", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

@@ -126,7 +126,7 @@ func (s *Set[T]) Stream() *fun.Stream[T] {
 	st := s.unsafeStream()
 
 	if mu != nil {
-		return st.WithMutex(mu)
+		return fun.MakeStream(fun.NewGenerator(st.Read).WithLock(mu)).WithHook(st.CloseHook())
 	}
 
 	return st

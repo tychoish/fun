@@ -8,6 +8,8 @@ import (
 	"math"
 	"math/rand"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -983,5 +985,34 @@ func RunStreamStringAlgoTests(
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
 		assert.Zero(t, counter)
 		assert.Nil(t, out)
+	})
+	t.Run("ConvertContinue", func(t *testing.T) {
+		count := 0
+		st := MakeStream(MakeGenerator(func() (int, error) {
+			count++
+
+			if count%2 == 0 {
+				return 0, ErrStreamContinue
+			}
+			if count < 16 {
+				return count, nil
+			}
+			if count >= 16 {
+				return 0, io.EOF
+			}
+
+			return count, ErrInvariantViolation
+		}))
+
+		newSl, err := MakeConverterErr(func(in int) (string, error) {
+			return strconv.Itoa(in), nil
+		}).Stream(st).Slice(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, len(newSl), 8)
+		check.Equal(t, newSl[3], "7")
+		check.Equal(t, false, slices.ContainsFunc(newSl, func(in string) bool {
+			return in == "4"
+		}))
+		check.Equal(t, newSl[0], "1")
 	})
 }

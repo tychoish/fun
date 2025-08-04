@@ -38,11 +38,11 @@ func And(ops ...That) That {
 		out := dt.NewSlice(make([]string, 0, len(ops)+1))
 		for _, that := range ops {
 			if that == nil {
-				out.Add("encountered nil is.That operation")
+				out.Push("encountered nil is.That operation")
 				break
 			}
 			if results := that(); len(results) > 0 {
-				out.Extend(results)
+				out.AppendSlice(results)
 				break
 			}
 		}
@@ -58,10 +58,10 @@ func All(ops ...That) That {
 	return func() []string {
 		out := dt.NewSlice(make([]string, 0, len(ops)+1))
 		dt.NewSlice(ops).ReadAll(func(op That) {
-			ft.ApplyWhen(op == nil, out.Add,
+			ft.ApplyWhen(op == nil, out.Push,
 				"encountered nil is.That operation",
 			)
-			out.Extend(ft.DoSafe(op))
+			out.AppendSlice(ft.DoSafe(op))
 		})
 		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}

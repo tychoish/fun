@@ -32,7 +32,6 @@ func (eel *list) Error() string {
 		return "<nil>"
 	}
 
-	// TODO: pool buffers.
 	buf := &bytes.Buffer{}
 
 	for elem := range eel.FIFO() {
@@ -145,7 +144,6 @@ func (eel *list) PushBack(err error) {
 		elem.next.prev = elem
 		elem.prev.next = elem
 	}
-
 }
 
 func (eel *list) PushFront(err error) {

@@ -153,8 +153,8 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Iterator()(fn) }
 //
 // This operation relies on a the underlying Range stream, and
 // advances lazily through the Range operation as callers advance the
-// stream. Be aware that this produces a stream that does not
-// reflect any particular atomic of the underlying map.
+// stream. Be aware that this produces a stream that does not reflect
+// any particular atomic state of the underlying map.
 func (mp *Map[K, V]) Stream() *fun.Stream[dt.Pair[K, V]] { return makeMapStream(mp, dt.MakePair) }
 
 // Iterator returns a native go iterator for a fun/dt.Map object.
@@ -186,10 +186,11 @@ func makeMapStream[K comparable, V any, O any](
 	rf func(K, V) O,
 ) *fun.Stream[O] {
 	pipe := fun.Blocking(make(chan O))
-	return fun.MakeStream(pipe.Generator().PreHook(fun.Operation(func(ctx context.Context) {
-		send := pipe.Send()
-		mp.Range(func(key K, value V) bool {
-			return send.Check(ctx, rf(key, value))
-		})
-	}).PostHook(pipe.Close).Go().Once()))
+	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).
+		PreHook(fun.Operation(func(ctx context.Context) {
+			send := pipe.Send()
+			mp.Range(func(key K, value V) bool {
+				return send.Check(ctx, rf(key, value))
+			})
+		}).PostHook(pipe.Close).Go().Once()))
 }

@@ -39,6 +39,12 @@ func TestList(t *testing.T) {
 		assert.NotPanic(t, func() { l.Len() })
 		assert.Zero(t, l.Len())
 	})
+	t.Run("IteratorList", func(t *testing.T) {
+		list := IteratorList(NewSlice([]int{1, 2, 3, 4, 5}).Iterator())
+		assert.Equal(t, list.Len(), 5)
+		assert.Equal(t, list.Front().Value(), 1)
+		assert.Equal(t, list.Back().Value(), 5)
+	})
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := ft.WithRecoverDo(func() bool {
 			var list *List[string]

@@ -37,13 +37,13 @@ func TestFundamentals(t *testing.T) {
 			ex := dt.NewSlice(base)
 			check.True(t, ex == nil)
 
-			ex.Extend(base)
+			ex.AppendSlice(base)
 			check.True(t, ex == nil)
 
 			exx := []string{}
 			check.True(t, exx != nil)
 
-			ex.Extend(exx)
+			ex.AppendSlice(exx)
 			check.True(t, ex == nil)
 		})
 	})
@@ -54,7 +54,6 @@ func TestFundamentals(t *testing.T) {
 		metadata.Add("one", 2)
 		metadata.Add("two", 3)
 		check.Equal(t, metadata.Len(), 2)
-
 	})
 }
 
