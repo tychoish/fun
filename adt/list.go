@@ -26,11 +26,10 @@ type List[T any] struct {
 
 func (l *List[T]) init() *element[T] {
 	l.size.Store(0)
-	head := l.newElem()
-	head.next, head.prev = head, head
-	head.root = true
-
-	return head
+	n := l.newElem()
+	n.next, n.prev = n, n
+	n.root = true
+	return n
 }
 
 func (l *List[T]) Head() *element[T]         { return l.root().Next() }
@@ -40,7 +39,6 @@ func (l *List[T]) PushFront(v *T)            { l.root().append(l.makeElem(v)) }
 func (l *List[T]) PopFront() *T              { return l.root().next.Pop() }
 func (l *List[T]) PopBack() *T               { return l.root().prev.Pop() }
 func (l *List[T]) Len() int                  { return int(l.size.Load()) }
-func (l *List[T]) valid() bool               { return l != nil }
 func (l *List[T]) newElem() *element[T]      { return &element[T]{list: l} }
 func (l *List[T]) makeElem(v *T) *element[T] { return l.newElem().Set(v) }
 func (l *List[T]) root() *element[T]         { return l.head.Call(l.init) }
@@ -56,14 +54,21 @@ type element[T any] struct {
 }
 
 func (el *element[T]) mtx() *sync.Mutex        { return &el.mutx }
-func (el *element[T]) isNotRoot() bool         { return !el.root }
-func (el *element[T]) isNotNil() bool          { return el != nil }
 func (el *element[T]) isAttached() bool        { return el.list != nil && el.next != nil && el.prev != nil }
 func (el *element[T]) unlessRoot() *element[T] { return ft.Unless(el.root, el) }
-func (el *element[T]) Next() *element[T]       { defer With(Lock(el.mtx())); return el.next.unlessRoot() }
-func (el *element[T]) Previous() *element[T]   { defer With(Lock(el.mtx())); return el.prev.unlessRoot() }
-
-// func (el *element[T]) isDetatched() bool       { return el.list == nil || el.next == nil || el.prev == nil }
+func (el *element[T]) mustNotRoot()            { fun.Invariant.Ok(!el.root, ErrOperationOnRootElement) }
+func (el *element[T]) innerElem() *element[T]  { defer With(Lock(el.mtx())); return el.unlessRoot() }
+func (el *element[T]) innerOk() bool           { defer With(Lock(el.mtx())); return el.ok }
+func (el *element[T]) innerValue() *T          { defer With(Lock(el.mtx())); return el.item }
+func (el *element[T]) Ref() T                  { return ft.Ref(el.Value()) }
+func (el *element[T]) RefOk() (T, bool)        { return ft.RefOk(el.Value()) }
+func (el *element[T]) Ok() bool                { return ft.DoWhen(el != nil, el.innerOk) }
+func (el *element[T]) Value() *T               { return ft.DoWhen(el != nil, el.innerValue) }
+func (el *element[T]) Next() *element[T]       { return ft.DoWhen(el != nil, el.next.innerElem) }
+func (el *element[T]) Previous() *element[T]   { return ft.DoWhen(el != nil, el.prev.innerElem) }
+func (el *element[T]) Pop() *T                 { return safeTx(el, el.innerPop) }
+func (el *element[T]) Drop()                   { safeTx(el, el.innerPop) }
+func (el *element[T]) Set(v *T) *element[T]    { el.mustNotRoot(); return el.doSet(v) }
 
 func (el *element[T]) Get() (*T, bool) {
 	if el == nil {
@@ -71,23 +76,6 @@ func (el *element[T]) Get() (*T, bool) {
 	}
 	defer With(Lock(el.mtx()))
 	return el.item, el.ok
-}
-
-func (el *element[T]) Value() *T {
-	if el == nil {
-		return nil
-	}
-
-	defer With(Lock(el.mtx()))
-	return el.item
-}
-
-func (el *element[T]) Ok() bool {
-	if el == nil {
-		return false
-	}
-	defer With(Lock(el.mtx()))
-	return el.ok
 }
 
 func (el *element[T]) Unset() (out *T, ok bool) {
@@ -101,52 +89,36 @@ func (el *element[T]) Unset() (out *T, ok bool) {
 	return
 }
 
-func (el *element[T]) Set(v *T) *element[T] {
-	fun.Invariant.IsFalse(el.root, ErrOperationOnRootElement)
+func (el *element[T]) doSet(v *T) *element[T] {
 	defer With(Lock(el.mtx()))
-
 	el.item, el.ok = v, true
 	return el
 }
 
-func (el *element[T]) Pop() (out *T) {
-	el.safeOp(func(inner *element[T]) {
-		out = inner.item
-		inner.item, inner.ok = nil, false
-		inner.list.size.Add(-1)
-		inner.prev.next = inner.next
-		inner.next.prev = inner.prev
-		inner.list = nil
-	}, el.isNotNil, el.next.isNotNil, el.prev.isNotNil, el.list.valid, el.isNotRoot)
-	return
+func safeTx[T any, O any](e *element[T], op func() O) O {
+	defer WithAll(LocksHeld(e.forTx()))
+	return ft.DoUnless(e.root, op)
 }
 
-func (el *element[T]) Drop() {
-	el.safeOp(func(el *element[T]) {
-		el.list.size.Add(-1)
-		el.prev.next = el.next
-		el.next.prev = el.prev
-		el.list = nil
-	}, el.isNotNil, el.next.isNotNil, el.prev.isNotNil, el.list.valid, el.isNotRoot)
+func (el *element[T]) innerPop() (out *T) {
+	out = el.item
+	el.item, el.ok = nil, false
+	el.list.size.Add(-1)
+	el.prev.next = el.next
+	el.next.prev = el.prev
+	el.list = nil
+	return out
 }
 
-func (el *element[T]) safeOp(op func(el *element[T]), preCheks ...func() bool) {
-	for _, c := range preCheks {
-		if !c() {
-			return
-		}
+func (el *element[T]) forTx() []*sync.Mutex {
+	if el == nil || el.next == nil || el.prev == nil {
+		return nil
 	}
-
-	defer WithAll(LocksHeld(el.mtx(), el.next.mtx(), el.prev.mtx()))
-	op(el)
+	return ft.Slice(el.mtx(), el.next.mtx(), el.prev.mtx())
 }
 
 func (el *element[t]) append(next *element[t]) {
-	fun.Invariant.Ok(el != nil, "cannot operate on nil elements")
-	fun.Invariant.Ok(el.next != nil, "cannot append to detached elements")
-	fun.Invariant.Ok(el.list != nil, "cannot append to items without a list reference")
-
-	defer WithAll(LocksHeld(el.mtx(), el.next.mtx(), next.mtx()))
+	defer WithAll(LocksHeld(el.forTx()))
 
 	fun.Invariant.IsTrue(el.isAttached(), ErrOperationOnAttachedElements)
 	fun.Invariant.IsTrue(next.next == nil && next.prev == nil, ErrOperationOnDetachedElements)
@@ -161,8 +133,6 @@ func (el *element[t]) append(next *element[t]) {
 
 func WithAll(locks []*sync.Mutex) { released(locks) }
 
-func LocksHeld(mtxs ...*sync.Mutex) []*sync.Mutex { return lockMany(mtxs) }
-
 func released(locks []*sync.Mutex) {
 	for idx, mtx := range locks {
 		if mtx != nil {
@@ -172,26 +142,35 @@ func released(locks []*sync.Mutex) {
 	}
 }
 
-func lockMany(mtxs []*sync.Mutex) []*sync.Mutex {
-	locked := make([]*sync.Mutex, len(mtxs))
+func doPanic(p any) { panic(p) }
 
-	defer func() {
-		if p := recover(); p != nil {
-			defer panic(p)
-			released(locked)
-		}
-	}()
+func LocksHeld(mtxs []*sync.Mutex) []*sync.Mutex {
+	fun.Invariant.Ok(mtxs != nil, "must hold the correct set of locks for the operation")
 
 	seen := map[*sync.Mutex]struct{}{}
+
 	for idx := range mtxs {
 		seen[mtxs[idx]] = struct{}{}
 	}
-	if len(seen) < len(mtxs) {
+	numDupes := len(mtxs) - len(seen)
+	if numDupes > 0 {
 		// we're modifying a single node list don't need to
 		// try to get one lock more than once, so we can
 		// de-duplicate.
 		mtxs = slices.Collect(maps.Keys(seen))
 	}
+
+	delete(seen, nil)
+	numNils := len(mtxs) - len(seen)
+	fun.Invariant.Ok(numNils == 0, "cannot lock with missing locks:", numNils)
+
+	locked := make([]*sync.Mutex, len(mtxs))
+
+	defer func() {
+		p := recover()
+		released(locked)
+		defer ft.ApplyWhen(p != nil, doPanic, p)
+	}()
 
 ACQUIRE:
 	for {
@@ -209,7 +188,7 @@ ACQUIRE:
 	RELEASE_ATTEMPT:
 		for idx := range locked {
 			if locked[idx] == nil {
-				break RELEASE_ATTEMPT
+				continue
 			}
 			locked[idx].Unlock()
 			locked[idx] = nil
