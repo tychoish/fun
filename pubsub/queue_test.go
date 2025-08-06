@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -588,7 +589,6 @@ func TestQueueStream(t *testing.T) {
 				}
 				if time.Since(start)-time.Since(end) < 100*time.Millisecond {
 					t.Error(time.Since(end) - time.Since(start))
-
 				}
 				return
 			}
@@ -598,7 +598,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		queue.front.link = queue.front
-		prod := queue.Generator()
+		prod := queue.Stream().Read
 		out, err := prod(ctx)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, io.EOF)
@@ -608,7 +608,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		sig := make(chan struct{})
-		prod := queue.Generator()
+		prod := queue.Stream().Read
 		go func() {
 			defer close(sig)
 			v, err := prod(ctx)
@@ -619,5 +619,78 @@ func TestQueueStream(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		assert.NotError(t, queue.Close())
 	})
+	t.Run("DrainAndShutdown", func(t *testing.T) {
+		t.Run("Shutdown", func(t *testing.T) {
+			queue := NewUnlimitedQueue[string]()
+			listener := queue.Distributor().Stream()
+			assert.NotError(t, queue.Add("foo"))
+			flag := &atomic.Int64{}
+			sig := make(chan struct{})
+			go func() {
+				defer close(sig)
+				flag.Add(1)
+				defer flag.Add(1)
+				check.NotError(t, queue.Shutdown(t.Context()))
+			}()
+			time.Sleep(time.Millisecond)
+			assert.ErrorIs(t, queue.Add("bar"), ErrQueueDraining)
+			assert.Equal(t, flag.Load(), 1)
+			val, err := listener.Read(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, "foo", val)
 
+			_, _ = listener.Read(t.Context())
+			<-sig
+
+			assert.Equal(t, flag.Load(), 2)
+		})
+		t.Run("Drain", func(t *testing.T) {
+			queue := NewUnlimitedQueue[string]()
+			listener := queue.Distributor().Stream()
+			assert.NotError(t, queue.Add("foo"))
+			flag := &atomic.Int64{}
+			sig := make(chan struct{})
+			go func() {
+				defer close(sig)
+				flag.Add(1)
+				defer flag.Add(1)
+				check.NotError(t, queue.Drain(t.Context()))
+			}()
+			time.Sleep(time.Millisecond)
+			assert.ErrorIs(t, queue.BlockingAdd(t.Context(), "bar"), ErrQueueDraining)
+			assert.Equal(t, flag.Load(), 1)
+			val, err := listener.Read(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, "foo", val)
+
+			<-sig
+
+			assert.Equal(t, flag.Load(), 2)
+		})
+		t.Run("ContextCancelation", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			queue := NewUnlimitedQueue[string]()
+			listener := queue.Distributor().Stream()
+			assert.NotError(t, queue.Add("foo"))
+			flag := &atomic.Int64{}
+			sig := make(chan struct{})
+			go func() {
+				defer close(sig)
+				flag.Add(1)
+				defer flag.Add(1)
+				err := queue.Shutdown(ctx)
+				check.Error(t, err)
+				check.ErrorIs(t, err, context.Canceled)
+			}()
+			time.Sleep(time.Millisecond)
+			assert.ErrorIs(t, queue.Add("bar"), ErrQueueDraining)
+			assert.Equal(t, flag.Load(), 2)
+			val, err := listener.Read(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, val, "foo")
+			check.NotError(t, queue.Shutdown(t.Context()))
+		})
+	})
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -145,72 +144,6 @@ func TestProcess(t *testing.T) {
 		obv(42)
 		check.Equal(t, called, 1)
 	})
-	t.Run("ErrorCheck", func(t *testing.T) {
-		t.Run("ShortCircut", func(t *testing.T) {
-			err := errors.New("test error")
-			var hf fn.Future[error] = func() error { return err }
-			called := 0
-
-			pf := MakeHandler(func(in int) error { called++; check.Equal(t, in, 42); return nil })
-			ecpf := pf.WithErrorCheck(hf)
-			e := ecpf.Wait(42)
-
-			check.Error(t, e)
-			check.ErrorIs(t, e, err)
-			check.Equal(t, 0, called)
-
-		})
-		t.Run("Noop", func(t *testing.T) {
-			var hf fn.Future[error] = func() error { return nil }
-			called := 0
-			pf := MakeHandler(func(in int) error { called++; check.Equal(t, in, 42); return nil })
-			ecpf := pf.WithErrorCheck(hf)
-			e := ecpf.Wait(42)
-			check.NotError(t, e)
-			check.Equal(t, 1, called)
-		})
-		t.Run("Multi", func(t *testing.T) {
-			called := 0
-			hfcall := 0
-			var hf fn.Future[error] = func() error {
-				hfcall++
-				switch hfcall {
-				case 1, 2, 3:
-					return nil
-				case 4, 5:
-					return ers.ErrCurrentOpAbort
-				}
-				return errors.New("unexpected error")
-			}
-			wf := MakeHandler(func(in int) error {
-				called++
-				check.Equal(t, in, 42)
-				if hfcall == 3 {
-					return io.EOF
-				}
-				return nil
-			})
-			ecpf := wf.WithErrorCheck(hf)
-			e := ecpf.Wait(42)
-			check.NotError(t, e)
-			check.Equal(t, 1, called)
-			check.Equal(t, 2, hfcall)
-
-			e = ecpf.Wait(42)
-			check.Error(t, e)
-			check.Equal(t, 2, called)
-			check.Equal(t, 4, hfcall)
-			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
-			check.ErrorIs(t, e, io.EOF)
-
-			e = ecpf.Wait(42)
-			check.Error(t, e)
-			check.Equal(t, 2, called)
-			check.Equal(t, 5, hfcall)
-			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
-			check.NotErrorIs(t, e, io.EOF)
-		})
-	})
 	t.Run("Lock", func(t *testing.T) {
 		t.Run("NilLockPanics", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -282,7 +215,6 @@ func TestProcess(t *testing.T) {
 				wg.Wait(ctx)
 
 				assert.Equal(t, count, 128)
-
 			})
 			t.Run("RWMutex", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -557,7 +489,6 @@ func TestProcess(t *testing.T) {
 			}
 			wg.Wait()
 			check.Equal(t, 2, count)
-
 		})
 	})
 	t.Run("Delay", func(t *testing.T) {
@@ -649,6 +580,7 @@ func TestProcess(t *testing.T) {
 		check.NotError(t, wf(ctx, 42))
 		dur = time.Since(start).Truncate(time.Millisecond)
 
+		t.Log(dur)
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 5*time.Millisecond)
 	})
@@ -677,7 +609,6 @@ func TestProcess(t *testing.T) {
 		t.Run("Noop", func(t *testing.T) {
 			check.Nil(t, JoinHandlers[int](nil, nil))
 			check.Nil(t, JoinHandlers[int]())
-
 		})
 		t.Run("Single", func(t *testing.T) {
 			var count int
@@ -696,7 +627,6 @@ func TestProcess(t *testing.T) {
 			assert.NotError(t, op.Wait(42))
 			check.Equal(t, 4, count)
 		})
-
 	})
 	t.Run("Must", func(t *testing.T) {
 		called := 0
@@ -729,5 +659,4 @@ func TestProcess(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 	})
-
 }

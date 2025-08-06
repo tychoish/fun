@@ -13,9 +13,21 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+// ConsumeTuples creates a *Tuples[K,V] object from a stream of
+// Tuple[K,V] objects.
+func ConsumeTuples[K any, V any](iter *fun.Stream[Tuple[K, V]]) fun.Generator[*Tuples[K, V]] {
+	return func(ctx context.Context) (*Tuples[K, V], error) {
+		p := &Tuples[K, V]{}
+		if err := p.AppendStream(iter).Run(ctx); err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+}
+
 func TestTuples(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
-		ps := NewMap(map[string]string{"in": "out"}).Tuples()
+		ps := MakeTuples(MakeTuple("in", "out"))
 		ps.Add("in", "in")
 		ps.Add("in", "what")
 		ps.Add("in", "out")
@@ -85,7 +97,7 @@ func TestTuples(t *testing.T) {
 	})
 	t.Run("Extend", func(t *testing.T) {
 		ps := &Tuples[string, string]{}
-		ps.Extend(MakeTuples(MakeTuple("one", "1"), MakeTuple("two", "2")))
+		ps.AppendTuples(MakeTuples(MakeTuple("one", "1"), MakeTuple("two", "2")))
 		assert.Equal(t, ps.Len(), 2)
 		assert.Equal(t, ps.ll.Front().Value(), MakeTuple("one", "1"))
 	})
@@ -100,7 +112,7 @@ func TestTuples(t *testing.T) {
 			sp.Add(i, i)
 		}
 		assert.Equal(t, ps.Len(), 128)
-		assert.NotError(t, ps.Consume(sp.Stream()).Run(ctx))
+		assert.NotError(t, ps.AppendStream(sp.Stream()).Run(ctx))
 		assert.Equal(t, ps.Len(), 256)
 		mp := Map[int, int]{}
 		mp.ExtendWithTuples(&ps)
@@ -109,7 +121,7 @@ func TestTuples(t *testing.T) {
 	t.Run("ConsumeTuples", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			expected := errors.New("hi")
-			iter := fun.StaticGenerator(MakeTuple("1", 1), expected).Stream()
+			iter := fun.MakeStream(fun.StaticGenerator(MakeTuple("1", 1), expected))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -134,7 +146,6 @@ func TestTuples(t *testing.T) {
 			assert.True(t, ps != nil)
 			check.Equal(t, ps.Len(), 6)
 		})
-
 	})
 	t.Run("Sorts", func(t *testing.T) {
 		cmp := func(a, b Tuple[int, int]) bool {

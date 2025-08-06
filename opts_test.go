@@ -2,12 +2,14 @@ package fun
 
 import (
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/ft"
 )
 
 func TestOptionProvider(t *testing.T) {
@@ -56,7 +58,6 @@ func TestOptionProvider(t *testing.T) {
 		n, err = OptionProvider[*WorkerGroupConf](func(_ *WorkerGroupConf) error { return errors.New("hi") }).Build(opt)
 		assert.Error(t, err)
 		assert.True(t, n == nil)
-
 	})
 	t.Run("HandleErrorEdgecases", func(t *testing.T) {
 		opt := &WorkerGroupConf{}
@@ -65,6 +66,11 @@ func TestOptionProvider(t *testing.T) {
 			check.True(t, opt.CanContinueOnError(nil))
 			check.Equal(t, 0, opt.ErrorCollector.Len())
 		})
+		t.Run("Termintaing", func(t *testing.T) {
+			opt.ErrorCollector = &erc.Collector{}
+			check.True(t, ft.Not(opt.CanContinueOnError(io.EOF)))
+		})
+
 		t.Run("Continue", func(t *testing.T) {
 			opt.ErrorCollector = &erc.Collector{}
 			check.True(t, opt.CanContinueOnError(ErrStreamContinue))

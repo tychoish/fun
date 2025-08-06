@@ -30,8 +30,6 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp.Len(), 100)
 		check.Equal(t, mp.Pairs().Len(), 100)
 		check.Equal(t, mp.Stream().Count(ctx), 100)
-		check.Equal(t, mp.Keys().Count(ctx), 100)
-		check.Equal(t, mp.Values().Count(ctx), 100)
 	})
 	t.Run("Extend", func(t *testing.T) {
 		mp := makeMap(100)
@@ -114,7 +112,6 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp["1"], 1)
 		check.Equal(t, mp["2"], 2)
 		check.Equal(t, mp["3"], 3)
-
 	})
 	t.Run("MapConverter", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -209,7 +206,6 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("Default", func(t *testing.T) {
 		t.Run("EndToEnd", func(t *testing.T) {
-
 			var nmp map[string]int
 			mp := map[string]int{"one": 1}
 
@@ -226,7 +222,6 @@ func TestMap(t *testing.T) {
 
 			nmp = DefaultMap(mp, 12)
 			check.Equal(t, nmp["one"], mp["one"])
-
 		})
 		t.Run("Passthrough", func(t *testing.T) {
 			sl := DefaultMap(map[string]int{"one": 1}, 32)
@@ -241,7 +236,6 @@ func TestMap(t *testing.T) {
 		t.Run("LengthOnly", func(t *testing.T) {
 			sl := DefaultMap[string, int](nil, 32)
 			check.Equal(t, len(sl), 0)
-
 		})
 		t.Run("ExtraPanic", func(t *testing.T) {
 			check.Panic(t, func() {
@@ -258,5 +252,4 @@ func TestMap(t *testing.T) {
 		mp.Delete("hi")
 		assert.Equal(t, mp.Len(), 0)
 	})
-
 }

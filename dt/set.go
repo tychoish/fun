@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/risky"
 )
 
 // Set provides a flexible generic set implementation, with optional
@@ -20,9 +21,10 @@ type Set[T comparable] struct {
 }
 
 // NewSetFromSlice constructs a map and adds all items from the input
-// slice to the new set.
+// slice to the new set. These sets are ordered.
 func NewSetFromSlice[T comparable](in []T) *Set[T] {
 	out := &Set[T]{}
+	out.Order()
 	out.AppendStream(fun.SliceStream(in))
 	return out
 }
@@ -114,11 +116,39 @@ func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 
 // Stream provides a way to iterate over the items in the
-// set. Provides items in iteration order if the set is ordered.
-func (s *Set[T]) Stream() *fun.Stream[T] { return s.Generator().Stream() }
+// set. Provides items in iteration order if the set is ordered.If
+// the Set is ordered, then the generator produces items in the set's
+// order. If the Set is synchronize, then the Stream always holds
+// the Set's lock when incrementing the stream.
+func (s *Set[T]) Stream() *fun.Stream[T] {
+	mu := s.lock()
+	defer s.with(mu)
+	st := s.unsafeStream()
+
+	if mu != nil {
+		return fun.MakeStream(fun.NewGenerator(st.Read).WithLock(mu)).WithHook(st.CloseHook())
+	}
+
+	return st
+}
 
 // Iterator returns a new-style native Go iterator for the items in the set.
 func (s *Set[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
+
+func (s *Set[T]) List() *List[T] {
+	if s.list != nil {
+		return s.list.Copy()
+	}
+	return StreamList(s.Stream())
+}
+
+func (s *Set[T]) Slice() Slice[T] {
+	if s.list != nil {
+		return s.list.Slice()
+	}
+
+	return risky.BlockForceIgnore(s.hash.Keys().Slice)
+}
 
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise
@@ -168,21 +198,6 @@ func (s *Set[T]) unsafeStream() *fun.Stream[T] {
 		return s.list.StreamFront()
 	}
 	return s.hash.Keys()
-}
-
-// Generator will produce each item from set on successive calls. If
-// the Set is ordered, then the generator produces items in the set's
-// order. If the Set is synchronize, then the Generator always holds
-// the Set's lock when called.
-func (s *Set[T]) Generator() (out fun.Generator[T]) {
-	defer s.with(s.lock())
-	defer func() { mu := s.mtx.Get(); ft.DoWhen(mu != nil, func() fun.Generator[T] { return out.WithLock(mu) }) }()
-
-	if s.list != nil {
-		return s.list.GeneratorFront()
-	}
-
-	return s.hash.GeneratorKeys()
 }
 
 // Equal tests two sets, returning true if the items in the sets have

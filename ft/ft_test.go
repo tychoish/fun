@@ -3,7 +3,6 @@ package ft
 import (
 	"context"
 	"errors"
-	"io"
 	"math/rand"
 	"slices"
 	"strconv"
@@ -253,16 +252,6 @@ func TestWrap(t *testing.T) {
 		check.Equal(t, 42, num)
 		ok, num = Flip(op()) //nolint
 	})
-	t.Run("Ignore", func(t *testing.T) {
-		const first int = 42
-		const second bool = true
-		t.Run("First", func(t *testing.T) {
-			assert.Equal(t, second, IgnoreFirst(func() (int, bool) { return first, second }()))
-		})
-		t.Run("Second", func(t *testing.T) {
-			assert.Equal(t, first, IgnoreSecond(func() (int, bool) { return first, second }()))
-		})
-	})
 	t.Run("SafeOK", func(t *testing.T) {
 		assert.True(t, !DoSafe[bool](nil))
 		assert.True(t, nil == DoSafe[*bool](nil))
@@ -277,15 +266,10 @@ func TestWrap(t *testing.T) {
 		assert.Equal(t, "hello world", SafeCast[string](any("hello world")))
 		assert.NotZero(t, SafeCast[time.Time](time.Now()))
 
-		var foo = "foo"
+		foo := "foo"
 		var tt testing.TB
 		assert.NotZero(t, SafeCast[*string](&foo))
 		assert.Zero(t, SafeCast[*testing.T](tt))
-	})
-	t.Run("Ignore", func(t *testing.T) {
-		called := 0
-		Ignore(func() int { called++; return 1 }())
-		assert.Equal(t, called, 1)
 	})
 	t.Run("Ref", func(t *testing.T) {
 		var strptr *string
@@ -329,7 +313,6 @@ func TestWrap(t *testing.T) {
 	t.Run("Do", func(t *testing.T) {
 		assert.Panic(t, func() { Do[int](nil) })
 		assert.Panic(t, func() { Do(func() int { panic("here") }) })
-
 	})
 	t.Run("DoMany", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
@@ -437,7 +420,6 @@ func TestWrap(t *testing.T) {
 			assert.Equal(t, count, 2)
 			assert.Equal(t, total, 4)
 		})
-
 	})
 	t.Run("SafeApply", func(t *testing.T) {
 		assert.NotPanic(t, func() { ApplySafe(nil, 4) })
@@ -446,7 +428,6 @@ func TestWrap(t *testing.T) {
 		ApplySafe(func(in int) { out = in }, 42)
 		assert.Equal(t, out, 42)
 	})
-
 }
 
 func TestContexts(t *testing.T) {
@@ -486,7 +467,6 @@ func TestContexts(t *testing.T) {
 		}))
 		assert.ErrorIs(t, cc.Err(), context.Canceled)
 	})
-
 }
 
 func TestJoin(t *testing.T) {
@@ -512,50 +492,26 @@ func TestError(t *testing.T) {
 		assert.Zero(t, out)
 		assert.True(t, !ok)
 	})
-
-	t.Run("Ignore", func(t *testing.T) {
-		check.NotPanic(t, func() { IgnoreError(errors.New("new")) })
-		check.NotPanic(t, func() { IgnoreError(nil) })
-	})
 }
 
 func TestPanicProtection(t *testing.T) {
 	const perr ers.Error = "panic error"
 
 	t.Run("Wrap", func(t *testing.T) {
-		t.Run("Call", func(t *testing.T) {
+		t.Run("RecoverCall", func(t *testing.T) {
 			fn := func() { panic(perr) }
 			assert.NotPanic(t, func() {
 				assert.Error(t, WrapRecoverCall(fn)())
 				assert.ErrorIs(t, WrapRecoverCall(fn)(), perr)
 			})
 		})
-		t.Run("Do", func(t *testing.T) {
+		t.Run("RecoverDo", func(t *testing.T) {
 			fn := func() int { panic(perr) }
 			assert.NotPanic(t, func() {
 				out, err := WrapRecoverDo(fn)()
 				assert.Error(t, err)
 				assert.Zero(t, out)
 				assert.ErrorIs(t, err, perr)
-			})
-		})
-		t.Run("OK", func(t *testing.T) {
-			fn := func() (int, error) { panic(perr) }
-			assert.NotPanic(t, func() {
-				out, ok := WrapRecoverOk(fn)()
-				assert.True(t, !ok)
-				assert.Zero(t, out)
-			})
-		})
-		t.Run("Happy", func(t *testing.T) {
-			assert.NotPanic(t, func() {
-				assert.NotError(t, WrapRecoverCall(func() {})())
-				out, err := WrapRecoverDo(func() int { return 42 })()
-				assert.Equal(t, out, 42)
-				assert.NotError(t, err)
-				out, ok := WrapRecoverOk(func() (int, error) { return 12, nil })()
-				assert.Equal(t, out, 12)
-				assert.True(t, ok)
 			})
 		})
 	})
@@ -609,12 +565,12 @@ func TestPanicProtection(t *testing.T) {
 	})
 	t.Run("SafeOK", func(t *testing.T) {
 		t.Run("Not", func(t *testing.T) {
-			num, ok := WithRecoverOk(func() (int, error) { return 42, io.EOF })
+			num, ok := Check(WithRecoverDo(func() int { panic("error?") }))
 			assert.True(t, !ok)
 			assert.Zero(t, num)
 		})
 		t.Run("Passes", func(t *testing.T) {
-			num, ok := WithRecoverOk(func() (int, error) { return 42, nil })
+			num, ok := Check(WithRecoverDo(func() int { return 42 }))
 			assert.True(t, ok)
 			assert.Equal(t, 42, num)
 		})
@@ -639,4 +595,60 @@ func TestPanicProtection(t *testing.T) {
 		assert.Equal(t, 10, inc)
 	})
 
+	t.Run("Ignore", func(t *testing.T) {
+		t.Run("FirstAndSecond", func(t *testing.T) {
+			const first int = 42
+			const second bool = true
+			t.Run("First", func(t *testing.T) {
+				assert.Equal(t, second, IgnoreFirst(func() (int, bool) { return first, second }()))
+			})
+			t.Run("Second", func(t *testing.T) {
+				assert.Equal(t, first, IgnoreSecond(func() (int, bool) { return first, second }()))
+			})
+		})
+		t.Run("Single", func(t *testing.T) {
+			called := 0
+			Ignore(func() int { called++; return 1 }())
+			assert.Equal(t, called, 1)
+		})
+	})
+	t.Run("DefautlApply", func(t *testing.T) {
+		ct := 0
+		op := func(in int) int { ct++; check.Equal(t, in, 42); return 42 * 2 }
+		out := DefaultApply(99, op, 42)
+		check.Equal(t, 1, ct)
+		check.Equal(t, out, 84)
+
+		out = DefaultApply(0, op, 42)
+		check.Equal(t, 1, ct)
+		check.Equal(t, out, 0)
+	})
+	t.Run("Filter", func(t *testing.T) {
+		t.Run("Safe", func(t *testing.T) {
+			var out int
+			assert.NotPanic(t, func() {
+				out = FilterSafe(nil, 44)
+			})
+
+			assert.Equal(t, out, 44)
+		})
+		t.Run("PanicNormal", func(t *testing.T) {
+			var out int
+			assert.Panic(t, func() {
+				out = Filter(nil, 44)
+			})
+
+			assert.Equal(t, out, 0)
+		})
+		t.Run("BasicSafe", func(t *testing.T) {
+			out := FilterSafe(func(in int) int { return in - 2 }, 44)
+
+			assert.Equal(t, out, 42)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			out := Filter(func(in int) int { return in - 2 }, 44)
+
+			assert.Equal(t, out, 42)
+		})
+	})
 }

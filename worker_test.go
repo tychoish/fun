@@ -326,7 +326,6 @@ func TestWorker(t *testing.T) {
 			check.True(t, dur >= 100)
 			check.Equal(t, 4, count.Load())
 		})
-
 	})
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("Join", func(t *testing.T) {
@@ -467,7 +466,6 @@ func TestWorker(t *testing.T) {
 			}
 			wg.Wait()
 			check.Equal(t, 2, count)
-
 		})
 	})
 	t.Run("Delay", func(t *testing.T) {
@@ -536,9 +534,7 @@ func TestWorker(t *testing.T) {
 			time.Sleep(120 * time.Millisecond)
 			check.Equal(t, 0, wg.Num())
 			check.Equal(t, count.Load(), 100)
-
 		})
-
 	})
 	t.Run("Jitter", func(t *testing.T) {
 		t.Parallel()
@@ -566,6 +562,7 @@ func TestWorker(t *testing.T) {
 		check.NotError(t, wf(ctx))
 		dur = time.Since(start).Truncate(time.Millisecond)
 
+		t.Log(dur)
 		assert.True(t, dur >= time.Millisecond)
 		assert.True(t, dur < 2*time.Millisecond)
 	})
@@ -638,7 +635,6 @@ func TestWorker(t *testing.T) {
 				})
 			})
 		})
-
 	})
 	t.Run("FilterError", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -873,7 +869,6 @@ func TestWorker(t *testing.T) {
 			errs := ers.Unwind(err)
 			t.Log(errs, len(errs))
 			assert.Equal(t, len(errs), 13)
-
 		})
 	})
 	t.Run("WorkerPool", func(t *testing.T) {
@@ -883,7 +878,7 @@ func TestWorker(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				wfs[i] = func(context.Context) error {
 					counter.Add(1)
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(25 * time.Millisecond)
 					counter.Add(1)
 					return nil
 				}
@@ -906,7 +901,7 @@ func TestWorker(t *testing.T) {
 			counter := &atomic.Int64{}
 			wfs := make([]Worker, 100)
 			for i := 0; i < 100; i++ {
-				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(10 * time.Millisecond); return experr }
+				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(25 * time.Millisecond); return experr }
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -945,5 +940,12 @@ func TestWorker(t *testing.T) {
 
 		assert.Equal(t, count.Load(), 2)
 	})
-
+	t.Run("ContextChannelWorker", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		err := MAKE.ContextChannelWorker(ctx).Run(t.Context())
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.True(t, t.Context().Err() == nil)
+	})
 }

@@ -148,20 +148,14 @@ func (s *Service) Start(ctx context.Context) error {
 			shutdown = func() error { return nil }
 		}
 
-		var signaler func()
+		if !HasBaseContext(ctx) {
+			ctx = SetBaseContext(ctx)
+		}
+
 		ctx, s.cancel = context.WithCancel(ctx)
-		if s.Signal != nil {
-			signaler = func() {
-				defer ec.Recover()
-				select {
-				case err := <-s.Signal.Signal(GetBaseContext(ctx)):
-					ec.Push(err)
-				case <-ctx.Done():
-				}
-				ec.Push(shutdown())
-			}
-		} else {
-			signaler = func() { defer ec.Recover(); <-ctx.Done(); ec.Push(shutdown()) }
+		sig := s.Signal
+		if sig == nil {
+			sig = fun.MAKE.ContextChannelWorker(ctx)
 		}
 
 		shutdownSignal := make(chan struct{})
@@ -170,7 +164,16 @@ func (s *Service) Start(ctx context.Context) error {
 			defer s.wg.Done()
 			defer close(shutdownSignal)
 			defer ec.Recover()
-			signaler()
+
+			var err error
+
+			select {
+			case err = <-sig.Signal(GetBaseContext(ctx)):
+			case <-ctx.Done():
+			}
+
+			filter := erc.NewFilter().WithoutContext()
+			ec.Join(filter.Apply(err), filter.Apply(shutdown()))
 		}()
 
 		s.wg.Add(1)
@@ -230,7 +233,6 @@ func (s *Service) waitFor(ctx context.Context) error {
 
 	s.wg.Wait(ctx)
 	return s.ec.Resolve()
-
 }
 
 // Worker runs the service, starting it if needed and then waiting for

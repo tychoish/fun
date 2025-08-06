@@ -92,9 +92,6 @@ func TestLocked(t *testing.T) {
 	})
 	t.Run("Accessors", func(t *testing.T) {
 		t.Run("Mutex", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
 			var getter fn.Future[int]
 			var setter fn.Handler[int]
 			getCalled := &atomic.Bool{}
@@ -104,7 +101,7 @@ func TestLocked(t *testing.T) {
 			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(200 * time.Millisecond) }
 			mget, mset := AccessorsWithLock(getter, setter)
 			start := time.Now()
-			sw := func() { go check.NotError(t, fun.MakeHandler(mset.Safe()).Read(ctx, 267)) }
+			sw := func() { go mset.Handle(267) }
 			go sw()
 			runtime.Gosched()
 			sig := make(chan struct{})
@@ -135,7 +132,7 @@ func TestLocked(t *testing.T) {
 			mget, mset := AccessorsWithReadLock(getter, setter)
 			start := time.Now()
 
-			sw := func() { go check.NotError(t, fun.MakeHandler(mset.Safe()).Read(ctx, 267)) }
+			sw := func() { go check.NotError(t, fun.MakeHandler(mset.RecoverPanic).Read(ctx, 267)) }
 			go sw()
 
 			runtime.Gosched()
@@ -159,7 +156,6 @@ func TestLocked(t *testing.T) {
 			wg.Wait()
 			check.True(t, getCalled.Load())
 			check.True(t, setCalled.Load())
-
 		})
 		t.Run("LockerRead", func(t *testing.T) {
 			mtx := &sync.RWMutex{}
@@ -204,5 +200,4 @@ func TestLocked(t *testing.T) {
 		rmu := &sync.RWMutex{}
 		assert.NotPanic(t, func() { WithR(LockR(rmu)) })
 	})
-
 }

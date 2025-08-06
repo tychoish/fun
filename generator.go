@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
-	"github.com/tychoish/fun/intish"
 )
 
 // Generator is a function type that is a failrly common
@@ -40,6 +39,11 @@ func StaticGenerator[T any](val T, err error) Generator[T] {
 // ValueGenerator returns a generator function that always returns the
 // provided value, and a nill error.
 func ValueGenerator[T any](val T) Generator[T] { return StaticGenerator(val, nil) }
+
+func errorGenerator[T any](err error) Generator[T] {
+	Invariant.Ok(err != nil, "cannot create error generator without an error")
+	return MakeGenerator(func() (zero T, _ error) { return zero, err })
+}
 
 // CheckedGenerator wraps a function object that uses the second ("OK")
 // value to indicate that no more values will be produced. Errors
@@ -160,8 +164,6 @@ func (pf Generator[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Futu
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
-func (pf Generator[T]) Capture() fn.Future[T] { return pf.Force() }
-
 // Ignore creates a future that runs the generator and returns
 // the value, ignoring the error.
 func (pf Generator[T]) Ignore(ctx context.Context) fn.Future[T] {
@@ -178,6 +180,8 @@ func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
 // future is resolved, the generator executes with a context that never
 // expires and panics in the case of an error.
 func (pf Generator[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
+
+func (pf Generator[T]) Resolve() T { return ft.Do(pf.Force()) }
 
 // Wait runs the generator with a context that will ever expire.
 func (pf Generator[T]) Wait() (T, error) { return pf(context.Background()) }
@@ -265,7 +269,6 @@ func (pf Generator[T]) When(cond func() bool) Generator[T] {
 	return func(ctx context.Context) (out T, _ error) {
 		if cond() {
 			return pf(ctx)
-
 		}
 		return out, nil
 	}
@@ -436,98 +439,5 @@ func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
 	}
 }
 
-// TODO: the stream method is the only dependency of the generator
-// type on Stream. Should probably deprecate to avoid accidental
-
-// Stream creates a stream that calls the Generator function once
-// for every iteration, until it errors. Errors that are not context
-// cancellation errors or io.EOF are propgated to the stream's Close
-// method.
-func (pf Generator[T]) Stream() *Stream[T] { return MakeStream(pf) }
-
-func makeErrorGenerator[T any](err error) Generator[T] {
-	Invariant.Ok(err != nil, "cannot create error generator without an error")
-	return MakeGenerator(func() (zero T, _ error) { return zero, err })
-}
-
-func (pf Generator[T]) WithErrorHandler(handler fn.Handler[error], resolver fn.Future[error]) Generator[T] {
-	Invariant.Ok(handler != nil && resolver != nil, "must cal WithErrorHandler with non-nil operators")
-	return func(ctx context.Context) (T, error) {
-		out, err := pf(ctx)
-		handler(err)
-		return out, resolver()
-	}
-}
-
-// internal function for use in generators: the idea is to let the
-// inner generator produce results until it errors and then add in the
-// error from the future.
-func (pf Generator[T]) wrapErrorWith(ef fn.Future[error]) Generator[T] {
-	return func(ctx context.Context) (zero T, err error) {
-		// just call the generator once: if there's no error,
-		// return the result, because otherwise we're throwing
-		// away work.
-		out, err := pf(ctx)
-		if err == nil {
-			return out, nil
-		}
-
-		// Now there was an error,
-
-		// first error is the error produced by the future, p
-		// error is the second error, which can only be a
-		// panic encountered by the error future.
-		ferr, perr := ef.RecoverPanic()
-
-		if ers.IsTerminating(err) && ferr != nil {
-			// if there's a real substantive error,
-			// encountered when there was an terminating
-			// error, then let's just return that.
-			return zero, erc.Join(ferr, perr)
-		}
-
-		// otherwise, merge everything (potentially)
-		return zero, erc.Join(err, ferr, perr)
-	}
-}
-
 // Read executes the generator and returns the result.
 func (pf Generator[T]) Read(ctx context.Context) (T, error) { return pf(ctx) }
-
-// Parallel returns a wrapped generator that produces items until the
-// generator function returns io.EOF, or the context. Parallel
-// operation, continue on error/continue-on-panic semantics are
-// available and share configuration with the ParallelProcess and Map
-// operations.
-//
-// You must specify a number of workers in the options greater than
-// one to get parallel operation. Otherwise, there is only one worker.
-//
-// The operation returns results from a buffer that can hold a number
-// of items equal to the number of workers. Buffered items may not be
-// returned to the caller in the case of early termination.
-func (pf Generator[T]) Parallel(
-	opts ...OptionProvider[*WorkerGroupConf],
-) Generator[T] {
-	conf := &WorkerGroupConf{}
-	if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
-		return makeErrorGenerator[T](err)
-	}
-
-	pipe := Blocking(make(chan T, intish.Abs(conf.NumWorkers*2)))
-
-	setup := Operation(func(ctx context.Context) {
-		pipe.Handler().ReadAll(pf.WithRecover().
-			WithErrorFilter(conf.errorFilter).
-			Stream(),
-		).Operation(conf.ErrorCollector.Push).
-			StartGroup(ctx, conf.NumWorkers).
-			PostHook(pipe.Close).
-			Background(ctx)
-	}).Once()
-
-	return pipe.Receive().
-		Generator().
-		PreHook(setup).
-		wrapErrorWith(conf.ErrorCollector.Resolve)
-}

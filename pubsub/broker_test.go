@@ -399,7 +399,6 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 					checkMatchingSets(t, seen1, seen2)
 				} else if len(seen1) == 0 && len(seen2) == 0 {
 					t.Error("should observe some events")
-
 				}
 
 				broker.Stop()
@@ -611,8 +610,8 @@ func TestBroker(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		check.Error(t, broker.Handler(ctx, 123))
-		check.ErrorIs(t, broker.Handler(ctx, 123), context.Canceled)
+		check.Error(t, broker.Send(ctx, 123))
+		check.ErrorIs(t, broker.Send(ctx, 123), context.Canceled)
 	})
 
 	t.Run("Populate", func(t *testing.T) {
@@ -667,7 +666,6 @@ func TestBroker(t *testing.T) {
 		case <-popsig:
 		}
 	})
-
 }
 
 func randomIntSlice(size int) []int {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -222,7 +221,6 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 		}
 		_ = iter.Close()
 	}
-
 }
 
 // Populate creates a fun.Worker function that publishes items from
@@ -232,7 +230,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 // Callers should avoid using a stream that will retain input
 // items in memory.
 func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker {
-	return fun.NewHandler(b.Handler).ReadAll(iter)
+	return fun.NewHandler(b.Send).ReadAll(iter)
 }
 
 // Stats provides introspection into the current state of the broker.
@@ -314,10 +312,10 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 }
 
 // Publish distributes a message to all subscribers.
-func (b *Broker[T]) Publish(ctx context.Context, msg T) { ft.Ignore(b.Handler(ctx, msg)) }
+func (b *Broker[T]) Publish(ctx context.Context, msg T) { risky.Ignore(b.Send(ctx, msg)) }
 
-// Handler distributes a message to all subscribers.
-func (b *Broker[T]) Handler(ctx context.Context, msg T) error {
+// Send distributes a message to all subscribers.
+func (b *Broker[T]) Send(ctx context.Context, msg T) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

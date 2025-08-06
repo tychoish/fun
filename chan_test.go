@@ -33,11 +33,11 @@ func TestChannel(t *testing.T) {
 				defer cancel()
 
 				ch := make(chan int, 2)
-				err := Blocking(ch).Send().Handler().Read(ctx, 1)
+				err := Blocking(ch).Send().Write(ctx, 1)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 1)
 
-				err = NonBlocking(ch).Send().Handler().Read(ctx, 3)
+				err = NonBlocking(ch).Send().Write(ctx, 3)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
@@ -74,7 +74,6 @@ func TestChannel(t *testing.T) {
 				assert.Equal(t, len(ch), 1)
 				Blocking(ch).Receive().Ignore(ctx)
 				assert.Equal(t, len(ch), 0)
-
 			})
 			t.Run("Zero", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -144,7 +143,6 @@ func TestChannel(t *testing.T) {
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, io.EOF)
 				})
-
 			})
 		})
 		t.Run("Receive", func(t *testing.T) {
@@ -282,7 +280,6 @@ func TestChannel(t *testing.T) {
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, io.EOF)
 				})
-
 			})
 		})
 		t.Run("Receive", func(t *testing.T) {
@@ -340,7 +337,7 @@ func TestChannel(t *testing.T) {
 
 				ch := Chan[string]().Blocking()
 				var count int
-				sig := ch.Receive().Handle(func(_ context.Context, in string) error {
+				sig := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					switch count {
 					case 0:
@@ -373,7 +370,7 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, ch.Send().Zero(ctx))
 				assert.NotError(t, ch.Send().Write(ctx, "third"))
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					switch count {
 					case 0:
@@ -400,7 +397,7 @@ func TestChannel(t *testing.T) {
 				var count int
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					check.Equal(t, in, "beep")
 					return io.EOF
@@ -417,7 +414,7 @@ func TestChannel(t *testing.T) {
 				var count int
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 				ch.Close()
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					check.Equal(t, in, "beep")
 					return nil
@@ -436,7 +433,7 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 				assert.NotError(t, ch.Send().Write(ctx, "beep"))
 				ch.Close()
-				err := ch.Receive().Handle(func(_ context.Context, in string) error {
+				err := ch.Receive().ReadAll(func(_ context.Context, in string) error {
 					defer func() { count++ }()
 					check.Equal(t, in, "beep")
 					if count == 1 {
@@ -472,26 +469,6 @@ func TestChannel(t *testing.T) {
 				idx++
 			}
 		})
-		t.Run("Seq2", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ch := Chan[int](2)
-			check.NotError(t, ch.Send().Write(ctx, 42))
-			check.NotError(t, ch.Send().Write(ctx, 84))
-			ch.Close()
-
-			for idx, num := range ch.Seq2(ctx) {
-				switch idx {
-				case 0:
-					check.Equal(t, num, 42)
-				case 1:
-					check.Equal(t, num, 84)
-				default:
-					t.Fatal("impossible situation", idx, num)
-				}
-			}
-		})
 		t.Run("Ok", func(t *testing.T) {
 			t.Run("DirectReturns", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -515,16 +492,6 @@ func TestChannel(t *testing.T) {
 				})
 			})
 		})
-	})
-	t.Run("Pipe", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		proc, prod := Blocking(make(chan string, 1)).Pipe()
-		check.NotError(t, proc(ctx, "hello world!"))
-		output, err := prod(ctx)
-		check.NotError(t, err)
-		check.Equal(t, output, "hello world!")
 	})
 	t.Run("Default", func(t *testing.T) {
 		t.Run("EndToEnd", func(t *testing.T) {
