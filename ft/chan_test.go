@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/assert/check"
 )
 
 func TestChannels(t *testing.T) {
@@ -49,5 +51,26 @@ func TestChannels(t *testing.T) {
 				t.Error("unexpected rtime:", rtime)
 			}
 		})
+	})
+	t.Run("Recv", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		go func() {
+			timer := time.NewTimer(time.Second)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+			case <-timer.C:
+				t.Error("soft timeout")
+				panic("bailout")
+			}
+		}()
+		ch := make(chan int, 1)
+		Send(ch, Wrap(42))
+		out := Recv(ch)
+		check.Equal(t, 42, out)
+		close(ch)
+		out = Recv(ch)
+		check.Zero(t, out)
 	})
 }
