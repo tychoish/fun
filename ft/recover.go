@@ -54,6 +54,6 @@ func WithRecoverFilter[T any](op func(T) T, in T) (_ T, err error) {
 	return op(in), nil
 }
 
-func WrapRecoverFilter[T any](op func(T) T, in T) func(T) (T, error) {
+func WrapRecoverFilter[T any](op func(T) T) func(T) (T, error) {
 	return func(v T) (T, error) { return WithRecoverFilter(op, v) }
 }

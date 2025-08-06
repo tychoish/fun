@@ -612,4 +612,43 @@ func TestPanicProtection(t *testing.T) {
 			assert.Equal(t, called, 1)
 		})
 	})
+	t.Run("DefautlApply", func(t *testing.T) {
+		ct := 0
+		op := func(in int) int { ct++; check.Equal(t, in, 42); return 42 * 2 }
+		out := DefaultApply(99, op, 42)
+		check.Equal(t, 1, ct)
+		check.Equal(t, out, 84)
+
+		out = DefaultApply(0, op, 42)
+		check.Equal(t, 1, ct)
+		check.Equal(t, out, 0)
+	})
+	t.Run("Filter", func(t *testing.T) {
+		t.Run("Safe", func(t *testing.T) {
+			var out int
+			assert.NotPanic(t, func() {
+				out = FilterSafe(nil, 44)
+			})
+
+			assert.Equal(t, out, 44)
+		})
+		t.Run("PanicNormal", func(t *testing.T) {
+			var out int
+			assert.Panic(t, func() {
+				out = Filter(nil, 44)
+			})
+
+			assert.Equal(t, out, 0)
+		})
+		t.Run("BasicSafe", func(t *testing.T) {
+			out := FilterSafe(func(in int) int { return in - 2 }, 44)
+
+			assert.Equal(t, out, 42)
+		})
+		t.Run("Basic", func(t *testing.T) {
+			out := Filter(func(in int) int { return in - 2 }, 44)
+
+			assert.Equal(t, out, 42)
+		})
+	})
 }

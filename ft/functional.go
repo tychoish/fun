@@ -13,6 +13,9 @@ func Call(op func()) { op() }
 // Do executes the provided function and returns its result.
 func Do[T any](op func() T) T { return op() }
 
+// Do2 executes the provided function and returns its results.
+func Do2[T any, V any](op func() (T, V)) (T, V) { return op() }
+
 // Apply calls the input function with the provided argument.
 func Apply[T any](fn func(T), arg T) { fn(arg) }
 
@@ -42,6 +45,8 @@ func ApplySafe[T any](fn func(T), arg T) {
 	}
 }
 
+// FilterSafe passes the arg value through the filter function. If the
+// filter function is nil, then FilterSafe returns the input argument.
 func FilterSafe[T any](fn func(T) T, arg T) T {
 	if fn != nil {
 		return fn(arg)
