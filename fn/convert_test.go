@@ -3,13 +3,14 @@ package fn
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 )
 
 func TestFilter(t *testing.T) {
-	// nb: these test cases were written by the robots
+	// nb: these test cases were written by the robots (gemini)
 
 	// A simple filter for re-use in tests: doubles an integer.
 	double := MakeFilter(func(i int) int { return i * 2 })
@@ -158,5 +159,138 @@ func TestFilter(t *testing.T) {
 		joined := double.Join(nil, addOne)
 		result := joined.Apply(5)
 		assert.Equal(t, result, 11)
+	})
+}
+
+func TestConverter(t *testing.T) {
+	// nb: these test cases were written by the robots (copilot+claude-3.5)
+	t.Run("Convert", func(t *testing.T) {
+		c := MakeConverter(func(i int) string { return "ok" })
+		assert.Equal(t, c.Convert(1), "ok")
+
+		n := MakeConverter(func(i int) int { return i * 2 })
+		assert.Equal(t, n.Convert(2), 4)
+	})
+	t.Run("Safe", func(t *testing.T) {
+		var c Converter[int, string]
+		assert.Equal(t, c.Safe().Convert(1), "")
+
+		var n Converter[int, int]
+		assert.Equal(t, n.Safe().Convert(1), 0)
+	})
+	t.Run("If", func(t *testing.T) {
+		c := MakeConverter(func(i int) string { return "ok" })
+		assert.Equal(t, c.If(false).Convert(1), "")
+		assert.Equal(t, c.If(true).Convert(1), "ok")
+
+		n := MakeConverter(func(i int) int { return i * 2 })
+		assert.Equal(t, n.If(false).Convert(2), 0)
+		assert.Equal(t, n.If(true).Convert(2), 4)
+	})
+	t.Run("Not", func(t *testing.T) {
+		c := MakeConverter(func(i int) string { return "ok" })
+		assert.Equal(t, c.Not(true).Convert(1), "")
+		assert.Equal(t, c.Not(false).Convert(1), "ok")
+
+		n := MakeConverter(func(i int) int { return i * 2 })
+		assert.Equal(t, n.Not(true).Convert(2), 0)
+		assert.Equal(t, n.Not(false).Convert(2), 4)
+	})
+	t.Run("When", func(t *testing.T) {
+		flag := false
+		c := MakeConverter(func(i int) string { return "ok" })
+		when := c.When(func() bool { return flag })
+		assert.Equal(t, when.Convert(1), "")
+		flag = true
+		assert.Equal(t, when.Convert(1), "ok")
+	})
+	t.Run("Hooks", func(t *testing.T) {
+		called := false
+		c := MakeConverter(func(i int) string { return "ok" })
+		pre := c.PreHook(func() { called = true })
+		assert.Equal(t, pre.Convert(1), "ok")
+		assert.True(t, called)
+
+		called = false
+		post := c.PostHook(func() { called = true })
+		assert.Equal(t, post.Convert(1), "ok")
+		assert.True(t, called)
+	})
+	t.Run("Filters", func(t *testing.T) {
+		c := MakeConverter(func(i int) string { return "ok" })
+		pre := c.PreFilter(func(i int) int { return i + 1 })
+		assert.Equal(t, pre.Convert(1), "ok")
+
+		post := c.PostFilter(func(s string) string { return s + "!" })
+		assert.Equal(t, post.Convert(1), "ok!")
+
+		n := MakeConverter(func(i int) int { return i * 2 })
+		npre := n.PreFilter(func(i int) int { return i + 1 })
+		assert.Equal(t, npre.Convert(2), 6) // (2+1)*2
+
+		npost := n.PostFilter(func(i int) int { return i + 1 })
+		assert.Equal(t, npost.Convert(2), 5) // (2*2)+1
+	})
+	t.Run("Concurrent", func(t *testing.T) {
+		counter := 0
+		mu := &sync.Mutex{}
+
+		c := MakeConverter(func(i int) int {
+			time.Sleep(time.Millisecond)
+			counter++
+			return counter
+		})
+
+		locked := c.WithLock(mu)
+
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result := locked.Convert(1)
+				assert.True(t, result > 0 && result <= 10)
+			}()
+		}
+		wg.Wait()
+		assert.Equal(t, counter, 10)
+
+		counter = 0
+		locked = c.Lock()
+
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result := locked.Convert(1)
+				assert.True(t, result > 0 && result <= 10)
+			}()
+		}
+		wg.Wait()
+		assert.Equal(t, counter, 10)
+	})
+	t.Run("WithLocker", func(t *testing.T) {
+		counter := 0
+		mu := &sync.Mutex{}
+
+		c := MakeConverter(func(i int) int {
+			time.Sleep(time.Millisecond)
+			counter++
+			return counter
+		})
+
+		locked := c.WithLocker(mu)
+
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result := locked.Convert(1)
+				assert.True(t, result > 0 && result <= 10)
+			}()
+		}
+		wg.Wait()
+		assert.Equal(t, counter, 10)
 	})
 }
