@@ -44,7 +44,7 @@ func (of Handler[T]) callSafe(in T)    { ft.ApplyWhen(of != nil, of, in) }
 
 // Handler provides a more expository operation to call a handler
 // function.
-func (of Handler[T]) Handle(in T) { of(in) }
+func (of Handler[T]) Read(in T) { of(in) }
 
 // WithRecover handles any panic encountered during the handler's execution
 // and converts it to an error.

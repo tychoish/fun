@@ -4,12 +4,14 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ft"
-	priv "github.com/tychoish/fun/internal"
+	prv "github.com/tychoish/fun/internal"
 )
 
-type Filter[T any] func(T) T
+type Filter[T any] Converter[T, T]
 
 func MakeFilter[T any](fl func(T) T) Filter[T]         { return fl }
+func ctf[T any](in Converter[T, T]) Filter[T]          { return MakeFilter(in) }
+func (fl Filter[T]) c() Converter[T, T]                { return MakeConverter(fl) }
 func (fl Filter[T]) Apply(v T) T                       { return fl(v) }
 func (fl Filter[T]) Ptr(v *T)                          { *v = fl(*v) }
 func (fl Filter[T]) Safe() Filter[T]                   { return func(v T) T { return ft.FilterSafe(fl, v) } }
@@ -17,18 +19,12 @@ func (fl Filter[T]) WithNext(next Filter[T]) Filter[T] { return func(v T) T { re
 func (fl Filter[T]) If(cond bool) Filter[T]            { return func(v T) T { return ft.FilterWhen(cond, fl, v) } }
 func (fl Filter[T]) Not(cond bool) Filter[T]           { return fl.If(ft.Not(cond)) }
 func (fl Filter[T]) Lock() Filter[T]                   { return fl.WithLock(&sync.Mutex{}) }
-
 func (fl Filter[T]) WithLock(mu *sync.Mutex) Filter[T] {
-	return func(v T) T { defer priv.With(priv.Lock(mu)); return fl.Apply(v) }
+	return func(v T) T { defer prv.With(prv.Lock(mu)); return fl.Apply(v) }
 }
+func (fl Filter[T]) PreHook(op func()) Filter[T] { return ctf(fl.c().PreHook(op)) }
 
-func (fl Filter[T]) PreHook(op func()) Filter[T] {
-	return func(v T) T { ft.CallSafe(op); return fl.Apply(v) }
-}
-
-func (fl Filter[T]) PostHook(op func()) Filter[T] {
-	return func(v T) T { defer ft.CallSafe(op); return fl.Apply(v) }
-}
+func (fl Filter[T]) PostHook(op func()) Filter[T] { return ctf(fl.c().PostHook(op)) }
 
 func (fl Filter[T]) Join(fls ...Filter[T]) Filter[T] {
 	return func(v T) T {
@@ -53,23 +49,24 @@ func (cf Converter[I, O]) If(cond bool) Converter[I, O]   { return ft.IfElse(con
 func (cf Converter[I, O]) When(c func() bool) Converter[I, O] {
 	return func(in I) O { return cf.If(c()).Convert(in) }
 }
+
 func (cf Converter[I, O]) PreHook(h func()) Converter[I, O] { return func(i I) O { h(); return cf(i) } }
 func (cf Converter[I, O]) PostHook(h func()) Converter[I, O] {
 	return func(i I) O { defer ft.CallSafe(h); return cf(i) }
 }
 
-func (cf Converter[I, O]) PreFilter(fl Filter[I]) Converter[I, O] {
-	return func(i I) O { return cf(fl(i)) }
+func (cf Converter[I, O]) PreFilter(f Filter[I]) Converter[I, O] {
+	return func(i I) O { return cf(f(i)) }
 }
 
-func (cf Converter[I, O]) PostFilter(fl Filter[O]) Converter[I, O] {
-	return func(i I) O { return fl(cf(i)) }
+func (cf Converter[I, O]) PostFilter(f Filter[O]) Converter[I, O] {
+	return func(i I) O { return f(cf(i)) }
 }
 
 func (cf Converter[I, O]) WithLock(m *sync.Mutex) Converter[I, O] {
-	return func(in I) O { defer priv.With(priv.Lock(m)); return cf(in) }
+	return func(in I) O { defer prv.With(prv.Lock(m)); return cf(in) }
 }
 
 func (cf Converter[I, O]) WithLocker(m sync.Locker) Converter[I, O] {
-	return func(in I) O { defer priv.WithL(priv.LockL(m)); return cf(in) }
+	return func(in I) O { defer prv.WithL(prv.LockL(m)); return cf(in) }
 }

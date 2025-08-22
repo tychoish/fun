@@ -202,7 +202,7 @@ func JoinStreams[T any](iters ...*Stream[T]) *Stream[T] { return new(Stream[T]).
 func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
 		st.closer.state.Store(true)
-		fn.JoinHandlers(st.closer.hooks).Handle(st)
+		fn.JoinHandlers(st.closer.hooks).Read(st)
 		ft.Call(ft.Join(st.closer.ops))
 	})
 }
