@@ -258,7 +258,6 @@ func TestGenerator(t *testing.T) {
 
 			check.Equal(t, 128, opct.Load())
 			assert.Equal(t, count, 128)
-
 		})
 		t.Run("Locker", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -336,7 +335,7 @@ func TestGenerator(t *testing.T) {
 	})
 	t.Run("Force", func(t *testing.T) {
 		count := 0
-		var err = io.EOF
+		err := io.EOF
 		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
@@ -348,23 +347,37 @@ func TestGenerator(t *testing.T) {
 	})
 	t.Run("Capture", func(t *testing.T) {
 		count := 0
-		var err = io.EOF
-		var pf = MakeGenerator(func() (int, error) { count++; return 42, err })
+		err := io.EOF
+		pf := MakeGenerator(func() (int, error) { count++; return 42, err })
 		var out int
 
-		assert.NotPanic(t, func() { out = pf.Capture().Resolve() })
+		assert.NotPanic(t, func() { out = pf.Force().Resolve() })
+		err = nil
+		assert.Equal(t, 42, pf.Resolve())
+		assert.Equal(t, 42, out)
+	})
+	t.Run("Check", func(t *testing.T) {
+		count := 0
+		err := io.EOF
+		pf := MakeGenerator(func() (int, error) { count++; return 42, err })
+
+		out, ok := pf.Check(t.Context())
 		assert.Equal(t, out, 42)
 		assert.Equal(t, count, 1)
-		err = nil
-		assert.Equal(t, 42, pf.Capture().Resolve())
+		assert.True(t, !ok)
 
+		err = nil
+		out, ok = pf.Check(t.Context())
+		assert.Equal(t, out, 42)
+		assert.Equal(t, count, 2)
+		assert.True(t, ok)
 	})
 	t.Run("Ignore", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		count := 0
-		var err = io.EOF
+		err := io.EOF
 		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
@@ -379,7 +392,7 @@ func TestGenerator(t *testing.T) {
 		defer cancel()
 
 		count := 0
-		var err = io.EOF
+		err := io.EOF
 		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
@@ -562,7 +575,6 @@ func TestGenerator(t *testing.T) {
 			check.ErrorIs(t, e, err)
 			check.Zero(t, out)
 			check.Equal(t, 0, called)
-
 		})
 		t.Run("Noop", func(t *testing.T) {
 			var hf fn.Future[error] = func() error { return nil }
@@ -617,7 +629,6 @@ func TestGenerator(t *testing.T) {
 			check.ErrorIs(t, e, ers.ErrCurrentOpAbort)
 			check.NotErrorIs(t, e, io.EOF)
 		})
-
 	})
 	t.Run("Limit", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
@@ -723,7 +734,6 @@ func TestGenerator(t *testing.T) {
 			}
 			wg.Wait()
 			check.Equal(t, 2, count.Load())
-
 		})
 	})
 	t.Run("Delay", func(t *testing.T) {
@@ -892,7 +902,6 @@ func TestGenerator(t *testing.T) {
 				assert.ErrorIs(t, err, exp)
 			}
 			assert.NotEqual(t, val, 100)
-
 		})
 		t.Run("Terminating", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
@@ -929,27 +938,6 @@ func TestGenerator(t *testing.T) {
 			assert.NotEqual(t, val, 100)
 		})
 	})
-	t.Run("ErrorHanldingOptions", func(t *testing.T) {
-		g := MakeGenerator(func() (int, error) { panic(42) })
-		g = g.Parallel(WorkerGroupConfWithErrorCollector(nil))
-		out, err := g.Read(t.Context())
-		assert.Zero(t, out)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, ers.ErrInvalidInput)
-	})
-	t.Run("WithErrorHandler", func(t *testing.T) {
-		const (
-			ErrUnseen ers.Error = "unseen"
-			ErrSeen   ers.Error = "seen"
-		)
-
-		eh, er := func(error) {}, func() error { return ErrSeen }
-		out, err := MakeGenerator(func() (int, error) { return 0, ErrUnseen }).WithErrorHandler(eh, er).Wait()
-		assert.Error(t, err)
-		assert.Zero(t, out)
-		assert.ErrorIs(t, err, ErrSeen)
-	})
-
 }
 
 func producerContinuesOnce[T any](out T, counter *atomic.Int64) Generator[T] {
@@ -966,5 +954,4 @@ func producerContinuesOnce[T any](out T, counter *atomic.Int64) Generator[T] {
 
 		return out, err
 	}
-
 }

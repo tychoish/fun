@@ -256,7 +256,6 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 	}
-
 }
 
 func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fixture[T]) {
@@ -330,9 +329,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 				t.Fatal(err)
 			}
 		})
-
 	})
-
 }
 
 func TestDeque(t *testing.T) {
@@ -420,7 +417,6 @@ func TestDeque(t *testing.T) {
 				}
 			}
 		})
-
 	})
 	t.Run("ForcePush", func(t *testing.T) {
 		dq, err := NewDeque[int](DequeOptions{Capacity: 10})
@@ -577,7 +573,6 @@ func TestDeque(t *testing.T) {
 						}
 						if time.Since(start)-time.Since(end) < 100*time.Millisecond {
 							t.Error(time.Since(end) - time.Since(start))
-
 						}
 						return
 					}
@@ -789,7 +784,7 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.BlockingGeneratorFront().Read(ctx)
+			_, err := dq.BlockingStreamFront().Read(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
@@ -797,7 +792,7 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.BlockingGeneratorBack().Read(ctx)
+			_, err := dq.BlockingStreamBack().Read(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
@@ -817,7 +812,7 @@ func TestDeque(t *testing.T) {
 				}
 			}()
 
-			val, err := dq.BlockingGeneratorFront().Read(ctx)
+			val, err := dq.BlockingStreamFront().Read(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, "hello!")
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/risky"
 )
 
 func TestSet(t *testing.T) {
@@ -60,7 +62,6 @@ func TestSet(t *testing.T) {
 					// second set should panic
 					check.Panic(t, func() { set.WithLock(&sync.Mutex{}) })
 				}
-
 			})
 			t.Run("JSON", func(t *testing.T) {
 				set := builder()
@@ -113,9 +114,9 @@ func TestSet(t *testing.T) {
 
 				ctx, cancel := context.WithCancel(context.Background())
 				before := runtime.NumGoroutine()
-				_, err := set.hash.GeneratorKeys().Read(ctx)
+				_, err := set.hash.Keys().Read(ctx)
 				assert.NotError(t, err)
-				_, err = set.hash.GeneratorValues().Read(ctx)
+				_, err = set.hash.Values().Read(ctx)
 				assert.NotError(t, err)
 
 				during := runtime.NumGoroutine()
@@ -177,14 +178,16 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						setst := set.Stream()
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						setst = set.Stream()
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -203,14 +206,16 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						setst := set.Stream()
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						setst = set.Stream()
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -231,14 +236,16 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						setst := set.Stream()
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						setst = set.Stream()
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -257,14 +264,16 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						getNextValue := set.Stream().Generator().Force()
+						setst := set.Stream()
+						getNextValue := func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						if getNextValue() == "abc" && getNextValue() == "def" && getNextValue() == "lmn" && getNextValue() == "opq" && getNextValue() == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						getNextValue = set.Stream().Generator().Force()
+						setst = set.Stream()
+						getNextValue = func() string { return risky.BlockForceIgnore(setst.Read) }
 
 						check.Equal(t, "abc", getNextValue())
 						check.Equal(t, "def", getNextValue())
@@ -386,7 +395,6 @@ func TestSet(t *testing.T) {
 			set2 := NewSetFromMap(mp)
 			check.Equal(t, 100, set2.Len())
 			check.True(t, set.Equal(set2))
-
 		})
 		t.Run("Slice", func(t *testing.T) {
 			var passed bool
@@ -427,6 +435,78 @@ func TestSet(t *testing.T) {
 		check.Equal(t, 100, set.Len())
 		set.AppendSet(NewSetFromMap(makeMap(100)))
 		check.Equal(t, 200, set.Len())
+	})
+	t.Run("List", func(t *testing.T) {
+		t.Run("Ordered", func(t *testing.T) {
+			ls := &List[int]{}
+
+			st := &Set[int]{}
+			st.Order()
+
+			for v := range 42 {
+				ls.PushBack(v)
+				st.Add(v)
+			}
+
+			assert.Equal(t, ls.Len(), 42)
+			assert.Equal(t, st.Len(), ls.Len())
+
+			setls := st.List()
+
+			count := 0
+			for elemL, elemS := ls.Front(), setls.Front(); elemL.Ok() && elemS.Ok(); elemL, elemS = elemL.Next(), elemS.Next() {
+				count++
+				check.Equal(t, elemL.Value(), elemS.Value())
+			}
+			assert.Equal(t, count, 42)
+		})
+		t.Run("Undordered", func(t *testing.T) {
+			ls := &List[int]{}
+
+			st := &Set[int]{}
+
+			for v := range 42 {
+				ls.PushBack(v)
+				st.Add(v)
+			}
+
+			setls := st.List()
+
+			assert.Equal(t, ls.Len(), 42)
+			assert.Equal(t, st.Len(), ls.Len())
+			assert.Equal(t, st.Len(), setls.Len())
+
+			checker := Map[int, int]{}
+			for v := range setls.Iterator() {
+				if checker.Check(v) {
+					t.Errorf("duplicate value, %d", v)
+				}
+				checker.SetDefault(v)
+				check.True(t, v <= 42)
+			}
+			assert.Equal(t, 42, len(checker))
+		})
+	})
+	t.Run("Slice", func(t *testing.T) {
+		t.Run("Ordered", func(t *testing.T) {
+			in := []int{1, 2, 3, 4, 5, 6}
+			st := &Set[int]{}
+			st.Order()
+			st.AppendStream(NewSlice(in).Stream())
+			assert.Equal(t, st.Len(), 6)
+			assert.True(t, slices.Equal(in, st.Slice()))
+		})
+		t.Run("Unordered", func(t *testing.T) {
+			in := []int{1, 2, 3, 4, 5, 6}
+			st := &Set[int]{}
+			st.AppendStream(NewSlice(in).Stream())
+			assert.Equal(t, st.Len(), 6)
+			out := st.Slice()
+			assert.Equal(t, len(out), 6)
+			for v := range slices.Values(out) {
+				check.True(t, v <= 6 && v >= 1)
+			}
+		})
 	})
 }
 
@@ -494,7 +574,6 @@ func BenchmarkSet(b *testing.B) {
 					set.Delete(i * size)
 				}
 			}
-
 		}
 		b.Run("Map", func(b *testing.B) {
 			set := &Set[int]{}
@@ -538,5 +617,4 @@ func BenchmarkSet(b *testing.B) {
 			}
 		})
 	})
-
 }

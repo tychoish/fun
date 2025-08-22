@@ -8,6 +8,8 @@ import (
 	"math"
 	"math/rand"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -188,7 +190,6 @@ func getConstructors[T comparable]() []FixtureStreamConstructors[T] {
 			},
 		},
 	}
-
 }
 
 func TestStreamImplementations(t *testing.T) {
@@ -390,7 +391,6 @@ func TestParallelForEach(t *testing.T) {
 			t.Log(errs)
 			t.Error(len(errs), "!= 10", errs)
 		}
-
 	})
 	t.Run("CollectAllErrors/Double", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -764,7 +764,6 @@ func RunStreamStringAlgoTests(
 							},
 							WorkerGroupConfNumWorkers(4),
 						).Slice(t.Context())
-
 						if err != nil {
 							t.Error(len(vals), " >>:", err)
 						}
@@ -782,163 +781,6 @@ func RunStreamStringAlgoTests(
 							t.Error("unexpected result", count)
 						}
 					})
-					t.Run("Generate", func(t *testing.T) {
-						t.Run("Basic", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							inputs := GenerateRandomStringSlice(512)
-							count := &atomic.Int32{}
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if int(count.Load()) > len(inputs) {
-									return "", io.EOF
-								}
-								return inputs[rand.Intn(511)], nil
-							}).Parallel().Stream()
-							sig := make(chan struct{})
-							go func() {
-								defer close(sig)
-								vals, err := out.Slice(ctx)
-								if err != nil {
-									t.Error(err)
-								}
-								if len(vals) != len(inputs) {
-									t.Error("unexpected result", count.Load(), len(vals), len(inputs))
-								}
-							}()
-							<-sig
-						})
-						t.Run("GenerateParallel", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							inputs := GenerateRandomStringSlice(512)
-							count := &atomic.Int32{}
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if int(count.Load()) > len(inputs) {
-									return "", io.EOF
-								}
-								return inputs[rand.Intn(511)], nil
-							}).Parallel(WorkerGroupConfNumWorkers(4)).Stream()
-							sig := make(chan struct{})
-							go func() {
-								defer close(sig)
-								vals, err := out.Slice(ctx)
-								if err != nil {
-									t.Error(err)
-								}
-								// aborting may not happen at the same moment, given this locking model
-								if len(vals)+16 < len(inputs) {
-									t.Error("unexpected result", len(vals), len(inputs))
-								}
-							}()
-							<-sig
-						})
-						t.Run("PanicSafety", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-							out := MakeGenerator(func() (string, error) {
-								panic("foo")
-							}).Parallel().Stream()
-
-							if out.Next(ctx) {
-								t.Fatal("should not iterate when panic")
-							}
-
-							err := out.Close()
-
-							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-							assert.Substring(t, err.Error(), "foo")
-						})
-						t.Run("ContinueOnPanic", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							count := &atomic.Int64{}
-							out := Generator[string](
-								func(_ context.Context) (string, error) {
-									count.Add(1)
-
-									if count.Load()%3 == 0 {
-										panic("foo")
-									}
-
-									if count.Load()%5 == 0 {
-										return "", ers.ErrCurrentOpAbort
-									}
-									return fmt.Sprint(count.Load()), nil
-								},
-							).Parallel(WorkerGroupConfContinueOnPanic()).Stream()
-							output, err := out.Slice(ctx)
-							if l := len(output); l != 3 {
-								t.Log(err, output)
-								t.Error(l)
-							}
-							if err == nil {
-								t.Fatal("should have errored", count.Load())
-							}
-							assert.Substring(t, err.Error(), "foo")
-							assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-						})
-						t.Run("ArbitraryErrorAborts", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-
-							count := &atomic.Int64{}
-							expectedErr := errors.New("beep")
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if count.Load() > 5 {
-									return "", expectedErr
-								}
-								return "foo", nil
-							}).Parallel().Stream()
-
-							output, err := out.Slice(ctx)
-							if l := len(output); l != 5 {
-								t.Error(l, output)
-							}
-
-							check.Error(t, err)
-							t.Log(err, out.Close())
-
-							// because it's parallel we collect both
-							if !ers.Is(err, expectedErr) && !ers.Is(err, io.EOF) {
-								t.Log(len(ers.Unwind(err)))
-								t.Errorf("unexpected panic '%v'", err)
-							}
-						})
-						t.Run("ContinueOnError", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
-							count := &atomic.Int64{}
-							expectedErr := errors.New("beep")
-							out := Generator[string](func(_ context.Context) (string, error) {
-								count.Add(1)
-								if count.Load() == 3 {
-									return "", expectedErr
-								}
-								if count.Load() >= 5 {
-									return "", io.EOF
-								}
-								return "foo", nil
-							}).Parallel(WorkerGroupConfContinueOnError()).Stream()
-
-							output, err := out.Slice(ctx)
-							if l := len(output); l != 3 {
-								t.Error(l, output)
-							}
-							if err == nil {
-								t.Error("should have errored")
-							}
-							// because it's parallel we collect both
-							if !ers.Is(err, expectedErr) && !ers.Is(err, io.EOF) {
-								t.Errorf("unexpected error '%v'", err)
-							}
-						})
-					})
 
 					t.Run("Reduce", func(t *testing.T) {
 						ctx, cancel := context.WithCancel(context.Background())
@@ -950,7 +792,6 @@ func RunStreamStringAlgoTests(
 							seen[in] = struct{}{}
 							return fmt.Sprint(value, in), nil
 						}).Read(ctx)
-
 						if err != nil {
 							t.Fatal(err)
 						}
@@ -970,28 +811,34 @@ func RunStreamStringAlgoTests(
 						iter := builder()
 
 						seen := map[string]none{}
+						expectedError := errors.New("boop")
 
 						count := 0
 						_, err := iter.Reduce(
 							func(in string, val string) (string, error) {
 								check.Zero(t, val)
 								seen[in] = none{}
-								if len(seen) == 2 {
-									return val, errors.New("boop")
-								}
 								count++
+								if len(seen) == 3 {
+									return val, expectedError
+								}
 								return "", nil
 							},
 						).Read(ctx)
-						check.Equal(t, count, 1)
+						check.Equal(t, count, 3)
 						if err == nil {
 							t.Fatal("expected error")
 						}
 
-						if e := err.Error(); e != "boop" {
-							t.Error("unexpected error:", e)
+						if !errors.Is(err, expectedError) {
+							t.Error("unexpected error:", err)
 						}
-						if l := len(seen); l != 2 {
+						errs := ers.Unwind(err)
+						if len(errs) != 2 {
+							t.Error(len(errs), errs)
+						}
+
+						if l := len(seen); l != 3 {
 							t.Error("seen", l, seen)
 						}
 					})
@@ -1027,11 +874,10 @@ func RunStreamStringAlgoTests(
 							}
 							return 42, nil
 						}).Read(ctx)
-						assert.NotError(t, err)
+						assert.ErrorIs(t, err, io.EOF)
 						assert.Equal(t, sum, 42)
 						assert.Equal(t, count, 16)
 					})
-
 				})
 			}
 		})
@@ -1139,5 +985,34 @@ func RunStreamStringAlgoTests(
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
 		assert.Zero(t, counter)
 		assert.Nil(t, out)
+	})
+	t.Run("ConvertContinue", func(t *testing.T) {
+		count := 0
+		st := MakeStream(MakeGenerator(func() (int, error) {
+			count++
+
+			if count%2 == 0 {
+				return 0, ErrStreamContinue
+			}
+			if count < 16 {
+				return count, nil
+			}
+			if count >= 16 {
+				return 0, io.EOF
+			}
+
+			return count, ErrInvariantViolation
+		}))
+
+		newSl, err := MakeConverterErr(func(in int) (string, error) {
+			return strconv.Itoa(in), nil
+		}).Stream(st).Slice(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, len(newSl), 8)
+		check.Equal(t, newSl[3], "7")
+		check.Equal(t, false, slices.ContainsFunc(newSl, func(in string) bool {
+			return in == "4"
+		}))
+		check.Equal(t, newSl[0], "1")
 	})
 }

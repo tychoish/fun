@@ -13,6 +13,16 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+// Ignore swallows an error and is a noop, but provides a level of
+// annotation beyond assigning to the empty identifier.
+//
+//	_ = operation()
+//
+// vs:
+//
+//	ft.Ignore(operation())
+func Ignore(error) { return } //nolint:staticcheck
+
 // Cast just provides as a wrapper around in.(T). Cast will panic.
 func Cast[T any](in any) T { return in.(T) }
 
@@ -27,45 +37,45 @@ func Check[T any](out T, err error) (T, bool) { return out, err == nil }
 //	size += risky.Force(buffer.Write([]byte("hello world")))
 func Force[T any](out T, _ error) T { return out }
 
-// ForceOp takes the function and calls it itself so that it can
+// ForceCall takes the function and calls it itself so that it can
 // ignore a possible panic and return an output. In the case of a
 // panic or an error the output value is often the zero value for the
 // type.
-func ForceOp[T any](fn func() (T, error)) T { defer Recover(); return ft.IgnoreSecond(fn()) }
+func ForceCall[T any](fn func() (T, error)) T { defer Recover(); return Force(fn()) }
 
-// Block runs the function with a context that is never canceled. Use
+// Block runs a function with a background Context, like Block.
+func Block[T any](fn func(context.Context) (T, error)) (T, error) { return fn(context.Background()) }
+
+// BlockForce runs the function with a context that is never canceled. Use
 // this in cases where you don't want to plumb a context through *and*
 // the operation cannot block on the context.
-func Block[T any](fn func(context.Context) T) T { return fn(context.Background()) }
+func BlockForce[T any](fn func(context.Context) T) T { return fn(context.Background()) }
 
-// BlockOp runs a function with a background Context, like Block.
-func BlockOp[T any](fn func(context.Context) (T, error)) (T, error) { return fn(context.Background()) }
-
-// BlockForceOp combines Block with ForceOp to run a function with a
+// BlockForceIgnore combines Block with ForceOp to run a function with a
 // context that is never canceled, ignoring any panics and returning
 // the output value.
-func BlockForceOp[T any](fn func(context.Context) (T, error)) T {
+func BlockForceIgnore[T any](fn func(context.Context) (T, error)) T {
 	defer Recover()
-	return ft.IgnoreSecond(BlockOp(fn))
+	return ft.IgnoreSecond(Block(fn))
 }
 
-// Ignore runs a function that takes an arbitrary argument and ignores
+// WithRecover runs a function that takes an arbitrary argument and ignores
 // the error and swallows any panic. This is a risky move: usually
 // functions panic for a reason, but for certain invariants this may
 // be useful.
 //
-// Be aware, that while Ignore will recover from any panics, defers
+// Be aware, that while WithRecover will recover from any panics, defers
 // within the ignored function will not run unless there is a call to
 // recover *before* the defer.
-func Ignore[T any](fn func(T) error, arg T) { defer Recover(); _ = fn(arg) }
+func WithRecover[T any](fn func(T) error, arg T) { defer Recover(); Ignore(fn(arg)) }
 
 // Recover catches a panic and discards its value.
 func Recover() { _ = recover() }
 
-// Try runs a function with the provided input, and returns the
-// input. If the operation panics or returns an error, Try returns the
-// input argument.
-func Try[T any](op func(T) (T, error), input T) (out T) {
+// ApplyDefault runs a function with the provided input, and returns the
+// input. If the operation panics or returns an error, ApplyDefault returns
+// the input argument.
+func ApplyDefault[T any](op func(T) (T, error), input T) (out T) {
 	defer Recover()
 	out = input
 	if output, err := op(input); err == nil {
@@ -74,7 +84,7 @@ func Try[T any](op func(T) (T, error), input T) (out T) {
 	return
 }
 
-// IgnoreMust runs a function that takes an arbitrary argument and
+// Apply runs a function that takes an arbitrary argument and
 // ignores the error and swallows any panic, returning the output of
 // the function, likely a Zero value, in the case of an error.  This
 // is a risky move: usually functions panic for a reason, but for
@@ -83,16 +93,20 @@ func Try[T any](op func(T) (T, error), input T) (out T) {
 // Be aware, that while Ignore will recover from any panics, defers
 // within the ignored function will not run unless there is a call to
 // recover *before* the defer.
-func IgnoreMust[T any, O any](fn func(T) (O, error), arg T) O {
+func Apply[T any, O any](fn func(T) (O, error), arg T) O {
 	defer Recover()
 	val, _ := fn(arg)
 	return val
 }
 
-// Apply processes an input slice, with the provided function,
-// returning a new slice that holds the results.
-func Apply[T any](fn func(T) T, in []T) []T {
-	out := make([]T, len(in))
+// ApplyAll processes an input slice, with the provided function,
+// returning a new slice that holds the results. Panics are ignored
+// and do not abort the operation. The output is always the same
+// length as the input.
+func ApplyAll[T any, O any](fn func(T) O, in []T) (out []O) {
+	defer Recover()
+
+	out = make([]O, len(in))
 
 	for idx := range in {
 		out[idx] = fn(in[idx])

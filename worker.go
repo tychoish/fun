@@ -58,6 +58,10 @@ func (Constructors) ErrorChannelWorker(ch <-chan error) Worker {
 	}
 }
 
+func (Constructors) ContextChannelWorker(ctx context.Context) Worker {
+	return MAKE.ErrorChannelWorker(ft.ContextErrorChannel(ctx))
+}
+
 // Run is equivalent to calling the worker function directly.
 func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 
@@ -129,7 +133,10 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
-func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.IgnoreError(wf(ctx)) } }
+func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.Ignore(wf(ctx)) } }
+
+// Force runs the worker, ignoring the output with background context.
+func (wf Worker) Force() { wf.Ignore().Wait() }
 
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed
@@ -378,7 +385,7 @@ func (wf Worker) WithoutErrors(errs ...error) Worker {
 // aggregated and returned to the caller only if the retry fails.
 func (wf Worker) Retry(n int) Worker {
 	return func(ctx context.Context) (err error) {
-		for i := 0; i < n; i++ {
+		for range n {
 			attemptErr := wf(ctx)
 			switch {
 			case attemptErr == nil:

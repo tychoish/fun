@@ -20,6 +20,10 @@ func MakeConverter[T any, O any](op func(T) O) Converter[T, O] {
 	return func(_ context.Context, in T) (O, error) { return op(in), nil }
 }
 
+func MakeConverterToAny[T any]() Converter[T, any] {
+	return MakeConverter(func(in T) any { return any(in) })
+}
+
 // MakeCovnerterOk builds a Transform function from a function that
 // converts between types T and O, but that returns a boolean/check
 // value. When the converter function returns false the
@@ -75,40 +79,33 @@ func (mpf Converter[T, O]) Wait(in T) (O, error) { return mpf.Convert(context.Ba
 // type (T) to another (O).
 func (mpf Converter[T, O]) Convert(ctx context.Context, in T) (O, error) { return mpf(ctx, in) }
 
-// Generator processes an input generator function with the Transform
-// function. Each call to the output generator returns one value from
-// the input generator after processing the item with the transform
-// function applied. The output generator returns any error encountered
-// during these operations (input, transform, output) to its caller
-// *except* ErrStreamContinue, which is respected.
-func (mpf Converter[T, O]) Generator(prod Generator[T]) Generator[O] {
-	return func(ctx context.Context) (out O, _ error) {
+// Stream takes an input stream of one type and converts it to a
+// stream of the another type. All errors from the original stream are
+// propagated to the output stream.
+func (mpf Converter[T, O]) Stream(iter *Stream[T]) *Stream[O] {
+	return MakeStream(func(ctx context.Context) (out O, _ error) {
 		for {
-			item, err := prod(ctx)
-			if err == nil {
-				out, err = mpf.Convert(ctx, item)
-				if err == nil {
-					return out, nil
-				}
+			item, err := iter.Read(ctx)
+			if err != nil {
+				// you'd think that you'd need to
+				// filter out Continue and other
+				// signals here, but the Read method
+				// on the stream will do that making
+				// these unreachable.
+				return mpf.zeroOut(), err
 			}
 
+			out, err = mpf.Convert(ctx, item)
 			switch {
+			case err == nil:
+				return out, nil
 			case errors.Is(err, ErrStreamContinue):
 				continue
 			default:
 				return mpf.zeroOut(), err
 			}
 		}
-	}
-}
-
-// Stream takes an input stream of one type and converts it to a
-// stream of the another type. All errors from the original stream are
-// propagated to the output stream.
-func (mpf Converter[T, O]) Stream(iter *Stream[T]) *Stream[O] {
-	return mpf.Generator(iter.Read).
-		Stream().
-		WithHook(func(st *Stream[O]) { st.AddError(iter.Close()) })
+	}).WithHook(func(st *Stream[O]) { st.AddError(iter.Close()) })
 }
 
 // Parallel runs the input stream through the transform
@@ -122,7 +119,7 @@ func (mpf Converter[T, O]) Parallel(
 ) *Stream[O] {
 	conf := &WorkerGroupConf{}
 	if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
-		return makeErrorGenerator[O](err).Stream()
+		return MakeStream(errorGenerator[O](err))
 	}
 
 	output := Blocking(make(chan O))
@@ -133,7 +130,7 @@ func (mpf Converter[T, O]) Parallel(
 	// till later, and error handling gets much easier if we
 	// wait.
 	setup := mpf.WithRecover().
-		mapPullProcess(output.Handler(), conf).
+		mapPullProcess(output.Send().Write, conf).
 		ReadAll(iter).
 		Group(conf.NumWorkers).
 		PostHook(output.Close).
@@ -141,9 +138,8 @@ func (mpf Converter[T, O]) Parallel(
 		Go().
 		Once()
 
-	return output.Generator().
-		PreHook(setup).
-		Stream().
+	return MakeStream(NewGenerator(output.Receive().Read).
+		PreHook(setup)).
 		WithHook(func(out *Stream[O]) {
 			out.AddError(iter.Close())
 			out.AddError(conf.ErrorCollector.Resolve())

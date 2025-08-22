@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ft"
 )
 
 // ChanSend provides access to channel send operations, and is
@@ -27,14 +28,10 @@ func NonBlockingSend[T any](ch chan<- T) ChanSend[T] {
 
 // Check performs a send and returns true when the send was successful
 // and false otherwise.
-func (sm ChanSend[T]) Check(ctx context.Context, it T) bool { return sm.Handler().Check(ctx, it) }
+func (sm ChanSend[T]) Check(ctx context.Context, it T) bool { return sm.Write(ctx, it) == nil }
 
 // Ignore performs a send and omits the error.
-func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { sm.Handler().Ignore(ctx, it) }
-
-// Handler returns the Write method as a processor for integration
-// into existing tools
-func (sm ChanSend[T]) Handler() Handler[T] { return sm.Write }
+func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { ft.Ignore(sm.Write(ctx, it)) }
 
 // Zero sends the zero value of T through the channel.
 func (sm ChanSend[T]) Zero(ctx context.Context) error { var v T; return sm.Write(ctx, v) }
@@ -86,11 +83,11 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 	}
 }
 
-// Consume returns a worker that, when executed, pushes the content
+// WriteAll returns a worker that, when executed, pushes the content
 // from the stream into the channel.
-func (sm ChanSend[T]) Consume(iter *Stream[T]) Worker {
+func (sm ChanSend[T]) WriteAll(iter *Stream[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(iter.Close(), err, erc.ParsePanic(recover())) }()
-		return sm.Handler().ReadAll(iter).Run(ctx)
+		return iter.Parallel(sm.Write, WorkerGroupConfNumWorkers(cap(sm.ch))).Run(ctx)
 	}
 }

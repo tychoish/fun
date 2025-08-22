@@ -174,14 +174,31 @@ func (q *Queue[T]) BlockingAdd(ctx context.Context, item T) error {
 // Remove removes and returns the frontmost (oldest) item in the queue and
 // reports whether an item was available.  If the queue is empty, Remove
 // returns nil, false.
-func (q *Queue[T]) Remove() (out T, _ bool) {
+func (q *Queue[T]) Remove() (out T, ok bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if q.tracker.len() == 0 {
-		return out, false
+	switch q.tracker.len() {
+	case 0:
+		return
+	case 1:
+		out = q.popFront()
+		ok = true
+		if q.draining || q.closed {
+			q.nempty.Broadcast()
+		}
+		q.nempty.Signal()
+	default:
+		out = q.popFront()
+		ok = true
+
+		if q.draining || q.closed {
+			q.nupdates.Broadcast()
+		}
+		q.nupdates.Signal()
 	}
-	return q.popFront(), true
+
+	return
 }
 
 // Wait blocks until q is non-empty or closed, and then returns the frontmost
@@ -217,15 +234,16 @@ func (q *Queue[T]) Drain(ctx context.Context) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	q.draining = true
-
-	if err := q.waitUntilEmpty(ctx); err != nil {
-		return err
-	}
-	return nil
+	return q.waitForDrain(ctx)
 }
 
-func (q *Queue[T]) waitUntilEmpty(ctx context.Context) error {
+func (q *Queue[T]) waitForDrain(ctx context.Context) error {
+	// when the function returns wake all other waiters.
+	ctx, cancel := context.WithCancel(ctx)
+	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
+	defer cancel()
+	q.draining = true
+
 	for q.tracker.len() > 0 {
 		if err := ctx.Err(); err != nil {
 			return ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
@@ -280,12 +298,11 @@ func (q *Queue[T]) Shutdown(ctx context.Context) error {
 
 	q.draining = true
 
-	if err := q.waitUntilEmpty(ctx); err != nil {
+	if err := q.waitForDrain(ctx); err != nil {
 		return err
 	}
 
 	q.closed = true
-	q.draining = false
 	q.nupdates.Broadcast()
 	q.nempty.Broadcast()
 	return nil
@@ -364,32 +381,9 @@ type entry[T any] struct {
 // the queue has been closed via the Close() method.
 //
 // To create a "consuming" stream, use a Distributor.
-func (q *Queue[T]) Stream() *fun.Stream[T] { return q.Generator().Stream() }
-
-// Distributor creates a object used to process the items in the
-// queue: items yielded by the Distributor's stream, are removed
-// from the queue.
-func (q *Queue[T]) Distributor() Distributor[T] {
-	return Distributor[T]{
-		push: fun.MakeHandler(q.Add),
-		pop: func(ctx context.Context) (_ T, err error) {
-			msg, ok := q.Remove()
-			if ok {
-				return msg, nil
-			}
-			msg, err = q.Wait(ctx)
-			return msg, err
-		},
-		size: q.tracker.len,
-	}
-}
-
-// Generator returns a function that produces items from the
-// queue, iteratively. It's not destructive, and has the same
-// semantics as the Stream.
-func (q *Queue[T]) Generator() fun.Generator[T] {
+func (q *Queue[T]) Stream() *fun.Stream[T] {
 	var next *entry[T]
-	return func(ctx context.Context) (o T, _ error) {
+	return fun.MakeStream(func(ctx context.Context) (o T, _ error) {
 		if next == nil {
 			q.mu.Lock()
 			next = q.front
@@ -425,5 +419,23 @@ func (q *Queue[T]) Generator() fun.Generator[T] {
 		}
 
 		return next.item, nil
+	})
+}
+
+// Distributor creates a object used to process the items in the
+// queue: items yielded by the Distributor's stream, are removed
+// from the queue.
+func (q *Queue[T]) Distributor() Distributor[T] {
+	return Distributor[T]{
+		push: fun.MakeHandler(q.Add),
+		pop: func(ctx context.Context) (_ T, err error) {
+			msg, ok := q.Remove()
+			if ok {
+				return msg, nil
+			}
+			msg, err = q.Wait(ctx)
+			return msg, err
+		},
+		size: q.tracker.len,
 	}
 }

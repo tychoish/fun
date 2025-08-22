@@ -14,7 +14,7 @@ import (
 func TestTupleExtra(t *testing.T) {
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Encode", func(t *testing.T) {
-			ps := NewMap(map[string]string{"in": "out"}).Tuples()
+			ps := MakeTuples(MakeTuple("in", "out"))
 			out, err := json.Marshal(ps)
 			check.NotError(t, err)
 			check.Equal(t, string(out), `[["in","out"]]`)
@@ -127,7 +127,5 @@ func TestTupleExtra(t *testing.T) {
 		elem.next.next.item.Two = 2
 
 		check.True(t, ft.Not(reflect.DeepEqual(tp.ll, tpc.ll)))
-
 	})
-
 }

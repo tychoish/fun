@@ -70,7 +70,7 @@ const ErrStreamContinue ers.Error = ers.ErrCurrentOpSkip
 // except in a few cases where a caller has exclusive access to the
 // stream.
 type Stream[T any] struct {
-	operation Generator[T]
+	operation func(context.Context) (T, error)
 	value     T
 
 	erc    erc.Collector
@@ -86,8 +86,8 @@ type Stream[T any] struct {
 // once for every item, until it errors. Errors other than context
 // cancellation errors and io.EOF are propgated to the stream's Close
 // method.
-func MakeStream[T any](gen Generator[T]) *Stream[T] {
-	op, cancel := gen.WithCancel()
+func MakeStream[T any](gen func(context.Context) (T, error)) *Stream[T] {
+	op, cancel := NewGenerator(gen).WithCancel()
 	st := &Stream[T]{operation: op}
 	st.closer.ops = append(st.closer.ops, cancel)
 	return st
@@ -119,12 +119,12 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
-// SeqStream wraps a native go iterator to a fun.Stream[T].
+// SeqStream wraps a native go iterator to a Stream[T].
 func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	return CheckedGenerator(func() (zero T, _ bool) {
+	return MakeStream(CheckedGenerator(func() (zero T, _ bool) {
 		if val, ok := next(); ok {
 			return val, true
 		}
@@ -137,7 +137,7 @@ func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 		case <-cc.Done():
 		}
 		stop()
-	}).PostHook(cancel).Go().Once()).Stream()
+	}).PostHook(cancel).Go().Once()))
 }
 
 // Transform processes a stream passing each element through a
@@ -164,7 +164,7 @@ func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := Blocking(make(chan T))
 	ec := &erc.Collector{}
-	eh := MAKE.ErrorHandlerWithoutTerminating(ec.Push)
+	ec.SetFilter(erc.NewFilter().WithoutContext().WithoutTerminating())
 
 	wg := &WaitGroup{}
 	init := Operation(func(ctx context.Context) {
@@ -173,20 +173,17 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		iters.ReadAll(func(iter *Stream[T]) {
 			// start a thread for reading this
 			// sub-iterator.
-			send.Consume(iter).
-				Operation(eh).
-				PostHook(func() { eh(iter.Close()) }).
+			send.WriteAll(iter).
+				Operation(ec.Push).
+				PostHook(func() { ec.Push(iter.Close()) }).
 				Add(ctx, wg)
-
-		}).Operation(eh).Add(ctx, wg)
+		}).Operation(ec.Push).Add(ctx, wg)
 
 		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
-	return pipe.Receive().
-		Generator().
-		PreHook(init).
-		Stream().
+	return MakeStream(NewGenerator(pipe.Receive().Read).
+		PreHook(init)).
 		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
 }
 
@@ -204,7 +201,7 @@ func JoinStreams[T any](iters ...*Stream[T]) *Stream[T] { return new(Stream[T]).
 func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
 		st.closer.state.Store(true)
-		fn.JoinHandlers(st.closer.hooks).Handle(st)
+		fn.JoinHandlers(st.closer.hooks).Read(st)
 		ft.Call(ft.Join(st.closer.ops))
 	})
 }
@@ -234,10 +231,6 @@ func (st *Stream[T]) AddError(e error) { st.erc.Push(e) }
 
 // ErrorHandler provides access to the AddError method as an error observer.
 func (st *Stream[T]) ErrorHandler() fn.Handler[error] { return st.erc.Push }
-
-// Generator provides access to the contents of the stream as a
-// Generator function.
-func (st *Stream[T]) Generator() Generator[T] { return st.Read }
 
 // Value returns the object at the current position in the
 // stream. It's often used with Next() for looping over the
@@ -350,7 +343,8 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 			return err
 		}
 
-		fn.WithRecover().WithErrorFilter(conf.errorFilter).
+		fn.WithRecover().
+			WithErrorFilter(conf.errorFilter).
 			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) })).
 			StartGroup(ctx, conf.NumWorkers).
 			Ignore().
@@ -365,29 +359,28 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map()
 func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
-	return st.Generator().Filter(check).Stream().WithHook(st.CloseHook())
-}
-
-// Any, as a special case of Transform converts a stream of any
-// type and converts it to a stream of any (e.g. interface{})
-// values.
-func (st *Stream[T]) Any() *Stream[any] {
-	return MakeConverter(func(in T) any { return any(in) }).Stream(st)
+	return MakeStream(NewGenerator(st.operation).Filter(check)).WithHook(st.CloseHook())
 }
 
 // Reduce processes a stream with a reducer function. The output
 // function is a Generator operation which runs synchronously, and no
 // processing happens before generator is called. If the reducer
-// function returns, ErrStreamContinue, the output value is ignored, and
-// the reducer operation continues. io.EOR errors are not propagated
-// to the caller, and in all situations, the last value produced by
-// the reducer is returned with an error.
+// function returns ErrStreamContinue, the output value is ignored,
+// and the reducer operation continues.
+//
+// If the underlying stream returns an error, it's returned by the
+// close method of this the new stream. If the reducer function
+// returns an error, that error is returned either by the Read or
+// Close methods of the stream. If the underlying stream terminates
+// cleanly, then the reducer will return it's last value without
+// error. Otherwise any error returned by the Reduce method, other
+// than ErrStreamContinue, is propagated to the caller.
 //
 // The "previous" value for the first reduce option is the zero value
 // for the type T.
-func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
+func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 	var value T
-	return func(ctx context.Context) (_ T, err error) {
+	return MakeStream(func(ctx context.Context) (_ T, err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 
 		for {
@@ -401,23 +394,19 @@ func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) Generator[T] {
 			case err == nil:
 				value = out
 				continue
-			case errors.Is(err, ErrStreamContinue):
+			case ers.Is(err, ErrStreamContinue):
 				continue
-			case ers.IsTerminating(err):
-				return value, nil
 			default:
 				return value, err
 			}
 		}
-	}
+	}).WithHook(st.CloseHook())
 }
 
 // Count returns the number of items observed by the stream. Callers
 // should still manually call Close on the stream.
 func (st *Stream[T]) Count(ctx context.Context) (count int) {
-	for proc := st.Generator(); ft.IsOk(proc.Check(ctx)); {
-		count++
-	}
+	st.ReadAll(func(T) { count++ }).Ignore().Run(ctx)
 	return count
 }
 
@@ -438,10 +427,10 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	}
 	pipe := Blocking(make(chan T))
 
-	setup := pipe.Send().Consume(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
+	setup := pipe.Send().WriteAll(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
-		output[idx] = pipe.Generator().PreHook(setup).Stream().WithHook(st.CloseHook())
+		output[idx] = MakeStream(NewGenerator(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
 	}
 
 	return output
@@ -455,11 +444,11 @@ func (st *Stream[T]) CloseHook() func(*Stream[T]) {
 // sequentially, and without starting any go routines. Otherwise
 // similar to Flatten (which processes each stream in parallel).
 func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
-	proc := st.Generator()
+	proc := NewGenerator(st.Read)
 	for idx := range iters {
 		proc = proc.Join(iters[idx].Read)
 	}
-	return proc.Stream()
+	return MakeStream(proc)
 }
 
 // Slice converts a stream to the slice of it's values, and
@@ -516,7 +505,8 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 		return err
 	}
 	var idx int
-	st.operation = st.operation.Join(func(_ context.Context) (out T, err error) {
+
+	st.operation = NewGenerator(st.operation).Join(func(context.Context) (out T, err error) {
 		if idx >= len(rv) {
 			return out, io.EOF
 		}
@@ -539,8 +529,8 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().Consume(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-	return buf.Generator().PreHook(pipe).Stream().WithHook(st.CloseHook())
+	pipe := buf.Send().WriteAll(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
+	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(pipe))
 }
 
 // BufferParallel, like buffer, process the input queue and stores
@@ -554,13 +544,13 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 func (st *Stream[T]) BufferParallel(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 
-	return buf.Generator().PreHook(
+	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(
 		st.Parallel(
-			buf.Send().Handler(),
+			buf.Send().Write,
 			WorkerGroupConfNumWorkers(n),
 		).Operation(st.ErrorHandler()).
 			PostHook(buf.Close).Go().Once(),
-	).Stream().WithHook(st.CloseHook())
+	)).WithHook(st.CloseHook())
 }
 
 // Channel proides access to the contents of the stream as a
@@ -573,7 +563,7 @@ func (st *Stream[T]) Channel(ctx context.Context) <-chan T { return st.BufferedC
 func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
 
-	out.Handler().
+	NewHandler(out.Send().Write).
 		ReadAll(st).
 		PostHook(out.Close).
 		Operation(st.AddError).

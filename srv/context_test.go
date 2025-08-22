@@ -237,9 +237,14 @@ func TestContext(t *testing.T) {
 func TestWorkerPool(t *testing.T) {
 	t.Parallel()
 	t.Run("Example", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
+		var cancel context.CancelFunc
+		ctx := context.Background()
+
+		ctx, cancel = context.WithCancel(ctx)
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", fun.WorkerGroupConfNumWorkers(4))
+		ctx = SetBaseContext(ctx)
+
+		ctx = WithWorkerPool(ctx, "kip", fun.WorkerGroupConfNumWorkers(4), fun.WorkerGroupConfIncludeContextErrors())
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})

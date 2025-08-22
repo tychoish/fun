@@ -73,6 +73,13 @@ func Default[T comparable](input T, defaultValue T) T {
 	return input
 }
 
+func DefaultApply[T comparable, A any](input T, fn func(A) T, arg A) T {
+	if IsZero(input) {
+		return input
+	}
+	return fn(arg)
+}
+
 // DefaultNew checks a pointer to a value, and when it is nil,
 // constructs a new value of the same type.
 func DefaultNew[T any](input *T) *T {

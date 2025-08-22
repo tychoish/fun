@@ -26,9 +26,9 @@ func TestOptional(t *testing.T) {
 		future := opt.Future()
 		handler := opt.Handler()
 		check.Equal(t, 400, future.Resolve())
-		handler.Handle(100)
+		handler.Read(100)
 		check.Equal(t, 100, future.Resolve())
-		handler.Handle(300)
+		handler.Read(300)
 		check.Equal(t, 300, future.Resolve())
 	})
 	t.Run("SetAndGet", func(t *testing.T) {
@@ -354,7 +354,6 @@ func TestOptional(t *testing.T) {
 			})
 		})
 	})
-
 }
 
 type mockSQLcell struct {

@@ -24,8 +24,9 @@ func Check[T any](value T, err error) (zero T, _ bool) {
 	return value, true
 }
 
-// IgnoreError discards an error.
-func IgnoreError(_ error) { return } //nolint
+func WrapCheck[T any](value T, err error) func() (T, bool) {
+	return func() (T, bool) { return Check(value, err) }
+}
 
 // MustBeOk raises an invariant violation if the ok value is false,
 // and returns the first value if the second value is ok. Useful as

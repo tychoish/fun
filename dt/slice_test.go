@@ -70,13 +70,13 @@ func TestSlice(t *testing.T) {
 			s := Slice[int]{}
 			assert.True(t, s.IsEmpty())
 
-			s.Add(42)
+			s.Push(42)
 			assert.Equal(t, 42, s.Index(0))
 			assert.Equal(t, 1, s.Len())
 		})
 		t.Run("Append", func(t *testing.T) {
 			s := Slice[int]{}
-			s.Append(42, 300, 64)
+			s.PushMany(42, 300, 64)
 			assert.Equal(t, 42, s.Index(0))
 			assert.Equal(t, 300, s.Index(1))
 			assert.Equal(t, 64, s.Index(2))
@@ -84,7 +84,7 @@ func TestSlice(t *testing.T) {
 		})
 		t.Run("Extend", func(t *testing.T) {
 			s := Slice[int]{}
-			s.Extend([]int{42, 300, 64})
+			s.AppendSlice([]int{42, 300, 64})
 			assert.Equal(t, 42, s.Index(0))
 			assert.Equal(t, 300, s.Index(1))
 			assert.Equal(t, 64, s.Index(2))
@@ -107,9 +107,7 @@ func TestSlice(t *testing.T) {
 			s.GrowCapacity(32)
 			check.Equal(t, cap(s), 32)
 			check.Equal(t, len(s), 3)
-
 		})
-
 	})
 	t.Run("Sparse", func(t *testing.T) {
 		s := Slice[*int]{ft.Ptr(1), ft.Ptr(42), nil, nil}
@@ -149,7 +147,7 @@ func TestSlice(t *testing.T) {
 				s.Truncate(50)
 			})
 
-			s.Append(1, 2, 3)
+			s.PushMany(1, 2, 3)
 			assert.Panic(t, func() {
 				s.Truncate(4)
 			})
@@ -351,7 +349,7 @@ func TestSlice(t *testing.T) {
 
 		sl := randomIntSlice(128)
 		ls := &List[int]{}
-		err := ls.Populate(sl.Stream()).Run(ctx)
+		err := ls.AppendStream(sl.Stream()).Run(ctx)
 
 		assert.NotError(t, err)
 
@@ -477,5 +475,4 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, sl.Index(3), 400)
 		check.Equal(t, sl.Index(6), 800)
 	})
-
 }
