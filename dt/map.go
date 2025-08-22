@@ -143,7 +143,7 @@ func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(pipe.Receive().Generator().PreHook(init))
+	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).PreHook(init))
 }
 
 // Keys provides a stream over just the keys in the map.
@@ -160,7 +160,7 @@ func (m Map[K, V]) Keys() *fun.Stream[K] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(pipe.Receive().Generator().PreHook(init))
+	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).PreHook(init))
 }
 
 // Values provides a stream over just the values in the map.
@@ -177,5 +177,5 @@ func (m Map[K, V]) Values() *fun.Stream[V] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(pipe.Receive().Generator().PreHook(init))
+	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).PreHook(init))
 }

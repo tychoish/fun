@@ -54,10 +54,10 @@ func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
 // false, and true when the Drop was successful.
-func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOk(ro.Generator().Check(ctx)) }
+func (ro ChanReceive[T]) Drop(ctx context.Context) bool { return ft.IsOk(ro.Check(ctx)) }
 
 // Ignore reads one item from the channel and discards it.
-func (ro ChanReceive[T]) Ignore(ctx context.Context) { ro.Generator().Ignore(ctx).Resolve() }
+func (ro ChanReceive[T]) Ignore(ctx context.Context) { _, _ = ro.Read(ctx) }
 
 // Force ignores the error returning only the value from Read. This is
 // either the value sent through the channel, or the zero value for
@@ -69,7 +69,7 @@ func (ro ChanReceive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(c
 // Check performs the read operation and converts the error into an
 // "ok" value, returning true if receive was successful and false
 // otherwise.
-func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ro.Generator().Check(ctx) }
+func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) { return ft.Check(ro.Read(ctx)) }
 
 // Ok attempts to read from a channel returns true either when the
 // channel is blocked or an item is read from the channel and false
@@ -136,10 +136,6 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 	}
 }
 
-// Generator returns the Read method as a generator for integration into
-// existing tools.
-func (ro ChanReceive[T]) Generator() Generator[T] { return ro.Read }
-
 // Stream provides access to the contents of the channel as a
 // fun-style stream. For ChanRecieve objects in
 // non-blocking mode, iteration ends when there are no items in the
@@ -159,7 +155,7 @@ func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.S
 // function returns ErrStreamContinue, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) ReadAll(op Handler[T]) Worker {
+func (ro ChanReceive[T]) ReadAll(op func(context.Context, T) error) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 

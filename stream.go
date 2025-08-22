@@ -182,8 +182,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
-	return MakeStream(pipe.Receive().
-		Generator().
+	return MakeStream(NewGenerator(pipe.Receive().Read).
 		PreHook(init)).
 		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
 }

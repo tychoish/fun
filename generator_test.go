@@ -352,10 +352,25 @@ func TestGenerator(t *testing.T) {
 		var out int
 
 		assert.NotPanic(t, func() { out = pf.Force().Resolve() })
-		assert.Equal(t, out, 42)
-		assert.Equal(t, count, 1)
 		err = nil
 		assert.Equal(t, 42, pf.Resolve())
+		assert.Equal(t, 42, out)
+	})
+	t.Run("Check", func(t *testing.T) {
+		count := 0
+		err := io.EOF
+		pf := MakeGenerator(func() (int, error) { count++; return 42, err })
+
+		out, ok := pf.Check(t.Context())
+		assert.Equal(t, out, 42)
+		assert.Equal(t, count, 1)
+		assert.True(t, !ok)
+
+		err = nil
+		out, ok = pf.Check(t.Context())
+		assert.Equal(t, out, 42)
+		assert.Equal(t, count, 2)
+		assert.True(t, ok)
 	})
 	t.Run("Ignore", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
