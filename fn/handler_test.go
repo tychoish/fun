@@ -30,7 +30,7 @@ func TestHandler(t *testing.T) {
 		var ob Handler[int] = func(_ int) {
 			panic(io.EOF)
 		}
-		ob.WithRecover(oe).Handle(100)
+		ob.WithRecover(oe).Read(100)
 		assert.Equal(t, 1, count)
 	})
 	t.Run("If", func(t *testing.T) {
@@ -40,9 +40,9 @@ func TestHandler(t *testing.T) {
 			count++
 		}
 
-		ob.If(false).Handle(100)
+		ob.If(false).Read(100)
 		assert.Equal(t, 0, count)
-		ob.If(true).Handle(100)
+		ob.If(true).Read(100)
 		assert.Equal(t, 1, count)
 	})
 	t.Run("When", func(t *testing.T) {
@@ -251,5 +251,32 @@ func TestHandler(t *testing.T) {
 		out := ErrorHandler[int](eh)(42, io.EOF)
 		assert.Equal(t, 42, out)
 		assert.True(t, called)
+	})
+	t.Run("NoopHandler", func(t *testing.T) {
+		assert.NotPanic(t, func() {
+			NewNoopHandler[func()]().Read(nil)
+		})
+	})
+	t.Run("Safe", func(t *testing.T) {
+		t.Run("FuncPtrs", func(t *testing.T) {
+			assert.Panic(t, func() {
+				var hf Handler[func()]
+				hf.Read(nil)
+			})
+			assert.NotPanic(t, func() {
+				var hf Handler[func()]
+				hf.Safe().Read(nil)
+			})
+		})
+		t.Run("Nums", func(t *testing.T) {
+			assert.Panic(t, func() {
+				var hf Handler[int]
+				hf.Read(-1)
+			})
+			assert.NotPanic(t, func() {
+				var hf Handler[int]
+				hf.Safe().Read(-1)
+			})
+		})
 	})
 }

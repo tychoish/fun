@@ -101,7 +101,7 @@ func TestLocked(t *testing.T) {
 			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(200 * time.Millisecond) }
 			mget, mset := AccessorsWithLock(getter, setter)
 			start := time.Now()
-			sw := func() { go mset.Handle(267) }
+			sw := func() { go mset.Read(267) }
 			go sw()
 			runtime.Gosched()
 			sig := make(chan struct{})
