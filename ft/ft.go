@@ -28,3 +28,6 @@ func Convert[A any, B any](mapper func(A) B, values iter.Seq[A]) iter.Seq[B] {
 // adapting functions that take slice arguments where it's easier to
 // pass values variadicly.
 func Slice[T any](items ...T) []T { return items }
+
+func Seq[T any](input T) iter.Seq[T]              { return func(yield func(T) bool) { yield(input) } }
+func Seq2[A any, B any](a A, b B) iter.Seq2[A, B] { return func(yield func(A, B) bool) { yield(a, b) } }
