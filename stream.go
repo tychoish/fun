@@ -202,7 +202,7 @@ func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
 		st.closer.state.Store(true)
 		fn.JoinHandlers(st.closer.hooks).Read(st)
-		ft.Call(ft.Join(st.closer.ops))
+		ft.Call(ft.Join(st.closer.ops...))
 	})
 }
 
@@ -219,6 +219,7 @@ func (st *Stream[T]) Close() error { st.doClose(); return st.erc.Resolve() }
 // method.
 func (st *Stream[T]) WithHook(hook fn.Handler[*Stream[T]]) *Stream[T] {
 	st.closer.hooks = append(st.closer.hooks, hook)
+
 	return st
 }
 

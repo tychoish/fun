@@ -471,14 +471,25 @@ func TestContexts(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		assert.NotPanic(t, func() { Join(Slice[func()]()) })
-		assert.NotPanic(t, func() { Join(Slice[func()](nil, nil)) })
+		assert.NotPanic(t, func() { Join(Slice[func()]()...) })
+		assert.NotPanic(t, func() { Join(Slice[func()](nil, nil)...) })
+		assert.NotPanic(t, func() { Join(Slice[func()]()...) })
+		assert.NotPanic(t, func() { Join() })
+		assert.NotPanic(t, func() { Join(nil, nil) })
 	})
 	t.Run("Called", func(t *testing.T) {
-		count := 0
-		fn := func() { count++ }
-		Join(Slice(fn, fn, nil, fn, fn))()
-		assert.Equal(t, count, 4)
+		t.Run("Mixed", func(t *testing.T) {
+			count := 0
+			fn := func() { count++ }
+			Join(fn, fn, nil, fn, fn)()
+			assert.Equal(t, count, 4)
+		})
+		t.Run("AllValid", func(t *testing.T) {
+			count := 0
+			fn := func() { count++ }
+			Join(fn, fn, fn, fn)()
+			assert.Equal(t, count, 4)
+		})
 	})
 }
 
@@ -594,7 +605,6 @@ func TestPanicProtection(t *testing.T) {
 		ApplyTimes(10, func(n int) { inc++; check.Equal(t, n, 42) }, 42)
 		assert.Equal(t, 10, inc)
 	})
-
 	t.Run("Ignore", func(t *testing.T) {
 		t.Run("FirstAndSecond", func(t *testing.T) {
 			const first int = 42

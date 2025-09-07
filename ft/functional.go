@@ -5,7 +5,7 @@ import "iter"
 // Join creates a function that iterates over all of the input
 // functions and calls all non-nil functions sequentially. Nil
 // functions are ignored.
-func Join(fns []func()) func() { return func() { CallMany(fns) } }
+func Join(fns ...func()) func() { return func() { CallMany(fns) } }
 
 // Call executes the provided function.
 func Call(op func()) { op() }
