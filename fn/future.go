@@ -44,7 +44,7 @@ func (f Future[T]) If(cond bool) Future[T] { return func() T { return ft.DoWhen(
 // checked every time the future is called.
 func (f Future[T]) When(c func() bool) Future[T] { return func() T { return ft.DoWhen(c(), f) } }
 
-// Locked returns a wrapped future that ensure that all calls to the
+// Lock returns a wrapped future that ensure that all calls to the
 // future are protected by a mutex.
 func (f Future[T]) Lock() Future[T] { return f.WithLock(&sync.Mutex{}) }
 
