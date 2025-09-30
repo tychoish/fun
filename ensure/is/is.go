@@ -68,11 +68,11 @@ func All(ops ...That) That {
 }
 
 func assert(cond bool, args ...any) That {
-	return That(fn.MakeFuture(fun.MAKE.Str(args).Slice()).Not(cond).Once())
+	return That(fn.MakeFuture(fun.MAKE.Str(args).Slice()).If(!cond).Once())
 }
 
 func assertf(cond bool, t string, a ...any) That {
-	return That(fn.MakeFuture(fun.MAKE.Strf(t, a).Slice()).Not(cond).Once())
+	return That(fn.MakeFuture(fun.MAKE.Strf(t, a).Slice()).If(!cond).Once())
 }
 
 // EqualTo asserts that two comparable values are equal to eachother.

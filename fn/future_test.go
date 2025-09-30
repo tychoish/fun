@@ -49,15 +49,6 @@ func TestFuture(t *testing.T) {
 		check.Equal(t, thunk.If(true).Resolve(), 42)
 		check.Equal(t, count, 1)
 	})
-	t.Run("Not", func(t *testing.T) {
-		count := 0
-		thunk := MakeFuture(func() int { count++; return 42 })
-		check.Equal(t, count, 0)
-		check.Equal(t, thunk.Not(true).Resolve(), 0)
-		check.Equal(t, count, 0)
-		check.Equal(t, thunk.Not(false).Resolve(), 42)
-		check.Equal(t, count, 1)
-	})
 	t.Run("When", func(t *testing.T) {
 		count := 0
 		thunk := MakeFuture(func() int { count++; return 42 })
@@ -142,18 +133,10 @@ func TestFuture(t *testing.T) {
 		})
 	})
 	t.Run("Panics", func(t *testing.T) {
-		t.Run("Op", func(t *testing.T) {
-			out, err := MakeFuture(func() int { panic("foo") }).RecoverPanic()
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			assert.Zero(t, out)
-		})
-		t.Run("Wrapper", func(t *testing.T) {
-			out, err := MakeFuture(func() int { panic("foo") }).Safe()()
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			assert.Zero(t, out)
-		})
+		out, err := MakeFuture(func() int { panic("foo") }).RecoverPanic()
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+		assert.Zero(t, out)
 	})
 	t.Run("Lock", func(t *testing.T) {
 		// this is mostly just tempting the race detecor

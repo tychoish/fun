@@ -74,7 +74,7 @@ func PtrGenerator[T any](fn func() *T) Generator[T] {
 
 // FutureGenerator creates a generator for the fn.Future
 // function. The underlying Future's panics are converted to errors.
-func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.Safe()) }
+func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.RecoverPanic) }
 
 // WithRecover returns a wrapped generator with a panic handler that converts
 // any panic to an error.

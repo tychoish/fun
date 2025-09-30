@@ -22,18 +22,11 @@ func (fl Filter[T]) Apply(v T) T { return fl(v) }
 // Ptr applies the filter to the value pointed to by the pointer, modifying it in place.
 func (fl Filter[T]) Ptr(v *T) { *v = fl(*v) }
 
-// Safe returns a filter that safely executes the filter function, but is a noop when the filter is nil. If the filter is nil,
-// the input is returned as is.
-func (fl Filter[T]) Safe() Filter[T] { return func(v T) T { return ft.FilterSafe(fl, v) } }
-
 // WithNext returns a filter that applies this filter first, then applies the next filter to the result.
 func (fl Filter[T]) WithNext(next Filter[T]) Filter[T] { return func(v T) T { return next(fl(v)) } }
 
 // If returns a filter that only executes when the condition is true, otherwise the filter will return the input as is.
 func (fl Filter[T]) If(cond bool) Filter[T] { return func(v T) T { return ft.FilterWhen(cond, fl, v) } }
-
-// Not returns a filter that only executes when the condition is false.
-func (fl Filter[T]) Not(cond bool) Filter[T] { return fl.If(ft.Not(cond)) }
 
 // Lock returns a filter that executes the filter operation using a new mutex, ensuring only one instance of the filter runs at
 // a time.

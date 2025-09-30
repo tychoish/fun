@@ -33,12 +33,6 @@ func TestFilter(t *testing.T) {
 		result := chained.Apply(5)
 		assert.Equal(t, result, 11)
 	})
-	t.Run("Safe", func(t *testing.T) {
-		var zippo Filter[int]
-		assert.Panic(t, func() { zippo.WithNext(double).Apply(1) })
-		assert.Panic(t, func() { double.WithNext(zippo).Apply(1) })
-		assert.Equal(t, 10, zippo.Safe().WithNext(double).Apply(5))
-	})
 
 	t.Run("If", func(t *testing.T) {
 		// Should apply filter when condition is true
@@ -48,16 +42,6 @@ func TestFilter(t *testing.T) {
 		// Should not apply filter when condition is false
 		resultFalse := double.If(false).Apply(5)
 		assert.Equal(t, resultFalse, 5)
-	})
-
-	t.Run("Not", func(t *testing.T) {
-		// Should not apply filter when Not(true)
-		resultTrue := double.Not(true).Apply(5)
-		assert.Equal(t, resultTrue, 5)
-
-		// Should apply filter when Not(false)
-		resultFalse := double.Not(false).Apply(5)
-		assert.Equal(t, resultFalse, 10)
 	})
 
 	t.Run("WithLock", func(t *testing.T) {
@@ -171,13 +155,6 @@ func TestConverter(t *testing.T) {
 		n := MakeConverter(func(i int) int { return i * 2 })
 		assert.Equal(t, n.Convert(2), 4)
 	})
-	t.Run("Safe", func(t *testing.T) {
-		var c Converter[int, string]
-		assert.Equal(t, c.Safe().Convert(1), "")
-
-		var n Converter[int, int]
-		assert.Equal(t, n.Safe().Convert(1), 0)
-	})
 	t.Run("If", func(t *testing.T) {
 		c := MakeConverter(func(_ int) string { return "ok" })
 		assert.Equal(t, c.If(false).Convert(1), "")
@@ -186,15 +163,6 @@ func TestConverter(t *testing.T) {
 		n := MakeConverter(func(i int) int { return i * 2 })
 		assert.Equal(t, n.If(false).Convert(2), 0)
 		assert.Equal(t, n.If(true).Convert(2), 4)
-	})
-	t.Run("Not", func(t *testing.T) {
-		c := MakeConverter(func(_ int) string { return "ok" })
-		assert.Equal(t, c.Not(true).Convert(1), "")
-		assert.Equal(t, c.Not(false).Convert(1), "ok")
-
-		n := MakeConverter(func(i int) int { return i * 2 })
-		assert.Equal(t, n.Not(true).Convert(2), 0)
-		assert.Equal(t, n.Not(false).Convert(2), 4)
 	})
 	t.Run("When", func(t *testing.T) {
 		flag := false

@@ -23,7 +23,6 @@ func AsFuture[T any](in T) Future[T] { return ft.Wrap(in) }
 
 // Resolve executes the future and returns its value.
 func (f Future[T]) Resolve() T               { return f() }
-func (f Future[T]) Safe() func() (T, error)  { return f.RecoverPanic }
 func (f Future[T]) RecoverPanic() (T, error) { return ft.WithRecoverDo(f) }
 
 // Once returns a future that will only run the underlying future
@@ -38,10 +37,6 @@ func (f Future[T]) Ignore() func() { return func() { _ = f() } }
 // true. If the condition is false, the future will return the zero
 // value of T.
 func (f Future[T]) If(cond bool) Future[T] { return func() T { return ft.DoWhen(cond, f) } }
-
-// Not produces that only runs when the condition value is false. If
-// the condition is true, the future will return the zero value of T.
-func (f Future[T]) Not(cond bool) Future[T] { return f.If(!cond) }
 
 // When produces a new future wrapping the input future that executes
 // when the condition function returns true, returning the zero
