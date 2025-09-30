@@ -92,7 +92,7 @@ func Must[T any](out T, err error) func(t testing.TB) T {
 //
 // WithEnv will assert if there are any problems setting
 // environment variables. Callers are responsible for managing
-// concurrency between multiple
+// concurrency between multiple.
 func WithEnv(t *testing.T, ev dt.Pair[string, string], op func()) {
 	t.Helper()
 	Logf(t, "key=%q value %q", ev.Key, ev.Value)
@@ -100,7 +100,6 @@ func WithEnv(t *testing.T, ev dt.Pair[string, string], op func()) {
 	prev, wasSet := os.LookupEnv(ev.Key)
 
 	defer func() {
-
 		if wasSet {
 			assert.NotError(t, os.Setenv(ev.Key, prev))
 			return

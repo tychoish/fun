@@ -36,7 +36,5 @@ func TestTracker(t *testing.T) {
 				t.Fatal("must end at zero")
 			}
 		})
-
 	})
-
 }

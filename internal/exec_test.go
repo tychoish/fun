@@ -13,7 +13,6 @@ func TestLimitingResolvers(t *testing.T) {
 				if err == nil {
 					t.Error("exepcted error for nil values")
 				}
-
 			})
 			t.Run("Zero is Noop", func(t *testing.T) {
 				resolver, err := TTLExec[bool](0)

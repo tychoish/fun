@@ -15,10 +15,9 @@ import (
 )
 
 type BrokerFixture[T comparable] struct {
-	Name        string
-	Construtor  func(ctx context.Context, t *testing.T) *Broker[T]
-	BufferSize  int
-	NonBlocking bool
+	Name       string
+	Construtor func(ctx context.Context, t *testing.T) *Broker[T]
+	BufferSize int
 }
 
 func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
@@ -411,64 +410,6 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 				broker.Unsubscribe(cctx, ch1)
 				check.Zero(t, broker.Stats(cctx))
 			})
-			if fix.NonBlocking {
-				t.Run("NonBlocking", func(t *testing.T) {
-					elems := elems
-					opts := fix
-
-					t.Parallel()
-					ctx, cancel := context.WithTimeout(pctx, 2*time.Second)
-					defer cancel()
-
-					broker := opts.Construtor(pctx, t)
-
-					wg := &fun.WaitGroup{}
-					ch1 := broker.Subscribe(ctx)
-					count := &atomic.Int32{}
-
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer broker.Unsubscribe(ctx, ch1)
-						for range ch1 {
-							count.Add(1)
-							if int(count.Load()) == len(elems) {
-								return
-							}
-						}
-					}()
-
-					if stat := broker.Stats(ctx); stat.Subscriptions != 1 {
-						t.Error(stat)
-					}
-
-					for i := 0; i < 20; i++ {
-						wg.Add(1)
-						go func(_ int) {
-							defer wg.Done()
-							for idx := range elems {
-								broker.Publish(ctx, elems[idx])
-
-								if int(count.Load()) == len(elems) {
-									return
-								}
-							}
-						}(i)
-					}
-
-					if stat := broker.Stats(ctx); stat.BufferDepth < 10 {
-						t.Error(stat)
-					}
-
-					wg.Wait(ctx)
-					broker.Stop()
-					broker.Wait(ctx)
-					if int(count.Load()) != len(elems) {
-						t.Log("context.Err=", ctx.Err())
-						t.Fatal("saw", count, "out of", len(elems))
-					}
-				})
-			}
 		})
 	}
 }

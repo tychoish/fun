@@ -26,7 +26,7 @@ func NotZero[T comparable](in T) bool { return Not(IsZero(in)) }
 func IsType[T any](in any) bool { _, ok := in.(T); return ok }
 
 // Cast is the same as doing `v, ok := in.(t)`, but with more clarity
-// at the call site,
+// at the call site,.
 func Cast[T any](in any) (v T, ok bool) { v, ok = in.(T); return }
 
 // SafeCast casts the input object to the specified type, and returns

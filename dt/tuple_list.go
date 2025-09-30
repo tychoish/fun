@@ -92,7 +92,7 @@ func (p *Tuples[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Add adds a new value to the underlying slice. This may add a
 // duplicate key. The return value is provided to support chaining
-// Add() operations
+// Add() operations.
 func (p *Tuples[K, V]) Add(k K, v V) *Tuples[K, V] { p.Push(Tuple[K, V]{One: k, Two: v}); return p }
 
 // Push adds a single tuple to the slice of tuples. This may add a

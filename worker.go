@@ -15,7 +15,7 @@ import (
 )
 
 // Worker represents a basic function used in worker pools and
-// other similar situations
+// other similar situations.
 type Worker func(context.Context) error
 
 // MakeWorker converts a non-context worker function into a worker for
@@ -141,7 +141,7 @@ func (wf Worker) Force() { wf.Ignore().Wait() }
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed
 // functions may be called more than once, and will run multiple
-// times potentiall.y
+// times potentiall.y.
 func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrap(cond)) }
 
 // When wraps a Worker function that will only run if the condition
@@ -317,7 +317,7 @@ func (wf Worker) PostHook(post func()) Worker {
 }
 
 // WithContextHook wraps the worker function, and passes the context
-// recieved by that function through the hook function before calling
+// received by that function through the hook function before calling
 // the underlying worker.
 func (wf Worker) WithContextHook(hook func(context.Context) context.Context) Worker {
 	return func(ctx context.Context) error { return wf.Run(hook(ctx)) }

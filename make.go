@@ -33,7 +33,7 @@ type Constructors struct{}
 //
 // For more configuraable options, use the itertool.Worker() function
 // which provides more configurability and supports both Operation and
-// Worker functions.f
+// Worker functions.f.
 func (Constructors) OperationPool(st *Stream[Operation]) Worker {
 	return st.Parallel(MAKE.OperationHandler(), WorkerGroupConfDefaults())
 }
@@ -132,7 +132,7 @@ func (Constructors) SimpleOperationHandler(ctx context.Context) fn.Handler[Opera
 
 // SimpleWorkerHandlerForce returns a handler that runs all Worker
 // functions its passed. All errors are ignored, and the worker's
-// recieve a background context.
+// receive a background context.
 func (Constructors) SimpleWorkerHandlerForce() fn.Handler[Worker] {
 	return func(f Worker) { f.Force() }
 }

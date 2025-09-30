@@ -30,7 +30,7 @@ func LessThanNative[T OrderableNative](a, b T) bool { return a < b }
 func LessThanCustom[T Orderable[T]](a, b T) bool { return a.LessThan(b) }
 
 // LessThanConverter provides a function to convert a non-orderable
-// type to an orderable type. Use this for
+// type to an orderable type. Use this for.
 func LessThanConverter[T any, S OrderableNative](converter func(T) S) LessThan[T] {
 	return func(a, b T) bool { return LessThanNative(converter(a), converter(b)) }
 }

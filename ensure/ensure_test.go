@@ -105,6 +105,7 @@ func TestEnsure(t *testing.T) {
 
 type mock struct {
 	*testing.T
+
 	messages []string
 }
 

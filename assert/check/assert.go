@@ -305,7 +305,7 @@ func MinRuntime(t testing.TB, dur time.Duration, op func()) {
 
 // Runtime asserts that the function will execute for less than the
 // absolute difference of the two durations provided. The absolute
-// difference between the durations is use to max
+// difference between the durations is use to max.
 func Runtime(t testing.TB, minValue, maxValue time.Duration, op func()) {
 	t.Helper()
 	start := time.Now()
@@ -318,7 +318,6 @@ func Runtime(t testing.TB, minValue, maxValue time.Duration, op func()) {
 			ranFor, min(minValue, maxValue), max(minValue, maxValue),
 		)
 	}
-
 }
 
 // Failing asserts that the specified test fails. This was required

@@ -65,7 +65,6 @@ func (e *Element[T]) Set(v T) bool {
 		e.ok = true
 		e.item = v
 		return true
-
 	}
 
 	return false
@@ -143,7 +142,7 @@ func (e *Element[T]) settable() bool                  { return e != nil && !e.is
 func (e *Element[T]) isRoot() bool                    { return e.list.nonNil() && e.list.head == e }
 func (e *Element[T]) isDetatched() bool               { return e.list == nil }
 
-// make sure we have members of the same list
+// make sure we have members of the same list.
 func (e *Element[T]) swappable(it *Element[T]) bool {
 	return it != nil && e != nil && it != e && e.list.nonNil() && e.list == it.list
 }

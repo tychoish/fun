@@ -87,7 +87,6 @@ func TestShardedMap(t *testing.T) {
 					}
 					assert.Equal(t, ct, 3)
 				})
-
 			})
 			t.Run("Fetch", func(t *testing.T) {
 				var item shard.MapItem[string, int]
@@ -230,5 +229,4 @@ func TestShardedMap(t *testing.T) {
 			assert.Zero(t, item.Version())
 		})
 	})
-
 }

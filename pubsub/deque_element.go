@@ -30,7 +30,7 @@ func (it *element[T]) getNextOrPrevious(direction dqDirection) *element[T] {
 	return it.next
 }
 
-// callers must hold the *list's* lock
+// callers must hold the *list's* lock.
 func (it *element[T]) wait(ctx context.Context, direction dqDirection) error {
 	var cond *sync.Cond
 

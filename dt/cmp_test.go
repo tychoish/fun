@@ -238,7 +238,6 @@ func TestSort(t *testing.T) {
 			}
 		})
 	})
-
 }
 func getSliceForList(ctx context.Context, list *List[int]) []int {
 	return ft.Must(list.StreamFront().Slice(ctx))

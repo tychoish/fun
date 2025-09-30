@@ -131,7 +131,6 @@ func TestMath(t *testing.T) {
 					if p := recover(); p == nil {
 						t.Error("should have been panic")
 					}
-
 				}()
 
 				Millis[int64](math.MaxInt64)
@@ -403,7 +402,6 @@ func TestMath(t *testing.T) {
 				Operation:   AbsBounds[int],
 			},
 		} {
-
 			id := fmt.Sprintf("%s/%s/From/%d_%d/To/%d_%d",
 				runtime.FuncForPC(reflect.ValueOf(tt.Operation).Pointer()).Name(),
 				tt.Name, tt.One, tt.Two, tt.ExpectedMin, tt.ExpectedMax,

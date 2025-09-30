@@ -10,7 +10,7 @@ import (
 
 // Uniq iterates over a stream of comparable items, and caches them
 // in a map, returning the first instance of each equivalent object,
-// and skipping subsequent items
+// and skipping subsequent items.
 func Uniq[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
 	set := &dt.Set[T]{}
 
@@ -19,7 +19,7 @@ func Uniq[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
 
 // DropZeroValues processes a stream removing all zero values.
 //
-// Deprecated: use `fun.Stream[T].Filter(ft.NotZero)` instead
+// Deprecated: use `fun.Stream[T].Filter(ft.NotZero)` instead.
 func DropZeroValues[T comparable](iter *fun.Stream[T]) *fun.Stream[T] {
 	return iter.Filter(ft.NotZero)
 }

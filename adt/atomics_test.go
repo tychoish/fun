@@ -119,7 +119,6 @@ func TestAtomics(t *testing.T) {
 				_ = CompareAndSwap[int](atom, 54, 100)
 			})
 		})
-
 	})
 	t.Run("Once", func(t *testing.T) {
 		t.Run("Do", func(t *testing.T) {
@@ -151,7 +150,6 @@ func TestAtomics(t *testing.T) {
 
 			wg.Wait(ctx)
 			assert.Equal(t, count.Load(), 1)
-
 		})
 		t.Run("Call", func(t *testing.T) {
 			t.Parallel()
@@ -218,7 +216,6 @@ func TestAtomics(t *testing.T) {
 			assert.True(t, actor.Defined())
 			assert.Equal(t, 42, actor.Resolve())
 		})
-
 	})
 }
 

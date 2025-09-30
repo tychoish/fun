@@ -95,7 +95,7 @@ func HasCleanup(ctx context.Context) bool {
 
 // WithCleanup adds a Cleanup service as created by the Cleanup()
 // constructor, to an orchestrator attached to the context (or creates
-// the orchestrator if needed,)
+// the orchestrator if needed,).
 func WithCleanup(ctx context.Context) context.Context {
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)

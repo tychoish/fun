@@ -211,7 +211,7 @@ func (st *Stream[T]) doClose() {
 // will typically release them, but close may not block until all
 // resources are released.
 //
-// Close is safe to call more than once and always resolves the error handler (e.g. AddError),
+// Close is safe to call more than once and always resolves the error handler (e.g. AddError),.
 func (st *Stream[T]) Close() error { st.doClose(); return st.erc.Resolve() }
 
 // WithHook constructs a stream from the generator. The
@@ -358,7 +358,7 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 // Filter passes every item in the stream and, if the check function
 // returns true propagates it to the output stream.  There is no
 // buffering, and check functions should return quickly. For more
-// advanced use, consider using itertool.Map()
+// advanced use, consider using itertool.Map().
 func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 	return MakeStream(NewGenerator(st.operation).Filter(check)).WithHook(st.CloseHook())
 }

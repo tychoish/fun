@@ -87,7 +87,6 @@ func TestStack(t *testing.T) {
 		}
 		if stack.Head().Next().Value() != 100 {
 			t.Fatal(stack.Head().Next().Value())
-
 		}
 	})
 	t.Run("Item", func(t *testing.T) {
@@ -277,7 +276,6 @@ func TestStack(t *testing.T) {
 					t.Error("stack should have split")
 				}
 			})
-
 		})
 	})
 	t.Run("Streams", func(t *testing.T) {
@@ -432,7 +430,6 @@ func TestStack(t *testing.T) {
 			last = item
 		}
 	})
-
 }
 
 func GenerateStack(t *testing.T, size int) *Stack[int] {

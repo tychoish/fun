@@ -69,7 +69,7 @@ func (p *Pairs[K, V]) Len() int { p.init(); return p.ll.Len() }
 
 // Add adds a new value to the underlying slice. This may add a
 // duplicate key. The return value is provided to support chaining
-// Add() operations
+// Add() operations.
 func (p *Pairs[K, V]) Add(k K, v V) *Pairs[K, V] { p.Push(Pair[K, V]{Key: k, Value: v}); return p }
 
 // Push adds a single pair to the slice of pairs. This may add a

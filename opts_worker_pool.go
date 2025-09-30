@@ -47,7 +47,7 @@ type WorkerGroupConf struct {
 }
 
 // Validate ensures that the configuration is valid, and returns an
-// error if there are impossible configurations
+// error if there are impossible configurations.
 func (o *WorkerGroupConf) Validate() error {
 	o.NumWorkers = max(1, o.NumWorkers)
 

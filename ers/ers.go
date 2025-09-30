@@ -27,7 +27,7 @@ func IsOk(err error) bool {
 // inverse of Ok().
 func IsError(err error) bool { return !IsOk(err) }
 
-// Cast returns e if e is an error and otherwise returns nil
+// Cast returns e if e is an error and otherwise returns nil.
 func Cast(e any) error { err, _ := e.(error); return err }
 
 // IsExpiredContext checks an error to see if it, or any of it's parent
@@ -115,5 +115,4 @@ func Wrapf(err error, tmpl string, args ...any) error {
 		)
 	}
 	return nil
-
 }

@@ -255,7 +255,7 @@ func (s Slice[T]) FillTo(length int) Slice[T] {
 }
 
 // GrowCapacity extends the capacity of the slice (by adding zero
-// items and the )
+// items and the ).
 func (s *Slice[T]) GrowCapacity(size int) {
 	origEnd := len(*s)
 	s.Grow(size)
@@ -263,7 +263,7 @@ func (s *Slice[T]) GrowCapacity(size int) {
 }
 
 // Ptrs converts a slice in to a slice of pointers to the values in
-// the original slice
+// the original slice.
 func (s Slice[T]) Ptrs() []*T {
 	out := make([]*T, len(s))
 	for idx := range s {

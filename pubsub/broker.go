@@ -81,7 +81,7 @@ func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
 // the receiving half.
 //
 // In general, you should configure the distributor to provide
-// whatever buffering requirements you have, and
+// whatever buffering requirements you have, and.
 func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts BrokerOptions) *Broker[T] {
 	b := makeBroker[T](opts)
 	ctx, b.close = context.WithCancel(ctx)

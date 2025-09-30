@@ -40,7 +40,7 @@ func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 }
 
 // Synchronize creates a mutex and enables its use in the Set. This
-// operation is safe to call more than once,
+// operation is safe to call more than once,.
 func (s *Set[T]) Synchronize() { s.mtx.Set(&sync.Mutex{}) }
 
 // Order enables order tracking for the Set. The method panics if there
@@ -151,7 +151,7 @@ func (s *Set[T]) Slice() Slice[T] {
 }
 
 // DeleteCheck removes the item from the set, return true when the
-// item had been in the Set, and returning false othewise
+// item had been in the Set, and returning false othewise.
 func (s *Set[T]) DeleteCheck(in T) bool {
 	defer s.with(s.lock())
 	defer delete(s.hash, in)

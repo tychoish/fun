@@ -52,7 +52,7 @@ func (o *Optional[T]) Resolve() T { return o.v }
 func (o *Optional[T]) Reset() { o.defined = false; var zero T; o.v = zero }
 
 // Swap returns the previous value of the optional and replaces it
-// with the provided value
+// with the provided value.
 func (o *Optional[T]) Swap(next T) (prev T) { prev = o.v; o.Set(next); return }
 
 // Get returns the current value of the optional and the ok value. Use
@@ -71,7 +71,7 @@ func (o *Optional[T]) Future() fn.Future[T] { return o.Resolve }
 // concurency control.
 func (o *Optional[T]) Handler() fn.Handler[T] { return o.Set }
 
-// Ok returns true when the optional
+// Ok returns true when the optional.
 func (o Optional[T]) Ok() bool { return o.defined }
 
 // Scan implements the sql.Scanner interface. This is invalid if the

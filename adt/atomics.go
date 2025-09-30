@@ -115,5 +115,4 @@ func SafeSet[T comparable, A AtomicValue[T]](atom A, value T) {
 	}
 
 	atom.Store(value)
-
 }

@@ -61,7 +61,6 @@ func TestCmp(t *testing.T) {
 				t.Error(idx, "expected not false (true)")
 			}
 		}
-
 	})
 	t.Run("Time", func(t *testing.T) {
 		if LessThanTime(time.Now(), time.Now().Add(-time.Hour)) {

@@ -454,7 +454,6 @@ func TestStream(t *testing.T) {
 					count.Add(1)
 				}
 			}(iter)
-
 		}
 
 		wg.Wait(ctx)

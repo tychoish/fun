@@ -29,7 +29,7 @@ type Orchestrator struct {
 	srv   *Service
 }
 
-// String implements fmt.Stringer and returns the type name and
+// String implements fmt.Stringer and returns the type name and.
 func (or *Orchestrator) String() string { return fmt.Sprintf("Orchestrator<%s>", or.Name) }
 
 func (or *Orchestrator) setup() {

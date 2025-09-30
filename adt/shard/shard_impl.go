@@ -66,7 +66,6 @@ func (sh *sh[K, V]) fetch(k K) (out V, _uint64, _ uint64, _ bool) {
 			if ov == version {
 				return value, version, shVersion, ok
 			}
-
 		}
 	}
 }

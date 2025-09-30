@@ -37,7 +37,7 @@ func WaitChannel[T any](ch <-chan T) Operation {
 // context to be cacneled with a timeout, for instance.
 func WaitContext(ctx context.Context) Operation { return WaitChannel(ctx.Done()) }
 
-// Run is equivalent to calling the operation directly
+// Run is equivalent to calling the operation directly.
 func (wf Operation) Run(ctx context.Context) { wf(ctx) }
 
 // WithCancel creates a Operation and a cancel function which will
@@ -157,7 +157,7 @@ func (wf Operation) WithRecover() Worker {
 
 // Worker converts a wait function into a fun.Worker. If the context
 // is canceled, the worker function returns the context's error. Does
-// not handle panics, use WithRecover() to convert panics to errors
+// not handle panics, use WithRecover() to convert panics to errors.
 func (wf Operation) Worker() Worker {
 	return func(ctx context.Context) (err error) { wf(ctx); return ctx.Err() }
 }
@@ -191,7 +191,7 @@ func (wf Operation) Delay(dur time.Duration) Operation { return wf.Worker().Dela
 // blocks until that time passes (or the context is canceled.)
 func (wf Operation) After(ts time.Time) Operation { return wf.Worker().Delay(time.Until(ts)).Ignore() }
 
-// When runs the condition function, and if it returns true,
+// When runs the condition function, and if it returns true,.
 func (wf Operation) When(cond func() bool) Operation { return wf.Worker().When(cond).Ignore() }
 
 // If provides a static version of the When that only runs if the

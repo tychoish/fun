@@ -48,7 +48,6 @@ func TestHandlers(t *testing.T) {
 					eh(fmt.Errorf("oops: %w", context.DeadlineExceeded))
 					check.Equal(t, count, n)
 				})
-
 			})
 		}
 		checkNoopSemantics(0)
@@ -231,7 +230,7 @@ func TestHandlers(t *testing.T) {
 		})
 	})
 	t.Run("Signal", func(t *testing.T) {
-		close, wait := MAKE.Signal()
+		closeWaiter, wait := MAKE.Signal()
 		trigger, signal := MAKE.Signal()
 
 		var count int
@@ -248,7 +247,7 @@ func TestHandlers(t *testing.T) {
 			defer wg.Done()
 			count++
 			check.Equal(t, count, 1)
-			close()
+			closeWaiter()
 			check.NotError(t, signal(t.Context()))
 			check.Equal(t, count, 2)
 			count++

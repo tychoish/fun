@@ -172,7 +172,6 @@ func TestTools(t *testing.T) {
 				_, isSetHere := os.LookupEnv(t.Name())
 				assert.True(t, isSetHere)
 				WithEnv(t, dt.MakePair(t.Name(), "beep!!beep"), func() {
-
 					assert.Equal(t, os.Getenv(t.Name()), "beep!!beep")
 					_, isSetNow := os.LookupEnv(t.Name())
 					assert.True(t, isSetNow)
@@ -188,5 +187,4 @@ func TestTools(t *testing.T) {
 			assert.True(t, ft.Not(isSet))
 		})
 	})
-
 }

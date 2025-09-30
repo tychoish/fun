@@ -271,19 +271,19 @@ func (h *Histogram) CumulativeDistribution() []Bracket {
 }
 
 // SignificantFigures returns the significant figures used to create the
-// histogram
+// histogram.
 func (h *Histogram) SignificantFigures() int64 {
 	return h.significantFigures
 }
 
 // LowestTrackableValue returns the lower bound on values that will be added
-// to the histogram
+// to the histogram.
 func (h *Histogram) LowestTrackableValue() int64 {
 	return h.lowestTrackableValue
 }
 
 // HighestTrackableValue returns the upper bound on values that will be added
-// to the histogram
+// to the histogram.
 func (h *Histogram) HighestTrackableValue() int64 {
 	return h.highestTrackableValue
 }
@@ -296,7 +296,7 @@ type Bar struct {
 }
 
 // Distribution returns an ordered list of bars of the
-// distribution of recorded values, counts can be normalized to a probability
+// distribution of recorded values, counts can be normalized to a probability.
 func (h *Histogram) Distribution() (result []Bar) {
 	i := h.iterator()
 	for i.next() {
@@ -339,10 +339,10 @@ func (h *Histogram) Equals(other *Histogram) bool {
 // A Snapshot is an exported view of a Histogram, useful for serializing them.
 // A Histogram can be constructed from it by passing it to Import.
 type Snapshot struct {
-	LowestTrackableValue  int64   `bson:"lowest" json:"lowest" yaml:"lowest"`
+	LowestTrackableValue  int64   `bson:"lowest"  json:"lowest"  yaml:"lowest"`
 	HighestTrackableValue int64   `bson:"highest" json:"highest" yaml:"highest"`
 	SignificantFigures    int64   `bson:"figures" json:"figures" yaml:"figures"`
-	Counts                []int64 `bson:"counts" json:"counts" yaml:"counts"`
+	Counts                []int64 `bson:"counts"  json:"counts"  yaml:"counts"`
 }
 
 // Export returns a snapshot view of the Histogram. This can be later passed to
@@ -505,6 +505,7 @@ func (i *iterator) next() bool {
 
 type rIterator struct {
 	iterator
+
 	countAddedThisStep int64
 }
 
@@ -520,6 +521,7 @@ func (r *rIterator) next() bool {
 
 type pIterator struct {
 	iterator
+
 	seenLastValue          bool
 	ticksPerHalfDistance   int32
 	percentileToIteratorTo float64

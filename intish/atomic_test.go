@@ -47,7 +47,6 @@ func TestAtomic(t *testing.T) {
 						return
 					}
 					t.Error("v is  == ", val)
-
 				}
 				t.Error("v is  == ", val)
 			})
@@ -103,7 +102,6 @@ func TestAtomic(t *testing.T) {
 						return
 					}
 					t.Error("v is  == ", val)
-
 				}
 				t.Error("v is  == ", val)
 			})
@@ -123,7 +121,6 @@ func TestAtomic(t *testing.T) {
 						}
 					}
 				}
-
 			})
 			cur := atom.Load()
 			if cur == 0 {
