@@ -7,6 +7,8 @@ import (
 	prv "github.com/tychoish/fun/internal"
 )
 
+// Filter describes a common function object and provides higher level operations on the functions themselves. These functions
+// take an object and returns a value of the same type. This is a special case of the Converter type.
 type Filter[T any] Converter[T, T]
 
 func MakeFilter[T any](fl func(T) T) Filter[T]         { return fl }

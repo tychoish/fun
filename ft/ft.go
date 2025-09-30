@@ -29,5 +29,8 @@ func Convert[A any, B any](mapper func(A) B, values iter.Seq[A]) iter.Seq[B] {
 // pass values variadicly.
 func Slice[T any](items ...T) []T { return items }
 
-func Seq[T any](input T) iter.Seq[T]              { return func(yield func(T) bool) { yield(input) } }
+// Seq returns an iterator that yields a single value.
+func Seq[T any](input T) iter.Seq[T] { return func(yield func(T) bool) { yield(input) } }
+
+// Seq2 returns an iterator that yields a single key-value pair.
 func Seq2[A any, B any](a A, b B) iter.Seq2[A, B] { return func(yield func(A, B) bool) { yield(a, b) } }

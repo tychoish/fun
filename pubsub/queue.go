@@ -23,7 +23,9 @@ const (
 
 	// ErrQueueClosed is returned by the Add method of a closed queue, and by
 	// the Wait method of a closed empty queue.
-	ErrQueueClosed   = ers.ErrContainerClosed
+	ErrQueueClosed = ers.ErrContainerClosed
+	// ErrQueueDraining is returned by Add methods when the queue is in a draining state before all the work has completed,
+	// when the Add method will begin returning ErrQueueClosed.
 	ErrQueueDraining = ers.Error("the queue is shutting down")
 )
 

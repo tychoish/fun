@@ -22,6 +22,8 @@ func CallWithContext(op func(context.Context)) {
 	op(ctx)
 }
 
+// DoWithContext runs a function, which is the same type as fun.Generator,
+// with a new context that is canceled after the function returns.
 func DoWithContext[T any](op func(context.Context) T) (out T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

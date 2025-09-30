@@ -45,15 +45,18 @@ func WithRecoverApply[T any](op func(T), in T) (err error) {
 	return
 }
 
+// WrapRecoverApply returns a function that calls WithRecoverApply with the provided operation and input.
 func WrapRecoverApply[T any](op func(T), in T) func() error {
 	return func() error { return WithRecoverApply(op, in) }
 }
 
+// WithRecoverFilter runs a filter function with a panic handler that converts the panic to an error.
 func WithRecoverFilter[T any](op func(T) T, in T) (_ T, err error) {
 	defer func() { err = erc.ParsePanic(recover()) }()
 	return op(in), nil
 }
 
+// WrapRecoverFilter wraps a filter function with one that returns the filtered value and an error if the underlying function panics.
 func WrapRecoverFilter[T any](op func(T) T) func(T) (T, error) {
 	return func(v T) (T, error) { return WithRecoverFilter(op, v) }
 }

@@ -19,6 +19,7 @@ func Do2[T any, V any](op func() (T, V)) (T, V) { return op() }
 // Apply calls the input function with the provided argument.
 func Apply[T any](fn func(T), arg T) { fn(arg) }
 
+// Filter calls the input function with the provided argument and returns the result.
 func Filter[T any](fn func(T) T, arg T) T { return fn(arg) }
 
 // CallSafe only calls the operation when it's non-nil.
@@ -75,8 +76,7 @@ func DoMany[T any](ops []func() T) iter.Seq[T] {
 	}
 }
 
-// DoMany2 calls each of the provided functions and returns an iterator
-// of their results.
+// DoMany2 calls each of the provided functions and returns an iterator of their results.
 func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for idx := range ops {
@@ -99,23 +99,21 @@ func ApplyMany[T any](fn func(T), args []T) {
 	}
 }
 
-// CallTimes runs the specified option n times.
+// CallTimes runs the specified operation n times.
 func CallTimes(n int, op func()) {
 	for range n {
 		op()
 	}
 }
 
-// ApplyTimes runs the provided function and argument pair, the
-// specfied number of times.
+// ApplyTimes runs the provided function with the argument the specified number of times.
 func ApplyTimes[T any](n int, fn func(T), arg T) {
 	for range n {
 		fn(arg)
 	}
 }
 
-// DoMany calls the provided functions n times and returns an iterator
-// of their results.
+// DoTimes calls the provided function n times and returns an iterator of their results.
 func DoTimes[T any](n int, op func() T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for range n {
