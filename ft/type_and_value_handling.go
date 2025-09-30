@@ -73,6 +73,7 @@ func Default[T comparable](input T, defaultValue T) T {
 	return input
 }
 
+// DefaultApply returns the input if it's not zero, otherwise applies the function to the argument and returns the result.
 func DefaultApply[T comparable, A any](input T, fn func(A) T, arg A) T {
 	if IsZero(input) {
 		return input

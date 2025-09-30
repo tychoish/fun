@@ -14,9 +14,13 @@ import (
 )
 
 const (
-	ErrOperationOnDetachedElements = ers.Error("impossible operation detached elements")              // probably a bug in calling code
-	ErrOperationOnAttachedElements = ers.Error("operation impacts elements attached to another list") // probably a bug in calling code
-	ErrOperationOnRootElement      = ers.Error("operation not permissible on the sentinel node ")     // probably a bug in the list implementation
+	// ErrOperationOnDetachedElements is used as the value for panics when attempting to manipulate add to elements that are not connected to a list.
+	ErrOperationOnDetachedElements = ers.Error("impossible operation: detached elements")
+	// ErrOperationOnAttachedElements is used as a panic value when attempting to attach elements that already belong to a list to a different list.
+	ErrOperationOnAttachedElements = ers.Error("operation impacts elements attached to another list") // probably a bug in
+	// ErrOperationOnRootElement is used as a panic when attempting to read the value or performing an
+	// operation that is impossible to perform on the root object.
+	ErrOperationOnRootElement = ers.Error("operation not permissible on the sentinel node ") // probably a bug in the list implementation
 )
 
 // List is a container type for a doublly-linked list that supports appending and prepending elements, as well as inserting

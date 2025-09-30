@@ -24,6 +24,7 @@ func Check[T any](value T, err error) (zero T, _ bool) {
 	return value, true
 }
 
+// WrapCheck returns a function that when called returns the result of Check on the provided value and error.
 func WrapCheck[T any](value T, err error) func() (T, bool) {
 	return func() (T, bool) { return Check(value, err) }
 }

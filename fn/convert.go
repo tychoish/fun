@@ -7,6 +7,9 @@ import (
 	prv "github.com/tychoish/fun/internal"
 )
 
+// Converter describes a function that takes a value of one type and returns a value of another type. provides a simplified
+// version of the fun.Converter type (without contexts or errors). The Converter type provides a number of higher level
+// operation over the function types with the provided methods.
 type Converter[I, O any] func(I) O
 
 func MakeConverter[I, O any](f func(I) O) Converter[I, O] { return f }
