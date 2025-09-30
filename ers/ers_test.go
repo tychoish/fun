@@ -215,7 +215,6 @@ func TestErrors(t *testing.T) {
 				t.Error(errs[100])
 			}
 			check.Equal(t, 101, len(internal.Unwind(err)))
-
 		})
 		t.Run("WrapfNil", func(t *testing.T) {
 			assert.NotError(t, Wrapf(nil, "foo %s", "bar"))

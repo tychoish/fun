@@ -102,5 +102,4 @@ func (q *queueLimitTrackerImpl) remove() {
 			q.credit = lenCap
 		}
 	}
-
 }

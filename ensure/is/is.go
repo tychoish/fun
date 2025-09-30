@@ -53,7 +53,7 @@ func And(ops ...That) That {
 
 // All combines a collection of that expressions. All expressions are
 // run in order, and the error are aggregated. Nil is.That expressions
-// are reported as errors
+// are reported as errors.
 func All(ops ...That) That {
 	return func() []string {
 		out := dt.NewSlice(make([]string, 0, len(ops)+1))

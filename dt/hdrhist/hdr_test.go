@@ -425,7 +425,6 @@ func TestExportImport(t *testing.T) {
 	if imported := hdrhist.Import(s); !imported.Equals(h) {
 		t.Error("Expected Hists to be equivalent")
 	}
-
 }
 
 func TestEquals(t *testing.T) {
@@ -455,7 +454,6 @@ func TestEquals(t *testing.T) {
 	if !h1.Equals(h2) {
 		t.Error("Expected Histograms to be equivalent")
 	}
-
 }
 
 func TestEqualsEdgeCase(t *testing.T) {
@@ -562,13 +560,11 @@ func TestEdgeCases(t *testing.T) {
 			// shouldn't panic
 
 			assert.NotPanic(t, func() {
-
 				hdrhist.New(0, 10000, 1)
 				hdrhist.New(0, 10000, 2)
 				hdrhist.New(0, 10000, 3)
 				hdrhist.New(0, 10000, 4)
 				hdrhist.New(0, 10000, 5)
-
 			})
 		})
 	})

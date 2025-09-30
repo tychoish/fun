@@ -207,5 +207,4 @@ func TestWaitGroup(t *testing.T) {
 		check.Equal(t, ec.Len(), 10)
 		check.ErrorIs(t, ec.Err(), io.EOF)
 	})
-
 }

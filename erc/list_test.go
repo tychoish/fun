@@ -224,7 +224,6 @@ func TestList(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
 				es := AsCollector(&slwind{})
 				check.NilPtr(t, es)
-
 			})
 			t.Run("Populated", func(t *testing.T) {
 				es := AsCollector(&slwind{out: []error{ers.ErrInvalidInput}})
@@ -236,7 +235,6 @@ func TestList(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
 				es := AsCollector(&slwrap{})
 				check.NilPtr(t, es)
-
 			})
 			t.Run("Populated", func(t *testing.T) {
 				es := AsCollector(&slwrap{out: []error{ers.ErrInvalidInput}})

@@ -8,7 +8,7 @@ import (
 
 // the maximum size for the ring: given that we divide to find the
 // index in the ring, if this is the maximum size of the ring, it
-// means we can't
+// means we can't.
 const maxRingSize int = 4294967296
 
 const defaultRingSize int = 1024

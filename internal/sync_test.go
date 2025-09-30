@@ -121,5 +121,4 @@ func TestLockHelpers(t *testing.T) {
 			t.Error("should be multiple of 4", number)
 		}
 	})
-
 }

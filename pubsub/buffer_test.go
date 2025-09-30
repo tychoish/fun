@@ -334,7 +334,6 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 							seen.Add(pop)
 						}
 					}()
-
 				}
 				wg.Wait()
 				assert.Equal(t, size, seen.Len())
@@ -381,7 +380,6 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 							count.Add(1)
 						}
 					}()
-
 				}
 				wg.Wait()
 				assert.Equal(t, size, int(count.Load()))

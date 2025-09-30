@@ -66,7 +66,5 @@ func TestFilter(t *testing.T) {
 		t.Run("WithApply", func(t *testing.T) {
 			check.Panic(t, func() { check.ErrorIs(t, NewFilter().Next(erf).Apply(io.EOF), io.EOF) })
 		})
-
 	})
-
 }

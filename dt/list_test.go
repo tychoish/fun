@@ -135,7 +135,6 @@ func TestList(t *testing.T) {
 		if seen != len(expected) {
 			t.Log(seen, list.Len(), ft.Must(list.StreamFront().Slice(t.Context())))
 			t.Error(seen, len(expected), expected)
-
 		}
 	})
 	t.Run("CStyleIteration", func(t *testing.T) {
@@ -996,7 +995,6 @@ func BenchmarkList(b *testing.B) {
 							}
 							idx++
 						}
-
 					}
 				})
 			})

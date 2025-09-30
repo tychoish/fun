@@ -71,7 +71,7 @@ func DistributorChannel[T any](ch chan T) Distributor[T] { return DistributorCha
 
 // DistributorChanOp constructs a Distributor from the channel
 // operator type constructed by the root package's Blocking() and
-// NonBlocking() functions
+// NonBlocking() functions.
 func DistributorChanOp[T any](ch fun.ChanOp[T]) Distributor[T] {
 	return MakeDistributor(ch.Send().Write, ch.Receive().Read, ch.Len)
 }

@@ -45,8 +45,9 @@ func TestQueueNew(t *testing.T) {
 }
 
 type testQueue struct {
-	t *testing.T
 	*Queue[string]
+
+	t *testing.T
 }
 
 func (q testQueue) mustAdd(item string) {

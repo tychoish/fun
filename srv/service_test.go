@@ -89,7 +89,6 @@ func TestService(t *testing.T) {
 		if s.Running() {
 			t.Fatal("still not running")
 		}
-
 	})
 	t.Run("Start", func(t *testing.T) {
 		t.Parallel()
@@ -255,7 +254,6 @@ func TestService(t *testing.T) {
 
 			if err.Error() != "expected" {
 				t.Error("got unexpected error", err)
-
 			}
 		})
 		t.Run("HappensBefore", func(t *testing.T) {
@@ -425,5 +423,4 @@ func TestService(t *testing.T) {
 			assert.ErrorIs(t, err, expected)
 		})
 	})
-
 }

@@ -75,5 +75,4 @@ func TestPanics(t *testing.T) {
 		assert.True(t, !ers.IsInvariantViolation(9001))
 		assert.True(t, !ers.IsInvariantViolation(io.EOF))
 	})
-
 }

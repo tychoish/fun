@@ -37,7 +37,7 @@ var (
 // synchronized, blocking, and destructive (e.g. so completed
 // workloads do not remain in memory) containers.
 //
-// WorkerPool is implemented using fun.Stream[T].Parallel()
+// WorkerPool is implemented using fun.Stream[T].Parallel().
 func WorkerPool[OP fun.Worker | fun.Operation](
 	iter *fun.Stream[OP],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],

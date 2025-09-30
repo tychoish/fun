@@ -96,7 +96,6 @@ func roundedSign[T Signed](multiple, a, b T) T {
 	default:
 		return 1
 	}
-
 }
 
 // RoundToMultipleTowardZero rounds a value to the nearest multiple of

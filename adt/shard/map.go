@@ -124,7 +124,7 @@ func (m *Map[K, V]) Store(key K, value V) { m.inc().shard(key).store(key, value)
 // Version returns the version for the entire sharded map.
 func (m *Map[K, V]) Version() uint64 { return m.clock.Load() }
 
-// Clocks returns a slice of the versions for the map and all of the shards. The first value is the "global" version
+// Clocks returns a slice of the versions for the map and all of the shards. The first value is the "global" version.
 func (m *Map[K, V]) Clocks() []uint64 {
 	shards := m.shards()
 	out := make([]uint64, 1+m.num)
@@ -197,7 +197,6 @@ func (m *Map[K, V]) Fetch(k K) MapItem[K, V] {
 		if it.GlobalVersion == m.clock.Load() {
 			return it
 		}
-
 	}
 }
 

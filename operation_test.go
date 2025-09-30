@@ -301,7 +301,6 @@ func TestOperation(t *testing.T) {
 				Join(MakeOperation(func() { ops = append(ops, "second") })).Run(ctx)
 			// check call order
 			check.EqualItems(t, ops, []string{"first"})
-
 		})
 	})
 	t.Run("Lock", func(t *testing.T) {
@@ -478,7 +477,6 @@ func TestOperation(t *testing.T) {
 					}
 					wg.Wait()
 					assert.Equal(t, count.Load(), 10)
-
 				})
 			})
 		})

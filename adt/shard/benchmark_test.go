@@ -96,7 +96,6 @@ func BenchmarkShardedMapTypeComparison(b *testing.B) {
 										runtime.Gosched()
 									}
 								}(i)
-
 							}
 							wg.Wait()
 						}
@@ -105,7 +104,6 @@ func BenchmarkShardedMapTypeComparison(b *testing.B) {
 			}
 		})
 	}
-
 }
 
 func populateMap(mp *Map[string, int], n int) {
@@ -122,5 +120,4 @@ func checkMap(b *testing.B, mp *Map[string, int], n int) {
 			b.Error("impossible values", i, str, val, ok)
 		}
 	}
-
 }

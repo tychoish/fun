@@ -36,7 +36,7 @@ type Deque[T any] struct {
 // impossible.
 //
 // Capcaity puts a firm upper cap on the number of items in the deque,
-// while the Unlimited options
+// while the Unlimited options.
 type DequeOptions struct {
 	Unlimited    bool
 	Capacity     int
@@ -237,7 +237,6 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 		default:
 			cond.Wait()
 		}
-
 	}
 
 	return dq.addAfter(it, afterGetter())

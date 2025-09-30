@@ -20,7 +20,7 @@ func MakeConverter[T any, O any](op func(T) O) Converter[T, O] {
 	return func(_ context.Context, in T) (O, error) { return op(in), nil }
 }
 
-// MakeConverterToAny produce a converter function
+// MakeConverterToAny produce a converter function.
 func MakeConverterToAny[T any]() Converter[T, any] {
 	return MakeConverter(func(in T) any { return any(in) })
 }

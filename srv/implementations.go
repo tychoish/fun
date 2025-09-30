@@ -26,7 +26,7 @@ import (
 // semantics as any other Service.
 //
 // Use Group(itertool.Slice([]*Service)) to produce a group from a
-// slice of *Services,
+// slice of *Services,.
 func Group(services *fun.Stream[*Service]) *Service {
 	waiters := pubsub.NewUnlimitedQueue[func() error]()
 	wg := &fun.WaitGroup{}
@@ -74,7 +74,6 @@ func Group(services *fun.Stream[*Service]) *Service {
 			return ec.Resolve()
 		},
 	}
-
 }
 
 // HTTP wraps an http.Server object in a Service, both for common use

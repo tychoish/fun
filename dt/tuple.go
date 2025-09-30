@@ -56,7 +56,6 @@ func (t *Tuple[K, V]) UnmarshalJSON(in []byte) error {
 	if len(rt) == 2 {
 		if err := json.Unmarshal(rt[1], &t.Two); err != nil {
 			return ers.Wrap(err, "tuple.Two")
-
 		}
 	}
 

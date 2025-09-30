@@ -104,7 +104,6 @@ func TestRing(t *testing.T) {
 				for idx := range fifo {
 					check.Equal(t, fifo[idx], expected[idx])
 				}
-
 			})
 			t.Run("LIFO", func(t *testing.T) {
 				ring := &Ring[int]{}
@@ -135,7 +134,6 @@ func TestRing(t *testing.T) {
 			// lazy init.
 			assert.Panic(t, func() { ring.Setup(math.MaxInt64) })
 			assert.Panic(t, func() { ring.Setup(maxRingSize + 2) })
-
 		})
 		t.Run("Safety", func(t *testing.T) {
 			// the max ring-size is big enough to OOM the

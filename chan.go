@@ -38,7 +38,7 @@ type ChanOp[T any] struct {
 
 // Chan constructs a channel op, like "make(chan T)", with the
 // optionally specified length. Operations (like read from and write
-// to a channel) on the channel are blocking by default, but the
+// to a channel) on the channel are blocking by default, but the.
 func Chan[T any](args ...int) ChanOp[T] {
 	switch len(args) {
 	case 0:
@@ -103,7 +103,7 @@ func (op ChanOp[T]) NonBlocking() ChanOp[T] { op.mode = modeNonBlocking; return 
 func (op ChanOp[T]) Channel() chan T { return op.ch }
 
 // Send returns a ChanSend object that acts on the same underlying
-// channel
+// channel.
 func (op ChanOp[T]) Send() ChanSend[T] { return ChanSend[T]{mode: op.mode, ch: op.ch} }
 
 // Receive returns a ChanReceive object that acts on the same

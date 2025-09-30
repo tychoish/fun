@@ -44,7 +44,7 @@ func (erf Filter) Apply(err error) error {
 
 // Join returns a filter that applies itself, and then applies all of
 // the filters passed to it sequentially. If an filter returns a
-// nil error immediately, execution stops as this is a short circut operation.
+// nil error immediately, execution stops as this is a short circuit operation.
 func (erf Filter) Join(filters ...Filter) Filter {
 	return func(err error) error {
 		if err = erf.Apply(err); ers.IsOk(err) {

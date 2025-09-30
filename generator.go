@@ -354,7 +354,6 @@ func (pf Generator[T]) Retry(n int) Generator[T] {
 			default:
 				err = erc.Join(attemptErr, err)
 			}
-
 		}
 		return zero, err
 	}

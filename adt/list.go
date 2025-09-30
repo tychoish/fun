@@ -25,7 +25,7 @@ const (
 
 // List is a container type for a doublly-linked list that supports appending and prepending elements, as well as inserting
 // elements in the middle of the list.  These lists are safe for concurrent access, and operations only require exclusive access
-// to, at most 3 nodes in the list. Becaues the list tracks it's length centrally, calls to Len() are efficent and safe.
+// to, at most 3 nodes in the list. Becaues the list tracks it's length centrally, calls to Len() are efficient and safe.
 type List[T any] struct {
 	size atomic.Int64
 	head Once[*element[T]]

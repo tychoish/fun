@@ -37,7 +37,6 @@ func TestConstant(t *testing.T) {
 		check.ErrorIs(t, err, ErrForTest.Err())
 	})
 	t.Run("As", func(t *testing.T) {
-
 		const ErrForTest Error = "for-test"
 		var errValue Error
 		var err error = ErrForTest

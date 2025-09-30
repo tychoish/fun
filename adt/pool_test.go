@@ -27,7 +27,6 @@ func TestPool(t *testing.T) {
 			p := &Pool[*poolTestType]{}
 			_ = p.Get()
 		})
-
 	})
 
 	t.Run("Init", func(t *testing.T) {
@@ -160,9 +159,7 @@ func TestPool(t *testing.T) {
 
 						runtime.GC()
 					}
-
 				}
-
 			}()
 		}
 		<-ctx.Done()
@@ -203,7 +200,6 @@ func TestPool(t *testing.T) {
 		}
 		testt.Log(t, "attempts:", count)
 		check.True(t, passed)
-
 	})
 	t.Run("BytesBuffer", func(t *testing.T) {
 		t.Run("Resizes", func(t *testing.T) {
@@ -240,7 +236,6 @@ func TestPool(t *testing.T) {
 					check.True(t, passed)
 				})
 			}
-
 		})
 		t.Run("OversizeSafely", func(t *testing.T) {
 			// hard to introspect if they're actually in
@@ -273,9 +268,6 @@ func TestPool(t *testing.T) {
 					check.Equal(t, len(buf), 0)
 				})
 			}
-
 		})
-
 	})
-
 }

@@ -72,7 +72,7 @@ func AsCollector(err error) *Collector {
 // Join takes a slice of errors and converts it into an *erc.List
 // typed error. This operation has several advantages relative to
 // using errors.Join(): if you call erc.Join repeatedly on the same
-// error set of errors the resulting error is convertable
+// error set of errors the resulting error is convertable.
 func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
 
 // with/lock are internal helpers to avoid twiddling the pointer to
@@ -145,7 +145,7 @@ func (ec *Collector) Unwrap() []error { defer ec.with(ec.lock()); return ec.list
 // errors in the collector OR their ancestors are the target error.
 func (ec *Collector) Is(target error) bool { defer ec.with(ec.lock()); return ec.list.Is(target) }
 
-// As supports the errors.As() operation to access
+// As supports the errors.As() operation to access.
 func (ec *Collector) As(target any) bool { defer ec.with(ec.lock()); return ec.list.As(target) }
 
 // Iterator returns an iterator over the errors in the
@@ -163,7 +163,6 @@ func (ec *Collector) Iterator() iter.Seq[error] {
 		}
 		ec.mu.Unlock()
 	}
-
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -192,7 +191,6 @@ func (ec *Collector) Join(errs ...error) {
 		defer ec.with(ec.lock())
 		ec.list.Add(errs)
 	}
-
 }
 
 // When is a helper function, typically useful for improving the
@@ -232,7 +230,7 @@ func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
 // Recover can be used in a defer to collect a panic and add it to the collector.
 func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
-// WithRecover calls the provided function, collecting any
+// WithRecover calls the provided function, collecting any.
 func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
 
 // WithRecoverHook catches a panic and adds it to the error collector

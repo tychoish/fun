@@ -65,5 +65,4 @@ func TestShardedMap(t *testing.T) {
 		assert.Substring(t, m.String(), "Shards(32)")
 		assert.Substring(t, m.String(), "Version(0)")
 	})
-
 }
