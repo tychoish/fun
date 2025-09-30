@@ -86,7 +86,7 @@ func TestHandler(t *testing.T) {
 				count++
 			}
 
-			cob := ob.Join(func(in int) { check.Equal(t, count, 1); count++; check.Equal(t, in, 100) })
+			cob := ob.WithNext(func(in int) { check.Equal(t, count, 1); count++; check.Equal(t, in, 100) })
 			cob(100)
 
 			assert.Equal(t, 2, count)
@@ -111,7 +111,7 @@ func TestHandler(t *testing.T) {
 				count++
 			}
 
-			cob := ob.Chain(ob, ob, ob)
+			cob := ob.Join(ob, ob, ob)
 			cob(100)
 
 			assert.Equal(t, 4, count)
@@ -263,19 +263,11 @@ func TestHandler(t *testing.T) {
 				var hf Handler[func()]
 				hf.Read(nil)
 			})
-			assert.NotPanic(t, func() {
-				var hf Handler[func()]
-				hf.Safe().Read(nil)
-			})
 		})
 		t.Run("Nums", func(t *testing.T) {
 			assert.Panic(t, func() {
 				var hf Handler[int]
 				hf.Read(-1)
-			})
-			assert.NotPanic(t, func() {
-				var hf Handler[int]
-				hf.Safe().Read(-1)
 			})
 		})
 	})

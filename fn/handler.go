@@ -37,12 +37,6 @@ func ErrorHandler[T any](eh Handler[error]) func(T, error) T {
 	return func(v T, err error) T { eh(err); return v }
 }
 
-// Safe returns a function that will execute the underlying Handler
-// function, only when the function is non-nil. Use WithRecover and
-// RecoverPanic to handle panics.
-func (of Handler[T]) Safe() Handler[T] { return of.callSafe }
-func (of Handler[T]) callSafe(in T)    { ft.ApplyWhen(of != nil, of, in) }
-
 // Handler provides a more expository operation to call a handler
 // function.
 func (of Handler[T]) Read(in T) { of(in) }
@@ -84,9 +78,9 @@ func (of Handler[T]) Filter(filter func(T) T) Handler[T] {
 	return func(in T) { of(filter(in)) }
 }
 
-// Join creates an handler function that runs both the root handler
+// WithNext creates an handler function that runs both the root handler
 // and the "next" handler.
-func (of Handler[T]) Join(next Handler[T]) Handler[T] {
+func (of Handler[T]) WithNext(next Handler[T]) Handler[T] {
 	return func(in T) { of(in); next(in) }
 }
 
@@ -94,10 +88,10 @@ func (of Handler[T]) Join(next Handler[T]) Handler[T] {
 // handler before the base handler.
 //
 // Returns itself if prev is nil.
-func (of Handler[T]) PreHook(prev Handler[T]) Handler[T] { return prev.Join(of) }
+func (of Handler[T]) PreHook(prev Handler[T]) Handler[T] { return prev.WithNext(of) }
 
-// Chain calls the base handler, and then calls every handler in the chain.
-func (of Handler[T]) Chain(chain ...Handler[T]) Handler[T] {
+// Join calls the base handler, and then calls every handler in the chain.
+func (of Handler[T]) Join(chain ...Handler[T]) Handler[T] {
 	return func(in T) {
 		of(in)
 		for idx := range chain {
@@ -122,7 +116,7 @@ func (of Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
 	return func(in T) { defer internal.With(internal.Lock(mtx)); of(in) }
 }
 
-// WithLock protects the action of the handler with the provied mutex.
+// WithLocker protects the action of the handler with the provied mutex.
 func (of Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
 	return func(in T) { defer internal.WithL(internal.LockL(mtx)); of(in) }
 }

@@ -214,14 +214,14 @@ func TestPanics(t *testing.T) {
 				t.Errorf("unexpected value%q", seen)
 			}
 		})
-		t.Run("Wait", func(t *testing.T) {
+		t.Run("Panic", func(t *testing.T) {
 			var called bool
 			of = func(string) {
 				called = true
 				panic("hi")
 			}
 
-			assert.Panic(t, func() { ts := of.Safe(); ts("hi") })
+			assert.Panic(t, func() { of("hi") })
 			assert.True(t, called)
 		})
 		t.Run("Wait", func(t *testing.T) {

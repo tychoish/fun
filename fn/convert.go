@@ -20,16 +20,9 @@ func (Converter[I, O]) noop() Converter[I, O]             { return func(I) (out 
 // the converter directly.
 func (cf Converter[I, O]) Convert(in I) O { return cf(in) }
 
-// Safe returns a converter that only executes if the converter function is not nil, otherwise is a noop, returning the zero
-// value of the output type.
-func (cf Converter[I, O]) Safe() Converter[I, O] { return cf.If(cf != nil) }
-
 // Lock returns a converter that protects the execution of the conversion with a new mutex, ensuring that only one conversion
 // runs at a time.
 func (cf Converter[I, O]) Lock() Converter[I, O] { return cf.WithLock(&sync.Mutex{}) }
-
-// Not returns a converter that executes only when the condition is false.
-func (cf Converter[I, O]) Not(cond bool) Converter[I, O] { return cf.If(ft.Not(cond)) }
 
 // If returns a converter that executes only when the condition is true, otherwise is a noop and returns zero value of the
 // output type..
