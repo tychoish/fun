@@ -1,0 +1,53 @@
+version: "2"
+linters:
+  default: "fast"
+  disable:
+    - noinlineerr
+    - nonamedreturns
+    - err113
+    - wsl
+    - wsl_v5
+    - gocognit
+    - cyclop
+    - gocyclo
+    - maintidx
+    - lll
+    - funlen
+    - nlreturn
+    - gochecknoinits
+    - testpackage
+    - godox
+    - funcorder
+    - inamedparam
+    - mnd
+  settings:
+    dupl:
+      threshold: 500
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
+    depguard:
+      rules:
+        main:
+          list-mode: original
+          allow:
+            - $gostd
+            - github.com/tychoish/fun
+run:
+  timeout: 1m
+  tests: true
+  allow-parallel-runners: true
+issues:
+  # fix: true
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofmt
+output:
+  path-mode: "abs"
+  show-stats: false
+  formats:
+    text:
+      print-issued-lines: false
