@@ -165,7 +165,7 @@ func TestFilter(t *testing.T) {
 func TestConverter(t *testing.T) {
 	// nb: these test cases were written by the robots (copilot+claude-3.5)
 	t.Run("Convert", func(t *testing.T) {
-		c := MakeConverter(func(i int) string { return "ok" })
+		c := MakeConverter(func(_ int) string { return "ok" })
 		assert.Equal(t, c.Convert(1), "ok")
 
 		n := MakeConverter(func(i int) int { return i * 2 })
@@ -179,7 +179,7 @@ func TestConverter(t *testing.T) {
 		assert.Equal(t, n.Safe().Convert(1), 0)
 	})
 	t.Run("If", func(t *testing.T) {
-		c := MakeConverter(func(i int) string { return "ok" })
+		c := MakeConverter(func(_ int) string { return "ok" })
 		assert.Equal(t, c.If(false).Convert(1), "")
 		assert.Equal(t, c.If(true).Convert(1), "ok")
 
@@ -188,7 +188,7 @@ func TestConverter(t *testing.T) {
 		assert.Equal(t, n.If(true).Convert(2), 4)
 	})
 	t.Run("Not", func(t *testing.T) {
-		c := MakeConverter(func(i int) string { return "ok" })
+		c := MakeConverter(func(_ int) string { return "ok" })
 		assert.Equal(t, c.Not(true).Convert(1), "")
 		assert.Equal(t, c.Not(false).Convert(1), "ok")
 
@@ -198,7 +198,7 @@ func TestConverter(t *testing.T) {
 	})
 	t.Run("When", func(t *testing.T) {
 		flag := false
-		c := MakeConverter(func(i int) string { return "ok" })
+		c := MakeConverter(func(_ int) string { return "ok" })
 		when := c.When(func() bool { return flag })
 		assert.Equal(t, when.Convert(1), "")
 		flag = true
@@ -206,7 +206,7 @@ func TestConverter(t *testing.T) {
 	})
 	t.Run("Hooks", func(t *testing.T) {
 		called := false
-		c := MakeConverter(func(i int) string { return "ok" })
+		c := MakeConverter(func(_ int) string { return "ok" })
 		pre := c.PreHook(func() { called = true })
 		assert.Equal(t, pre.Convert(1), "ok")
 		assert.True(t, called)
@@ -217,7 +217,7 @@ func TestConverter(t *testing.T) {
 		assert.True(t, called)
 	})
 	t.Run("Filters", func(t *testing.T) {
-		c := MakeConverter(func(i int) string { return "ok" })
+		c := MakeConverter(func(_ int) string { return "ok" })
 		pre := c.PreFilter(func(i int) int { return i + 1 })
 		assert.Equal(t, pre.Convert(1), "ok")
 
@@ -235,7 +235,7 @@ func TestConverter(t *testing.T) {
 		counter := 0
 		mu := &sync.Mutex{}
 
-		c := MakeConverter(func(i int) int {
+		c := MakeConverter(func(_ int) int {
 			time.Sleep(time.Millisecond)
 			counter++
 			return counter
@@ -273,7 +273,7 @@ func TestConverter(t *testing.T) {
 		counter := 0
 		mu := &sync.Mutex{}
 
-		c := MakeConverter(func(i int) int {
+		c := MakeConverter(func(_ int) int {
 			time.Sleep(time.Millisecond)
 			counter++
 			return counter
