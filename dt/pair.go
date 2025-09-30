@@ -10,7 +10,7 @@ type Pair[K comparable, V any] struct {
 // Get returns only the key and value of a Pair. Provided for symmetry.
 func (p Pair[K, V]) Get() (K, V) { return p.Key, p.Value }
 
-// GetValue returns only the key of a Pair. Provided for symmetry.
+// GetKey returns only the key of a Pair. Provided for symmetry.
 func (p Pair[K, V]) GetKey() K { return p.Key }
 
 // GetValue returns only the value of a Pair. Provided for symmetry.

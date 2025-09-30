@@ -73,6 +73,7 @@ func If(cond bool, err error) error {
 	return err
 }
 
+// When constructs an error from the provided string when the condition is true, and returns nil otherwise.
 func When(cond bool, val string) error {
 	if !cond {
 		return nil

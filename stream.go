@@ -534,8 +534,8 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(pipe))
 }
 
-// BufferParallel, like buffer, process the input queue and stores
-// those items in a channel; however, unlike Buffer, multiple workers
+// BufferParallel processes the input queue and stores
+// those items in a channel (like Buffer); however, unlike Buffer, multiple workers
 // consume the input stream: as a result the order of the elements
 // in the output stream is not the same as the input order.
 //

@@ -51,8 +51,7 @@ func (mp *Map[K, V]) Check(key K) bool { return ft.IsOk(mp.mp.Load(key)) }
 // the key was present in the map.
 func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key)) }
 
-// Ensure store takes a value and returns true if the value was stored
-// in the map.
+// EnsureStore takes a value and returns true if the value was stored in the map.
 func (mp *Map[K, V]) EnsureStore(k K, v V) bool { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
 
 // EnsureSet has the same semantics as EnsureStore, but takes a dt.Pair

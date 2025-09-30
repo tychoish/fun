@@ -85,13 +85,12 @@ func (pf Generator[T]) WithRecover() Generator[T] {
 	}
 }
 
-// Join, on successive calls, runs the first generator until it
-// returns an io.EOF error, and then returns the results of the second
-// generator. If either generator returns another error (context
-// cancelation or otherwise,) those errors are returned.
+// Join runs the first generator until it returns an io.EOF error, and then returns the results of the second generator. A
+// generator will be re-run until it returns a terminating error (e.g. io.EOF, ers.ErrContainerClosed, or
+// ers.ErrCurrentOpAbort). If the first generator returns any other error, that error is returned to the caller and the second
+// generator never runs.
 //
-// When the second function returns io.EOF, all successive calls will
-// return io.EOF.
+// When the second function returns a terminating error, or any other error, all successive calls return io.EOF.
 func (pf Generator[T]) Join(next Generator[T]) Generator[T] {
 	const (
 		runFirstFunc int64 = iota
@@ -123,7 +122,7 @@ func (pf Generator[T]) Join(next Generator[T]) Generator[T] {
 					return out, nil
 				case errors.Is(err, ErrStreamContinue):
 					continue RETRY_FIRST
-				case !errors.Is(err, io.EOF):
+				case !ers.IsTerminating(err):
 					ferr = err
 					stage.Store(firstFunctionErrored)
 					return zero, err

@@ -125,7 +125,7 @@ func (dq *Deque[T]) PushFront(it T) error {
 	return dq.addAfter(it, dq.root)
 }
 
-// PushFront adds an item to the back or end of the deque, and
+// PushBack adds an item to the back or end of the deque, and
 // erroring if the queue is closed, at capacity, or has reached its
 // limit.
 func (dq *Deque[T]) PushBack(it T) error {
@@ -256,7 +256,7 @@ func (dq *Deque[T]) StreamBack() *fun.Stream[T] {
 	return fun.MakeStream(dq.confGenerator(dqPrev, false))
 }
 
-// BlockingGeneratorFront exposes the deque to a single-function interface
+// BlockingStreamFront exposes the deque to a single-function interface
 // for iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back, and will block for a new element if the deque is
@@ -266,7 +266,7 @@ func (dq *Deque[T]) BlockingStreamFront() *fun.Stream[T] {
 	return fun.MakeStream(dq.confGenerator(dqNext, true))
 }
 
-// BlockingGeneratorBack exposes the deque to a single-function interface
+// BlockingStreamBack exposes the deque to a single-function interface
 // for iteration. The generator function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to fron, and will block for a new element if the deque is

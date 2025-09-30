@@ -1,3 +1,4 @@
+// Package ft provides high-level function tools for manipulating common function objects and types.
 package ft
 
 import "iter"

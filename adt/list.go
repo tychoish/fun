@@ -28,10 +28,10 @@ const (
 // to, at most 3 nodes in the list. Becaues the list tracks it's length centrally, calls to Len() are efficient and safe.
 type List[T any] struct {
 	size atomic.Int64
-	head Once[*element[T]]
+	head Once[*Element[T]]
 }
 
-func (l *List[T]) init() *element[T] {
+func (l *List[T]) init() *Element[T] {
 	l.size.Store(0)
 	n := l.newElem()
 	n.next, n.prev = n, n
@@ -39,18 +39,18 @@ func (l *List[T]) init() *element[T] {
 	return n
 }
 
-func (l *List[T]) Head() *element[T]         { return l.root().Next() }
-func (l *List[T]) Tail() *element[T]         { return l.root().Previous() }
+func (l *List[T]) Head() *Element[T]         { return l.root().Next() }
+func (l *List[T]) Tail() *Element[T]         { return l.root().Previous() }
 func (l *List[T]) PushBack(v *T)             { l.root().prev.append(l.makeElem(v)) }
 func (l *List[T]) PushFront(v *T)            { l.root().append(l.makeElem(v)) }
 func (l *List[T]) PopFront() *T              { return l.root().next.Pop() }
 func (l *List[T]) PopBack() *T               { return l.root().prev.Pop() }
 func (l *List[T]) Len() int                  { return int(l.size.Load()) }
-func (l *List[T]) newElem() *element[T]      { return &element[T]{list: l} }
-func (l *List[T]) makeElem(v *T) *element[T] { return l.newElem().Set(v) }
-func (l *List[T]) root() *element[T]         { return l.head.Call(l.init) }
+func (l *List[T]) newElem() *Element[T]      { return &Element[T]{list: l} }
+func (l *List[T]) makeElem(v *T) *Element[T] { return l.newElem().Set(v) }
+func (l *List[T]) root() *Element[T]         { return l.head.Call(l.init) }
 
-func safeTx[T any, O any](e *element[T], op func() O) O {
+func safeTx[T any, O any](e *Element[T], op func() O) O {
 	defer WithAll(LocksHeld(e.forTx()))
 	return ft.DoUnless(e.root, op)
 }

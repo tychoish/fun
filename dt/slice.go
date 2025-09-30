@@ -135,8 +135,8 @@ func (s *Slice[T]) Prepend(in ...T) { *s = append(in, *s...) }
 // AppendSlice adds the items from the input slice to the root slice.
 func (s *Slice[T]) AppendSlice(in []T) { *s = append(*s, in...) }
 
-// Populate constructs an operation that adds all items from the
-// stream to the slice.
+// AppendStream creates a worker an operation that adds all items from the stream to the slice when the worker calls. The Worker
+// must be called, with a context, to modify the slice.
 func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(s.Push) }
 
 // Copy performs a shallow copy of the Slice.
