@@ -181,7 +181,7 @@ func (l *List[T]) StreamBack() *fun.Stream[T] {
 	})
 }
 
-// PopStream produces a stream that consumes elements from the
+// StreamPopFront produces a stream that consumes elements from the
 // list as it iterates, moving front-to-back.
 //
 // If you add values to the list during iteration *behind* where the
