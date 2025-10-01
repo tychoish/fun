@@ -180,6 +180,8 @@ func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
 // expires and panics in the case of an error.
 func (pf Generator[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
 
+// Resolve calls the function returned by Force resolving the generator. This ignores all errors and provides a the underlying
+// generator with a context that will never be canceled.
 func (pf Generator[T]) Resolve() T { return ft.Do(pf.Force()) }
 
 // Wait runs the generator with a context that will ever expire.

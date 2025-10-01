@@ -58,6 +58,9 @@ func (Constructors) ErrorChannelWorker(ch <-chan error) Worker {
 	}
 }
 
+// ContextChannelWorker creates a worker function that wraps a context and will--when called--block until the context is done,
+// returning the context's cancellation error. Unless provided with a custom context that can be canceled but does not return an
+// error (which would break many common assumptions regarding contexts,) this worker will always return an error.
 func (Constructors) ContextChannelWorker(ctx context.Context) Worker {
 	return MAKE.ErrorChannelWorker(ft.ContextErrorChannel(ctx))
 }
