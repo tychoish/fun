@@ -54,8 +54,7 @@ func (r *Ring[T]) oldest() int            { return ft.IfElse(r.hasWrapped(), r.p
 func (r *Ring[T]) after(idx int) int      { return r.offset(idx, 1) % r.size }
 func (r *Ring[T]) before(idx int) int     { return r.offset(idx, -1) % r.size }
 
-// Returns the capacity of the ring buffer. This is either the size
-// passed to Setup() or the default 1024.
+// Cap returns the capacity of the ring buffer. This is either the size passed to Setup() or the default 1024.
 func (r *Ring[T]) Cap() int { return r.size }
 
 // Len returns the number of elements in the buffer. This is, some

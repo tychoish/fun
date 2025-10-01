@@ -39,12 +39,30 @@ func (l *List[T]) init() *Element[T] {
 	return n
 }
 
-func (l *List[T]) Head() *Element[T]         { return l.root().Next() }
-func (l *List[T]) Tail() *Element[T]         { return l.root().Previous() }
-func (l *List[T]) PushBack(v *T)             { l.root().prev.append(l.makeElem(v)) }
-func (l *List[T]) PushFront(v *T)            { l.root().append(l.makeElem(v)) }
-func (l *List[T]) PopFront() *T              { return l.root().next.Pop() }
-func (l *List[T]) PopBack() *T               { return l.root().prev.Pop() }
+// Head returns the first element in the list, or nil if the list is empty.
+func (l *List[T]) Head() *Element[T] { return l.root().Next() }
+
+// Tail returns the last element in the list, or nil if the list is empty.
+func (l *List[T]) Tail() *Element[T] { return l.root().Previous() }
+
+// PushBack appends a new element containing the given value to the end of the list.
+// Thise is safe for concurrent access and only requires locking the adjoining nodes.
+func (l *List[T]) PushBack(v *T) { l.root().prev.append(l.makeElem(v)) }
+
+// PushFront prepends a new element containing the given value to the beginning of the list.
+// This operation is safe for concurrent access and only requires locking the adjoining nodes.
+func (l *List[T]) PushFront(v *T) { l.root().append(l.makeElem(v)) }
+
+// PopFront removes and returns the value from the first element in the list.
+// Returns nil if the list is empty.
+func (l *List[T]) PopFront() *T { return l.root().next.Pop() }
+
+// PopBack removes and returns the value from the last element in the list.
+// Returns nil if the list is empty.
+func (l *List[T]) PopBack() *T { return l.root().prev.Pop() }
+
+// Len returns the current number of elements in the list.
+// This operation is efficient and safe for concurrent access as the length is tracked atomically.
 func (l *List[T]) Len() int                  { return int(l.size.Load()) }
 func (l *List[T]) newElem() *Element[T]      { return &Element[T]{list: l} }
 func (l *List[T]) makeElem(v *T) *Element[T] { return l.newElem().Set(v) }
@@ -55,19 +73,25 @@ func safeTx[T any, O any](e *Element[T], op func() O) O {
 	return ft.DoUnless(e.root, op)
 }
 
+// WithAll releases all of the non-nill locks in slice of mutexes, and can be used with adt.LocksHeld in a defer statement.
 func WithAll(locks []*sync.Mutex) { released(locks) }
 
-func released(locks []*sync.Mutex) {
+func released(locks []*sync.Mutex) []*sync.Mutex {
 	for idx, mtx := range locks {
 		if mtx != nil {
 			mtx.Unlock()
 			locks[idx] = nil
 		}
 	}
+	return locks
 }
 
 func doPanic(p any) { panic(p) }
 
+// LocksHeld acquires all of the locks in the slice, and returns them, for use with the adt.WithAll function. If some of the
+// locks are held, all locks are released the operation sleeps for a short period of time (upto 3ms) and then attempts to
+// acquire the locks again. Retries attempt to acquire the locks in different orders to avoid implicit dependencies on lock
+// order.
 func LocksHeld(mtxs []*sync.Mutex) []*sync.Mutex {
 	fun.Invariant.Ok(mtxs != nil, "must hold the correct set of locks for the operation")
 
@@ -92,8 +116,8 @@ func LocksHeld(mtxs []*sync.Mutex) []*sync.Mutex {
 
 	defer func() {
 		p := recover()
-		released(locked)
 		defer ft.ApplyWhen(p != nil, doPanic, p)
+		ft.ApplyWhen(p != nil, WithAll, locked)
 	}()
 
 ACQUIRE:
@@ -110,13 +134,7 @@ ACQUIRE:
 		return locked
 
 	RELEASE_ATTEMPT:
-		for idx := range locked {
-			if locked[idx] == nil {
-				continue
-			}
-			locked[idx].Unlock()
-			locked[idx] = nil
-		}
+		locked = released(locked)
 
 		rdur := time.Duration(rand.Int63n(int64(time.Millisecond)))
 		time.Sleep(max(
