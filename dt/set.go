@@ -135,6 +135,7 @@ func (s *Set[T]) Stream() *fun.Stream[T] {
 // Iterator returns a new-style native Go iterator for the items in the set.
 func (s *Set[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
 
+// List exports the contents of the set to a List, structure which is implemented as a doubly linked list.
 func (s *Set[T]) List() *List[T] {
 	if s.list != nil {
 		return s.list.Copy()
@@ -142,6 +143,7 @@ func (s *Set[T]) List() *List[T] {
 	return StreamList(s.Stream())
 }
 
+// Slice exports the contents of the set to a slice.
 func (s *Set[T]) Slice() Slice[T] {
 	if s.list != nil {
 		return s.list.Slice()

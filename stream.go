@@ -437,6 +437,8 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	return output
 }
 
+// CloseHook returns a function that can be passed to the WithHook() method on a _new_ stream that wraps this stream, so that
+// the other stream will call the inner stream's close method and include the inner stream's errors.
 func (st *Stream[T]) CloseHook() func(*Stream[T]) {
 	return func(next *Stream[T]) { next.AddError(st.Close()) }
 }

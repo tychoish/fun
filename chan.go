@@ -113,5 +113,7 @@ func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mo
 // Stream returns the "receive" aspect of the channel as an
 // stream. This is equivalent to fun.ChannelStream(), but may be
 // more accessible in some contexts.
-func (op ChanOp[T]) Stream() *Stream[T]                       { return op.Receive().Stream() }
+func (op ChanOp[T]) Stream() *Stream[T] { return op.Receive().Stream() }
+
+// Iterator returns a standard Go library iterator over the contents of the channel.
 func (op ChanOp[T]) Iterator(ctx context.Context) iter.Seq[T] { return op.Receive().Iterator(ctx) }

@@ -114,7 +114,9 @@ func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Generator[
 // Stream returns a stream to the items of the slice the range
 // keyword also works for these slices.
 func (s Slice[T]) Stream() *fun.Stream[T] { return fun.SliceStream(s) }
-func (s Slice[T]) Iterator() iter.Seq[T]  { return slices.Values(s) }
+
+// Iterator returns the contents of a slice as a standard Go iterator, equivalent/wrapping slices.Values().
+func (s Slice[T]) Iterator() iter.Seq[T] { return slices.Values(s) }
 
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false
