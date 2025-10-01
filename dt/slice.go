@@ -28,6 +28,7 @@ func Variadic[T any](in ...T) Slice[T] { return in }
 // values. This is a helper for NewSlice(in).Ptrs().
 func SlicePtrs[T any](in []T) Slice[*T] { return NewSlice(in).Ptrs() }
 
+// SliceWithCapacity constructs a new (wrapped) slice object with a length of 0 but the specificed capacity.
 func SliceWithCapacity[T any](n int) Slice[T] { return make([]T, 0, n) }
 
 // SliceSparseRefs converts a slice of pointers to a slice of objects,

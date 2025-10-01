@@ -196,10 +196,16 @@ func (ec *Collector) Join(errs ...error) {
 // When is a helper function, typically useful for improving the
 // readability of validation code. If the condition is true, then When
 // creates an error with the string value and adds it to the Collector.
-func (ec *Collector) When(cond bool, val string)      { ec.Push(ers.When(cond, val)) }
-func (ec *Collector) If(cond bool, val error)         { ec.Push(ers.If(cond, val)) }
+func (ec *Collector) When(cond bool, val string) { ec.Push(ers.When(cond, val)) }
+
+// If adds the error to the collector when the condition is true, and ignores it otherwise.
+func (ec *Collector) If(cond bool, val error) { ec.Push(ers.If(cond, val)) }
+
+// Errorf constructs an error, using fmt.Errorf, and adds it to the collector.
 func (ec *Collector) Errorf(tmpl string, args ...any) { ec.Push(fmt.Errorf(tmpl, args...)) }
-func (ec *Collector) New(val string)                  { ec.Push(ers.New(val)) }
+
+// New adds an error to the collector using the provided string as its value. The error is an ers.Error object.
+func (ec *Collector) New(val string) { ec.Push(ers.New(val)) }
 
 // Whenf conditionally creates and adds an error to the collector, as
 // When, and with a similar use case, but permits Sprintf/Errorf

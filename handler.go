@@ -70,6 +70,7 @@ func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.IsOk(pf(
 // context that will not expire.
 func (pf Handler[T]) Force(in T) { ft.Ignore(pf.Wait(in)) }
 
+// Must calls the underlying handler, but converts all errors returned by the handler into panics.
 func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ctx, in)) }
 
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
@@ -194,6 +195,8 @@ func (pf Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
 	}
 }
 
+// WithLocker wraps the Handler and ensures that the sync.Locker instance is
+// always held while the root Handler is called.
 func (pf Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		defer internal.WithL(internal.LockL(mtx))

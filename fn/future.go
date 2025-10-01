@@ -22,7 +22,9 @@ func MakeFuture[T any](f func() T) Future[T] { return f }
 func AsFuture[T any](in T) Future[T] { return ft.Wrap(in) }
 
 // Resolve executes the future and returns its value.
-func (f Future[T]) Resolve() T               { return f() }
+func (f Future[T]) Resolve() T { return f() }
+
+// RecoverPanic resolves the future, catching any panics and converting them to errors.
 func (f Future[T]) RecoverPanic() (T, error) { return ft.WithRecoverDo(f) }
 
 // Once returns a future that will only run the underlying future
@@ -91,11 +93,15 @@ func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 	}
 }
 
+// TTL returns a future that will cache (and return) the value returned by the inner future, for the period described by the
+// value of dur.
 func (f Future[T]) TTL(dur time.Duration) Future[T] {
 	resolver := ft.Must(internal.TTLExec[T](dur))
 	return func() T { return resolver(f) }
 }
 
+// Limit returns a future that will call the inner future exactly the specified number of times, and return the last value
+// provided thereafter.
 func (f Future[T]) Limit(in int) Future[T] {
 	resolver := ft.Must(internal.LimitExec[T](in))
 	return func() T { return resolver(f) }

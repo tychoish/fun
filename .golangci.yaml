@@ -47,22 +47,16 @@ linters:
 
             # the following option(s) are a non-goal for the codebase:
             # - "check-private-receivers"
+            # - "check-public-interface"
 
             # the following options are NOT provided because the
-            # codebase passes the check.
-
+            # codebase passes these checks:
             # - "disable-stuttering-check"
             # - "disable-checks-on-constants"
             # - "disable-checks-on-types"
             # - "disable-checks-on-variables"
-
-            # these options are disabled (or enabled) because they
-            # don't currently pass but their state should be inverted
-            # as the codebase becomes compliant.
-
-            # - "check-public-interface"
-            - "disable-checks-on-functions"
-            - "disable-checks-on-methods"
+            # - "disable-checks-on-functions"
+            # - "disable-checks-on-methods"
 run:
   timeout: 1m
   tests: true
