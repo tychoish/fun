@@ -120,7 +120,7 @@ func (mpf Converter[T, O]) Parallel(
 ) *Stream[O] {
 	conf := &WorkerGroupConf{}
 	if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
-		return MakeStream(errorGenerator[O](err))
+		return MakeStream(errFuture[O](err))
 	}
 
 	output := Blocking(make(chan O))
@@ -139,7 +139,7 @@ func (mpf Converter[T, O]) Parallel(
 		Go().
 		Once()
 
-	return MakeStream(NewGenerator(output.Receive().Read).
+	return MakeStream(NewFuture(output.Receive().Read).
 		PreHook(setup)).
 		WithHook(func(out *Stream[O]) {
 			out.AddError(iter.Close())

@@ -18,13 +18,13 @@ import (
 	"github.com/tychoish/fun/intish"
 )
 
-func TestGenerator(t *testing.T) {
+func TestFuture(t *testing.T) {
 	t.Parallel()
 	t.Run("WithCancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		wf, cancel := NewGenerator(func(ctx context.Context) (int, error) {
+		wf, cancel := NewFuture(func(ctx context.Context) (int, error) {
 			timer := time.NewTimer(time.Hour)
 			defer timer.Stop()
 			select {
@@ -51,7 +51,7 @@ func TestGenerator(t *testing.T) {
 		defer cancel()
 
 		called := 0
-		pf := Generator[int](func(_ context.Context) (int, error) {
+		pf := Future[int](func(_ context.Context) (int, error) {
 			called++
 			return 42, nil
 		}).Once()
@@ -66,7 +66,7 @@ func TestGenerator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		called := 0
-		pf := Generator[int](func(_ context.Context) (int, error) {
+		pf := Future[int](func(_ context.Context) (int, error) {
 			called++
 			return 42, nil
 		})
@@ -86,7 +86,7 @@ func TestGenerator(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		called := 0
-		pf := Generator[int](func(_ context.Context) (int, error) {
+		pf := Future[int](func(_ context.Context) (int, error) {
 			called++
 			return 42, nil
 		})
@@ -107,7 +107,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			pf := ValueGenerator(42)
+			pf := ValueFuture(42)
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
 				assert.NotError(t, err)
@@ -116,7 +116,7 @@ func TestGenerator(t *testing.T) {
 		})
 		t.Run("Ptr", func(t *testing.T) {
 			t.Run("Empty", func(t *testing.T) {
-				pf := PtrGenerator(func() *int { return nil })
+				pf := PtrFuture(func() *int { return nil })
 				ctx := t.Context()
 
 				for i := 0; i < 1024; i++ {
@@ -126,7 +126,7 @@ func TestGenerator(t *testing.T) {
 				}
 			})
 			t.Run("Always", func(t *testing.T) {
-				pf := PtrGenerator(func() *int { return ft.Ptr(42) })
+				pf := PtrFuture(func() *int { return ft.Ptr(42) })
 				ctx := t.Context()
 
 				for i := 0; i < 1024; i++ {
@@ -137,7 +137,7 @@ func TestGenerator(t *testing.T) {
 			})
 			t.Run("Few", func(t *testing.T) {
 				count := 0
-				pf := PtrGenerator(func() *int {
+				pf := PtrFuture(func() *int {
 					if count < 512 {
 						count++
 						return ft.Ptr(42)
@@ -168,7 +168,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			root := ers.Error(t.Name())
-			pf := StaticGenerator(42, root)
+			pf := StaticFuture(42, root)
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
 				assert.ErrorIs(t, err, root)
@@ -180,7 +180,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			root := ers.Error(t.Name())
-			pf := MakeGenerator(func() (int, error) { return 42, root })
+			pf := MakeFuture(func() (int, error) { return 42, root })
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
 				assert.ErrorIs(t, err, root)
@@ -195,7 +195,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			pf := MakeGenerator(func() (int, error) { callCount++; return 42, root })
+			pf := MakeFuture(func() (int, error) { callCount++; return 42, root })
 			ff := pf.Future(ctx, func(err error) { errCount++; assert.ErrorIs(t, err, root) })
 			for i := 0; i < 1024; i++ {
 				v := ff()
@@ -208,7 +208,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("Consistent", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			pf := FutureGenerator(func() int { return 42 })
+			pf := WrapFuture(func() int { return 42 })
 			for i := 0; i < 1024; i++ {
 				v, err := pf(ctx)
 				assert.Equal(t, v, 42)
@@ -221,7 +221,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			op := Generator[int](func(context.Context) (int, error) {
+			op := Future[int](func(context.Context) (int, error) {
 				count++
 				return 42, nil
 			})
@@ -238,7 +238,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			op := Generator[int](func(context.Context) (int, error) {
+			op := Future[int](func(context.Context) (int, error) {
 				count++
 				return 42, nil
 			})
@@ -263,7 +263,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			op := Generator[int](func(context.Context) (int, error) {
+			op := Future[int](func(context.Context) (int, error) {
 				count++
 				return 42, nil
 			})
@@ -292,7 +292,7 @@ func TestGenerator(t *testing.T) {
 			wg := &WaitGroup{}
 
 			count := 0
-			op := Generator[int](func(context.Context) (int, error) {
+			op := Future[int](func(context.Context) (int, error) {
 				count++
 				return 42, nil
 			}).WithLock(mu)
@@ -317,7 +317,7 @@ func TestGenerator(t *testing.T) {
 
 		count := 0
 		var err error
-		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
+		var pf Future[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 
 		checkOutput := func(in int, err error) error { check.Equal(t, 42, in); return err }
 
@@ -336,7 +336,7 @@ func TestGenerator(t *testing.T) {
 	t.Run("Force", func(t *testing.T) {
 		count := 0
 		err := io.EOF
-		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
+		var pf Future[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
 		assert.NotPanic(t, func() { out = pf.Force().Resolve() })
@@ -348,7 +348,7 @@ func TestGenerator(t *testing.T) {
 	t.Run("Capture", func(t *testing.T) {
 		count := 0
 		err := io.EOF
-		pf := MakeGenerator(func() (int, error) { count++; return 42, err })
+		pf := MakeFuture(func() (int, error) { count++; return 42, err })
 		var out int
 
 		assert.NotPanic(t, func() { out = pf.Force().Resolve() })
@@ -359,7 +359,7 @@ func TestGenerator(t *testing.T) {
 	t.Run("Check", func(t *testing.T) {
 		count := 0
 		err := io.EOF
-		pf := MakeGenerator(func() (int, error) { count++; return 42, err })
+		pf := MakeFuture(func() (int, error) { count++; return 42, err })
 
 		out, ok := pf.Check(t.Context())
 		assert.Equal(t, out, 42)
@@ -378,7 +378,7 @@ func TestGenerator(t *testing.T) {
 
 		count := 0
 		err := io.EOF
-		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
+		var pf Future[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
 		assert.NotPanic(t, func() { out = pf.Ignore(ctx).Resolve() })
@@ -393,7 +393,7 @@ func TestGenerator(t *testing.T) {
 
 		count := 0
 		err := io.EOF
-		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, err }
+		var pf Future[int] = func(_ context.Context) (int, error) { count++; return 42, err }
 		var out int
 
 		assert.Panic(t, func() { out = pf.Must(ctx).Resolve() })
@@ -404,7 +404,7 @@ func TestGenerator(t *testing.T) {
 	})
 	t.Run("Block", func(t *testing.T) {
 		count := 0
-		var pf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, io.EOF }
+		var pf Future[int] = func(_ context.Context) (int, error) { count++; return 42, io.EOF }
 		out, err := pf.Wait()
 		assert.ErrorIs(t, err, io.EOF)
 		assert.Equal(t, out, 42)
@@ -415,7 +415,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			var pf Generator[int] = func(_ context.Context) (int, error) { count++; return -1, io.EOF }
+			var pf Future[int] = func(_ context.Context) (int, error) { count++; return -1, io.EOF }
 			pf = pf.Join(pf)
 			out, err := pf(ctx)
 			assert.Error(t, err)
@@ -452,7 +452,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			counter := &atomic.Int64{}
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				return -1, io.EOF
 			}).Join(producerContinuesOnce(42, counter))
 			out, err := pf(ctx)
@@ -464,7 +464,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			count := 0
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				return -1, context.Canceled
 			}).Join(func(_ context.Context) (int, error) { count++; return 300, nil })
 			out, err := pf(ctx)
@@ -484,7 +484,7 @@ func TestGenerator(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			counter := 0
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				return -1, io.EOF
 			}).Join(func(_ context.Context) (int, error) { counter++; return 300, context.Canceled })
 			out, err := pf(ctx)
@@ -505,7 +505,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				assert.Equal(t, count, 1)
 				count++
 				return 42, nil
@@ -519,7 +519,7 @@ func TestGenerator(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				assert.Equal(t, count, 1)
 				count++
 				return 42, nil
@@ -536,7 +536,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("WithPanic", func(t *testing.T) {
 			root := ers.Error(t.Name())
 			count := 0
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				assert.Zero(t, count)
 				count++
 				return 42, nil
@@ -550,7 +550,7 @@ func TestGenerator(t *testing.T) {
 		})
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
-			pf := Generator[int](func(_ context.Context) (int, error) {
+			pf := Future[int](func(_ context.Context) (int, error) {
 				assert.Zero(t, count)
 				count++
 				return 42, nil
@@ -568,7 +568,7 @@ func TestGenerator(t *testing.T) {
 			err := errors.New("test error")
 			var hf fn.Future[error] = func() error { return err }
 			called := 0
-			pf := MakeGenerator(func() (int, error) { called++; return 42, nil })
+			pf := MakeFuture(func() (int, error) { called++; return 42, nil })
 			ecpf := pf.WithErrorCheck(hf)
 			out, e := ecpf.Wait()
 			check.Error(t, e)
@@ -579,7 +579,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("Noop", func(t *testing.T) {
 			var hf fn.Future[error] = func() error { return nil }
 			called := 0
-			pf := MakeGenerator(func() (int, error) { called++; return 42, nil })
+			pf := MakeFuture(func() (int, error) { called++; return 42, nil })
 			ecpf := pf.WithErrorCheck(hf)
 			out, e := ecpf.Wait()
 			check.NotError(t, e)
@@ -599,7 +599,7 @@ func TestGenerator(t *testing.T) {
 				}
 				return errors.New("unexpected error")
 			}
-			wf := MakeGenerator(func() (int, error) {
+			wf := MakeFuture(func() (int, error) {
 				called++
 				if hfcall == 3 {
 					return 0, io.EOF
@@ -636,7 +636,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			count := 0
-			var wf Generator[int] = func(_ context.Context) (int, error) { count++; return 42, nil }
+			var wf Future[int] = func(_ context.Context) (int, error) { count++; return 42, nil }
 			wf = wf.Limit(10)
 			for i := 0; i < 100; i++ {
 				out, err := wf(ctx)
@@ -650,7 +650,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(_ context.Context) (int, error) { count.Add(1); return 42, nil }
+			var wf Future[int] = func(_ context.Context) (int, error) { count.Add(1); return 42, nil }
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
@@ -669,7 +669,7 @@ func TestGenerator(t *testing.T) {
 			expected := errors.New("cat")
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.TTL(0)
 			for i := 0; i < 100; i++ {
 				out, err := wf(ctx)
@@ -685,7 +685,7 @@ func TestGenerator(t *testing.T) {
 			expected := errors.New("cat")
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.TTL(100 * time.Millisecond)
 			for i := 0; i < 100; i++ {
 				out, err := wf(ctx)
@@ -709,7 +709,7 @@ func TestGenerator(t *testing.T) {
 			wg := &sync.WaitGroup{}
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.TTL(100 * time.Millisecond)
 			wg.Add(100)
 			for i := 0; i < 100; i++ {
@@ -743,7 +743,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.Delay(100 * time.Millisecond)
 			wg := &WaitGroup{}
 			wg.Add(100)
@@ -767,7 +767,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.Delay(100 * time.Millisecond)
 			wg := &WaitGroup{}
 			wg.Add(100)
@@ -790,7 +790,7 @@ func TestGenerator(t *testing.T) {
 			defer cancel()
 
 			count := &atomic.Int64{}
-			var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			ts := time.Now().Add(100 * time.Millisecond)
 			wf = wf.After(ts)
 			wg := &WaitGroup{}
@@ -818,7 +818,7 @@ func TestGenerator(t *testing.T) {
 		expected := errors.New("cat")
 
 		count := &atomic.Int64{}
-		var wf Generator[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
+		var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 		delay := 100 * time.Millisecond
 		wf = wf.Jitter(func() time.Duration { return delay })
 		start := time.Now()
@@ -848,7 +848,7 @@ func TestGenerator(t *testing.T) {
 
 		t.Run("Skip", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
-			val, err := MakeGenerator(func() (int, error) {
+			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				if count.Get() == 0 {
 					return 100, ers.ErrCurrentOpSkip
@@ -862,7 +862,7 @@ func TestGenerator(t *testing.T) {
 		})
 		t.Run("FirstTry", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
-			val, err := MakeGenerator(func() (int, error) {
+			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				return 42, nil
 			}).Retry(10).Read(ctx)
@@ -873,7 +873,7 @@ func TestGenerator(t *testing.T) {
 		})
 		t.Run("ArbitraryError", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
-			val, err := MakeGenerator(func() (int, error) {
+			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				if count.Get() < 3 {
 					return 100, errors.New("why not")
@@ -888,7 +888,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("DoesFail", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
 			exp := errors.New("why not")
-			val, err := MakeGenerator(func() (int, error) {
+			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				return 100, exp
 			}).Retry(16).Read(ctx)
@@ -906,7 +906,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("Terminating", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
 			exp := errors.New("why not")
-			val, err := MakeGenerator(func() (int, error) {
+			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				if count.Load() == 11 {
 					return 100, erc.Join(exp, ers.ErrCurrentOpAbort)
@@ -923,7 +923,7 @@ func TestGenerator(t *testing.T) {
 		t.Run("Canceled", func(t *testing.T) {
 			count := &intish.Atomic[int]{}
 			exp := errors.New("why not")
-			val, err := MakeGenerator(func() (int, error) {
+			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				if count.Load() == 11 {
 					return 100, erc.Join(exp, context.Canceled)
@@ -940,7 +940,7 @@ func TestGenerator(t *testing.T) {
 	})
 }
 
-func producerContinuesOnce[T any](out T, counter *atomic.Int64) Generator[T] {
+func producerContinuesOnce[T any](out T, counter *atomic.Int64) Future[T] {
 	once := &sync.Once{}
 	var zero T
 	return func(_ context.Context) (_ T, err error) {

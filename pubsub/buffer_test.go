@@ -200,16 +200,16 @@ func TestDistributor(t *testing.T) {
 	})
 }
 
-type DistGenerator[T comparable] struct {
-	Name      string
-	Generator func(*testing.T, *fun.Stream[T]) Distributor[T]
+type DistFuture[T comparable] struct {
+	Name   string
+	Future func(*testing.T, *fun.Stream[T]) Distributor[T]
 }
 
-func MakeGenerators[T comparable](size int) []DistGenerator[T] {
-	return []DistGenerator[T]{
+func MakeFutures[T comparable](size int) []DistFuture[T] {
+	return []DistFuture[T]{
 		{
 			Name: "ChannelBuffered",
-			Generator: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T, size)
 				for input.Next(ctx) {
@@ -222,7 +222,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DirectChannel",
-			Generator: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T)
 				go func() {
@@ -243,7 +243,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DistChannel",
-			Generator: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				ch := make(chan T)
 				out := DistributorChannel(ch)
@@ -263,7 +263,7 @@ func MakeGenerators[T comparable](size int) []DistGenerator[T] {
 		},
 		{
 			Name: "DistQueue",
-			Generator: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.Distributor()
@@ -391,11 +391,11 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 
 func RunDistributorTests[T comparable](t *testing.T, size int, producer func() *fun.Stream[T]) {
 	t.Parallel()
-	for _, gent := range MakeGenerators[T](size) {
+	for _, gent := range MakeFutures[T](size) {
 		t.Run(gent.Name, func(t *testing.T) {
 			for _, tt := range MakeCases[T](size) {
 				t.Run(tt.Name, func(t *testing.T) {
-					tt.Test(t, gent.Generator(t, producer()))
+					tt.Test(t, gent.Future(t, producer()))
 				})
 			}
 		})

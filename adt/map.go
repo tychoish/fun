@@ -185,7 +185,7 @@ func makeMapStream[K comparable, V any, O any](
 	rf func(K, V) O,
 ) *fun.Stream[O] {
 	pipe := fun.Blocking(make(chan O))
-	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).
+	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).
 		PreHook(fun.Operation(func(ctx context.Context) {
 			send := pipe.Send()
 			mp.Range(func(key K, value V) bool {

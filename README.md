@@ -34,7 +34,7 @@ your project.
 - Streams. The `fun.Stream[T]` type provides a stream/iterator,
   interface and tool kit for developing Go applications that lean
   heavily into streaming data and message-passing patterns. The
-  associated `fun.Generator[T]` and `fun.Handler[T]` functions
+  associated `fun.Future[T]` and `fun.Handler[T]` functions
   provide a comfortable abstraction for interacting with these data.
 
 - Pubsub. The `pubsub` package provides queue and message broker

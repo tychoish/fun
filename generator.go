@@ -15,41 +15,41 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Generator is a function type that is a failrly common
+// Future is a function type that is a failrly common
 // constructor. It's signature is used to create iterators/streams, as
-// a generator, and functions like a Future.
-type Generator[T any] func(context.Context) (T, error)
+// a future, and functions like a Future.
+type Future[T any] func(context.Context) (T, error)
 
-// MakeGenerator constructs a generator that wraps a similar
+// MakeFuture constructs a future that wraps a similar
 // function that does not take a context.
-func MakeGenerator[T any](fn func() (T, error)) Generator[T] {
+func MakeFuture[T any](fn func() (T, error)) Future[T] {
 	return func(context.Context) (T, error) { return fn() }
 }
 
-// NewGenerator returns a generator as a convenience function to avoid
+// NewFuture returns a future as a convenience function to avoid
 // the extra cast when creating new function objects.
-func NewGenerator[T any](fn func(ctx context.Context) (T, error)) Generator[T] { return fn }
+func NewFuture[T any](fn func(ctx context.Context) (T, error)) Future[T] { return fn }
 
-// StaticGenerator returns a generator function that always returns the
+// StaticFuture returns a future function that always returns the
 // provided values.
-func StaticGenerator[T any](val T, err error) Generator[T] {
+func StaticFuture[T any](val T, err error) Future[T] {
 	return func(context.Context) (T, error) { return val, err }
 }
 
-// ValueGenerator returns a generator function that always returns the
+// ValueFuture returns a future function that always returns the
 // provided value, and a nill error.
-func ValueGenerator[T any](val T) Generator[T] { return StaticGenerator(val, nil) }
+func ValueFuture[T any](val T) Future[T] { return StaticFuture(val, nil) }
 
-func errorGenerator[T any](err error) Generator[T] {
-	Invariant.Ok(err != nil, "cannot create error generator without an error")
-	return MakeGenerator(func() (zero T, _ error) { return zero, err })
+func errFuture[T any](err error) Future[T] {
+	Invariant.Ok(err != nil, "cannot create error future without an error")
+	return MakeFuture(func() (zero T, _ error) { return zero, err })
 }
 
-// CheckedGenerator wraps a function object that uses the second ("OK")
+// CheckedFuture wraps a function object that uses the second ("OK")
 // value to indicate that no more values will be produced. Errors
 // returned from the resulting produce are always either the context
 // cancellation error or io.EOF.
-func CheckedGenerator[T any](op func() (T, bool)) Generator[T] {
+func CheckedFuture[T any](op func() (T, bool)) Future[T] {
 	return func(context.Context) (zero T, _ error) {
 		out, ok := op()
 		if !ok {
@@ -59,12 +59,12 @@ func CheckedGenerator[T any](op func() (T, bool)) Generator[T] {
 	}
 }
 
-// PtrGenerator uses a function that returns a pointer to a value and
-// converts that into a generator that de-references and returns
+// PtrFuture uses a function that returns a pointer to a value and
+// converts that into a future that de-references and returns
 // non-nil values of the pointer, and returns EOF for nil values of
 // the pointer.
-func PtrGenerator[T any](fn func() *T) Generator[T] {
-	return CheckedGenerator(func() (zero T, _ bool) {
+func PtrFuture[T any](fn func() *T) Future[T] {
+	return CheckedFuture(func() (zero T, _ bool) {
 		if val := fn(); val != nil {
 			return *val, true
 		}
@@ -72,26 +72,26 @@ func PtrGenerator[T any](fn func() *T) Generator[T] {
 	})
 }
 
-// FutureGenerator creates a generator for the fn.Future
+// WrapFuture creates a future for the fn.Future
 // function. The underlying Future's panics are converted to errors.
-func FutureGenerator[T any](f fn.Future[T]) Generator[T] { return MakeGenerator(f.RecoverPanic) }
+func WrapFuture[T any](f fn.Future[T]) Future[T] { return MakeFuture(f.RecoverPanic) }
 
-// WithRecover returns a wrapped generator with a panic handler that converts
+// WithRecover returns a wrapped future with a panic handler that converts
 // any panic to an error.
-func (pf Generator[T]) WithRecover() Generator[T] {
+func (pf Future[T]) WithRecover() Future[T] {
 	return func(ctx context.Context) (_ T, err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		return pf(ctx)
 	}
 }
 
-// Join runs the first generator until it returns an io.EOF error, and then returns the results of the second generator. A
-// generator will be re-run until it returns a terminating error (e.g. io.EOF, ers.ErrContainerClosed, or
-// ers.ErrCurrentOpAbort). If the first generator returns any other error, that error is returned to the caller and the second
-// generator never runs.
+// Join runs the first future until it returns an io.EOF error, and then returns the results of the second future. A
+// future will be re-run until it returns a terminating error (e.g. io.EOF, ers.ErrContainerClosed, or
+// ers.ErrCurrentOpAbort). If the first future returns any other error, that error is returned to the caller and the second
+// future never runs.
 //
 // When the second function returns a terminating error, or any other error, all successive calls return io.EOF.
-func (pf Generator[T]) Join(next Generator[T]) Generator[T] {
+func (pf Future[T]) Join(next Future[T]) Future[T] {
 	const (
 		runFirstFunc int64 = iota
 		firstFunctionErrored
@@ -159,44 +159,44 @@ func (pf Generator[T]) Join(next Generator[T]) Generator[T] {
 
 // Future creates a future function using the context provided and
 // error observer to collect the error.
-func (pf Generator[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Future[T] {
+func (pf Future[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Future[T] {
 	return func() T { out, err := pf(ctx); ob(err); return out }
 }
 
-// Ignore creates a future that runs the generator and returns
+// Ignore creates a future that runs the future and returns
 // the value, ignoring the error.
-func (pf Generator[T]) Ignore(ctx context.Context) fn.Future[T] {
+func (pf Future[T]) Ignore(ctx context.Context) fn.Future[T] {
 	return func() T { return ft.IgnoreSecond(pf(ctx)) }
 }
 
-// Must returns a future that resolves the generator returning the
-// constructed value and panicing if the generator errors.
-func (pf Generator[T]) Must(ctx context.Context) fn.Future[T] {
+// Must returns a future that resolves the future returning the
+// constructed value and panicing if the future errors.
+func (pf Future[T]) Must(ctx context.Context) fn.Future[T] {
 	return func() T { return ft.Must(pf.Read(ctx)) }
 }
 
 // Force combines the semantics of Must and Wait as a future: when the
-// future is resolved, the generator executes with a context that never
+// future is resolved, the future executes with a context that never
 // expires and panics in the case of an error.
-func (pf Generator[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
+func (pf Future[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
 
-// Resolve calls the function returned by Force resolving the generator. This ignores all errors and provides a the underlying
-// generator with a context that will never be canceled.
-func (pf Generator[T]) Resolve() T { return ft.Do(pf.Force()) }
+// Resolve calls the function returned by Force resolving the future. This ignores all errors and provides a the underlying
+// future with a context that will never be canceled.
+func (pf Future[T]) Resolve() T { return ft.Do(pf.Force()) }
 
-// Wait runs the generator with a context that will ever expire.
-func (pf Generator[T]) Wait() (T, error) { return pf(context.Background()) }
+// Wait runs the future with a context that will ever expire.
+func (pf Future[T]) Wait() (T, error) { return pf(context.Background()) }
 
 // Check converts the error into a boolean, with true indicating
 // success and false indicating (but not propagating it.).
-func (pf Generator[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
+func (pf Future[T]) Check(ctx context.Context) (T, bool) { o, e := pf(ctx); return o, e == nil }
 
 // WithErrorCheck takes an error future, and checks it before
-// executing the generator function. If the error future returns an
-// error (any error), the generator propagates that error, rather than
-// running the underying generator. Useful for injecting an abort into
+// executing the future function. If the error future returns an
+// error (any error), the future propagates that error, rather than
+// running the underying future. Useful for injecting an abort into
 // an existing pipleine or chain.
-func (pf Generator[T]) WithErrorCheck(ef fn.Future[error]) Generator[T] {
+func (pf Future[T]) WithErrorCheck(ef fn.Future[error]) Future[T] {
 	return func(ctx context.Context) (zero T, _ error) {
 		if err := ef(); err != nil {
 			return zero, err
@@ -211,10 +211,10 @@ func (pf Generator[T]) WithErrorCheck(ef fn.Future[error]) Generator[T] {
 	}
 }
 
-// Once returns a generator that only executes ones, and caches the
-// return values, so that subsequent calls to the output generator will
+// Once returns a future that only executes ones, and caches the
+// return values, so that subsequent calls to the output future will
 // return the same values.
-func (pf Generator[T]) Once() Generator[T] {
+func (pf Future[T]) Once() Future[T] {
 	var (
 		out T
 		err error
@@ -229,27 +229,27 @@ func (pf Generator[T]) Once() Generator[T] {
 	}
 }
 
-// If returns a generator that will execute the root generator only if
+// If returns a future that will execute the root future only if
 // the cond value is true. Otherwise, If will return the zero value
 // for T and a nil error.
-func (pf Generator[T]) If(cond bool) Generator[T] { return pf.When(ft.Wrap(cond)) }
+func (pf Future[T]) If(cond bool) Future[T] { return pf.When(ft.Wrap(cond)) }
 
-// After will return a Generator that will block until the provided
+// After will return a Future that will block until the provided
 // time is in the past, and then execute normally.
-func (pf Generator[T]) After(ts time.Time) Generator[T] { return pf.Delay(time.Until(ts)) }
+func (pf Future[T]) After(ts time.Time) Future[T] { return pf.Delay(time.Until(ts)) }
 
-// Delay wraps a Generator in a function that will always wait for the
+// Delay wraps a Future in a function that will always wait for the
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Generator[T]) Delay(d time.Duration) Generator[T] { return pf.Jitter(ft.Wrap(d)) }
+func (pf Future[T]) Delay(d time.Duration) Future[T] { return pf.Jitter(ft.Wrap(d)) }
 
-// Jitter wraps a Generator that runs the jitter function (jf) once
+// Jitter wraps a Future that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
-// resulting duration before running the Generator.
+// resulting duration before running the Future.
 //
 // If the function produces a negative duration, there is no delay.
-func (pf Generator[T]) Jitter(jf func() time.Duration) Generator[T] {
+func (pf Future[T]) Jitter(jf func() time.Duration) Future[T] {
 	return func(ctx context.Context) (out T, _ error) {
 		timer := time.NewTimer(max(0, jf()))
 		defer timer.Stop()
@@ -262,11 +262,11 @@ func (pf Generator[T]) Jitter(jf func() time.Duration) Generator[T] {
 	}
 }
 
-// When constructs a generator that will call the cond upon every
+// When constructs a future that will call the cond upon every
 // execution, and when true, will run and return the results of the
-// root generator. Otherwise When will return the zero value of T and a
+// root future. Otherwise When will return the zero value of T and a
 // nil error.
-func (pf Generator[T]) When(cond func() bool) Generator[T] {
+func (pf Future[T]) When(cond func() bool) Future[T] {
 	return func(ctx context.Context) (out T, _ error) {
 		if cond() {
 			return pf(ctx)
@@ -275,26 +275,26 @@ func (pf Generator[T]) When(cond func() bool) Generator[T] {
 	}
 }
 
-// Lock creates a generator that runs the root mutex as per normal, but
+// Lock creates a future that runs the root mutex as per normal, but
 // under the protection of a mutex so that there's only one execution
-// of the generator at a time.
-func (pf Generator[T]) Lock() Generator[T] { return pf.WithLock(&sync.Mutex{}) }
+// of the future at a time.
+func (pf Future[T]) Lock() Future[T] { return pf.WithLock(&sync.Mutex{}) }
 
-// WithLock uses the provided mutex to protect the execution of the generator.
-func (pf Generator[T]) WithLock(mtx *sync.Mutex) Generator[T] {
+// WithLock uses the provided mutex to protect the execution of the future.
+func (pf Future[T]) WithLock(mtx *sync.Mutex) Future[T] {
 	return func(ctx context.Context) (T, error) { defer internal.With(internal.Lock(mtx)); return pf(ctx) }
 }
 
-// WithLocker uses the provided mutex to protect the execution of the generator.
-func (pf Generator[T]) WithLocker(mtx sync.Locker) Generator[T] {
+// WithLocker uses the provided mutex to protect the execution of the future.
+func (pf Future[T]) WithLocker(mtx sync.Locker) Future[T] {
 	return func(ctx context.Context) (T, error) { defer internal.WithL(internal.LockL(mtx)); return pf(ctx) }
 }
 
-// WithCancel creates a Generator and a cancel function which will
-// terminate the context that the root Generator is running
+// WithCancel creates a Future and a cancel function which will
+// terminate the context that the root Future is running
 // with. This context isn't canceled *unless* the cancel function is
-// called (or the context passed to the Generator is canceled.)
-func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
+// called (or the context passed to the Future is canceled.)
+func (pf Future[T]) WithCancel() (Future[T], context.CancelFunc) {
 	var wctx context.Context
 	var cancel context.CancelFunc
 	once := &sync.Once{}
@@ -306,10 +306,10 @@ func (pf Generator[T]) WithCancel() (Generator[T], context.CancelFunc) {
 	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }
 
-// Limit runs the generator a specified number of times, and caches the
+// Limit runs the future a specified number of times, and caches the
 // result of the last execution and returns that value for any
 // subsequent executions.
-func (pf Generator[T]) Limit(in int) Generator[T] {
+func (pf Future[T]) Limit(in int) Future[T] {
 	resolver := ft.Must(internal.LimitExec[tuple[T, error]](in))
 
 	return func(ctx context.Context) (T, error) {
@@ -322,7 +322,7 @@ func (pf Generator[T]) Limit(in int) Generator[T] {
 }
 
 // Retry constructs a worker function that takes runs the underlying
-// generator until the error value is nil, or it encounters a
+// future until the error value is nil, or it encounters a
 // terminating error (io.EOF, ers.ErrAbortCurrentOp, or context
 // cancellation.) In all cases, unless the error value is nil
 // (e.g. the retry succeeds)
@@ -335,9 +335,9 @@ func (pf Generator[T]) Limit(in int) Generator[T] {
 //
 // Except for ErrStreamContinue, which is ignored, all other errors are
 // aggregated and returned to the caller only if the retry fails. It's
-// possible to return a nil error and a zero value, if the generator
+// possible to return a nil error and a zero value, if the future
 // only returned ErrStreamContinue values.
-func (pf Generator[T]) Retry(n int) Generator[T] {
+func (pf Future[T]) Retry(n int) Future[T] {
 	var zero T
 	return func(ctx context.Context) (_ T, err error) {
 		for i := 0; i < n; i++ {
@@ -365,9 +365,9 @@ type tuple[T, U any] struct {
 	Two U
 }
 
-// TTL runs the generator only one time per specified interval. The
+// TTL runs the future only one time per specified interval. The
 // interval must me greater than 0.
-func (pf Generator[T]) TTL(dur time.Duration) Generator[T] {
+func (pf Future[T]) TTL(dur time.Duration) Future[T] {
 	resolver := ft.Must(internal.TTLExec[tuple[T, error]](dur))
 
 	return func(ctx context.Context) (T, error) {
@@ -380,10 +380,10 @@ func (pf Generator[T]) TTL(dur time.Duration) Generator[T] {
 }
 
 // PreHook configures an operation function to run before the returned
-// generator. If the pre-hook panics, it is converted to an error which
-// is aggregated with the (potential) error from the generator, and
-// returned with the generator's output.
-func (pf Generator[T]) PreHook(op Operation) Generator[T] {
+// future. If the pre-hook panics, it is converted to an error which
+// is aggregated with the (potential) error from the future, and
+// returned with the future's output.
+func (pf Future[T]) PreHook(op Operation) Future[T] {
 	return func(ctx context.Context) (out T, err error) {
 		e := ft.WithRecoverCall(func() { op(ctx) })
 		out, err = pf(ctx)
@@ -391,13 +391,13 @@ func (pf Generator[T]) PreHook(op Operation) Generator[T] {
 	}
 }
 
-// PostHook appends a function to the execution of the generator. If
+// PostHook appends a function to the execution of the future. If
 // the function panics it is converted to an error and aggregated with
-// the error of the generator.
+// the error of the future.
 //
 // Useful for calling context.CancelFunc, closers, or incrementing
 // counters as necessary.
-func (pf Generator[T]) PostHook(op func()) Generator[T] {
+func (pf Future[T]) PostHook(op func()) Future[T] {
 	return func(ctx context.Context) (o T, e error) {
 		o, e = pf(ctx)
 		e = erc.Join(ft.WithRecoverCall(op), e)
@@ -405,27 +405,27 @@ func (pf Generator[T]) PostHook(op func()) Generator[T] {
 	}
 }
 
-// WithoutErrors returns a Generator function that wraps the root
-// generator and, after running the root generator, and makes the error
-// value of the generator nil if the error returned is in the error
+// WithoutErrors returns a Future function that wraps the root
+// future and, after running the root future, and makes the error
+// value of the future nil if the error returned is in the error
 // list. The produced value in these cases is almost always the zero
 // value for the type.
-func (pf Generator[T]) WithoutErrors(errs ...error) Generator[T] {
+func (pf Future[T]) WithoutErrors(errs ...error) Future[T] {
 	return pf.WithErrorFilter(erc.NewFilter().Without(errs...))
 }
 
-// WithErrorFilter passes the error of the root Generator function with
+// WithErrorFilter passes the error of the root Future function with
 // the erc.Filter.
-func (pf Generator[T]) WithErrorFilter(ef erc.Filter) Generator[T] {
+func (pf Future[T]) WithErrorFilter(ef erc.Filter) Future[T] {
 	return func(ctx context.Context) (out T, err error) { out, err = pf(ctx); return out, ef(err) }
 }
 
-// Filter creates a function that passes the output of the generator to
+// Filter creates a function that passes the output of the future to
 // the filter function, which, if it returns true. is returned to the
-// caller, otherwise the Generator returns the zero value of type T and
+// caller, otherwise the Future returns the zero value of type T and
 // ers.ErrCurrentOpSkip error (e.g. continue), which streams and
-// other generator-consuming functions can respect.
-func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
+// other future-consuming functions can respect.
+func (pf Future[T]) Filter(fl func(T) bool) Future[T] {
 	var zero T
 	return func(ctx context.Context) (T, error) {
 		val, err := pf(ctx)
@@ -439,5 +439,5 @@ func (pf Generator[T]) Filter(fl func(T) bool) Generator[T] {
 	}
 }
 
-// Read executes the generator and returns the result.
-func (pf Generator[T]) Read(ctx context.Context) (T, error) { return pf(ctx) }
+// Read executes the future and returns the result.
+func (pf Future[T]) Read(ctx context.Context) (T, error) { return pf(ctx) }

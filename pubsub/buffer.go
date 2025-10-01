@@ -13,7 +13,7 @@ import (
 // Broker.
 type Distributor[T any] struct {
 	push fun.Handler[T]
-	pop  fun.Generator[T]
+	pop  fun.Future[T]
 	size func() int
 }
 
@@ -21,7 +21,7 @@ type Distributor[T any] struct {
 // functions.
 func MakeDistributor[T any](
 	processor fun.Handler[T],
-	producer fun.Generator[T],
+	producer fun.Future[T],
 	length func() int,
 ) Distributor[T] {
 	return Distributor[T]{

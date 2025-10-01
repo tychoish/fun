@@ -75,7 +75,7 @@ func TestError(t *testing.T) {
 			ec2.Push(ec1)
 			assert.Equal(t, 2, ec2.Len())
 		})
-		t.Run("Generator", func(t *testing.T) {
+		t.Run("Future", func(t *testing.T) {
 			ec := &Collector{}
 			for i := 0; i < 100; i++ {
 				ec.Errorf("%d", i)
@@ -389,7 +389,7 @@ func TestError(t *testing.T) {
 			}
 		})
 	})
-	t.Run("LockingGenerator", func(t *testing.T) {
+	t.Run("LockingFuture", func(t *testing.T) {
 		ec := &Collector{}
 		ec.Push(errors.New("ok,"))
 		ec.Push(errors.New("this"))

@@ -128,7 +128,7 @@ func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
 // iteration order is randomized following the convention in go.
 //
 // Use in combination with other stream processing tools
-// (generators, observers, transformers, etc.) to limit the number of
+// (futures, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
 func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
@@ -143,7 +143,7 @@ func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).PreHook(init))
+	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).PreHook(init))
 }
 
 // Keys provides a stream over just the keys in the map.
@@ -160,7 +160,7 @@ func (m Map[K, V]) Keys() *fun.Stream[K] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).PreHook(init))
+	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).PreHook(init))
 }
 
 // Values provides a stream over just the values in the map.
@@ -177,5 +177,5 @@ func (m Map[K, V]) Values() *fun.Stream[V] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(fun.NewGenerator(pipe.Receive().Read).PreHook(init))
+	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).PreHook(init))
 }
