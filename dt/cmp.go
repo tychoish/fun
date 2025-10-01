@@ -11,7 +11,6 @@ package dt
 import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/fn"
 )
 
 // Heap provides a min-order heap using the Heap.LT comparison
@@ -22,8 +21,9 @@ type Heap[T any] struct {
 	data *List[T]
 }
 
-func (h *Heap[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(h.Handler()) }
-func (h *Heap[T]) Handler() fn.Handler[T]                  { return h.Push }
+// AppendStream returns a Worker that, when called, will add all the items of from the stream to the Heap, returning only when
+// the stream has closed.
+func (h *Heap[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(h.Push) }
 
 func (h *Heap[T]) list() *List[T] {
 	if h == nil || h.LT == nil {

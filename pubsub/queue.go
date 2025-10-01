@@ -232,6 +232,9 @@ func (q *Queue[T]) Wait(ctx context.Context) (out T, _ error) {
 	return q.popFront(), nil
 }
 
+// Drain marks the queue as draining so that new items cannot be added, and then blocks until the queue is empty (or it's
+// context is canceled.) This does not close the queue: when Drain returns the queue is empty, but new work can then be
+// added. To Drain and shutdown, use the Shutdown method.
 func (q *Queue[T]) Drain(ctx context.Context) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -245,6 +248,7 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
 	defer cancel()
 	q.draining = true
+	defer func() { q.draining = false }()
 
 	for q.tracker.len() > 0 {
 		if err := ctx.Err(); err != nil {
@@ -288,26 +292,31 @@ func (q *Queue[T]) waitForNew(ctx context.Context) error {
 func (q *Queue[T]) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.closed = true
-	q.nupdates.Broadcast()
-	q.nempty.Broadcast()
+
+	q.doClose()
+
 	return nil
 }
 
+// Shutdown drains the queue, waiting for all items to be removed from the queue and then clsoes it so no additional work can be
+// added to the queue.
 func (q *Queue[T]) Shutdown(ctx context.Context) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-
-	q.draining = true
 
 	if err := q.waitForDrain(ctx); err != nil {
 		return err
 	}
 
+	q.doClose()
+
+	return nil
+}
+
+func (q *Queue[T]) doClose() {
 	q.closed = true
 	q.nupdates.Broadcast()
 	q.nempty.Broadcast()
-	return nil
 }
 
 // popFront removes the frontmost item of q and returns its value after

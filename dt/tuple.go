@@ -24,6 +24,7 @@ type Tuple[K any, V any] struct {
 // constructors.
 func MakeTuple[K any, V any](k K, v V) Tuple[K, V] { return Tuple[K, V]{One: k, Two: v} }
 
+// MarshalJSON returns a json representation of the tuple as a two item json array.
 func (t Tuple[K, V]) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -40,6 +41,8 @@ func (t Tuple[K, V]) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// UnmarshalJSON reads a slice of json data and constructs a tuple object. The json data must be a sequence of exactly two
+// values.
 func (t *Tuple[K, V]) UnmarshalJSON(in []byte) error {
 	rt := []json.RawMessage{}
 	if err := json.Unmarshal(in, &rt); err != nil {

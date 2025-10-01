@@ -30,10 +30,19 @@ type List[T any] struct {
 	meta *struct{ length int }
 }
 
-func VariadicList[T any](elems ...T) *List[T]                     { return SliceList(elems) }
-func SliceList[T any](elems []T) *List[T]                         { l := new(List[T]); l.Append(elems...); return l }
+// VariadicList constructs a doubly-linked list from a sequence of arguments passed to the constructor.
+func VariadicList[T any](elems ...T) *List[T] { return SliceList(elems) }
+
+// SliceList constructs a doubly-linked list from the elements of a slice.
+func SliceList[T any](elems []T) *List[T] { l := new(List[T]); l.Append(elems...); return l }
+
+// MapList constructs a doubly-linked list of Pair objects from the elements of a map.
 func MapList[K comparable, V any](mp Map[K, V]) *List[Pair[K, V]] { return StreamList(mp.Stream()) }
-func IteratorList[T any](in iter.Seq[T]) *List[T]                 { l := new(List[T]); l.AppendIterator(in); return l }
+
+// IteratorList constructs a doubly-linked list from the elements of a Go standard library iterator.
+func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.AppendIterator(in); return l }
+
+// StreamList constructs conscturcts a doubly-linked list from the elements read from a Stream.
 func StreamList[T any](st *fun.Stream[T]) *List[T] {
 	l := new(List[T])
 	l.AppendStream(st).Force()
@@ -49,6 +58,7 @@ func (l *List[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.Rea
 // Append adds a variadic sequence of items to the end of the list.
 func (l *List[T]) Append(items ...T) *List[T] { return l.AppendSlice(items) }
 
+// AppendSlice adds all of the items in a slice to the end of the list.
 func (l *List[T]) AppendSlice(sl []T) *List[T] {
 	for idx := range sl {
 		l.PushBack(sl[idx])
@@ -65,6 +75,7 @@ func (l *List[T]) AppendList(input *List[T]) *List[T] {
 	return l
 }
 
+// AppendIterator adds all of the items in the standard Go iterator to end of the list.
 func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
 	for val := range input {
 		l.PushBack(val)
@@ -72,6 +83,7 @@ func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
 	return l
 }
 
+// Reset removes all members of the list, and releases all references to items in the list.
 func (l *List[T]) Reset() {
 	// remove all items so that they don't pass membership checks
 	l.StreamPopFront().
