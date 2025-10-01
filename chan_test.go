@@ -173,7 +173,7 @@ func TestChannel(t *testing.T) {
 					assert.Equal(t, val, "deleuze")
 					assert.True(t, ok)
 				})
-				t.Run("Generator", func(t *testing.T) {
+				t.Run("Future", func(t *testing.T) {
 					ch := make(chan string, 1)
 					ch <- "hello world"
 					val, err := Blocking(ch).Receive().Read(ctx)

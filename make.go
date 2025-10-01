@@ -327,7 +327,7 @@ func (Constructors) Stringer(op fmt.Stringer) fn.Future[string] { return op.Stri
 // (presumably plaintext) io.Reader, using the bufio.Scanner.
 func (Constructors) Lines(reader io.Reader) *Stream[string] {
 	scanner := bufio.NewScanner(reader)
-	return MakeStream(MakeGenerator(func() (string, error) {
+	return MakeStream(MakeFuture(func() (string, error) {
 		if !scanner.Scan() {
 			return "", erc.Join(io.EOF, scanner.Err())
 		}
@@ -356,7 +356,7 @@ func (Constructors) Atoi() Converter[string, int] { return MakeConverterErr(strc
 // monotonically increasing integers until the maximum is reached.
 func (Constructors) Counter(maxVal int) *Stream[int] {
 	state := &atomic.Int64{}
-	return MakeStream(MakeGenerator(func() (int, error) {
+	return MakeStream(MakeFuture(func() (int, error) {
 		if prev := int(state.Add(1)); prev <= maxVal {
 			return prev, nil
 		}

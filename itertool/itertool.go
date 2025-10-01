@@ -1,6 +1,6 @@
 // Package itertool provides a set of functional helpers for
 // managinging and using fun.Streams, including a parallel
-// processing, generators, Map/Reduce, Merge, and other convenient
+// processing, futures, Map/Reduce, Merge, and other convenient
 // tools.
 package itertool
 
@@ -81,7 +81,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}
 
-	return fun.MakeStream(fun.NewGenerator(func(ctx context.Context) (zero T, _ error) {
+	return fun.MakeStream(fun.NewFuture(func(ctx context.Context) (zero T, _ error) {
 		for {
 			now := time.Now()
 

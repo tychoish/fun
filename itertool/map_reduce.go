@@ -36,9 +36,9 @@ func Map[T any, O any](
 // stream (in parallel, according to configuration) into an output
 // stream, and then process that stream with the reduce function.
 //
-// MapReduce itself returns a fun.Generator function, which functions
+// MapReduce itself returns a fun.Future function, which functions
 // as a future, and the entire operation, does not begin running until
-// the generator is called.
+// the future is called.
 //
 // This works as a pull: the Reduce operation starts and
 // waits for the map operation to produce a value, the map operation
@@ -49,7 +49,7 @@ func MapReduce[T any, O any, R any](
 	reduceFn func(O, R) (R, error),
 	initialReduceValue R,
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
-) fun.Generator[R] {
+) fun.Future[R] {
 	return Reduce(Map(input, mapFn, optp...), reduceFn, initialReduceValue)
 }
 
@@ -60,7 +60,7 @@ func Reduce[T any, O any](
 	iter *fun.Stream[T],
 	reduceFn func(T, O) (O, error),
 	initialReduceValue O,
-) fun.Generator[O] {
+) fun.Future[O] {
 	// TODO: add emitter function
 
 	return func(ctx context.Context) (value O, err error) {

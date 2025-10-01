@@ -50,7 +50,7 @@ func testIntIter(t *testing.T, size int) *Stream[int] {
 		check.Equal(t, count, size)
 	})
 
-	return MakeStream(MakeGenerator(func() (int, error) {
+	return MakeStream(MakeFuture(func() (int, error) {
 		if count >= size {
 			return 0, io.EOF
 		}
@@ -140,7 +140,7 @@ func TestStream(t *testing.T) {
 		count := 0
 		observes := 0
 		sum := 0
-		err := MakeStream(MakeGenerator(func() (int, error) {
+		err := MakeStream(MakeFuture(func() (int, error) {
 			count++
 			switch count {
 			case 25, 50, 75:
@@ -342,7 +342,7 @@ func TestStream(t *testing.T) {
 			assert.Equal(t, calls, 2)
 		})
 	})
-	t.Run("Generator", func(t *testing.T) {
+	t.Run("Future", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		t.Run("BasicOperation", func(t *testing.T) {
@@ -840,7 +840,7 @@ func TestJSON(t *testing.T) {
 		})
 		t.Run("Continue", func(t *testing.T) {
 			count := 0
-			out, err := MakeStream(MakeGenerator(func() (int, error) {
+			out, err := MakeStream(MakeFuture(func() (int, error) {
 				count++
 				if count%2 == 0 {
 					return -1, ErrStreamContinue

@@ -246,37 +246,37 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 // the back. When the stream reaches the beginning of the queue it
 // ends.
 func (dq *Deque[T]) StreamFront() *fun.Stream[T] {
-	return fun.MakeStream(dq.confGenerator(dqNext, false))
+	return fun.MakeStream(dq.confFuture(dqNext, false))
 }
 
 // StreamBack starts at the back of the queue and iterates
 // towards the front. When the stream reaches the end of the queue
 // it ends.
 func (dq *Deque[T]) StreamBack() *fun.Stream[T] {
-	return fun.MakeStream(dq.confGenerator(dqPrev, false))
+	return fun.MakeStream(dq.confFuture(dqPrev, false))
 }
 
 // BlockingStreamFront exposes the deque to a single-function interface
-// for iteration. The generator function operation will not modify the
+// for iteration. The future function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back, and will block for a new element if the deque is
-// empty or the generator reaches the end, the operation will block
+// empty or the future reaches the end, the operation will block
 // until another item is added.
 func (dq *Deque[T]) BlockingStreamFront() *fun.Stream[T] {
-	return fun.MakeStream(dq.confGenerator(dqNext, true))
+	return fun.MakeStream(dq.confFuture(dqNext, true))
 }
 
 // BlockingStreamBack exposes the deque to a single-function interface
-// for iteration. The generator function operation will not modify the
+// for iteration. The future function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to fron, and will block for a new element if the deque is
-// empty or the generator reaches the end, the operation will block
+// empty or the future reaches the end, the operation will block
 // until another item is added.
 func (dq *Deque[T]) BlockingStreamBack() *fun.Stream[T] {
-	return fun.MakeStream(dq.confGenerator(dqPrev, true))
+	return fun.MakeStream(dq.confFuture(dqPrev, true))
 }
 
-func (dq *Deque[T]) confGenerator(direction dqDirection, blocking bool) fun.Generator[T] {
+func (dq *Deque[T]) confFuture(direction dqDirection, blocking bool) fun.Future[T] {
 	var current *element[T]
 	return func(ctx context.Context) (out T, _ error) {
 		defer adt.With(adt.Lock(dq.mtx))

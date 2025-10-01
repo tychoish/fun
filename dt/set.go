@@ -117,7 +117,7 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 
 // Stream provides a way to iterate over the items in the
 // set. Provides items in iteration order if the set is ordered.If
-// the Set is ordered, then the generator produces items in the set's
+// the Set is ordered, then the future produces items in the set's
 // order. If the Set is synchronize, then the Stream always holds
 // the Set's lock when incrementing the stream.
 func (s *Set[T]) Stream() *fun.Stream[T] {
@@ -126,7 +126,7 @@ func (s *Set[T]) Stream() *fun.Stream[T] {
 	st := s.unsafeStream()
 
 	if mu != nil {
-		return fun.MakeStream(fun.NewGenerator(st.Read).WithLock(mu)).WithHook(st.CloseHook())
+		return fun.MakeStream(fun.NewFuture(st.Read).WithLock(mu)).WithHook(st.CloseHook())
 	}
 
 	return st

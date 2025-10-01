@@ -217,7 +217,7 @@ func TestStreamImplementations(t *testing.T) {
 func TestStreamAlgoInts(t *testing.T) {
 	t.Parallel()
 
-	elemGenerator := func() []int {
+	elemFuture := func() []int {
 		e := make([]int, 100)
 		for idx := range e {
 			e[idx] = idx
@@ -232,7 +232,7 @@ func TestStreamAlgoInts(t *testing.T) {
 		},
 		{
 			Name:     "Large",
-			Elements: elemGenerator(),
+			Elements: elemFuture(),
 		},
 	}
 
@@ -988,7 +988,7 @@ func RunStreamStringAlgoTests(
 	})
 	t.Run("ConvertContinue", func(t *testing.T) {
 		count := 0
-		st := MakeStream(MakeGenerator(func() (int, error) {
+		st := MakeStream(MakeFuture(func() (int, error) {
 			count++
 
 			if count%2 == 0 {

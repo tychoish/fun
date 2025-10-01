@@ -101,7 +101,7 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 // transformation, with the exception of fun.ErrStreamContinue. All
 // errors are returned to the caller, except io.EOF which indicates
 // the (early) end of iteration.
-func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Generator[Slice[O]] {
+func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Future[Slice[O]] {
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {

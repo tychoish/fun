@@ -51,7 +51,7 @@ const ErrStreamContinue ers.Error = ers.ErrCurrentOpSkip
 // for the stream blocks, (or continues iterating) until the
 // stream is exhausted, or closed.
 //
-// However, additional methods, such as ReadOne, the Generator()
+// However, additional methods, such as ReadOne, the Future()
 // function (which is a wrapper around ReadOne) provide a different
 // iteraction paradigm: they combine the Next() and value operations
 // into a single function call. When the stream is exhausted these
@@ -64,7 +64,7 @@ const ErrStreamContinue ers.Error = ers.ErrCurrentOpSkip
 // Using Next/Value cannot be used concurrently, as there is no way to
 // synchronize the Next/Value calls with respect to eachother: it's
 // possible in this mode to both miss and/or get duplicate values from
-// the stream in this case. If the generator/generator function in
+// the stream in this case. If the future function in
 // the stream is safe for concurrent use, then ReadOne can be used
 // safely. As a rule, all tooling in the fun package uses ReadOne
 // except in a few cases where a caller has exclusive access to the
@@ -82,12 +82,12 @@ type Stream[T any] struct {
 	}
 }
 
-// MakeStream constructs a stream that calls the Generator function
+// MakeStream constructs a stream that calls the Future function
 // once for every item, until it errors. Errors other than context
 // cancellation errors and io.EOF are propgated to the stream's Close
 // method.
 func MakeStream[T any](gen func(context.Context) (T, error)) *Stream[T] {
-	op, cancel := NewGenerator(gen).WithCancel()
+	op, cancel := NewFuture(gen).WithCancel()
 	st := &Stream[T]{operation: op}
 	st.closer.ops = append(st.closer.ops, cancel)
 	return st
@@ -124,7 +124,7 @@ func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	return MakeStream(CheckedGenerator(func() (zero T, _ bool) {
+	return MakeStream(CheckedFuture(func() (zero T, _ bool) {
 		if val, ok := next(); ok {
 			return val, true
 		}
@@ -182,7 +182,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
-	return MakeStream(NewGenerator(pipe.Receive().Read).
+	return MakeStream(NewFuture(pipe.Receive().Read).
 		PreHook(init)).
 		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
 }
@@ -214,7 +214,7 @@ func (st *Stream[T]) doClose() {
 // Close is safe to call more than once and always resolves the error handler (e.g. AddError),.
 func (st *Stream[T]) Close() error { st.doClose(); return st.erc.Resolve() }
 
-// WithHook constructs a stream from the generator. The
+// WithHook constructs a stream from the future. The
 // provided hook function will run during the Stream's Close()
 // method.
 func (st *Stream[T]) WithHook(hook fn.Handler[*Stream[T]]) *Stream[T] {
@@ -238,13 +238,13 @@ func (st *Stream[T]) ErrorHandler() fn.Handler[error] { return st.erc.Push }
 // stream.
 //
 // Value and Next cannot be done safely when the stream is being
-// used concrrently. Use ReadOne or the Generator method.
+// used concrrently. Use ReadOne or the Future method.
 func (st *Stream[T]) Value() T { return st.value }
 
 // Next advances the stream (using ReadOne) and caches the current
 // value for access with the Value() method. When Next is true, the
 // Value() will return the next item. When false, either the stream
-// has been exhausted (e.g. the Generator function has returned io.EOF)
+// has been exhausted (e.g. the Future function has returned io.EOF)
 // or the context passed to Next has been canceled.
 //
 // Using Next/Value cannot be done safely if stream is accessed from
@@ -360,12 +360,12 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map().
 func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
-	return MakeStream(NewGenerator(st.operation).Filter(check)).WithHook(st.CloseHook())
+	return MakeStream(NewFuture(st.operation).Filter(check)).WithHook(st.CloseHook())
 }
 
 // Reduce processes a stream with a reducer function. The output
-// function is a Generator operation which runs synchronously, and no
-// processing happens before generator is called. If the reducer
+// function is a Future operation which runs synchronously, and no
+// processing happens before future is called. If the reducer
 // function returns ErrStreamContinue, the output value is ignored,
 // and the reducer operation continues.
 //
@@ -431,7 +431,7 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	setup := pipe.Send().WriteAll(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
-		output[idx] = MakeStream(NewGenerator(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
+		output[idx] = MakeStream(NewFuture(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
 	}
 
 	return output
@@ -447,7 +447,7 @@ func (st *Stream[T]) CloseHook() func(*Stream[T]) {
 // sequentially, and without starting any go routines. Otherwise
 // similar to Flatten (which processes each stream in parallel).
 func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
-	proc := NewGenerator(st.Read)
+	proc := NewFuture(st.Read)
 	for idx := range iters {
 		proc = proc.Join(iters[idx].Read)
 	}
@@ -509,7 +509,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 	}
 	var idx int
 
-	st.operation = NewGenerator(st.operation).Join(func(context.Context) (out T, err error) {
+	st.operation = NewFuture(st.operation).Join(func(context.Context) (out T, err error) {
 		if idx >= len(rv) {
 			return out, io.EOF
 		}
@@ -523,7 +523,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 }
 
 // Buffer adds a buffer in the queue using a channel as buffer to
-// smooth out iteration performance, if the iteration (generator) and the
+// smooth out iteration performance, if the iteration function (future) and the
 // consumer both take time, even a small buffer will improve the
 // throughput of the system and prevent both components of the system
 // from blocking on eachother.
@@ -533,7 +533,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 	pipe := buf.Send().WriteAll(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(pipe))
+	return MakeStream(NewFuture(buf.Receive().Read).PreHook(pipe))
 }
 
 // BufferParallel processes the input queue and stores
@@ -547,7 +547,7 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 func (st *Stream[T]) BufferParallel(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 
-	return MakeStream(NewGenerator(buf.Receive().Read).PreHook(
+	return MakeStream(NewFuture(buf.Receive().Read).PreHook(
 		st.Parallel(
 			buf.Send().Write,
 			WorkerGroupConfNumWorkers(n),
