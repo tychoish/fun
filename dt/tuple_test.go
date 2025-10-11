@@ -1,4 +1,3 @@
-// GENERATED FILE FROM PAIR IMPLEMENTATION
 package dt
 
 import (

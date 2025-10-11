@@ -30,13 +30,13 @@ jobs:
       - uses: actions/setup-go@v3
         if: env.GIT_DIFF
         with:
-          go-version: '1.24'
+          go-version: "1.24"
       - uses: golangci/golangci-lint-action@v7
         if: env.GIT_DIFF
         with:
           # Required: the version of golangci-lint is required and
           # must be specified with patch version: we always use the
           # latest patch version.
-          version: v2.0.0
+          version: v2.5.0
           args: --timeout 8m
           github-token: ${{ secrets.github_token }}

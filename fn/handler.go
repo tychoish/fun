@@ -37,7 +37,7 @@ func ErrorHandler[T any](eh Handler[error]) func(T, error) T {
 	return func(v T, err error) T { eh(err); return v }
 }
 
-// Handler provides a more expository operation to call a handler
+// Read provides a more expository operation to call a handler
 // function.
 func (of Handler[T]) Read(in T) { of(in) }
 
