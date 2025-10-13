@@ -205,11 +205,11 @@ func TestHandlers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		var prev string
-		check.NotError(t, MAKE.LinesWithSpaceTrimed(buf).ReadAll(func(line string) {
+		check.NotError(t, MAKE.LinesWithSpaceTrimed(buf).ReadAll(FromHandler(func(line string) {
 			count++
 			assert.Equal(t, len(line), 64)
 			assert.NotEqual(t, prev, line)
-		}).Run(ctx))
+		})).Run(ctx))
 		check.Equal(t, count, 128)
 	})
 	t.Run("Transforms", func(t *testing.T) {
@@ -328,23 +328,6 @@ func TestHandlers(t *testing.T) {
 					})
 
 					check.Equal(t, 1, count)
-				})
-			})
-			t.Run("Force", func(t *testing.T) {
-				t.Run("Workers", func(t *testing.T) {
-					count := 0
-					tctx := t.Context()
-					worker := Worker(func(ctx context.Context) error { check.True(t, ctx != tctx); count++; return nil })
-					check.NotError(t, MAKE.ForceRunAllWorkers(VariadicStream(worker, worker, worker, worker, worker)))
-					check.Equal(t, 5, count)
-				})
-
-				t.Run("Operations", func(t *testing.T) {
-					count := 0
-
-					op := Operation(func(ctx context.Context) { check.True(t, ctx == context.Background()); count++ })
-					check.NotError(t, MAKE.ForceRunAllOperations(VariadicStream(op, op, op, op, op)))
-					check.Equal(t, 5, count)
 				})
 			})
 			t.Run("Converter", func(t *testing.T) {

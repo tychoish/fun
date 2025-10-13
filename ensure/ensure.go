@@ -109,9 +109,9 @@ func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
 //
 // Each pair is logged as it's own Log statement.
 func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
-	fun.Invariant.Must(md.Stream().ReadAll(func(p dt.Pair[string, any]) {
+	fun.Invariant.Must(md.Stream().ReadAll(fun.FromHandler(func(p dt.Pair[string, any]) {
 		a.messages.PushBack(fun.MAKE.Sprintf(`%s: "%v"`, p.Key, p.Value))
-	}).Wait())
+	})).Wait())
 	return a
 }
 

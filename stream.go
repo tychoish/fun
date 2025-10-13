@@ -23,6 +23,8 @@ import (
 // ErrStreamContinue instructs consumers of Streams and related
 // processors that run groups. Equivalent to the "continue" keyword in
 // other contexts.
+//
+// Deprecated: use ers.ErrCurrentOpSkip instead.
 const ErrStreamContinue ers.Error = ers.ErrCurrentOpSkip
 
 // Stream provides a safe, context-respecting iteration/sequence
@@ -170,14 +172,14 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	init := Operation(func(ctx context.Context) {
 		send := pipe.Send()
 
-		iters.ReadAll(func(iter *Stream[T]) {
+		iters.ReadAll(FromHandler(func(iter *Stream[T]) {
 			// start a thread for reading this
 			// sub-iterator.
 			send.WriteAll(iter).
 				Operation(ec.Push).
 				PostHook(func() { ec.Push(iter.Close()) }).
 				Add(ctx, wg)
-		}).Operation(ec.Push).Add(ctx, wg)
+		})).Operation(ec.Push).Add(ctx, wg)
 
 		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
@@ -287,7 +289,7 @@ func (st *Stream[T]) Read(ctx context.Context) (out T, err error) {
 		switch {
 		case err == nil:
 			return out, nil
-		case errors.Is(err, ErrStreamContinue):
+		case errors.Is(err, ers.ErrCurrentOpSkip):
 			continue
 		case ers.IsTerminating(err):
 			return out, err
@@ -307,17 +309,22 @@ func (st *Stream[T]) Read(ctx context.Context) (out T, err error) {
 // the provided processor function.
 //
 // All panics are converted to errors and propagated in the response
-// of the worker, and abort the processing. If the processor function
-// returns ErrStreamContinue, processing continues. All other errors
+// of the worker, and abort the processing. If the handler function
+// returns ers.ErrCurrentOpSkip, processing continues. All other errors
 // abort processing and are returned by the worker.
-func (st *Stream[T]) ReadAll(fn fn.Handler[T]) Worker {
+func (st *Stream[T]) ReadAll(fn Handler[T]) Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover()), st.Close()) }()
 		for {
 			item, err := st.Read(ctx)
+			if err == nil {
+				err = fn(ctx, item)
+			}
 			switch {
 			case err == nil:
-				fn(item)
+				continue
+			case errors.Is(err, ErrStreamContinue):
+				continue
 			case ers.IsExpiredContext(err):
 				return err
 			case ers.IsTerminating(err):
@@ -344,9 +351,8 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 			return err
 		}
 
-		fn.WithRecover().
-			WithErrorFilter(conf.errorFilter).
-			ReadAll(st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) })).
+		st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) }).
+			ReadAll(fn.WithRecover().WithErrorFilter(conf.errorFilter)).
 			StartGroup(ctx, conf.NumWorkers).
 			Ignore().
 			Run(ctx)
@@ -366,7 +372,7 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 // Reduce processes a stream with a reducer function. The output
 // function is a Future operation which runs synchronously, and no
 // processing happens before future is called. If the reducer
-// function returns ErrStreamContinue, the output value is ignored,
+// function returns ers.ErrCurrentOpSkip, the output value is ignored,
 // and the reducer operation continues.
 //
 // If the underlying stream returns an error, it's returned by the
@@ -375,7 +381,7 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 // Close methods of the stream. If the underlying stream terminates
 // cleanly, then the reducer will return it's last value without
 // error. Otherwise any error returned by the Reduce method, other
-// than ErrStreamContinue, is propagated to the caller.
+// than ers.ErrCurrentOpSkip, is propagated to the caller.
 //
 // The "previous" value for the first reduce option is the zero value
 // for the type T.
@@ -395,7 +401,7 @@ func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 			case err == nil:
 				value = out
 				continue
-			case ers.Is(err, ErrStreamContinue):
+			case ers.Is(err, ers.ErrCurrentOpSkip):
 				continue
 			default:
 				return value, err
@@ -407,7 +413,7 @@ func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 // Count returns the number of items observed by the stream. Callers
 // should still manually call Close on the stream.
 func (st *Stream[T]) Count(ctx context.Context) (count int) {
-	st.ReadAll(func(T) { count++ }).Ignore().Run(ctx)
+	st.ReadAll(FromHandler(func(T) { count++ })).Ignore().Run(ctx)
 	return count
 }
 
@@ -460,7 +466,7 @@ func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 // In the case of an error in the underlying stream the output slice
 // will have the values encountered before the error.
 func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
-	return out, st.ReadAll(func(in T) { out = append(out, in) }).Run(ctx)
+	return out, st.ReadAll(FromHandler(func(in T) { out = append(out, in) })).Run(ctx)
 }
 
 // MarshalJSON is useful for implementing json.Marshaler methods
@@ -566,8 +572,7 @@ func (st *Stream[T]) Channel(ctx context.Context) <-chan T { return st.BufferedC
 func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	out := Blocking(make(chan T, size))
 
-	NewHandler(out.Send().Write).
-		ReadAll(st).
+	st.ReadAll(out.Send().Write).
 		PostHook(out.Close).
 		Operation(st.AddError).
 		Launch(ctx)

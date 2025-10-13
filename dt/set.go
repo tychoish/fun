@@ -190,7 +190,9 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 }
 
 // AppendStream adds all items encountered in the stream to the set.
-func (s *Set[T]) AppendStream(iter *fun.Stream[T]) { iter.ReadAll(s.Add).Ignore().Wait() }
+func (s *Set[T]) AppendStream(iter *fun.Stream[T]) {
+	iter.ReadAll(fun.FromHandler(s.Add)).Ignore().Wait()
+}
 
 // AppendSet adds the items of one set to this set.
 func (s *Set[T]) AppendSet(extra *Set[T]) { s.AppendStream(extra.Stream()) }

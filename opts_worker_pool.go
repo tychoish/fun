@@ -62,7 +62,7 @@ func (o *WorkerGroupConf) Validate() error {
 // the WorkerGroupConf, and then returning true if processing should
 // continue and false otherwise.
 //
-// Neither io.EOF nor ErrStreamContinue errors are ever observed.
+// Neither io.EOF nor ers.ErrCurrentOpSkip errors are ever observed.
 // All panic errors are observed. Context cancellation errors are
 // observed only when configured. as well as context cancellation
 // errors when configured.
@@ -72,7 +72,7 @@ func (o *WorkerGroupConf) CanContinueOnError(err error) (out bool) {
 	}
 
 	switch {
-	case errors.Is(err, ErrStreamContinue):
+	case errors.Is(err, ers.ErrCurrentOpSkip):
 		return true
 	case ers.IsTerminating(err):
 		return false
@@ -96,7 +96,7 @@ func (o *WorkerGroupConf) errorFilter(err error) error {
 	case err == nil:
 		return nil
 	case o.CanContinueOnError(err):
-		return ErrStreamContinue
+		return ers.ErrCurrentOpSkip
 	default:
 		return err
 	}

@@ -25,7 +25,9 @@ func (s *Stack[T]) Append(items ...T) { ft.ApplyMany(s.Push, items) }
 // stack. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
-func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(s.Push) }
+func (s *Stack[T]) Populate(iter *fun.Stream[T]) fun.Worker {
+	return iter.ReadAll(fun.FromHandler(s.Push))
+}
 
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
 func (*Stack[T]) zero() (o T)       { return }

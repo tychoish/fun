@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -77,7 +78,7 @@ func Reduce[T any, O any](
 			case err == nil:
 				value = out
 				continue
-			case errors.Is(err, fun.ErrStreamContinue):
+			case errors.Is(err, ers.ErrCurrentOpSkip):
 				continue
 			case errors.Is(err, io.EOF):
 				return value, nil

@@ -152,7 +152,7 @@ func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.S
 
 // ReadAll returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor
-// function returns ErrStreamContinue, the processing will continue. All
+// function returns ers.ErrCurrentOpSkip, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
 func (ro ChanReceive[T]) ReadAll(op func(context.Context, T) error) Worker {
@@ -176,7 +176,7 @@ func (ro ChanReceive[T]) ReadAll(op func(context.Context, T) error) Worker {
 				continue LOOP
 			case errors.Is(err, io.EOF):
 				return nil
-			case errors.Is(err, ErrStreamContinue):
+			case errors.Is(err, ers.ErrCurrentOpSkip):
 				continue LOOP
 			default:
 				return err

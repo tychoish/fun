@@ -23,7 +23,9 @@ type Heap[T any] struct {
 
 // AppendStream returns a Worker that, when called, will add all the items of from the stream to the Heap, returning only when
 // the stream has closed.
-func (h *Heap[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(h.Push) }
+func (h *Heap[T]) AppendStream(iter *fun.Stream[T]) fun.Worker {
+	return iter.ReadAll(fun.FromHandler(h.Push))
+}
 
 func (h *Heap[T]) list() *List[T] {
 	if h == nil || h.LT == nil {

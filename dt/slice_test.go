@@ -290,7 +290,7 @@ func TestSlice(t *testing.T) {
 						return "", io.EOF
 					}
 					if count%2 == 0 {
-						return "", fun.ErrStreamContinue
+						return "", ers.ErrCurrentOpSkip
 					}
 					return fmt.Sprint(in), nil
 				})).Read(ctx)

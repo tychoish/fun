@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
@@ -164,7 +165,7 @@ func TestMap(t *testing.T) {
 			keys := mp.Keys()
 
 			count := 0
-			err := keys.ReadAll(func(in string) {
+			err := keys.ReadAll(fun.FromHandler(func(in string) {
 				switch in {
 				case "big":
 					count++
@@ -175,7 +176,7 @@ func TestMap(t *testing.T) {
 				default:
 					t.Error("unexpected", in)
 				}
-			}).Run(ctx)
+			})).Run(ctx)
 			assert.Equal(t, 3, count)
 			assert.NotError(t, err)
 		})
@@ -188,7 +189,7 @@ func TestMap(t *testing.T) {
 			keys := mp.Values()
 
 			count := 0
-			err := keys.ReadAll(func(in int) {
+			err := keys.ReadAll(fun.FromHandler(func(in int) {
 				switch in {
 				case 42:
 					count++
@@ -199,7 +200,7 @@ func TestMap(t *testing.T) {
 				default:
 					t.Error("unexpected", in)
 				}
-			}).Run(ctx)
+			})).Run(ctx)
 			assert.Equal(t, 3, count)
 			assert.NotError(t, err)
 		})

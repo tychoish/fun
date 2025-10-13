@@ -109,7 +109,7 @@ func (p *Tuples[K, V]) AppendTuples(toAdd *Tuples[K, V]) { p.init(); p.ll.Append
 
 // AppendStream adds items from a stream of tuples to the current Tuples slice.
 func (p *Tuples[K, V]) AppendStream(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
-	return iter.ReadAll(func(item Tuple[K, V]) { p.Push(item) })
+	return iter.ReadAll(fun.FromHandler(func(item Tuple[K, V]) { p.Push(item) }))
 }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first

@@ -126,7 +126,7 @@ func TestSmoke(t *testing.T) {
 					if count == 1 {
 						return 42, nil
 					}
-					return value, fun.ErrStreamContinue
+					return value, ers.ErrCurrentOpSkip
 				}, 0).Read(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, sum, 42)
@@ -156,7 +156,7 @@ func TestSmoke(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, fun.MAKE.Counter(size).ReadAll(func(in int) { count++; check.True(t, last < in); last = in }).Run(ctx))
+		check.NotError(t, fun.MAKE.Counter(size).ReadAll(fun.FromHandler(func(in int) { count++; check.True(t, last < in); last = in })).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -261,7 +261,7 @@ func TestDropZeros(t *testing.T) {
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).ReadAll(func(in string) { assert.Zero(t, in) }).Run(ctx))
+	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).ReadAll(fun.FromHandler(func(in string) { assert.Zero(t, in) })).Run(ctx))
 
 	all[45] = "49"
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
@@ -271,7 +271,7 @@ func TestDropZeros(t *testing.T) {
 func TestIndexed(t *testing.T) {
 	iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 	count := 0
-	err := iter.ReadAll(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) }).Run(t.Context())
+	err := iter.ReadAll(fun.FromHandler(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) })).Run(t.Context())
 	check.NotError(t, err)
 	assert.Equal(t, count, 10)
 }
@@ -290,12 +290,14 @@ func TestRateLimit(t *testing.T) {
 	t.Run("Serial", func(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).ReadAll(func(in int) {
-			check.True(t, in >= 0)
-			check.True(t, in <= 100)
-			count.Add(1)
-			testt.Log(t, count.Get(), "-->", time.Now())
-		}).Run(testt.Context(t)))
+		assert.NotError(t, RateLimit(
+			fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).
+			ReadAll(fun.FromHandler(func(in int) {
+				check.True(t, in >= 0)
+				check.True(t, in <= 100)
+				count.Add(1)
+				testt.Log(t, count.Get(), "-->", time.Now())
+			})).Run(testt.Context(t)))
 		end := time.Now()
 		dur := end.Sub(start)
 
@@ -330,12 +332,12 @@ func TestRateLimit(t *testing.T) {
 		go func() { time.Sleep(time.Second); cancel() }()
 		count := &intish.Atomic[int]{}
 		err := RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Second).
-			ReadAll(func(in int) {
+			ReadAll(fun.FromHandler(func(in int) {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)
 				testt.Log(t, count.Get(), "-->", time.Now())
-			}).Run(ctx)
+			})).Run(ctx)
 		end := time.Now()
 		dur := end.Sub(start)
 

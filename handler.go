@@ -2,7 +2,6 @@ package fun
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -277,32 +276,3 @@ func (pf Handler[T]) WithoutErrors(errs ...error) Handler[T] {
 
 // Read executes the Handler once.
 func (pf Handler[T]) Read(ctx context.Context, in T) error { return pf(ctx, in) }
-
-// ReadAll reads elements from the producer until an error is
-// encountered and passes them to a producer, until the first error is
-// encountered. The worker is blocking.
-func (pf Handler[T]) ReadAll(st *Stream[T]) Worker {
-	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(err, st.Close(), erc.ParsePanic(recover())) }()
-
-		for {
-			item, err := st.Read(ctx)
-			if err == nil {
-				err = pf(ctx, item)
-			}
-
-			switch {
-			case err == nil:
-				continue
-			case errors.Is(err, ErrStreamContinue):
-				continue
-			case ers.IsTerminating(err):
-				return nil
-			case ers.IsExpiredContext(err):
-				return err
-			default:
-				return err
-			}
-		}
-	}
-}
