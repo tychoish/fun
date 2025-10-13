@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -28,13 +29,13 @@ func MakeConverterToAny[T any]() Converter[T, any] {
 // MakeCovnerterOk builds a Transform function from a function that
 // converts between types T and O, but that returns a boolean/check
 // value. When the converter function returns false the
-// transform function returns a ErrStreamContinue error.
+// transform function returns a ers.ErrCurrentOpSkip error.
 func MakeCovnerterOk[T any, O any](op func(T) (O, bool)) Converter[T, O] {
 	return func(_ context.Context, in T) (out O, err error) {
 		var ok bool
 		out, ok = op(in)
 		if !ok {
-			err = ErrStreamContinue
+			err = ers.ErrCurrentOpSkip
 		}
 
 		return
@@ -100,7 +101,7 @@ func (mpf Converter[T, O]) Stream(iter *Stream[T]) *Stream[O] {
 			switch {
 			case err == nil:
 				return out, nil
-			case errors.Is(err, ErrStreamContinue):
+			case errors.Is(err, ers.ErrCurrentOpSkip):
 				continue
 			default:
 				return mpf.zeroOut(), err
@@ -130,9 +131,8 @@ func (mpf Converter[T, O]) Parallel(
 	// iteration, so opts doesn't have to be populated/applied
 	// till later, and error handling gets much easier if we
 	// wait.
-	setup := mpf.WithRecover().
-		mapPullProcess(output.Send().Write, conf).
-		ReadAll(iter).
+	setup := iter.ReadAll(mpf.WithRecover().
+		mapPullProcess(output.Send().Write, conf)).
 		Group(conf.NumWorkers).
 		PostHook(output.Close).
 		Operation(conf.ErrorCollector.Push).

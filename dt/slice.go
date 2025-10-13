@@ -98,14 +98,14 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 
 // Transform processes a slice of one type into a slice of another
 // type using the transformation function. Errors abort the
-// transformation, with the exception of fun.ErrStreamContinue. All
+// transformation, with the exception of ers.ErrCurrentOpSkip. All
 // errors are returned to the caller, except io.EOF which indicates
 // the (early) end of iteration.
 func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Future[Slice[O]] {
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
-		if err := op.Stream(in.Stream()).ReadAll(out.Push).Run(ctx); err != nil {
+		if err := op.Stream(in.Stream()).ReadAll(fun.FromHandler(out.Push)).Run(ctx); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -140,7 +140,9 @@ func (s *Slice[T]) AppendSlice(in []T) { *s = append(*s, in...) }
 
 // AppendStream creates a worker an operation that adds all items from the stream to the slice when the worker calls. The Worker
 // must be called, with a context, to modify the slice.
-func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(s.Push) }
+func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fun.Worker {
+	return iter.ReadAll(fun.FromHandler(s.Push))
+}
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }

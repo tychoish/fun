@@ -45,7 +45,7 @@ func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.AppendI
 // StreamList constructs conscturcts a doubly-linked list from the elements read from a Stream.
 func StreamList[T any](st *fun.Stream[T]) *List[T] {
 	l := new(List[T])
-	l.AppendStream(st).Force()
+	l.AppendStream(st).Ignore().Wait()
 	return l
 }
 
@@ -53,7 +53,9 @@ func StreamList[T any](st *fun.Stream[T]) *List[T] {
 // list. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
-func (l *List[T]) AppendStream(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(l.PushBack) }
+func (l *List[T]) AppendStream(iter *fun.Stream[T]) fun.Worker {
+	return iter.ReadAll(fun.FromHandler(l.PushBack))
+}
 
 // Append adds a variadic sequence of items to the end of the list.
 func (l *List[T]) Append(items ...T) *List[T] { return l.AppendSlice(items) }
@@ -87,7 +89,7 @@ func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
 func (l *List[T]) Reset() {
 	// remove all items so that they don't pass membership checks
 	l.StreamPopFront().
-		ReadAll(fn.NewNoopHandler[T]()).
+		ReadAll(fun.FromHandler(fn.NewNoopHandler[T]())).
 		PostHook(l.uncheckedSetup). // reset everything...
 		Ignore().Wait()
 }

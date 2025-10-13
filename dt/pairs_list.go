@@ -86,7 +86,7 @@ func (p *Pairs[K, V]) AppendPairs(toAdd *Pairs[K, V]) { p.init(); p.ll.AppendLis
 
 // AppendStream adds items from a stream of pairs to the current Pairs slice.
 func (p *Pairs[K, V]) AppendStream(iter *fun.Stream[Pair[K, V]]) fun.Worker {
-	return iter.ReadAll(func(item Pair[K, V]) { p.Push(item) })
+	return iter.ReadAll(fun.FromHandler(func(item Pair[K, V]) { p.Push(item) }))
 }
 
 // AppendMap adds all of the items in a map to the Pairs object.

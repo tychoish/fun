@@ -135,8 +135,13 @@ func TestMapReduce(t *testing.T) {
 		pipe <- t.Name()
 
 		var mf Converter[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
-		mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}).
-			ReadAll(Blocking(pipe).Receive().Stream()).
+
+		Blocking(pipe).
+			Receive().
+			Stream().
+			ReadAll(
+				mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}),
+			).
 			Ignore().
 			Add(ctx, wg)
 
@@ -854,7 +859,7 @@ func RunStreamStringAlgoTests(
 							if count == 1 {
 								return 42, nil
 							}
-							return value, ErrStreamContinue
+							return value, ers.ErrCurrentOpSkip
 						}).Read(ctx)
 						assert.NotError(t, err)
 						assert.Equal(t, sum, 42)
@@ -920,7 +925,7 @@ func RunStreamStringAlgoTests(
 		tfrm = MakeCovnerterOk(func(in string) (string, bool) { return in, false })
 		out, err = tfrm(ctx, "bye")
 		check.Error(t, err)
-		check.ErrorIs(t, err, ErrStreamContinue)
+		check.ErrorIs(t, err, ers.ErrCurrentOpSkip)
 		check.Equal(t, out, "bye")
 	})
 	t.Run("Block", func(t *testing.T) {
@@ -992,7 +997,7 @@ func RunStreamStringAlgoTests(
 			count++
 
 			if count%2 == 0 {
-				return 0, ErrStreamContinue
+				return 0, ers.ErrCurrentOpSkip
 			}
 			if count < 16 {
 				return count, nil

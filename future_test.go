@@ -946,7 +946,7 @@ func producerContinuesOnce[T any](out T, counter *atomic.Int64) Future[T] {
 	return func(_ context.Context) (_ T, err error) {
 		once.Do(func() {
 			out = zero
-			err = ErrStreamContinue
+			err = ers.ErrCurrentOpSkip
 		})
 		if counter.Add(1) > 2 {
 			return zero, io.EOF

@@ -76,7 +76,7 @@ func TestDistributor(t *testing.T) {
 				assert.NotError(t, queue.Close())
 			}()
 
-			if err := iter.ReadAll(func(in string) { set.Add(in); seen++ }).Run(ctx); err != nil {
+			if err := iter.ReadAll(fun.FromHandler(func(in string) { set.Add(in); seen++ })).Run(ctx); err != nil {
 				t.Error(seen, err)
 			}
 			if iter.Next(ctx) {
@@ -112,11 +112,11 @@ func TestDistributor(t *testing.T) {
 
 			count := 0
 			err := dist.Stream().
-				ReadAll(func(in int) {
+				ReadAll(fun.FromHandler(func(in int) {
 					count++
 					check.True(t, ft.Not(in == 0))
 					check.True(t, ft.Not(in%2 != 0))
-				}).
+				})).
 				Run(ctx)
 
 			check.NotError(t, err)
@@ -136,11 +136,11 @@ func TestDistributor(t *testing.T) {
 			err := DistributorChanOp(ch).
 				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 }).
 				Stream().
-				ReadAll(func(in int) {
+				ReadAll(fun.FromHandler(func(in int) {
 					count++
 					check.True(t, ft.Not(in == 0))
 					check.True(t, ft.Not(in%2 != 0))
-				}).
+				})).
 				Run(ctx)
 
 			check.NotError(t, err)

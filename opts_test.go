@@ -73,7 +73,7 @@ func TestOptionProvider(t *testing.T) {
 
 		t.Run("Continue", func(t *testing.T) {
 			opt.ErrorCollector = &erc.Collector{}
-			check.True(t, opt.CanContinueOnError(ErrStreamContinue))
+			check.True(t, opt.CanContinueOnError(ers.ErrCurrentOpSkip))
 			check.Equal(t, 0, opt.ErrorCollector.Len())
 		})
 	})

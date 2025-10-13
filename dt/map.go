@@ -94,19 +94,19 @@ func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
 func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
-	pairs.Stream().ReadAll(m.AddPair).Ignore().Wait()
+	pairs.Stream().ReadAll(fun.FromHandler(m.AddPair)).Ignore().Wait()
 }
 
 // ExtendWithPairs adds items to the map from a Pairs object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ExtendWithPairs(pairs *Pairs[K, V]) {
-	pairs.Stream().ReadAll(m.AddPair).Ignore().Wait()
+	pairs.Stream().ReadAll(fun.FromHandler(m.AddPair)).Ignore().Wait()
 }
 
 // ExtendWithTuples adds items to the map from a Tuples object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ExtendWithTuples(tuples *Tuples[K, V]) {
-	tuples.Stream().ReadAll(m.AddTuple).Ignore().Wait()
+	tuples.Stream().ReadAll(fun.FromHandler(m.AddTuple)).Ignore().Wait()
 }
 
 // ExtendWithStream adds items to the map. If a key already exists in the
@@ -115,7 +115,7 @@ func (m Map[K, V]) ExtendWithTuples(tuples *Tuples[K, V]) {
 // This operation is lazy, and returns a Worker (future) function that
 // must be excuted to process the stream.
 func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
-	return it.ReadAll(m.AddPair)
+	return it.ReadAll(fun.FromHandler(m.AddPair))
 }
 
 // Stream converts a map into a stream of dt.Pair objects. The

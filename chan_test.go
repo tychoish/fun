@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -438,7 +439,7 @@ func TestChannel(t *testing.T) {
 					check.Equal(t, in, "beep")
 					if count == 1 {
 						skipped = true
-						return ErrStreamContinue
+						return ers.ErrCurrentOpSkip
 					}
 					return nil
 				}).Run(ctx)
@@ -541,11 +542,11 @@ func TestChannel(t *testing.T) {
 				func(in int) bool { return in%2 == 0 && in != 0 },
 			).
 			Stream().
-			ReadAll(func(in int) {
+			ReadAll(FromHandler(func(in int) {
 				count++
 				check.True(t, ft.Not(in == 0))
 				check.True(t, ft.Not(in%2 != 0))
-			}).
+			})).
 			Run(ctx)
 
 		check.NotError(t, err)

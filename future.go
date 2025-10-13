@@ -120,7 +120,7 @@ func (pf Future[T]) Join(next Future[T]) Future[T] {
 				switch {
 				case err == nil:
 					return out, nil
-				case errors.Is(err, ErrStreamContinue):
+				case errors.Is(err, ers.ErrCurrentOpSkip):
 					continue RETRY_FIRST
 				case !ers.IsTerminating(err):
 					ferr = err
@@ -139,7 +139,7 @@ func (pf Future[T]) Join(next Future[T]) Future[T] {
 				switch {
 				case err == nil:
 					return out, nil
-				case errors.Is(err, ErrStreamContinue):
+				case errors.Is(err, ers.ErrCurrentOpSkip):
 					continue RETRY_SECOND
 				case !errors.Is(err, io.EOF):
 					serr = err
@@ -329,14 +329,14 @@ func (pf Future[T]) Limit(in int) Future[T] {
 //
 // Context cancellation errors are returned to the caller, other
 // terminating errors are not, with any other errors encountered
-// during retries. ErrStreamContinue is always ignored and not
+// during retries. ers.ErrCurrentOpSkip is always ignored and not
 // aggregated. All errors are discarded if the retry operation
 // succeeds in the provided number of retries.
 //
-// Except for ErrStreamContinue, which is ignored, all other errors are
+// Except for ers.ErrCurrentOpSkip, which is ignored, all other errors are
 // aggregated and returned to the caller only if the retry fails. It's
 // possible to return a nil error and a zero value, if the future
-// only returned ErrStreamContinue values.
+// only returned ers.ErrCurrentOpSkip values.
 func (pf Future[T]) Retry(n int) Future[T] {
 	var zero T
 	return func(ctx context.Context) (_ T, err error) {
@@ -349,7 +349,7 @@ func (pf Future[T]) Retry(n int) Future[T] {
 				return zero, erc.Join(attemptErr, err)
 			case ers.IsExpiredContext(attemptErr):
 				return zero, erc.Join(attemptErr, err)
-			case errors.Is(attemptErr, ErrStreamContinue):
+			case errors.Is(attemptErr, ers.ErrCurrentOpSkip):
 				i--
 				continue
 			default:

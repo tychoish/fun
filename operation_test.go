@@ -222,7 +222,7 @@ func TestOperation(t *testing.T) {
 			counter++
 		}
 
-		wf := SliceStream(ops).ReadAll(of)
+		wf := SliceStream(ops).ReadAll(FromHandler(of))
 
 		if len(seen) != 0 || counter != 0 {
 			t.Error("should be lazy execution", counter, seen)
