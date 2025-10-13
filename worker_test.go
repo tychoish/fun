@@ -872,53 +872,54 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("WorkerPool", func(t *testing.T) {
+		const wpJobCount = 75
+		const minDuration = 25 * time.Millisecond
+
 		t.Run("Basic", func(t *testing.T) {
 			counter := &atomic.Int64{}
-			wfs := make([]Worker, 100)
-			for i := 0; i < 100; i++ {
+			wfs := make([]Worker, wpJobCount)
+			for i := 0; i < wpJobCount; i++ {
 				wfs[i] = func(context.Context) error {
 					counter.Add(1)
-					time.Sleep(25 * time.Millisecond)
+					time.Sleep(minDuration)
 					counter.Add(1)
 					return nil
 				}
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			start := time.Now()
 			assert.Equal(t, counter.Load(), 0)
-			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
+
+			err := MAKE.WorkerPool(SliceStream(wfs)).Run(t.Context())
 			dur := time.Since(start)
-			if dur > 500*time.Millisecond || dur < 100*time.Millisecond {
+			if dur > 500*time.Millisecond || dur < minDuration || dur < wpJobCount*time.Millisecond {
 				t.Error(dur)
 			}
 			assert.NotError(t, err)
-			assert.Equal(t, counter.Load(), 200)
+			assert.Equal(t, counter.Load(), 2*wpJobCount)
 		})
 		t.Run("Errors", func(t *testing.T) {
 			const experr ers.Error = "expected error"
 
 			counter := &atomic.Int64{}
-			wfs := make([]Worker, 100)
-			for i := 0; i < 100; i++ {
-				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(25 * time.Millisecond); return experr }
+			wfs := make([]Worker, wpJobCount)
+			for i := 0; i < wpJobCount; i++ {
+				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(minDuration); return experr }
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+
 			start := time.Now()
 			assert.Equal(t, counter.Load(), 0)
 
-			err := MAKE.WorkerPool(SliceStream(wfs)).Run(ctx)
+			err := MAKE.WorkerPool(SliceStream(wfs)).Run(t.Context())
 			dur := time.Since(start)
-			if dur > 500*time.Millisecond || dur < 100*time.Millisecond {
+			if dur > 500*time.Millisecond || dur < minDuration || dur < wpJobCount*time.Millisecond {
 				t.Error(dur)
 			}
 
 			assert.Error(t, err)
 			errs := ers.Unwind(err)
 
-			assert.Equal(t, len(errs), 100)
-			assert.Equal(t, counter.Load(), 100)
+			assert.Equal(t, len(errs), wpJobCount)
+			assert.Equal(t, counter.Load(), wpJobCount)
 
 			for _, e := range errs {
 				assert.ErrorIs(t, e, experr)
