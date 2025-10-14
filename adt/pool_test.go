@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -78,7 +78,7 @@ func TestPool(t *testing.T) {
 			return in
 		})
 
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		for gr := 0; gr < 32; gr++ {

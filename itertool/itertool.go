@@ -14,16 +14,17 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 )
 
 // compile-time assertions that both worker types support the "safe"
 // interface needed for the Worker() tool.
 var (
-	_ interface{ WithRecover() fun.Worker } = new(fun.Worker)
-	_ interface{ WithRecover() fun.Worker } = new(fun.Operation)
+	_ interface{ WithRecover() fnx.Worker } = new(fnx.Worker)
+	_ interface{ WithRecover() fnx.Worker } = new(fnx.Operation)
 )
 
-// WorkerPool takes streams of fun.WorkerPool or fun.Operation lambdas
+// WorkerPool takes streams of fnx.Worker or fnx.Operation lambdas
 // and processes them in according to the configuration.
 //
 // All operations functions are processed using their respective
@@ -38,12 +39,12 @@ var (
 // workloads do not remain in memory) containers.
 //
 // WorkerPool is implemented using fun.Stream[T].Parallel().
-func WorkerPool[OP fun.Worker | fun.Operation](
+func WorkerPool[OP fnx.Worker | fnx.Operation](
 	iter *fun.Stream[OP],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
-) fun.Worker {
+) fnx.Worker {
 	return iter.Parallel(func(ctx context.Context, op OP) error {
-		return any(op).(interface{ WithRecover() fun.Worker }).WithRecover().Run(ctx)
+		return any(op).(interface{ WithRecover() fnx.Worker }).WithRecover().Run(ctx)
 	}, append(optp,
 		fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}),
 		fun.WorkerGroupConfWorkerPerCPU(),
@@ -54,13 +55,13 @@ func WorkerPool[OP fun.Worker | fun.Operation](
 // documents into objects in the form of a stream.
 func JSON[T any](in io.Reader) *fun.Stream[T] {
 	var zero T
-	return fun.MakeConverterErr(func(in string) (out T, err error) {
+	return fun.Convert(fnx.MakeConverterErr(func(in string) (out T, err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 		if err = json.Unmarshal([]byte(in), &out); err != nil {
 			return zero, err
 		}
 		return out, err
-	}).Stream(fun.MAKE.LinesWithSpaceTrimed(in))
+	})).Stream(fun.MAKE.LinesWithSpaceTrimed(in))
 }
 
 // Indexed produces a stream that keeps track of and reports the
@@ -69,7 +70,7 @@ func Indexed[T any](iter *fun.Stream[T]) *fun.Stream[dt.Pair[int, T]] {
 	idx := &atomic.Int64{}
 	idx.Store(-1)
 
-	return fun.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) }).Stream(iter)
+	return fun.Convert(fnx.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) })).Stream(iter)
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the
@@ -81,7 +82,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}
 
-	return fun.MakeStream(fun.NewFuture(func(ctx context.Context) (zero T, _ error) {
+	return fun.MakeStream(fnx.NewFuture(func(ctx context.Context) (zero T, _ error) {
 		for {
 			now := time.Now()
 

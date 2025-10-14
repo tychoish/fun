@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 )
@@ -295,7 +296,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("ClosedQueueError", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		queue := pubsub.NewUnlimitedQueue[fun.Worker]()
+		queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 		ctx = WithWorkerPool(ctx, "buddy")
 		ctx = SetWorkerPool(ctx, "kip", queue)
 

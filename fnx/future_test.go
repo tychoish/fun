@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -936,6 +936,39 @@ func TestFuture(t *testing.T) {
 			assert.ErrorIs(t, err, context.Canceled)
 			assert.Equal(t, val, 0)
 			assert.NotEqual(t, val, 100)
+		})
+	})
+	t.Run("Filter", func(t *testing.T) {
+		rc := &intish.Atomic[int]{}
+		rv := 22
+		fc := &intish.Atomic[int]{}
+
+		var re error
+
+		rf := MakeFuture(func() (int, error) { defer rc.Add(1); return rv, re })
+
+		ctx := t.Context()
+
+		t.Run("NoErrorNoFilter", func(t *testing.T) {
+			out, err := rf.Filter(func(in int) bool { defer fc.Add(1); return in%2 == 0 }).Read(ctx)
+			assert.Equal(t, out, rv)
+			assert.NotError(t, err)
+			assert.Equal(t, 1, fc.Load())
+		})
+		t.Run("WithFiltered", func(t *testing.T) {
+			rv++
+			out, err := rf.Filter(func(in int) bool { defer fc.Add(1); return in%2 == 0 }).Read(ctx)
+			assert.Zero(t, out)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrCurrentOpSkip)
+			assert.Equal(t, 2, fc.Load())
+		})
+		t.Run("Error", func(t *testing.T) {
+			re = ers.New("test error")
+			out, err := rf.Filter(func(in int) bool { defer fc.Add(1); return in%2 == 0 }).Read(ctx)
+			assert.Zero(t, out)
+			assert.Error(t, err)
+			assert.Equal(t, 2, fc.Load())
 		})
 	})
 }

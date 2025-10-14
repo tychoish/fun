@@ -12,6 +12,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 )
@@ -89,7 +90,7 @@ func HasOrchestrator(ctx context.Context) bool {
 // HasCleanup returns true if a cleanup process is registered in the
 // context.
 func HasCleanup(ctx context.Context) bool {
-	_, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.Worker])
+	_, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fnx.Worker])
 	return ok
 }
 
@@ -100,15 +101,15 @@ func WithCleanup(ctx context.Context) context.Context {
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
-	pipe := pubsub.NewUnlimitedQueue[fun.Worker]()
+	pipe := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
 	fun.Invariant.Must(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
 
 	return context.WithValue(ctx, cleanupCtxKey{}, pipe)
 }
 
-func getCleanup(ctx context.Context) *pubsub.Queue[fun.Worker] {
-	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fun.Worker])
+func getCleanup(ctx context.Context) *pubsub.Queue[fnx.Worker] {
+	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fnx.Worker])
 	fun.Invariant.IsTrue(ok, "cleanup service not configured")
 	return val
 }
@@ -117,7 +118,7 @@ func getCleanup(ctx context.Context) *pubsub.Queue[fun.Worker] {
 // pending in the context. Raises an invariant failure if the cleanup
 // service was not previously configured, or if you attempt to add a
 // new cleanup function while shutdown is running.
-func AddCleanup(ctx context.Context, cleanup fun.Worker) {
+func AddCleanup(ctx context.Context, cleanup fnx.Worker) {
 	fun.Invariant.Must(getCleanup(ctx).Add(cleanup))
 }
 
@@ -268,11 +269,11 @@ func WithHandlerWorkerPool(
 	return SetHandlerWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Queue[fun.Worker] {
+func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
 	opts := &fun.WorkerGroupConf{}
 	fun.Invariant.Must(fun.JoinOptionProviders(optp...).Apply(opts))
 
-	return risky.Force(pubsub.NewQueue[fun.Worker](
+	return risky.Force(pubsub.NewQueue[fnx.Worker](
 		pubsub.QueueOptions{
 			SoftQuota:   2 * opts.NumWorkers,
 			HardLimit:   4 * opts.NumWorkers,
@@ -298,7 +299,7 @@ func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Q
 func SetWorkerPool(
 	ctx context.Context,
 	key string,
-	queue *pubsub.Queue[fun.Worker],
+	queue *pubsub.Queue[fnx.Worker],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
@@ -328,7 +329,7 @@ func SetWorkerPool(
 func SetHandlerWorkerPool(
 	ctx context.Context,
 	key string,
-	queue *pubsub.Queue[fun.Worker],
+	queue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) context.Context {
@@ -337,7 +338,7 @@ func SetHandlerWorkerPool(
 	})
 }
 
-func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.Worker], attach func(*Orchestrator)) context.Context {
+func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fnx.Worker], attach func(*Orchestrator)) context.Context {
 	if !HasOrchestrator(ctx) {
 		ctx = WithOrchestrator(ctx)
 	}
@@ -357,8 +358,8 @@ func setupWorkerPool(ctx context.Context, key string, queue *pubsub.Queue[fun.Wo
 // any error produced a worker function until the service exits, while
 // observer pools pass errors to the observer function and then
 // release them.
-func AddToWorkerPool(ctx context.Context, key string, fn fun.Worker) error {
-	queue, ok := ctx.Value(workerPoolNameCtxKey(key)).(*pubsub.Queue[fun.Worker])
+func AddToWorkerPool(ctx context.Context, key string, fn fnx.Worker) error {
+	queue, ok := ctx.Value(workerPoolNameCtxKey(key)).(*pubsub.Queue[fnx.Worker])
 	if !ok {
 		return fmt.Errorf("worker pool named %q is not registered [%T]", key, ctx.Value(workerPoolNameCtxKey(key)))
 	}

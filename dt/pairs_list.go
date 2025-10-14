@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -39,13 +40,13 @@ func (p *Pairs[K, V]) Stream() *fun.Stream[Pair[K, V]] { p.init(); return p.ll.S
 // Keys returns a stream over only the keys in a sequence of
 // iterator items.
 func (p *Pairs[K, V]) Keys() *fun.Stream[K] {
-	return fun.MakeConverter(func(p Pair[K, V]) K { return p.Key }).Stream(p.Stream())
+	return fun.Convert(fnx.MakeConverter(func(p Pair[K, V]) K { return p.Key })).Stream(p.Stream())
 }
 
 // Values returns a stream over only the values in a sequence of
 // iterator pairs.
 func (p *Pairs[K, V]) Values() *fun.Stream[V] {
-	return fun.MakeConverter(func(p Pair[K, V]) V { return p.Value }).Stream(p.Stream())
+	return fun.Convert(fnx.MakeConverter(func(p Pair[K, V]) V { return p.Value })).Stream(p.Stream())
 }
 
 // Slice creates a new slice of all the Pair objects.
@@ -85,8 +86,8 @@ func (p *Pairs[K, V]) PushMany(vals ...Pair[K, V]) { p.init(); p.ll.Append(vals.
 func (p *Pairs[K, V]) AppendPairs(toAdd *Pairs[K, V]) { p.init(); p.ll.AppendList(toAdd.ll) }
 
 // AppendStream adds items from a stream of pairs to the current Pairs slice.
-func (p *Pairs[K, V]) AppendStream(iter *fun.Stream[Pair[K, V]]) fun.Worker {
-	return iter.ReadAll(fun.FromHandler(func(item Pair[K, V]) { p.Push(item) }))
+func (p *Pairs[K, V]) AppendStream(iter *fun.Stream[Pair[K, V]]) fnx.Worker {
+	return iter.ReadAll(fnx.FromHandler(func(item Pair[K, V]) { p.Push(item) }))
 }
 
 // AppendMap adds all of the items in a map to the Pairs object.

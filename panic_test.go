@@ -10,9 +10,9 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -203,7 +203,7 @@ func TestPanics(t *testing.T) {
 				seen = in
 			}
 
-			err := FromHandler(of).Read(ctx, "hello")
+			err := fnx.FromHandler(of).Read(ctx, "hello")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -242,15 +242,5 @@ func TestPanics(t *testing.T) {
 			assert.Panic(t, func() { Invariant.Failure(false) })
 			assert.Panic(t, func() { Invariant.Failure(nil) })
 		})
-	})
-	t.Run("ExtractErrors", func(t *testing.T) {
-		ec := &erc.Collector{}
-		extractErrors(ec, []any{nil, ers.Error("hi"), 1, true})
-		check.Equal(t, ec.Len(), 2)
-
-		var nerr error
-		ec = &erc.Collector{}
-		extractErrors(ec, []any{nil, ers.Error("hi"), func() error { return nil }(), nerr, 2, false})
-		check.Equal(t, ec.Len(), 2)
 	})
 }

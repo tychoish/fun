@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -170,10 +170,10 @@ func TestProcess(t *testing.T) {
 			})
 
 			wg := &WaitGroup{}
-			oe := MAKE.ErrorHandler(func(err error) { Invariant.Must(err) })
+			oe := FromHandler(func(err error) { must(err) })
 			op = op.Lock()
 
-			ft.CallTimes(128, func() { oe(op(ctx, 42)) })
+			ft.CallTimes(128, func() { oe(ctx, op(ctx, 42)) })
 			wg.Wait(ctx)
 			assert.Equal(t, count, 128)
 		})
@@ -550,7 +550,7 @@ func TestProcess(t *testing.T) {
 					defer wg.Done()
 					start := time.Now()
 					defer func() { check.True(t, time.Since(start) > 75*time.Millisecond) }()
-					check.NotError(t, wf(ctx, 42))
+					check.True(t, wf.Check(ctx, 42))
 				}()
 			}
 			check.Equal(t, 100, wg.Num())
@@ -658,5 +658,18 @@ func TestProcess(t *testing.T) {
 		assert.Equal(t, called, 3)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+	})
+	t.Run("WithRecover", func(t *testing.T) {
+		phf := MakeHandler(func(int) error { panic(42) })
+		t.Run("ValidateFixture", func(t *testing.T) {
+			assert.Panic(t, func() { _ = phf.Wait(42) })
+		})
+
+		t.Run("ConvertsToError", func(t *testing.T) {
+			var err error
+			assert.NotPanic(t, func() { err = phf.WithRecover().Wait(42) })
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+		})
 	})
 }

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 )
 
 func TestLocked(t *testing.T) {
@@ -132,7 +132,7 @@ func TestLocked(t *testing.T) {
 			mget, mset := AccessorsWithReadLock(getter, setter)
 			start := time.Now()
 
-			sw := func() { go check.NotError(t, fun.MakeHandler(mset.RecoverPanic).Read(ctx, 267)) }
+			sw := func() { go check.NotError(t, fnx.MakeHandler(mset.RecoverPanic).Read(ctx, 267)) }
 			go sw()
 
 			runtime.Gosched()

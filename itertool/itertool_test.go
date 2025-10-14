@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/testt"
 )
@@ -26,7 +27,7 @@ func TestSmoke(t *testing.T) {
 		ctx := testt.Context(t)
 
 		count := &atomic.Int64{}
-		err := WorkerPool(fun.SliceStream([]fun.Operation{
+		err := WorkerPool(fun.SliceStream([]fnx.Operation{
 			func(context.Context) { count.Add(1) },
 			func(context.Context) { count.Add(1) },
 			func(context.Context) { count.Add(1) },
@@ -156,7 +157,7 @@ func TestSmoke(t *testing.T) {
 		const size = 37017
 		count := 0
 		last := -1
-		check.NotError(t, fun.MAKE.Counter(size).ReadAll(fun.FromHandler(func(in int) { count++; check.True(t, last < in); last = in })).Run(ctx))
+		check.NotError(t, fun.MAKE.Counter(size).ReadAll(fnx.FromHandler(func(in int) { count++; check.True(t, last < in); last = in })).Run(ctx))
 		check.Equal(t, size, count)
 		check.Equal(t, last, count)
 	})
@@ -261,7 +262,7 @@ func TestDropZeros(t *testing.T) {
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
 	assert.Equal(t, 0, n)
 
-	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).ReadAll(fun.FromHandler(func(in string) { assert.Zero(t, in) })).Run(ctx))
+	check.NotError(t, DropZeroValues[string](fun.SliceStream(all)).ReadAll(fnx.FromHandler(func(in string) { assert.Zero(t, in) })).Run(ctx))
 
 	all[45] = "49"
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
@@ -271,7 +272,7 @@ func TestDropZeros(t *testing.T) {
 func TestIndexed(t *testing.T) {
 	iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 	count := 0
-	err := iter.ReadAll(fun.FromHandler(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) })).Run(t.Context())
+	err := iter.ReadAll(fnx.FromHandler(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) })).Run(t.Context())
 	check.NotError(t, err)
 	assert.Equal(t, count, 10)
 }
@@ -292,7 +293,7 @@ func TestRateLimit(t *testing.T) {
 		count := &intish.Atomic[int]{}
 		assert.NotError(t, RateLimit(
 			fun.SliceStream(makeIntSlice(100)), 10, 100*time.Millisecond).
-			ReadAll(fun.FromHandler(func(in int) {
+			ReadAll(fnx.FromHandler(func(in int) {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)
@@ -310,7 +311,7 @@ func TestRateLimit(t *testing.T) {
 		start := time.Now()
 		count := &intish.Atomic[int]{}
 		assert.NotError(t, RateLimit(fun.SliceStream(makeIntSlice(101)), 10, 10*time.Millisecond).
-			Parallel(fun.FromHandler(func(in int) {
+			Parallel(fnx.FromHandler(func(in int) {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)
@@ -332,7 +333,7 @@ func TestRateLimit(t *testing.T) {
 		go func() { time.Sleep(time.Second); cancel() }()
 		count := &intish.Atomic[int]{}
 		err := RateLimit(fun.SliceStream(makeIntSlice(100)), 10, 100*time.Second).
-			ReadAll(fun.FromHandler(func(in int) {
+			ReadAll(fnx.FromHandler(func(in int) {
 				check.True(t, in >= 0)
 				check.True(t, in <= 100)
 				count.Add(1)

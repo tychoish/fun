@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
@@ -53,8 +54,8 @@ func StreamList[T any](st *fun.Stream[T]) *List[T] {
 // list. Any error returned is either a context cancellation error or
 // the result of a panic in the input stream. The close method on
 // the input stream is not called.
-func (l *List[T]) AppendStream(iter *fun.Stream[T]) fun.Worker {
-	return iter.ReadAll(fun.FromHandler(l.PushBack))
+func (l *List[T]) AppendStream(iter *fun.Stream[T]) fnx.Worker {
+	return iter.ReadAll(fnx.FromHandler(l.PushBack))
 }
 
 // Append adds a variadic sequence of items to the end of the list.
@@ -89,7 +90,7 @@ func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
 func (l *List[T]) Reset() {
 	// remove all items so that they don't pass membership checks
 	l.StreamPopFront().
-		ReadAll(fun.FromHandler(fn.NewNoopHandler[T]())).
+		ReadAll(fnx.FromHandler(fn.NewNoopHandler[T]())).
 		PostHook(l.uncheckedSetup). // reset everything...
 		Ignore().Wait()
 }

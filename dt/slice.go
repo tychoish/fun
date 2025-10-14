@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -101,11 +102,11 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 // transformation, with the exception of ers.ErrCurrentOpSkip. All
 // errors are returned to the caller, except io.EOF which indicates
 // the (early) end of iteration.
-func Transform[T any, O any](in Slice[T], op fun.Converter[T, O]) fun.Future[Slice[O]] {
+func Transform[T any, O any](in Slice[T], op fnx.Converter[T, O]) fnx.Future[Slice[O]] {
 	out := NewSlice(make([]O, 0, len(in)))
 
 	return func(ctx context.Context) (Slice[O], error) {
-		if err := op.Stream(in.Stream()).ReadAll(fun.FromHandler(out.Push)).Run(ctx); err != nil {
+		if err := fun.Convert(op).Stream(in.Stream()).ReadAll(fnx.FromHandler(out.Push)).Run(ctx); err != nil {
 			return nil, err
 		}
 		return out, nil
@@ -140,8 +141,8 @@ func (s *Slice[T]) AppendSlice(in []T) { *s = append(*s, in...) }
 
 // AppendStream creates a worker an operation that adds all items from the stream to the slice when the worker calls. The Worker
 // must be called, with a context, to modify the slice.
-func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fun.Worker {
-	return iter.ReadAll(fun.FromHandler(s.Push))
+func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fnx.Worker {
+	return iter.ReadAll(fnx.FromHandler(s.Push))
 }
 
 // Copy performs a shallow copy of the Slice.

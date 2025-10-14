@@ -2,6 +2,7 @@ package dt
 
 import (
 	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -128,7 +129,7 @@ func (r *Ring[T]) LIFO() *fun.Stream[T] { r.init(); return r.iterate(r.before(r.
 // PopFIFO returns a FIFO stream that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
 // through all elements. The stream is exhusted when the buffer is empty.
-func (r *Ring[T]) PopFIFO() *fun.Stream[T] { return fun.MakeStream(fun.PtrFuture(r.Pop)) }
+func (r *Ring[T]) PopFIFO() *fun.Stream[T] { return fun.MakeStream(fnx.PtrFuture(r.Pop)) }
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Stream[T] {
 	var count int
@@ -136,7 +137,7 @@ func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Stream[T] {
 
 	next := from
 
-	return fun.MakeStream(fun.CheckedFuture(func() (T, bool) {
+	return fun.MakeStream(fnx.CheckedFuture(func() (T, bool) {
 		for r.count > 0 && (count == 0 || next != from) {
 			current = next
 			next = advance(current)

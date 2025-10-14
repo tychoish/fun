@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -542,7 +543,7 @@ func TestChannel(t *testing.T) {
 				func(in int) bool { return in%2 == 0 && in != 0 },
 			).
 			Stream().
-			ReadAll(FromHandler(func(in int) {
+			ReadAll(fnx.FromHandler(func(in int) {
 				count++
 				check.True(t, ft.Not(in == 0))
 				check.True(t, ft.Not(in%2 != 0))
@@ -552,6 +553,18 @@ func TestChannel(t *testing.T) {
 		check.NotError(t, err)
 		check.Equal(t, count, 49)
 	})
+	t.Run("Signal", func(t *testing.T) {
+		ch := Blocking(make(chan int, 1))
+		assert.NotError(t, ch.Send().Write(t.Context(), 77))
+		val, err := ch.Receive().Read(t.Context())
+		assert.NotError(t, err)
+		assert.Equal(t, 77, val)
+		ch.Send().Signal(t.Context())
+		val, err = ch.Receive().Read(t.Context())
+		assert.NotError(t, err)
+		assert.Equal(t, 0, val)
+	})
+
 	t.Run("SizeReporters", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

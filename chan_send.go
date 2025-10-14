@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/tychoish/fun/erc"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -85,7 +86,7 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 
 // WriteAll returns a worker that, when executed, pushes the content
 // from the stream into the channel.
-func (sm ChanSend[T]) WriteAll(iter *Stream[T]) Worker {
+func (sm ChanSend[T]) WriteAll(iter *Stream[T]) fnx.Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(iter.Close(), err, erc.ParsePanic(recover())) }()
 		return iter.Parallel(sm.Write, WorkerGroupConfNumWorkers(cap(sm.ch))).Run(ctx)

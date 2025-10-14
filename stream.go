@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -89,7 +90,7 @@ type Stream[T any] struct {
 // cancellation errors and io.EOF are propgated to the stream's Close
 // method.
 func MakeStream[T any](gen func(context.Context) (T, error)) *Stream[T] {
-	op, cancel := NewFuture(gen).WithCancel()
+	op, cancel := fnx.NewFuture(gen).WithCancel()
 	st := &Stream[T]{operation: op}
 	st.closer.ops = append(st.closer.ops, cancel)
 	return st
@@ -126,14 +127,14 @@ func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	return MakeStream(CheckedFuture(func() (zero T, _ bool) {
+	return MakeStream(fnx.CheckedFuture(func() (zero T, _ bool) {
 		if val, ok := next(); ok {
 			return val, true
 		}
 		stop()
 		cancel()
 		return zero, false
-	}).PreHook(Operation(func(cc context.Context) {
+	}).PreHook(fnx.Operation(func(cc context.Context) {
 		select {
 		case <-ctx.Done():
 		case <-cc.Done():
@@ -141,11 +142,6 @@ func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 		stop()
 	}).PostHook(cancel).Go().Once()))
 }
-
-// Transform processes a stream passing each element through a
-// transform function. The type of the stream is the same for the
-// output. Use Convert stream to change the type of the value.
-func (st *Stream[T]) Transform(op Converter[T, T]) *Stream[T] { return op.Stream(st) }
 
 // MergeStreams takes a collection of streams of the same type of
 // objects and provides a single stream over these items.
@@ -168,11 +164,11 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	ec := &erc.Collector{}
 	ec.SetFilter(erc.NewFilter().WithoutContext().WithoutTerminating())
 
-	wg := &WaitGroup{}
-	init := Operation(func(ctx context.Context) {
+	wg := &fnx.WaitGroup{}
+	init := fnx.Operation(func(ctx context.Context) {
 		send := pipe.Send()
 
-		iters.ReadAll(FromHandler(func(iter *Stream[T]) {
+		iters.ReadAll(fnx.FromHandler(func(iter *Stream[T]) {
 			// start a thread for reading this
 			// sub-iterator.
 			send.WriteAll(iter).
@@ -184,7 +180,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		wg.Operation().PostHook(pipe.Close).Background(ctx)
 	}).Once()
 
-	return MakeStream(NewFuture(pipe.Receive().Read).
+	return MakeStream(fnx.NewFuture(pipe.Receive().Read).
 		PreHook(init)).
 		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
 }
@@ -312,7 +308,7 @@ func (st *Stream[T]) Read(ctx context.Context) (out T, err error) {
 // of the worker, and abort the processing. If the handler function
 // returns ers.ErrCurrentOpSkip, processing continues. All other errors
 // abort processing and are returned by the worker.
-func (st *Stream[T]) ReadAll(fn Handler[T]) Worker {
+func (st *Stream[T]) ReadAll(fn fnx.Handler[T]) fnx.Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover()), st.Close()) }()
 		for {
@@ -344,7 +340,7 @@ func (st *Stream[T]) ReadAll(fn Handler[T]) Worker {
 // This is the work-house operation of the package, and can be used as
 // the basis of worker pools, even processing, or message dispatching
 // for pubsub queues and related systems.
-func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroupConf]) Worker {
+func (st *Stream[T]) Parallel(fn fnx.Handler[T], opts ...OptionProvider[*WorkerGroupConf]) fnx.Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
 		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
@@ -366,7 +362,13 @@ func (st *Stream[T]) Parallel(fn Handler[T], opts ...OptionProvider[*WorkerGroup
 // buffering, and check functions should return quickly. For more
 // advanced use, consider using itertool.Map().
 func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
-	return MakeStream(NewFuture(st.operation).Filter(check)).WithHook(st.CloseHook())
+	return MakeStream(fnx.NewFuture(st.operation).Filter(check)).WithHook(st.CloseHook())
+}
+
+// Transform passes each item in a stream through a converter to produce a new stream with
+// transformed items.
+func (st *Stream[T]) Transform(converter fnx.Converter[T, T]) *Stream[T] {
+	return Convert(converter).Stream(st)
 }
 
 // Reduce processes a stream with a reducer function. The output
@@ -413,7 +415,7 @@ func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 // Count returns the number of items observed by the stream. Callers
 // should still manually call Close on the stream.
 func (st *Stream[T]) Count(ctx context.Context) (count int) {
-	st.ReadAll(FromHandler(func(T) { count++ })).Ignore().Run(ctx)
+	st.ReadAll(fnx.FromHandler(func(T) { count++ })).Ignore().Run(ctx)
 	return count
 }
 
@@ -437,7 +439,7 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	setup := pipe.Send().WriteAll(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
-		output[idx] = MakeStream(NewFuture(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
+		output[idx] = MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
 	}
 
 	return output
@@ -453,7 +455,7 @@ func (st *Stream[T]) CloseHook() func(*Stream[T]) {
 // sequentially, and without starting any go routines. Otherwise
 // similar to Flatten (which processes each stream in parallel).
 func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
-	proc := NewFuture(st.Read)
+	proc := fnx.NewFuture(st.Read)
 	for idx := range iters {
 		proc = proc.Join(iters[idx].Read)
 	}
@@ -466,7 +468,7 @@ func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 // In the case of an error in the underlying stream the output slice
 // will have the values encountered before the error.
 func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
-	return out, st.ReadAll(FromHandler(func(in T) { out = append(out, in) })).Run(ctx)
+	return out, st.ReadAll(fnx.FromHandler(func(in T) { out = append(out, in) })).Run(ctx)
 }
 
 // MarshalJSON is useful for implementing json.Marshaler methods
@@ -515,7 +517,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 	}
 	var idx int
 
-	st.operation = NewFuture(st.operation).Join(func(context.Context) (out T, err error) {
+	st.operation = fnx.NewFuture(st.operation).Join(func(context.Context) (out T, err error) {
 		if idx >= len(rv) {
 			return out, io.EOF
 		}
@@ -539,7 +541,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 	pipe := buf.Send().WriteAll(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-	return MakeStream(NewFuture(buf.Receive().Read).PreHook(pipe))
+	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe))
 }
 
 // BufferParallel processes the input queue and stores
@@ -553,7 +555,7 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 func (st *Stream[T]) BufferParallel(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
 
-	return MakeStream(NewFuture(buf.Receive().Read).PreHook(
+	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(
 		st.Parallel(
 			buf.Send().Write,
 			WorkerGroupConfNumWorkers(n),

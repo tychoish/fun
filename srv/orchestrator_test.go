@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -86,7 +86,7 @@ func TestOrchestrator(t *testing.T) {
 			if orc.srv == nil {
 				t.Error("service is created lazily, by now")
 			}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				go func(id int) {
@@ -103,7 +103,7 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("RunEndToEnd", func(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -137,7 +137,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("FinishedErrorsPropogate", func(t *testing.T) {
 			orc := &Orchestrator{}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -267,7 +267,7 @@ func TestOrchestrator(t *testing.T) {
 			t.Parallel()
 
 			orc := &Orchestrator{}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(makeBlockingService(t)); err != nil {
@@ -296,7 +296,7 @@ func TestOrchestrator(t *testing.T) {
 			t.Parallel()
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{
@@ -330,7 +330,7 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("PropogateErrors", func(t *testing.T) {
 			t.Parallel()
 			orc := &Orchestrator{}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				if err := orc.Add(&Service{

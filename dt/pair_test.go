@@ -9,12 +9,13 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
 // ConsumePairs creates a *Pairs[K,V] object from a stream of
 // Pair[K,V] objects.
-func ConsumePairs[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fun.Future[*Pairs[K, V]] {
+func ConsumePairs[K comparable, V any](iter *fun.Stream[Pair[K, V]]) fnx.Future[*Pairs[K, V]] {
 	return func(ctx context.Context) (*Pairs[K, V], error) {
 		p := &Pairs[K, V]{}
 		if err := p.AppendStream(iter).Run(ctx); err != nil {
@@ -121,7 +122,7 @@ func TestPairs(t *testing.T) {
 	t.Run("ConsumePairs", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			expected := errors.New("hi")
-			iter := fun.MakeStream(fun.StaticFuture(MakePair("1", 1), expected))
+			iter := fun.MakeStream(fnx.StaticFuture(MakePair("1", 1), expected))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

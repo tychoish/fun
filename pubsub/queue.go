@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
 // stolen shamelessly from https://github.com/tendermint/tendermint/tree/master/internal/libs/queue
@@ -438,7 +439,7 @@ func (q *Queue[T]) Stream() *fun.Stream[T] {
 // from the queue.
 func (q *Queue[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
-		push: fun.MakeHandler(q.Add),
+		push: fnx.MakeHandler(q.Add),
 		pop: func(ctx context.Context) (_ T, err error) {
 			msg, ok := q.Remove()
 			if ok {

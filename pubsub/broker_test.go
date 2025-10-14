@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -300,7 +301,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 
 				seen1 := make(map[T]struct{}, len(elems))
 				seen2 := make(map[T]struct{}, len(elems))
-				wg := &fun.WaitGroup{}
+				wg := &fnx.WaitGroup{}
 				wg.Add(3)
 				sig := make(chan struct{})
 

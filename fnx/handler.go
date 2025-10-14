@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -70,7 +70,7 @@ func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.IsOk(pf(
 func (pf Handler[T]) Force(in T) { ft.Ignore(pf.Wait(in)) }
 
 // Must calls the underlying handler, but converts all errors returned by the handler into panics.
-func (pf Handler[T]) Must(ctx context.Context, in T) { Invariant.Must(pf.Read(ctx, in)) }
+func (pf Handler[T]) Must(ctx context.Context, in T) { must(pf.Read(ctx, in)) }
 
 // WithRecover runs the producer, converted all panics into errors. WithRecover is
 // itself a processor.
@@ -235,7 +235,7 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 
 	return func(ctx context.Context, in T) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
+		invariant(wctx != nil, "must start the operation before calling cancel")
 		return pf(wctx, in)
 	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }

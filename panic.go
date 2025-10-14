@@ -1,10 +1,6 @@
 package fun
 
 import (
-	"errors"
-	"fmt"
-	"strings"
-
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
@@ -33,26 +29,7 @@ type RuntimeInvariant struct{}
 // New creates an error that is rooted in ers.ErrInvariantViolation,
 // aggregating errors and annotating the error.
 func (RuntimeInvariant) New(args ...any) error {
-	switch len(args) {
-	case 0:
-		return ers.ErrInvariantViolation
-	case 1:
-		switch ei := args[0].(type) {
-		case error:
-			return erc.Join(ei, ers.ErrInvariantViolation)
-		case string:
-			return erc.Join(ers.New(ei), ers.ErrInvariantViolation)
-		case func() error:
-			return erc.Join(ei(), ers.ErrInvariantViolation)
-		default:
-			return fmt.Errorf("%v: %w", args[0], ers.ErrInvariantViolation)
-		}
-	default:
-		ec := &erc.Collector{}
-		ec.Push(ers.ErrInvariantViolation)
-		extractErrors(ec, args)
-		return ec.Resolve()
-	}
+	return erc.NewInvariantError(args...)
 }
 
 // Ok panics if the condition is false, passing an error that is
@@ -84,32 +61,3 @@ func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.Ok(!cond, ar
 // processes the arguments as with the other invariant failures:
 // extracting errors and aggregating constituent errors.
 func (RuntimeInvariant) Failure(args ...any) { Invariant.Ok(false, args...) }
-
-// extractErrors iterates through a list of untyped objects and removes the
-// errors from the list, returning both the errors and the remaining
-// items.
-func extractErrors(ec *erc.Collector, in []any) {
-	args := []any{}
-
-	for idx := range in {
-		switch val := in[idx].(type) {
-		case nil:
-			continue
-		case error:
-			ec.Push(val)
-		case func() error:
-			ec.Push(val())
-		case string:
-			val = strings.TrimSpace(val)
-			if val != "" {
-				args = append(args, val)
-			}
-		default:
-			args = append(args, val)
-		}
-	}
-
-	if len(args) > 0 {
-		ec.Push(errors.New(strings.TrimSpace(fmt.Sprintln(args...))))
-	}
-}

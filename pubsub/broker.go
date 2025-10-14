@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -21,7 +22,7 @@ import (
 // Broker is a simple message broker that provides a useable interface
 // for distributing messages to an arbitrary group of channels.
 type Broker[T any] struct {
-	wg        fun.WaitGroup
+	wg        fnx.WaitGroup
 	publishCh chan T
 	subCh     chan chan T
 	unsubCh   chan chan T
@@ -205,7 +206,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		for iter.Next(ctx) {
 			wg.Add(1)
 			go func(msg T, ch chan T) {
@@ -229,7 +230,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 //
 // Callers should avoid using a stream that will retain input
 // items in memory.
-func (b *Broker[T]) Populate(iter *fun.Stream[T]) fun.Worker { return iter.ReadAll(b.Send) }
+func (b *Broker[T]) Populate(iter *fun.Stream[T]) fnx.Worker { return iter.ReadAll(b.Send) }
 
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {

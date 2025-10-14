@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -166,62 +166,29 @@ func TestWorker(t *testing.T) {
 		ch := make(chan struct{}, 1)
 
 		expected := errors.New("kip")
-		var oee fn.Handler[error] = func(err error) { check.ErrorIs(t, err, expected); Blocking(ch).Send().Signal(ctx) }
-		var oen fn.Handler[error] = func(err error) { check.NotError(t, err); Blocking(ch).Send().Signal(ctx) }
+		var oee fn.Handler[error] = func(err error) { check.ErrorIs(t, err, expected); ch <- struct{}{} }
+		var oen fn.Handler[error] = func(err error) { check.NotError(t, err); ch <- struct{}{} }
 		var wf Worker
 		t.Run("Panic", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); panic(expected) }
 			wf.WithRecover().Background(ctx, oee).Run(ctx)
-			Blocking(ch).Receive().Ignore(ctx)
+			<-ch
 			assert.True(t, called.Load())
 		})
 		t.Run("Nil", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); return nil }
 			wf.Background(ctx, oen).Run(ctx)
-			Blocking(ch).Receive().Ignore(ctx)
+			<-ch
 			assert.True(t, called.Load())
 		})
 		t.Run("Error", func(t *testing.T) {
 			called := &atomic.Bool{}
 			wf = func(context.Context) error { called.Store(true); return expected }
 			wf.Background(ctx, oee).Run(ctx)
-			Blocking(ch).Receive().Ignore(ctx)
+			<-ch
 			assert.True(t, called.Load())
-		})
-	})
-	t.Run("MAKE.ErrorChannelWorker", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		expected := errors.New("cat")
-		var ch chan error
-		t.Run("NilChannel", func(t *testing.T) {
-			assert.NotError(t, MAKE.ErrorChannelWorker(ch).Run(ctx))
-		})
-		t.Run("ClosedChannel", func(t *testing.T) {
-			ch = make(chan error)
-			close(ch)
-			assert.NotError(t, MAKE.ErrorChannelWorker(ch).Run(ctx))
-		})
-		t.Run("ContextCanceled", func(t *testing.T) {
-			nctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			ch = make(chan error)
-			err := MAKE.ErrorChannelWorker(ch).Run(nctx)
-			assert.ErrorIs(t, err, context.Canceled)
-		})
-		t.Run("Error", func(t *testing.T) {
-			ch = make(chan error, 1)
-			ch <- expected
-			err := MAKE.ErrorChannelWorker(ch).Run(ctx)
-			assert.ErrorIs(t, err, expected)
-		})
-		t.Run("NilError", func(t *testing.T) {
-			ch = make(chan error, 1)
-			ch <- nil
-			err := MAKE.ErrorChannelWorker(ch).Run(ctx)
-			assert.NotError(t, err)
 		})
 	})
 	t.Run("Once ", func(t *testing.T) {
@@ -686,20 +653,6 @@ func TestWorker(t *testing.T) {
 			})
 		})
 	})
-	t.Run("MAKE.ErrorChannelWorker", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ch := make(chan error, 1)
-		wf := MAKE.ErrorChannelWorker(ch)
-		root := ers.New("will-be-cached")
-		ch <- root
-		err := wf(ctx)
-		check.ErrorIs(t, err, root)
-		close(ch)
-		check.NotError(t, wf(ctx))
-		check.NotError(t, wf(ctx))
-		check.NotError(t, wf(ctx))
-	})
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("Chain", func(t *testing.T) {
 			count := 0
@@ -871,61 +824,6 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, len(errs), 13)
 		})
 	})
-	t.Run("WorkerPool", func(t *testing.T) {
-		const wpJobCount = 75
-		const minDuration = 25 * time.Millisecond
-
-		t.Run("Basic", func(t *testing.T) {
-			counter := &atomic.Int64{}
-			wfs := make([]Worker, wpJobCount)
-			for i := 0; i < wpJobCount; i++ {
-				wfs[i] = func(context.Context) error {
-					counter.Add(1)
-					time.Sleep(minDuration)
-					counter.Add(1)
-					return nil
-				}
-			}
-			start := time.Now()
-			assert.Equal(t, counter.Load(), 0)
-
-			err := MAKE.WorkerPool(SliceStream(wfs)).Run(t.Context())
-			dur := time.Since(start)
-			if dur > 500*time.Millisecond || dur < minDuration || dur < wpJobCount*time.Millisecond {
-				t.Error(dur)
-			}
-			assert.NotError(t, err)
-			assert.Equal(t, counter.Load(), 2*wpJobCount)
-		})
-		t.Run("Errors", func(t *testing.T) {
-			const experr ers.Error = "expected error"
-
-			counter := &atomic.Int64{}
-			wfs := make([]Worker, wpJobCount)
-			for i := 0; i < wpJobCount; i++ {
-				wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(minDuration); return experr }
-			}
-
-			start := time.Now()
-			assert.Equal(t, counter.Load(), 0)
-
-			err := MAKE.WorkerPool(SliceStream(wfs)).Run(t.Context())
-			dur := time.Since(start)
-			if dur > 500*time.Millisecond || dur < minDuration || dur < wpJobCount*time.Millisecond {
-				t.Error(dur)
-			}
-
-			assert.Error(t, err)
-			errs := ers.Unwind(err)
-
-			assert.Equal(t, len(errs), wpJobCount)
-			assert.Equal(t, counter.Load(), wpJobCount)
-
-			for _, e := range errs {
-				assert.ErrorIs(t, e, experr)
-			}
-		})
-	})
 	t.Run("WithContextHook", func(t *testing.T) {
 		count := &atomic.Int64{}
 		assert.NotError(t, Worker(func(ctx context.Context) error {
@@ -941,12 +839,28 @@ func TestWorker(t *testing.T) {
 
 		assert.Equal(t, count.Load(), 2)
 	})
-	t.Run("ContextChannelWorker", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-		err := MAKE.ContextChannelWorker(ctx).Run(t.Context())
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
-		assert.True(t, t.Context().Err() == nil)
+	t.Run("Group", func(t *testing.T) {
+		count := &atomic.Int64{}
+		started := &atomic.Int64{}
+		start := time.Now()
+		wf := MakeWorker(func() error { defer count.Add(1); started.Add(1); time.Sleep(100 * time.Millisecond); return nil })
+		assert.True(t, time.Since(start) < 100*time.Millisecond)
+		runtime.Gosched()
+		assert.Equal(t, 0, started.Load())
+		assert.Equal(t, 0, count.Load())
+
+		wait := wf.Group(8)
+
+		sig := make(chan struct{})
+		go func() { defer close(sig); check.NotError(t, wait(t.Context())) }()
+		runtime.Gosched()
+		time.Sleep(10 * time.Millisecond)
+		assert.Equal(t, 8, started.Load())
+		assert.Equal(t, 0, count.Load())
+
+		<-sig
+
+		assert.Equal(t, 8, count.Load())
+		assert.True(t, time.Since(start) >= 100*time.Millisecond)
 	})
 }

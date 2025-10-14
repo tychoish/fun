@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -276,7 +277,7 @@ func (dq *Deque[T]) BlockingStreamBack() *fun.Stream[T] {
 	return fun.MakeStream(dq.confFuture(dqPrev, true))
 }
 
-func (dq *Deque[T]) confFuture(direction dqDirection, blocking bool) fun.Future[T] {
+func (dq *Deque[T]) confFuture(direction dqDirection, blocking bool) fnx.Future[T] {
 	var current *element[T]
 	return func(ctx context.Context) (out T, _ error) {
 		defer adt.With(adt.Lock(dq.mtx))
@@ -316,7 +317,7 @@ func (dq *Deque[T]) BlockingDistributor() Distributor[T] {
 // from the front of the queue before adding them to the back.
 func (dq *Deque[T]) Distributor() Distributor[T] {
 	return Distributor[T]{
-		push: fun.MakeHandler(dq.ForcePushBack),
+		push: fnx.MakeHandler(dq.ForcePushBack),
 		pop:  dq.WaitFront,
 		size: dq.Len,
 	}
