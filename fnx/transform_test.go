@@ -97,6 +97,4 @@ func TestConverter(t *testing.T) {
 		check.Panic(t, func() { _, _ = mpf(t.Context(), 22) })
 		check.NotPanic(t, func() { _, _ = mpf.WithRecover().Convert(t.Context(), 22) })
 	})
-	t.Run("ToAny", func(t *testing.T) {
-	})
 }
