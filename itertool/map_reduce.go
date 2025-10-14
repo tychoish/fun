@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
 // Map provides an orthodox functional map implementation based around
@@ -27,10 +28,10 @@ import (
 // not set.
 func Map[T any, O any](
 	input *fun.Stream[T],
-	mapFn fun.Converter[T, O],
+	mapFn fnx.Converter[T, O],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *fun.Stream[O] {
-	return mapFn.Parallel(input, optp...)
+	return fun.Convert(mapFn).Parallel(input, optp...)
 }
 
 // MapReduce combines the map and reduce operations to process an
@@ -46,11 +47,11 @@ func Map[T any, O any](
 // waits for the input stream to produce values.
 func MapReduce[T any, O any, R any](
 	input *fun.Stream[T],
-	mapFn fun.Converter[T, O],
+	mapFn fnx.Converter[T, O],
 	reduceFn func(O, R) (R, error),
 	initialReduceValue R,
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
-) fun.Future[R] {
+) fnx.Future[R] {
 	return Reduce(Map(input, mapFn, optp...), reduceFn, initialReduceValue)
 }
 
@@ -61,7 +62,7 @@ func Reduce[T any, O any](
 	iter *fun.Stream[T],
 	reduceFn func(T, O) (O, error),
 	initialReduceValue O,
-) fun.Future[O] {
+) fnx.Future[O] {
 	// TODO: add emitter function
 
 	return func(ctx context.Context) (value O, err error) {

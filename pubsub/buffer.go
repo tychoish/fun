@@ -5,6 +5,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
 // Distributor provides a layer of indirection above queue-like
@@ -12,16 +13,16 @@ import (
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
 type Distributor[T any] struct {
-	push fun.Handler[T]
-	pop  fun.Future[T]
+	push fnx.Handler[T]
+	pop  fnx.Future[T]
 	size func() int
 }
 
 // MakeDistributor builds a distributor from producer and processor
 // functions.
 func MakeDistributor[T any](
-	processor fun.Handler[T],
-	producer fun.Future[T],
+	processor fnx.Handler[T],
+	producer fnx.Future[T],
 	length func() int,
 ) Distributor[T] {
 	return Distributor[T]{

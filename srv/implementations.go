@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
 )
 
@@ -29,7 +30,7 @@ import (
 // slice of *Services,.
 func Group(services *fun.Stream[*Service]) *Service {
 	waiters := pubsub.NewUnlimitedQueue[func() error]()
-	wg := &fun.WaitGroup{}
+	wg := &fnx.WaitGroup{}
 	ec := &erc.Collector{}
 
 	return &Service{
@@ -118,7 +119,7 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // When the service returns all worker Goroutines as well as the input
 // worker will have returned. Use a blocking pubsub stream to
 // dispatch wait functions throughout the lifecycle of your program.
-func Wait(iter *fun.Stream[fun.Operation]) *Service {
+func Wait(iter *fun.Stream[fnx.Operation]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
@@ -130,7 +131,7 @@ func Wait(iter *fun.Stream[fun.Operation]) *Service {
 				}
 
 				wg.Add(1)
-				go func(fn fun.Operation) {
+				go func(fn fnx.Operation) {
 					defer ec.Recover()
 					defer wg.Done()
 					fn(ctx)
@@ -151,7 +152,7 @@ func Wait(iter *fun.Stream[fun.Operation]) *Service {
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessStream[T any](
 	iter *fun.Stream[T],
-	processor fun.Handler[T],
+	processor fnx.Handler[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	return &Service{
@@ -165,7 +166,7 @@ func ProcessStream[T any](
 // shutdown (e.g. either after Close() is called or when the context
 // is canceled.) The timeout, when non-zero, is passed to the clean up
 // operation. Cleanup functions are dispatched in parallel.
-func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
+func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 	closer, waitForSignal := fun.MAKE.Signal()
 
 	return &Service{
@@ -180,7 +181,7 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 			}
 
 			if err := pipe.Distributor().Stream().Parallel(
-				func(ctx context.Context, wf fun.Worker) error { return wf.Run(ctx) },
+				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfContinueOnPanic(),
 				fun.WorkerGroupConfWorkerPerCPU(),
@@ -197,10 +198,10 @@ func Cleanup(pipe *pubsub.Queue[fun.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
 	return &Service{
 		Run: workQueue.Distributor().Stream().Parallel(
-			func(ctx context.Context, fn fun.Worker) error {
+			func(ctx context.Context, fn fnx.Worker) error {
 				return fn.Run(ctx)
 			},
 			optp...,
@@ -226,13 +227,13 @@ func WorkerPool(workQueue *pubsub.Queue[fun.Worker], optp ...fun.OptionProvider[
 // the service's Wait method; but all errors that occur during the
 // execution of the workload will be observed (including panics) as well.
 func HandlerWorkerPool(
-	workQueue *pubsub.Queue[fun.Worker],
+	workQueue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{
 		Run: workQueue.Distributor().Stream().Parallel(
-			func(ctx context.Context, fn fun.Worker) error {
+			func(ctx context.Context, fn fnx.Worker) error {
 				observer(fn.Run(ctx))
 				return nil
 			},
@@ -267,7 +268,7 @@ func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
 	fun.Invariant.IsTrue(c != nil, "exec.Cmd must be non-nil")
 
 	started := make(chan struct{})
-	wg := &fun.WaitGroup{}
+	wg := &fnx.WaitGroup{}
 
 	return &Service{
 		Run: func(_ context.Context) error {

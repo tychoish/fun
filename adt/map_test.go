@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -60,7 +60,7 @@ func TestMap(t *testing.T) {
 		defer cancel()
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {
@@ -96,7 +96,7 @@ func TestMap(t *testing.T) {
 		defer cancel()
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {

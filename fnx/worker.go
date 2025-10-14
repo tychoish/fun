@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -22,49 +22,6 @@ type Worker func(context.Context) error
 // compatibility with tooling.
 func MakeWorker(fn func() error) Worker { return func(context.Context) error { return fn() } }
 
-// ErrorChannelWorker constructs a worker from an error channel. The
-// resulting worker blocks until an error is produced in the error
-// channel, the error channel is closed, or the worker's context is
-// canceled. If the channel is closed, the worker will return a nil
-// error, and if the context is canceled, the worker will return a
-// context error. In all other cases the work will propagate the error
-// (or nil) received from the channel.
-//
-// You can call the resulting worker function more than once: if there
-// are multiple errors produced or passed to the channel, they will be
-// propogated; however, after the channel is closed subsequent calls
-// to the worker function will return nil.
-func (Constructors) ErrorChannelWorker(ch <-chan error) Worker {
-	pipe := BlockingReceive(ch)
-	return func(ctx context.Context) error {
-		if ch == nil || pipe.ch == nil {
-			return nil
-		}
-
-		val, err := pipe.Read(ctx)
-		switch {
-		case errors.Is(err, io.EOF):
-			pipe.ch = nil
-			return nil
-		case val != nil:
-			// actual error
-			return val
-		case err != nil:
-			// context error?
-			return err
-		default:
-			return nil
-		}
-	}
-}
-
-// ContextChannelWorker creates a worker function that wraps a context and will--when called--block until the context is done,
-// returning the context's cancellation error. Unless provided with a custom context that can be canceled but does not return an
-// error (which would break many common assumptions regarding contexts,) this worker will always return an error.
-func (Constructors) ContextChannelWorker(ctx context.Context) Worker {
-	return MAKE.ErrorChannelWorker(ft.ContextErrorChannel(ctx))
-}
-
 // Run is equivalent to calling the worker function directly.
 func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 
@@ -85,9 +42,15 @@ func (wf Worker) WithRecover() Worker {
 // A value, possibly nil, is always sent through the channel. Panics
 // are not caught or handled.
 func (wf Worker) Signal(ctx context.Context) <-chan error {
-	out := Blocking(make(chan error))
-	go func() { defer out.Close(); out.Send().Ignore(ctx, wf.Run(ctx)) }()
-	return out.Channel()
+	out := make(chan error)
+	go func() {
+		defer close(out)
+		select {
+		case <-ctx.Done():
+		case out <- wf.Run(ctx):
+		}
+	}()
+	return out
 }
 
 // Launch runs the worker function in a go routine and returns a new
@@ -98,7 +61,14 @@ func (wf Worker) Signal(ctx context.Context) <-chan error {
 // The underlying worker begins executing before future returns.
 func (wf Worker) Launch(ctx context.Context) Worker {
 	out := wf.Signal(ctx)
-	return MAKE.ErrorChannelWorker(out)
+	return func(ctx context.Context) (err error) {
+		ctxCh := ft.ContextErrorChannel(ctx)
+		select {
+		case err = <-out:
+		case err = <-ctxCh:
+		}
+		return ft.IfElse(errors.Is(err, io.EOF), nil, err)
+	}
 }
 
 // Background starts the worker function in a go routine, passing the
@@ -132,7 +102,7 @@ func (wf Worker) Wait() error { return wf.Run(context.Background()) }
 // Must converts a Worker function into a wait function; however,
 // if the worker produces an error Must converts the error into a
 // panic.
-func (wf Worker) Must() Operation { return func(ctx context.Context) { Invariant.Must(wf(ctx)) } }
+func (wf Worker) Must() Operation { return func(ctx context.Context) { must(wf(ctx)) } }
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
@@ -291,7 +261,7 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 
 	return func(ctx context.Context) error {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
+		invariant(wctx != nil, "must start the operation before calling cancel")
 		return wf(wctx)
 	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }

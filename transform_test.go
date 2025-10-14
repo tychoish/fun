@@ -19,10 +19,11 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
-func Map[T any, O any](it *Stream[T], mpf Converter[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Stream[O] {
-	return mpf.Parallel(it, optp...)
+func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Stream[O] {
+	return Convert(mpf).Parallel(it, optp...)
 }
 
 func CheckSeenMap[T comparable](t *testing.T, elems []T, seen map[T]struct{}) {
@@ -131,16 +132,16 @@ func TestMapReduce(t *testing.T) {
 
 		pipe := make(chan string, 1)
 		output := make(chan int)
-		wg := &WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		pipe <- t.Name()
 
-		var mf Converter[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
+		var mf fnx.Converter[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
 
 		Blocking(pipe).
 			Receive().
 			Stream().
 			ReadAll(
-				mf.WithRecover().mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}),
+				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}),
 			).
 			Ignore().
 			Add(ctx, wg)
@@ -604,7 +605,8 @@ func RunStreamIntegerAlgoTests(
 							if err == nil {
 								t.Fatal("expected error", out)
 							}
-							if err.Error() != "whoop" {
+
+							if err.Error() != "whoop: whoop" {
 								t.Error(err)
 							}
 
@@ -915,74 +917,9 @@ func RunStreamStringAlgoTests(
 		check.NotError(t, erc.NewFilter().Without(ErrCountMeOut).Apply(err))
 		check.ErrorIs(t, err, ErrCountMeOut)
 	})
-	t.Run("ConverterOK", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		tfrm := MakeCovnerterOk(func(in string) (string, bool) { return in, true })
-		out, err := tfrm(ctx, "hello")
-		check.Equal(t, out, "hello")
-		check.NotError(t, err)
-		tfrm = MakeCovnerterOk(func(in string) (string, bool) { return in, false })
-		out, err = tfrm(ctx, "bye")
-		check.Error(t, err)
-		check.ErrorIs(t, err, ers.ErrCurrentOpSkip)
-		check.Equal(t, out, "bye")
-	})
-	t.Run("Block", func(t *testing.T) {
-		t.Run("Basic", func(t *testing.T) {
-			count := 0
-			mpf := Converter[int, string](func(ctx context.Context, in int) (string, error) {
-				check.Equal(t, ctx, context.Background())
-				check.Equal(t, in, 42)
-				count++
-				return fmt.Sprint(in), nil
-			})
-
-			out, err := mpf.Wait(42)
-			check.Equal(t, "42", out)
-			check.NotError(t, err)
-			check.Equal(t, count, 1)
-		})
-		t.Run("Error", func(t *testing.T) {
-			count := 0
-			mpf := Converter[int, string](func(ctx context.Context, in int) (string, error) {
-				check.Equal(t, ctx, context.Background())
-				check.Equal(t, in, 42)
-				count++
-				return fmt.Sprint(in), io.EOF
-			})
-
-			out, err := mpf.Wait(42)
-			check.Equal(t, "42", out)
-			check.Error(t, err)
-			check.ErrorIs(t, err, io.EOF)
-			check.Equal(t, count, 1)
-		})
-	})
-	t.Run("Lock", func(t *testing.T) {
-		count := &atomic.Int64{}
-
-		mpf := Converter[int, string](func(_ context.Context, in int) (string, error) {
-			check.Equal(t, in, 42)
-			count.Add(1)
-			return fmt.Sprint(in), nil
-		})
-		mpf = mpf.Lock()
-		// tempt the race detector
-		wg := &WaitGroup{}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		wg.Group(128, func(ctx context.Context) {
-			out, err := mpf(ctx, 42)
-			check.Equal(t, out, "42")
-			check.NotError(t, err)
-		}).Run(ctx)
-		wg.Wait(ctx)
-		check.Equal(t, count.Load(), 128)
-	})
 	t.Run("ParallelProccesingInvalidConfig", func(t *testing.T) {
 		counter := 0
-		out, err := MakeConverter(func(in int) string { counter++; return fmt.Sprint(in) }).Parallel(
+		out, err := Convert(fnx.MakeConverter(func(in int) string { counter++; return fmt.Sprint(in) })).Parallel(
 			SliceStream([]int{42, 84, 21}),
 			WorkerGroupConfWithErrorCollector(nil),
 		).Slice(t.Context())
@@ -993,7 +930,7 @@ func RunStreamStringAlgoTests(
 	})
 	t.Run("ConvertContinue", func(t *testing.T) {
 		count := 0
-		st := MakeStream(MakeFuture(func() (int, error) {
+		st := MakeStream(fnx.MakeFuture(func() (int, error) {
 			count++
 
 			if count%2 == 0 {
@@ -1009,9 +946,9 @@ func RunStreamStringAlgoTests(
 			return count, ErrInvariantViolation
 		}))
 
-		newSl, err := MakeConverterErr(func(in int) (string, error) {
+		newSl, err := Convert(fnx.MakeConverterErr(func(in int) (string, error) {
 			return strconv.Itoa(in), nil
-		}).Stream(st).Slice(t.Context())
+		})).Stream(st).Slice(t.Context())
 		check.NotError(t, err)
 		check.Equal(t, len(newSl), 8)
 		check.Equal(t, newSl[3], "7")

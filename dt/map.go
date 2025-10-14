@@ -5,6 +5,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
 // ErrUninitializedContainer is the content of the panic produced when you
@@ -94,19 +95,19 @@ func (m Map[K, V]) Len() int { return len(m) }
 
 // Extend adds a sequence of Pairs to the map.
 func (m Map[K, V]) Extend(pairs *Pairs[K, V]) {
-	pairs.Stream().ReadAll(fun.FromHandler(m.AddPair)).Ignore().Wait()
+	pairs.Stream().ReadAll(fnx.FromHandler(m.AddPair)).Ignore().Wait()
 }
 
 // ExtendWithPairs adds items to the map from a Pairs object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ExtendWithPairs(pairs *Pairs[K, V]) {
-	pairs.Stream().ReadAll(fun.FromHandler(m.AddPair)).Ignore().Wait()
+	pairs.Stream().ReadAll(fnx.FromHandler(m.AddPair)).Ignore().Wait()
 }
 
 // ExtendWithTuples adds items to the map from a Tuples object. Existing
 // values for K are always overwritten.
 func (m Map[K, V]) ExtendWithTuples(tuples *Tuples[K, V]) {
-	tuples.Stream().ReadAll(fun.FromHandler(m.AddTuple)).Ignore().Wait()
+	tuples.Stream().ReadAll(fnx.FromHandler(m.AddTuple)).Ignore().Wait()
 }
 
 // ExtendWithStream adds items to the map. If a key already exists in the
@@ -114,8 +115,8 @@ func (m Map[K, V]) ExtendWithTuples(tuples *Tuples[K, V]) {
 //
 // This operation is lazy, and returns a Worker (future) function that
 // must be excuted to process the stream.
-func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
-	return it.ReadAll(fun.FromHandler(m.AddPair))
+func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fnx.Worker {
+	return it.ReadAll(fnx.FromHandler(m.AddPair))
 }
 
 // Stream converts a map into a stream of dt.Pair objects. The
@@ -133,7 +134,7 @@ func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fun.Worker {
 func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 	pipe := fun.Blocking(make(chan Pair[K, V]))
 
-	init := fun.Operation(func(ctx context.Context) {
+	init := fnx.Operation(func(ctx context.Context) {
 		defer pipe.Close()
 		send := pipe.Send()
 		for k, v := range m {
@@ -143,14 +144,14 @@ func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).PreHook(init))
+	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(init))
 }
 
 // Keys provides a stream over just the keys in the map.
 func (m Map[K, V]) Keys() *fun.Stream[K] {
 	pipe := fun.Blocking(make(chan K))
 
-	init := fun.Operation(func(ctx context.Context) {
+	init := fnx.Operation(func(ctx context.Context) {
 		defer pipe.Close()
 		send := pipe.Send()
 		for k := range m {
@@ -160,14 +161,14 @@ func (m Map[K, V]) Keys() *fun.Stream[K] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).PreHook(init))
+	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(init))
 }
 
 // Values provides a stream over just the values in the map.
 func (m Map[K, V]) Values() *fun.Stream[V] {
 	pipe := fun.Blocking(make(chan V))
 
-	init := fun.Operation(func(ctx context.Context) {
+	init := fnx.Operation(func(ctx context.Context) {
 		defer pipe.Close()
 		send := pipe.Send()
 		for k := range m {
@@ -177,5 +178,5 @@ func (m Map[K, V]) Values() *fun.Stream[V] {
 		}
 	}).Go().Once()
 
-	return fun.MakeStream(fun.NewFuture(pipe.Receive().Read).PreHook(init))
+	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(init))
 }

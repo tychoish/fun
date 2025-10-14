@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -50,7 +50,6 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 	once := &sync.Once{}
 	return func(ctx context.Context) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant.IsTrue(wctx != nil, "must start the operation before calling cancel")
 		wf(wctx)
 	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }
@@ -200,9 +199,9 @@ func (wf Operation) If(cond bool) Operation { return wf.Worker().If(cond).Ignore
 
 // Limit returns an operation that will only run the specified number
 // of times. The resulting operation is safe for concurrent use, but
-// operations can run concurrently.
+// operations can run concurrently. All limits less that 1 are treated as 1.
 func (wf Operation) Limit(in int) Operation {
-	Invariant.Ok(in > 0, "limit must be greater than zero;", in)
+	invariant(in > 0, "limit must be greater than zero;", in)
 	counter := &atomic.Int64{}
 
 	return wf.When(func() bool {

@@ -3,6 +3,7 @@ package fun
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -25,16 +27,16 @@ var MAKE = Constructors{}
 // this package.
 type Constructors struct{}
 
-// OperationPool returns a Operation that, when called, processes the
-// incoming stream of Operations, starts a go routine for running
+// OperationPool returns a fnx.Operation that, when called, processes the
+// incoming stream of fnx.Operations, starts a go routine for running
 // each element in the stream, (without any throttling or rate
 // limiting) and then blocks until all operations have returned, or
 // the context passed to the output function has been canceled.
 //
 // For more configuraable options, use the itertool.Worker() function
-// which provides more configurability and supports both Operation and
+// which provides more configurability and supports both fnx.Operation and
 // Worker functions.f.
-func (Constructors) OperationPool(st *Stream[Operation]) Worker {
+func (Constructors) OperationPool(st *Stream[fnx.Operation]) fnx.Worker {
 	return st.Parallel(MAKE.OperationHandler(), WorkerGroupConfDefaults())
 }
 
@@ -47,23 +49,23 @@ func (Constructors) OperationPool(st *Stream[Operation]) Worker {
 // may create memory pressure) and there's no special handling of panics.
 //
 // For more configuraable options, use the itertool.Worker() function
-// which provides more configurability and supports both Operation and
+// which provides more configurability and supports both fnx.Operation and
 // Worker functions.
-func (Constructors) WorkerPool(st *Stream[Worker]) Worker {
+func (Constructors) WorkerPool(st *Stream[fnx.Worker]) fnx.Worker {
 	return st.Parallel(MAKE.WorkerHandler(), WorkerGroupConfDefaults())
 }
 
 // RunAllWorkers returns a Worker function that will run all of the
 // Worker functions in the stream serially.
-func (Constructors) RunAllWorkers(st *Stream[Worker]) Worker {
+func (Constructors) RunAllWorkers(st *Stream[fnx.Worker]) fnx.Worker {
 	return func(ctx context.Context) error {
 		return st.ReadAll(MAKE.WorkerHandler()).Run(ctx)
 	}
 }
 
 // RunAllOperations returns a worker function that will run all the
-// Operation functions  in the stream serially.
-func (Constructors) RunAllOperations(st *Stream[Operation]) Worker {
+// fnx.Operation functions  in the stream serially.
+func (Constructors) RunAllOperations(st *Stream[fnx.Operation]) fnx.Worker {
 	return func(ctx context.Context) error { return st.ReadAll(MAKE.OperationHandler()).Run(ctx) }
 }
 
@@ -79,8 +81,8 @@ func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqSt
 // method as in:
 //
 //	fun.MAKE.OperationHandler()
-func (Constructors) OperationHandler() Handler[Operation] {
-	return func(ctx context.Context, op Operation) error { return op.WithRecover().Run(ctx) }
+func (Constructors) OperationHandler() fnx.Handler[fnx.Operation] {
+	return func(ctx context.Context, op fnx.Operation) error { return op.WithRecover().Run(ctx) }
 }
 
 // WorkerHandler constructs a Handler function for running Worker
@@ -93,22 +95,51 @@ func (Constructors) OperationHandler() Handler[Operation] {
 //	fun.MAKE.WorkerHandler()
 //
 // The WorkerHandler provides no panic protection.
-func (Constructors) WorkerHandler() Handler[Worker] {
-	return func(ctx context.Context, op Worker) error { return op.Run(ctx) }
+func (Constructors) WorkerHandler() fnx.Handler[fnx.Worker] {
+	return func(ctx context.Context, op fnx.Worker) error { return op.Run(ctx) }
 }
 
-// ConvertOperationToWorker provides a converter function to produce
-// Worker functions from Operation functions. The errors produced by
-// the worker functions--if any--are the recovered panics from the
-// inner operation.
-func (Constructors) ConvertOperationToWorker() Converter[Operation, Worker] {
-	return MakeConverter(func(o Operation) Worker { return o.WithRecover() })
+// ErrorChannelWorker constructs a worker from an error channel. The
+// resulting worker blocks until an error is produced in the error
+// channel, the error channel is closed, or the worker's context is
+// canceled. If the channel is closed, the worker will return a nil
+// error, and if the context is canceled, the worker will return a
+// context error. In all other cases the work will propagate the error
+// (or nil) received from the channel.
+//
+// You can call the resulting worker function more than once: if there
+// are multiple errors produced or passed to the channel, they will be
+// propogated; however, after the channel is closed subsequent calls
+// to the worker function will return nil.
+func (Constructors) ErrorChannelWorker(ch <-chan error) fnx.Worker {
+	pipe := BlockingReceive(ch)
+	return func(ctx context.Context) error {
+		if ch == nil || pipe.ch == nil {
+			return nil
+		}
+
+		val, err := pipe.Read(ctx)
+		switch {
+		case errors.Is(err, io.EOF):
+			pipe.ch = nil
+			return nil
+		case val != nil:
+			// actual error
+			return val
+		case err != nil:
+			// context error?
+			return err
+		default:
+			return nil
+		}
+	}
 }
 
-// ConvertWorkerToOperation converts Worker functions to Operation
-// function, capturing their errors with the provided error handler.
-func (Constructors) ConvertWorkerToOperation(eh fn.Handler[error]) Converter[Worker, Operation] {
-	return MakeConverter(func(wf Worker) Operation { return wf.Operation(eh) })
+// ContextChannelWorker creates a worker function that wraps a context and will--when called--block until the context is done,
+// returning the context's cancellation error. Unless provided with a custom context that can be canceled but does not return an
+// error (which would break many common assumptions regarding contexts,) this worker will always return an error.
+func (Constructors) ContextChannelWorker(ctx context.Context) fnx.Worker {
+	return MAKE.ErrorChannelWorker(ft.ContextErrorChannel(ctx))
 }
 
 // Signal is a wrapper around the common pattern where signal channels
@@ -120,7 +151,7 @@ func (Constructors) ConvertWorkerToOperation(eh fn.Handler[error]) Converter[Wor
 // The closer is safe to call multiple times. The worker ALWAYS
 // returns the context cancellation error if its been canceled even if
 // the signal channel was closed.
-func (Constructors) Signal() (func(), Worker) {
+func (Constructors) Signal() (func(), fnx.Worker) {
 	sig := make(chan struct{})
 	closer := sync.OnceFunc(func() { close(sig) })
 
@@ -161,24 +192,6 @@ func (Constructors) ErrorHandlerWithoutTerminating(of fn.Handler[error]) fn.Hand
 	})
 }
 
-// ErrorUnwindTransformer provides the ers.Unwind operation as a
-// transform method, which consumes an error and produces a slice of
-// its component errors. All errors are processed by the provided
-// filter, and the transformer's context is not used. The error value
-// of the Transform function is always nil.
-func (Constructors) ErrorUnwindTransformer(filter erc.Filter) Converter[error, []error] {
-	return func(_ context.Context, err error) ([]error, error) {
-		unwound := ers.Unwind(err)
-		out := make([]error, 0, len(unwound))
-		for idx := range unwound {
-			if e := filter(unwound[idx]); e != nil {
-				out = append(out, e)
-			}
-		}
-		return out, nil
-	}
-}
-
 // ErrorHandlerWithAbort creates a new error handler that--ignoring
 // nil and context expiration errors--will call the provided context
 // cancellation function when it receives an error.
@@ -193,21 +206,6 @@ func (Constructors) ErrorHandlerWithAbort(cancel context.CancelFunc) fn.Handler[
 
 		cancel()
 	}
-}
-
-// ConvertErrorsToStrings makes a Converter function that translates
-// slices of errors to slices of errors.
-func (Constructors) ConvertErrorsToStrings() Converter[[]error, []string] {
-	return MakeConverter(func(errs []error) []string {
-		out := make([]string, 0, len(errs))
-		for idx := range errs {
-			if !ers.IsOk(errs[idx]) {
-				out = append(out, errs[idx].Error())
-			}
-		}
-
-		return out
-	})
 }
 
 // Sprintln constructs a future that calls fmt.Sprintln over the given
@@ -280,7 +278,7 @@ func (Constructors) Stringer(op fmt.Stringer) fn.Future[string] { return op.Stri
 // (presumably plaintext) io.Reader, using the bufio.Scanner.
 func (Constructors) Lines(reader io.Reader) *Stream[string] {
 	scanner := bufio.NewScanner(reader)
-	return MakeStream(MakeFuture(func() (string, error) {
+	return MakeStream(fnx.MakeFuture(func() (string, error) {
 		if !scanner.Scan() {
 			return "", erc.Join(io.EOF, scanner.Err())
 		}
@@ -292,24 +290,71 @@ func (Constructors) Lines(reader io.Reader) *Stream[string] {
 // line-separated content of an io.Reader, line Lines(), but with the
 // leading and trailing space trimmed from each line.
 func (Constructors) LinesWithSpaceTrimed(reader io.Reader) *Stream[string] {
-	return MAKE.Lines(reader).Transform(MakeConverter(strings.TrimSpace))
+	return MAKE.Lines(reader).Transform(fnx.MakeConverter(strings.TrimSpace))
 }
 
 // Itoa produces a Transform function that converts integers into
 // strings.
-func (Constructors) Itoa() Converter[int, string] {
-	return MakeConverter(func(in int) string { return fmt.Sprint(in) })
+func (Constructors) Itoa() fnx.Converter[int, string] {
+	return fnx.MakeConverter(func(in int) string { return fmt.Sprint(in) })
 }
 
 // Atoi produces a Transform function that converts strings into
 // integers.
-func (Constructors) Atoi() Converter[string, int] { return MakeConverterErr(strconv.Atoi) }
+func (Constructors) Atoi() fnx.Converter[string, int] { return fnx.MakeConverterErr(strconv.Atoi) }
+
+// ConvertOperationToWorker provides a converter function to produce
+// Worker functions from Operation functions. The errors produced by
+// the worker functions--if any--are the recovered panics from the
+// inner operation.
+func (Constructors) ConvertOperationToWorker() fnx.Converter[fnx.Operation, fnx.Worker] {
+	return fnx.MakeConverter(func(o fnx.Operation) fnx.Worker { return o.WithRecover() })
+}
+
+// ConvertWorkerToOperation converts Worker functions to Operation
+// function, capturing their errors with the provided error handler.
+func (Constructors) ConvertWorkerToOperation(eh fn.Handler[error]) fnx.Converter[fnx.Worker, fnx.Operation] {
+	return fnx.MakeConverter(func(wf fnx.Worker) fnx.Operation { return wf.Operation(eh) })
+}
+
+// ErrorUnwindTransformer provides the ers.Unwind operation as a
+// transform method, which consumes an error and produces a slice of
+// its component errors. All errors are processed by the provided
+// filter, and the transformer's context is not used. The error value
+// of the Transform function is always nil.
+func (Constructors) ErrorUnwindTransformer(filter erc.Filter) fnx.Converter[error, []error] {
+	return func(_ context.Context, err error) ([]error, error) {
+		unwound := ers.Unwind(err)
+		out := make([]error, 0, len(unwound))
+		for idx := range unwound {
+			if e := filter(unwound[idx]); e != nil {
+				out = append(out, e)
+			}
+		}
+		return out, nil
+	}
+}
+
+// ConvertErrorsToStrings makes a Converter function that translates
+// slices of errors to slices of errors.
+func (Constructors) ConvertErrorsToStrings() fnx.Converter[[]error, []string] {
+	return fnx.MakeConverter(func(errs []error) []string {
+		out := make([]string, 0, len(errs))
+		for idx := range errs {
+			if !ers.IsOk(errs[idx]) {
+				out = append(out, errs[idx].Error())
+			}
+		}
+
+		return out
+	})
+}
 
 // Counter produces a stream that, starting at 1, yields
 // monotonically increasing integers until the maximum is reached.
 func (Constructors) Counter(maxVal int) *Stream[int] {
 	state := &atomic.Int64{}
-	return MakeStream(MakeFuture(func() (int, error) {
+	return MakeStream(fnx.MakeFuture(func() (int, error) {
 		if prev := int(state.Add(1)); prev <= maxVal {
 			return prev, nil
 		}

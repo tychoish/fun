@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -58,7 +59,7 @@ type Service struct {
 	//
 	// Implementations are responsible for returning promptly when
 	// the context is canceled.
-	Run fun.Worker
+	Run fnx.Worker
 
 	// Cleanup is optional, but if defined is always called after the
 	// Run function returned. Cleanup operations should all return
@@ -73,7 +74,7 @@ type Service struct {
 	// must return before the Cleanup function runs.
 	Shutdown func() error
 
-	Signal fun.Worker
+	Signal fnx.Worker
 
 	// ErrorHandler functions, if specified, are called when the
 	// service returns, with the output of the Service's error
@@ -94,7 +95,7 @@ type Service struct {
 
 	// the mutex just protects the signal. this is a race in some
 	// tests, but should generally not be an issue.
-	wg fun.WaitGroup
+	wg fnx.WaitGroup
 }
 
 // String implements fmt.Stringer and includes value of s.Name.
@@ -237,13 +238,13 @@ func (s *Service) waitFor(ctx context.Context) error {
 
 // Worker runs the service, starting it if needed and then waiting for
 // the service to return. If the service has already finished, the
-// fun.Worker, like Wait(), will return the same aggreagated error
+// fnx.Worker, like Wait(), will return the same aggreagated error
 // from the service when called multiple times on a completed service.
 //
-// Unlike Wait(), the fun.Worker respects the context and will return
+// Unlike Wait(), the fnx.Worker respects the context and will return
 // early if the context is canceled: returning a context cancelation
 // error.
-func (s *Service) Worker() fun.Worker {
+func (s *Service) Worker() fnx.Worker {
 	return func(ctx context.Context) error {
 		_ = s.Start(ctx)
 		werr := s.waitFor(ctx)

@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
@@ -837,8 +838,8 @@ func TestDequeIntegration(t *testing.T) {
 		counter := &atomic.Int64{}
 		input := &atomic.Int64{}
 
-		wg := &fun.WaitGroup{}
-		signal := fun.Operation(wg.Wait).Worker().Signal(ctx)
+		wg := &fnx.WaitGroup{}
+		signal := fnx.Operation(wg.Wait).Worker().Signal(ctx)
 
 		for i := 0; i < num; i++ {
 			wg.Add(1)
@@ -904,13 +905,13 @@ func TestDequeIntegration(t *testing.T) {
 		sent := &atomic.Int64{}
 		recv := &atomic.Int64{}
 
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		const (
 			factor = 2
 			worker = 32
 			num    = factor * worker
 		)
-		wwg := &fun.WaitGroup{}
+		wwg := &fnx.WaitGroup{}
 		for i := 0; i < factor; i++ {
 			wg.Add(1)
 			go func() {

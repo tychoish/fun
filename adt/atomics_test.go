@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -70,7 +70,7 @@ func TestAtomics(t *testing.T) {
 		defer cancel()
 		atom := &Atomic[int]{}
 
-		wg := &fun.WaitGroup{}
+		wg := &fnx.WaitGroup{}
 		// this should always pass, but we're mostly tempting
 		// the race detector.
 		for i := 1; i < 256; i++ {
@@ -126,7 +126,7 @@ func TestAtomics(t *testing.T) {
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			count := &atomic.Int64{}
 			actor := &Once[int]{}
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 64; i++ {
 				wg.Add(1)
 				// this function panics rather than
@@ -171,7 +171,7 @@ func TestAtomics(t *testing.T) {
 			})
 			check.True(t, actor.Defined())
 			check.True(t, !actor.Called())
-			wg := &fun.WaitGroup{}
+			wg := &fnx.WaitGroup{}
 			for i := 0; i < 64; i++ {
 				wg.Add(1)
 				// this function panics rather than

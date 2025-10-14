@@ -8,6 +8,7 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -155,7 +156,7 @@ func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.S
 // function returns ers.ErrCurrentOpSkip, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) ReadAll(op func(context.Context, T) error) Worker {
+func (ro ChanReceive[T]) ReadAll(op func(context.Context, T) error) fnx.Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 

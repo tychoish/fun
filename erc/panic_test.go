@@ -3,8 +3,10 @@ package erc
 import (
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
@@ -74,5 +76,43 @@ func TestPanics(t *testing.T) {
 		assert.True(t, !ers.IsInvariantViolation(nil))
 		assert.True(t, !ers.IsInvariantViolation(9001))
 		assert.True(t, !ers.IsInvariantViolation(io.EOF))
+	})
+	t.Run("ExtractErrors", func(t *testing.T) {
+		ec := &Collector{}
+		input := []any{nil, ers.Error("hi"), 1, true, "   ", "hi"}
+		ec.extractErrors(input)
+		check.Equal(t, ec.Len(), 2)
+
+		var nerr error
+		ec = &Collector{}
+		input = []any{nil, ers.Error("hi"), func() error { return nil }, nerr, 2, false, "etc..."}
+		ec.extractErrors(input)
+		check.Equal(t, ec.Len(), 2)
+
+		ec = &Collector{}
+		input = []any{ers.Error("hi"), ers.Error("hi"), ers.Error("hi"), ers.Error("hi")}
+		ec.extractErrors(input)
+		check.Equal(t, ec.Len(), 4)
+	})
+	t.Run("InvariantError", func(t *testing.T) {
+		t.Run("Empty", func(t *testing.T) {
+			assert.Equal[error](t, ers.ErrInvariantViolation, NewInvariantError())
+			assert.ErrorIs(t, NewInvariantError(), ers.ErrInvariantViolation)
+		})
+		t.Run("One", func(t *testing.T) {
+			vals := []any{"hello", time.Now(), ers.New("hello"), func() error { return errors.New("hello") }}
+			for val := range slices.Values(vals) {
+				err := NewInvariantError(val)
+				check.Error(t, err)
+				check.ErrorIs(t, err, ers.ErrInvariantViolation)
+				check.Equal(t, 2, len(ers.Unwind(err)))
+			}
+		})
+		t.Run("Many", func(t *testing.T) {
+			input := []any{errors.New("hello"), ers.New("hello"), io.EOF}
+			err := NewInvariantError(input...)
+			check.ErrorIs(t, err, ers.ErrInvariantViolation)
+			check.Equal(t, len(input)+1, len(ers.Unwind(err)))
+		})
 	})
 }

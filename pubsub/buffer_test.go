@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -76,7 +77,7 @@ func TestDistributor(t *testing.T) {
 				assert.NotError(t, queue.Close())
 			}()
 
-			if err := iter.ReadAll(fun.FromHandler(func(in string) { set.Add(in); seen++ })).Run(ctx); err != nil {
+			if err := iter.ReadAll(fnx.FromHandler(func(in string) { set.Add(in); seen++ })).Run(ctx); err != nil {
 				t.Error(seen, err)
 			}
 			if iter.Next(ctx) {
@@ -112,7 +113,7 @@ func TestDistributor(t *testing.T) {
 
 			count := 0
 			err := dist.Stream().
-				ReadAll(fun.FromHandler(func(in int) {
+				ReadAll(fnx.FromHandler(func(in int) {
 					count++
 					check.True(t, ft.Not(in == 0))
 					check.True(t, ft.Not(in%2 != 0))
@@ -136,7 +137,7 @@ func TestDistributor(t *testing.T) {
 			err := DistributorChanOp(ch).
 				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 }).
 				Stream().
-				ReadAll(fun.FromHandler(func(in int) {
+				ReadAll(fnx.FromHandler(func(in int) {
 					count++
 					check.True(t, ft.Not(in == 0))
 					check.True(t, ft.Not(in%2 != 0))

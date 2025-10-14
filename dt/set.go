@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
@@ -126,7 +127,7 @@ func (s *Set[T]) Stream() *fun.Stream[T] {
 	st := s.unsafeStream()
 
 	if mu != nil {
-		return fun.MakeStream(fun.NewFuture(st.Read).WithLock(mu)).WithHook(st.CloseHook())
+		return fun.MakeStream(fnx.NewFuture(st.Read).WithLock(mu)).WithHook(st.CloseHook())
 	}
 
 	return st
@@ -191,7 +192,7 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 
 // AppendStream adds all items encountered in the stream to the set.
 func (s *Set[T]) AppendStream(iter *fun.Stream[T]) {
-	iter.ReadAll(fun.FromHandler(s.Add)).Ignore().Wait()
+	iter.ReadAll(fnx.FromHandler(s.Add)).Ignore().Wait()
 }
 
 // AppendSet adds the items of one set to this set.

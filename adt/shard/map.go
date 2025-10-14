@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -52,6 +53,11 @@ type Map[K comparable, V any] struct {
 	imp   MapType
 }
 
+type mapper[T, O any] interface {
+	Stream(*fun.Stream[T]) *fun.Stream[O]
+	Parallel(*fun.Stream[T], ...fun.OptionProvider[*fun.WorkerGroupConf]) *fun.Stream[O]
+}
+
 // Setup initializes the shard with non-default shard size and backing
 // map implementation. Once the Map is initialized (e.g. after calling
 // this function, modifying the map, or accessing the contents of the
@@ -93,19 +99,20 @@ func (m *Map[K, V]) defaultShards() []sh[K, V]                      { return m.i
 func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                     { return m.sh.Call(m.defaultShards) }
 func (m *Map[K, V]) shard(key K) *sh[K, V]                          { return m.shards().Ptr(int(m.shardID(key))) }
 func (m *Map[K, V]) inc() *Map[K, V]                                { m.clock.Add(1); return m }
-func to[T, O any](in func(T) O) fun.Converter[T, O]                 { return fun.MakeConverter(in) }
-func (m *Map[K, V]) s2ks() fun.Converter[*sh[K, V], *fun.Stream[K]] { return to(m.shKeys) }
-func (m *Map[K, V]) s2vs() fun.Converter[*sh[K, V], *fun.Stream[V]] { return to(m.shValues) }
-func (m *Map[K, V]) vp() fun.Converter[*sh[K, V], *fun.Stream[V]]   { return to(m.shValsp) }
-func (m *Map[K, V]) keyToItem() fun.Converter[K, MapItem[K, V]]     { return to(m.Fetch) }
+func to[T, O any](in func(T) O) fnx.Converter[T, O]                 { return fnx.MakeConverter(in) }
+func mapc[T, O any](op fnx.Converter[T, O]) mapper[T, O]            { return fun.Convert(op) }
+func (m *Map[K, V]) s2ks() fnx.Converter[*sh[K, V], *fun.Stream[K]] { return to(m.shKeys) }
+func (m *Map[K, V]) s2vs() fnx.Converter[*sh[K, V], *fun.Stream[V]] { return to(m.shValues) }
+func (m *Map[K, V]) vp() fnx.Converter[*sh[K, V], *fun.Stream[V]]   { return to(m.shValsp) }
+func (m *Map[K, V]) keyToItem() fnx.Converter[K, MapItem[K, V]]     { return to(m.Fetch) }
 func (*Map[K, V]) shKeys(sh *sh[K, V]) *fun.Stream[K]               { return sh.keys() }
 func (*Map[K, V]) shValues(sh *sh[K, V]) *fun.Stream[V]             { return sh.values() }
 func (m *Map[K, V]) shValsp(sh *sh[K, V]) *fun.Stream[V]            { return sh.valsp(int(m.num)) }
 func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                    { return m.shards().Ptrs() }
 func (m *Map[K, V]) shIter() *fun.Stream[*sh[K, V]]                 { return m.shPtrs().Stream() }
-func (m *Map[K, V]) keyItr() *fun.Stream[*fun.Stream[K]]            { return m.s2ks().Stream(m.shIter()) }
-func (m *Map[K, V]) valItr() *fun.Stream[*fun.Stream[V]]            { return m.s2vs().Stream(m.shIter()) }
-func (m *Map[K, V]) valItrp() *fun.Stream[*fun.Stream[V]]           { return m.vp().Stream(m.shIter()) }
+func (m *Map[K, V]) keyItr() *fun.Stream[*fun.Stream[K]]            { return mapc(m.s2ks()).Stream(m.shIter()) }
+func (m *Map[K, V]) valItr() *fun.Stream[*fun.Stream[V]]            { return mapc(m.s2vs()).Stream(m.shIter()) }
+func (m *Map[K, V]) valItrp() *fun.Stream[*fun.Stream[V]]           { return mapc(m.vp()).Stream(m.shIter()) }
 func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf] { return poolOpts(int(m.num)) }
 
 func (m *Map[K, V]) shardID(key K) uint64 {
@@ -153,7 +160,7 @@ func (m *Map[K, V]) Values() *fun.Stream[V] { return fun.MergeStreams(m.valItr()
 // MapItem type captures the version information and information about
 // the sharded configuration.
 func (m *Map[K, V]) Stream() *fun.Stream[MapItem[K, V]] {
-	return m.keyToItem().Stream(m.Keys()).Filter(m.filter)
+	return fun.Convert(m.keyToItem()).Stream(m.Keys()).Filter(m.filter)
 }
 
 func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }
@@ -165,7 +172,7 @@ func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }
 // possible that the stream could return some items where
 // MapItem.Exists is false if items are deleted during iteration.
 func (m *Map[K, V]) ParallelStream() *fun.Stream[MapItem[K, V]] {
-	return m.keyToItem().Parallel(m.Keys(), m.popt()).Filter(m.filter)
+	return fun.Convert(m.keyToItem()).Parallel(m.Keys(), m.popt()).Filter(m.filter)
 }
 
 // ParallelValues returns a stream over all values in the sharded map. Because items are processed

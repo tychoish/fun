@@ -7,10 +7,10 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -284,7 +284,7 @@ func TestSlice(t *testing.T) {
 		t.Run("ContinueEarlEnd", func(t *testing.T) {
 			count := 0
 			out, err := Transform(randomIntSlice(100),
-				fun.MakeConverterErr(func(in int) (string, error) {
+				fnx.MakeConverterErr(func(in int) (string, error) {
 					count++
 					if count >= 50 {
 						return "", io.EOF
@@ -302,7 +302,7 @@ func TestSlice(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
 			count := 0
 			out, err := Transform(randomIntSlice(100),
-				fun.MakeConverterErr(func(in int) (string, error) {
+				fnx.MakeConverterErr(func(in int) (string, error) {
 					count++
 					return fmt.Sprint(in), nil
 				})).Read(ctx)
@@ -314,7 +314,7 @@ func TestSlice(t *testing.T) {
 		t.Run("EarlyError", func(t *testing.T) {
 			count := 0
 			out, err := Transform(randomIntSlice(100),
-				fun.MakeConverterErr(func(in int) (string, error) {
+				fnx.MakeConverterErr(func(in int) (string, error) {
 					if count < 10 {
 						count++
 						return fmt.Sprint(in), nil

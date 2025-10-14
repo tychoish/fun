@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -62,13 +63,13 @@ func (p *Tuples[K, V]) Stream() *fun.Stream[Tuple[K, V]] { p.init(); return p.ll
 // Ones returns a stream over only the first item from a sequence of
 // tuples.
 func (p *Tuples[K, V]) Ones() *fun.Stream[K] {
-	return fun.MakeConverter(func(p Tuple[K, V]) K { return p.One }).Stream(p.Stream())
+	return fun.Convert(fnx.MakeConverter(func(p Tuple[K, V]) K { return p.One })).Stream(p.Stream())
 }
 
 // Twos returns a stream over only the second item from a sequence of
 // tuples.
 func (p *Tuples[K, V]) Twos() *fun.Stream[V] {
-	return fun.MakeConverter(func(p Tuple[K, V]) V { return p.Two }).Stream(p.Stream())
+	return fun.Convert(fnx.MakeConverter(func(p Tuple[K, V]) V { return p.Two })).Stream(p.Stream())
 }
 
 // Slice creates a new slice of all the Tuple objects.
@@ -108,8 +109,8 @@ func (p *Tuples[K, V]) PushMany(vals ...Tuple[K, V]) { p.init(); p.ll.Append(val
 func (p *Tuples[K, V]) AppendTuples(toAdd *Tuples[K, V]) { p.init(); p.ll.AppendList(toAdd.ll) }
 
 // AppendStream adds items from a stream of tuples to the current Tuples slice.
-func (p *Tuples[K, V]) AppendStream(iter *fun.Stream[Tuple[K, V]]) fun.Worker {
-	return iter.ReadAll(fun.FromHandler(func(item Tuple[K, V]) { p.Push(item) }))
+func (p *Tuples[K, V]) AppendStream(iter *fun.Stream[Tuple[K, V]]) fnx.Worker {
+	return iter.ReadAll(fnx.FromHandler(func(item Tuple[K, V]) { p.Push(item) }))
 }
 
 // MarshalJSON produces a JSON encoding for the Pairs object by first

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
@@ -114,9 +115,9 @@ func makeStream(size int) *fun.Stream[int] {
 	return fun.SliceStream(slice)
 }
 
-func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {
+func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fnx.Worker] {
 	t.Helper()
-	queue := pubsub.NewUnlimitedQueue[fun.Worker]()
+	queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
 	for i := 0; i < size; i++ {
 		assert.NotError(t, queue.Add(func(_ context.Context) error {
@@ -129,9 +130,9 @@ func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Wo
 	return queue
 }
 
-func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fun.Worker] {
+func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fnx.Worker] {
 	t.Helper()
-	queue := pubsub.NewUnlimitedQueue[fun.Worker]()
+	queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
 	for i := 0; i < size; i++ {
 		idx := i

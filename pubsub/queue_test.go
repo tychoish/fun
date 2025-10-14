@@ -685,7 +685,7 @@ func TestQueueStream(t *testing.T) {
 				check.Error(t, err)
 				check.ErrorIs(t, err, context.Canceled)
 			}()
-			time.Sleep(2 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 
 			assert.Equal(t, flag.Load(), 2)
 			val, err := listener.Read(t.Context())

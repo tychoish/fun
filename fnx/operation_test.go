@@ -1,9 +1,8 @@
-package fun
+package fnx
 
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -14,7 +13,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -180,68 +178,6 @@ func TestOperation(t *testing.T) {
 			t.Error(time.Since(start))
 		}
 	})
-	t.Run("Merge", func(t *testing.T) {
-		wfs := make([]Operation, 100)
-		count := &atomic.Int64{}
-		for i := 0; i < 100; i++ {
-			wfs[i] = func(context.Context) {
-				startAt := time.Now()
-				defer count.Add(1)
-
-				time.Sleep(10 * time.Millisecond)
-				t.Log(time.Since(startAt))
-			}
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		start := time.Now()
-		t.Log("before exec:", count.Load())
-		err := MAKE.OperationPool(SliceStream(wfs)).Run(ctx)
-		t.Log("after exec:", count.Load())
-		if err != nil {
-			t.Error(err)
-		}
-		dur := time.Since(start)
-		t.Log("duration was:", dur)
-		if dur > 500*time.Millisecond {
-			t.Error(dur, "is not > 150ms")
-		}
-		if int(dur) < (1000 / runtime.NumCPU()) {
-			t.Error(t, dur, "<", 1000/runtime.NumCPU())
-		}
-	})
-	t.Run("Wait", func(t *testing.T) {
-		ops := make([]int, 100)
-		for i := 0; i < len(ops); i++ {
-			ops[i] = rand.Int()
-		}
-		seen := make(map[int]struct{})
-		counter := 0
-		var of fn.Handler[int] = func(in int) {
-			seen[in] = struct{}{}
-			counter++
-		}
-
-		wf := SliceStream(ops).ReadAll(FromHandler(of))
-
-		if len(seen) != 0 || counter != 0 {
-			t.Error("should be lazy execution", counter, seen)
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		if err := wf(ctx); err != nil {
-			t.Error(err)
-		}
-
-		if len(seen) != 100 {
-			t.Error(len(seen), seen)
-		}
-		if counter != 100 {
-			t.Error(counter)
-		}
-	})
 	t.Run("WorkerConverter", func(t *testing.T) {
 		called := &atomic.Bool{}
 		ctx, cancel := context.WithCancel(context.Background())
@@ -338,23 +274,6 @@ func TestOperation(t *testing.T) {
 			op.WithLock(mu).StartGroup(ctx, 128).Run(ctx)
 
 			assert.Equal(t, count, 128)
-		})
-		t.Run("ForBackground", func(t *testing.T) {
-			count := 0
-			op := Operation(func(context.Context) {
-				count++
-			}).Lock()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			jobs := []Operation{}
-
-			ft.CallTimes(128, func() { jobs = append(jobs, op) })
-
-			err := SliceStream(jobs).Parallel(MAKE.OperationHandler(), WorkerGroupConfNumWorkers(4)).Run(ctx)
-			assert.NotError(t, err)
-			check.Equal(t, count, 128)
 		})
 	})
 	t.Run("Signal", func(t *testing.T) {
@@ -662,7 +581,7 @@ func TestOperation(t *testing.T) {
 		ec := &erc.Collector{}
 		ec.Push(MakeOperation(func() { panic(42) }).WithErrorHook(ec.Push).Run(t.Context()))
 		check.True(t, !ec.Ok())
-		check.ErrorIs(t, ec.Resolve(), ErrRecoveredPanic)
+		check.ErrorIs(t, ec.Resolve(), ers.ErrRecoveredPanic)
 		t.Log(t, ers.Unwind(ec.Resolve()))
 		check.Equal(t, ec.Len(), 2)
 	})
@@ -678,5 +597,22 @@ func TestOperation(t *testing.T) {
 			return nil
 		}).Run(t.Context())
 		assert.Equal(t, 2, count.Load())
+	})
+	t.Run("Once", func(t *testing.T) {
+		count := &atomic.Int64{}
+		op := MakeOperation(func() { count.Add(1) }).Once()
+		ctx := t.Context()
+		for range 100 {
+			op.Run(ctx)
+		}
+		assert.Equal(t, 1, count.Load())
+	})
+	t.Run("Go", func(t *testing.T) {
+		start := time.Now()
+		sig := make(chan struct{})
+		MakeOperation(func() { defer close(sig); time.Sleep(100 * time.Millisecond) }).Go().Run(t.Context())
+		assert.True(t, time.Since(start) < 100*time.Millisecond)
+		<-sig
+		assert.True(t, time.Since(start) >= 100*time.Millisecond)
 	})
 }

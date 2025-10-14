@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"context"
@@ -39,11 +39,6 @@ func StaticFuture[T any](val T, err error) Future[T] {
 // ValueFuture returns a future function that always returns the
 // provided value, and a nill error.
 func ValueFuture[T any](val T) Future[T] { return StaticFuture(val, nil) }
-
-func errFuture[T any](err error) Future[T] {
-	Invariant.Ok(err != nil, "cannot create error future without an error")
-	return MakeFuture(func() (zero T, _ error) { return zero, err })
-}
 
 // CheckedFuture wraps a function object that uses the second ("OK")
 // value to indicate that no more values will be produced. Errors
@@ -301,7 +296,7 @@ func (pf Future[T]) WithCancel() (Future[T], context.CancelFunc) {
 
 	return func(ctx context.Context) (out T, _ error) {
 		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		Invariant.IsFalse(wctx == nil, "must start the operation before calling cancel")
+		invariant(wctx != nil, "must start the operation before calling cancel")
 		return pf(wctx)
 	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
 }

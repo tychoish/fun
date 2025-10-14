@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
@@ -26,7 +27,7 @@ func TestHelpers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(fun.VariadicStream(fun.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
+		svc := Wait(fun.VariadicStream(fnx.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)
@@ -216,7 +217,7 @@ func TestHelpers(t *testing.T) {
 		}()
 
 		broker.Publish(ctx, 42)
-		fun.WaitChannel(sig).Run(ctx)
+		fnx.WaitChannel(sig).Run(ctx)
 	})
 }
 
@@ -440,7 +441,7 @@ func TestCleanup(t *testing.T) {
 		defer cancel()
 		ctx = SetBaseContext(ctx)
 
-		pipe := pubsub.NewUnlimitedQueue[fun.Worker]()
+		pipe := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
 		signal := make(chan struct{})
 		count := &atomic.Int64{}

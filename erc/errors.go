@@ -6,8 +6,10 @@
 package erc
 
 import (
+	"errors"
 	"fmt"
 	"iter"
+	"strings"
 	"sync"
 
 	"github.com/tychoish/fun/ers"
@@ -251,5 +253,32 @@ func (ec *Collector) WithRecoverHook(hook func()) {
 		if hook != nil {
 			hook()
 		}
+	}
+}
+
+func (ec *Collector) extractErrors(in []any) {
+	args := make([]any, 0, len(in))
+
+	for idx := range in {
+		switch val := in[idx].(type) {
+		case nil:
+			continue
+		case error:
+			// this handles nested collectors well.
+			ec.Push(val)
+		case func() error:
+			ec.Push(val())
+		case string:
+			val = strings.TrimSpace(val)
+			if val != "" {
+				args = append(args, val)
+			}
+		default:
+			args = append(args, val)
+		}
+	}
+
+	if len(args) > 0 {
+		ec.Push(errors.New(strings.TrimSpace(fmt.Sprintln(args...))))
 	}
 }

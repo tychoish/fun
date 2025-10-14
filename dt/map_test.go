@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -165,7 +165,7 @@ func TestMap(t *testing.T) {
 			keys := mp.Keys()
 
 			count := 0
-			err := keys.ReadAll(fun.FromHandler(func(in string) {
+			err := keys.ReadAll(fnx.FromHandler(func(in string) {
 				switch in {
 				case "big":
 					count++
@@ -189,7 +189,7 @@ func TestMap(t *testing.T) {
 			keys := mp.Values()
 
 			count := 0
-			err := keys.ReadAll(fun.FromHandler(func(in int) {
+			err := keys.ReadAll(fnx.FromHandler(func(in int) {
 				switch in {
 				case 42:
 					count++
