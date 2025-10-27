@@ -102,13 +102,13 @@ func TestLocked(t *testing.T) {
 			mget, mset := AccessorsWithLock(getter, setter)
 			start := time.Now()
 			sw := func() { go mset.Read(267) }
-			go sw()
+			sw()
 			runtime.Gosched()
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
-				check.MinRuntime(t, 100*time.Millisecond, func() { check.Equal(t, 42, mget()) })
 				sw()
+				check.MinRuntime(t, 100*time.Millisecond, func() { check.Equal(t, 42, mget()) })
 				if time.Since(start) < 100*time.Millisecond {
 					t.Log(time.Since(start))
 				}
