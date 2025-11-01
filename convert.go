@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
 )
 
@@ -16,6 +17,14 @@ func Convert[T any, O any](op fnx.Converter[T, O]) interface {
 	Parallel(*Stream[T], ...OptionProvider[*WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: op}
+}
+
+// ConvertOp simplifies calls to fun.Convert for fn.Convert types
+func ConvertFn[T any, O any](op fn.Converter[T, O]) interface {
+	Stream(*Stream[T]) *Stream[O]
+	Parallel(*Stream[T], ...OptionProvider[*WorkerGroupConf]) *Stream[O]
+} {
+	return &converter[T, O]{op: fnx.MakeConverter(op)}
 }
 
 type converter[T any, O any] struct {

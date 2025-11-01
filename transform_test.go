@@ -919,7 +919,7 @@ func RunStreamStringAlgoTests(
 	})
 	t.Run("ParallelProccesingInvalidConfig", func(t *testing.T) {
 		counter := 0
-		out, err := Convert(fnx.MakeConverter(func(in int) string { counter++; return fmt.Sprint(in) })).Parallel(
+		out, err := ConvertFn(func(in int) string { counter++; return fmt.Sprint(in) }).Parallel(
 			SliceStream([]int{42, 84, 21}),
 			WorkerGroupConfWithErrorCollector(nil),
 		).Slice(t.Context())
