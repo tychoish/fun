@@ -1,6 +1,7 @@
 package fn
 
 import (
+	"context"
 	"sync"
 
 	"github.com/tychoish/fun/ft"
@@ -60,4 +61,9 @@ func (cf Converter[I, O]) WithLock(m *sync.Mutex) Converter[I, O] {
 // WithLocker returns a converter that protects the execution of the conversion with the provided sync.Locker instance.
 func (cf Converter[I, O]) WithLocker(m sync.Locker) Converter[I, O] {
 	return func(in I) O { defer prv.WithL(prv.LockL(m)); return cf(in) }
+}
+
+// WithContext returns a wrapped version of the converter function that has he same signature as fnx.Converter functions.
+func (cf Converter[I, O]) WithContext() func(context.Context, I) (O, error) {
+	return func(_ context.Context, in I) (O, error) { return cf(in), nil }
 }

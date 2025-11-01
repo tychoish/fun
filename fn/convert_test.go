@@ -155,6 +155,38 @@ func TestConverter(t *testing.T) {
 		n := MakeConverter(func(i int) int { return i * 2 })
 		assert.Equal(t, n.Convert(2), 4)
 	})
+	t.Run("WithContext", func(t *testing.T) {
+		t.Run("ConvertTypes", func(t *testing.T) {
+			c := MakeConverter(func(_ int) string { return "ok" }).WithContext()
+			val, err := c(t.Context(), 1)
+			assert.NotError(t, err)
+			assert.Equal(t, val, "ok")
+		})
+		t.Run("Numbers", func(t *testing.T) {
+			n := MakeConverter(func(i int) int { return i * 2 }).WithContext()
+			val, err := n(t.Context(), 2)
+			assert.NotError(t, err)
+			assert.Equal(t, val, 4)
+		})
+		t.Run("Panic", func(t *testing.T) {
+			var count int
+			assert.Panic(t, func() {
+				f := MakeConverter(func(i int) int {
+					check.Equal(t, 12, i)
+					count++
+					panic("24")
+					count++
+					return 24
+				}).WithContext()
+
+				out, err := f(t.Context(), 12)
+				assert.NotError(t, err)
+				assert.Equal(t, out, 24)
+				count++
+			})
+			assert.Equal(t, count, 1)
+		})
+	})
 	t.Run("If", func(t *testing.T) {
 		c := MakeConverter(func(_ int) string { return "ok" })
 		assert.Equal(t, c.If(false).Convert(1), "")
