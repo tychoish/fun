@@ -133,7 +133,7 @@ func TestRing(t *testing.T) {
 			// this panics because it fails validation during the
 			// lazy init.
 			assert.Panic(t, func() { ring.Setup(math.MaxInt64) })
-			assert.Panic(t, func() { ring.Setup(maxRingSize + 2) })
+			assert.Panic(t, func() { ring.Setup(int(maxRingSize + 2)) })
 		})
 		t.Run("Safety", func(t *testing.T) {
 			// the max ring-size is big enough to OOM the

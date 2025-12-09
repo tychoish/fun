@@ -10,7 +10,7 @@ import (
 // the maximum size for the ring: given that we divide to find the
 // index in the ring, if this is the maximum size of the ring, it
 // means we can't.
-const maxRingSize int = 4294967296
+const maxRingSize int64 = 4294967296
 
 const defaultRingSize int = 1024
 
@@ -41,7 +41,7 @@ func (r *Ring[T]) init() { ft.CallWhen(r.buf.ring == nil, r.innerInit) }
 func (r *Ring[T]) innerInit() {
 	r.size = ft.Default(r.size, defaultRingSize)
 
-	fun.Invariant.IsTrue(r.size <= maxRingSize, "invalid size", r.size, "max:", maxRingSize)
+	fun.Invariant.IsTrue(int64(r.size) <= maxRingSize, "invalid size", r.size, "max:", maxRingSize)
 	fun.Invariant.IsTrue(r.size >= 2, "invalid size", r.size, "(must be > 1)")
 
 	r.buf.ring = make([]T, r.size)
