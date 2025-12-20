@@ -3,13 +3,14 @@ package dt
 import (
 	"context"
 	"iter"
+	"maps"
 	"sync"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/irt"
 )
 
 // Set provides a flexible generic set implementation, with optional
@@ -26,7 +27,7 @@ type Set[T comparable] struct {
 func NewSetFromSlice[T comparable](in []T) *Set[T] {
 	out := &Set[T]{}
 	out.Order()
-	out.AppendStream(fun.SliceStream(in))
+	out.AppendStream(irt.Slice(in))
 	return out
 }
 
@@ -36,7 +37,7 @@ func NewSetFromSlice[T comparable](in []T) *Set[T] {
 // of the map, and may not therefore roundtrip.
 func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 	out := &Set[Pair[K, V]]{}
-	out.AppendStream(NewMap(in).Stream())
+	out.AppendStream(irt.Map(in))
 	return out
 }
 
@@ -116,32 +117,30 @@ func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(
 // Delete attempts to remove the item from the set.
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 
-// Stream provides a way to iterate over the items in the
-// set. Provides items in iteration order if the set is ordered.If
+// Iterator returns a new-style native Go iterator for the items in the set. Provides items in iteration order if the set is ordered.If
 // the Set is ordered, then the future produces items in the set's
 // order. If the Set is synchronize, then the Stream always holds
-// the Set's lock when incrementing the stream.
-func (s *Set[T]) Stream() *fun.Stream[T] {
+// the Set's lock when advancing the iterator.
+func (s *Set[T]) Iterator() iter.Seq[T] {
 	mu := s.lock()
 	defer s.with(mu)
 	st := s.unsafeStream()
 
 	if mu != nil {
-		return fun.MakeStream(fnx.NewFuture(st.Read).WithLock(mu)).WithHook(st.CloseHook())
+		fun.MakeStream(
+			fnx.NewFuture(fun.SeqStream(st).Read).WithLock(mu),
+		).Iterator(context.Background())
 	}
 
 	return st
 }
-
-// Iterator returns a new-style native Go iterator for the items in the set.
-func (s *Set[T]) Iterator() iter.Seq[T] { return s.Stream().Iterator(context.Background()) }
 
 // List exports the contents of the set to a List, structure which is implemented as a doubly linked list.
 func (s *Set[T]) List() *List[T] {
 	if s.list != nil {
 		return s.list.Copy()
 	}
-	return StreamList(s.Stream())
+	return IteratorList(s.Iterator())
 }
 
 // Slice exports the contents of the set to a slice.
@@ -150,7 +149,7 @@ func (s *Set[T]) Slice() Slice[T] {
 		return s.list.Slice()
 	}
 
-	return risky.BlockForceIgnore(s.hash.Keys().Slice)
+	return irt.Collect(s.hash.Keys(), 0, s.Len())
 }
 
 // DeleteCheck removes the item from the set, return true when the
@@ -191,16 +190,14 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 }
 
 // AppendStream adds all items encountered in the stream to the set.
-func (s *Set[T]) AppendStream(iter *fun.Stream[T]) {
-	iter.ReadAll(fnx.FromHandler(s.Add)).Ignore().Wait()
-}
+func (s *Set[T]) AppendStream(iter iter.Seq[T]) { irt.Apply(iter, s.Add) }
 
 // AppendSet adds the items of one set to this set.
-func (s *Set[T]) AppendSet(extra *Set[T]) { s.AppendStream(extra.Stream()) }
+func (s *Set[T]) AppendSet(extra *Set[T]) { s.AppendStream(extra.Iterator()) }
 
-func (s *Set[T]) unsafeStream() *fun.Stream[T] {
+func (s *Set[T]) unsafeStream() iter.Seq[T] {
 	if s.list != nil {
-		return s.list.StreamFront()
+		return s.list.Iterator()
 	}
 	return s.hash.Keys()
 }
@@ -228,13 +225,7 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 		return iter.Close() == nil && otherIter.Close() == nil
 	}
 
-	for iter.Next(ctx) {
-		if !other.Check(iter.Value()) {
-			return false
-		}
-	}
-
-	return iter.Close() == nil
+	return maps.Equal(s.hash, other.hash)
 }
 
 // MarshalJSON generates a JSON array of the items in the set.

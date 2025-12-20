@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -12,12 +11,10 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func TestStack(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
 		ok, err := ft.WithRecoverDo(func() bool {
 			var list *Stack[string]
@@ -283,17 +280,15 @@ func TestStack(t *testing.T) {
 			list := &Stack[int]{}
 			ct := 0
 			assert.NotPanic(t, func() {
-				iter := list.Stream()
-				for iter.Next(ctx) {
+				for range list.Iterator() {
 					ct++
 				}
-				check.NotError(t, iter.Close())
 			})
 			assert.Zero(t, ct)
 		})
 		t.Run("Content", func(t *testing.T) {
 			stack := GenerateStack(t, 100)
-			items := ft.Must(stack.Stream().Slice(ctx))
+			items := irt.Collect(stack.Iterator())
 			if len(items) != stack.Len() {
 				t.Fatal("unexpected collection", len(items), stack.Len())
 			}
@@ -313,13 +308,12 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Interface", func(t *testing.T) {
 			stack := GenerateStack(t, 5)
-			iter := stack.Stream()
 			seen := 0
-			for iter.Next(ctx) {
+			for val := range stack.Iterator() {
 				seen++
-				iter.Value()
+				check.NotZero(t, val)
 			}
-			fun.Invariant.IsTrue(iter.Close() == nil)
+
 			if seen != stack.Len() {
 				t.Fatal("did not see all values")
 			}
@@ -328,11 +322,10 @@ func TestStack(t *testing.T) {
 			stack := GenerateStack(t, 50)
 			iter := stack.StreamPop()
 			seen := 0
-			for iter.Next(ctx) {
+			for value := range iter {
 				seen++
-				iter.Value()
+				check.NotZero(t, value)
 			}
-			fun.Invariant.IsTrue(iter.Close() == nil)
 			if seen != 50 {
 				t.Fatal("did not see all values", seen)
 			}
@@ -344,11 +337,10 @@ func TestStack(t *testing.T) {
 			stack := &Stack[int]{}
 			iter := stack.StreamPop()
 			seen := 0
-			for iter.Next(ctx) {
+			for value := range iter {
 				seen++
-				iter.Value()
+				check.NotZero(t, value)
 			}
-			fun.Invariant.IsTrue(iter.Close() == nil)
 			if seen != 0 {
 				t.Fatal("stack should be empty", stack.Len())
 			}
@@ -412,13 +404,8 @@ func TestStack(t *testing.T) {
 		})
 	})
 	t.Run("Seq", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		stack := &Stack[int]{}
-		err := stack.Populate(fun.VariadicStream(100_000, 10_000, 1_000, 100, 10, 1)).Run(ctx)
-
-		assert.NotError(t, err)
+		stack.Append(100_000, 10_000, 1_000, 100, 10, 1)
 
 		last := 1 // initialize to one to avoid dividing by zero
 		for item := range stack.Iterator() {

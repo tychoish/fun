@@ -2,6 +2,8 @@ package dt
 
 import (
 	"context"
+	"iter"
+	"maps"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
@@ -148,35 +150,7 @@ func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
 }
 
 // Keys provides a stream over just the keys in the map.
-func (m Map[K, V]) Keys() *fun.Stream[K] {
-	pipe := fun.Blocking(make(chan K))
-
-	init := fnx.Operation(func(ctx context.Context) {
-		defer pipe.Close()
-		send := pipe.Send()
-		for k := range m {
-			if !send.Check(ctx, k) {
-				break
-			}
-		}
-	}).Go().Once()
-
-	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(init))
-}
+func (m Map[K, V]) Keys() iter.Seq[K] { return maps.Keys(m) }
 
 // Values provides a stream over just the values in the map.
-func (m Map[K, V]) Values() *fun.Stream[V] {
-	pipe := fun.Blocking(make(chan V))
-
-	init := fnx.Operation(func(ctx context.Context) {
-		defer pipe.Close()
-		send := pipe.Send()
-		for k := range m {
-			if !send.Check(ctx, m[k]) {
-				break
-			}
-		}
-	}).Go().Once()
-
-	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(init))
-}
+func (m Map[K, V]) Values() iter.Seq[V] { return maps.Values(m) }
