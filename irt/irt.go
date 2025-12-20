@@ -19,7 +19,18 @@ func Collect2[K comparable, V any](seq iter.Seq2[K, V], args ...int) map[K]V {
 	return mp
 }
 
-func CollectFirstN[T any](seq iter.Seq[T], n int) []T { return nil }
+func CollectFirstN[T any](seq iter.Seq[T], n int) []T {
+	out := make([]T, n)
+	idx := 0
+	for value := range seq {
+		out[idx] = value
+		if idx+1 == n {
+			break
+		}
+		idx++
+	}
+	return out
+}
 
 func Slice[T any](sl []T) iter.Seq[T]                     { return slices.Values(sl) }
 func Args[T any](items ...T) iter.Seq[T]                  { return Slice(items) }
