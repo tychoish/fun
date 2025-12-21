@@ -42,9 +42,9 @@ func CollectFirstN[T any](seq iter.Seq[T], n int) []T {
 
 func One[T any](v T) iter.Seq[T]                          { return func(yield func(T) bool) { yield(v) } }
 func Two[A, B any](a A, b B) iter.Seq2[A, B]              { return func(yield func(A, B) bool) { yield(a, b) } }
-func Slice[T any](sl []T) iter.Seq[T]                     { return slice(sl) }
+func Map[K comparable, V any](mp map[K]V) iter.Seq2[K, V] { return maps.All(mp) }
+func Slice[T any](sl []T) iter.Seq[T]                     { return slices.Values(sl) }
 func Args[T any](items ...T) iter.Seq[T]                  { return Slice(items) }
-func Map[K comparable, V any](mp map[K]V) iter.Seq2[K, V] { return table(mp) }
 
 func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] { return Flip(With(seq, wrap[T](counter()))) }
 func JoinErrors(seq iter.Seq[error]) error           { return errors.Join(slices.Collect(seq)...) }
@@ -55,7 +55,7 @@ func Second[A, B any](seq iter.Seq2[A, B]) iter.Seq[B]   { return Merge(seq, sec
 
 func Ptrs[T any](seq iter.Seq[T]) iter.Seq[*T]                { return Convert(seq, ptr) }
 func PtrsWithNils[T comparable](seq iter.Seq[T]) iter.Seq[*T] { return Convert(seq, ptrznil) }
-func Deref[T any](seq iter.Seq[*T]) iter.Seq[T]               { return Convert(WithoutNils(seq), derefz) }
+func Deref[T any](seq iter.Seq[*T]) iter.Seq[T]               { return Convert(RemoveNils(seq), derefz) }
 func DerefWithZeros[T any](seq iter.Seq[*T]) iter.Seq[T]      { return Convert(seq, derefz) }
 
 func Generator[T any](gen func() (T, bool)) iter.Seq[T] {
@@ -169,10 +169,10 @@ func ApplyWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) (count int) 
 	for key, value := range seq {
 		count++
 		if !op(key, value) {
-			return count
+			break
 		}
-		return count
 	}
+	return count
 }
 
 func ApplyUnless2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) int {
@@ -260,13 +260,45 @@ func Chain[T any](seq iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 		}
 	}
 }
-func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T] { return Chain(Convert(seq, slice)) }
+func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T]           { return Chain(Convert(seq, Slice)) }
+func RemoveNils[T any](seq iter.Seq[*T]) iter.Seq[*T]            { return Remove(seq, isNil) }
+func RemoveZeros[T comparable](seq iter.Seq[T]) iter.Seq[T]      { return Remove(seq, isZero) }
+func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return KeepOk(Convert2(seq, checkErr)) }
+func KeepOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]           { return First(Keep2(seq, isOk)) }
+func WhileOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]          { return First(While2(seq, isOk)) }
+func WhileSuccess[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return First(While2(seq, isSuccess2)) }
+func UntilError[T any](seq iter.Seq2[T, error]) iter.Seq[T]      { return First(Until2(seq, isError2)) }
+func Until[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return While(seq, negate(prd)) }
+func Until2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
+	return While2(seq, negate2(prd))
+}
 
-func WithoutNils[T any](seq iter.Seq[*T]) iter.Seq[*T]            { return Remove(seq, isNil) }
-func WithoutZeros[T comparable](seq iter.Seq[T]) iter.Seq[T]      { return Remove(seq, isZero) }
-func WithoutErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return AllOk(Convert2(seq, checkErr)) }
-func AllOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]             { return First(Remove2(seq, isOk)) }
-func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, negate(prd)) }
+func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for value := range seq {
+			switch {
+			case prd(value) && yield(value):
+				continue
+			default:
+				return
+			}
+		}
+	}
+}
+
+func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		for key, value := range seq {
+			switch {
+			case prd(key, value) && yield(key, value):
+				continue
+			default:
+				return
+			}
+		}
+	}
+}
+
 func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for value := range seq {
@@ -287,6 +319,7 @@ func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	}
 }
 
+func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, negate(prd)) }
 func Remove2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	return Keep2(seq, negate2(prd))
 }
@@ -383,10 +416,8 @@ func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
 
 // aliases of stdlib
 
-func slice[E any, S ~[]E](sl S) iter.Seq[E]                       { return slices.Values(sl) }
-func table[K comparable, V any, M ~map[K]V](in M) iter.Seq2[K, V] { return maps.All(in) }
-func keys[K comparable, V any, M ~map[K]V](in M) iter.Seq[K]      { return maps.Keys(in) }
-func values[K comparable, V any, M ~map[K]V](in M) iter.Seq[V]    { return maps.Values(in) }
+func keys[K comparable, V any, M ~map[K]V](in M) iter.Seq[K]   { return maps.Keys(in) }
+func values[K comparable, V any, M ~map[K]V](in M) iter.Seq[V] { return maps.Values(in) }
 
 // statefull function utilities
 
@@ -441,9 +472,12 @@ func negate2[A, B any](op func(A, B) bool) func(A, B) bool {
 
 func isNil[T any](in *T) bool                  { return in == nil }
 func isZero[T comparable](in T) bool           { var zero T; return in == zero }
+func isNonZero[T comparable](in T) bool        { return not(isZero(in)) }
 func isOk[T any](_ T, ok bool) bool            { return ok }
 func isError(err error) bool                   { return err != nil }
+func isError2[T any](_ T, err error) bool      { return err != nil }
 func isSuccess(err error) bool                 { return err == nil }
+func isSuccess2[T any](_ T, err error) bool    { return err == nil }
 func zero[T any]() (zero T)                    { return zero }
 func zerofor[T any](T) (zero T)                { return zero }
 func checkErr[T any](v T, err error) (T, bool) { ok := isError(err); return ifelsedo(ok, v, zero), ok }
@@ -636,7 +670,7 @@ func (og *orderedGrouping[K, V]) with(fn func(V) K) func(V) {
 }
 
 func (og *orderedGrouping[K, V]) append(key K)            { og.order = append(og.order, key) }
-func (og *orderedGrouping[K, V]) iter() iter.Seq2[K, []V] { return With(slice(og.order), og.table.pop) }
+func (og *orderedGrouping[K, V]) iter() iter.Seq2[K, []V] { return With(Slice(og.order), og.table.pop) }
 
 func mapPop[K comparable, V any](mp map[K]V, k K) (V, bool) {
 	v, ok := mp[k]
