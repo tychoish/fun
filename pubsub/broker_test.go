@@ -588,8 +588,8 @@ func TestBroker(t *testing.T) {
 		popsig := make(chan struct{})
 		go func() {
 			defer close(popsig)
-			if err := broker.Populate(iter).Run(ctx); err != nil {
-				t.Error(err)
+			for it := range iter.Iterator(ctx) {
+				broker.Send(ctx, it)
 			}
 		}()
 

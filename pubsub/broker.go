@@ -165,7 +165,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 				})
 			case msg := <-b.publishCh:
 				count++
-				if err := dist.Send(ctx, msg); err != nil {
+				if err := dist.Write(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
 					// result of user configuration (and we don't log anyway,) or
 					// the queue has been closed (return), but otherwise
@@ -193,7 +193,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 		go func() {
 			defer b.wg.Done()
 			for {
-				msg, err := dist.Receive(ctx)
+				msg, err := dist.Read(ctx)
 				if err != nil {
 					return
 				}
@@ -223,14 +223,6 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T
 		_ = iter.Close()
 	}
 }
-
-// Populate creates a fun.Worker function that publishes items from
-// the input stream to the broker, returning when its context
-// expires or the stream is closed (propagating its error).
-//
-// Callers should avoid using a stream that will retain input
-// items in memory.
-func (b *Broker[T]) Populate(iter *fun.Stream[T]) fnx.Worker { return iter.ReadAll(b.Send) }
 
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {

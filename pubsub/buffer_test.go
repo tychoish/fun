@@ -37,7 +37,7 @@ func TestDistributor(t *testing.T) {
 				sig := make(chan struct{})
 				go func() {
 					defer close(sig)
-					err := buf.Send(ctx, "kip")
+					err := buf.Write(ctx, "kip")
 					if err == nil {
 						t.Error("expected error")
 					}
@@ -71,7 +71,7 @@ func TestDistributor(t *testing.T) {
 				t.Fatal(queue.tracker.len())
 			}
 
-			iter := dist.Stream()
+			iter := fun.InterfaceStream(dist)
 			go func() {
 				time.Sleep(250 * time.Millisecond)
 				assert.NotError(t, queue.Close())
@@ -106,13 +106,13 @@ func TestDistributor(t *testing.T) {
 				WithInputFilter(func(in int) bool { t.Log(in); return in%2 == 0 && in != 0 })
 
 			for i := 0; i < 100; i++ {
-				assert.NotError(t, dist.Send(ctx, i))
+				assert.NotError(t, dist.Write(ctx, i))
 			}
 
 			ch.Close()
 
 			count := 0
-			err := dist.Stream().
+			err := fun.InterfaceStream(dist).
 				ReadAll(fnx.FromHandler(func(in int) {
 					count++
 					check.True(t, ft.Not(in == 0))
@@ -134,9 +134,8 @@ func TestDistributor(t *testing.T) {
 
 			ch.Close()
 			count := 0
-			err := DistributorChanOp(ch).
-				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 }).
-				Stream().
+			err := fun.InterfaceStream(DistributorChanOp(ch).
+				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 })).
 				ReadAll(fnx.FromHandler(func(in int) {
 					count++
 					check.True(t, ft.Not(in == 0))
@@ -251,7 +250,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 				go func() {
 					defer close(ch)
 					for input.Next(ctx) {
-						err := out.Send(ctx, input.Value())
+						err := out.Write(ctx, input.Value())
 						if err != nil {
 							break
 						}
@@ -268,7 +267,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.Distributor()
-				send := out.Send
+				send := out.Write
 				go func() {
 					defer func() { _ = queue.Close() }()
 					for input.Next(ctx) {
@@ -303,7 +302,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 				go func() {
 					defer close(signal)
 					for {
-						pop, err := d.Receive(ctx)
+						pop, err := d.Read(ctx)
 						if err != nil {
 							break
 						}
@@ -351,7 +350,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 				go func() {
 					defer close(signal)
 					for {
-						_, err := d.Receive(ctx)
+						_, err := d.Read(ctx)
 						if err != nil {
 							break
 						}
@@ -374,7 +373,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 					go func() {
 						defer wg.Done()
 						for {
-							_, err := d.Receive(ctx)
+							_, err := d.Read(ctx)
 							if err != nil {
 								break
 							}
