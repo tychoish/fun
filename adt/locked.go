@@ -3,25 +3,7 @@ package adt
 import (
 	"fmt"
 	"sync"
-
-	"github.com/tychoish/fun/fn"
 )
-
-// AccessorsWithLock takes a getter/setter pair and configures both
-// with a shared mutex: all read/write operations are fully
-// synchronized with regards to eachother.
-func AccessorsWithLock[T any](getter fn.Future[T], setter fn.Handler[T]) (fn.Future[T], fn.Handler[T]) {
-	lock := &sync.Mutex{}
-	return getter.WithLock(lock), setter.WithLock(lock)
-}
-
-// AccessorsWithReadLock takes a getter/setter pair and configures
-// them with a rw-mutex: the getter (Future) uses the read lock, while
-// the setter is write-locked.
-func AccessorsWithReadLock[T any](getter fn.Future[T], setter fn.Handler[T]) (fn.Future[T], fn.Handler[T]) {
-	lock := &sync.RWMutex{}
-	return getter.WithLocker(lock.RLocker()), setter.WithLocker(lock)
-}
 
 // Synchronized wraps an arbitrary type with a lock, and provides a
 // functional interface for interacting with that type. In general
@@ -75,7 +57,7 @@ func LockW(m *sync.RWMutex) *sync.RWMutex { m.Lock(); return m }
 func NewSynchronized[T any](in T) *Synchronized[T] { return &Synchronized[T]{obj: in} }
 
 // With runs the input function within the lock, to mutate the object.
-func (s *Synchronized[T]) With(in func(obj T)) { s.Using(func() { in(s.obj) }) }
+func (s *Synchronized[T]) With(in func(obj T)) { defer With(Lock(&s.mtx)); in(s.obj) }
 
 // Set overrides the current value of the protected object.
 func (s *Synchronized[T]) Set(in T) { s.Store(in) }

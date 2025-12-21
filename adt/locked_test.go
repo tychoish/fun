@@ -1,18 +1,14 @@
 package adt
 
 import (
-	"context"
 	"math/rand"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
 )
 
 func TestLocked(t *testing.T) {
@@ -90,110 +86,42 @@ func TestLocked(t *testing.T) {
 		defer with(lock(mtx))
 		t.Log("defered")
 	})
-	t.Run("Accessors", func(t *testing.T) {
-		t.Run("Mutex", func(t *testing.T) {
-			var getter fn.Future[int]
-			var setter fn.Handler[int]
-			getCalled := &atomic.Bool{}
-			setCalled := &atomic.Bool{}
-
-			getter = func() int { getCalled.Store(true); return 42 }
-			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(200 * time.Millisecond) }
-			mget, mset := AccessorsWithLock(getter, setter)
-			start := time.Now()
-			sw := func() { go mset.Read(267) }
-			sw()
-			runtime.Gosched()
-			sig := make(chan struct{})
-			go func() {
-				defer close(sig)
-				sw()
-				check.MinRuntime(t, 100*time.Millisecond, func() { check.Equal(t, 42, mget()) })
-				if time.Since(start) < 100*time.Millisecond {
-					t.Log(time.Since(start))
-				}
-			}()
-
-			<-sig
-			check.True(t, getCalled.Load())
-			check.True(t, setCalled.Load())
-		})
-		t.Run("RWMutex", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			var getter fn.Future[int]
-			var setter fn.Handler[int]
-			getCalled := &atomic.Bool{}
-			setCalled := &atomic.Bool{}
-
-			getter = func() int { getCalled.Store(true); return 42 }
-			setter = func(in int) { setCalled.Store(true); check.Equal(t, in, 267); time.Sleep(100 * time.Millisecond) }
-			mget, mset := AccessorsWithReadLock(getter, setter)
-			start := time.Now()
-
-			sw := func() { go check.NotError(t, fnx.MakeHandler(mset.RecoverPanic).Read(ctx, 267)) }
-			go sw()
-
-			runtime.Gosched()
-			wg := &sync.WaitGroup{}
-			wg.Add(2)
+	t.Run("LockerRead", func(t *testing.T) {
+		mtx := &sync.RWMutex{}
+		var number int64
+		wg := &sync.WaitGroup{}
+		for range 2 * runtime.NumCPU() {
+			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				sw()
-				if time.Since(start) < 100*time.Millisecond {
-					t.Log(time.Since(start))
+				for range 1000 {
+					func() {
+						defer WithW(LockW(mtx))
+						switch number {
+						case 0:
+							number = 2
+						case 2:
+							number = 4
+						case 4:
+							number = 8
+						case 8:
+							number = 16
+						case 16:
+							number = 32
+						case 32:
+							number = 2
+						default:
+							panic("should never happen")
+						}
+						time.Sleep(1 + time.Duration(rand.Int63n(number)))
+					}()
 				}
 			}()
-			go func() {
-				defer wg.Done()
-				check.Equal(t, mget(), 42)
-				if time.Since(start) < 100*time.Millisecond {
-					t.Log(time.Since(start))
-				}
-			}()
+		}
 
-			wg.Wait()
-			check.True(t, getCalled.Load())
-			check.True(t, setCalled.Load())
-		})
-		t.Run("LockerRead", func(t *testing.T) {
-			mtx := &sync.RWMutex{}
-			var number int64
-			wg := &sync.WaitGroup{}
-			for range 2 * runtime.NumCPU() {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for range 1000 {
-						func() {
-							defer WithW(LockW(mtx))
-							switch number {
-							case 0:
-								number = 2
-							case 2:
-								number = 4
-							case 4:
-								number = 8
-							case 8:
-								number = 16
-							case 16:
-								number = 32
-							case 32:
-								number = 2
-							default:
-								panic("should never happen")
-							}
-							time.Sleep(1 + time.Duration(rand.Int63n(number)))
-						}()
-					}
-				}()
-			}
+		wg.Wait()
 
-			wg.Wait()
-
-			assert.Zero(t, number%4)
-		})
+		assert.Zero(t, number%4)
 	})
 	t.Run("LockR", func(t *testing.T) {
 		// straigtht forward, just making sure we don't panic
