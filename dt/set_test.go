@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -107,29 +106,6 @@ func TestSet(t *testing.T) {
 					t.Error("should have only added key once")
 				}
 			})
-			t.Run("AvoidLeaks", func(t *testing.T) {
-				set := builder()
-				set.Add("abc")
-				set.Add("def")
-
-				ctx, cancel := context.WithCancel(context.Background())
-				before := runtime.NumGoroutine()
-				_, err := set.hash.Keys().Read(ctx)
-				assert.NotError(t, err)
-				_, err = set.hash.Values().Read(ctx)
-				assert.NotError(t, err)
-
-				during := runtime.NumGoroutine()
-				assert.True(t, during >= before)
-
-				time.Sleep(50 * time.Millisecond)
-				cancel()
-				time.Sleep(50 * time.Millisecond)
-
-				after := runtime.NumGoroutine()
-				assert.True(t, before >= after)
-			})
-
 			t.Run("Delete", func(t *testing.T) {
 				set := builder()
 				set.Add("abc")
@@ -492,14 +468,15 @@ func TestSet(t *testing.T) {
 			in := []int{1, 2, 3, 4, 5, 6}
 			st := &Set[int]{}
 			st.Order()
-			st.AppendStream(NewSlice(in).Stream())
+
+			st.AppendStream(irt.Slice(in))
 			assert.Equal(t, st.Len(), 6)
 			assert.True(t, slices.Equal(in, st.Slice()))
 		})
 		t.Run("Unordered", func(t *testing.T) {
 			in := []int{1, 2, 3, 4, 5, 6}
 			st := &Set[int]{}
-			st.AppendStream(NewSlice(in).Stream())
+			st.AppendStream(irt.Slice(in))
 			assert.Equal(t, st.Len(), 6)
 			out := st.Slice()
 			assert.Equal(t, len(out), 6)

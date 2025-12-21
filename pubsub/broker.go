@@ -197,7 +197,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 				if err != nil {
 					return
 				}
-				b.dispatchMessage(ctx, subs.Keys(), msg)
+				b.dispatchMessage(ctx, fun.SeqStream(subs.Keys()), msg)
 			}
 		}()
 	}

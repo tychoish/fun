@@ -161,15 +161,6 @@ func TestSort(t *testing.T) {
 			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
 			assert.ErrorIs(t, err, ErrUninitializedContainer)
 		})
-		t.Run("StreamConstructor", func(t *testing.T) {
-			iter := NewSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}).Stream()
-			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
-			err := heap.AppendStream(iter).Run(ctx)
-			assert.NotError(t, err)
-			assert.Equal(t, heap.Len(), 10)
-			assert.Equal(t, heap.data.Back().Value(), 9)
-			assert.Equal(t, heap.data.Front().Value(), 0)
-		})
 		t.Run("Stream", func(t *testing.T) {
 			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
 			if heap.Len() != 0 {
@@ -186,20 +177,16 @@ func TestSort(t *testing.T) {
 				t.Fatal("heap should have expected number of items", heap.Len())
 			}
 			last := math.MinInt
-			iter := heap.Stream()
 			seen := 0
-			for iter.Next(ctx) {
+			for value := range heap.Iterator() {
 				seen++
-				current := iter.Value()
+				current := value
 				if current == 0 {
 					t.Fatal("should not see zero ever", seen)
 				}
 				if last > current {
 					t.Error(seen, last, ">", current)
 				}
-			}
-			if err := iter.Close(); err != nil {
-				t.Fatal(err)
 			}
 			if seen != 100 {
 				t.Log("saw incorrect number of items", seen)

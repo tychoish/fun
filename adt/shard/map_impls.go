@@ -2,9 +2,9 @@ package shard
 
 import (
 	"fmt"
+	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 )
@@ -63,8 +63,8 @@ type oomap[K comparable, V any] interface {
 	Store(K, V)
 	Delete(K)
 	Check(K) bool
-	Keys() *fun.Stream[K]
-	Values() *fun.Stream[V]
+	Keys() iter.Seq[K]
+	Values() iter.Seq[V]
 }
 
 type vmap[K comparable, V any] oomap[K, *Versioned[V]]
@@ -79,13 +79,13 @@ func (m *rmtxMap[K, V]) Delete(k K)         { defer adt.WithW(adt.LockW(&m.mu));
 func (m *rmtxMap[K, V]) Load(k K) (V, bool) { defer adt.WithR(adt.LockR(&m.mu)); return m.d.Load(k) }
 func (m *rmtxMap[K, V]) Check(k K) bool     { defer adt.WithR(adt.LockR(&m.mu)); return m.d.Check(k) }
 
-func (m *rmtxMap[K, V]) Keys() *fun.Stream[K] {
+func (m *rmtxMap[K, V]) Keys() iter.Seq[K] {
 	defer adt.WithR(adt.LockR(&m.mu))
 
 	return m.d.Keys()
 }
 
-func (m *rmtxMap[K, V]) Values() *fun.Stream[V] {
+func (m *rmtxMap[K, V]) Values() iter.Seq[V] {
 	defer adt.WithR(adt.LockR(&m.mu))
 
 	return m.d.Values()
@@ -101,12 +101,12 @@ func (m *mtxMap[K, V]) Delete(k K)         { defer adt.With(adt.Lock(&m.mu)); m.
 func (m *mtxMap[K, V]) Load(k K) (V, bool) { defer adt.With(adt.Lock(&m.mu)); return m.d.Load(k) }
 func (m *mtxMap[K, V]) Check(k K) bool     { defer adt.With(adt.Lock(&m.mu)); return m.d.Check(k) }
 
-func (m *mtxMap[K, V]) Keys() *fun.Stream[K] {
+func (m *mtxMap[K, V]) Keys() iter.Seq[K] {
 	defer adt.With(adt.Lock(&m.mu))
 	return m.d.Keys()
 }
 
-func (m *mtxMap[K, V]) Values() *fun.Stream[V] {
+func (m *mtxMap[K, V]) Values() iter.Seq[V] {
 	defer adt.With(adt.Lock(&m.mu))
 	return m.d.Values()
 }

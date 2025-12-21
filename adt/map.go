@@ -1,15 +1,13 @@
 package adt
 
 import (
-	"context"
 	"encoding/json"
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 // Map provides a wrapper around the standard library's sync.Map type
@@ -98,11 +96,7 @@ func (mp *Map[K, V]) EnsureDefault(key K, constr func() V) V {
 // reflect a specific snapshot of the map if the map is being modified
 // while being marshaled: keys will only appear at most once but order
 // or which version of a value is not defined.
-func (mp *Map[K, V]) MarshalJSON() ([]byte, error) {
-	out := map[K]V{}
-	mp.Range(func(k K, v V) bool { out[k] = v; return true })
-	return json.Marshal(out)
-}
+func (mp *Map[K, V]) MarshalJSON() ([]byte, error) { return json.Marshal(irt.Collect2(mp.Iterator())) }
 
 // UnmarshalJSON takes a json sequence and adds the values to the
 // map. This does not remove or reset the values in the map, and other
@@ -155,13 +149,11 @@ func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Iterator()(fn) }
 // advances lazily through the Range operation as callers advance the
 // stream. Be aware that this produces a stream that does not reflect
 // any particular atomic state of the underlying map.
-func (mp *Map[K, V]) Stream() *fun.Stream[dt.Pair[K, V]] { return makeMapStream(mp, dt.MakePair) }
+func (mp *Map[K, V]) Stream() iter.Seq[dt.Pair[K, V]] { return irt.Merge(mp.Iterator(), dt.MakePair) }
 
 // Iterator returns a native go iterator for a fun/dt.Map object.
 func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
-	return func(fn func(K, V) bool) {
-		mp.mp.Range(func(ak, av any) bool { return fn(ak.(K), av.(V)) })
-	}
+	return func(yield func(K, V) bool) { mp.mp.Range(func(ak, av any) bool { return yield(ak.(K), av.(V)) }) }
 }
 
 // Keys returns a stream that renders all of the keys in the map.
@@ -170,7 +162,7 @@ func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
 // advances lazily through the Range operation as callers advance the
 // stream. Be aware that this produces a stream that does not reflect
 // any particular atomic of the underlying map.
-func (mp *Map[K, V]) Keys() *fun.Stream[K] { return makeMapStream(mp, func(k K, _ V) K { return k }) }
+func (mp *Map[K, V]) Keys() iter.Seq[K] { return irt.First(mp.Iterator()) }
 
 // Values returns a stream that renders all of the values in the
 // map.
@@ -179,18 +171,4 @@ func (mp *Map[K, V]) Keys() *fun.Stream[K] { return makeMapStream(mp, func(k K, 
 // advances lazily through the Range operation as callers advance the
 // stream. Be aware that this produces a stream that does not
 // reflect any particular atomic of the underlying map.
-func (mp *Map[K, V]) Values() *fun.Stream[V] { return makeMapStream(mp, func(_ K, v V) V { return v }) }
-
-func makeMapStream[K comparable, V any, O any](
-	mp *Map[K, V],
-	rf func(K, V) O,
-) *fun.Stream[O] {
-	pipe := fun.Blocking(make(chan O))
-	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).
-		PreHook(fnx.Operation(func(ctx context.Context) {
-			send := pipe.Send()
-			mp.Range(func(key K, value V) bool {
-				return send.Check(ctx, rf(key, value))
-			})
-		}).PostHook(pipe.Close).Go().Once()))
-}
+func (mp *Map[K, V]) Values() iter.Seq[V] { return irt.Second(mp.Iterator()) }

@@ -1,11 +1,9 @@
 package dt
 
 import (
-	"context"
 	"iter"
 	"maps"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 )
@@ -112,15 +110,6 @@ func (m Map[K, V]) ExtendWithTuples(tuples *Tuples[K, V]) {
 	tuples.Stream().ReadAll(fnx.FromHandler(m.AddTuple)).Ignore().Wait()
 }
 
-// ExtendWithStream adds items to the map. If a key already exists in the
-// map, it will be overwritten for subsequent appearances of that key.
-//
-// This operation is lazy, and returns a Worker (future) function that
-// must be excuted to process the stream.
-func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fnx.Worker {
-	return it.ReadAll(fnx.FromHandler(m.AddPair))
-}
-
 // Stream converts a map into a stream of dt.Pair objects. The
 // stream is panic-safe, and uses one go routine to track the
 // progress through the map. As a result you should always, either
@@ -133,21 +122,7 @@ func (m Map[K, V]) ExtendWithStream(it *fun.Stream[Pair[K, V]]) fnx.Worker {
 // Use in combination with other stream processing tools
 // (futures, observers, transformers, etc.) to limit the number of
 // times a collection of data must be coppied.
-func (m Map[K, V]) Stream() *fun.Stream[Pair[K, V]] {
-	pipe := fun.Blocking(make(chan Pair[K, V]))
-
-	init := fnx.Operation(func(ctx context.Context) {
-		defer pipe.Close()
-		send := pipe.Send()
-		for k, v := range m {
-			if !send.Check(ctx, MakePair(k, v)) {
-				break
-			}
-		}
-	}).Go().Once()
-
-	return fun.MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(init))
-}
+func (m Map[K, V]) Iterator() iter.Seq2[K, V] { return maps.All(m) }
 
 // Keys provides a stream over just the keys in the map.
 func (m Map[K, V]) Keys() iter.Seq[K] { return maps.Keys(m) }

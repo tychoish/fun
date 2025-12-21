@@ -2,6 +2,7 @@ package dt
 
 import (
 	"context"
+	"encoding/json"
 	"iter"
 	"maps"
 	"sync"
@@ -37,7 +38,7 @@ func NewSetFromSlice[T comparable](in []T) *Set[T] {
 // of the map, and may not therefore roundtrip.
 func NewSetFromMap[K, V comparable](in map[K]V) *Set[Pair[K, V]] {
 	out := &Set[Pair[K, V]]{}
-	out.AppendStream(irt.Map(in))
+	out.AppendStream(irt.Merge(irt.Map(in), MakePair))
 	return out
 }
 
@@ -211,32 +212,26 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 		return false
 	}
 
-	ctx := context.Background()
 	iter := s.unsafeStream()
 
 	if s.isOrdered() {
-		otherIter := other.Stream()
-		for iter.Next(ctx) && otherIter.Next(ctx) {
-			if iter.Value() != otherIter.Value() {
-				return false
-			}
-		}
-
-		return iter.Close() == nil && otherIter.Close() == nil
+		return irt.Equal(iter, other.Iterator())
 	}
 
 	return maps.Equal(s.hash, other.hash)
 }
 
 // MarshalJSON generates a JSON array of the items in the set.
-func (s *Set[T]) MarshalJSON() ([]byte, error) { return s.Stream().MarshalJSON() }
+func (s *Set[T]) MarshalJSON() ([]byte, error) { return json.Marshal(s.Slice()) }
 
 // UnmarshalJSON reads input JSON data, constructs an array in memory
 // and then adds items from the array to existing set. Items that are
 // in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
-	iter := NewSlice([]T{}).Stream()
-	iter.AddError(iter.UnmarshalJSON(in))
-	s.AppendStream(iter)
-	return iter.Close()
+	var items []T
+	err := json.Unmarshal(in, &items)
+	if err == nil {
+		ft.ApplyMany(s.Add, items)
+	}
+	return err
 }

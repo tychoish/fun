@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"context"
 	"iter"
 	"slices"
 	"sort"
@@ -9,8 +8,8 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 // Slice is just a local wrapper around a slice, providing a similarly
@@ -97,26 +96,6 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 	}
 }
 
-// Transform processes a slice of one type into a slice of another
-// type using the transformation function. Errors abort the
-// transformation, with the exception of ers.ErrCurrentOpSkip. All
-// errors are returned to the caller, except io.EOF which indicates
-// the (early) end of iteration.
-func Transform[T any, O any](in Slice[T], op fnx.Converter[T, O]) fnx.Future[Slice[O]] {
-	out := NewSlice(make([]O, 0, len(in)))
-
-	return func(ctx context.Context) (Slice[O], error) {
-		if err := fun.Convert(op).Stream(in.Stream()).ReadAll(fnx.FromHandler(out.Push)).Run(ctx); err != nil {
-			return nil, err
-		}
-		return out, nil
-	}
-}
-
-// Stream returns a stream to the items of the slice the range
-// keyword also works for these slices.
-func (s Slice[T]) Stream() *fun.Stream[T] { return fun.SliceStream(s) }
-
 // Iterator returns the contents of a slice as a standard Go iterator, equivalent/wrapping slices.Values().
 func (s Slice[T]) Iterator() iter.Seq[T] { return slices.Values(s) }
 
@@ -138,12 +117,6 @@ func (s *Slice[T]) Prepend(in ...T) { *s = append(in, *s...) }
 
 // AppendSlice adds the items from the input slice to the root slice.
 func (s *Slice[T]) AppendSlice(in []T) { *s = append(*s, in...) }
-
-// AppendStream creates a worker an operation that adds all items from the stream to the slice when the worker calls. The Worker
-// must be called, with a context, to modify the slice.
-func (s *Slice[T]) AppendStream(iter *fun.Stream[T]) fnx.Worker {
-	return iter.ReadAll(fnx.FromHandler(s.Push))
-}
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }
@@ -283,15 +256,5 @@ func (s Slice[T]) Ptrs() []*T {
 // reflection), if the value is nil, and only adds the item when it is
 // not-nil.
 func (s Slice[T]) Sparse() Slice[T] {
-	// use a List to avoid (over) pre-allocating.
-	buf := &List[T]{}
-	for idx := range s {
-		if !ft.IsNil(s[idx]) {
-			buf.PushBack(s[idx])
-		}
-	}
-
-	out := NewSlice(make([]T, 0, buf.Len()))
-	out.AppendStream(buf.StreamPopFront()).Ignore().Wait()
-	return out
+	return irt.Collect(irt.Remove(irt.Slice(s), func(in T) bool { return ft.IsNil(in) }))
 }

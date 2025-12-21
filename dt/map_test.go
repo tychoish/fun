@@ -1,16 +1,13 @@
 package dt
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func makeMap(size int) Map[string, int] {
@@ -23,14 +20,10 @@ func makeMap(size int) Map[string, int] {
 
 func TestMap(t *testing.T) {
 	t.Run("ExpectedSize", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		mp := makeMap(100)
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
 		check.Equal(t, mp.Pairs().Len(), 100)
-		check.Equal(t, mp.Stream().Count(ctx), 100)
 	})
 	t.Run("Extend", func(t *testing.T) {
 		mp := makeMap(100)
@@ -44,34 +37,15 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("Append", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		mp := makeMap(100)
 
 		// noop because same keys
-		mp.Append(ft.Must(mp.Pairs().Stream().Slice(ctx))...)
+		mp.Append(irt.Collect(mp.Pairs().Iterator())...)
 		check.Equal(t, mp.Len(), 100)
 
 		// works because different keys, probably
-		mp.Append(ft.Must(makeMap(100).Stream().Slice(ctx))...)
+		mp.Append(irt.Collect(makeMap(100).Pairs().Iterator())...)
 		check.Equal(t, mp.Len(), 200)
-	})
-	t.Run("Canceled", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		num := int(time.Microsecond)
-		mp := makeMap(num)
-
-		check.True(t, mp.Stream().Count(ctx) == mp.Len())
-
-		iter := mp.Stream()
-		check.True(t, iter.Next(ctx))
-
-		cancel()
-
-		check.True(t, !iter.Next(ctx))
-
-		check.True(t, mp.Stream().Count(ctx) < num)
 	})
 	t.Run("SetDefaultAndCheck", func(t *testing.T) {
 		mp := Map[string, bool]{}
@@ -115,18 +89,14 @@ func TestMap(t *testing.T) {
 		check.Equal(t, mp["3"], 3)
 	})
 	t.Run("MapConverter", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		in := map[string]string{
 			"hi":  "there",
 			"how": "are you doing",
 		}
 
-		iter := NewMap(in).Stream()
+		mp := NewMap(in)
 		seen := 0
-		for iter.Next(ctx) {
-			item := iter.Value()
+		for item := range mp.Pairs().Iterator() {
 			switch item.Key {
 			case "hi":
 				check.Equal(t, item.Value, "there")
@@ -143,20 +113,7 @@ func TestMap(t *testing.T) {
 		assert.NotPanic(t, func() { NewSlice([]int{1, 2, 3}) })
 		assert.NotPanic(t, func() { NewMap(map[string]int{"a": 1, "b": 2, "c": 3}) })
 	})
-	t.Run("ConsumeStream", func(t *testing.T) {
-		source := makeMap(300)
-		target := NewMap(map[string]int{})
-		assert.NotError(t, target.ExtendWithStream(source.Stream()).Run(t.Context()))
-		assert.Equal(t, source.Len(), target.Len())
-		for pair := range source.Stream().Iterator(t.Context()) {
-			assert.True(t, target.Check(pair.Key))
-			assert.Equal(t, pair.Value, target.Get(pair.Key))
-		}
-	})
 	t.Run("Constructors", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		t.Run("MapKeys", func(t *testing.T) {
 			mp := Map[string, int]{}
 			mp.Add("big", 42)
@@ -165,7 +122,7 @@ func TestMap(t *testing.T) {
 			keys := mp.Keys()
 
 			count := 0
-			err := keys.ReadAll(fnx.FromHandler(func(in string) {
+			report := irt.Apply(keys, func(in string) {
 				switch in {
 				case "big":
 					count++
@@ -176,9 +133,9 @@ func TestMap(t *testing.T) {
 				default:
 					t.Error("unexpected", in)
 				}
-			})).Run(ctx)
+			})
 			assert.Equal(t, 3, count)
-			assert.NotError(t, err)
+			assert.Equal(t, 3, report)
 		})
 		t.Run("MapValues", func(t *testing.T) {
 			mp := Map[string, int]{}
@@ -189,7 +146,7 @@ func TestMap(t *testing.T) {
 			keys := mp.Values()
 
 			count := 0
-			err := keys.ReadAll(fnx.FromHandler(func(in int) {
+			report := irt.Apply(keys, func(in int) {
 				switch in {
 				case 42:
 					count++
@@ -200,9 +157,9 @@ func TestMap(t *testing.T) {
 				default:
 					t.Error("unexpected", in)
 				}
-			})).Run(ctx)
+			})
 			assert.Equal(t, 3, count)
-			assert.NotError(t, err)
+			assert.Equal(t, 3, report)
 		})
 	})
 	t.Run("Default", func(t *testing.T) {

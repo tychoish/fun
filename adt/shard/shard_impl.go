@@ -1,10 +1,15 @@
+// Package shard provides a logically versioned map implementation backed by a collection of
+// independently synchronized maps.
+//
+// In the current iteration the parallel methods/helpers are not implemented with (safe?) parallelism.
 package shard
 
 import (
+	"context"
 	"fmt"
+	"iter"
 	"sync/atomic"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
@@ -31,16 +36,15 @@ func (*sh[K, V]) makeVmap(impl MapType) vmap[K, V] {
 	}
 }
 
-func (sh *sh[K, V]) read() vmap[K, V]                  { return sh.data }
-func (sh *sh[K, V]) write() vmap[K, V]                 { sh.clock.Add(1); return sh.data }
-func (sh *sh[K, V]) load(k K) (V, bool)                { v, ok := sh.read().Load(k); return v.Load(), ok }
-func (sh *sh[K, V]) keys() *fun.Stream[K]              { return sh.read().Keys() }
-func (sh *sh[K, V]) vvals() *fun.Stream[*Versioned[V]] { return sh.read().Values() }
-func (sh *sh[K, V]) values() *fun.Stream[V]            { return mapc(to(sh.inner)).Stream(sh.vvals()) }
-func (*sh[K, V]) inner(vv *Versioned[V]) V             { return vv.Load() }
-func (sh *sh[K, V]) valsp(n int) *fun.Stream[V] {
-	return mapc(to(sh.inner)).Parallel(sh.vvals(), poolOpts(n))
-}
+func (*sh[K, V]) inner(vv *Versioned[V]) V          { return vv.Load() }
+func (*sh[K, V]) ctx() context.Context              { return context.TODO() }
+func (sh *sh[K, V]) read() vmap[K, V]               { return sh.data }
+func (sh *sh[K, V]) write() vmap[K, V]              { sh.clock.Add(1); return sh.data }
+func (sh *sh[K, V]) load(k K) (V, bool)             { v, ok := sh.read().Load(k); return v.Load(), ok }
+func (sh *sh[K, V]) keys() iter.Seq[K]              { return sh.read().Keys() }
+func (sh *sh[K, V]) vvals() iter.Seq[*Versioned[V]] { return sh.read().Values() }
+func (sh *sh[K, V]) values() iter.Seq[V]            { return mapc(to(sh.inner)).Iterate(sh.ctx(), sh.vvals()) }
+func (sh *sh[K, V]) valsp(_ int) iter.Seq[V]        { return sh.values() }
 
 func (sh *sh[K, V]) store(k K, v V) {
 	mp := sh.write()

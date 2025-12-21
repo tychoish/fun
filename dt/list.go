@@ -38,25 +38,10 @@ func VariadicList[T any](elems ...T) *List[T] { return SliceList(elems) }
 func SliceList[T any](elems []T) *List[T] { l := new(List[T]); l.Append(elems...); return l }
 
 // MapList constructs a doubly-linked list of Pair objects from the elements of a map.
-func MapList[K comparable, V any](mp Map[K, V]) *List[Pair[K, V]] { return StreamList(mp.Stream()) }
+func MapList[K comparable, V any](mp Map[K, V]) *List[Pair[K, V]] { return mp.Pairs().List() }
 
 // IteratorList constructs a doubly-linked list from the elements of a Go standard library iterator.
 func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.AppendIterator(in); return l }
-
-// StreamList constructs conscturcts a doubly-linked list from the elements read from a Stream.
-func StreamList[T any](st *fun.Stream[T]) *List[T] {
-	l := new(List[T])
-	l.AppendStream(st).Ignore().Wait()
-	return l
-}
-
-// AppendStream returns a worker that adds items from the stream to the
-// list. Any error returned is either a context cancellation error or
-// the result of a panic in the input stream. The close method on
-// the input stream is not called.
-func (l *List[T]) AppendStream(iter *fun.Stream[T]) fnx.Worker {
-	return iter.ReadAll(fnx.FromHandler(l.PushBack))
-}
 
 // Append adds a variadic sequence of items to the end of the list.
 func (l *List[T]) Append(items ...T) *List[T] { return l.AppendSlice(items) }

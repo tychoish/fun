@@ -14,7 +14,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/testt"
+	"github.com/tychoish/fun/irt"
 )
 
 // When implementing the Map[K,V] type, I wrote a number of
@@ -38,18 +38,14 @@ import (
 // results if the input map is mutated during the operation. Keys and
 // values from the input map will replace keys and values from the
 // output map.
-func (mp *Map[K, V]) Join(in *Map[K, V]) {
-	in.Range(func(k K, v V) bool { mp.Store(k, v); return true })
-}
+func (mp *Map[K, V]) Join(in *Map[K, V]) { irt.Apply2(in.Iterator(), mp.Store) }
 
 // Append adds a sequence of pairs to the map.
 func (mp *Map[K, V]) Append(its ...dt.Pair[K, V]) { mp.Extend(its) }
 
 // Extend adds a slice of pairs to the map.
 func (mp *Map[K, V]) Extend(its []dt.Pair[K, V]) {
-	for _, it := range its {
-		mp.Store(it.Key, it.Value)
-	}
+	irt.Apply(irt.Slice(its), func(p dt.Pair[K, V]) { mp.Store(p.Get()) })
 }
 
 func TestMap(t *testing.T) {
@@ -164,19 +160,16 @@ func TestMap(t *testing.T) {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
-		iter := mp.Stream()
-		ctx := testt.Context(t)
+
 		count := 0
-		for iter.Next(ctx) {
+		for key, value := range mp.Iterator() {
 			count++
-			pair := iter.Value()
-			if pair.Key < 100 {
-				assert.True(t, pair.Value >= 43)
+			if key < 100 {
+				assert.True(t, value >= 43)
 				continue
 			}
-			assert.True(t, pair.Value == 42)
+			assert.True(t, value == 42)
 		}
-		assert.NotError(t, iter.Close())
 		assert.Equal(t, count, 200)
 	})
 	t.Run("Stream", func(t *testing.T) {
@@ -186,22 +179,13 @@ func TestMap(t *testing.T) {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
-		iter := mp.Stream()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		count := 0
-		for iter.Next(ctx) {
+		for value := range mp.Values() {
 			count++
-			pair := iter.Value()
-			assert.True(t, pair.Value == 42)
-			if count == 100 {
-				cancel()
-			}
+			assert.True(t, value == 42)
 		}
-		assert.NotError(t, iter.Close())
-		assert.Equal(t, count, 100)
+		assert.Equal(t, count, 200)
 	})
 	t.Run("Contains", func(t *testing.T) {
 		mp := &Map[string, int]{}
@@ -311,14 +295,12 @@ func TestMap(t *testing.T) {
 				mp.Ensure(fmt.Sprint(i))
 			}
 
-			ctx := testt.Context(t)
 			assert.Equal(t, mp.Len(), 100)
-			iter := mp.Keys()
 			count := 0
 			seen := map[string]struct{}{}
-			for iter.Next(ctx) {
+			for key := range mp.Keys() {
 				count++
-				seen[iter.Value()] = struct{}{}
+				seen[key] = struct{}{}
 			}
 			assert.Equal(t, count, 100)
 			assert.Equal(t, len(seen), 100)
@@ -330,13 +312,11 @@ func TestMap(t *testing.T) {
 				mp.Ensure(fmt.Sprint(i))
 			}
 
-			ctx := testt.Context(t)
 			assert.Equal(t, mp.Len(), 100)
-			iter := mp.Values()
 			count := 0
-			for iter.Next(ctx) {
+			for value := range mp.Values() {
 				count++
-				assert.Equal(t, iter.Value(), 38)
+				assert.Equal(t, value, 38)
 			}
 			assert.Equal(t, count, 100)
 		})

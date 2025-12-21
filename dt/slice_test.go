@@ -1,16 +1,11 @@
 package dt
 
 import (
-	"context"
-	"fmt"
-	"io"
 	"math/rand"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 )
@@ -222,26 +217,6 @@ func TestSlice(t *testing.T) {
 		assert.Equal(t, s.Last(), 49)
 		assert.Equal(t, s.Len(), 50)
 	})
-	t.Run("Stream", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		s := randomIntSlice(100)
-		iter := s.Stream()
-		count := 0
-		for iter.Next(ctx) {
-			func(val int) {
-				defer func() { count++ }()
-				check.Equal(t, val, s[count])
-				check.Equal(t, val, s.Index(count))
-				if t.Failed() {
-					t.Log("index", count)
-					t.Fail()
-				}
-			}(iter.Value())
-		}
-		assert.NotError(t, iter.Close())
-	})
 	t.Run("Empty", func(t *testing.T) {
 		s := randomIntSlice(100)
 		check.Equal(t, s.Cap(), 100)
@@ -277,56 +252,6 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, next[0], 40)
 		check.Equal(t, next[1], 42)
 	})
-	t.Run("Transform", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		t.Run("ContinueEarlEnd", func(t *testing.T) {
-			count := 0
-			out, err := Transform(randomIntSlice(100),
-				fnx.MakeConverterErr(func(in int) (string, error) {
-					count++
-					if count >= 50 {
-						return "", io.EOF
-					}
-					if count%2 == 0 {
-						return "", ers.ErrCurrentOpSkip
-					}
-					return fmt.Sprint(in), nil
-				})).Read(ctx)
-			check.NotError(t, err)
-			check.Equal(t, count, 50)
-			check.Equal(t, len(out), 25)
-			check.Equal(t, cap(out), 100)
-		})
-		t.Run("Basic", func(t *testing.T) {
-			count := 0
-			out, err := Transform(randomIntSlice(100),
-				fnx.MakeConverterErr(func(in int) (string, error) {
-					count++
-					return fmt.Sprint(in), nil
-				})).Read(ctx)
-			check.NotError(t, err)
-			check.Equal(t, count, 100)
-			check.Equal(t, len(out), 100)
-			check.Equal(t, cap(out), 100)
-		})
-		t.Run("EarlyError", func(t *testing.T) {
-			count := 0
-			out, err := Transform(randomIntSlice(100),
-				fnx.MakeConverterErr(func(in int) (string, error) {
-					if count < 10 {
-						count++
-						return fmt.Sprint(in), nil
-					}
-					return "", ers.ErrInvalidInput
-				})).Read(ctx)
-			check.Error(t, err)
-			check.ErrorIs(t, err, ers.ErrInvalidInput)
-			check.Equal(t, count, 10)
-			check.True(t, out == nil)
-		})
-	})
 	t.Run("Ptr", func(t *testing.T) {
 		strs := Slice[int]{100}
 		assert.Equal(t, *strs.Ptr(0), 100)
@@ -342,21 +267,6 @@ func TestSlice(t *testing.T) {
 		assert.NotEqual(t, *ptrs[1], 100)
 		strs[1] = 100
 		assert.Equal(t, *ptrs[1], 100)
-	})
-	t.Run("List", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		sl := randomIntSlice(128)
-		ls := &List[int]{}
-		err := ls.AppendStream(sl.Stream()).Run(ctx)
-
-		assert.NotError(t, err)
-
-		exp := ls.Slice()
-
-		check.Equal(t, sl.Len(), ls.Len())
-		check.EqualItems(t, sl, exp)
 	})
 	t.Run("Default", func(t *testing.T) {
 		t.Run("EndToEnd", func(t *testing.T) {

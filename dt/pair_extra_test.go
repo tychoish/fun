@@ -9,8 +9,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestPairExtra(t *testing.T) {
@@ -107,22 +105,6 @@ func TestPairExtra(t *testing.T) {
 			_, err := ps.MarshalJSON()
 			assert.Error(t, err)
 		})
-	})
-	t.Run("FunctionalStreams", func(t *testing.T) {
-		ctx := t.Context()
-
-		num := 1000
-		seen := &Set[int]{}
-
-		ps, err := ConsumePairs(randNumPairListFixture(t, num).StreamPopFront()).Read(ctx)
-		assert.NotError(t, err)
-		err = ps.Stream().ReadAll(fnx.FromHandler(func(p Pair[int, int]) {
-			check.Equal(t, p.Key, p.Value)
-			check.True(t, ft.Not(seen.Check(p.Key)))
-			seen.Add(p.Key)
-		})).Run(ctx)
-		assert.NotError(t, err)
-		check.Equal(t, seen.Len(), num)
 	})
 	t.Run("Consume", func(t *testing.T) {
 		ctx := t.Context()

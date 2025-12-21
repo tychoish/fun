@@ -12,38 +12,27 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/testt"
 )
 
 func TestStream(t *testing.T) {
 	t.Run("Semantics", func(t *testing.T) {
-		ctx := testt.Context(t)
 		mp := &Map[string, int]{}
 		mp.Store("one", 1)
 		mp.Store("two", 2)
 		mp.Store("three", 3)
 		mp.Store("four", 4)
 
-		iter := mp.Stream()
-
 		seen := 0
-		for iter.Next(ctx) {
+		for key, value := range mp.Iterator() {
 			seen++
-			item := iter.Value()
-			if item.Value > 4 || item.Value <= 0 {
-				t.Error(item)
+			if value > 4 || value <= 0 {
+				t.Log(key)
+				t.Error(value)
 			}
-		}
-		uiter := dt.Unwrap(iter)
-		if uiter == iter {
-			t.Error("unwrap should not be the same")
 		}
 		if seen != 4 {
 			t.Error(seen)
-		}
-		if iter.Close() != nil {
-			t.Error(iter.Close())
 		}
 	})
 	t.Run("ReadOne", func(t *testing.T) {
@@ -52,7 +41,7 @@ func TestStream(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			mp.Store(fmt.Sprint("key=", i), i)
 		}
-		iter := mp.Values()
+		iter := fun.SeqStream(mp.Values())
 		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
 		for i := 0; i < 10; i++ {
