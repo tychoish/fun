@@ -180,7 +180,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 				defer cancel()
 			}
 
-			if err := pipe.Distributor().Stream().Parallel(
+			if err := fun.InterfaceStream(pipe.Distributor()).Parallel(
 				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
 				fun.WorkerGroupConfContinueOnError(),
 				fun.WorkerGroupConfContinueOnPanic(),
@@ -200,7 +200,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 // propogated to the service's ywait function.
 func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
 	return &Service{
-		Run: workQueue.Distributor().Stream().Parallel(
+		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(
 			func(ctx context.Context, fn fnx.Worker) error {
 				return fn.Run(ctx)
 			},
@@ -232,7 +232,7 @@ func HandlerWorkerPool(
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
 	s := &Service{
-		Run: workQueue.Distributor().Stream().Parallel(
+		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(
 			func(ctx context.Context, fn fnx.Worker) error {
 				observer(fn.Run(ctx))
 				return nil

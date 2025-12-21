@@ -122,6 +122,13 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
+func InterfaceStream[T any](obj interface {
+	Read(context.Context) (T, error)
+},
+) *Stream[T] {
+	return MakeStream(obj.Read)
+}
+
 // SeqStream wraps a native go iterator to a Stream[T].
 func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)

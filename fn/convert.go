@@ -2,6 +2,7 @@ package fn
 
 import (
 	"context"
+	"iter"
 	"sync"
 
 	"github.com/tychoish/fun/ft"
@@ -66,4 +67,14 @@ func (cf Converter[I, O]) WithLocker(m sync.Locker) Converter[I, O] {
 // WithContext returns a wrapped version of the converter function that has he same signature as fnx.Converter functions.
 func (cf Converter[I, O]) WithContext() func(context.Context, I) (O, error) {
 	return func(_ context.Context, in I) (O, error) { return cf(in), nil }
+}
+
+func (cf Converter[I, O]) Iterator(input iter.Seq[I]) iter.Seq[O] {
+	return func(yield func(O) bool) {
+		for value := range input {
+			if !yield(cf.Convert(value)) {
+				return
+			}
+		}
+	}
 }
