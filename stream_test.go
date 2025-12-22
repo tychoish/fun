@@ -665,9 +665,9 @@ func TestStream(t *testing.T) {
 
 		pipe := make(chan string)
 		iter := JoinStreams(
-			Blocking(pipe).Stream(),
-			Blocking(pipe).Stream(),
-			Blocking(pipe).Stream(),
+			Blocking(pipe).Receive().Stream(),
+			Blocking(pipe).Receive().Stream(),
+			Blocking(pipe).Receive().Stream(),
 		)
 
 		ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)

@@ -63,7 +63,7 @@ func Group(services iter.Seq[*Service]) *Service {
 			// services. This will cause our "group service" to
 			// have the same semantics as a single service, however.
 
-			for value := range waiters.Seq(ctx) {
+			for value := range waiters.Iterator(ctx) {
 				wg.Add(1)
 				go func(wait func() error) {
 					defer ec.Recover()
@@ -149,7 +149,7 @@ func ProcessStream[T any](
 	processor fnx.Handler[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
-	st := fun.SeqStream(seq)
+	st := fun.IteratorStream(seq)
 	return &Service{
 		Run:      st.Parallel(processor, optp...),
 		Shutdown: st.Close,

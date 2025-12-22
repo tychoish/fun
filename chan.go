@@ -1,9 +1,6 @@
 package fun
 
 import (
-	"context"
-	"iter"
-
 	"github.com/tychoish/fun/ers"
 )
 
@@ -80,10 +77,7 @@ func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlo
 // underlying channel, which makes it safe to call on nil or
 // already-closed channels: the result in all cases (that the channel
 // is closed when Close() returns, is the same in all cases.)
-func (op ChanOp[T]) Close() {
-	defer func() { _ = recover() }()
-	close(op.ch)
-}
+func (op ChanOp[T]) Close() { defer func() { _ = recover() }(); close(op.ch) }
 
 // Len returns the current length of the channel.
 func (op ChanOp[T]) Len() int { return len(op.ch) }
@@ -109,11 +103,3 @@ func (op ChanOp[T]) Send() ChanSend[T] { return ChanSend[T]{mode: op.mode, ch: o
 // Receive returns a ChanReceive object that acts on the same
 // underlying sender.
 func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
-
-// Stream returns the "receive" aspect of the channel as an
-// stream. This is equivalent to fun.ChannelStream(), but may be
-// more accessible in some contexts.
-func (op ChanOp[T]) Stream() *Stream[T] { return op.Receive().Stream() }
-
-// Iterator returns a standard Go library iterator over the contents of the channel.
-func (op ChanOp[T]) Iterator(ctx context.Context) iter.Seq[T] { return op.Receive().Iterator(ctx) }

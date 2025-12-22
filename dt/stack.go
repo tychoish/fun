@@ -69,10 +69,10 @@ func (s *Stack[T]) Iterator() iter.Seq[T] {
 	}
 }
 
-// StreamPop returns a destructive stream over the Items in a
-// stack. StreamPop will not observe new items added to the
+// IteratorPop returns a destructive stream over the Items in a
+// stack. IteratorPop will not observe new items added to the
 // stack during iteration.
-func (s *Stack[T]) StreamPop() iter.Seq[T] {
+func (s *Stack[T]) IteratorPop() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for item := s.Pop(); item.Ok() && item != s.head; item = s.Pop() {
 			if !yield(item.Value()) {

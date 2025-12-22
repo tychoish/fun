@@ -428,23 +428,6 @@ func TestWrap(t *testing.T) {
 		ApplySafe(func(in int) { out = in }, 42)
 		assert.Equal(t, out, 42)
 	})
-	t.Run("Seq", func(t *testing.T) {
-		count := 0
-		for item := range Seq(42) {
-			count++
-			assert.Equal(t, item, 42)
-		}
-		assert.Equal(t, count, 1)
-	})
-	t.Run("Seq2", func(t *testing.T) {
-		count := 0
-		for item, str := range Seq2(42, "42") {
-			count++
-			assert.Equal(t, item, 42)
-			assert.Equal(t, str, "42")
-		}
-		assert.Equal(t, count, 1)
-	})
 }
 
 func TestContexts(t *testing.T) {

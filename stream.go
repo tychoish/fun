@@ -102,7 +102,7 @@ func VariadicStream[T any](in ...T) *Stream[T] { return SliceStream(in) }
 
 // ChannelStream exposes access to an existing "receive" channel as
 // a stream.
-func ChannelStream[T any](ch <-chan T) *Stream[T] { return BlockingReceive(ch).Stream() }
+func ChannelStream[T any](ch <-chan T) *Stream[T] { return Blocking(ch).Receive().Stream() }
 
 // SliceStream provides Stream access to the elements in a slice.
 func SliceStream[T any](in []T) *Stream[T] {
@@ -129,8 +129,8 @@ func InterfaceStream[T any](obj interface {
 	return MakeStream(obj.Read)
 }
 
-// SeqStream wraps a native go iterator to a Stream[T].
-func SeqStream[T any](it iter.Seq[T]) *Stream[T] {
+// IteratorStream wraps a native go iterator to a Stream[T].
+func IteratorStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -178,7 +178,8 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 		iters.ReadAll(fnx.FromHandler(func(iter *Stream[T]) {
 			// start a thread for reading this
 			// sub-iterator.
-			send.WriteAll(iter).
+
+			iter.Parallel(send.Write, WorkerGroupConfNumWorkers(pipe.Cap())).
 				Operation(ec.Push).
 				PostHook(func() { ec.Push(iter.Close()) }).
 				Add(ctx, wg)
@@ -443,7 +444,7 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	}
 	pipe := Blocking(make(chan T))
 
-	setup := pipe.Send().WriteAll(st).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
+	setup := st.Parallel(pipe.Send().Write, WorkerGroupConfNumWorkers(pipe.Cap())).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
 		output[idx] = MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
@@ -494,7 +495,7 @@ func (st *Stream[T]) MarshalJSON() ([]byte, error) {
 	// stream or not care
 	ctx := context.TODO()
 
-	for val := range st.Seq(ctx) {
+	for val := range st.Iterator(ctx) {
 		if first {
 			first = false
 		} else {
@@ -547,7 +548,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := buf.Send().WriteAll(st).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
+	pipe := st.Parallel(buf.Send().Write, WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
 	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe))
 }
 
@@ -589,8 +590,8 @@ func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	return out.Channel()
 }
 
-// Seq converts a fun.Stream[T] into a native go iterator.
-func (st *Stream[T]) Seq(ctx context.Context) iter.Seq[T] {
+// Iterator converts a fun.Stream[T] into a native go iterator.
+func (st *Stream[T]) Iterator(ctx context.Context) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for {
 			item, err := st.Read(ctx)

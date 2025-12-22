@@ -41,7 +41,7 @@ func TestStream(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			mp.Store(fmt.Sprint("key=", i), i)
 		}
-		iter := fun.SeqStream(mp.Values())
+		iter := fun.IteratorStream(mp.Values())
 		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
 		for i := 0; i < 10; i++ {

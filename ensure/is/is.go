@@ -33,7 +33,7 @@ func And(ops ...That) That {
 				break
 			}
 			if results := that(); len(results) > 0 {
-				out.Append(results)
+				out.Append(results...)
 				break
 			}
 		}
@@ -52,7 +52,7 @@ func All(ops ...That) That {
 			ft.ApplyWhen(op == nil, out.Push,
 				"encountered nil is.That operation",
 			)
-			out.Append(ft.DoSafe(op))
+			out.Append(ft.DoSafe(op)...)
 		})
 		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}

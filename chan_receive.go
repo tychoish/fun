@@ -40,17 +40,19 @@ func (ro ChanReceive[T]) Filter(ctx context.Context, filter func(T) bool) ChanRe
 	return out.Receive()
 }
 
-// BlockingReceive is the equivalent of Blocking(ch).Receive(), except
-// that it accepts a receive-only channel.
-func BlockingReceive[T any](ch <-chan T) ChanReceive[T] {
-	return ChanReceive[T]{mode: modeBlocking, ch: ch}
-}
+// Stream provides access to the contents of the channel as a
+// fun-style stream. For ChanRecieve objects in
+// non-blocking mode, iteration ends when there are no items in the
+// channel. In blocking mode, iteration ends when the context is
+// canceled or the channel is closed.
+func (ro ChanReceive[T]) Stream() *Stream[T] { return MakeStream(ro.Read) }
 
-// NonBlockingReceive is the equivalent of NonBlocking(ch).Receive(),
-// except that it accepts a receive-only channel.
-func NonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
-	return ChanReceive[T]{mode: modeNonBlocking, ch: ch}
-}
+// Iterator provides access to the contents of the channel as a
+// new-style standard library stream. For ChanRecieve objects in
+// non-blocking mode, iteration ends when there are no items in the
+// channel. In blocking mode, iteration ends when the context is
+// canceled or the channel is closed.
+func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.Stream().Iterator(ctx) }
 
 // Drop performs a read operation and drops the response. If an item
 // was dropped (e.g. Read would return an error), Drop() returns
@@ -137,26 +139,12 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 	}
 }
 
-// Stream provides access to the contents of the channel as a
-// fun-style stream. For ChanRecieve objects in
-// non-blocking mode, iteration ends when there are no items in the
-// channel. In blocking mode, iteration ends when the context is
-// canceled or the channel is closed.
-func (ro ChanReceive[T]) Stream() *Stream[T] { return MakeStream(ro.Read) }
-
-// Iterator provides access to the contents of the channel as a
-// new-style standard library stream. For ChanRecieve objects in
-// non-blocking mode, iteration ends when there are no items in the
-// channel. In blocking mode, iteration ends when the context is
-// canceled or the channel is closed.
-func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.Stream().Seq(ctx) }
-
 // ReadAll returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor
 // function returns ers.ErrCurrentOpSkip, the processing will continue. All
 // other Handler errors (and problems reading from the channel,)
 // abort stream. io.EOF errors are not propagated to the caller.
-func (ro ChanReceive[T]) ReadAll(op func(context.Context, T) error) fnx.Worker {
+func (ro ChanReceive[T]) ReadAll(op fnx.Handler[T]) fnx.Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
 

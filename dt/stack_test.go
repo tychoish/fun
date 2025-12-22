@@ -319,7 +319,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("Destructive", func(t *testing.T) {
 			stack := GenerateStack(t, 50)
-			iter := stack.StreamPop()
+			iter := stack.IteratorPop()
 			seen := 0
 			for value := range iter {
 				seen++
@@ -334,7 +334,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("EmptyStart", func(t *testing.T) {
 			stack := &Stack[int]{}
-			iter := stack.StreamPop()
+			iter := stack.IteratorPop()
 			seen := 0
 			for value := range iter {
 				seen++

@@ -65,6 +65,8 @@ func (it *Item[T]) Append(n *Item[T]) *Item[T] {
 	return n
 }
 
+func (it *Item[T]) Push(v T) *Item[T] { return it.Append(NewItem(v)) }
+
 // Remove removes the item from the stack, (at some expense, for items
 // deeper in the stack.) If the operation isn't successful or possible
 // the operation returns false.

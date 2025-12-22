@@ -114,11 +114,11 @@ func TestSort(t *testing.T) {
 			}
 			list.SortMerge(cmp.LessThanNative[int])
 			if !stdCheckSortedIntsFromList(t, list) {
-				t.Log(irt.Collect(list.SeqFront()))
+				t.Log(irt.Collect(list.IteratorFront()))
 				t.Fatal("sort should be verified, externally")
 			}
 			if !list.IsSorted(cmp.LessThanNative[int]) {
-				t.Log(irt.Collect(list.SeqFront()))
+				t.Log(irt.Collect(list.IteratorFront()))
 				t.Fatal("should be sorted")
 			}
 		})
@@ -127,8 +127,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			list.SortMerge(cmp.LessThanNative[int])
 			lcopy.SortQuick(cmp.LessThanNative[int])
-			listVals := irt.Collect(list.SeqFront())
-			copyVals := irt.Collect(lcopy.SeqFront())
+			listVals := irt.Collect(list.IteratorFront())
+			copyVals := irt.Collect(lcopy.IteratorFront())
 			assert.Equal(t, len(listVals), len(copyVals))
 			assert.True(t, len(listVals) == 10)
 			for i := 0; i < 10; i++ {
@@ -227,7 +227,7 @@ func TestSort(t *testing.T) {
 func stdCheckSortedIntsFromList(t *testing.T, list *List[int]) bool {
 	t.Helper()
 
-	return sort.IntsAreSorted(irt.Collect(list.SeqFront()))
+	return sort.IntsAreSorted(irt.Collect(list.IteratorFront()))
 }
 
 func BenchmarkSorts(b *testing.B) {

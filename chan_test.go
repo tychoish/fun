@@ -207,11 +207,11 @@ func TestChannel(t *testing.T) {
 				defer cancel()
 
 				ch := make(chan int, 2)
-				err := BlockingSend(ch).Write(ctx, 1)
+				err := Blocking(ch).Send().Write(ctx, 1)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 1)
 
-				err = NonBlockingSend(ch).Write(ctx, 3)
+				err = NonBlocking(ch).Send().Write(ctx, 3)
 				assert.NotError(t, err)
 				assert.Equal(t, <-ch, 3)
 			})
@@ -221,7 +221,7 @@ func TestChannel(t *testing.T) {
 
 				ch := make(chan int)
 				close(ch)
-				err := BlockingSend(ch).Write(ctx, 43)
+				err := Blocking(ch).Send().Write(ctx, 43)
 				assert.ErrorIs(t, err, io.EOF)
 			})
 			t.Run("NonBlocking", func(t *testing.T) {
@@ -231,7 +231,7 @@ func TestChannel(t *testing.T) {
 
 					ch := make(chan int)
 
-					err := NonBlockingSend(ch).Write(ctx, 3)
+					err := NonBlocking(ch).Send().Write(ctx, 3)
 					assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 					close(ch)
 					out, ok := <-ch
@@ -244,7 +244,7 @@ func TestChannel(t *testing.T) {
 
 					ch := make(chan int, 1)
 
-					sent := NonBlockingSend(ch).Check(ctx, 3)
+					sent := NonBlocking(ch).Send().Check(ctx, 3)
 					assert.True(t, sent)
 					out, ok := <-ch
 					assert.True(t, ok)
@@ -256,7 +256,7 @@ func TestChannel(t *testing.T) {
 
 					ch := make(chan int, 1)
 
-					NonBlockingSend(ch).Ignore(ctx, 3)
+					NonBlocking(ch).Send().Ignore(ctx, 3)
 					out, ok := <-ch
 					assert.True(t, ok)
 					assert.Equal(t, 3, out)
@@ -266,14 +266,14 @@ func TestChannel(t *testing.T) {
 					cancel()
 					ch := make(chan int)
 
-					err := BlockingSend(ch).Write(ctx, 1)
+					err := Blocking(ch).Send(x).Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, context.Canceled)
-					err = NonBlockingSend(ch).Write(ctx, 1)
+					err = NonBlocking(ch).Send().Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, context.Canceled)
 
-					assert.True(t, !NonBlockingSend(ch).Check(ctx, 1))
+					assert.True(t, !NonBlocking(ch).Send().Check(ctx, 1))
 
 					err = (ChanSend[int]{ch: ch}).Write(ctx, 1)
 					assert.Error(t, err)
@@ -291,31 +291,31 @@ func TestChannel(t *testing.T) {
 			t.Run("Blocking", func(t *testing.T) {
 				ch := make(chan string, 1)
 				ch <- "hello world"
-				val, err := BlockingReceive(ch).Read(ctx)
+				val, err := Blocking(ch).Receive().Read(ctx)
 				assert.NotError(t, err)
 				assert.Equal(t, val, "hello world")
 
 				ch <- "kip"
-				val, ok := BlockingReceive(ch).Check(ctx)
+				val, ok := Blocking(ch).Receive().Check(ctx)
 				assert.Equal(t, val, "kip")
 				assert.True(t, ok)
 
 				ch <- "buddy"
-				assert.True(t, BlockingReceive(ch).Drop(ctx))
+				assert.True(t, Blocking(ch).Receive().Drop(ctx))
 				// do this to verify if it the channel is now empty
-				_, err = NonBlockingReceive(ch).Read(ctx)
+				_, err = NonBlocking(ch).Receive().Read(ctx)
 				assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 
 				ch <- "deleuze"
-				val = BlockingReceive(ch).Force(ctx)
+				val = Blocking(ch).Receive().Force(ctx)
 				assert.Equal(t, val, "deleuze")
 				assert.True(t, ok)
 			})
 			t.Run("NonBlocking", func(t *testing.T) {
 				ch := make(chan string, 1)
-				assert.Zero(t, NonBlockingReceive(ch).Force(ctx))
-				assert.True(t, !NonBlockingReceive(ch).Drop(ctx))
-				val, err := NonBlockingReceive(ch).Read(ctx)
+				assert.Zero(t, NonBlocking(ch).Receive().Force(ctx))
+				assert.True(t, !NonBlocking(ch).Receive().Drop(ctx))
+				val, err := NonBlocking(ch).Receive.Read(ctx)
 				assert.Zero(t, val)
 				assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 			})
@@ -459,7 +459,7 @@ func TestChannel(t *testing.T) {
 			check.NotError(t, ch.Send().Write(ctx, 84))
 			ch.Close()
 			idx := 0
-			for num := range ch.Iterator(ctx) {
+			for num := range ch.Receive().Iterator(ctx) {
 				switch idx {
 				case 0:
 					check.Equal(t, num, 42)
@@ -475,10 +475,10 @@ func TestChannel(t *testing.T) {
 			t.Run("DirectReturns", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				check.True(t, NonBlockingReceive(ctx.Done()).Ok())
+				check.True(t, NonBlocking(ctx.Done()).Receive().Ok())
 				cancel()
-				check.True(t, !BlockingReceive(ctx.Done()).Ok())
-				check.True(t, !NonBlockingReceive(ctx.Done()).Ok())
+				check.True(t, !Blocking(ctx.Done()).Receive().Ok())
+				check.True(t, !NonBlocking(ctx.Done()).Receive().Ok())
 			})
 			t.Run("Impossible", func(t *testing.T) {
 				ch := &ChanOp[struct{}]{ch: make(chan struct{}), mode: 43}
@@ -489,7 +489,7 @@ func TestChannel(t *testing.T) {
 					assert.MinRuntime(t, 100*time.Millisecond, func() {
 						ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 						defer cancel()
-						BlockingReceive(ctx.Done()).Ok()
+						Blocking(ctx.Done()).Receive().Ok()
 					})
 				})
 			})

@@ -37,13 +37,13 @@ func TestFundamentals(t *testing.T) {
 			ex := dt.NewSlice(base)
 			check.True(t, ex == nil)
 
-			ex.Append(base)
+			ex.Append(base...)
 			check.True(t, ex == nil)
 
 			exx := []string{}
 			check.True(t, exx != nil)
 
-			ex.Append(exx)
+			ex.Append(exx...)
 			check.True(t, ex == nil)
 		})
 	})

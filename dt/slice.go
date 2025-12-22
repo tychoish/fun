@@ -71,7 +71,7 @@ func MergeSlices[T any](sls ...[]T) Slice[T] {
 
 	out := SliceWithCapacity[T](size)
 	for idx := range sls {
-		out.Append(sls[idx])
+		out.Append(sls[idx]...)
 	}
 	return out
 }

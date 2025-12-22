@@ -63,4 +63,4 @@ func (h *Heap[T]) Len() int { return h.list().Len() }
 func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), e.Ok() }
 
 // Iterator provides an iterator to the items in the heap.
-func (h *Heap[T]) Iterator() iter.Seq[T] { ; return h.list().SeqFront() }
+func (h *Heap[T]) Iterator() iter.Seq[T] { ; return h.list().IteratorFront() }

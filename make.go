@@ -71,7 +71,9 @@ func (Constructors) RunAllOperations(st *Stream[fnx.Operation]) fnx.Worker {
 
 // ErrorStream provides a stream that provides access to the error
 // collector.
-func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] { return SeqStream(ec.Iterator()) }
+func (Constructors) ErrorStream(ec *erc.Collector) *Stream[error] {
+	return IteratorStream(ec.Iterator())
+}
 
 // OperationHandler constructs a Handler function for running Worker
 // functions. Use with streams to build worker pools.
@@ -112,7 +114,7 @@ func (Constructors) WorkerHandler() fnx.Handler[fnx.Worker] {
 // propogated; however, after the channel is closed subsequent calls
 // to the worker function will return nil.
 func (Constructors) ErrorChannelWorker(ch <-chan error) fnx.Worker {
-	pipe := BlockingReceive(ch)
+	pipe := Blocking(ch).Receive()
 	return func(ctx context.Context) error {
 		if ch == nil || pipe.ch == nil {
 			return nil

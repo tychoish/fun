@@ -588,7 +588,7 @@ func TestBroker(t *testing.T) {
 		popsig := make(chan struct{})
 		go func() {
 			defer close(popsig)
-			for it := range iter.Seq(ctx) {
+			for it := range iter.Iterator(ctx) {
 				broker.Send(ctx, it)
 			}
 		}()

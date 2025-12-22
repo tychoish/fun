@@ -33,8 +33,8 @@ func VariadicList[T any](elems ...T) *List[T] { return SliceList(elems) }
 // SliceList constructs a doubly-linked list from the elements of a slice.
 func SliceList[T any](elems []T) *List[T] { l := new(List[T]); l.Append(elems...); return l }
 
-// SeqList constructs a doubly-linked list from the elements of a Go standard library iterator.
-func SeqList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.Extend(in); return l }
+// IteratorList constructs a doubly-linked list from the elements of a Go standard library iterator.
+func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.Extend(in); return l }
 
 // Append adds a variadic sequence of items to the end of the list.
 func (l *List[T]) Append(items ...T) *List[T] { return l.Extend(irt.Slice(items)) }
@@ -46,7 +46,7 @@ func (l *List[T]) Extend(seq iter.Seq[T]) *List[T] { irt.Apply(seq, l.PushBack);
 func (l *List[T]) Reset() {
 	// TODO(design) should this return the list for chaining or a count
 	// NOTE: remove all items so that they don't pass membership checks
-	for range l.SeqPopFront() {
+	for range l.IteratorPopFront() {
 		continue
 	}
 }
@@ -109,23 +109,23 @@ func (l *List[T]) Front() *Element[T] { return l.root().next }
 func (l *List[T]) Back() *Element[T] { return l.root().prev }
 
 // Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() Slice[T] { return irt.Collect(l.SeqFront(), 0, l.Len()) }
+func (l *List[T]) Slice() Slice[T] { return irt.Collect(l.IteratorFront(), 0, l.Len()) }
 
-// SeqFront returns an iterator to the items in the list starting at the front and moving toward the
+// IteratorFront returns an iterator to the items in the list starting at the front and moving toward the
 // back of the list.
 //
 // If you add values to the list during iteration *behind* where the stream is, these values will
 // not be present in the stream; however, values added ahead of the stream, will be visible.
-func (l *List[T]) SeqFront() iter.Seq[T] { return l.iterator(l.Front, l.elemNext) }
+func (l *List[T]) IteratorFront() iter.Seq[T] { return l.iterator(l.Front, l.elemNext) }
 
-// SeqBack returns an iterator to the items in the list starting at the back and moving toward the
+// IteratorBack returns an iterator to the items in the list starting at the back and moving toward the
 // front of the list.
 //
 // If you add values to the list during iteration *behind* where the stream is, these values will
 // not be present in the stream; however, values added ahead of the stream, will be visible.
-func (l *List[T]) SeqBack() iter.Seq[T] { return l.iterator(l.Back, l.elemPrevious) }
+func (l *List[T]) IteratorBack() iter.Seq[T] { return l.iterator(l.Back, l.elemPrevious) }
 
-// SeqPopFront returns a destructive iterator that consumes elements from the list as it iterates,
+// IteratorPopFront returns a destructive iterator that consumes elements from the list as it iterates,
 // moving front-to-back.
 //
 // If you add values to the list during iteration *behind* where the stream is, these values will
@@ -133,7 +133,7 @@ func (l *List[T]) SeqBack() iter.Seq[T] { return l.iterator(l.Back, l.elemPrevio
 //
 // In most cases, for destructive iteration, use the pubsub.Queue, pubsub.Deque, or one of the
 // pubsub.Distributor implementations, because those implementations are thread safe.
-func (l *List[T]) SeqPopFront() iter.Seq[T] { return l.iterator(l.PopFront, l.wrapElem(l.PopFront)) }
+func (l *List[T]) IteratorPopFront() iter.Seq[T] { return l.iterator(l.PopFront, l.wrap(l.PopFront)) }
 
 // SeqPopBack returns a destructive iterator that consumes elements from the list as it iterates,
 // moving back-to-fron.
@@ -143,16 +143,15 @@ func (l *List[T]) SeqPopFront() iter.Seq[T] { return l.iterator(l.PopFront, l.wr
 //
 // In most cases, for destructive iteration, use the pubsub.Queue, pubsub.Deque, or one of the
 // pubsub.Distributor implementations, because those implementations are thread safe.
-func (l *List[T]) StreamPopBack() iter.Seq[T] { return l.iterator(l.PopBack, l.wrapElem(l.PopBack)) }
-
-func (*List[T]) wrapElem(inner func() *Element[T]) func(*Element[T]) *Element[T] {
-	return func(*Element[T]) *Element[T] { return inner() }
-}
+func (l *List[T]) IteratorPopBack() iter.Seq[T] { return l.iterator(l.PopBack, l.wrap(l.PopBack)) }
 
 func (*List[T]) elemNext(e *Element[T]) *Element[T]     { return e.Next() }
 func (*List[T]) elemPrevious(e *Element[T]) *Element[T] { return e.Previous() }
+func (*List[T]) wrap(fn func() *Element[T]) func(*Element[T]) *Element[T] {
+	return func(*Element[T]) *Element[T] { return fn() }
+}
 
-func (l *List[T]) iterator(first func() *Element[T], next func(current *Element[T]) *Element[T]) iter.Seq[T] {
+func (l *List[T]) iterator(first func() *Element[T], next func(*Element[T]) *Element[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for elem := first(); !elem.Ok() || elem.isDetatched() || !yield(elem.Value()); elem = next(elem) {
 			return
@@ -279,8 +278,8 @@ func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 			out.Back().Append(b.PopFront())
 		}
 	}
-	out.Extend(a.SeqFront())
-	out.Extend(b.SeqFront())
+	out.Extend(a.IteratorFront())
+	out.Extend(b.IteratorFront())
 
 	return out
 }

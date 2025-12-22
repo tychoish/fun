@@ -385,7 +385,7 @@ type entry[T any] struct {
 	link *entry[T]
 }
 
-// Seq produces a stream implementation that wraps the
+// Iterator produces a stream implementation that wraps the
 // underlying queue linked list. The stream respects the Queue's
 // mutex and is safe for concurrent access and current queue
 // operations, without additional locking. The stream does not
@@ -393,7 +393,7 @@ type entry[T any] struct {
 // the queue has been closed via the Close() method.
 //
 // To create a "consuming" stream, use a Distributor.
-func (q *Queue[T]) Seq(ctx context.Context) iter.Seq[T] {
+func (q *Queue[T]) Iterator(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
 	op := func() (o T, _ bool) {
 		if next == nil {

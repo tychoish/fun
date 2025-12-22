@@ -95,7 +95,7 @@ func TestTools(t *testing.T) {
 					}
 				}()
 
-				output := Blocking(pipe).Stream().Channel(ctx)
+				output := Blocking(pipe).Receive().Stream().Channel(ctx)
 				runtime.Gosched()
 
 				count := 0
@@ -192,7 +192,7 @@ func getConstructors[T comparable]() []FixtureStreamConstructors[T] {
 					vals <- elems[idx]
 				}
 				close(vals)
-				return Blocking(vals).Stream()
+				return Blocking(vals).Receive().Stream()
 			},
 		},
 	}

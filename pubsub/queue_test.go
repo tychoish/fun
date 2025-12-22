@@ -236,8 +236,8 @@ func TestQueueStream(t *testing.T) {
 			t.Fatal("unexpected queue length", queue.Len())
 		}
 
-		values := irt.Collect(queue.Seq(ctx))
-		iter := queue.Seq(ctx)
+		values := irt.Collect(queue.Iterator(ctx))
+		iter := queue.Iterator(ctx)
 		if len(values) != 3 {
 			t.Log(values)
 			t.Fatal("unexpected length")
@@ -256,7 +256,7 @@ func TestQueueStream(t *testing.T) {
 		startAt := time.Now()
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 400*time.Millisecond)
 		defer timeoutCancel()
-		iter = queue.Seq(timeoutCtx)
+		iter = queue.Iterator(timeoutCtx)
 		sig := make(chan struct{})
 		go func() {
 			defer close(sig)
@@ -300,7 +300,7 @@ func TestQueueStream(t *testing.T) {
 
 		startAt := time.Now()
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 400*time.Millisecond)
-		iter := queue.Seq(timeoutCtx)
+		iter := queue.Iterator(timeoutCtx)
 		defer timeoutCancel()
 		sig := make(chan struct{})
 		go func() {
@@ -347,7 +347,7 @@ func TestQueueStream(t *testing.T) {
 			}
 		}
 		count := 0
-		iter := queue.Seq(ctx)
+		iter := queue.Iterator(ctx)
 		for range iter {
 			count++
 			if count == 100 {
@@ -372,7 +372,7 @@ func TestQueueStream(t *testing.T) {
 		}
 
 		count := 0
-		for range queue.Seq(ctx) {
+		for range queue.Iterator(ctx) {
 			count++
 			if count == 100 {
 				break
@@ -395,7 +395,7 @@ func TestQueueStream(t *testing.T) {
 		}
 
 		count := 0
-		for range queue.Seq(ctx) {
+		for range queue.Iterator(ctx) {
 			count++
 			break
 		}
@@ -405,7 +405,7 @@ func TestQueueStream(t *testing.T) {
 
 		cancel()
 		count = 0
-		for range queue.Seq(ctx) {
+		for range queue.Iterator(ctx) {
 			count++
 			break
 		}
@@ -423,7 +423,7 @@ func TestQueueStream(t *testing.T) {
 			t.Fatal(err)
 		}
 		count := 0
-		for range queue.Seq(ctx) {
+		for range queue.Iterator(ctx) {
 			count++
 		}
 		if count != 1 {
@@ -432,7 +432,7 @@ func TestQueueStream(t *testing.T) {
 
 		assert.NotError(t, queue.Close())
 		count = 0
-		for range queue.Seq(ctx) {
+		for range queue.Iterator(ctx) {
 			count++
 		}
 		if count != 1 {
@@ -466,7 +466,7 @@ func TestQueueStream(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 		toctx, toccancel := context.WithTimeout(ctx, 10*time.Millisecond)
 		defer toccancel()
-		iter := queue.Seq(toctx)
+		iter := queue.Iterator(toctx)
 		sa := time.Now()
 		count := 0
 		for range iter {
@@ -478,7 +478,7 @@ func TestQueueStream(t *testing.T) {
 		}()
 		time.Sleep(20 * time.Millisecond)
 		assert.Zero(t, count)
-		iter = queue.Seq(ctx)
+		iter = queue.Iterator(ctx)
 		for range iter {
 			count++
 		}
@@ -601,7 +601,7 @@ func TestQueueStream(t *testing.T) {
 
 		assert.MinRuntime(t, 100*time.Millisecond, func() {
 			count++
-			for range queue.Seq(ctx) {
+			for range queue.Iterator(ctx) {
 				count++
 			}
 			count++
@@ -613,7 +613,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		sig := make(chan struct{})
-		iter := queue.Seq(ctx)
+		iter := queue.Iterator(ctx)
 		go func() {
 			defer close(sig)
 			count := 0

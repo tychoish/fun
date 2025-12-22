@@ -63,11 +63,14 @@ func (d Distributor[T]) Read(ctx context.Context) (T, error) { return d.pop(ctx)
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
-func DistributorChannel[T any](ch chan T) Distributor[T] { return DistributorChanOp(fun.Blocking(ch)) }
+func DistributorChannel[T any](ch chan T) Distributor[T] {
+	c := fun.Blocking(ch)
+	return distForChanOp(c)
+}
 
-// DistributorChanOp constructs a Distributor from the channel
+// distForChanOp constructs a Distributor from the channel
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions.
-func DistributorChanOp[T any](ch fun.ChanOp[T]) Distributor[T] {
-	return MakeDistributor(ch.Send().Write, ch.Receive().Read, ch.Len)
+func distForChanOp[T any](c fun.ChanOp[T]) Distributor[T] {
+	return MakeDistributor(c.Send().Write, c.Receive().Read, c.Len)
 }

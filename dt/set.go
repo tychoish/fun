@@ -125,7 +125,7 @@ func (s *Set[T]) List() *List[T] {
 	if s.list != nil {
 		return s.list.Copy()
 	}
-	return SeqList(s.Iterator())
+	return IteratorList(s.Iterator())
 }
 
 // Slice exports the contents of the set to a slice.
@@ -182,7 +182,7 @@ func (s *Set[T]) AppendSet(extra *Set[T]) { s.AppendStream(extra.Iterator()) }
 
 func (s *Set[T]) unsafeStream() iter.Seq[T] {
 	if s.list != nil {
-		return s.list.SeqFront()
+		return s.list.IteratorFront()
 	}
 	return s.hash.Keys()
 }

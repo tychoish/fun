@@ -4,8 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -15,16 +13,6 @@ import (
 type ChanSend[T any] struct {
 	mode blockingMode
 	ch   chan<- T
-}
-
-// BlockingSend is equivalent to Blocking(ch).Send() except that
-// it accepts a send-only channel.
-func BlockingSend[T any](ch chan<- T) ChanSend[T] { return ChanSend[T]{mode: modeBlocking, ch: ch} }
-
-// NonBlockingSend is equivalent to NonBlocking(ch).Send() except that
-// it accepts a send-only channel.
-func NonBlockingSend[T any](ch chan<- T) ChanSend[T] {
-	return ChanSend[T]{mode: modeNonBlocking, ch: ch}
 }
 
 // Check performs a send and returns true when the send was successful
@@ -81,14 +69,5 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 		// outside of this project, because you'd need to
 		// construct an invalid Send object.
 		return io.EOF
-	}
-}
-
-// WriteAll returns a worker that, when executed, pushes the content
-// from the stream into the channel.
-func (sm ChanSend[T]) WriteAll(iter *Stream[T]) fnx.Worker {
-	return func(ctx context.Context) (err error) {
-		defer func() { err = erc.Join(iter.Close(), err, erc.ParsePanic(recover())) }()
-		return iter.Parallel(sm.Write, WorkerGroupConfNumWorkers(cap(sm.ch))).Run(ctx)
 	}
 }

@@ -243,37 +243,37 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	return dq.addAfter(it, afterGetter())
 }
 
-// SeqFront starts at the front of the queue and iterates towards
+// IteratorFront starts at the front of the queue and iterates towards
 // the back. When the stream reaches the beginning of the queue it
 // ends.
-func (dq *Deque[T]) SeqFront(ctx context.Context) iter.Seq[T] {
+func (dq *Deque[T]) IteratorFront(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqNext, false)
 }
 
-// SeqBack starts at the back of the queue and iterates
+// IteratorBack starts at the back of the queue and iterates
 // towards the front. When the stream reaches the end of the queue
 // it ends.
-func (dq *Deque[T]) SeqBack(ctx context.Context) iter.Seq[T] {
+func (dq *Deque[T]) IteratorBack(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqPrev, false)
 }
 
-// SeqFrontBlocking exposes the deque to a single-function interface
+// IteratorWaitFront exposes the deque to a single-function interface
 // for iteration. The future function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back, and will block for a new element if the deque is
 // empty or the future reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) SeqFrontBlocking(ctx context.Context) iter.Seq[T] {
+func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqNext, true)
 }
 
-// SeqBackBlocking exposes the deque to a single-function interface
+// IteratorWaitBack exposes the deque to a single-function interface
 // for iteration. The future function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to fron, and will block for a new element if the deque is
 // empty or the future reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) SeqBackBlocking(ctx context.Context) iter.Seq[T] {
+func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqPrev, true)
 }
 

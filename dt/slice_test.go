@@ -79,7 +79,7 @@ func TestSlice(t *testing.T) {
 		})
 		t.Run("Extend", func(t *testing.T) {
 			s := Slice[int]{}
-			s.Append([]int{42, 300, 64})
+			s.Append([]int{42, 300, 64}...)
 			assert.Equal(t, 42, s.Index(0))
 			assert.Equal(t, 300, s.Index(1))
 			assert.Equal(t, 64, s.Index(2))

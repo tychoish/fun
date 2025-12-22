@@ -401,7 +401,7 @@ func TestSet(t *testing.T) {
 			assert.Equal(t, st.Len(), setls.Len())
 
 			checker := Map[int, int]{}
-			for v := range setls.SeqFront() {
+			for v := range setls.IteratorFront() {
 				if checker.Check(v) {
 					t.Errorf("duplicate value, %d", v)
 				}

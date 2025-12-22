@@ -101,15 +101,15 @@ func TestDistributor(t *testing.T) {
 		t.Run("Input", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			ch := fun.Blocking(make(chan int, 100))
-			dist := DistributorChanOp(ch).
+			ch := make(chan int, 100)
+			dist := DistributorChannel(ch).
 				WithInputFilter(func(in int) bool { t.Log(in); return in%2 == 0 && in != 0 })
 
 			for i := 0; i < 100; i++ {
 				assert.NotError(t, dist.Write(ctx, i))
 			}
 
-			ch.Close()
+			close(ch)
 
 			count := 0
 			err := fun.InterfaceStream(dist).
@@ -134,7 +134,7 @@ func TestDistributor(t *testing.T) {
 
 			ch.Close()
 			count := 0
-			err := fun.InterfaceStream(DistributorChanOp(ch).
+			err := fun.InterfaceStream(DistributorChannel(ch.Channel()).
 				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 })).
 				ReadAll(fnx.FromHandler(func(in int) {
 					count++
