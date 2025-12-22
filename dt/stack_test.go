@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
@@ -362,9 +361,9 @@ func TestStack(t *testing.T) {
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
 			}
-			fun.Invariant.IsTrue(nl.Head().Value() == stack.Head().Value())
-			fun.Invariant.IsTrue(nl.Head().Next().Value() == stack.Head().Next().Value())
-			fun.Invariant.IsTrue(nl.Head().Next().Next().Value() == stack.Head().Next().Next().Value())
+			assert.True(t, nl.Head().Value() == stack.Head().Value())
+			assert.True(t, nl.Head().Next().Value() == stack.Head().Next().Value())
+			assert.True(t, nl.Head().Next().Next().Value() == stack.Head().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			stack := &Stack[int]{}

@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
@@ -678,9 +677,9 @@ func TestList(t *testing.T) {
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
 			}
-			fun.Invariant.IsTrue(nl.Front().Value() == list.Front().Value())
-			fun.Invariant.IsTrue(nl.Front().Next().Value() == list.Front().Next().Value())
-			fun.Invariant.IsTrue(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
+			assert.True(t, nl.Front().Value() == list.Front().Value())
+			assert.True(t, nl.Front().Next().Value() == list.Front().Next().Value())
+			assert.True(t, nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			list := VariadicList(400, 300, 42)

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"iter"
 
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -22,7 +22,8 @@ func (s *Stack[T]) Append(items ...T) *Stack[T] { ft.ApplyMany(s.Push, items); r
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
 func (*Stack[T]) zero() (o T)       { return }
 func (s *Stack[T]) root() *Item[T] {
-	fun.Invariant.Ok(s != nil, ErrUninitializedContainer)
+	ft.Invariant(ers.If(s != nil, ErrUninitializedContainer))
+
 	ft.CallWhen(s.head == nil, s.uncheckedSetup)
 
 	return s.head

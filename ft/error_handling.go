@@ -9,9 +9,10 @@ import (
 
 // Must wraps a function that returns a value and an error, and
 // converts the error to a panic.
-func Must[T any](arg T, err error) T {
+func Must[T any](arg T, err error) T { Invariant(err); return arg }
+
+func Invariant(err error) {
 	CallWhen(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
-	return arg
 }
 
 // Check can wrap a the callsite of a function that returns a value

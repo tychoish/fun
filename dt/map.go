@@ -38,8 +38,7 @@ func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
 	}
 }
 
-// NewMap provides a constructor that will produce a fun.Map without
-// specifying types.
+// NewMap provides a constructor to return a dt.Map without specifying types.
 func NewMap[K comparable, V any](in map[K]V) Map[K, V] { return in }
 
 // Check returns true if the value K is in the map.

@@ -1,15 +1,13 @@
 package dt
 
 import (
-	"context"
 	"encoding/json"
 	"iter"
 	"maps"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
@@ -44,7 +42,8 @@ func (s *Set[T]) Order() {
 	if s.list != nil {
 		return
 	}
-	fun.Invariant.Ok(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data")
+	ft.Invariant(ers.When(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data"))
+
 	s.list = &List[T]{}
 }
 
@@ -70,7 +69,8 @@ func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
 }
 
 func (s *Set[T]) forceSetupOrdered() {
-	fun.Invariant.Ok(s.list == nil)
+	ft.Invariant(ers.If(s.list == nil, ErrUninitializedContainer))
+
 	s.list = &List[T]{}
 	for item := range s.hash {
 		s.list.PushBack(item)
@@ -81,12 +81,11 @@ func (s *Set[T]) forceSetupOrdered() {
 // mutex. If the mutex is nil, or the Set is already synchronized with
 // a different mutex, WithLock panics with an invariant violation.
 func (s *Set[T]) WithLock(mtx *sync.Mutex) {
-	fun.Invariant.Ok(mtx != nil, "mutexes must be non-nil")
-	fun.Invariant.Ok(s.mtx.Set(mtx), "cannot override an existing mutex")
+	ft.Invariant(ers.When(mtx != nil, "mutexes must be non-nil"))
+	ft.Invariant(ers.When(s.mtx.Set(mtx), "cannot override an existing mutex"))
 }
 
-func (s *Set[T]) isOrdered() bool { return s.list != nil }
-
+func (s *Set[T]) isOrdered() bool  { return s.list != nil }
 func (s *Set[T]) init()            { s.hash = Map[T, *Element[T]]{} }
 func (*Set[T]) with(m *sync.Mutex) { ft.CallWhen(m != nil, m.Unlock) }
 func (s *Set[T]) lock() *sync.Mutex {
@@ -108,20 +107,15 @@ func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(
 // Delete attempts to remove the item from the set.
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 
-// Iterator returns a new-style native Go iterator for the items in the set. Provides items in iteration order if the set is ordered.If
-// the Set is ordered, then the future produces items in the set's
-// order. If the Set is synchronize, then the Stream always holds
-// the Set's lock when advancing the iterator.
+// Iterator returns a new-style native Go iterator for the items in the set. Provides items in
+// iteration order if the set is ordered. If the Set is ordered, then the future produces items in
+// the set's order.
+//
+// When Synchrnoized, the lock is NOT held when the iterator is advanced.
 func (s *Set[T]) Iterator() iter.Seq[T] {
 	mu := s.lock()
 	defer s.with(mu)
 	st := s.unsafeStream()
-
-	if mu != nil {
-		fun.MakeStream(
-			fnx.NewFuture(fun.SeqStream(st).Read).WithLock(mu),
-		).Iterator(context.Background())
-	}
 
 	return st
 }
