@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"context"
 	"errors"
 	"math"
 	"math/rand"
@@ -12,6 +11,7 @@ import (
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
@@ -46,9 +46,6 @@ func PopulateList(t testing.TB, size int, list *List[int]) {
 }
 
 func TestSort(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Run("Sort", func(t *testing.T) {
 		t.Run("IsSorted", func(t *testing.T) {
 			t.Run("RejectsRandomList", func(t *testing.T) {
@@ -78,7 +75,7 @@ func TestSort(t *testing.T) {
 					t.Error("list should be sorted")
 				}
 
-				if !stdCheckSortedIntsFromList(ctx, t, list) {
+				if !stdCheckSortedIntsFromList(t, list) {
 					t.Error("confirm stdlib")
 				}
 			})
@@ -106,7 +103,7 @@ func TestSort(t *testing.T) {
 				list.PushBack(9)
 
 				if list.IsSorted(cmp.LessThanNative[int]) {
-					t.Error("list isn't sorted", getSliceForList(ctx, list))
+					t.Error("list isn't sorted", list.Slice())
 				}
 			})
 		})
@@ -116,12 +113,12 @@ func TestSort(t *testing.T) {
 				t.Fatal("should not be sorted")
 			}
 			list.SortMerge(cmp.LessThanNative[int])
-			if !stdCheckSortedIntsFromList(ctx, t, list) {
-				t.Log(list.StreamFront().Slice(ctx))
+			if !stdCheckSortedIntsFromList(t, list) {
+				t.Log(irt.Collect(list.SeqFront()))
 				t.Fatal("sort should be verified, externally")
 			}
 			if !list.IsSorted(cmp.LessThanNative[int]) {
-				t.Log(list.StreamFront().Slice(ctx))
+				t.Log(irt.Collect(list.SeqFront()))
 				t.Fatal("should be sorted")
 			}
 		})
@@ -130,8 +127,8 @@ func TestSort(t *testing.T) {
 			lcopy := list.Copy()
 			list.SortMerge(cmp.LessThanNative[int])
 			lcopy.SortQuick(cmp.LessThanNative[int])
-			listVals := ft.Must(list.StreamFront().Slice(ctx))
-			copyVals := ft.Must(lcopy.StreamFront().Slice(ctx))
+			listVals := irt.Collect(list.SeqFront())
+			copyVals := irt.Collect(lcopy.SeqFront())
 			assert.Equal(t, len(listVals), len(copyVals))
 			assert.True(t, len(listVals) == 10)
 			for i := 0; i < 10; i++ {
@@ -227,14 +224,10 @@ func TestSort(t *testing.T) {
 	})
 }
 
-func getSliceForList(ctx context.Context, list *List[int]) []int {
-	return ft.Must(list.StreamFront().Slice(ctx))
-}
-
-func stdCheckSortedIntsFromList(ctx context.Context, t *testing.T, list *List[int]) bool {
+func stdCheckSortedIntsFromList(t *testing.T, list *List[int]) bool {
 	t.Helper()
 
-	return sort.IntsAreSorted(getSliceForList(ctx, list))
+	return sort.IntsAreSorted(irt.Collect(list.SeqFront()))
 }
 
 func BenchmarkSorts(b *testing.B) {

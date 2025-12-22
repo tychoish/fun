@@ -12,7 +12,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 )
@@ -39,14 +38,6 @@ import (
 // values from the input map will replace keys and values from the
 // output map.
 func (mp *Map[K, V]) Join(in *Map[K, V]) { irt.Apply2(in.Iterator(), mp.Store) }
-
-// Append adds a sequence of pairs to the map.
-func (mp *Map[K, V]) Append(its ...dt.Pair[K, V]) { mp.Extend(its) }
-
-// Extend adds a slice of pairs to the map.
-func (mp *Map[K, V]) Extend(its []dt.Pair[K, V]) {
-	irt.Apply(irt.Slice(its), func(p dt.Pair[K, V]) { mp.Store(p.Get()) })
-}
 
 func TestMap(t *testing.T) {
 	t.Parallel()
@@ -153,7 +144,7 @@ func TestMap(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 100; i++ {
-			mp.Set(dt.Pair[int, int]{Key: i, Value: rand.Int() + 43})
+			mp.Store(i, rand.Int()+43)
 		}
 
 		for i := 0; i < 200; i++ {
@@ -247,17 +238,6 @@ func TestMap(t *testing.T) {
 			assert.Equal(t, mp.Get("foo"), 500)
 		})
 	})
-	t.Run("Append", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		assert.Equal(t, 0, mp.Len())
-		mp.Append(dt.MakePair("foo", 400))
-		assert.Equal(t, 1, mp.Len())
-		mp.Append(dt.MakePair("foo", 42), dt.MakePair("bar", 3))
-		assert.Equal(t, 2, mp.Len())
-		assert.Equal(t, 42, mp.Get("foo"))
-		mp.Append(dt.MakePair("foofoo", 42), dt.MakePair("baz", 3))
-		assert.Equal(t, 4, mp.Len())
-	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("HappyPath", func(t *testing.T) {
 			mp := &Map[string, int]{}
@@ -280,11 +260,11 @@ func TestMap(t *testing.T) {
 
 	t.Run("Ensure", func(t *testing.T) {
 		mp := &Map[string, int]{}
-		ok := mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 100})
+		ok := mp.EnsureStore("hi", 100)
 		check.True(t, ok)
-		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 100})
+		ok = mp.EnsureStore("hi", 100)
 		check.True(t, !ok)
-		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 10})
+		ok = mp.EnsureStore("hi", 10)
 		check.True(t, !ok)
 	})
 	t.Run("Streams", func(t *testing.T) {

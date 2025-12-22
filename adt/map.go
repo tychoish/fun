@@ -5,7 +5,6 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
@@ -32,9 +31,6 @@ func (mp *Map[K, V]) Delete(key K) { mp.mp.Delete(key) }
 // values as needed.
 func (mp *Map[K, V]) Store(k K, v V) { mp.mp.Store(k, v) }
 
-// Set adds a key and value to the map from a Pair.
-func (mp *Map[K, V]) Set(it dt.Pair[K, V]) { mp.Store(it.Key, it.Value) }
-
 // Ensure adds a key to the map if it does not already exist, using
 // the default value. The default value, is taken from the pool, which
 // has a configurable constructor if you want a different default
@@ -52,10 +48,6 @@ func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key))
 
 // EnsureStore takes a value and returns true if the value was stored in the map.
 func (mp *Map[K, V]) EnsureStore(k K, v V) bool { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
-
-// EnsureSet has the same semantics as EnsureStore, but takes a dt.Pair
-// object.
-func (mp *Map[K, V]) EnsureSet(i dt.Pair[K, V]) bool { return mp.EnsureStore(i.Key, i.Value) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {
@@ -141,15 +133,6 @@ func (mp *Map[K, V]) Len() int {
 // appear at most once but order or which version of a value is not
 // defined.
 func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Iterator()(fn) }
-
-// Stream returns a stream that produces a sequence of pair
-// objects.
-//
-// This operation relies on a the underlying Range stream, and
-// advances lazily through the Range operation as callers advance the
-// stream. Be aware that this produces a stream that does not reflect
-// any particular atomic state of the underlying map.
-func (mp *Map[K, V]) Stream() iter.Seq[dt.Pair[K, V]] { return irt.Merge(mp.Iterator(), dt.MakePair) }
 
 // Iterator returns a native go iterator for a fun/dt.Map object.
 func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {

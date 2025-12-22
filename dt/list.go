@@ -1,17 +1,13 @@
 package dt
 
 import (
-	"context"
-	"io"
 	"iter"
 	"sort"
 
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/irt"
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -36,9 +32,6 @@ func VariadicList[T any](elems ...T) *List[T] { return SliceList(elems) }
 
 // SliceList constructs a doubly-linked list from the elements of a slice.
 func SliceList[T any](elems []T) *List[T] { l := new(List[T]); l.Append(elems...); return l }
-
-// MapList constructs a doubly-linked list of Pair objects from the elements of a map.
-func MapList[K comparable, V any](mp Map[K, V]) *List[Pair[K, V]] { return mp.Pairs().List() }
 
 // IteratorList constructs a doubly-linked list from the elements of a Go standard library iterator.
 func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.AppendIterator(in); return l }
@@ -73,11 +66,11 @@ func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
 
 // Reset removes all members of the list, and releases all references to items in the list.
 func (l *List[T]) Reset() {
-	// remove all items so that they don't pass membership checks
-	l.StreamPopFront().
-		ReadAll(fnx.FromHandler(fn.NewNoopHandler[T]())).
-		PostHook(l.uncheckedSetup). // reset everything...
-		Ignore().Wait()
+	// TODO(design) should this return the list for chaining or a count
+	// NOTE: remove all items so that they don't pass membership checks
+	for range l.SeqPopFront() {
+		continue
+	}
 }
 
 // Len returns the length of the list. As the Append/Remove operations
@@ -138,86 +131,55 @@ func (l *List[T]) Front() *Element[T] { return l.root().next }
 func (l *List[T]) Back() *Element[T] { return l.root().prev }
 
 // Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() Slice[T] { return risky.BlockForceIgnore(l.StreamFront().Slice) }
+func (l *List[T]) Slice() Slice[T] { return irt.Collect(l.SeqFront(), 0, l.Len()) }
 
-// Iterator returns a native go stream function for the items in a list.
-func (l *List[T]) Iterator() iter.Seq[T] { return risky.BlockForce(l.StreamFront().Iterator) }
-
-// StreamFront returns a stream over the values in the list in
-// front-to-back order. The Stream is not synchronized with the
-// values in the list, and will be exhausted when you reach the end of
-// the list.
+// SeqFront returns an iterator to the items in the list starting at the front and moving toward the
+// back of the list.
 //
-// If you add values to the list during iteration *behind* where the
-// stream is, these values will not be present in the stream;
-// however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamFront() *fun.Stream[T] {
-	current := l.root()
-	return fun.MakeStream(func(context.Context) (o T, _ error) {
-		current = current.Next()
-		if !current.Ok() || current.isDetatched() {
-			return o, io.EOF
-		}
-		return current.Value(), nil
-	})
+// If you add values to the list during iteration *behind* where the stream is, these values will
+// not be present in the stream; however, values added ahead of the stream, will be visible.
+func (l *List[T]) SeqFront() iter.Seq[T] { return l.iterator(l.Front, l.elemNext) }
+
+// SeqBack returns an iterator to the items in the list starting at the back and moving toward the
+// front of the list.
+//
+// If you add values to the list during iteration *behind* where the stream is, these values will
+// not be present in the stream; however, values added ahead of the stream, will be visible.
+func (l *List[T]) SeqBack() iter.Seq[T] { return l.iterator(l.Back, l.elemPrevious) }
+
+// SeqPopFront returns a destructive iterator that consumes elements from the list as it iterates,
+// moving front-to-back.
+//
+// If you add values to the list during iteration *behind* where the stream is, these values will
+// not be present in the stream; however, values added ahead of the stream, will be visible.
+//
+// In most cases, for destructive iteration, use the pubsub.Queue, pubsub.Deque, or one of the
+// pubsub.Distributor implementations, because those implementations are thread safe.
+func (l *List[T]) SeqPopFront() iter.Seq[T] { return l.iterator(l.PopFront, l.wrapElem(l.PopFront)) }
+
+// SeqPopBack returns a destructive iterator that consumes elements from the list as it iterates,
+// moving back-to-fron.
+//
+// If you add values to the list during iteration *behind* where the stream is, these values will
+// not be present in the stream; however, values added ahead of the stream, will be visible.
+//
+// In most cases, for destructive iteration, use the pubsub.Queue, pubsub.Deque, or one of the
+// pubsub.Distributor implementations, because those implementations are thread safe.
+func (l *List[T]) StreamPopBack() iter.Seq[T] { return l.iterator(l.PopBack, l.wrapElem(l.PopBack)) }
+
+func (*List[T]) wrapElem(inner func() *Element[T]) func(*Element[T]) *Element[T] {
+	return func(*Element[T]) *Element[T] { return inner() }
 }
 
-// StreamBack returns a stream that produces elements from the list,
-// from the back to the front. The stream is not
-// synchronized with the values in the list, and will be exhausted
-// when you reach the front of the list.
-//
-// If you add values to the list during iteration *behind* where the
-// stream is, these values will not be present in the stream;
-// however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamBack() *fun.Stream[T] {
-	current := l.root()
-	return fun.MakeStream(func(context.Context) (o T, _ error) {
-		current = current.Previous()
-		if !current.Ok() || current.isDetatched() {
-			return o, io.EOF
+func (*List[T]) elemNext(e *Element[T]) *Element[T]     { return e.Next() }
+func (*List[T]) elemPrevious(e *Element[T]) *Element[T] { return e.Previous() }
+
+func (l *List[T]) iterator(first func() *Element[T], next func(current *Element[T]) *Element[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for elem := first(); !elem.Ok() || elem.isDetatched() || !yield(elem.Value()); elem = next(elem) {
+			return
 		}
-		return current.Value(), nil
-	})
-}
-
-// StreamPopFront produces a stream that consumes elements from the
-// list as it iterates, moving front-to-back.
-//
-// If you add values to the list during iteration *behind* where the
-// stream is, these values will not be present in the stream;
-// however, values added ahead of the stream, will be visible.
-//
-// In most cases, for destructive iteration, use the pubsub.Queue,
-// pubsub.Deque, or one of the pubsub.Distributor implementations.
-func (l *List[T]) StreamPopFront() *fun.Stream[T] {
-	var current *Element[T]
-	return fun.MakeStream(func(context.Context) (o T, _ error) {
-		current = l.PopFront()
-
-		if !current.Ok() {
-			return o, io.EOF
-		}
-
-		return current.item, nil
-	})
-}
-
-// StreamPopBack produces a stream that consumes elements from the
-// list as it iterates, moving back-to-front.
-//
-// If you add values to the list during iteration *behind* where the
-// stream is, these values will not be present in the stream;
-// however, values added ahead of the stream, will be visible.
-func (l *List[T]) StreamPopBack() *fun.Stream[T] {
-	var current *Element[T]
-	return fun.MakeStream(func(context.Context) (o T, _ error) {
-		current = l.PopBack()
-		if !current.Ok() {
-			return o, io.EOF
-		}
-		return current.item, nil
-	})
+	}
 }
 
 // Copy duplicates the list. The element objects in the list are

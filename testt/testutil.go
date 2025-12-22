@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/dt"
 )
 
 // Context creates a context and attaches its cancellation function to
@@ -93,22 +92,22 @@ func Must[T any](out T, err error) func(t testing.TB) T {
 // WithEnv will assert if there are any problems setting
 // environment variables. Callers are responsible for managing
 // concurrency between multiple.
-func WithEnv(t *testing.T, ev dt.Pair[string, string], op func()) {
+func WithEnv(t *testing.T, key, value string, op func()) {
 	t.Helper()
-	Logf(t, "key=%q value %q", ev.Key, ev.Value)
+	Logf(t, "key=%q value %q", key, value)
 
-	prev, wasSet := os.LookupEnv(ev.Key)
+	prev, wasSet := os.LookupEnv(key)
 
 	defer func() {
 		if wasSet {
-			assert.NotError(t, os.Setenv(ev.Key, prev))
+			assert.NotError(t, os.Setenv(key, prev))
 			return
 		}
 
-		assert.NotError(t, os.Unsetenv(ev.Key))
+		assert.NotError(t, os.Unsetenv(key))
 	}()
 
-	assert.NotError(t, os.Setenv(ev.Key, ev.Value))
+	assert.NotError(t, os.Setenv(key, value))
 
 	op()
 }

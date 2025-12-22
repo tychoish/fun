@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/intish"
@@ -267,14 +266,6 @@ func TestDropZeros(t *testing.T) {
 	all[45] = "49"
 	n = DropZeroValues[string](fun.SliceStream(all)).Count(ctx)
 	assert.Equal(t, 1, n)
-}
-
-func TestIndexed(t *testing.T) {
-	iter := Indexed(fun.VariadicStream(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
-	count := 0
-	err := iter.ReadAll(fnx.FromHandler(func(in dt.Pair[int, int]) { count++; check.Equal(t, in.Key, in.Value) })).Run(t.Context())
-	check.NotError(t, err)
-	assert.Equal(t, count, 10)
 }
 
 func makeIntSlice(size int) []int {

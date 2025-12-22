@@ -16,15 +16,6 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Plist is a simple constructor for making metadata pairs for the
-// ensure.Assertion.Metadata() method. The return value is chainable,
-// as in:
-//
-//	ensure.That(is.True(os.IsNotExists(err))).Metadata(
-//		  is.Plist().Pair("name", name).
-//			     Pair("path", path)).Run(t)
-func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
-
 // That is the root type for the assertion helpers in this
 // package. Implementations return nil for no-errors, and one or more
 // error messages for failing assertions..

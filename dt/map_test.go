@@ -23,29 +23,6 @@ func TestMap(t *testing.T) {
 		mp := makeMap(100)
 		check.Equal(t, len(mp), 100)
 		check.Equal(t, mp.Len(), 100)
-		check.Equal(t, mp.Pairs().Len(), 100)
-	})
-	t.Run("Extend", func(t *testing.T) {
-		mp := makeMap(100)
-
-		// noop because same keys
-		mp.Extend(mp.Pairs())
-		check.Equal(t, mp.Len(), 100)
-
-		// works because different keys, probably
-		mp.Extend(makeMap(100).Pairs())
-		check.Equal(t, mp.Len(), 200)
-	})
-	t.Run("Append", func(t *testing.T) {
-		mp := makeMap(100)
-
-		// noop because same keys
-		mp.Append(irt.Collect(mp.Pairs().Iterator())...)
-		check.Equal(t, mp.Len(), 100)
-
-		// works because different keys, probably
-		mp.Append(irt.Collect(makeMap(100).Pairs().Iterator())...)
-		check.Equal(t, mp.Len(), 200)
 	})
 	t.Run("SetDefaultAndCheck", func(t *testing.T) {
 		mp := Map[string, bool]{}
@@ -83,7 +60,7 @@ func TestMap(t *testing.T) {
 		mp := Map[string, int]{}
 		assert.Equal(t, len(orig), 3)
 		assert.Equal(t, len(mp), 0)
-		mp.ExtendWithPairs(orig.Pairs())
+		mp.Extend(mp.Iterator())
 		check.Equal(t, mp["1"], 1)
 		check.Equal(t, mp["2"], 2)
 		check.Equal(t, mp["3"], 3)
@@ -96,14 +73,14 @@ func TestMap(t *testing.T) {
 
 		mp := NewMap(in)
 		seen := 0
-		for item := range mp.Pairs().Iterator() {
-			switch item.Key {
+		for key, value := range mp.Iterator() {
+			switch key {
 			case "hi":
-				check.Equal(t, item.Value, "there")
+				check.Equal(t, value, "there")
 			case "how":
-				check.Equal(t, item.Value, "are you doing")
+				check.Equal(t, value, "are you doing")
 			default:
-				t.Errorf("unexpected value: %s", item)
+				t.Errorf("unexpected pair: %s, %s", key, value)
 			}
 			seen++
 		}

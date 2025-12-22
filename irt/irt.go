@@ -58,7 +58,10 @@ func PtrsWithNils[T comparable](seq iter.Seq[T]) iter.Seq[*T] { return Convert(s
 func Deref[T any](seq iter.Seq[*T]) iter.Seq[T]               { return Convert(RemoveNils(seq), derefz) }
 func DerefWithZeros[T any](seq iter.Seq[*T]) iter.Seq[T]      { return Convert(seq, derefz) }
 
-func Generator[T any](gen func() (T, bool)) iter.Seq[T] {
+func Generate[T any](gen func() (T, bool)) iter.Seq[T] {
+	// TODO(perf): compare with..
+	//    GenerateWhile2(gen, isOk)
+
 	return func(yield func(T) bool) {
 		for val, ok := gen(); ok && yield(val); val, ok = gen() {
 			continue
@@ -66,9 +69,33 @@ func Generator[T any](gen func() (T, bool)) iter.Seq[T] {
 	}
 }
 
-func Generator2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
+func Generate2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for first, second, ok := gen(); ok && yield(first, second); first, second, ok = gen() {
+			continue
+		}
+	}
+}
+
+func GenerateWhile[T any](op func() T, while func(T) bool) iter.Seq[T] {
+	return While(Perpetual(op), while)
+}
+
+func GenerateWhile2[A, B any](op func() (A, B), while func(A, B) bool) iter.Seq2[A, B] {
+	return While2(Perpetual2(op), while)
+}
+
+func Perpetual[T any](op func() T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for yield(op()) {
+			continue
+		}
+	}
+}
+
+func Perpetual2[A, B any](op func() (A, B)) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		for yield(op()) {
 			continue
 		}
 	}
@@ -151,7 +178,7 @@ func ApplyUntil[T any](seq iter.Seq[T], op func(T) error) error {
 	return nil
 }
 
-func ApplyUnless[T any](seq iter.Seq[T], op func(T) bool) int { return ApplyWhile(seq, negate(op)) }
+func ApplyUnless[T any](seq iter.Seq[T], op func(T) bool) int { return ApplyWhile(seq, notf(op)) }
 func ApplyAll[T any](seq iter.Seq[T], op func(T) error) error { return JoinErrors(Convert(seq, op)) }
 
 func Apply2[A, B any](seq iter.Seq2[A, B], op func(A, B)) (count int) {
@@ -176,7 +203,7 @@ func ApplyWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) (count int) 
 }
 
 func ApplyUnless2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) int {
-	return ApplyWhile2(seq, negate2(op))
+	return ApplyWhile2(seq, notf2(op))
 }
 
 func ApplyUntil2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
@@ -267,10 +294,12 @@ func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return KeepOk
 func KeepOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]           { return First(Keep2(seq, isOk)) }
 func WhileOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]          { return First(While2(seq, isOk)) }
 func WhileSuccess[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return First(While2(seq, isSuccess2)) }
+func UntilNil[T any](seq iter.Seq[*T]) iter.Seq[T]               { return Deref(Until(seq, isNil)) }
 func UntilError[T any](seq iter.Seq2[T, error]) iter.Seq[T]      { return First(Until2(seq, isError2)) }
-func Until[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return While(seq, negate(prd)) }
+func Until[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return While(seq, notf(prd)) }
+
 func Until2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
-	return While2(seq, negate2(prd))
+	return While2(seq, notf2(prd))
 }
 
 func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
@@ -319,9 +348,9 @@ func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	}
 }
 
-func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, negate(prd)) }
+func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, notf(prd)) }
 func Remove2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
-	return Keep2(seq, negate2(prd))
+	return Keep2(seq, notf2(prd))
 }
 
 func GroupBy[K comparable, V any](seq iter.Seq[V], groupBy func(V) K) iter.Seq2[K, []V] {
@@ -436,6 +465,10 @@ func noop[T any](in T) T                   { return in }
 func wrap[A, B any](op func() B) func(A) B { return func(A) B { return op() } }
 func args[T any](args ...T) []T            { return args }
 
+func wrap2[A, B any](op func() A, wrap func(A) B) func() (A, B) {
+	return func() (A, B) { o := op(); return o, wrap(o) }
+}
+
 func funcall[T any](op func(T), arg T)         { op(arg) }
 func funcallv[T any](op func(...T), args ...T) { op(args...) }
 func funcalls[T any](op func([]T), args []T)   { op(args) }
@@ -464,9 +497,9 @@ func zipthread[A, B, C, D any](op func(A) (B, C), merge func(B, C) D) func(A) D 
 
 // predicates
 
-func not(is bool) bool                           { return !is }
-func negate[T any](op func(T) bool) func(T) bool { return func(in T) bool { return not(op(in)) } }
-func negate2[A, B any](op func(A, B) bool) func(A, B) bool {
+func not(is bool) bool                         { return !is }
+func notf[T any](op func(T) bool) func(T) bool { return func(in T) bool { return not(op(in)) } }
+func notf2[A, B any](op func(A, B) bool) func(A, B) bool {
 	return func(a A, b B) bool { return !op(a, b) }
 }
 

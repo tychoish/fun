@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ensure/is"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -105,14 +104,11 @@ func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
 	return a
 }
 
-// Metadata adds structured logging pairs, which can be constructed
-// using the is.Plist().Add(k,v) constructor and chaining.
+// WithMetadata annotates the assertion with additional (structured, keyed) logging.
 //
 // Each pair is logged as it's own Log statement.
-func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
-	fun.Invariant.Must(md.Stream().ReadAll(fnx.FromHandler(func(p dt.Pair[string, any]) {
-		a.messages.PushBack(fun.MAKE.Sprintf(`%s: "%v"`, p.Key, p.Value))
-	})).Wait())
+func (a *Assertion) WithMetadata(key string, value any) *Assertion {
+	a.messages.PushBack(fun.MAKE.Sprintf(`%s: "%v"`, key, value))
 	return a
 }
 

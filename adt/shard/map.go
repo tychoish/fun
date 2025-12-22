@@ -225,9 +225,6 @@ func (m *Map[K, V]) Load(key K) (V, bool) { return m.shard(key).load(key) }
 // it exists.
 func (m *Map[K, V]) Delete(key K) { m.inc().shard(key).write().Delete(key) }
 
-// Set adds a key and value to the map from a Pair.
-func (m *Map[K, V]) Set(it dt.Pair[K, V]) { m.Store(it.Key, it.Value) }
-
 // Check returns true if the key exists in the map or false otherwise.
 func (m *Map[K, V]) Check(key K) bool { return m.shard(key).read().Check(key) }
 

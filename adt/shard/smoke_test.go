@@ -7,7 +7,6 @@ import (
 	"github.com/tychoish/fun/adt/shard"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -94,7 +93,7 @@ func TestShardedMap(t *testing.T) {
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
 
-				m.Set(dt.MakePair("one", 37))
+				m.Store("one", 37)
 				item = m.Fetch("one")
 				assert.True(t, item.Exists)
 				assert.Equal(t, item.Value, 37)
@@ -116,7 +115,7 @@ func TestShardedMap(t *testing.T) {
 					assert.Equal(t, 42+1, len(m.Clocks()))
 				})
 				t.Run("AfterPopulated", func(t *testing.T) {
-					m.Set(dt.MakePair("one", 37))
+					m.Store("one", 37)
 					assert.True(t, m.Check("one"))
 					item = m.Fetch("one")
 					assert.True(t, item.Exists)
@@ -183,7 +182,7 @@ func TestShardedMap(t *testing.T) {
 			assert.Equal(t, item.NumShards, 32)
 		})
 		t.Run("AfterPopulated", func(t *testing.T) {
-			m.Set(dt.MakePair("one", 37))
+			m.Store("one", 37)
 			assert.True(t, m.Check("one"))
 			item = m.Fetch("one")
 			assert.True(t, item.Exists)

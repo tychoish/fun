@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"sync/atomic"
 	"time"
 
 	"github.com/tychoish/fun"
@@ -62,15 +61,6 @@ func JSON[T any](in io.Reader) *fun.Stream[T] {
 		}
 		return out, err
 	})).Stream(fun.MAKE.LinesWithSpaceTrimed(in))
-}
-
-// Indexed produces a stream that keeps track of and reports the
-// sequence/index id of the item in the iteration sequence.
-func Indexed[T any](iter *fun.Stream[T]) *fun.Stream[dt.Pair[int, T]] {
-	idx := &atomic.Int64{}
-	idx.Store(-1)
-
-	return fun.Convert(fnx.MakeConverter(func(in T) dt.Pair[int, T] { return dt.MakePair(int(idx.Add(1)), in) })).Stream(iter)
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the

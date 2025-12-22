@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -153,7 +152,7 @@ func TestTools(t *testing.T) {
 			assert.Zero(t, os.Getenv(t.Name()))
 			_, isSet := os.LookupEnv(t.Name())
 			assert.True(t, ft.Not(isSet))
-			WithEnv(t, dt.MakePair(t.Name(), "beep!!beep"), func() {
+			WithEnv(t, t.Name(), "beep!!beep", func() {
 				assert.Equal(t, os.Getenv(t.Name()), "beep!!beep")
 				_, isSetNow := os.LookupEnv(t.Name())
 				assert.True(t, isSetNow)
@@ -167,11 +166,11 @@ func TestTools(t *testing.T) {
 			_, isSet := os.LookupEnv(t.Name())
 			assert.True(t, ft.Not(isSet))
 
-			WithEnv(t, dt.MakePair(t.Name(), "boop!!boop"), func() {
+			WithEnv(t, t.Name(), "boop!!boop", func() {
 				assert.Equal(t, os.Getenv(t.Name()), "boop!!boop")
 				_, isSetHere := os.LookupEnv(t.Name())
 				assert.True(t, isSetHere)
-				WithEnv(t, dt.MakePair(t.Name(), "beep!!beep"), func() {
+				WithEnv(t, t.Name(), "beep!!beep", func() {
 					assert.Equal(t, os.Getenv(t.Name()), "beep!!beep")
 					_, isSetNow := os.LookupEnv(t.Name())
 					assert.True(t, isSetNow)
