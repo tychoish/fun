@@ -1,6 +1,7 @@
 package adt
 
 import (
+	"iter"
 	"maps"
 	"math/rand"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 const (
@@ -67,6 +69,11 @@ func (l *List[T]) Len() int                  { return int(l.size.Load()) }
 func (l *List[T]) newElem() *Element[T]      { return &Element[T]{list: l} }
 func (l *List[T]) makeElem(v *T) *Element[T] { return l.newElem().Set(v) }
 func (l *List[T]) root() *Element[T]         { return l.head.Call(l.init) }
+
+func (l *List[T]) ExtendFront(seq iter.Seq[*T]) *List[T] { irt.Apply(seq, l.PushFront); return l }
+func (l *List[T]) ExtendBack(seq iter.Seq[*T]) *List[T]  { irt.Apply(seq, l.PushBack); return l }
+func (l *List[T]) Append(values ...*T) *List[T]          { return l.ExtendBack(irt.Slice(values)) }
+func (l *List[T]) Prepend(values ...*T) *List[T]         { return l.ExtendFront(irt.Slice(values)) }
 
 func safeTx[T any, O any](e *Element[T], op func() O) O {
 	defer WithAll(LocksHeld(e.forTx()))

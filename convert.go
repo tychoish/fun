@@ -4,20 +4,17 @@ import (
 	"context"
 	"errors"
 	"io"
-	"iter"
 
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/irt"
 )
 
 // Convert takes an input stream of one type, and returns a function which takes an
 // fnx.Converter function that returns the output stream.  and converts it to a stream of the
 // another type. All errors from the original stream are propagated to the output stream.
-func Convert[T any, O any](op fnx.Converter[T, O]) interface {
+func Convert[T, O any](op fnx.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
 	Parallel(*Stream[T], ...OptionProvider[*WorkerGroupConf]) *Stream[O]
-	Iterate(context.Context, iter.Seq[T]) iter.Seq[O]
 } {
 	return &converter[T, O]{op: op}
 }
@@ -35,10 +32,6 @@ type converter[T any, O any] struct {
 }
 
 func (converter[T, O]) zero() (v O) { return v }
-
-func (c *converter[T, O]) Iterate(ctx context.Context, seq iter.Seq[T]) iter.Seq[O] {
-	return irt.UntilError(irt.With2(seq, func(in T) (O, error) { return c.op.Convert(ctx, in) }))
-}
 
 func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 	return MakeStream(func(ctx context.Context) (out O, _ error) {

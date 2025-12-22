@@ -39,7 +39,7 @@ func TestList(t *testing.T) {
 		assert.Zero(t, l.Len())
 	})
 	t.Run("IteratorList", func(t *testing.T) {
-		list := IteratorList(NewSlice([]int{1, 2, 3, 4, 5}).Iterator())
+		list := SeqList(NewSlice([]int{1, 2, 3, 4, 5}).Iterator())
 		assert.Equal(t, list.Len(), 5)
 		assert.Equal(t, list.Front().Value(), 1)
 		assert.Equal(t, list.Back().Value(), 5)
@@ -614,7 +614,7 @@ func TestList(t *testing.T) {
 			l2 := GetPopulatedList(t, 100)
 			l2tail := l2.Back()
 
-			l1.AppendList(l2)
+			l1.Extend(l2.SeqFront())
 			if l1.Len() != 200 {
 				t.Error(l1.Len())
 			}
@@ -641,7 +641,7 @@ func TestList(t *testing.T) {
 				t.Fatal("incorrect items")
 			}
 
-			lOne.AppendList(lTwo)
+			lOne.Extend(lTwo.SeqFront())
 			combined := append(itemsOne, itemsTwo...)
 			idx := 0
 			for value := range lOne.SeqFront() {

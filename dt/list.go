@@ -33,36 +33,14 @@ func VariadicList[T any](elems ...T) *List[T] { return SliceList(elems) }
 // SliceList constructs a doubly-linked list from the elements of a slice.
 func SliceList[T any](elems []T) *List[T] { l := new(List[T]); l.Append(elems...); return l }
 
-// IteratorList constructs a doubly-linked list from the elements of a Go standard library iterator.
-func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.AppendIterator(in); return l }
+// SeqList constructs a doubly-linked list from the elements of a Go standard library iterator.
+func SeqList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.Extend(in); return l }
 
 // Append adds a variadic sequence of items to the end of the list.
-func (l *List[T]) Append(items ...T) *List[T] { return l.AppendSlice(items) }
+func (l *List[T]) Append(items ...T) *List[T] { return l.Extend(irt.Slice(items)) }
 
-// AppendSlice adds all of the items in a slice to the end of the list.
-func (l *List[T]) AppendSlice(sl []T) *List[T] {
-	for idx := range sl {
-		l.PushBack(sl[idx])
-	}
-	return l
-}
-
-// AppendList removes items from the front of the input list, and appends
-// them to the end (back) of the current list.
-func (l *List[T]) AppendList(input *List[T]) *List[T] {
-	for elem := input.PopFront(); elem.Ok(); elem = input.PopFront() {
-		l.Back().Append(elem)
-	}
-	return l
-}
-
-// AppendIterator adds all of the items in the standard Go iterator to end of the list.
-func (l *List[T]) AppendIterator(input iter.Seq[T]) *List[T] {
-	for val := range input {
-		l.PushBack(val)
-	}
-	return l
-}
+// Extend adds all of the items in a slice to the end of the list.
+func (l *List[T]) Extend(seq iter.Seq[T]) *List[T] { irt.Apply(seq, l.PushBack); return l }
 
 // Reset removes all members of the list, and releases all references to items in the list.
 func (l *List[T]) Reset() {
@@ -301,8 +279,8 @@ func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
 			out.Back().Append(b.PopFront())
 		}
 	}
-	out.AppendList(a)
-	out.AppendList(b)
+	out.Extend(a.SeqFront())
+	out.Extend(b.SeqFront())
 
 	return out
 }

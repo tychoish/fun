@@ -125,7 +125,7 @@ func (s *Set[T]) List() *List[T] {
 	if s.list != nil {
 		return s.list.Copy()
 	}
-	return IteratorList(s.Iterator())
+	return SeqList(s.Iterator())
 }
 
 // Slice exports the contents of the set to a slice.

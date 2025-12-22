@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 // Stack provides a generic singly linked list, with an interface that
@@ -17,7 +18,8 @@ type Stack[T any] struct {
 }
 
 // Append adds a variadic sequence of items to the list.
-func (s *Stack[T]) Append(items ...T) *Stack[T] { ft.ApplyMany(s.Push, items); return s }
+func (s *Stack[T]) Append(items ...T) *Stack[T]      { return s.Extend(irt.Slice(items)) }
+func (s *Stack[T]) Extend(seq iter.Seq[T]) *Stack[T] { irt.Apply(seq, s.Push); return s }
 
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
 func (*Stack[T]) zero() (o T)       { return }

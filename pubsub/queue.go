@@ -3,12 +3,12 @@ package pubsub
 import (
 	"context"
 	"fmt"
-	"io"
+	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 )
 
 // stolen shamelessly from https://github.com/tendermint/tendermint/tree/master/internal/libs/queue
@@ -385,7 +385,7 @@ type entry[T any] struct {
 	link *entry[T]
 }
 
-// Stream produces a stream implementation that wraps the
+// Seq produces a stream implementation that wraps the
 // underlying queue linked list. The stream respects the Queue's
 // mutex and is safe for concurrent access and current queue
 // operations, without additional locking. The stream does not
@@ -393,9 +393,9 @@ type entry[T any] struct {
 // the queue has been closed via the Close() method.
 //
 // To create a "consuming" stream, use a Distributor.
-func (q *Queue[T]) Stream() *fun.Stream[T] {
+func (q *Queue[T]) Seq(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
-	return fun.MakeStream(func(ctx context.Context) (o T, _ error) {
+	op := func() (o T, _ bool) {
 		if next == nil {
 			q.mu.Lock()
 			next = q.front
@@ -405,7 +405,7 @@ func (q *Queue[T]) Stream() *fun.Stream[T] {
 		q.mu.Lock()
 		if next.link == q.front {
 			q.mu.Unlock()
-			return o, io.EOF
+			return o, false
 		}
 
 		if next.link != nil {
@@ -414,13 +414,13 @@ func (q *Queue[T]) Stream() *fun.Stream[T] {
 		} else if next.link == nil {
 			if q.closed {
 				q.mu.Unlock()
-				return o, io.EOF
+				return o, false
 			}
 
 			q.mu.Unlock()
 
 			if err := q.waitForNew(ctx); err != nil {
-				return o, err
+				return o, false
 			}
 
 			q.mu.Lock()
@@ -430,8 +430,9 @@ func (q *Queue[T]) Stream() *fun.Stream[T] {
 			q.mu.Unlock()
 		}
 
-		return next.item, nil
-	})
+		return next.item, true
+	}
+	return irt.Generate(op)
 }
 
 // Distributor creates a object used to process the items in the

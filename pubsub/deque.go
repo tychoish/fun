@@ -3,13 +3,13 @@ package pubsub
 import (
 	"context"
 	"fmt"
-	"io"
+	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -243,61 +243,63 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	return dq.addAfter(it, afterGetter())
 }
 
-// StreamFront starts at the front of the queue and iterates towards
+// SeqFront starts at the front of the queue and iterates towards
 // the back. When the stream reaches the beginning of the queue it
 // ends.
-func (dq *Deque[T]) StreamFront() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqNext, false))
+func (dq *Deque[T]) SeqFront(ctx context.Context) iter.Seq[T] {
+	return dq.confFuture(ctx, dqNext, false)
 }
 
-// StreamBack starts at the back of the queue and iterates
+// SeqBack starts at the back of the queue and iterates
 // towards the front. When the stream reaches the end of the queue
 // it ends.
-func (dq *Deque[T]) StreamBack() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqPrev, false))
+func (dq *Deque[T]) SeqBack(ctx context.Context) iter.Seq[T] {
+	return dq.confFuture(ctx, dqPrev, false)
 }
 
-// BlockingStreamFront exposes the deque to a single-function interface
+// SeqFrontBlocking exposes the deque to a single-function interface
 // for iteration. The future function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // front to back, and will block for a new element if the deque is
 // empty or the future reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) BlockingStreamFront() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqNext, true))
+func (dq *Deque[T]) SeqFrontBlocking(ctx context.Context) iter.Seq[T] {
+	return dq.confFuture(ctx, dqNext, true)
 }
 
-// BlockingStreamBack exposes the deque to a single-function interface
+// SeqBackBlocking exposes the deque to a single-function interface
 // for iteration. The future function operation will not modify the
 // contents of the Deque, but will produce elements from the deque,
 // back to fron, and will block for a new element if the deque is
 // empty or the future reaches the end, the operation will block
 // until another item is added.
-func (dq *Deque[T]) BlockingStreamBack() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqPrev, true))
+func (dq *Deque[T]) SeqBackBlocking(ctx context.Context) iter.Seq[T] {
+	return dq.confFuture(ctx, dqPrev, true)
 }
 
-func (dq *Deque[T]) confFuture(direction dqDirection, blocking bool) fnx.Future[T] {
+func (*Deque[T]) zero() (z T) { return z }
+func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, blocking bool) iter.Seq[T] {
 	var current *element[T]
-	return func(ctx context.Context) (out T, _ error) {
+
+	op := func() (T, bool) {
 		defer adt.With(adt.Lock(dq.mtx))
 		if current == nil {
 			current = dq.root
 		}
-
 		if current.getNextOrPrevious(direction) == dq.root && blocking {
 			if err := current.wait(ctx, direction); err != nil {
-				return out, err
+				return dq.zero(), false
 			}
 		}
 		next := current.getNextOrPrevious(direction)
 		if next == nil || next == dq.root {
-			return out, io.EOF
+			return dq.zero(), false
 		}
 
 		current = next
-		return current.item, nil
+		return current.item, true
 	}
+	return irt.Generate(op)
 }
 
 // BlockingDistributor produces a BlockingDistributor instance with

@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func sumUint64(in []uint64) (out uint64) {
@@ -47,7 +46,6 @@ func TestShardedMap(t *testing.T) {
 				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
 			})
 			t.Run("Stream", func(t *testing.T) {
-				ctx := testt.Context(t)
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
 
@@ -73,14 +71,6 @@ func TestShardedMap(t *testing.T) {
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
 					for item := range m.Stream() {
-						ct++
-						check(t, item)
-					}
-					assert.Equal(t, ct, 3)
-				})
-				t.Run("Parallel", func(t *testing.T) {
-					ct := 0
-					for item := range m.ParallelStream().Iterator(ctx) {
 						ct++
 						check(t, item)
 					}

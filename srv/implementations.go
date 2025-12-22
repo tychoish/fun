@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"net"
 	"net/http"
 	"os"
@@ -28,21 +29,21 @@ import (
 //
 // Use Group(itertool.Slice([]*Service)) to produce a group from a
 // slice of *Services,.
-func Group(services *fun.Stream[*Service]) *Service {
+func Group(services iter.Seq[*Service]) *Service {
 	waiters := pubsub.NewUnlimitedQueue[func() error]()
 	wg := &fnx.WaitGroup{}
 	ec := &erc.Collector{}
 
 	return &Service{
 		Run: func(ctx context.Context) error {
-			for services.Next(ctx) {
+			for srvc := range services {
 				wg.Add(1)
 				go func(s *Service) {
 					defer ec.Recover()
 					defer wg.Done()
 					defer func() { fun.Invariant.IsTrue(waiters.Add(s.Wait) == nil) }()
 					ec.Push(s.Start(ctx))
-				}(services.Value())
+				}(srvc)
 			}
 			wg.Wait(ctx)
 			ec.Push(waiters.Close())
@@ -50,25 +51,25 @@ func Group(services *fun.Stream[*Service]) *Service {
 		},
 		Cleanup: func() error {
 			defer ec.Recover()
-			// we're calling each service's wait() here, which
-			// might be a recipe for deadlocks, but it gives us
-			// the chance to collect all errors from the contained
-			// services. This will cause our "group service" to
-			// have the same semantics as a single service, however.
-			iter := waiters.Stream()
-
 			// because we know that the implementation of the
 			// waiters stream won't block in this context, it's
 			// safe to call it with a background context, though
 			// it's worth being careful here
 			ctx := context.Background()
-			for iter.Next(ctx) {
+
+			// we're calling each service's wait() here, which
+			// might be a recipe for deadlocks, but it gives us
+			// the chance to collect all errors from the contained
+			// services. This will cause our "group service" to
+			// have the same semantics as a single service, however.
+
+			for value := range waiters.Seq(ctx) {
 				wg.Add(1)
 				go func(wait func() error) {
 					defer ec.Recover()
 					defer wg.Done()
 					ec.Push(wait())
-				}(iter.Value())
+				}(value)
 			}
 
 			wg.Operation().Wait()
@@ -119,17 +120,12 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // When the service returns all worker Goroutines as well as the input
 // worker will have returned. Use a blocking pubsub stream to
 // dispatch wait functions throughout the lifecycle of your program.
-func Wait(iter *fun.Stream[fnx.Operation]) *Service {
+func Wait(seq iter.Seq[fnx.Operation]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
 		Run: func(ctx context.Context) error {
-			for {
-				value, err := iter.Read(ctx)
-				if err != nil {
-					break
-				}
-
+			for value := range seq {
 				wg.Add(1)
 				go func(fn fnx.Operation) {
 					defer ec.Recover()
@@ -138,12 +134,10 @@ func Wait(iter *fun.Stream[fnx.Operation]) *Service {
 				}(value)
 			}
 
-			ec.Push(iter.Close())
 			wg.Wait()
 			return nil
 		},
-		Cleanup:  func() error { wg.Wait(); return ec.Resolve() },
-		Shutdown: iter.Close,
+		Cleanup: func() error { wg.Wait(); return ec.Resolve() },
 	}
 }
 
@@ -151,13 +145,14 @@ func Wait(iter *fun.Stream[fnx.Operation]) *Service {
 // *Service. For a long running service, use a stream that is
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessStream[T any](
-	iter *fun.Stream[T],
+	seq iter.Seq[T],
 	processor fnx.Handler[T],
 	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
 ) *Service {
+	st := fun.SeqStream(seq)
 	return &Service{
-		Run:      iter.Parallel(processor, optp...),
-		Shutdown: iter.Close,
+		Run:      st.Parallel(processor, optp...),
+		Shutdown: st.Close,
 	}
 }
 

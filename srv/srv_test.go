@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
@@ -107,12 +108,12 @@ func testCheckOrderingEffects(t *testing.T, s *Service) {
 	}
 }
 
-func makeStream(size int) *fun.Stream[int] {
+func makeSeq(size int) iter.Seq[int] {
 	slice := make([]int, size)
 	for i := 0; i < size; i++ {
 		slice[i] = rand.Intn(size)
 	}
-	return fun.SliceStream(slice)
+	return irt.Slice(slice)
 }
 
 func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fnx.Worker] {

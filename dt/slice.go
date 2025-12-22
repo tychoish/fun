@@ -71,7 +71,7 @@ func MergeSlices[T any](sls ...[]T) Slice[T] {
 
 	out := SliceWithCapacity[T](size)
 	for idx := range sls {
-		out.AppendSlice(sls[idx])
+		out.Append(sls[idx])
 	}
 	return out
 }
@@ -109,13 +109,16 @@ func (s Slice[T]) Sort(cp func(a, b T) bool) {
 func (s *Slice[T]) Push(in T) { *s = append(*s, in) }
 
 // PushMany adds all of the items to the end of the slice.
-func (s *Slice[T]) PushMany(in ...T) { s.AppendSlice(in) }
+func (s *Slice[T]) PushMany(in ...T) { s.Extend(slices.Values(in)) }
 
 // Prepend adds the items to beginning of the slice.
-func (s *Slice[T]) Prepend(in ...T) { *s = append(in, *s...) }
+func (s *Slice[T]) Prepend(in ...T) *Slice[T] { *s = append(in, *s...); return s }
 
-// AppendSlice adds the items from the input slice to the root slice.
-func (s *Slice[T]) AppendSlice(in []T) { *s = append(*s, in...) }
+// Append adds the items from the input slice to the root slice.
+func (s *Slice[T]) Append(in ...T) *Slice[T] { *s = append(*s, in...); return s }
+
+// Extend adds the items from the input slice to the root slice.
+func (s *Slice[T]) Extend(seq iter.Seq[T]) *Slice[T] { *s = slices.AppendSeq(*s, seq); return s }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }

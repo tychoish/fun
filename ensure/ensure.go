@@ -139,7 +139,7 @@ func (a *Assertion) Run(t testing.TB) {
 		"no tests defined",
 	)
 
-	result.AppendSlice(a.check.Resolve())
+	result.Append(a.check.Resolve())
 
 	for sub := a.subtests.Front(); sub.Ok(); sub = sub.Next() {
 		st := sub.Value()

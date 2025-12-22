@@ -149,7 +149,7 @@ func (ro ChanReceive[T]) Stream() *Stream[T] { return MakeStream(ro.Read) }
 // non-blocking mode, iteration ends when there are no items in the
 // channel. In blocking mode, iteration ends when the context is
 // canceled or the channel is closed.
-func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.Stream().Iterator(ctx) }
+func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] { return ro.Stream().Seq(ctx) }
 
 // ReadAll returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor

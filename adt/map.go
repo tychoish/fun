@@ -123,17 +123,6 @@ func (mp *Map[K, V]) Len() int {
 	return count
 }
 
-// Range provides a method for iterating over the values in the map,
-// with a similar API as the standard library's sync.Map. The function
-// is called once on every key in the map. When the range function
-// returns false the iteration stops.
-//
-// Range functions do not reflect a specific snapshot of the map if
-// the map is being modified while being marshaled: keys will only
-// appear at most once but order or which version of a value is not
-// defined.
-func (mp *Map[K, V]) Range(fn func(K, V) bool) { mp.Iterator()(fn) }
-
 // Iterator returns a native go iterator for a fun/dt.Map object.
 func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) { mp.mp.Range(func(ak, av any) bool { return yield(ak.(K), av.(V)) }) }

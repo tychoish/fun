@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"runtime"
 	"sync/atomic"
@@ -53,7 +54,7 @@ type fixture[T any] struct {
 	name   string
 	add    func(T) error
 	remove func() (T, bool)
-	stream func() *fun.Stream[T]
+	stream func(context.Context) iter.Seq[T]
 	close  func() error
 	len    func() int
 	elems  []T
@@ -77,7 +78,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "QueueUnlimited",
 				add:    cue.Add,
 				remove: cue.Remove,
-				stream: cue.Stream,
+				stream: cue.Seq,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.tracker.len,
@@ -90,7 +91,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "QueueLimited",
 				add:    cue.Add,
 				remove: cue.Remove,
-				stream: cue.Stream,
+				stream: cue.Seq,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.tracker.len,
@@ -103,7 +104,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushBackPopFrontForward",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.StreamFront,
+				stream: cue.SeqFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -116,7 +117,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushFrontPopBackForward",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.StreamFront,
+				stream: cue.SeqFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -129,7 +130,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushBackPopFrontReverse",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.StreamBack,
+				stream: cue.SeqBack,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.Len,
@@ -142,7 +143,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushFrontPopBackReverse",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.StreamBack,
+				stream: cue.SeqBack,
 				elems:  makeElems(50),
 				len:    cue.Len,
 				close:  cue.Close,
@@ -155,7 +156,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushBackPopFrontForward",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.StreamFront,
+				stream: cue.SeqFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -169,7 +170,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushFrontPopBackForward",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.StreamFront,
+				stream: cue.SeqFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -182,7 +183,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushBackPopFrontReverse",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.StreamBack,
+				stream: cue.SeqBack,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.Len,
@@ -195,7 +196,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushFrontPopBackReverse",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.StreamBack,
+				stream: cue.SeqBack,
 				elems:  makeElems(50),
 				len:    cue.Len,
 				close:  cue.Close,
@@ -209,7 +210,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushBackPopFrontForward",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.StreamFront,
+				stream: cue.SeqFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -224,7 +225,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeBurstPushFrontPopBackForward",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.StreamFront,
+				stream: cue.SeqFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -237,7 +238,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeBurstPushBackPopFrontReverse",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.StreamBack,
+				stream: cue.SeqBack,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.Len,
@@ -250,7 +251,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeBurstPushFrontPopBackReverse",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.StreamBack,
+				stream: cue.SeqBack,
 				elems:  makeElems(50),
 				len:    cue.Len,
 				close:  cue.Close,
@@ -308,26 +309,19 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 
 			assert.Equal(t, fix.len(), len(fix.elems))
 			seen := 0
-			iter := fix.stream()
+			iter := fix.stream(ctx)
 
 			if err := fix.close(); err != nil {
 				t.Fatal(err)
 			}
 
-			for iter.Next(ctx) {
+			for value := range iter {
 				seen++
-				t.Logf("%d: %T", seen, iter.Value())
-				assert.NotZero(t, iter.Value())
+				t.Logf("%d: %T", seen, value)
+				assert.NotZero(t, value)
 			}
 			if seen != len(fix.elems) {
 				t.Fatal("did not iterate far enough", seen, len(fix.elems))
-			}
-
-			if err := ctx.Err(); err != nil {
-				t.Error("shouldn't cancel", err)
-			}
-			if err := iter.Close(); err != nil {
-				t.Fatal(err)
 			}
 		})
 	})
@@ -593,13 +587,12 @@ func TestDeque(t *testing.T) {
 			t.Error("should not pop empty list")
 		}
 		t.Run("Stream", func(t *testing.T) {
-			for idx, iter := range []*fun.Stream[int]{
-				dq.StreamFront(),
-				dq.StreamBack(),
+			for idx, iter := range []iter.Seq[int]{
+				dq.SeqFront(t.Context()),
+				dq.SeqBack(t.Context()),
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
-					ctx := testt.Context(t)
-					if iter.Next(ctx) {
+					for range iter {
 						t.Error("should not iterate", idx)
 					}
 				})
@@ -714,37 +707,16 @@ func TestDeque(t *testing.T) {
 			}
 		})
 		t.Run("Stream", func(t *testing.T) {
-			for idx, iter := range []*fun.Stream[int]{
-				dq.StreamFront(),
-				dq.StreamBack(),
+			for idx, iter := range []iter.Seq[int]{
+				dq.SeqFront(t.Context()),
+				dq.SeqBack(t.Context()),
 			} {
 				t.Run(fmt.Sprint(idx), func(t *testing.T) {
-					ctx := testt.Context(t)
 					seen := 0
-					for iter.Next(ctx) {
+					for range iter {
 						seen++
 					}
 					if seen != 2 {
-						t.Fatalf("stream had %d and saw %d", dq.Len(), seen)
-					}
-				})
-			}
-		})
-		t.Run("StreamClosed", func(t *testing.T) {
-			for idx, iter := range []*fun.Stream[int]{
-				dq.StreamFront(),
-				dq.StreamBack(),
-			} {
-				t.Run(fmt.Sprint(idx), func(t *testing.T) {
-					seen := 0
-					ctx := testt.Context(t)
-					if err := iter.Close(); err != nil {
-						t.Fatal(err)
-					}
-					for iter.Next(ctx) {
-						seen++
-					}
-					if seen != 0 {
 						t.Fatalf("stream had %d and saw %d", dq.Len(), seen)
 					}
 				})
@@ -758,70 +730,75 @@ func TestDeque(t *testing.T) {
 	})
 	t.Run("StreamHandlesEmpty", func(t *testing.T) {
 		t.Parallel()
-		ctx := testt.Context(t)
 		queue := NewUnlimitedDeque[int]()
 
-		toctx, toccancel := context.WithTimeout(ctx, 4*time.Millisecond)
-		defer toccancel()
 		sa := time.Now()
-		iter := queue.StreamFront()
-		if iter.Next(toctx) {
-			t.Error("should have reported false early", time.Since(sa))
+
+		count := 0
+		for range queue.SeqFront(t.Context()) {
+			count++
 		}
-		// stream is empty, becomes closed
+		if count == 0 {
+			t.Error("should have reported item", time.Since(sa), queue.Len())
+		}
 
 		time.Sleep(2 * time.Millisecond)
 		t.Log(queue.PushFront(31), queue.Len())
 
 		// new itertor should fined item
-		iter = queue.StreamFront()
-		if !iter.Next(ctx) {
-			t.Error("should have reported item", time.Since(sa), iter.Value(), queue.Len())
+		count = 0
+		for range queue.SeqFront(t.Context()) {
+			count++
 		}
-		t.Log(iter.Close(), queue.Len())
+		if count == 0 {
+			t.Error("should have reported item", time.Since(sa), queue.Len())
+		}
 	})
 	t.Run("Future", func(t *testing.T) {
 		t.Run("BlockingEmpty", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.BlockingStreamFront().Read(ctx)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, context.DeadlineExceeded)
+			assert.MinRuntime(t, 100*time.Millisecond, func() {
+				for range dq.SeqFrontBlocking(ctx) {
+					continue
+				}
+			})
+			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 		})
 		t.Run("ReverseBlockingEmpty", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			_, err := dq.BlockingStreamBack().Read(ctx)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, context.DeadlineExceeded)
+			assert.MinRuntime(t, 100*time.Millisecond, func() {
+				for range dq.SeqFrontBlocking(ctx) {
+					continue
+				}
+			})
+			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 		})
 		t.Run("Production", func(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			start := time.Now()
-			go func() {
-				select {
-				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-						t.Error("should not reach timeout")
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+				assert.MinRuntime(t, 10*time.Millisecond, func() {
+					go func() {
+						select {
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+								t.Error("should not reach timeout")
+							}
+						case <-time.After(10 * time.Millisecond):
+							check.NotError(t, dq.PushBack("hello!"))
+						}
+					}()
+
+					for val := range dq.SeqFrontBlocking(ctx) {
+						check.Equal(t, val, "hello!")
 					}
-				case <-time.After(10 * time.Millisecond):
-					check.NotError(t, dq.PushBack("hello!"))
-				}
-			}()
-
-			val, err := dq.BlockingStreamFront().Read(ctx)
-			check.NotError(t, err)
-			check.Equal(t, val, "hello!")
-
-			dur := time.Since(start)
-
-			if dur < 10*time.Millisecond || dur >= 100*time.Millisecond {
-				t.Error("duration out of bounds", dur)
-			}
+				})
+			})
 		})
 	})
 }
@@ -855,14 +832,14 @@ func TestDequeIntegration(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		runtime.Gosched()
 		wg.Add(1)
-		go func(iter *fun.Stream[int64]) {
+		go func(iter iter.Seq[int64]) {
 			defer wg.Done()
 			runtime.Gosched()
-			for iter.Next(ctx) {
+			for range iter {
 				counter.Add(1)
 				runtime.Gosched()
 			}
-		}(queue.StreamFront())
+		}(queue.SeqFront(ctx))
 
 		ticker := testt.Ticker(t, 50*time.Millisecond)
 		timeout := testt.Timer(t, 1000*time.Millisecond)
@@ -924,14 +901,13 @@ func TestDequeIntegration(t *testing.T) {
 			}()
 			for i := 0; i < worker; i++ {
 				wwg.Add(1)
-				go func(iter *fun.Stream[func()]) {
+				go func(iter iter.Seq[func()]) {
 					defer wwg.Done()
 
-					for iter.Next(ctx) {
-						iter.Value()()
+					for range iter {
 						recv.Add(1)
 					}
-				}(queue.StreamFront())
+				}(queue.SeqFront(ctx))
 			}
 		}
 

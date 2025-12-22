@@ -16,6 +16,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
 )
@@ -27,7 +28,7 @@ func TestHelpers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(fun.VariadicStream(fnx.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
+		svc := Wait(irt.One(fnx.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)
@@ -47,7 +48,7 @@ func TestHelpers(t *testing.T) {
 		t.Run("Large", func(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessStream(
-				makeStream(100),
+				makeSeq(100),
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
 				fun.WorkerGroupConfNumWorkers(2),
 			)
@@ -67,7 +68,7 @@ func TestHelpers(t *testing.T) {
 		t.Run("Medium", func(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessStream(
-				makeStream(50),
+				makeSeq(50),
 				func(_ context.Context, _ int) error {
 					time.Sleep(10 * time.Millisecond)
 					count.Add(1)
