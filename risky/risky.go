@@ -16,11 +16,6 @@ import (
 // Cast just provides as a wrapper around in.(T). Cast will panic.
 func Cast[T any](in any) T { return in.(T) }
 
-// Check takes two values and returns the first value and a second
-// "ok" value. The second value is true if the error is nil (isOK) and
-// false otherwise. This is not too risky.
-func Check[T any](out T, err error) (T, bool) { return out, err == nil }
-
 // Force swallows an error, and returns the output, as a non-panic'ing
 // form of risky.Force.
 //

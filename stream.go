@@ -103,7 +103,7 @@ func VariadicStream[T any](in ...T) *Stream[T] { return SliceStream(in) }
 // ChannelStream exposes access to an existing "receive" channel as
 // a stream.
 func ChannelStream[T any](ch <-chan T) *Stream[T] {
-	return MakeStream(makeChanRecv(modeBlocking, ch).Read)
+	return InterfaceStream(makeChanRecv(modeBlocking, ch))
 }
 
 // SliceStream provides Stream access to the elements in a slice.

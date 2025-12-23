@@ -92,23 +92,21 @@ func (m *Map[K, V]) makeShards() []sh[K, V] {
 	return shards
 }
 
-func (m *Map[K, V]) defaultShards() []sh[K, V]                      { return m.init(defaultSize, MapTypeDefault) }
-func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                     { return m.sh.Call(m.defaultShards) }
-func (m *Map[K, V]) shard(key K) *sh[K, V]                          { return m.shards().Ptr(int(m.shardID(key))) }
-func (m *Map[K, V]) inc() *Map[K, V]                                { m.clock.Add(1); return m }
-func to[T, O any](in func(T) O) fn.Converter[T, O]                  { return fn.MakeConverter(in) }
-func (m *Map[K, V]) s2ks() fn.Converter[*sh[K, V], iter.Seq[K]]     { return to(m.shKeys) }
-func (m *Map[K, V]) s2vs() fn.Converter[*sh[K, V], iter.Seq[V]]     { return to(m.shValues) }
-func (m *Map[K, V]) vp() fn.Converter[*sh[K, V], iter.Seq[V]]       { return to(m.shValsp) }
-func (m *Map[K, V]) keyToItem() fn.Converter[K, MapItem[K, V]]      { return to(m.Fetch) }
-func (*Map[K, V]) shKeys(sh *sh[K, V]) iter.Seq[K]                  { return sh.keys() }
-func (*Map[K, V]) shValues(sh *sh[K, V]) iter.Seq[V]                { return sh.values() }
-func (m *Map[K, V]) shValsp(sh *sh[K, V]) iter.Seq[V]               { return sh.valsp(int(m.num)) }
-func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                    { return m.shards().Ptrs() }
-func (m *Map[K, V]) shIter() iter.Seq[*sh[K, V]]                    { return m.shPtrs().Iterator() }
-func (m *Map[K, V]) keyItr() iter.Seq[iter.Seq[K]]                  { return m.s2ks().Iterator(m.shIter()) }
-func (m *Map[K, V]) valItr() iter.Seq[iter.Seq[V]]                  { return m.s2vs().Iterator(m.shIter()) }
-func (m *Map[K, V]) popt() fun.OptionProvider[*fun.WorkerGroupConf] { return poolOpts(int(m.num)) }
+func (m *Map[K, V]) defaultShards() []sh[K, V]                  { return m.init(defaultSize, MapTypeDefault) }
+func (m *Map[K, V]) shards() dt.Slice[sh[K, V]]                 { return m.sh.Call(m.defaultShards) }
+func (m *Map[K, V]) shard(key K) *sh[K, V]                      { return m.shards().Ptr(int(m.shardID(key))) }
+func (m *Map[K, V]) inc() *Map[K, V]                            { m.clock.Add(1); return m }
+func to[T, O any](in func(T) O) fn.Converter[T, O]              { return fn.MakeConverter(in) }
+func (m *Map[K, V]) s2ks() fn.Converter[*sh[K, V], iter.Seq[K]] { return to(m.shKeys) }
+func (m *Map[K, V]) s2vs() fn.Converter[*sh[K, V], iter.Seq[V]] { return to(m.shValues) }
+func (m *Map[K, V]) keyToItem() fn.Converter[K, MapItem[K, V]]  { return to(m.Fetch) }
+func (*Map[K, V]) shKeys(sh *sh[K, V]) iter.Seq[K]              { return sh.keys() }
+func (*Map[K, V]) shValues(sh *sh[K, V]) iter.Seq[V]            { return sh.values() }
+func (m *Map[K, V]) shPtrs() dt.Slice[*sh[K, V]]                { return m.shards().Ptrs() }
+func (m *Map[K, V]) shIter() iter.Seq[*sh[K, V]]                { return m.shPtrs().Iterator() }
+func (m *Map[K, V]) keyItr() iter.Seq[iter.Seq[K]]              { return m.s2ks().Iterator(m.shIter()) }
+func (m *Map[K, V]) valItr() iter.Seq[iter.Seq[V]]              { return m.s2vs().Iterator(m.shIter()) }
+func (m *Map[K, V]) itemItr() iter.Seq[MapItem[K, V]]           { return m.keyToItem().Iterator(m.Keys()) }
 
 func (m *Map[K, V]) shardID(key K) uint64 {
 	h := hashPool.Get()
@@ -156,13 +154,10 @@ func (m *Map[K, V]) ValuesSharded() iter.Seq[iter.Seq[V]] { return m.valItr() }
 // Items provides a stream over all items in the map. The
 // MapItem type captures the version information and information about
 // the sharded configuration.
-func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] {
-	return irt.Keep(m.keyToItem().Iterator(m.Keys()), m.filter)
-}
-func (m *Map[K, V]) Iterator() iter.Seq2[K, V] { return irt.With2(m.Items(), m.split) }
-
-func (*Map[K, V]) split(mi MapItem[K, V]) (K, V) { return mi.Key, mi.Value }
-func (*Map[K, V]) filter(mi MapItem[K, V]) bool  { return mi.Exists }
+func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] { return irt.Keep(m.itemItr(), m.filter) }
+func (m *Map[K, V]) Iterator() iter.Seq2[K, V]      { return irt.With2(m.Items(), m.split) }
+func (*Map[K, V]) split(mi MapItem[K, V]) (K, V)    { return mi.Key, mi.Value }
+func (*Map[K, V]) filter(mi MapItem[K, V]) bool     { return mi.Exists }
 
 // MapItem wraps the value stored in a sharded map, with synchronized
 // sharding and versioning information.

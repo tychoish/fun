@@ -42,7 +42,6 @@ func (sh *sh[K, V]) load(k K) (V, bool)             { v, ok := sh.read().Load(k)
 func (sh *sh[K, V]) keys() iter.Seq[K]              { return sh.read().Keys() }
 func (sh *sh[K, V]) vvals() iter.Seq[*Versioned[V]] { return sh.read().Values() }
 func (sh *sh[K, V]) values() iter.Seq[V]            { return to(sh.inner).Iterator(sh.vvals()) }
-func (sh *sh[K, V]) valsp(_ int) iter.Seq[V]        { return sh.values() }
 
 func (sh *sh[K, V]) store(k K, v V) {
 	mp := sh.write()

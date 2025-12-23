@@ -771,7 +771,7 @@ func TestDeque(t *testing.T) {
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
 			assert.MinRuntime(t, 100*time.Millisecond, func() {
-				for range dq.IteratorWaitFront(ctx) {
+				for range dq.IteratorWaitBack(ctx) {
 					continue
 				}
 			})

@@ -395,7 +395,7 @@ type entry[T any] struct {
 // To create a "consuming" stream, use a Distributor.
 func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
-	op := func() (o T, _ bool) {
+	op := func() (o T, ok bool) {
 		if next == nil {
 			q.mu.Lock()
 			next = q.front
@@ -403,33 +403,33 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 		}
 
 		q.mu.Lock()
-		if next.link == q.front || ctx.Err() != nil {
+		if next.link == q.front || (next.link == nil && q.closed) || ctx.Err() != nil {
 			q.mu.Unlock()
 			return o, false
 		} else if next.link != nil {
 			next = next.link
 			q.mu.Unlock()
-		} else if next.link == nil {
-			if q.closed || ctx.Err() != nil {
-				q.mu.Unlock()
-				return o, false
-			}
+			return next.item, true
+		} else {
 			q.mu.Unlock()
-
 			if err := q.waitForNew(ctx); err != nil {
 				return o, false
 			}
 
-			q.mu.Lock()
-			if next.link != q.front {
-				next = next.link
-			}
-			q.mu.Unlock()
+			next, ok = q.advance(next)
+			return next.item, ok
 		}
-
-		return next.item, true
 	}
 	return irt.Generate(op)
+}
+
+func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if next.link != q.front && next.link != nil {
+		next, ok = next.link, true
+	}
+	return next, ok
 }
 
 func (q *Queue[T]) Iterator() iter.Seq[T] {

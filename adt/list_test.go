@@ -1,7 +1,9 @@
 package adt
 
 import (
+	"math/rand/v2"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -181,5 +183,17 @@ func TestAtomicList(t *testing.T) {
 			check.NotPanic(t, func() { ft.ApplyWhen(false, doPanic, 1) })
 			check.NotPanic(t, func() { ft.ApplyWhen(false, doPanic, nil) })
 		})
+	})
+	t.Run("AddingElements", func(t *testing.T) {
+		l := new(List[int])
+		wg := &sync.WaitGroup{}
+		wg.Add(32)
+		for range 32 {
+			go func() {
+				defer wg.Done()
+				time.Sleep(time.Duration(rand.Int64N(10 * int64(time.Millisecond))))
+				l.Append(rand.Int())
+			}()
+		}
 	})
 }

@@ -516,7 +516,7 @@ func zerofor[T any](T) (zero T)                { return zero }
 func checkErr[T any](v T, err error) (T, bool) { ok := isError(err); return ifelsedo(ok, v, zero), ok }
 func withCheckErr[T any]() func(T, error) bool { return func(_ T, e error) bool { return e != nil } }
 
-// pointers and refernces
+// pointers and references
 
 func ptr[T any](in T) *T                       { return &in }
 func ptrznil[T comparable](in T) *T            { return ifelsedo(isZero(in), nil, ptrlazy(in)) }
