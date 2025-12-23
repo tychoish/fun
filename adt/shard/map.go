@@ -142,23 +142,27 @@ func (m *Map[K, V]) Clocks() []uint64 {
 // are randomized within the shard. The keys are NOT captured in a
 // snapshot, so keys reflecting different logical moments will appear
 // in the stream. No key will appear more than once.
-func (m *Map[K, V]) Keys() iter.Seq[K] { return irt.Chain(m.keyItr()) }
+func (m *Map[K, V]) Keys() iter.Seq[K]                  { return irt.Chain(m.KeysSharded()) }
+func (m *Map[K, V]) KeysSharded() iter.Seq[iter.Seq[K]] { return m.keyItr() }
 
 // Values returns a stream for all of the keys in the map. Values
 // are provided from shards sequentially, and always in the same
 // sequences, but randomized within each shard. The values are NOT
 // captured in a snapshot, so values reflecting different logical
 // moments will appear in the stream.
-func (m *Map[K, V]) Values() iter.Seq[V] { return irt.Chain(m.valItr()) }
+func (m *Map[K, V]) Values() iter.Seq[V]                  { return irt.Chain(m.ValuesSharded()) }
+func (m *Map[K, V]) ValuesSharded() iter.Seq[iter.Seq[V]] { return m.valItr() }
 
-// Stream provides a stream over all items in the map. The
+// Items provides a stream over all items in the map. The
 // MapItem type captures the version information and information about
 // the sharded configuration.
-func (m *Map[K, V]) Stream() iter.Seq[MapItem[K, V]] {
+func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] {
 	return irt.Keep(m.keyToItem().Iterator(m.Keys()), m.filter)
 }
+func (m *Map[K, V]) Iterator() iter.Seq2[K, V] { return irt.With2(m.Items(), m.split) }
 
-func (*Map[K, V]) filter(mi MapItem[K, V]) bool { return mi.Exists }
+func (*Map[K, V]) split(mi MapItem[K, V]) (K, V) { return mi.Key, mi.Value }
+func (*Map[K, V]) filter(mi MapItem[K, V]) bool  { return mi.Exists }
 
 // MapItem wraps the value stored in a sharded map, with synchronized
 // sharding and versioning information.

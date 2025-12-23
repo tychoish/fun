@@ -497,7 +497,7 @@ func TestError(t *testing.T) {
 	t.Run("Check", func(t *testing.T) {
 		value, ok := Check(100, errors.New("foo"))
 		check.True(t, !ok)
-		check.Equal(t, 100, value)
+		check.Equal(t, 0, value)
 
 		value, ok = Check(100, nil)
 		check.True(t, ok)

@@ -102,7 +102,9 @@ func VariadicStream[T any](in ...T) *Stream[T] { return SliceStream(in) }
 
 // ChannelStream exposes access to an existing "receive" channel as
 // a stream.
-func ChannelStream[T any](ch <-chan T) *Stream[T] { return MakeStream(makeChanRecv(modeBlocking, ch).Read)}
+func ChannelStream[T any](ch <-chan T) *Stream[T] {
+	return MakeStream(makeChanRecv(modeBlocking, ch).Read)
+}
 
 // SliceStream provides Stream access to the elements in a slice.
 func SliceStream[T any](in []T) *Stream[T] {
@@ -133,17 +135,21 @@ func InterfaceStream[T any](obj interface {
 func IteratorStream[T any](it iter.Seq[T]) *Stream[T] {
 	next, stop := iter.Pull(it)
 	ctx, cancel := context.WithCancel(context.Background())
+	mtx := &sync.Mutex{}
+
 	return MakeStream(fnx.CheckedFuture(func() (zero T, _ bool) {
 		if val, ok := next(); ok {
 			return val, true
 		}
 		cancel()
 		return zero, false
-	}).PreHook(fnx.Operation(func(cc context.Context) {
+	}).WithLock(mtx).PreHook(fnx.Operation(func(cc context.Context) {
 		select {
 		case <-ctx.Done():
 		case <-cc.Done():
 		}
+
+		defer internal.With(internal.Lock(mtx))
 		stop()
 	}).PostHook(cancel).Go().Once()))
 }
