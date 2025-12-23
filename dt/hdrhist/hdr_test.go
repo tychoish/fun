@@ -264,6 +264,10 @@ func TestCumulativeDistribution(t *testing.T) {
 		{Quantile: 100, Count: 1000000, ValueAt: 1000447},
 	}
 
+	if len(actual) != len(expected) {
+		t.Error("unexpected lengths; expected:", len(expected), "got", len(actual))
+	}
+
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("CF was %#v, but expected %#v", actual, expected)
 	}

@@ -9,9 +9,9 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestChannel(t *testing.T) {
@@ -266,7 +266,7 @@ func TestChannel(t *testing.T) {
 					cancel()
 					ch := make(chan int)
 
-					err := Blocking(ch).Send(x).Write(ctx, 1)
+					err := Blocking(ch).Send().Write(ctx, 1)
 					assert.Error(t, err)
 					assert.ErrorIs(t, err, context.Canceled)
 					err = NonBlocking(ch).Send().Write(ctx, 1)
@@ -315,7 +315,7 @@ func TestChannel(t *testing.T) {
 				ch := make(chan string, 1)
 				assert.Zero(t, NonBlocking(ch).Receive().Force(ctx))
 				assert.True(t, !NonBlocking(ch).Receive().Drop(ctx))
-				val, err := NonBlocking(ch).Receive.Read(ctx)
+				val, err := NonBlocking(ch).Receive().Read(ctx)
 				assert.Zero(t, val)
 				assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
 			})
@@ -475,10 +475,10 @@ func TestChannel(t *testing.T) {
 			t.Run("DirectReturns", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				check.True(t, NonBlocking(ctx.Done()).Receive().Ok())
+				check.True(t, makeChanRecv(modeNonBlocking, ctx.Done()).Ok())
 				cancel()
-				check.True(t, !Blocking(ctx.Done()).Receive().Ok())
-				check.True(t, !NonBlocking(ctx.Done()).Receive().Ok())
+				check.True(t, !makeChanRecv(modeBlocking, ctx.Done()).Ok())
+				check.True(t, !makeChanRecv(modeNonBlocking, ctx.Done()).Ok())
 			})
 			t.Run("Impossible", func(t *testing.T) {
 				ch := &ChanOp[struct{}]{ch: make(chan struct{}), mode: 43}
@@ -489,7 +489,7 @@ func TestChannel(t *testing.T) {
 					assert.MinRuntime(t, 100*time.Millisecond, func() {
 						ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 						defer cancel()
-						Blocking(ctx.Done()).Receive().Ok()
+						makeChanRecv(modeBlocking, ctx.Done()).Ok()
 					})
 				})
 			})
@@ -528,31 +528,6 @@ func TestChannel(t *testing.T) {
 			})
 		})
 	})
-	t.Run("Filter", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ch := Blocking(make(chan int, 100))
-		for i := 0; i < 100; i++ {
-			assert.NotError(t, ch.Send().Write(ctx, i))
-		}
-		ch.Close()
-		count := 0
-		err := ch.Receive().
-			Filter(ctx,
-				func(in int) bool { return in%2 == 0 && in != 0 },
-			).
-			Stream().
-			ReadAll(fnx.FromHandler(func(in int) {
-				count++
-				check.True(t, ft.Not(in == 0))
-				check.True(t, ft.Not(in%2 != 0))
-			})).
-			Run(ctx)
-
-		check.NotError(t, err)
-		check.Equal(t, count, 49)
-	})
 	t.Run("Signal", func(t *testing.T) {
 		ch := Blocking(make(chan int, 1))
 		assert.NotError(t, ch.Send().Write(t.Context(), 77))
@@ -576,4 +551,39 @@ func TestChannel(t *testing.T) {
 		check.Equal(t, 100, ch.Cap())
 		check.Equal(t, 1, ch.Len())
 	})
+}
+
+// ReadAll returns a Worker function that processes the output of data
+// from the channel with the Handler function. If the processor
+// function returns ers.ErrCurrentOpSkip, the processing will continue. All
+// other Handler errors (and problems reading from the channel,)
+// abort stream. io.EOF errors are not propagated to the caller.
+func (ro ChanReceive[T]) ReadAll(op fnx.Handler[T]) fnx.Worker {
+	return func(ctx context.Context) (err error) {
+		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
+
+		var value T
+	LOOP:
+		for {
+			value, err = ro.Read(ctx)
+			if err != nil {
+				goto HANDLE_ERROR
+			}
+			if err = op(ctx, value); err != nil {
+				goto HANDLE_ERROR
+			}
+
+		HANDLE_ERROR:
+			switch {
+			case err == nil:
+				continue LOOP
+			case errors.Is(err, io.EOF):
+				return nil
+			case errors.Is(err, ers.ErrCurrentOpSkip):
+				continue LOOP
+			default:
+				return err
+			}
+		}
+	}
 }

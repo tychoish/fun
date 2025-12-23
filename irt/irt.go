@@ -225,8 +225,8 @@ func Channel[T any](ctx context.Context, ch <-chan T) iter.Seq[T] {
 			select {
 			case <-ctx.Done():
 				return
-			case value := <-ch:
-				if !yield(value) {
+			case value, ok := <-ch:
+				if !ok || !yield(value) {
 					return
 				}
 			}

@@ -13,16 +13,6 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
-// Ignore swallows an error and is a noop, but provides a level of
-// annotation beyond assigning to the empty identifier.
-//
-//	_ = operation()
-//
-// vs:
-//
-//	ft.Ignore(operation())
-func Ignore(error) { return } //nolint:staticcheck
-
 // Cast just provides as a wrapper around in.(T). Cast will panic.
 func Cast[T any](in any) T { return in.(T) }
 
@@ -67,7 +57,7 @@ func BlockForceIgnore[T any](fn func(context.Context) (T, error)) T {
 // Be aware, that while WithRecover will recover from any panics, defers
 // within the ignored function will not run unless there is a call to
 // recover *before* the defer.
-func WithRecover[T any](fn func(T) error, arg T) { defer Recover(); Ignore(fn(arg)) }
+func WithRecover[T any](fn func(T) error, arg T) { defer Recover(); ft.Ignore(fn(arg)) }
 
 // Recover catches a panic and discards its value.
 func Recover() { _ = recover() }

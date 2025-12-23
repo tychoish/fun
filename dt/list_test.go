@@ -613,8 +613,11 @@ func TestList(t *testing.T) {
 			l1 := GetPopulatedList(t, 100)
 			l2 := GetPopulatedList(t, 100)
 			l2tail := l2.Back()
+			if l1.Len() != 100 {
+				t.Error(l1.Len())
+			}
 
-			l1.Extend(l2.IteratorFront())
+			l1.Extend(l2.IteratorPopFront())
 			if l1.Len() != 200 {
 				t.Error(l1.Len())
 			}
@@ -624,6 +627,9 @@ func TestList(t *testing.T) {
 			}
 
 			if l2.Len() != 0 {
+				t.Error(l2.Len())
+			}
+			if l1.Len() != 200 {
 				t.Error(l2.Len())
 			}
 		})
@@ -641,7 +647,7 @@ func TestList(t *testing.T) {
 				t.Fatal("incorrect items")
 			}
 
-			lOne.Extend(lTwo.IteratorFront())
+			lOne.Extend(lTwo.IteratorPopFront())
 			combined := append(itemsOne, itemsTwo...)
 			idx := 0
 			for value := range lOne.IteratorFront() {

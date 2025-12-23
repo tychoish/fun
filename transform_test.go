@@ -95,7 +95,7 @@ func TestTools(t *testing.T) {
 					}
 				}()
 
-				output := Blocking(pipe).Receive().Stream().Channel(ctx)
+				output := ChannelStream(pipe).Channel(ctx)
 				runtime.Gosched()
 
 				count := 0
@@ -137,9 +137,7 @@ func TestMapReduce(t *testing.T) {
 
 		var mf fnx.Converter[string, int] = func(_ context.Context, _ string) (int, error) { return 53, nil }
 
-		Blocking(pipe).
-			Receive().
-			Stream().
+		ChannelStream(pipe).
 			ReadAll(
 				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}),
 			).
@@ -192,7 +190,7 @@ func getConstructors[T comparable]() []FixtureStreamConstructors[T] {
 					vals <- elems[idx]
 				}
 				close(vals)
-				return Blocking(vals).Receive().Stream()
+				return ChannelStream(vals)
 			},
 		},
 	}

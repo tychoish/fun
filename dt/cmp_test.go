@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert"
+	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -129,8 +130,11 @@ func TestSort(t *testing.T) {
 			lcopy.SortQuick(cmp.LessThanNative[int])
 			listVals := irt.Collect(list.IteratorFront())
 			copyVals := irt.Collect(lcopy.IteratorFront())
-			assert.Equal(t, len(listVals), len(copyVals))
-			assert.True(t, len(listVals) == 10)
+			check.Equal(t, len(listVals), len(copyVals))
+			check.Equal(t, len(listVals), len(copyVals))
+			check.Equal(t, list.Len(), lcopy.Len())
+			check.Equal(t, list.Len(), len(copyVals))
+			check.Equal(t, list.Len(), 10)
 			for i := 0; i < 10; i++ {
 				if listVals[i] != copyVals[i] {
 					t.Error("sort missmatch", i, listVals[i], copyVals[i])

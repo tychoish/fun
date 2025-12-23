@@ -24,8 +24,7 @@ func (s *Stack[T]) Extend(seq iter.Seq[T]) *Stack[T] { irt.Apply(seq, s.Push); r
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }
 func (*Stack[T]) zero() (o T)       { return }
 func (s *Stack[T]) root() *Item[T] {
-	ft.Invariant(ers.If(s != nil, ErrUninitializedContainer))
-
+	ft.Invariant(ers.If(s == nil, ErrUninitializedContainer))
 	ft.CallWhen(s.head == nil, s.uncheckedSetup)
 
 	return s.head
@@ -36,7 +35,7 @@ func (s *Stack[T]) root() *Item[T] {
 func (s *Stack[T]) Len() int { return s.length }
 
 // Push appends an item to the stack.
-func (s *Stack[T]) Push(it T) { s.root().Append(NewItem(it)) }
+func (s *Stack[T]) Push(it T) { s.root().Push(it) }
 
 // Head returns the item at the top of this stack. This is a non
 // destructive operation.
@@ -61,10 +60,8 @@ func (s *Stack[T]) Pop() *Item[T] {
 // Iterator returns a native go iterator function for the items in a set.
 func (s *Stack[T]) Iterator() iter.Seq[T] {
 	return func(yield func(T) bool) {
-		for item := (&Item[T]{next: s.head}); item.Ok(); item = item.Next() {
-			if !yield(item.Value()) {
-				return
-			}
+		for item := s.Head(); item.Ok() && yield(item.Value()); item = item.Next() {
+			continue
 		}
 	}
 }
@@ -74,10 +71,8 @@ func (s *Stack[T]) Iterator() iter.Seq[T] {
 // stack during iteration.
 func (s *Stack[T]) IteratorPop() iter.Seq[T] {
 	return func(yield func(T) bool) {
-		for item := s.Pop(); item.Ok() && item != s.head; item = s.Pop() {
-			if !yield(item.Value()) {
-				return
-			}
+		for item := s.Pop(); item.Ok() && item != s.head && yield(item.Value()); item = s.Pop() {
+			continue
 		}
 	}
 }

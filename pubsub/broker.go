@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -303,7 +304,7 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 }
 
 // Publish distributes a message to all subscribers.
-func (b *Broker[T]) Publish(ctx context.Context, msg T) { risky.Ignore(b.Send(ctx, msg)) }
+func (b *Broker[T]) Publish(ctx context.Context, msg T) { ft.Ignore(b.Send(ctx, msg)) }
 
 // Send distributes a message to all subscribers.
 func (b *Broker[T]) Send(ctx context.Context, msg T) error {

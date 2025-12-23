@@ -218,7 +218,7 @@ func (s Slice[T]) Zero() {
 // raised.
 func (s Slice[T]) ZeroRange(start, end int) {
 	ft.Invariant(ers.Whenf(
-		start >= 0 && end > start && end < len(s)-1,
+		start < 0 || end < start || end > len(s)-1,
 		"start = %d, end = %d, are not valid bounds", start, end,
 	))
 	for i := start; i <= end; i++ {
@@ -232,7 +232,7 @@ func (s Slice[T]) ZeroRange(start, end int) {
 func (s Slice[T]) FillTo(length int) Slice[T] {
 	ft.Invariant(
 		ers.Whenf(
-			length > len(s),
+			length < len(s),
 			"%w: cannot grow a slice to a length that is less than the current length: fill %d <=, %d", ers.ErrInvalidInput, length, len(s),
 		),
 	)

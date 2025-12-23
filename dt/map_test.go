@@ -60,7 +60,7 @@ func TestMap(t *testing.T) {
 		mp := Map[string, int]{}
 		assert.Equal(t, len(orig), 3)
 		assert.Equal(t, len(mp), 0)
-		mp.Extend(mp.Iterator())
+		mp.Extend(orig.Iterator())
 		check.Equal(t, mp["1"], 1)
 		check.Equal(t, mp["2"], 2)
 		check.Equal(t, mp["3"], 3)
@@ -93,9 +93,9 @@ func TestMap(t *testing.T) {
 	t.Run("Constructors", func(t *testing.T) {
 		t.Run("MapKeys", func(t *testing.T) {
 			mp := Map[string, int]{}
-			mp.Add("big", 42)
-			mp.Add("small", 4)
-			mp.Add("orange", 400)
+			mp.Store("big", 42)
+			mp.Store("small", 4)
+			mp.Store("orange", 400)
 			keys := mp.Keys()
 
 			count := 0

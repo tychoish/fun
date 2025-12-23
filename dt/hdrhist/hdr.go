@@ -407,7 +407,7 @@ func (h *Histogram) sizeOfEquivalentValueRange(v int64) int64 {
 	// TODO: assess if this invariant should hold or if it's an
 	// implementation detail that it's unreachable in all testing.
 
-	ft.Invariant(ers.When(subBucketIdx < h.subBucketCount, "found out of range bucket"))
+	ft.Invariant(ers.When(subBucketIdx >= h.subBucketCount, "found out of range bucket"))
 
 	// Previous versions of the code did this: revert if the above
 	// invariant is hit.
@@ -485,7 +485,7 @@ func (i *iterator) next() bool {
 	}
 
 	// TODO: evaluate if this invariant holds:
-	ft.Invariant(ers.When(i.bucketIdx < i.h.bucketCount, "iteration out of bounds, should have halted here"))
+	ft.Invariant(ers.When(i.bucketIdx >= i.h.bucketCount, "iteration out of bounds, should have halted here"))
 
 	// Previous versions of the code recovered thusly:
 	//
@@ -541,8 +541,8 @@ func (p *pIterator) next() bool {
 	// TODO: evaluate if this invariant holds:
 	ft.Invariant(
 		ers.Whenf(
-			p.subBucketIdx != -1 || p.iterator.next(),
-			"out of bounds iteration %d", p.subBucketIdx,
+			p.subBucketIdx <= 0 && !p.iterator.next(),
+			"out of bounds iteration (%d)", p.subBucketIdx,
 		),
 	)
 

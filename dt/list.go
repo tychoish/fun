@@ -135,8 +135,8 @@ func (l *List[T]) IteratorBack() iter.Seq[T] { return l.iterator(l.Back, l.elemP
 // pubsub.Distributor implementations, because those implementations are thread safe.
 func (l *List[T]) IteratorPopFront() iter.Seq[T] { return l.iterator(l.PopFront, l.wrap(l.PopFront)) }
 
-// SeqPopBack returns a destructive iterator that consumes elements from the list as it iterates,
-// moving back-to-fron.
+// IteratorPopBack returns a destructive iterator that consumes elements from the list as it
+// iterates, moving back-to-fron.
 //
 // If you add values to the list during iteration *behind* where the stream is, these values will
 // not be present in the stream; however, values added ahead of the stream, will be visible.
@@ -153,8 +153,8 @@ func (*List[T]) wrap(fn func() *Element[T]) func(*Element[T]) *Element[T] {
 
 func (l *List[T]) iterator(first func() *Element[T], next func(*Element[T]) *Element[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		for elem := first(); !elem.Ok() || elem.isDetatched() || !yield(elem.Value()); elem = next(elem) {
-			return
+		for elem := first(); elem.Ok() && yield(elem.Value()); elem = next(elem) {
+			continue
 		}
 	}
 }
@@ -175,7 +175,7 @@ func (l *List[T]) Copy() *List[T] {
 func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != nil }
 
 func (l *List[T]) root() *Element[T] {
-	ft.Invariant(ers.If(l != nil, ErrUninitializedContainer))
+	ft.Invariant(ers.If(l == nil, ErrUninitializedContainer))
 
 	ft.CallWhen(l.head == nil, l.uncheckedSetup)
 

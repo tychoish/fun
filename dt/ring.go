@@ -43,8 +43,8 @@ func (r *Ring[T]) init() { ft.CallWhen(r.buf.ring == nil, r.innerInit) }
 func (r *Ring[T]) innerInit() {
 	r.size = ft.Default(r.size, defaultRingSize)
 
-	ft.Invariant(ers.Whenf(int64(r.size) <= maxRingSize, "invalid size (%d) max: %d", r.size, maxRingSize))
-	ft.Invariant(ers.Whenf(r.size >= 2, "invalid size %d (must be > 1)", r.size))
+	ft.Invariant(ers.Whenf(int64(r.size) > maxRingSize, "invalid size (%d) max: %d", r.size, maxRingSize))
+	ft.Invariant(ers.Whenf(r.size < 2, "invalid size %d (must be > 1)", r.size))
 
 	r.buf.ring = make([]T, r.size)
 	r.buf.nils = make([]*T, r.size)
@@ -134,9 +134,8 @@ func (r *Ring[T]) LIFO() iter.Seq[T] { r.init(); return r.iterate(r.before(r.pos
 func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Perpetual(r.Pop)) }
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) iter.Seq[T] {
-	var count int
 	var current int
-
+	var count int
 	next := from
 
 	return func(yield func(T) bool) {

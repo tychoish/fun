@@ -114,7 +114,7 @@ func (Constructors) WorkerHandler() fnx.Handler[fnx.Worker] {
 // propogated; however, after the channel is closed subsequent calls
 // to the worker function will return nil.
 func (Constructors) ErrorChannelWorker(ch <-chan error) fnx.Worker {
-	pipe := Blocking(ch).Receive()
+	pipe := ChanReceive[error]{mode: modeBlocking, ch: ch}
 	return func(ctx context.Context) error {
 		if ch == nil || pipe.ch == nil {
 			return nil

@@ -45,6 +45,27 @@ func TestRing(t *testing.T) {
 		assert.Equal(t, ring.Cap(), 1024)
 		assert.Equal(t, 0, ring.Len())
 	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		ring := &Ring[int]{}
+		ring.Setup(10)
+		ring.Push(42)
+		ring.Push(42)
+		ring.Push(42)
+		ring.Push(24)
+		ring.Push(42)
+		ring.Push(42)
+		count := 0
+		assert.Equal(t, ring.Len(), 6)
+		for val := range ring.LIFO() {
+			count++
+			t.Log(val)
+			check.True(t, val == 42 || val == 24)
+			if val == 24 {
+				break
+			}
+		}
+		assert.Equal(t, count, 3)
+	})
 
 	t.Run("Setup", func(t *testing.T) {
 		ring := &Ring[int]{}

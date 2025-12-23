@@ -128,10 +128,10 @@ func TestSet(t *testing.T) {
 			t.Run("AddCheck", func(t *testing.T) {
 				set := builder()
 
-				if set.AddCheck("abc") {
+				if set.AddCHeck("abc") {
 					t.Error("set item should not have been present")
 				}
-				if !set.AddCheck("abc") {
+				if !set.AddCHeck("abc") {
 					t.Error("set item should have been present")
 				}
 			})
@@ -417,14 +417,14 @@ func TestSet(t *testing.T) {
 			st := &Set[int]{}
 			st.Order()
 
-			st.AppendStream(irt.Slice(in))
+			st.Extend(irt.Slice(in))
 			assert.Equal(t, st.Len(), 6)
 			assert.True(t, slices.Equal(in, st.Slice()))
 		})
 		t.Run("Unordered", func(t *testing.T) {
 			in := []int{1, 2, 3, 4, 5, 6}
 			st := &Set[int]{}
-			st.AppendStream(irt.Slice(in))
+			st.Extend(irt.Slice(in))
 			assert.Equal(t, st.Len(), 6)
 			out := st.Slice()
 			assert.Equal(t, len(out), 6)

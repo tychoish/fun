@@ -26,7 +26,7 @@ type Set[T comparable] struct {
 func NewSetFromSlice[T comparable](in []T) *Set[T] {
 	out := &Set[T]{}
 	out.Order()
-	out.AppendStream(irt.Slice(in))
+	out.Extend(irt.Slice(in))
 	return out
 }
 
@@ -42,7 +42,7 @@ func (s *Set[T]) Order() {
 	if s.list != nil {
 		return
 	}
-	ft.Invariant(ers.When(len(s.hash) == 0, "cannot make an ordered set out of an un-ordered set that contain data"))
+	ft.Invariant(ers.When(len(s.hash) != 0, "cannot make an ordered set out of an un-ordered set that contain data"))
 
 	s.list = &List[T]{}
 }
@@ -69,7 +69,7 @@ func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
 }
 
 func (s *Set[T]) forceSetupOrdered() {
-	ft.Invariant(ers.If(s.list == nil, ErrUninitializedContainer))
+	ft.Invariant(ers.If(s.list != nil, ErrUninitializedContainer))
 
 	s.list = &List[T]{}
 	for item := range s.hash {
@@ -81,8 +81,8 @@ func (s *Set[T]) forceSetupOrdered() {
 // mutex. If the mutex is nil, or the Set is already synchronized with
 // a different mutex, WithLock panics with an invariant violation.
 func (s *Set[T]) WithLock(mtx *sync.Mutex) {
-	ft.Invariant(ers.When(mtx != nil, "mutexes must be non-nil"))
-	ft.Invariant(ers.When(s.mtx.Set(mtx), "cannot override an existing mutex"))
+	ft.Invariant(ers.When(mtx == nil, "mutexes must be non-nil"))
+	ft.Invariant(ers.When(!s.mtx.Set(mtx), "cannot override an existing mutex"))
 }
 
 func (s *Set[T]) isOrdered() bool  { return s.list != nil }
@@ -95,8 +95,8 @@ func (s *Set[T]) lock() *sync.Mutex {
 	return m
 }
 
-// Add attempts to add the item to the mutex, and is a noop otherwise.
-func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
+// Add attempts to add the item while holding to the mutex, and is a noop otherwise.
+func (s *Set[T]) Add(in T) { _ = s.AddCHeck(in) }
 
 // Len returns the number of items tracked in the set.
 func (s *Set[T]) Len() int { defer s.with(s.lock()); return len(s.hash) }
@@ -152,10 +152,10 @@ func (s *Set[T]) DeleteCheck(in T) bool {
 	return true
 }
 
-// AddCheck adds an item to the set and returns true if the item had
-// been in the set before AddCheck. In all cases when AddCheck
+// AddCHeck adds an item to the set and returns true if the item had
+// been in the set before AddCHeck. In all cases when AddCHeck
 // returns, the item is a member of the set.
-func (s *Set[T]) AddCheck(in T) (ok bool) {
+func (s *Set[T]) AddCHeck(in T) (ok bool) {
 	defer s.with(s.lock())
 	ok = s.hash.Check(in)
 	if ok {
@@ -174,11 +174,8 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 	return
 }
 
-// AppendStream adds all items encountered in the stream to the set.
-func (s *Set[T]) AppendStream(iter iter.Seq[T]) { irt.Apply(iter, s.Add) }
-
-// AppendSet adds the items of one set to this set.
-func (s *Set[T]) AppendSet(extra *Set[T]) { s.AppendStream(extra.Iterator()) }
+// Extend adds all items encountered in the stream to the set.
+func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.Add) }
 
 func (s *Set[T]) unsafeStream() iter.Seq[T] {
 	if s.list != nil {
