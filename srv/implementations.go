@@ -63,7 +63,7 @@ func Group(services iter.Seq[*Service]) *Service {
 			// services. This will cause our "group service" to
 			// have the same semantics as a single service, however.
 
-			for value := range waiters.Iterator(ctx) {
+			for value := range waiters.IteratorWait(ctx) {
 				wg.Add(1)
 				go func(wait func() error) {
 					defer ec.Recover()

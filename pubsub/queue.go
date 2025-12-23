@@ -385,7 +385,7 @@ type entry[T any] struct {
 	link *entry[T]
 }
 
-// Iterator produces a stream implementation that wraps the
+// IteratorWait produces an iteratorthat wraps the
 // underlying queue linked list. The stream respects the Queue's
 // mutex and is safe for concurrent access and current queue
 // operations, without additional locking. The stream does not
@@ -393,7 +393,7 @@ type entry[T any] struct {
 // the queue has been closed via the Close() method.
 //
 // To create a "consuming" stream, use a Distributor.
-func (q *Queue[T]) Iterator(ctx context.Context) iter.Seq[T] {
+func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
 	op := func() (o T, _ bool) {
 		if next == nil {
@@ -403,20 +403,17 @@ func (q *Queue[T]) Iterator(ctx context.Context) iter.Seq[T] {
 		}
 
 		q.mu.Lock()
-		if next.link == q.front {
+		if next.link == q.front || ctx.Err() != nil {
 			q.mu.Unlock()
 			return o, false
-		}
-
-		if next.link != nil {
+		} else if next.link != nil {
 			next = next.link
 			q.mu.Unlock()
 		} else if next.link == nil {
-			if q.closed {
+			if q.closed || ctx.Err() != nil {
 				q.mu.Unlock()
 				return o, false
 			}
-
 			q.mu.Unlock()
 
 			if err := q.waitForNew(ctx); err != nil {
@@ -433,6 +430,14 @@ func (q *Queue[T]) Iterator(ctx context.Context) iter.Seq[T] {
 		return next.item, true
 	}
 	return irt.Generate(op)
+}
+
+func (q *Queue[T]) Iterator() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for next := q.front.link; !q.closed && next != nil && q.front != q.back && q.front != next && yield(next.item); next = next.link {
+			continue
+		}
+	}
 }
 
 // Distributor creates a object used to process the items in the

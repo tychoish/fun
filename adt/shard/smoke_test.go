@@ -70,7 +70,7 @@ func TestShardedMap(t *testing.T) {
 
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
-					for item := range m.Stream() {
+					for item := range m.Items() {
 						ct++
 						check(t, item)
 					}

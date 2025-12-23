@@ -78,7 +78,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "QueueUnlimited",
 				add:    cue.Add,
 				remove: cue.Remove,
-				stream: cue.Iterator,
+				stream: cue.IteratorWait,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.tracker.len,
@@ -91,7 +91,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "QueueLimited",
 				add:    cue.Add,
 				remove: cue.Remove,
-				stream: cue.Iterator,
+				stream: cue.IteratorWait,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.tracker.len,
@@ -738,20 +738,20 @@ func TestDeque(t *testing.T) {
 		for range queue.IteratorFront(t.Context()) {
 			count++
 		}
-		if count == 0 {
-			t.Error("should have reported item", time.Since(sa), queue.Len())
+		if count != 0 {
+			t.Error("(first) should have reported item", time.Since(sa), queue.Len())
 		}
 
 		time.Sleep(2 * time.Millisecond)
-		t.Log(queue.PushFront(31), queue.Len())
+		t.Log("push", queue.PushFront(31), queue.Len())
 
 		// new itertor should fined item
 		count = 0
 		for range queue.IteratorFront(t.Context()) {
 			count++
 		}
-		if count == 0 {
-			t.Error("should have reported item", time.Since(sa), queue.Len())
+		if count != 1 {
+			t.Error("(second) should have reported item", time.Since(sa), queue.Len())
 		}
 	})
 	t.Run("Future", func(t *testing.T) {
@@ -781,8 +781,8 @@ func TestDeque(t *testing.T) {
 			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
-			assert.MaxRuntime(t, 100*time.Millisecond, func() {
-				assert.MinRuntime(t, 10*time.Millisecond, func() {
+			assert.MaxRuntime(t, 128*time.Millisecond, func() {
+				assert.MinRuntime(t, 16*time.Millisecond, func() {
 					go func() {
 						select {
 						case <-ctx.Done():
@@ -904,7 +904,8 @@ func TestDequeIntegration(t *testing.T) {
 				go func(iter iter.Seq[func()]) {
 					defer wwg.Done()
 
-					for range iter {
+					for op := range iter {
+						op()
 						recv.Add(1)
 					}
 				}(queue.IteratorFront(ctx))

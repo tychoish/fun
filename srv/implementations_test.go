@@ -285,7 +285,7 @@ func TestCmd(t *testing.T) {
 
 				check.NotError(t, s.Start(ctx))
 				assert.MaxRuntime(t, 500*time.Millisecond, func() {
-					s.Close()
+					s.cancel()
 					runtime.Gosched()
 					err := s.Wait()
 					check.Error(t, err)

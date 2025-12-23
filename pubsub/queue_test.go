@@ -236,8 +236,7 @@ func TestQueueStream(t *testing.T) {
 			t.Fatal("unexpected queue length", queue.Len())
 		}
 
-		values := irt.Collect(queue.Iterator(ctx))
-		iter := queue.Iterator(ctx)
+		values := irt.Collect(queue.Iterator())
 		if len(values) != 3 {
 			t.Log(values)
 			t.Fatal("unexpected length")
@@ -249,23 +248,28 @@ func TestQueueStream(t *testing.T) {
 		if val := values[1]; val != "two" {
 			t.Fatal("unexpected value", val)
 		}
-		if val := values[3]; val != "thr" {
+		if val := values[2]; val != "thr" {
 			t.Fatal("unexpected value", val)
 		}
 
 		startAt := time.Now()
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 400*time.Millisecond)
 		defer timeoutCancel()
-		iter = queue.Iterator(timeoutCtx)
+		iter := queue.IteratorWait(timeoutCtx)
 		sig := make(chan struct{})
 		go func() {
 			defer close(sig)
 			start := time.Now()
-			for range iter {
-				return
+			t.Log("started iteration check")
+			count := 0
+			for val := range iter {
+				t.Log("saw:", val)
+				count++
+				break
 			}
-
-			t.Error("expected to eventually be true", time.Since(start))
+			if count != 1 {
+				t.Error("expected to eventually be true", time.Since(start))
+			}
 		}()
 		time.Sleep(10 * time.Millisecond)
 		if err := queue.Add("four"); err != nil {
@@ -300,7 +304,7 @@ func TestQueueStream(t *testing.T) {
 
 		startAt := time.Now()
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 400*time.Millisecond)
-		iter := queue.Iterator(timeoutCtx)
+		iter := queue.IteratorWait(timeoutCtx)
 		defer timeoutCancel()
 		sig := make(chan struct{})
 		go func() {
@@ -347,7 +351,7 @@ func TestQueueStream(t *testing.T) {
 			}
 		}
 		count := 0
-		iter := queue.Iterator(ctx)
+		iter := queue.IteratorWait(ctx)
 		for range iter {
 			count++
 			if count == 100 {
@@ -372,7 +376,7 @@ func TestQueueStream(t *testing.T) {
 		}
 
 		count := 0
-		for range queue.Iterator(ctx) {
+		for range queue.IteratorWait(ctx) {
 			count++
 			if count == 100 {
 				break
@@ -383,8 +387,6 @@ func TestQueueStream(t *testing.T) {
 		}
 	})
 	t.Run("CanceledDoesNotIterate", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(testt.Context(t))
-		defer cancel()
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
 		if err != nil {
 			t.Fatal(err)
@@ -395,48 +397,54 @@ func TestQueueStream(t *testing.T) {
 		}
 
 		count := 0
-		for range queue.Iterator(ctx) {
+		for range queue.Iterator() {
 			count++
-			break
 		}
 		if count != 1 {
-			t.Fatal("should iterate once")
+			t.Error("should have one item", count)
 		}
 
-		cancel()
 		count = 0
-		for range queue.Iterator(ctx) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		for range queue.IteratorWait(ctx) {
 			count++
-			break
 		}
 		if count != 0 {
-			t.Fatal("should iterate once")
+			t.Fatal("should not iterate", count)
+		}
+
+		val, err := queue.Wait(t.Context())
+		assert.NotError(t, err)
+		check.Equal(t, val, "one")
+		for range queue.IteratorWait(ctx) {
+			count++
+		}
+		if count != 0 {
+			t.Fatal("should not iterate", count)
 		}
 	})
 	t.Run("ClosedQueueDoesNotIterate", func(t *testing.T) {
 		ctx := testt.Context(t)
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = queue.Add("one"); err != nil {
-			t.Fatal(err)
-		}
+		assert.NotError(t, err)
+		assert.NotError(t, queue.Add("one"))
+
 		count := 0
-		for range queue.Iterator(ctx) {
+		for range queue.Iterator() {
 			count++
 		}
 		if count != 1 {
-			t.Fatal("should iterate once")
+			t.Error("should iterate at least once", count)
 		}
 
-		assert.NotError(t, queue.Close())
+		check.NotError(t, queue.Close())
 		count = 0
-		for range queue.Iterator(ctx) {
+		for range queue.IteratorWait(ctx) {
 			count++
 		}
 		if count != 1 {
-			t.Fatal("should only once")
+			t.Error("should only once")
 		}
 	})
 	t.Run("WaitRespectsQueue", func(t *testing.T) {
@@ -466,7 +474,7 @@ func TestQueueStream(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 		toctx, toccancel := context.WithTimeout(ctx, 10*time.Millisecond)
 		defer toccancel()
-		iter := queue.Iterator(toctx)
+		iter := queue.IteratorWait(toctx)
 		sa := time.Now()
 		count := 0
 		for range iter {
@@ -478,11 +486,11 @@ func TestQueueStream(t *testing.T) {
 		}()
 		time.Sleep(20 * time.Millisecond)
 		assert.Zero(t, count)
-		iter = queue.Iterator(ctx)
-		for range iter {
+		for range queue.IteratorWait(ctx) {
 			count++
+			break
 		}
-		assert.Zero(t, count)
+		assert.Equal(t, count, 1)
 		assert.True(t, time.Since(sa) >= 10*time.Millisecond)
 	})
 
@@ -596,24 +604,23 @@ func TestQueueStream(t *testing.T) {
 	t.Run("WaitOnEmpty", func(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
-		queue.front.link = queue.front
 		count := 0
 
-		assert.MinRuntime(t, 100*time.Millisecond, func() {
+		check.MinRuntime(t, 100*time.Millisecond, func() {
 			count++
-			for range queue.Iterator(ctx) {
+			for range queue.IteratorWait(ctx) {
 				count++
 			}
 			count++
 		})
 
-		assert.Equal(t, 2, count)
+		check.Equal(t, 2, count)
 	})
 	t.Run("WaitOnClosed", func(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 		queue := NewUnlimitedQueue[string]()
 		sig := make(chan struct{})
-		iter := queue.Iterator(ctx)
+		iter := queue.IteratorWait(ctx)
 		go func() {
 			defer close(sig)
 			count := 0
