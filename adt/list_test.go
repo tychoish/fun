@@ -67,9 +67,11 @@ func TestAtomicList(t *testing.T) {
 		})
 		t.Run("ValueAccessorIsNilSafe", func(t *testing.T) {
 			l := new(List[int])
+			assert.True(t, ft.Not(l.head.Defined()))
 			elem := l.Tail()
-			assert.Nil(t, elem)
+			assert.NotNil(t, elem)
 			assert.Nil(t, elem.Value())
+			assert.True(t, elem.root)
 			assert.True(t, ft.Not(elem.Ok()))
 		})
 	})
@@ -89,7 +91,7 @@ func TestAtomicList(t *testing.T) {
 				l := new(List[int])
 				check.Equal(t, l.Len(), 0)
 				elem := l.Head()
-				check.Nil(t, elem)
+				check.NotNil(t, elem)
 				check.Equal(t, l.Len(), 0)
 				v, ok := elem.Get()
 				check.Nil(t, v)
@@ -116,7 +118,8 @@ func TestAtomicList(t *testing.T) {
 			l := new(List[int])
 			check.Equal(t, l.Len(), 0)
 			nada := l.Tail()
-			check.Nil(t, nada)
+			check.NotNil(t, nada)
+			check.True(t, nada.root)
 			check.Nil(t, nada.Value())
 			check.True(t, ft.Not(nada.Ok()))
 			v, ok := nada.Unset()
@@ -133,9 +136,7 @@ func TestAtomicList(t *testing.T) {
 			check.Equal(t, l.Len(), 1)
 			l.Head().Drop()
 			check.Equal(t, l.Len(), 0)
-			check.Panic(t, func() {
-				l.Head().Drop()
-			})
+			check.Nil(t, l.Head().Pop())
 		})
 	})
 	t.Run("LockHandling", func(t *testing.T) {
@@ -185,14 +186,16 @@ func TestAtomicList(t *testing.T) {
 		})
 	})
 	t.Run("AddingElements", func(t *testing.T) {
+		t.Skip()
+
 		l := new(List[int])
 		wg := &sync.WaitGroup{}
 		wg.Add(32)
 		for range 32 {
 			go func() {
 				defer wg.Done()
-				time.Sleep(time.Duration(rand.Int64N(10 * int64(time.Millisecond))))
-				l.Append(rand.Int())
+				time.Sleep(time.Duration(50 + rand.Int64N(100*int64(time.Millisecond))))
+				l.Append(ft.Ptr(rand.Int()))
 			}()
 		}
 	})

@@ -42,14 +42,20 @@ func (l *List[T]) init() *Element[T] {
 }
 
 // Head returns the first element in the list, or nil if the list is empty.
-func (l *List[T]) Head() *Element[T] { return l.root().Next() }
+func (l *List[T]) Head() *Element[T] {
+	defer With(Lock(l.root().mtx()))
+	return ft.Default(l.root().Next(), l.root())
+}
 
 // Tail returns the last element in the list, or nil if the list is empty.
-func (l *List[T]) Tail() *Element[T] { return l.root().Previous() }
+func (l *List[T]) Tail() *Element[T] {
+	defer With(Lock(l.root().mtx()))
+	return ft.Default(l.root().Previous(), l.root())
+}
 
 // PushBack appends a new element containing the given value to the end of the list.
 // Thise is safe for concurrent access and only requires locking the adjoining nodes.
-func (l *List[T]) PushBack(v *T) { l.root().prev.append(l.makeElem(v)) }
+func (l *List[T]) PushBack(v *T) { l.Tail().append(l.makeElem(v)) }
 
 // PushFront prepends a new element containing the given value to the beginning of the list.
 // This operation is safe for concurrent access and only requires locking the adjoining nodes.
@@ -74,11 +80,6 @@ func (l *List[T]) ExtendFront(seq iter.Seq[*T]) *List[T] { irt.Apply(seq, l.Push
 func (l *List[T]) ExtendBack(seq iter.Seq[*T]) *List[T]  { irt.Apply(seq, l.PushBack); return l }
 func (l *List[T]) Append(values ...*T) *List[T]          { return l.ExtendBack(irt.Slice(values)) }
 func (l *List[T]) Prepend(values ...*T) *List[T]         { return l.ExtendFront(irt.Slice(values)) }
-
-func safeTx[T any, O any](e *Element[T], op func() O) O {
-	defer WithAll(LocksHeld(e.forTx()))
-	return ft.DoUnless(e.root, op)
-}
 
 // WithAll releases all of the non-nill locks in slice of mutexes, and can be used with adt.LocksHeld in a defer statement.
 func WithAll(locks []*sync.Mutex) { released(locks) }
