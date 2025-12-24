@@ -20,12 +20,12 @@ func TestCollect(t *testing.T) {
 		expected []int
 	}{
 		{
-			name:     "empty sequence",
+			name:     "EmptySequence",
 			seq:      func(yield func(int) bool) {},
 			expected: []int{},
 		},
 		{
-			name: "simple sequence",
+			name: "SimpleSequence",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -38,7 +38,7 @@ func TestCollect(t *testing.T) {
 			expected: []int{1, 2, 3},
 		},
 		{
-			name: "with initial size",
+			name: "WithInitialSize",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -49,7 +49,7 @@ func TestCollect(t *testing.T) {
 			expected: []int{0, 0, 0, 0, 0, 1, 2},
 		},
 		{
-			name: "with initial capacity",
+			name: "WithInitialCapacity",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -60,7 +60,7 @@ func TestCollect(t *testing.T) {
 			expected: []int{1, 2},
 		},
 		{
-			name: "with initial capacity and length",
+			name: "WithInitialCapacityAndLength",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -90,12 +90,12 @@ func TestCollect2(t *testing.T) {
 		expected map[string]int
 	}{
 		{
-			name:     "empty sequence",
+			name:     "EmptySequence",
 			seq:      func(yield func(string, int) bool) {},
 			expected: map[string]int{},
 		},
 		{
-			name: "simple sequence",
+			name: "SimpleSequence",
 			seq: func(yield func(string, int) bool) {
 				if !yield("a", 1) {
 					return
@@ -105,7 +105,7 @@ func TestCollect2(t *testing.T) {
 			expected: map[string]int{"a": 1, "b": 2},
 		},
 		{
-			name: "with initial capacity",
+			name: "WithInitialCapacity",
 			seq: func(yield func(string, int) bool) {
 				yield("x", 10)
 			},
@@ -138,14 +138,14 @@ func TestCollectFirstN(t *testing.T) {
 		maxCalls int
 	}{
 		{
-			name:     "empty sequence",
+			name:     "EmptySequence",
 			seq:      func(yield func(int) bool) {},
 			n:        3,
 			expected: []int{},
 			maxCalls: 0,
 		},
 		{
-			name: "exact n elements",
+			name: "ExactNElements",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -160,7 +160,7 @@ func TestCollectFirstN(t *testing.T) {
 			maxCalls: 3,
 		},
 		{
-			name: "more than n elements - should stop early",
+			name: "MoreThanNElementsShouldStopEarly",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -181,14 +181,14 @@ func TestCollectFirstN(t *testing.T) {
 			maxCalls: 2,
 		},
 		{
-			name:     "less than n elements",
+			name:     "LessThanNElements",
 			seq:      func(yield func(int) bool) { yield(1) },
 			n:        3,
 			expected: []int{1},
 			maxCalls: 1,
 		},
 		{
-			name: "n is zero",
+			name: "NIsZero",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -229,9 +229,9 @@ func TestOne(t *testing.T) {
 		value    interface{}
 		expected []interface{}
 	}{
-		{"int", 42, []interface{}{42}},
-		{"string", "hello", []interface{}{"hello"}},
-		{"nil", nil, []interface{}{nil}},
+		{"Int", 42, []interface{}{42}},
+		{"String", "hello", []interface{}{"hello"}},
+		{"Nil", nil, []interface{}{nil}},
 	}
 
 	for _, tt := range tests {
@@ -250,9 +250,9 @@ func TestTwo(t *testing.T) {
 		name string
 		a, b interface{}
 	}{
-		{"int-string", 42, "hello"},
-		{"string-int", "world", 123},
-		{"nil-nil", nil, nil},
+		{"IntString", 42, "hello"},
+		{"StringInt", "world", 123},
+		{"NilNil", nil, nil},
 	}
 
 	for _, tt := range tests {
@@ -277,9 +277,9 @@ func TestMap(t *testing.T) {
 		name string
 		mp   map[string]int
 	}{
-		{"empty", map[string]int{}},
-		{"single", map[string]int{"a": 1}},
-		{"multiple", map[string]int{"a": 1, "b": 2, "c": 3}},
+		{"Empty", map[string]int{}},
+		{"Single", map[string]int{"a": 1}},
+		{"Multiple", map[string]int{"a": 1, "b": 2, "c": 3}},
 	}
 
 	for _, tt := range tests {
@@ -303,9 +303,9 @@ func TestSlice(t *testing.T) {
 		name string
 		sl   []int
 	}{
-		{"empty", []int{}},
-		{"single", []int{1}},
-		{"multiple", []int{1, 2, 3, 4}},
+		{"Empty", []int{}},
+		{"Single", []int{1}},
+		{"Multiple", []int{1, 2, 3, 4}},
 	}
 
 	for _, tt := range tests {
@@ -324,9 +324,9 @@ func TestArgs(t *testing.T) {
 		name  string
 		items []int
 	}{
-		{"empty", []int{}},
-		{"single", []int{1}},
-		{"multiple", []int{1, 2, 3}},
+		{"Empty", []int{}},
+		{"Single", []int{1}},
+		{"Multiple", []int{1, 2, 3}},
 	}
 
 	for _, tt := range tests {
@@ -350,7 +350,7 @@ func TestIndex(t *testing.T) {
 		}
 	}{
 		{
-			name: "empty",
+			name: "Empty",
 			seq:  func(yield func(string) bool) {},
 			expected: []struct {
 				idx int
@@ -358,7 +358,7 @@ func TestIndex(t *testing.T) {
 			}{},
 		},
 		{
-			name: "single",
+			name: "Single",
 			seq:  func(yield func(string) bool) { yield("a") },
 			expected: []struct {
 				idx int
@@ -366,7 +366,7 @@ func TestIndex(t *testing.T) {
 			}{{1, "a"}},
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(string) bool) {
 				if !yield("a") {
 					return
@@ -417,12 +417,12 @@ func TestJoinErrors(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:     "single error",
+			name:     "SingleError",
 			seq:      func(yield func(error) bool) { yield(errors.New("error1")) },
 			expected: "error1",
 		},
 		{
-			name: "multiple errors",
+			name: "MultipleErrors",
 			seq: func(yield func(error) bool) {
 				if !yield(errors.New("error1")) {
 					return
@@ -432,7 +432,7 @@ func TestJoinErrors(t *testing.T) {
 			expected: "error1\nerror2",
 		},
 		{
-			name: "with nil error",
+			name: "WithNilError",
 			seq: func(yield func(error) bool) {
 				if !yield(errors.New("error1")) {
 					return
@@ -472,7 +472,7 @@ func TestFlip(t *testing.T) {
 		}
 	}{
 		{
-			name: "empty",
+			name: "Empty",
 			seq:  func(yield func(string, int) bool) {},
 			expected: []struct {
 				a int
@@ -480,7 +480,7 @@ func TestFlip(t *testing.T) {
 			}{},
 		},
 		{
-			name: "single",
+			name: "Single",
 			seq:  func(yield func(string, int) bool) { yield("a", 1) },
 			expected: []struct {
 				a int
@@ -488,7 +488,7 @@ func TestFlip(t *testing.T) {
 			}{{1, "a"}},
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(string, int) bool) {
 				if !yield("a", 1) {
 					return
@@ -538,7 +538,7 @@ func TestFirst(t *testing.T) {
 			expected: []string{"a"},
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(string, int) bool) {
 				if !yield("a", 1) {
 					return
@@ -577,7 +577,7 @@ func TestSecond(t *testing.T) {
 			expected: []int{1},
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(string, int) bool) {
 				if !yield("a", 1) {
 					return
@@ -604,9 +604,9 @@ func TestPtrs(t *testing.T) {
 		name   string
 		values []int
 	}{
-		{"empty", []int{}},
-		{"single", []int{1}},
-		{"multiple", []int{1, 2, 3}},
+		{"Empty", []int{}},
+		{"Single", []int{1}},
+		{"Multiple", []int{1, 2, 3}},
 	}
 
 	for _, tt := range tests {
@@ -632,9 +632,9 @@ func TestPtrsWithNils(t *testing.T) {
 		expected []*int
 	}{
 		{"empty", []int{}, []*int{}},
-		{"no zeros", []int{1, 2, 3}, []*int{ptr(1), ptr(2), ptr(3)}},
-		{"with zeros", []int{1, 0, 3}, []*int{ptr(1), nil, ptr(3)}},
-		{"all zeros", []int{0, 0}, []*int{nil, nil}},
+		{"NoZeros", []int{1, 2, 3}, []*int{ptr(1), ptr(2), ptr(3)}},
+		{"WithZeros", []int{1, 0, 3}, []*int{ptr(1), nil, ptr(3)}},
+		{"AllZeros", []int{0, 0}, []*int{nil, nil}},
 	}
 
 	for _, tt := range tests {
@@ -665,10 +665,10 @@ func TestDeref(t *testing.T) {
 		ptrs     []*int
 		expected []int
 	}{
-		{"empty", []*int{}, []int{}},
-		{"no nils", []*int{ptr(1), ptr(2)}, []int{1, 2}},
-		{"with nils", []*int{ptr(1), nil, ptr(3)}, []int{1, 3}},
-		{"all nils", []*int{nil, nil}, []int{}},
+		{"Empty", []*int{}, []int{}},
+		{"NoNils", []*int{ptr(1), ptr(2)}, []int{1, 2}},
+		{"WithNils", []*int{ptr(1), nil, ptr(3)}, []int{1, 3}},
+		{"AllNils", []*int{nil, nil}, []int{}},
 	}
 
 	for _, tt := range tests {
@@ -688,8 +688,8 @@ func TestDerefWithZeros(t *testing.T) {
 		ptrs     []*int
 		expected []int
 	}{
-		{"empty", []*int{}, []int{}},
-		{"no nils", []*int{ptr(1), ptr(2)}, []int{1, 2}},
+		{"Empty", []*int{}, []int{}},
+		{"NoNils", []*int{ptr(1), ptr(2)}, []int{1, 2}},
 		{"with nils", []*int{ptr(1), nil, ptr(3)}, []int{1, 0, 3}},
 		{"all nils", []*int{nil, nil}, []int{0, 0}},
 	}
@@ -712,12 +712,12 @@ func TestGenerate(t *testing.T) {
 		expected []int
 	}{
 		{
-			name:     "empty generator",
+			name:     "EmptyGenerator",
 			gen:      func() (int, bool) { return 0, false },
 			expected: []int{},
 		},
 		{
-			name: "single value",
+			name: "SingleValue",
 			gen: func() func() (int, bool) {
 				called := false
 				return func() (int, bool) {
@@ -731,7 +731,7 @@ func TestGenerate(t *testing.T) {
 			expected: []int{42},
 		},
 		{
-			name: "multiple values",
+			name: "MultipleValues",
 			gen: func() func() (int, bool) {
 				count := 0
 				return func() (int, bool) {
@@ -775,7 +775,7 @@ func TestGenerate2(t *testing.T) {
 			}{},
 		},
 		{
-			name: "single value",
+			name: "SingleValue",
 			gen: func() func() (string, int, bool) {
 				called := false
 				return func() (string, int, bool) {
@@ -821,14 +821,14 @@ func TestGenerateWhile(t *testing.T) {
 		maxCalls int
 	}{
 		{
-			name:     "never true",
+			name:     "NeverTrue",
 			op:       func() int { return 1 },
 			while:    func(int) bool { return false },
 			expected: []int{},
 			maxCalls: 1,
 		},
 		{
-			name: "limited calls",
+			name: "LimitedCalls",
 			op: func() func() int {
 				count := 0
 				return func() int {
@@ -865,7 +865,7 @@ func TestGenerateWhile(t *testing.T) {
 }
 
 func TestPerpetual(t *testing.T) {
-	t.Run("limited iterations", func(t *testing.T) {
+	t.Run("LimitedIterations", func(t *testing.T) {
 		callCount := int32(0)
 		op := func() int {
 			return int(atomic.AddInt32(&callCount, 1))
@@ -896,7 +896,7 @@ func TestWith(t *testing.T) {
 		}
 	}{
 		{
-			name: "empty",
+			name: "Empty",
 			seq:  func(yield func(int) bool) {},
 			op:   func(i int) string { return string(rune('a' + i)) },
 			expected: []struct {
@@ -905,7 +905,7 @@ func TestWith(t *testing.T) {
 			}{},
 		},
 		{
-			name: "single",
+			name: "Single",
 			seq:  func(yield func(int) bool) { yield(1) },
 			op:   func(i int) string { return string(rune('a' + i)) },
 			expected: []struct {
@@ -914,7 +914,7 @@ func TestWith(t *testing.T) {
 			}{{1, "b"}},
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(int) bool) {
 				if !yield(0) {
 					return
@@ -981,7 +981,7 @@ func TestConvert(t *testing.T) {
 			expected: []string{"b"},
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(int) bool) {
 				if !yield(0) {
 					return
@@ -1038,7 +1038,7 @@ func TestApply(t *testing.T) {
 			expectedSum:   5,
 		},
 		{
-			name: "multiple",
+			name: "Multiple",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1154,7 +1154,7 @@ func TestChunk(t *testing.T) {
 			expected: [][]int{},
 		},
 		{
-			name: "exact chunks",
+			name: "ExactChunks",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1171,7 +1171,7 @@ func TestChunk(t *testing.T) {
 			expected: [][]int{{1, 2}, {3, 4}},
 		},
 		{
-			name: "partial last chunk",
+			name: "PartialLastChunk",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1185,7 +1185,7 @@ func TestChunk(t *testing.T) {
 			expected: [][]int{{1, 2}, {3}},
 		},
 		{
-			name: "single element chunks",
+			name: "SingleElementChunks",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1235,7 +1235,7 @@ func TestChain(t *testing.T) {
 			expected: []int{},
 		},
 		{
-			name: "single sequence",
+			name: "SingleSequence",
 			seq: func(yield func(iter.Seq[int]) bool) {
 				yield(func(yield func(int) bool) {
 					if !yield(1) {
@@ -1247,7 +1247,7 @@ func TestChain(t *testing.T) {
 			expected: []int{1, 2},
 		},
 		{
-			name: "multiple sequences",
+			name: "MultipleSequences",
 			seq: func(yield func(iter.Seq[int]) bool) {
 				if !yield(func(yield func(int) bool) {
 					if !yield(1) {
@@ -1293,7 +1293,7 @@ func TestKeep(t *testing.T) {
 			expected: []int{},
 		},
 		{
-			name: "keep evens",
+			name: "KeepEvens",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1310,7 +1310,7 @@ func TestKeep(t *testing.T) {
 			expected: []int{2, 4},
 		},
 		{
-			name: "keep all",
+			name: "KeepAll",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1321,7 +1321,7 @@ func TestKeep(t *testing.T) {
 			expected: []int{1, 2},
 		},
 		{
-			name: "keep none",
+			name: "KeepNone",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1371,7 +1371,7 @@ func TestRemove(t *testing.T) {
 			expected: []int{},
 		},
 		{
-			name: "remove evens",
+			name: "RemoveEvens",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1412,7 +1412,7 @@ func TestUnique(t *testing.T) {
 			expected: []int{},
 		},
 		{
-			name: "no duplicates",
+			name: "NoDuplicates",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1425,7 +1425,7 @@ func TestUnique(t *testing.T) {
 			expected: []int{1, 2, 3},
 		},
 		{
-			name: "with duplicates",
+			name: "WithDuplicates",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1478,7 +1478,7 @@ func TestContains(t *testing.T) {
 			maxCalls: 0,
 		},
 		{
-			name: "found early - should stop",
+			name: "FoundEarlyShouldStop",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1496,7 +1496,7 @@ func TestContains(t *testing.T) {
 			maxCalls: 2,
 		},
 		{
-			name: "not found - checks all",
+			name: "NotFoundChecksAll",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1548,7 +1548,7 @@ func TestEqual(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "equal sequences",
+			name: "EqualSequences",
 			seq1: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1570,7 +1570,7 @@ func TestEqual(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "different lengths",
+			name: "DifferentLengths",
 			seq1: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1589,7 +1589,7 @@ func TestEqual(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "different values",
+			name: "DifferentValues",
 			seq1: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1633,7 +1633,7 @@ func TestZip(t *testing.T) {
 		}
 	}{
 		{
-			name: "both empty",
+			name: "BothEmpty",
 			seq1: func(yield func(int) bool) {},
 			seq2: func(yield func(string) bool) {},
 			expected: []struct {
@@ -1642,7 +1642,7 @@ func TestZip(t *testing.T) {
 			}{},
 		},
 		{
-			name: "equal length",
+			name: "EqualLength",
 			seq1: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1661,7 +1661,7 @@ func TestZip(t *testing.T) {
 			}{{1, "a"}, {2, "b"}},
 		},
 		{
-			name: "first shorter",
+			name: "FirstShorter",
 			seq1: func(yield func(int) bool) { yield(1) },
 			seq2: func(yield func(string) bool) {
 				if !yield("a") {
@@ -1675,7 +1675,7 @@ func TestZip(t *testing.T) {
 			}{{1, "a"}},
 		},
 		{
-			name: "second shorter",
+			name: "SecondShorter",
 			seq1: func(yield func(int) bool) {
 				if !yield(1) {
 					return
@@ -1713,7 +1713,7 @@ func TestZip(t *testing.T) {
 }
 
 func TestCollectFirstNErrorCases(t *testing.T) {
-	t.Run("negative n", func(t *testing.T) {
+	t.Run("NegativeN", func(t *testing.T) {
 		result := CollectFirstN(func(yield func(int) bool) { yield(1); yield(2) }, -1)
 		if len(result) != 0 {
 			t.Errorf("Expected empty slice for negative n, got %v", result)
@@ -1722,7 +1722,7 @@ func TestCollectFirstNErrorCases(t *testing.T) {
 }
 
 func TestChunkErrorCases(t *testing.T) {
-	t.Run("zero chunk size", func(t *testing.T) {
+	t.Run("ZeroChunkSize", func(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("Expected panic for zero chunk size")
@@ -1734,7 +1734,7 @@ func TestChunkErrorCases(t *testing.T) {
 		}
 	})
 
-	t.Run("negative chunk size", func(t *testing.T) {
+	t.Run("NegativeChunkSize", func(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("Expected panic for negative chunk size")
@@ -2049,7 +2049,7 @@ func TestUniqueBy(t *testing.T) {
 }
 
 func TestEarlyReturnBehavior(t *testing.T) {
-	t.Run("Collect early return", func(t *testing.T) {
+	t.Run("CollectEarlyReturn", func(t *testing.T) {
 		callCount := int32(0)
 		seq := func(yield func(int) bool) {
 			for i := 1; i <= 5; i++ {
@@ -2074,7 +2074,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 	})
 
-	t.Run("Convert early return", func(t *testing.T) {
+	t.Run("ConvertEarlyReturn", func(t *testing.T) {
 		sourceCallCount := int32(0)
 		convertCallCount := int32(0)
 
@@ -2108,7 +2108,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 	})
 
-	t.Run("Keep early return", func(t *testing.T) {
+	t.Run("KeepEarlyReturn", func(t *testing.T) {
 		sourceCallCount := int32(0)
 		predicateCallCount := int32(0)
 
@@ -2142,7 +2142,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 	})
 
-	t.Run("Chain early return", func(t *testing.T) {
+	t.Run("ChainEarlyReturn", func(t *testing.T) {
 		callCount := int32(0)
 
 		seq := func(yield func(iter.Seq[int]) bool) {
@@ -2187,7 +2187,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 	})
 
-	t.Run("Zip early return", func(t *testing.T) {
+	t.Run("ZipEarlyReturn", func(t *testing.T) {
 		callCount1 := int32(0)
 		callCount2 := int32(0)
 
@@ -2228,7 +2228,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 }
 
 func TestChannelCancellation(t *testing.T) {
-	t.Run("context cancellation", func(t *testing.T) {
+	t.Run("ContextCancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		ch := make(chan int, 3)
 		ch <- 1
@@ -2256,7 +2256,7 @@ func TestChannelCancellation(t *testing.T) {
 }
 
 func TestPipeCancellation(t *testing.T) {
-	t.Run("context cancellation", func(t *testing.T) {
+	t.Run("ContextCancellation", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 		defer cancel()
 
