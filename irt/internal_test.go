@@ -142,9 +142,9 @@ func TestNoopHelper(t *testing.T) {
 }
 
 func TestWrapHelper(t *testing.T) {
-	callCount := int32(0)
+	var callCount atomic.Int32
 	op := func() string {
-		atomic.AddInt32(&callCount, 1)
+		callCount.Add(1)
 		return "result"
 	}
 
@@ -155,8 +155,8 @@ func TestWrapHelper(t *testing.T) {
 		t.Errorf("wrap(op)(42) = %v, want 'result'", result)
 	}
 
-	if callCount != 1 {
-		t.Errorf("wrapped function called %d times, want 1", callCount)
+	if callCount.Load() != 1 {
+		t.Errorf("wrapped function called %d times, want 1", callCount.Load())
 	}
 }
 

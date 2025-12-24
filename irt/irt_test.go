@@ -199,14 +199,26 @@ func TestCollectFirstN(t *testing.T) {
 			expected: []int{},
 			maxCalls: 0,
 		},
+		{
+			name: "NegativeN",
+			seq: func(yield func(int) bool) {
+				if !yield(1) {
+					return
+				}
+				yield(2)
+			},
+			n:        -1,
+			expected: []int{},
+			maxCalls: 0,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			callCount := int32(0)
+			var callCount atomic.Int32
 			wrappedSeq := func(yield func(int) bool) {
 				tt.seq(func(v int) bool {
-					atomic.AddInt32(&callCount, 1)
+					callCount.Add(1)
 					return yield(v)
 				})
 			}
@@ -216,8 +228,8 @@ func TestCollectFirstN(t *testing.T) {
 				t.Errorf("CollectFirstN() = %v, want %v", result, tt.expected)
 			}
 
-			if int(callCount) != tt.maxCalls {
-				t.Errorf("CollectFirstN() called sequence %d times, want %d", callCount, tt.maxCalls)
+			if int(callCount.Load()) != tt.maxCalls {
+				t.Errorf("CollectFirstN() called sequence %d times, want %d", callCount.Load(), tt.maxCalls)
 			}
 		})
 	}
@@ -844,9 +856,9 @@ func TestGenerateWhile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			callCount := int32(0)
+			var callCount atomic.Int32
 			wrappedOp := func() int {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				return tt.op()
 			}
 
@@ -857,8 +869,8 @@ func TestGenerateWhile(t *testing.T) {
 				t.Errorf("GenerateWhile() = %v, want %v", result, tt.expected)
 			}
 
-			if int(callCount) > tt.maxCalls {
-				t.Errorf("GenerateWhile() called op %d times, max expected %d", callCount, tt.maxCalls)
+			if int(callCount.Load()) > tt.maxCalls {
+				t.Errorf("GenerateWhile() called op %d times, max expected %d", callCount.Load(), tt.maxCalls)
 			}
 		})
 	}
@@ -866,9 +878,9 @@ func TestGenerateWhile(t *testing.T) {
 
 func TestPerpetual(t *testing.T) {
 	t.Run("LimitedIterations", func(t *testing.T) {
-		callCount := int32(0)
+		var callCount atomic.Int32
 		op := func() int {
-			return int(atomic.AddInt32(&callCount, 1))
+			return int(callCount.Add(1))
 		}
 
 		seq := Perpetual(op)
@@ -879,8 +891,8 @@ func TestPerpetual(t *testing.T) {
 			t.Errorf("Perpetual() = %v, want %v", result, expected)
 		}
 
-		if callCount != 3 {
-			t.Errorf("Perpetual() called op %d times, want 3", callCount)
+		if callCount.Load() != 3 {
+			t.Errorf("Perpetual() called op %d times, want 3", callCount.Load())
 		}
 	})
 }
@@ -934,9 +946,9 @@ func TestWith(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			callCount := int32(0)
+			var callCount atomic.Int32
 			wrappedOp := func(i int) string {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				return tt.op(i)
 			}
 
@@ -954,8 +966,8 @@ func TestWith(t *testing.T) {
 				i++
 			}
 
-			if int(callCount) != len(tt.expected) {
-				t.Errorf("With() called op %d times, want %d", callCount, len(tt.expected))
+			if int(callCount.Load()) != len(tt.expected) {
+				t.Errorf("With() called op %d times, want %d", callCount.Load(), len(tt.expected))
 			}
 		})
 	}
@@ -998,9 +1010,9 @@ func TestConvert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			callCount := int32(0)
+			var callCount atomic.Int32
 			wrappedOp := func(i int) string {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				return tt.op(i)
 			}
 
@@ -1011,8 +1023,8 @@ func TestConvert(t *testing.T) {
 				t.Errorf("Convert() = %v, want %v", result, tt.expected)
 			}
 
-			if int(callCount) != len(tt.expected) {
-				t.Errorf("Convert() called op %d times, want %d", callCount, len(tt.expected))
+			if int(callCount.Load()) != len(tt.expected) {
+				t.Errorf("Convert() called op %d times, want %d", callCount.Load(), len(tt.expected))
 			}
 		})
 	}
@@ -1056,9 +1068,9 @@ func TestApply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sum := 0
-			callCount := int32(0)
+			var callCount atomic.Int32
 			op := func(i int) {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				sum += i
 			}
 
@@ -1070,8 +1082,8 @@ func TestApply(t *testing.T) {
 			if sum != tt.expectedSum {
 				t.Errorf("Apply() sum = %v, want %v", sum, tt.expectedSum)
 			}
-			if int(callCount) != tt.expectedCount {
-				t.Errorf("Apply() called op %d times, want %d", callCount, tt.expectedCount)
+			if int(callCount.Load()) != tt.expectedCount {
+				t.Errorf("Apply() called op %d times, want %d", callCount.Load(), tt.expectedCount)
 			}
 		})
 	}
@@ -1083,9 +1095,9 @@ func TestChannel(t *testing.T) {
 		values   []int
 		expected []int
 	}{
-		{"empty", []int{}, []int{}},
-		{"single", []int{1}, []int{1}},
-		{"multiple", []int{1, 2, 3}, []int{1, 2, 3}},
+		{"Empty", []int{}, []int{}},
+		{"Single", []int{1}, []int{1}},
+		{"Multiple", []int{1, 2, 3}, []int{1, 2, 3}},
 	}
 
 	for _, tt := range tests {
@@ -1107,6 +1119,32 @@ func TestChannel(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		ch := make(chan int, 3)
+		ch <- 1
+		ch <- 2
+		ch <- 3
+		close(ch)
+
+		seq := Channel(ctx, ch)
+		count := 0
+		for range seq {
+			count++
+			if count == 1 {
+				cancel() // Cancel after first item
+			}
+			if count > 2 {
+				t.Error("Should have stopped after cancellation")
+				break
+			}
+		}
+
+		if count > 2 {
+			t.Errorf("Expected early termination, got %d items", count)
+		}
+	})
 }
 
 func TestPipe(t *testing.T) {
@@ -1115,9 +1153,9 @@ func TestPipe(t *testing.T) {
 		values   []int
 		expected []int
 	}{
-		{"empty", []int{}, []int{}},
-		{"single", []int{1}, []int{1}},
-		{"multiple", []int{1, 2, 3}, []int{1, 2, 3}},
+		{"Empty", []int{}, []int{}},
+		{"Single", []int{1}, []int{1}},
+		{"Multiple", []int{1, 2, 3}, []int{1, 2, 3}},
 	}
 
 	for _, tt := range tests {
@@ -1138,6 +1176,32 @@ func TestPipe(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+		defer cancel()
+
+		// Create a slow sequence
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 100; i++ {
+				time.Sleep(5 * time.Millisecond)
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		ch := Pipe(ctx, seq)
+		count := 0
+		for range ch {
+			count++
+		}
+
+		// Should terminate early due to context timeout
+		if count >= 100 {
+			t.Error("Expected early termination due to context cancellation")
+		}
+	})
 }
 
 func TestChunk(t *testing.T) {
@@ -1221,6 +1285,30 @@ func TestChunk(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("ZeroChunkSize", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic for zero chunk size")
+			}
+		}()
+		seq := Chunk(func(yield func(int) bool) { yield(1) }, 0)
+		for range seq {
+			break
+		}
+	})
+
+	t.Run("NegativeChunkSize", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic for negative chunk size")
+			}
+		}()
+		seq := Chunk(func(yield func(int) bool) { yield(1) }, -1)
+		for range seq {
+			break
+		}
+	})
 }
 
 func TestChain(t *testing.T) {
@@ -1335,9 +1423,9 @@ func TestKeep(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			callCount := int32(0)
+			var callCount atomic.Int32
 			wrappedPred := func(i int) bool {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				return tt.pred(i)
 			}
 
@@ -1350,8 +1438,8 @@ func TestKeep(t *testing.T) {
 
 			// Predicate should be called for each input element
 			expectedCalls := len(Collect(tt.seq))
-			if int(callCount) != expectedCalls {
-				t.Errorf("Keep() called predicate %d times, want %d", callCount, expectedCalls)
+			if int(callCount.Load()) != expectedCalls {
+				t.Errorf("Keep() called predicate %d times, want %d", callCount.Load(), expectedCalls)
 			}
 		})
 	}
@@ -1514,10 +1602,10 @@ func TestContains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			callCount := int32(0)
+			var callCount atomic.Int32
 			wrappedSeq := func(yield func(int) bool) {
 				tt.seq(func(v int) bool {
-					atomic.AddInt32(&callCount, 1)
+					callCount.Add(1)
 					return yield(v)
 				})
 			}
@@ -1527,8 +1615,8 @@ func TestContains(t *testing.T) {
 				t.Errorf("Contains() = %v, want %v", result, tt.expected)
 			}
 
-			if int(callCount) > tt.maxCalls {
-				t.Errorf("Contains() called sequence %d times, max expected %d", callCount, tt.maxCalls)
+			if int(callCount.Load()) > tt.maxCalls {
+				t.Errorf("Contains() called sequence %d times, max expected %d", callCount.Load(), tt.maxCalls)
 			}
 		})
 	}
@@ -1712,45 +1800,10 @@ func TestZip(t *testing.T) {
 	}
 }
 
-func TestCollectFirstNErrorCases(t *testing.T) {
-	t.Run("NegativeN", func(t *testing.T) {
-		result := CollectFirstN(func(yield func(int) bool) { yield(1); yield(2) }, -1)
-		if len(result) != 0 {
-			t.Errorf("Expected empty slice for negative n, got %v", result)
-		}
-	})
-}
-
-func TestChunkErrorCases(t *testing.T) {
-	t.Run("ZeroChunkSize", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic for zero chunk size")
-			}
-		}()
-		seq := Chunk(func(yield func(int) bool) { yield(1) }, 0)
-		for range seq {
-			break
-		}
-	})
-
-	t.Run("NegativeChunkSize", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic for negative chunk size")
-			}
-		}()
-		seq := Chunk(func(yield func(int) bool) { yield(1) }, -1)
-		for range seq {
-			break
-		}
-	})
-}
-
 func TestGenerateWhile2(t *testing.T) {
-	callCount := int32(0)
+	var callCount atomic.Int32
 	op := func() (string, int) {
-		count := int(atomic.AddInt32(&callCount, 1))
+		count := int(callCount.Add(1))
 		return "item" + string(rune('0'+count)), count
 	}
 
@@ -1762,15 +1815,15 @@ func TestGenerateWhile2(t *testing.T) {
 		t.Errorf("GenerateWhile2() length = %v, want %v", len(result), len(expected))
 	}
 
-	if callCount != 4 { // Called 4 times: 3 successful + 1 that fails condition
-		t.Errorf("GenerateWhile2() called op %d times, want 4", callCount)
+	if callCount.Load() != 4 { // Called 4 times: 3 successful + 1 that fails condition
+		t.Errorf("GenerateWhile2() called op %d times, want 4", callCount.Load())
 	}
 }
 
 func TestPerpetual2(t *testing.T) {
-	callCount := int32(0)
+	var callCount atomic.Int32
 	op := func() (string, int) {
-		count := int(atomic.AddInt32(&callCount, 1))
+		count := int(callCount.Add(1))
 		return "item" + string(rune('0'+count)), count
 	}
 
@@ -1787,15 +1840,15 @@ func TestPerpetual2(t *testing.T) {
 		}
 	}
 
-	if callCount != 3 {
-		t.Errorf("Perpetual2() called op %d times, want 3", callCount)
+	if callCount.Load() != 3 {
+		t.Errorf("Perpetual2() called op %d times, want 3", callCount.Load())
 	}
 }
 
 func TestWith2(t *testing.T) {
-	callCount := int32(0)
+	var callCount atomic.Int32
 	op := func(i int) (string, bool) {
-		atomic.AddInt32(&callCount, 1)
+		callCount.Add(1)
 		return "item" + string(rune('0'+i)), i%2 == 0
 	}
 
@@ -1828,14 +1881,14 @@ func TestWith2(t *testing.T) {
 		i++
 	}
 
-	if callCount != 3 {
-		t.Errorf("With2() called op %d times, want 3", callCount)
+	if callCount.Load() != 3 {
+		t.Errorf("With2() called op %d times, want 3", callCount.Load())
 	}
 }
 
 func TestApplyWhile(t *testing.T) {
 	sum := 0
-	callCount := int32(0)
+	var callCount atomic.Int32
 
 	count := ApplyWhile(
 		func(yield func(int) bool) {
@@ -1851,7 +1904,7 @@ func TestApplyWhile(t *testing.T) {
 			yield(4)
 		},
 		func(i int) bool {
-			atomic.AddInt32(&callCount, 1)
+			callCount.Add(1)
 			sum += i
 			return i < 3 // Stop at 3
 		},
@@ -1863,13 +1916,13 @@ func TestApplyWhile(t *testing.T) {
 	if sum != 6 { // 1+2+3
 		t.Errorf("ApplyWhile() sum = %v, want 6", sum)
 	}
-	if callCount != 3 {
-		t.Errorf("ApplyWhile() called op %d times, want 3", callCount)
+	if callCount.Load() != 3 {
+		t.Errorf("ApplyWhile() called op %d times, want 3", callCount.Load())
 	}
 }
 
 func TestApplyUntil(t *testing.T) {
-	callCount := int32(0)
+	var callCount atomic.Int32
 
 	err := ApplyUntil(
 		func(yield func(int) bool) {
@@ -1882,7 +1935,7 @@ func TestApplyUntil(t *testing.T) {
 			yield(3)
 		},
 		func(i int) error {
-			atomic.AddInt32(&callCount, 1)
+			callCount.Add(1)
 			if i == 2 {
 				return errors.New("stop at 2")
 			}
@@ -1893,13 +1946,13 @@ func TestApplyUntil(t *testing.T) {
 	if err == nil || err.Error() != "stop at 2" {
 		t.Errorf("ApplyUntil() error = %v, want 'stop at 2'", err)
 	}
-	if callCount != 2 {
-		t.Errorf("ApplyUntil() called op %d times, want 2", callCount)
+	if callCount.Load() != 2 {
+		t.Errorf("ApplyUntil() called op %d times, want 2", callCount.Load())
 	}
 }
 
 func TestApplyAll(t *testing.T) {
-	callCount := int32(0)
+	var callCount atomic.Int32
 
 	err := ApplyAll(
 		func(yield func(int) bool) {
@@ -1912,7 +1965,7 @@ func TestApplyAll(t *testing.T) {
 			yield(3)
 		},
 		func(i int) error {
-			atomic.AddInt32(&callCount, 1)
+			callCount.Add(1)
 			if i == 2 {
 				return errors.New("error at 2")
 			}
@@ -1923,8 +1976,8 @@ func TestApplyAll(t *testing.T) {
 	if err == nil {
 		t.Error("ApplyAll() should return joined errors")
 	}
-	if callCount != 3 {
-		t.Errorf("ApplyAll() called op %d times, want 3", callCount)
+	if callCount.Load() != 3 {
+		t.Errorf("ApplyAll() called op %d times, want 3", callCount.Load())
 	}
 }
 
@@ -2050,10 +2103,10 @@ func TestUniqueBy(t *testing.T) {
 
 func TestEarlyReturnBehavior(t *testing.T) {
 	t.Run("CollectEarlyReturn", func(t *testing.T) {
-		callCount := int32(0)
+		var callCount atomic.Int32
 		seq := func(yield func(int) bool) {
 			for i := 1; i <= 5; i++ {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				if !yield(i) {
 					return
 				}
@@ -2069,18 +2122,18 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			}
 		}
 
-		if callCount != 2 {
-			t.Errorf("Sequence should stop after 2 calls, got %d", callCount)
+		if callCount.Load() != 2 {
+			t.Errorf("Sequence should stop after 2 calls, got %d", callCount.Load())
 		}
 	})
 
 	t.Run("ConvertEarlyReturn", func(t *testing.T) {
-		sourceCallCount := int32(0)
-		convertCallCount := int32(0)
+		var sourceCallCount atomic.Int32
+		var convertCallCount atomic.Int32
 
 		source := func(yield func(int) bool) {
 			for i := 1; i <= 5; i++ {
-				atomic.AddInt32(&sourceCallCount, 1)
+				sourceCallCount.Add(1)
 				if !yield(i) {
 					return
 				}
@@ -2088,7 +2141,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 
 		converted := Convert(source, func(i int) string {
-			atomic.AddInt32(&convertCallCount, 1)
+			convertCallCount.Add(1)
 			return "item" + string(rune('0'+i))
 		})
 
@@ -2100,21 +2153,21 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			}
 		}
 
-		if sourceCallCount != 2 {
-			t.Errorf("Source should be called 2 times, got %d", sourceCallCount)
+		if sourceCallCount.Load() != 2 {
+			t.Errorf("Source should be called 2 times, got %d", sourceCallCount.Load())
 		}
-		if convertCallCount != 2 {
-			t.Errorf("Convert should be called 2 times, got %d", convertCallCount)
+		if convertCallCount.Load() != 2 {
+			t.Errorf("Convert should be called 2 times, got %d", convertCallCount.Load())
 		}
 	})
 
 	t.Run("KeepEarlyReturn", func(t *testing.T) {
-		sourceCallCount := int32(0)
-		predicateCallCount := int32(0)
+		var sourceCallCount atomic.Int32
+		var predicateCallCount atomic.Int32
 
 		source := func(yield func(int) bool) {
 			for i := 1; i <= 10; i++ {
-				atomic.AddInt32(&sourceCallCount, 1)
+				sourceCallCount.Add(1)
 				if !yield(i) {
 					return
 				}
@@ -2122,7 +2175,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 
 		filtered := Keep(source, func(i int) bool {
-			atomic.AddInt32(&predicateCallCount, 1)
+			predicateCallCount.Add(1)
 			return i%2 == 0 // Keep even numbers
 		})
 
@@ -2134,24 +2187,24 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			}
 		}
 
-		if sourceCallCount != 4 { // Should process 1,2,3,4
-			t.Errorf("Source should be called 4 times, got %d", sourceCallCount)
+		if sourceCallCount.Load() != 4 { // Should process 1,2,3,4
+			t.Errorf("Source should be called 4 times, got %d", sourceCallCount.Load())
 		}
-		if predicateCallCount != 4 {
-			t.Errorf("Predicate should be called 4 times, got %d", predicateCallCount)
+		if predicateCallCount.Load() != 4 {
+			t.Errorf("Predicate should be called 4 times, got %d", predicateCallCount.Load())
 		}
 	})
 
 	t.Run("ChainEarlyReturn", func(t *testing.T) {
-		callCount := int32(0)
+		var callCount atomic.Int32
 
 		seq := func(yield func(iter.Seq[int]) bool) {
 			inner1 := func(yield func(int) bool) {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				if !yield(1) {
 					return
 				}
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				if !yield(2) {
 					return
 				}
@@ -2161,11 +2214,11 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			}
 
 			inner2 := func(yield func(int) bool) {
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				if !yield(3) {
 					return
 				}
-				atomic.AddInt32(&callCount, 1)
+				callCount.Add(1)
 				if !yield(4) {
 					return
 				}
@@ -2182,18 +2235,18 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			}
 		}
 
-		if callCount != 2 {
-			t.Errorf("Should stop early, callCount = %d, want 2", callCount)
+		if callCount.Load() != 2 {
+			t.Errorf("Should stop early, callCount = %d, want 2", callCount.Load())
 		}
 	})
 
 	t.Run("ZipEarlyReturn", func(t *testing.T) {
-		callCount1 := int32(0)
-		callCount2 := int32(0)
+		var callCount1 atomic.Int32
+		var callCount2 atomic.Int32
 
 		seq1 := func(yield func(int) bool) {
 			for i := 1; i <= 5; i++ {
-				atomic.AddInt32(&callCount1, 1)
+				callCount1.Add(1)
 				if !yield(i) {
 					return
 				}
@@ -2202,7 +2255,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 
 		seq2 := func(yield func(string) bool) {
 			for i := 1; i <= 5; i++ {
-				atomic.AddInt32(&callCount2, 1)
+				callCount2.Add(1)
 				if !yield("item" + string(rune('0'+i))) {
 					return
 				}
@@ -2218,67 +2271,12 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			}
 		}
 
-		if callCount1 != 2 {
-			t.Errorf("Seq1 should be called 2 times, got %d", callCount1)
+		if callCount1.Load() != 2 {
+			t.Errorf("Seq1 should be called 2 times, got %d", callCount1.Load())
 		}
-		if callCount2 != 2 {
-			t.Errorf("Seq2 should be called 2 times, got %d", callCount2)
-		}
-	})
-}
-
-func TestChannelCancellation(t *testing.T) {
-	t.Run("ContextCancellation", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		ch := make(chan int, 3)
-		ch <- 1
-		ch <- 2
-		ch <- 3
-		close(ch)
-
-		seq := Channel(ctx, ch)
-		count := 0
-		for range seq {
-			count++
-			if count == 1 {
-				cancel() // Cancel after first item
-			}
-			if count > 2 {
-				t.Error("Should have stopped after cancellation")
-				break
-			}
-		}
-
-		if count > 2 {
-			t.Errorf("Expected early termination, got %d items", count)
+		if callCount2.Load() != 2 {
+			t.Errorf("Seq2 should be called 2 times, got %d", callCount2.Load())
 		}
 	})
 }
 
-func TestPipeCancellation(t *testing.T) {
-	t.Run("ContextCancellation", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
-		defer cancel()
-
-		// Create a slow sequence
-		seq := func(yield func(int) bool) {
-			for i := 1; i <= 100; i++ {
-				time.Sleep(5 * time.Millisecond)
-				if !yield(i) {
-					return
-				}
-			}
-		}
-
-		ch := Pipe(ctx, seq)
-		count := 0
-		for range ch {
-			count++
-		}
-
-		// Should terminate early due to context timeout
-		if count >= 100 {
-			t.Error("Expected early termination due to context cancellation")
-		}
-	})
-}
