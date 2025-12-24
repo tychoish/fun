@@ -572,8 +572,8 @@ func TestOrderedGroupingHelper(t *testing.T) {
 	og.add("c", 4)
 
 	// Test iter preserves order
-	var keys []string
-	var values [][]int
+	keys := make([]string, 0, 3)
+	values := make([][]int, 0, 3)
 	for k, v := range og.iter() {
 		keys = append(keys, k)
 		values = append(values, v)
@@ -658,10 +658,10 @@ func TestSplitsHelper(t *testing.T) {
 
 	seq := Splits(Slice(elems))
 
-	var result []struct {
+	result := make([]struct {
 		a int
 		b string
-	}
+	}, 0, 3)
 	for a, b := range seq {
 		result = append(result, struct {
 			a int

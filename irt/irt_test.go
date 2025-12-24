@@ -2279,4 +2279,3 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 	})
 }
-
