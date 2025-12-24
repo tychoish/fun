@@ -4,42 +4,49 @@ package irt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"maps"
 	"slices"
 )
 
-func Collect[T any](seq iter.Seq[T], args ...int) []T {
-	size := max(0, idxorz(0, args))
-	capacity := max(size, idxorz(1, args))
-	return slices.AppendSeq(make([]T, size, capacity), seq)
+func Collect[T any](seq iter.Seq[T], args ...int) (s []T) {
+	switch len(args) {
+	case 0:
+	// pass, use the nil slice
+	case 1:
+		s = make([]T, idxorz(0, args))
+	case 2:
+		fallthrough
+	default:
+		size := max(0, idxorz(0, args))
+		capacity := min(size, idxorz(1, args))
+		s = make([]T, size, capacity)
+	}
+	return slices.AppendSeq(s, seq)
 }
 
 func Collect2[K comparable, V any](seq iter.Seq2[K, V], args ...int) map[K]V {
-	mp := make(map[K]V, idxorz(0, args))
+	mp := make(map[K]V, max(0, idxorz(0, args)))
 	maps.Insert(mp, seq)
 	return mp
 }
 
 func CollectFirstN[T any](seq iter.Seq[T], n int) []T {
-	out := make([]T, n)
+	if n <= 0 {
+		return make([]T, 0)
+	}
+	out := make([]T, 0, n)
 	idx := 0
 	for value := range seq {
-		out[idx] = value
+		out = append(out, value)
 		if idx+1 == n {
 			break
 		}
 		idx++
 	}
 
-	switch idx {
-	case n:
-		return out
-	case 0:
-		return out[:0]
-	default:
-		return out[:idx-1]
-	}
+	return out
 }
 
 func One[T any](v T) iter.Seq[T]                          { return func(yield func(T) bool) { yield(v) } }
@@ -261,7 +268,7 @@ func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 
 		for hasMore := true; hasMore; {
 			gen := withlimit(next, num)
-			if !yield(func(yield func(T) bool) {
+			if gen != nil && !yield(func(yield func(T) bool) {
 				for value, okp := gen(); okp != nil; value, okp = gen() {
 					if !deref(okp) {
 						hasMore = false
@@ -643,9 +650,8 @@ func ntimes[T any](op func() T, times int) func() (T, bool) {
 
 func withlimit[T any](op func() (T, bool), limit int) func() (T, *bool) {
 	if limit <= 0 {
-		panic("limit must be greater than zero")
+		panic(fmt.Errorf("limit [%d] must be greater than zero", limit))
 	}
-
 	var count int
 	var exhausted bool
 
