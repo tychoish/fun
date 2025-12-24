@@ -1,12 +1,15 @@
 package fn
 
 import (
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func TestFilter(t *testing.T) {
@@ -147,6 +150,29 @@ func TestFilter(t *testing.T) {
 }
 
 func TestConverter(t *testing.T) {
+	t.Run("Iterator", func(t *testing.T) {
+		conv := MakeConverter(strconv.Itoa)
+		input := ft.Slice(1, 2, 3, 4)
+		out := irt.Collect(conv.Iterator(irt.Slice(input)))
+		assert.Equal(t, len(input), len(out))
+		for idx := range out {
+			switch out[idx] {
+			case "1":
+				check.Equal(t, 1, input[idx])
+			case "2":
+				check.Equal(t, 2, input[idx])
+			case "3":
+				check.Equal(t, 3, input[idx])
+			case "4":
+				check.Equal(t, 4, input[idx])
+			default:
+				t.Log("out:", out)
+				t.Log("input:", input)
+				t.Errorf("unexpected output at index %d", idx)
+			}
+		}
+	})
+
 	// nb: these test cases were written by the robots (copilot+claude-3.5)
 	t.Run("Convert", func(t *testing.T) {
 		c := MakeConverter(func(_ int) string { return "ok" })

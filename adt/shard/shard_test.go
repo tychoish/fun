@@ -65,4 +65,25 @@ func TestShardedMap(t *testing.T) {
 		assert.Substring(t, m.String(), "Shards(32)")
 		assert.Substring(t, m.String(), "Version(0)")
 	})
+	t.Run("Iterator", func(t *testing.T) {
+		m := &Map[string, int]{}
+		m.Store("one", 1)
+		m.Store("two", 2)
+		m.Store("three", 3)
+		count := 0
+		for k, v := range m.Iterator() {
+			count++
+			switch v {
+			case 1:
+				check.Equal(t, k, "one")
+			case 2:
+				check.Equal(t, k, "two")
+			case 3:
+				check.Equal(t, k, "three")
+			default:
+				t.Fatalf("unexpected key [%s] value [%d] in iteration", k, v)
+			}
+		}
+		assert.Equal(t, count, 3)
+	})
 }
