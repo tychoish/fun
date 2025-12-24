@@ -10,7 +10,9 @@ import (
 )
 
 func Collect[T any](seq iter.Seq[T], args ...int) []T {
-	return slices.AppendSeq(make([]T, idxorz(0, args), idxorz(1, args)), seq)
+	size := max(0, idxorz(0, args))
+	capacity := max(size, idxorz(1, args))
+	return slices.AppendSeq(make([]T, size, capacity), seq)
 }
 
 func Collect2[K comparable, V any](seq iter.Seq2[K, V], args ...int) map[K]V {
@@ -541,7 +543,7 @@ func idxorz[E any, S ~[]E](idx int, sl S) E {
 	// TODO: performance compare
 	// ifdoelsedo(len(sl) >= idx, zero[T], idxlazy(idx, sl))
 
-	if len(sl)-1 < idx {
+	if idx >= len(sl) || idx < 0 {
 		return zero[E]()
 	}
 	return sl[idx]
