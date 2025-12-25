@@ -63,8 +63,8 @@ func TestEqualHelper(t *testing.T) {
 func TestFirstHelper(t *testing.T) {
 	tests := []struct {
 		name     string
-		a, b     interface{}
-		expected interface{}
+		a, b     any
+		expected any
 	}{
 		{"int-string", 42, "hello", 42},
 		{"string-int", "world", 123, "world"},
@@ -84,8 +84,8 @@ func TestFirstHelper(t *testing.T) {
 func TestSecondHelper(t *testing.T) {
 	tests := []struct {
 		name     string
-		a, b     interface{}
-		expected interface{}
+		a, b     any
+		expected any
 	}{
 		{"int-string", 42, "hello", "hello"},
 		{"string-int", "world", 123, 123},
@@ -105,7 +105,7 @@ func TestSecondHelper(t *testing.T) {
 func TestFlipFuncHelper(t *testing.T) {
 	tests := []struct {
 		name string
-		a, b interface{}
+		a, b any
 	}{
 		{"int-string", 42, "hello"},
 		{"string-int", "world", 123},
@@ -124,7 +124,7 @@ func TestFlipFuncHelper(t *testing.T) {
 func TestNoopHelper(t *testing.T) {
 	tests := []struct {
 		name  string
-		input interface{}
+		input any
 	}{
 		{"int", 42},
 		{"string", "hello"},

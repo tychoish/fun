@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"math/rand/v2"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -238,12 +239,12 @@ func TestCollectFirstN(t *testing.T) {
 func TestOne(t *testing.T) {
 	tests := []struct {
 		name     string
-		value    interface{}
-		expected []interface{}
+		value    any
+		expected []any
 	}{
-		{"Int", 42, []interface{}{42}},
-		{"String", "hello", []interface{}{"hello"}},
-		{"Nil", nil, []interface{}{nil}},
+		{"Int", 42, []any{42}},
+		{"String", "hello", []any{"hello"}},
+		{"Nil", nil, []any{nil}},
 	}
 
 	for _, tt := range tests {
@@ -260,7 +261,7 @@ func TestOne(t *testing.T) {
 func TestTwo(t *testing.T) {
 	tests := []struct {
 		name string
-		a, b interface{}
+		a, b any
 	}{
 		{"IntString", 42, "hello"},
 		{"StringInt", "world", 123},
@@ -893,6 +894,28 @@ func TestPerpetual(t *testing.T) {
 
 		if callCount.Load() != 3 {
 			t.Errorf("Perpetual() called op %d times, want 3", callCount.Load())
+		}
+	})
+	t.Run("Arbitrary", func(t *testing.T) {
+		var callCount atomic.Int32
+		previous := callCount.Add(1)
+		op := func() int32 {
+			return callCount.Add(1)
+		}
+
+		for val := range Perpetual(op) {
+			if val <= previous {
+				t.Errorf("value %d shouldn't be less than previous %d", val, previous)
+			}
+			if callCount.Load() != val {
+				t.Errorf("value %d should be the same as the current call count %d (no buffering)", val, callCount.Load())
+			}
+			if val > rand.Int32N(100)+1 {
+				break
+			}
+		}
+		if callCount.Load() <= 1 {
+			t.Error("iteration was not observed")
 		}
 	})
 }
