@@ -9,6 +9,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"sync"
 )
 
 func Collect[T any](seq iter.Seq[T], args ...int) (s []T) {
@@ -68,6 +69,17 @@ func FirstValue[T any](seq iter.Seq[T]) (zero T, ok bool) {
 		return value, true
 	}
 	return zero, ok
+}
+
+func Head[T any](seq iter.Seq[T], n int) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		inc := counter()
+		for elem := range seq {
+			if !yield(elem) || inc() >= n {
+				return
+			}
+		}
+	}
 }
 
 func Ptrs[T any](seq iter.Seq[T]) iter.Seq[*T]                { return Convert(seq, ptr) }
@@ -381,6 +393,11 @@ func WithHooks[T any](seq iter.Seq[T], before func(), after func()) iter.Seq[T] 
 	return func(yield func(T) bool) { before(); defer after(); flush(seq, yield) }
 }
 
+func WithSetup[T any](seq iter.Seq[T], setup func()) iter.Seq[T] {
+	setup = once(setup)
+	return func(yield func(T) bool) { setup(); flush(seq, yield) }
+}
+
 func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, notf(prd)) }
 func Remove2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	return Keep2(seq, notf2(prd))
@@ -401,6 +418,18 @@ func Group[K comparable, V any](seq iter.Seq2[K, V]) iter.Seq2[K, []V] {
 func Unique[T comparable](seq iter.Seq[T]) iter.Seq[T] { return Remove(seq, seen[T]()) }
 func UniqueBy[K comparable, V any](seq iter.Seq[V], kfn func(V) K) iter.Seq[V] {
 	return First(Remove2(With(seq, kfn), seenSecond[K, V]()))
+}
+
+func Count[T any](seq iter.Seq[T]) (size int) {
+	inc := counter()
+	Apply(seq, func(T) { size = inc() })
+	return
+}
+
+func Count2[A, B any](seq iter.Seq2[A, B]) (size int) {
+	inc := counter()
+	Apply2(seq, func(A, B) { size = inc() })
+	return
 }
 
 func Reduce[T any](seq iter.Seq[T], rfn func(T, T) T) (out T) {
@@ -471,6 +500,11 @@ func Zip[A, B any](rh iter.Seq[A], lh iter.Seq[B]) iter.Seq2[A, B] {
 
 func keys[K comparable, V any, M ~map[K]V](in M) iter.Seq[K]   { return maps.Keys(in) }
 func values[K comparable, V any, M ~map[K]V](in M) iter.Seq[V] { return maps.Values(in) }
+func once(op func()) func()                                    { return sync.OnceFunc(op) }
+func oncev[T any](op func() T) func() T                        { return sync.OnceValue(op) }
+func oncevs[A, B any](op func() (A, B)) func() (A, B)          { return sync.OnceValues(op) }
+func with(mtx *sync.Mutex)                                     { mtx.Unlock() }
+func lock(mtx *sync.Mutex) *sync.Mutex                         { mtx.Lock(); return mtx }
 
 // statefull function utilities
 
@@ -519,21 +553,24 @@ func methodizethread[A, B, C, D, E any](self A, op func(A, B) (C, D), outer func
 }
 
 func thread[A, B, C any](a func(A) B, b func(B) C) func(A) C { return func(v A) C { return b(a(v)) } }
-func mergethread[A, B, C, D any](op func(A, B) C, merge func(C) D) func(A, B) D { return func(a A, b B) D { return merge(op(a, b))}}
+func mergethread[A, B, C, D any](op func(A, B) C, merge func(C) D) func(A, B) D {
+	return func(a A, b B) D { return merge(op(a, b)) }
+}
+
 func zipthread[A, B, C, D any](op func(A) (B, C), merge func(B, C) D) func(A) D {
 	return func(v A) D { return merge(op(v)) }
 }
 
 // predicates
-func predLT[N cmp.Ordered](n N) func(N) bool             { return func(value N) bool { return n < value } }
-func predEQ[N cmp.Ordered](n N) func(N) bool             { return func(value N) bool { return n == value } }
-func predGT[N cmp.Ordered](n N) func(N) bool             { return func(value N) bool { return n > value } }
-func predLTE[N cmp.Ordered](n N) func(N) bool            { return func(value N) bool { return n <= value } }
-func predGTE[N cmp.Ordered](n N) func(N) bool            { return func(value N) bool { return n >= value } }
+func predLT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return n < value } }
+func predEQ[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return n == value } }
+func predGT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return n > value } }
+func predLTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return n <= value } }
+func predGTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return n >= value } }
 
 func notf2[A, B any](op func(A, B) bool) func(A, B) bool { return mergethread(op, not) }
-func not(is bool) bool                         { return !is }
-func notf[T any](op func(T) bool) func(T) bool { return thread(op, not) }
+func not(is bool) bool                                   { return !is }
+func notf[T any](op func(T) bool) func(T) bool           { return thread(op, not) }
 
 func isNil[T any](in *T) bool                  { return in == nil }
 func isNilChan[T any](in chan T) bool          { return in == nil }

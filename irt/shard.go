@@ -10,7 +10,7 @@ func ShardByHash[T any](ctx context.Context, num int64, seq iter.Seq[T], getHash
 	shards := makeShards(getHash)
 	shards.init(num)
 
-	populate := sync.OnceFunc(func() {
+	populate := once(func() {
 		go func() {
 			defer shards.closeAll()
 
@@ -50,8 +50,7 @@ type shardSet[T any] struct {
 }
 
 func makeShards[T any](hashf func(T) int64) *shardSet[T] { return &shardSet[T]{hashf: hashf} }
-func with(mtx *sync.Mutex)                               { mtx.Unlock() }
-func (sh *shardSet[T]) lock() *sync.Mutex                { m := sh.mtx(); m.Lock(); return m }
+func (sh *shardSet[T]) lock() *sync.Mutex                { return lock(sh.mtx()) }
 func (sh *shardSet[T]) mtx() *sync.Mutex                 { return &sh.mutex }
 
 func (sh *shardSet[T]) init(size int64) {
