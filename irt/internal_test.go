@@ -148,13 +148,20 @@ func TestWrapHelper(t *testing.T) {
 		return "result"
 	}
 
-	wrapped := wrap[int](op)
+	wrapped := wrap(op, func(in string) int {
+		if in != "result" {
+			t.Fatalf("got %s", in)
+		}
+		return 52
+	})
 
-	result := wrapped(42)
+	result, num := wrapped()
 	if result != "result" {
 		t.Errorf("wrap(op)(42) = %v, want 'result'", result)
 	}
-
+	if num != 52 {
+		t.Errorf("wrap(op)(42) = %v, want '52'", result)
+	}
 	if callCount.Load() != 1 {
 		t.Errorf("wrapped function called %d times, want 1", callCount.Load())
 	}
@@ -414,7 +421,7 @@ func TestNtimesHelper(t *testing.T) {
 				return 42
 			}
 
-			fn := ntimes(op, tt.times)
+			fn := ntimes(tt.times, op)
 			var result []int
 
 			for {
@@ -458,7 +465,7 @@ func TestWithlimitHelper(t *testing.T) {
 						t.Errorf("withlimit(op, 0) should panic")
 					}
 				}()
-				withlimit(func() (int, bool) { return 0, false }, 0)
+				withlimit(0, func() (int, bool) { return 0, false })
 				return
 			}
 
@@ -472,7 +479,7 @@ func TestWithlimitHelper(t *testing.T) {
 				return val, true
 			}
 
-			fn := withlimit(op, tt.limit)
+			fn := withlimit(tt.limit, op)
 			var result []int
 
 			for {
