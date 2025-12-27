@@ -299,7 +299,7 @@ func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, block
 		current = next
 		return current.item, true
 	}
-	return irt.Generate(op)
+	return irt.GenerateOk(op)
 }
 
 // BlockingDistributor produces a BlockingDistributor instance with

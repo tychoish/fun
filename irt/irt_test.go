@@ -763,7 +763,7 @@ func TestGenerate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			seq := Generate(tt.gen)
+			seq := GenerateOk(tt.gen)
 			result := Collect(seq)
 			if !slices.Equal(result, tt.expected) {
 				t.Errorf("Generate() = %v, want %v", result, tt.expected)
@@ -810,7 +810,7 @@ func TestGenerate2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			seq := Generate2(tt.gen)
+			seq := GenerateOk2(tt.gen)
 			i := 0
 			for a, b := range seq {
 				if i >= len(tt.expected) {
@@ -886,7 +886,7 @@ func TestPerpetual(t *testing.T) {
 			return int(callCount.Add(1))
 		}
 
-		seq := Perpetual(op)
+		seq := Generate(op)
 		result := CollectFirstN(seq, 3)
 
 		expected := []int{1, 2, 3}
@@ -905,7 +905,7 @@ func TestPerpetual(t *testing.T) {
 			return callCount.Add(1)
 		}
 
-		for val := range Perpetual(op) {
+		for val := range Generate(op) {
 			if val <= previous {
 				t.Errorf("value %d shouldn't be less than previous %d", val, previous)
 			}
@@ -1403,6 +1403,88 @@ func TestChain(t *testing.T) {
 	}
 }
 
+func TestChainSlices(t *testing.T) {
+	tests := []struct {
+		name     string
+		seq      iter.Seq[[]int]
+		expected []int
+	}{
+		{
+			name:     "Empty",
+			seq:      func(yield func([]int) bool) {},
+			expected: []int{},
+		},
+		{
+			name: "EmptySlices",
+			seq: func(yield func([]int) bool) {
+				if !yield([]int{}) {
+					return
+				}
+				yield([]int{})
+			},
+			expected: []int{},
+		},
+		{
+			name: "NilSlices",
+			seq: func(yield func([]int) bool) {
+				if !yield(nil) {
+					return
+				}
+				yield(nil)
+			},
+			expected: []int{},
+		},
+		{
+			name: "MixedSlices",
+			seq: func(yield func([]int) bool) {
+				if !yield([]int{1, 2}) {
+					return
+				}
+				if !yield([]int{}) {
+					return
+				}
+				yield([]int{3})
+			},
+			expected: []int{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seq := ChainSlices(tt.seq)
+			result := Collect(seq)
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("ChainSlices() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		seq := func(yield func([]int) bool) {
+			callCount.Add(1)
+			if !yield([]int{1, 2}) {
+				return
+			}
+			callCount.Add(1)
+			yield([]int{3, 4})
+		}
+
+		chained := ChainSlices(seq)
+		count := 0
+		for range chained {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+
+		if callCount.Load() != 1 {
+			t.Errorf("Should stop after first slice, callCount = %d, want 1", callCount.Load())
+		}
+	})
+}
+
 func TestKeep(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1863,7 +1945,7 @@ func TestPerpetual2(t *testing.T) {
 		return "item" + string(rune('0'+count)), count
 	}
 
-	seq := Perpetual2(op)
+	seq := Generate2(op)
 	count := 0
 	for a, b := range seq {
 		count++
@@ -2490,6 +2572,63 @@ func TestFirstValue(t *testing.T) {
 	})
 }
 
+func TestFirstValue2(t *testing.T) {
+	t.Run("Smoke", func(t *testing.T) {
+		// Ensure the iterator is only iterated once and returns the first pair
+		iterated := 0
+		input := func(yield func(int, string) bool) {
+			pairs := []struct {
+				k int
+				v string
+			}{{10, "a"}, {20, "b"}, {30, "c"}}
+			for _, p := range pairs {
+				iterated++
+				if !yield(p.k, p.v) {
+					return
+				}
+			}
+		}
+
+		k, v, ok := FirstValue2(input)
+
+		if !ok {
+			t.Fatalf("FirstValue2() returned ok = false, want true")
+		}
+		if k != 10 || v != "a" {
+			t.Errorf("FirstValue2() = (%v, %v), want (10, a)", k, v)
+		}
+		if iterated != 1 {
+			t.Errorf("Iterator was iterated %d times, want 1", iterated)
+		}
+	})
+	t.Run("Empty", func(t *testing.T) {
+		k, v, ok := FirstValue2(func(yield func(string, float64) bool) {})
+		if ok {
+			t.Error("unexpected true ok for empty sequence")
+		}
+		if k != "" || v != 0.0 {
+			t.Errorf("unexpected values for empty sequence: (%v, %v)", k, v)
+		}
+	})
+	t.Run("Single", func(t *testing.T) {
+		k, v, ok := FirstValue2(Two("hello", 42))
+		if !ok {
+			t.Fatal("expected ok")
+		}
+		if k != "hello" || v != 42 {
+			t.Errorf("got (%v, %v), want (hello, 42)", k, v)
+		}
+	})
+	t.Run("Types", func(t *testing.T) {
+		type testStruct struct{ val int }
+		s := testStruct{val: 100}
+		k, v, ok := FirstValue2(Two(s, true))
+		if !ok || k.val != 100 || v != true {
+			t.Errorf("got (%v, %v, %v), want ({100}, true, true)", k, v, ok)
+		}
+	})
+}
+
 func TestHead(t *testing.T) {
 	input := Slice([]int{1, 2, 3, 4, 5})
 	output := Collect(Limit(input, 3))
@@ -2625,6 +2764,25 @@ func TestMonotonicFrom(t *testing.T) {
 		gen := Limit(MonotonicFrom(10), 3)
 		output := Collect(gen)
 		expected := []int{10, 11, 12}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Monotonic() with early return = %v, want %v", output, expected)
+		}
+	})
+}
+
+func TestMonotonic(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		gen := Limit(Monotonic(), 5)
+		output := Collect(gen)
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Monotonic() = %v, want %v", output, expected)
+		}
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		gen := Limit(Monotonic(), 3)
+		output := Collect(gen)
+		expected := []int{1, 2, 3}
 		if !slices.Equal(output, expected) {
 			t.Errorf("Monotonic() with early return = %v, want %v", output, expected)
 		}
@@ -2892,4 +3050,162 @@ func TestUntil2(t *testing.T) {
 			t.Errorf("Until2() with zero value = %v, want %v", output, expected)
 		}
 	})
+}
+
+func TestLimit(t *testing.T) {
+	t.Run("Positive", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		output := Collect(Limit(input, 3))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Limit() = %v, want %v", output, expected)
+		}
+	})
+	t.Run("Zero", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3})
+		output := Collect(Limit(input, 0))
+		if len(output) != 0 {
+			t.Errorf("Limit(0) produced %d items", len(output))
+		}
+	})
+	t.Run("Negative", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3})
+		output := Collect(Limit(input, -1))
+		if len(output) != 0 {
+			t.Errorf("Limit(-1) produced %d items", len(output))
+		}
+	})
+	t.Run("MoreThanAvailable", func(t *testing.T) {
+		input := Slice([]int{1, 2})
+		output := Collect(Limit(input, 5))
+		expected := []int{1, 2}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Limit() = %v, want %v", output, expected)
+		}
+	})
+}
+
+func TestLimit2(t *testing.T) {
+	t.Run("Positive", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		output := Collect2(Limit2(input, 2))
+		if len(output) != 2 {
+			t.Errorf("Limit2(2) produced %d items, want 2", len(output))
+		}
+	})
+	t.Run("Zero", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1})
+		output := Collect2(Limit2(input, 0))
+		if len(output) != 0 {
+			t.Errorf("Limit2(0) produced %d items", len(output))
+		}
+	})
+}
+
+func TestConvert2(t *testing.T) {
+	input := Map(map[string]int{"a": 1, "b": 2})
+	output := Collect2(Convert2(input, func(k string, v int) (string, int) {
+		return k + "!", v * 10
+	}))
+	expected := map[string]int{"a!": 10, "b!": 20}
+	if !maps.Equal(output, expected) {
+		t.Errorf("Convert2() = %v, want %v", output, expected)
+	}
+}
+
+func TestMerge(t *testing.T) {
+	input := Map(map[string]int{"a": 1, "b": 2})
+	output := Collect(Merge(input, func(k string, v int) string {
+		return fmt.Sprintf("%s:%d", k, v)
+	}))
+	slices.Sort(output)
+	expected := []string{"a:1", "b:2"}
+	if !slices.Equal(output, expected) {
+		t.Errorf("Merge() = %v, want %v", output, expected)
+	}
+}
+
+func TestRemoveZeros(t *testing.T) {
+	tests := []struct {
+		name     string
+		seq      iter.Seq[int]
+		expected []int
+	}{
+		{
+			name:     "Empty",
+			seq:      Args[int](),
+			expected: []int{},
+		},
+		{
+			name:     "NoZeros",
+			seq:      Args(1, 2, 3),
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "WithZeros",
+			seq:      Args(1, 0, 2, 0, 3),
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "AllZeros",
+			seq:      Args(0, 0, 0),
+			expected: []int{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(RemoveZeros(tt.seq))
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("RemoveZeros() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRemoveErrors(t *testing.T) {
+	err := errors.New("error")
+	tests := []struct {
+		name     string
+		seq      iter.Seq2[int, error]
+		expected []int
+	}{
+		{
+			name:     "Empty",
+			seq:      func(yield func(int, error) bool) {},
+			expected: []int{},
+		},
+		{
+			name: "NoErrors",
+			seq: func(yield func(int, error) bool) {
+				yield(1, nil)
+				yield(2, nil)
+			},
+			expected: []int{1, 2},
+		},
+		{
+			name: "WithErrors",
+			seq: func(yield func(int, error) bool) {
+				yield(1, nil)
+				yield(2, err)
+				yield(3, nil)
+			},
+			expected: []int{1, 3},
+		},
+		{
+			name: "AllErrors",
+			seq: func(yield func(int, error) bool) {
+				yield(1, err)
+				yield(2, err)
+			},
+			expected: []int{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(RemoveErrors(tt.seq))
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("RemoveErrors() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
 }

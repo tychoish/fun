@@ -420,7 +420,7 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 			return next.item, ok
 		}
 	}
-	return irt.Generate(op)
+	return irt.GenerateOk(op)
 }
 
 func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {

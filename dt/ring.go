@@ -131,7 +131,7 @@ func (r *Ring[T]) LIFO() iter.Seq[T] { r.init(); return r.iterate(r.before(r.pos
 // PopFIFO returns a FIFO stream that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
 // through all elements. The stream is exhusted when the buffer is empty.
-func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Perpetual(r.Pop)) }
+func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Generate(r.Pop)) }
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) iter.Seq[T] {
 	var current int

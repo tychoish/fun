@@ -56,11 +56,10 @@ func Two[A, B any](a A, b B) iter.Seq2[A, B]              { return func(yield fu
 func Map[K comparable, V any](mp map[K]V) iter.Seq2[K, V] { return maps.All(mp) }
 func Slice[T any](sl []T) iter.Seq[T]                     { return slices.Values(sl) }
 func Args[T any](items ...T) iter.Seq[T]                  { return Slice(items) }
-
 func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] {
 	return Flip(With(seq, dropInput[T](counterFrom(-1))))
 }
-func JoinErrors(seq iter.Seq[error]) error { return errors.Join(slices.Collect(seq)...) }
+func JoinErrors(seq iter.Seq[error]) error { return errors.Join(Collect(seq)...) }
 
 func Flip[A, B any](seq iter.Seq2[A, B]) iter.Seq2[B, A] { return Convert2(seq, flip) }
 func First[A, B any](seq iter.Seq2[A, B]) iter.Seq[A]    { return Merge(seq, first) }
@@ -113,7 +112,37 @@ func PtrsWithNils[T comparable](seq iter.Seq[T]) iter.Seq[*T] { return Convert(s
 func Deref[T any](seq iter.Seq[*T]) iter.Seq[T]               { return Convert(RemoveNils(seq), derefz) }
 func DerefWithZeros[T any](seq iter.Seq[*T]) iter.Seq[T]      { return Convert(seq, derefz) }
 
-func Generate[T any](gen func() (T, bool)) iter.Seq[T] {
+func Convert[A, B any](seq iter.Seq[A], op func(A) B) iter.Seq[B] {
+	return func(yield func(B) bool) {
+		for value := range seq {
+			if !yield(op(value)) {
+				return
+			}
+		}
+	}
+}
+
+func Convert2[A, B, C, D any](seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Seq2[C, D] {
+	return func(yield func(C, D) bool) {
+		for key, value := range seq {
+			if !yield(op(key, value)) {
+				return
+			}
+		}
+	}
+}
+
+func Merge[A, B, C any](seq iter.Seq2[A, B], op func(A, B) C) iter.Seq[C] {
+	return func(yield func(C) bool) {
+		for key, value := range seq {
+			if !yield(op(key, value)) {
+				return
+			}
+		}
+	}
+}
+
+func GenerateOk[T any](gen func() (T, bool)) iter.Seq[T] {
 	// TODO(perf): compare with..
 	//    GenerateWhile2(gen, isOk)
 
@@ -124,7 +153,7 @@ func Generate[T any](gen func() (T, bool)) iter.Seq[T] {
 	}
 }
 
-func Generate2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
+func GenerateOk2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for first, second, ok := gen(); ok && yield(first, second); first, second, ok = gen() {
 			continue
@@ -133,11 +162,11 @@ func Generate2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
 }
 
 func GenerateWhile[T any](op func() T, while func(T) bool) iter.Seq[T] {
-	return While(Perpetual(op), while)
+	return While(Generate(op), while)
 }
 
 func GenerateWhile2[A, B any](op func() (A, B), while func(A, B) bool) iter.Seq2[A, B] {
-	return While2(Perpetual2(op), while)
+	return While2(Generate2(op), while)
 }
 
 func GenerateN[T any](num int, op func() T) iter.Seq[T] {
@@ -148,11 +177,11 @@ func GenerateN[T any](num int, op func() T) iter.Seq[T] {
 	}
 }
 
-func Monotonic() iter.Seq[int]               { return Perpetual(counter()) }
-func MonotonicFrom(start int) iter.Seq[int]  { return Perpetual(counterFrom(start - 1)) }
+func Monotonic() iter.Seq[int]               { return Generate(counter()) }
+func MonotonicFrom(start int) iter.Seq[int]  { return Generate(counterFrom(start - 1)) }
 func Range(start int, end int) iter.Seq[int] { return While(MonotonicFrom(start), predLTE(end)) }
 
-func Perpetual[T any](op func() T) iter.Seq[T] {
+func Generate[T any](op func() T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for yield(op()) {
 			continue
@@ -160,7 +189,7 @@ func Perpetual[T any](op func() T) iter.Seq[T] {
 	}
 }
 
-func Perpetual2[A, B any](op func() (A, B)) iter.Seq2[A, B] {
+func Generate2[A, B any](op func() (A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for yield(op()) {
 			continue
@@ -188,30 +217,10 @@ func With2[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[B, C] {
 	}
 }
 
-func Convert[A, B any](seq iter.Seq[A], op func(A) B) iter.Seq[B] {
-	return func(yield func(B) bool) {
+func GenerateWith[A, B any](seq iter.Seq[A], op func() B) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
 		for value := range seq {
-			if !yield(op(value)) {
-				return
-			}
-		}
-	}
-}
-
-func Convert2[A, B, C, D any](seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Seq2[C, D] {
-	return func(yield func(C, D) bool) {
-		for key, value := range seq {
-			if !yield(op(key, value)) {
-				return
-			}
-		}
-	}
-}
-
-func Merge[A, B, C any](seq iter.Seq2[A, B], op func(A, B) C) iter.Seq[C] {
-	return func(yield func(C) bool) {
-		for key, value := range seq {
-			if !yield(op(key, value)) {
+			if !yield(value, op()) {
 				return
 			}
 		}
@@ -248,8 +257,12 @@ func ApplyUntil[T any](seq iter.Seq[T], op func(T) error) error {
 func ApplyUnless[T any](seq iter.Seq[T], op func(T) bool) int { return ApplyWhile(seq, notf(op)) }
 func ApplyAll[T any](seq iter.Seq[T], op func(T) error) error { return JoinErrors(Convert(seq, op)) }
 
+func ApplyAll2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
+	return JoinErrors(Merge(seq, op))
+}
+
 func Apply2[A, B any](seq iter.Seq2[A, B], op func(A, B)) (count int) {
-	// TODO(perf): check performance against:
+	// TODO(perf): check performance against:2
 	//    return Apply(Elems(seq), elemApply(op))
 
 	for key, value := range seq {
@@ -280,10 +293,6 @@ func ApplyUntil2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
 		}
 	}
 	return nil
-}
-
-func ApplyAll2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
-	return JoinErrors(Merge(seq, op))
 }
 
 func Channel[T any](ctx context.Context, ch <-chan T) iter.Seq[T] {
@@ -346,7 +355,7 @@ func Chain[T any](seq iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T]           { return Chain(Convert(seq, Slice)) }
 func RemoveNils[T any](seq iter.Seq[*T]) iter.Seq[*T]            { return Remove(seq, isNil) }
 func RemoveZeros[T comparable](seq iter.Seq[T]) iter.Seq[T]      { return Remove(seq, isZero) }
-func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return KeepOk(Convert2(seq, checkErr)) }
+func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return First(Remove2(seq, isError2)) }
 func KeepOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]           { return First(Keep2(seq, isOk)) }
 func WhileOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]          { return First(While2(seq, isOk)) }
 func WhileSuccess[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return First(While2(seq, isSuccess2)) }
@@ -405,7 +414,7 @@ func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 }
 
 func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
-	return Generate(ntimes(num, curry2(Channel, ctx, Pipe(ctx, seq))))
+	return GenerateOk(ntimes(num, curry2(Channel, ctx, Pipe(ctx, seq))))
 }
 
 func WithHooks[T any](seq iter.Seq[T], before func(), after func()) iter.Seq[T] {
