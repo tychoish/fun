@@ -57,8 +57,10 @@ func Map[K comparable, V any](mp map[K]V) iter.Seq2[K, V] { return maps.All(mp) 
 func Slice[T any](sl []T) iter.Seq[T]                     { return slices.Values(sl) }
 func Args[T any](items ...T) iter.Seq[T]                  { return Slice(items) }
 
-func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] { return Flip(With(seq, dropInput[T](counter()))) }
-func JoinErrors(seq iter.Seq[error]) error           { return errors.Join(slices.Collect(seq)...) }
+func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] {
+	return Flip(With(seq, dropInput[T](counterFrom(-1))))
+}
+func JoinErrors(seq iter.Seq[error]) error { return errors.Join(slices.Collect(seq)...) }
 
 func Flip[A, B any](seq iter.Seq2[A, B]) iter.Seq2[B, A] { return Convert2(seq, flip) }
 func First[A, B any](seq iter.Seq2[A, B]) iter.Seq[A]    { return Merge(seq, first) }
@@ -68,14 +70,38 @@ func FirstValue[T any](seq iter.Seq[T]) (zero T, ok bool) {
 	for value := range seq {
 		return value, true
 	}
-	return zero, ok
+	return
 }
 
-func Head[T any](seq iter.Seq[T], n int) iter.Seq[T] {
+func FirstValue2[A, B any](seq iter.Seq2[A, B]) (azero A, bzero B, ok bool) {
+	for k, v := range seq {
+		return k, v, true
+	}
+	return
+}
+
+func Limit[T any](seq iter.Seq[T], n int) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if n <= 0 {
+			return
+		}
 		inc := counter()
 		for elem := range seq {
 			if !yield(elem) || inc() >= n {
+				return
+			}
+		}
+	}
+}
+
+func Limit2[A, B any](seq iter.Seq2[A, B], n int) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		if n <= 0 {
+			return
+		}
+		inc := counter()
+		for k, v := range seq {
+			if !yield(k, v) || inc() >= n {
 				return
 			}
 		}
@@ -106,9 +132,6 @@ func Generate2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
 	}
 }
 
-func counterLT(n int) func() bool  { inc := counter(); return func() bool { return n < inc() } }
-func counterLTE(n int) func() bool { inc := counter(); return func() bool { return n <= inc() } }
-
 func GenerateWhile[T any](op func() T, while func(T) bool) iter.Seq[T] {
 	return While(Perpetual(op), while)
 }
@@ -118,7 +141,11 @@ func GenerateWhile2[A, B any](op func() (A, B), while func(A, B) bool) iter.Seq2
 }
 
 func GenerateN[T any](num int, op func() T) iter.Seq[T] {
-	return GenerateWhile(op, dropInput[T](counterLT(num)))
+	return func(yield func(T) bool) {
+		for i := 0; i < num && yield(op()); i++ {
+			continue
+		}
+	}
 }
 
 func Monotonic() iter.Seq[int]               { return Perpetual(counter()) }
@@ -255,18 +282,12 @@ func ApplyUntil2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
 	return nil
 }
 
-func ApplyAll12[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
+func ApplyAll2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
 	return JoinErrors(Merge(seq, op))
 }
 
 func Channel[T any](ctx context.Context, ch <-chan T) iter.Seq[T] {
 	return func(yield func(T) bool) { loopWhile(func() bool { return recvAndYield(ctx, ch, yield) }) }
-}
-
-func loopWhile(op func() bool) {
-	for op() {
-		continue
-	}
 }
 
 func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
@@ -322,15 +343,13 @@ func Chain[T any](seq iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 		}
 	}
 }
-func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T]        { return Chain(Convert(seq, Slice)) }
-func RemoveNils[T any](seq iter.Seq[*T]) iter.Seq[*T]         { return Remove(seq, isNil) }
-func RemoveZeros[T comparable](seq iter.Seq[T]) iter.Seq[T]   { return Remove(seq, isZero) }
-func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T] { return KeepOk(Convert2(seq, checkErr)) }
-func KeepOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]        { return First(Keep2(seq, isOk)) }
-func WhileOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]       { return First(While2(seq, isOk)) }
-func WhileSuccess[T any](seq iter.Seq2[T, error]) iter.Seq[T] {
-	return First(While2(seq, isSuccess2))
-}
+func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T]           { return Chain(Convert(seq, Slice)) }
+func RemoveNils[T any](seq iter.Seq[*T]) iter.Seq[*T]            { return Remove(seq, isNil) }
+func RemoveZeros[T comparable](seq iter.Seq[T]) iter.Seq[T]      { return Remove(seq, isZero) }
+func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return KeepOk(Convert2(seq, checkErr)) }
+func KeepOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]           { return First(Keep2(seq, isOk)) }
+func WhileOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T]          { return First(While2(seq, isOk)) }
+func WhileSuccess[T any](seq iter.Seq2[T, error]) iter.Seq[T]    { return First(While2(seq, isSuccess2)) }
 func UntilNil[T any](seq iter.Seq[*T]) iter.Seq[T]               { return Deref(Until(seq, isNil)) }
 func UntilError[T any](seq iter.Seq2[T, error]) iter.Seq[T]      { return First(Until2(seq, isError2)) }
 func Until[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return While(seq, notf(prd)) }
@@ -505,10 +524,23 @@ func oncev[T any](op func() T) func() T                        { return sync.Onc
 func oncevs[A, B any](op func() (A, B)) func() (A, B)          { return sync.OnceValues(op) }
 func with(mtx *sync.Mutex)                                     { mtx.Unlock() }
 func lock(mtx *sync.Mutex) *sync.Mutex                         { mtx.Lock(); return mtx }
+func withRW(mtx *sync.RWMutex)                                 { mtx.Unlock() }
+func lockRW(mtx *sync.RWMutex) *sync.RWMutex                   { mtx.Lock(); return mtx }
+func withRR(mtx *sync.RWMutex)                                 { mtx.RUnlock() }
+func lockRR(mtx *sync.RWMutex) *sync.RWMutex                   { mtx.RLock(); return mtx }
+
+func loopWhile(op func() bool) {
+	for op() {
+		continue
+	}
+}
 
 // statefull function utilities
 
-func counter() func() int                              { return counterFrom(-1) }
+func counterLT(n int) func() bool  { inc := counter(); return func() bool { return inc() < n } }
+func counterLTE(n int) func() bool { inc := counter(); return func() bool { return inc() <= n } }
+
+func counter() func() int                              { return counterFrom(0) }
 func counterFrom(next int) func() int                  { return func() int { next++; return next } }
 func seen[T comparable]() func(T) bool                 { s := set[T]{}; return s.add }
 func equal[T comparable](lh, rh T) bool                { return lh == rh }
@@ -562,11 +594,11 @@ func zipthread[A, B, C, D any](op func(A) (B, C), merge func(B, C) D) func(A) D 
 }
 
 // predicates
-func predLT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return n < value } }
-func predEQ[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return n == value } }
-func predGT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return n > value } }
-func predLTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return n <= value } }
-func predGTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return n >= value } }
+func predLT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return value < n } }
+func predGT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return value > n } }
+func predEQ[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return value == n } }
+func predLTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return value <= n } }
+func predGTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return value >= n } }
 
 func notf2[A, B any](op func(A, B) bool) func(A, B) bool { return mergethread(op, not) }
 func not(is bool) bool                                   { return !is }

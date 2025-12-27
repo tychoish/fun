@@ -4,6 +4,7 @@ import (
 	"context"
 	"iter"
 	"sync"
+	"time"
 )
 
 func ShardByHash[T any](ctx context.Context, num int64, seq iter.Seq[T], getHash func(T) int64) iter.Seq[iter.Seq[T]] {
@@ -13,26 +14,29 @@ func ShardByHash[T any](ctx context.Context, num int64, seq iter.Seq[T], getHash
 	populate := once(func() {
 		go func() {
 			defer shards.closeAll()
-
+			timer := time.NewTimer(0)
+			defer timer.Stop()
 		NEXT:
 			for value := range seq {
+			RETRY:
 				for ch := range shards.getShardsFrom(getHash(value)) {
+					timer.Reset(20 * time.Millisecond)
 					select {
 					case <-ctx.Done():
 						return
 					case ch <- value:
 						continue NEXT
+					case <-timer.C:
+						continue RETRY
 					}
 				}
 			}
-			return
 		}()
 	})
 
 	return Merge(Index(shards.iterator()), func(shardID int, ch chan T) iter.Seq[T] {
 		populate()
 		return func(yield func(T) bool) {
-			defer shards.clean()
 			defer shards.closeIdx(shardID)
 
 			for recvAndYield(ctx, ch, yield) {
@@ -43,43 +47,53 @@ func ShardByHash[T any](ctx context.Context, num int64, seq iter.Seq[T], getHash
 }
 
 type shardSet[T any] struct {
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	chans []chan T
+	start int64
 	count int64
 	hashf func(T) int64
 }
 
 func makeShards[T any](hashf func(T) int64) *shardSet[T] { return &shardSet[T]{hashf: hashf} }
-func (sh *shardSet[T]) lock() *sync.Mutex                { return lock(sh.mtx()) }
-func (sh *shardSet[T]) mtx() *sync.Mutex                 { return &sh.mutex }
-
-func (sh *shardSet[T]) init(size int64) {
-	defer with(sh.lock())
-	sh.count = size
-	sh.chans = Collect(WhileOk(Perpetual2(ntimes(int(size), sh.makeCh))))
+func (sh *shardSet[T]) lockRW() *sync.RWMutex            { return lockRW(sh.mtx()) }
+func (sh *shardSet[T]) lockRR() *sync.RWMutex            { return lockRR(sh.mtx()) }
+func (sh *shardSet[T]) mtx() *sync.RWMutex               { return &sh.mutex }
+func (sh *shardSet[T]) getChans(size int) []chan T {
+	return Collect(WhileOk(Perpetual2(ntimes(size, sh.makeCh))))
 }
 
-func (*shardSet[T]) makeCh() chan T                  { return make(chan T) }
-func (*shardSet[T]) closeCh(in chan T)               { close(in) }
-func (sh *shardSet[T]) closeIdx(idx int)             { defer with(sh.lock()); close(sh.chans[idx]) }
-func (sh *shardSet[T]) withLock(op func() bool) bool { defer with(sh.lock()); return op() }
-func (sh *shardSet[T]) clean()                       { defer with(sh.lock()); sh.chans, sh.count = sh.compact(), sh.len() }
-func (sh *shardSet[T]) closeAll()                    { defer with(sh.lock()); Apply(sh.iterator(), sh.closeCh) }
-func (sh *shardSet[T]) iterator() iter.Seq[chan T]   { return Remove(Slice(sh.chans), isNilChan) }
-func (sh *shardSet[T]) compact() []chan T            { return Collect(sh.iterator(), 0, int(sh.count)) }
-func (sh *shardSet[T]) len() int64                   { return int64(len(sh.chans)) }
-func (sh *shardSet[T]) atIndex(index int64) chan T   { return sh.chans[index] }
+func (sh *shardSet[T]) init(size int64) {
+	sh.count, sh.start = size, size
+	sh.chans = sh.getChans(int(size))
+}
+
+func (*shardSet[T]) makeCh() chan T         { return make(chan T) }
+func (*shardSet[T]) closeCh(in chan T)      { close(in) }
+func (sh *shardSet[T]) get(idx int) chan T  { return sh.chans[idx] }
+func (sh *shardSet[T]) nonNil(idx int) bool { return sh.chans[idx] == nil }
+func (sh *shardSet[T]) unset(idx int)       { sh.count--; sh.chans[idx] = nil }
+func (sh *shardSet[T]) doClose(idx int)     { sh.closeCh(sh.get(idx)); sh.unset(idx) }
+
+func (sh *shardSet[T]) closeIdx(idx int) {
+	defer withRW(sh.lockRW())
+	whencall(sh.nonNil(idx), sh.doClose, idx)
+}
+
+func (sh *shardSet[T]) withRLock(op func() bool) bool { defer withRR(sh.lockRR()); return op() }
+func (sh *shardSet[T]) closeAll()                     { defer withRW(sh.lockRW()); Apply(sh.iterator(), sh.closeCh) }
+func (sh *shardSet[T]) iterator() iter.Seq[chan T]    { return Remove(Slice(sh.chans), isNilChan) }
+func (sh *shardSet[T]) len() int64                    { return int64(len(sh.chans)) }
+func (sh *shardSet[T]) atIndex(index int64) chan T    { return sh.chans[index] }
 
 func (sh *shardSet[T]) getShardsFrom(index int64) iter.Seq[chan T] {
 	return func(yield func(chan T) bool) {
-		for idx, ct := index%sh.count, int64(0); ct < sh.count; idx, ct = idx+1%sh.count, ct+1 {
-			if sh.withLock(func() bool {
-				if sh := sh.atIndex(idx); sh == nil {
+		for idx, ct := index%sh.count, int64(0); ct < sh.count && idx < sh.len(); idx, ct = idx+1%sh.count, ct+1 {
+			if sh.withRLock(func() bool {
+				if ch := sh.atIndex(idx); ch == nil {
 					return false
 				} else {
-					yield(sh)
+					return !yield(ch)
 				}
-				return true
 			}) {
 				return
 			}

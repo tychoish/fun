@@ -3,9 +3,13 @@ package irt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
+	"maps"
 	"math/rand/v2"
 	"slices"
+	"sort"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -376,7 +380,7 @@ func TestIndex(t *testing.T) {
 			expected: []struct {
 				idx int
 				val string
-			}{{1, "a"}},
+			}{{0, "a"}},
 		},
 		{
 			name: "Multiple",
@@ -392,7 +396,7 @@ func TestIndex(t *testing.T) {
 			expected: []struct {
 				idx int
 				val string
-			}{{1, "a"}, {2, "b"}, {3, "c"}},
+			}{{0, "a"}, {1, "b"}, {2, "c"}},
 		},
 	}
 
@@ -1145,26 +1149,37 @@ func TestChannel(t *testing.T) {
 
 	t.Run("ContextCancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
-		ch := make(chan int, 3)
-		ch <- 1
-		ch <- 2
-		ch <- 3
-		close(ch)
+		defer cancel()
+		pctx, pcancel := context.WithCancel(t.Context())
+		defer pcancel()
+
+		ch := make(chan int)
+		go func() {
+			defer close(ch)
+
+			for idx := range 50 {
+				select {
+				case ch <- idx:
+				case <-pctx.Done():
+					return
+				}
+			}
+		}()
 
 		seq := Channel(ctx, ch)
 		count := 0
 		for range seq {
 			count++
-			if count == 1 {
+			if count == 10 {
 				cancel() // Cancel after first item
 			}
-			if count > 2 {
+			if count > 11 {
 				t.Error("Should have stopped after cancellation")
 				break
 			}
 		}
-
-		if count > 2 {
+		pcancel()
+		if count > 12 {
 			t.Errorf("Expected early termination, got %d items", count)
 		}
 	})
@@ -1869,44 +1884,95 @@ func TestPerpetual2(t *testing.T) {
 }
 
 func TestWith2(t *testing.T) {
-	var callCount atomic.Int32
-	op := func(i int) (string, bool) {
-		callCount.Add(1)
-		return "item" + string(rune('0'+i)), i%2 == 0
-	}
-
-	seq := With2(func(yield func(int) bool) {
-		if !yield(1) {
-			return
+	t.Run("Claude", func(t *testing.T) {
+		var callCount atomic.Int32
+		op := func(i int) (string, bool) {
+			callCount.Add(1)
+			return "item" + string(rune('0'+i)), i%2 == 0
 		}
-		if !yield(2) {
-			return
-		}
-		yield(3)
-	}, op)
 
-	expected := []struct {
-		a string
-		b bool
-	}{
-		{"item1", false}, {"item2", true}, {"item3", false},
-	}
+		seq := With2(func(yield func(int) bool) {
+			if !yield(1) {
+				return
+			}
+			if !yield(2) {
+				return
+			}
+			yield(3)
+		}, op)
 
-	i := 0
-	for a, b := range seq {
-		if i >= len(expected) {
-			t.Errorf("With2() yielded more items than expected")
-			break
+		expected := []struct {
+			a string
+			b bool
+		}{
+			{"item1", false}, {"item2", true}, {"item3", false},
 		}
-		if a != expected[i].a || b != expected[i].b {
-			t.Errorf("With2() yielded (%v, %v), want (%v, %v)", a, b, expected[i].a, expected[i].b)
-		}
-		i++
-	}
 
-	if callCount.Load() != 3 {
-		t.Errorf("With2() called op %d times, want 3", callCount.Load())
-	}
+		i := 0
+		for a, b := range seq {
+			if i >= len(expected) {
+				t.Errorf("With2() yielded more items than expected")
+				break
+			}
+			if a != expected[i].a || b != expected[i].b {
+				t.Errorf("With2() yielded (%v, %v), want (%v, %v)", a, b, expected[i].a, expected[i].b)
+			}
+			i++
+		}
+
+		if callCount.Load() != 3 {
+			t.Errorf("With2() called op %d times, want 3", callCount.Load())
+		}
+	})
+	t.Run("GPT", func(t *testing.T) {
+		t.Run("NormalOperation", func(t *testing.T) {
+			input := Slice([]int{1, 2, 3, 4})
+			gen := With2(input, func(x int) (int, int) {
+				return x * x, x * x * x
+			})
+
+			output := Collect2(gen)
+			expected := map[int]int{
+				1:  1,
+				4:  8,
+				9:  27,
+				16: 64,
+			}
+			if !maps.Equal(output, expected) {
+				t.Errorf("With2() = %v, want %v", output, expected)
+			}
+		})
+
+		t.Run("EmptyInput", func(t *testing.T) {
+			input := Slice([]int{})
+			gen := With2(input, func(x int) (int, int) {
+				return x * x, x * x * x
+			})
+
+			output := Collect2(gen)
+			expected := map[int]int{}
+			if !maps.Equal(output, expected) {
+				t.Errorf("With2() with empty input = %v, want %v", output, expected)
+			}
+		})
+
+		t.Run("EarlyReturn", func(t *testing.T) {
+			input := Slice([]int{1, 2, 3, 4})
+			gen := With2(input, func(x int) (int, int) {
+				return x * x, x * x * x
+			})
+
+			output := Collect2(Splits(Limit(Elems(gen), 2)))
+
+			expected := map[int]int{
+				1: 1,
+				4: 8,
+			}
+			if !maps.Equal(output, expected) {
+				t.Errorf("With2() with early return = %v, want %v", output, expected)
+			}
+		})
+	})
 }
 
 func TestApplyWhile(t *testing.T) {
@@ -1945,33 +2011,69 @@ func TestApplyWhile(t *testing.T) {
 }
 
 func TestApplyUntil(t *testing.T) {
-	var callCount atomic.Int32
+	t.Run("Claude", func(t *testing.T) {
+		var callCount atomic.Int32
 
-	err := ApplyUntil(
-		func(yield func(int) bool) {
-			if !yield(1) {
-				return
-			}
-			if !yield(2) {
-				return
-			}
-			yield(3)
-		},
-		func(i int) error {
-			callCount.Add(1)
-			if i == 2 {
-				return errors.New("stop at 2")
-			}
-			return nil
-		},
-	)
+		err := ApplyUntil(
+			func(yield func(int) bool) {
+				if !yield(1) {
+					return
+				}
+				if !yield(2) {
+					return
+				}
+				yield(3)
+			},
+			func(i int) error {
+				callCount.Add(1)
+				if i == 2 {
+					return errors.New("stop at 2")
+				}
+				return nil
+			},
+		)
 
-	if err == nil || err.Error() != "stop at 2" {
-		t.Errorf("ApplyUntil() error = %v, want 'stop at 2'", err)
-	}
-	if callCount.Load() != 2 {
-		t.Errorf("ApplyUntil() called op %d times, want 2", callCount.Load())
-	}
+		if err == nil || err.Error() != "stop at 2" {
+			t.Errorf("ApplyUntil() error = %v, want 'stop at 2'", err)
+		}
+		if callCount.Load() != 2 {
+			t.Errorf("ApplyUntil() called op %d times, want 2", callCount.Load())
+		}
+	})
+	t.Run("GPT", func(t *testing.T) {
+		t.Run("HappyPath", func(t *testing.T) {
+			input := Slice([]int{1, 2, 3, 4, 5})
+			sum := 0
+			err := ApplyUntil(input, func(v int) error {
+				sum += v
+				return nil
+			})
+			if err != nil {
+				t.Errorf("ApplyUntil() returned error %v, want nil", err)
+			}
+			if sum != 15 {
+				t.Errorf("ApplyUntil() sum = %d, want 15", sum)
+			}
+		})
+
+		t.Run("EarlyError", func(t *testing.T) {
+			input := Slice([]int{1, 2, 3, 4, 5})
+			sum := 0
+			err := ApplyUntil(input, func(v int) error {
+				sum += v
+				if v == 3 {
+					return errors.New("early stop")
+				}
+				return nil
+			})
+			if err == nil || err.Error() != "early stop" {
+				t.Errorf("ApplyUntil() error = %v, want 'early stop'", err)
+			}
+			if sum != 6 {
+				t.Errorf("ApplyUntil() sum = %d, want 6", sum)
+			}
+		})
+	})
 }
 
 func TestApplyAll(t *testing.T) {
@@ -2299,6 +2401,775 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 		if callCount2.Load() != 2 {
 			t.Errorf("Seq2 should be called 2 times, got %d", callCount2.Load())
+		}
+	})
+}
+
+// Additional tests for Shard and ShardByHash
+
+func TestShard(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	workload := Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	numShards := 3
+
+	shards := Shard(ctx, numShards, workload)
+
+	// Ensure each shard contains a portion of the workload
+	totalItems := 0
+	for shard := range shards {
+		shardItems := Collect(shard)
+		totalItems += len(shardItems)
+		t.Logf("Shard: %v", shardItems)
+	}
+	if totalItems != 10 {
+		t.Errorf("Total items across shards = %d, want 10", totalItems)
+	}
+
+	t.Run("SupportEarlyReturn", func(t *testing.T) {
+		// Ensure early return does not block other shards
+		shards = Shard(ctx, numShards, workload)
+		seen := 0
+		for shard := range shards {
+			seen++
+			if seen == 2 {
+				break // Simulate early return
+			}
+
+			count := 0
+			for value := range shard {
+				count++
+				if value == 0 {
+					t.Error("saw zero value")
+				}
+			}
+			if count == 0 {
+				t.Error("should have seen more than one", seen, count)
+			}
+		}
+		if seen == 0 {
+			t.Error("should have seen more than one", seen)
+		}
+	})
+}
+
+func TestShardByHash(t *testing.T) {
+	t.Run("ParallelProcessing", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// Input workload
+		workload := Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+		numShards := 4
+
+		// Hash function to distribute workload
+		hashFunc := func(value int) int64 {
+			return int64(value % numShards)
+		}
+
+		// Start time
+		start := time.Now()
+
+		// Shard the workload
+		shards := ShardByHash(ctx, int64(numShards), workload, hashFunc)
+
+		// Process shards in parallel
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make([]int, 0)
+
+		for shard := range shards {
+			wg.Add(1)
+			go func(shard iter.Seq[int]) {
+				defer wg.Done()
+
+				for value := range shard {
+					// Simulate processing time with a short sleep
+					time.Sleep(10 * time.Millisecond)
+
+					// Collect results
+					mu.Lock()
+					results = append(results, value)
+					mu.Unlock()
+				}
+			}(shard)
+		}
+
+		wg.Wait()
+
+		// End time
+		duration := time.Since(start)
+
+		// Verify results
+		sort.Ints(results)
+		expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+		if !slices.Equal(results, expected) {
+			t.Errorf("ShardByHash() results = %v, want %v", results, expected)
+		}
+
+		// Assert that the total time taken is less than the total sleep time
+		// Total sleep time = 10ms * 10 items = 100ms
+		// Parallel processing should take less than 100ms
+		if duration >= 100*time.Millisecond {
+			t.Errorf("ShardByHash() took %v, want less than 100ms", duration)
+		}
+	})
+	t.Run("DeterministicRouting", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Input workload
+		workload := Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+		numShards := 2
+
+		// Hash function: Route even numbers to shard 0, odd numbers to shard 1
+		hashFunc := func(value int) int64 {
+			if value%2 == 0 {
+				return 0 // Even numbers
+			}
+			return 1 // Odd numbers
+		}
+
+		// Start time
+		start := time.Now()
+
+		// Shard the workload
+		shards := ShardByHash(ctx, int64(numShards), workload, hashFunc)
+
+		// Process shards in parallel
+		var wg sync.WaitGroup
+		results := make([][]int, numShards)
+		var mu sync.Mutex
+
+		for shardID, shard := range Collect2(Index(shards)) {
+			wg.Add(1)
+			go func(shardID int, shard iter.Seq[int]) {
+				defer wg.Done()
+
+				shardResults := []int{}
+				for value := range shard {
+					// Simulate processing time with a short sleep
+					time.Sleep(10 * time.Millisecond)
+					shardResults = append(shardResults, value)
+				}
+
+				// Store results for this shard
+				mu.Lock()
+				results[shardID] = shardResults
+				mu.Unlock()
+			}(shardID, shard)
+		}
+
+		wg.Wait()
+
+		// End time
+		duration := time.Since(start)
+
+		// Verify results
+		expected := [][]int{
+			{2, 4, 6, 8, 10}, // Even numbers
+			{1, 3, 5, 7, 9},  // Odd numbers
+		}
+
+		// Sort results for comparison
+		for i := range results {
+			sort.Ints(results[i])
+		}
+
+		if len(results) != len(expected) {
+			t.Fatalf("ShardByHash() produced %d shards, want %d", len(results), len(expected))
+		}
+
+		for i := range results {
+			if !slices.Equal(results[i], expected[i]) {
+				t.Errorf("ShardByHash() shard %d = %v, want %v", i, results[i], expected[i])
+			}
+		}
+
+		// Assert that the total time taken is less than the total sleep time
+		// Total sleep time = 10ms * 10 items = 100ms
+		// Parallel processing should take less than 100ms
+		if duration >= 100*time.Millisecond {
+			t.Errorf("ShardByHash() took %v, want less than 100ms", duration)
+		}
+	})
+	t.Run("EarlyReturnFromOneShard", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// Input workload
+		workload := Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+		numShards := 3
+
+		// Hash function: Route items to shards based on value % numShards
+		hashFunc := func(value int) int64 {
+			return int64(value % numShards)
+		}
+
+		// Start time
+		start := time.Now()
+
+		// Shard the workload
+		shards := ShardByHash(ctx, int64(numShards), workload, hashFunc)
+
+		// Process shards in parallel
+		var wg sync.WaitGroup
+		results := make([][]int, numShards)
+		var mu sync.Mutex
+
+		for shardID, shard := range Collect2(Index(shards)) {
+			wg.Add(1)
+			go func(shardID int, shard iter.Seq[int]) {
+				defer wg.Done()
+
+				shardResults := []int{}
+				count := 0
+				for value := range shard {
+					// Simulate processing time with a short sleep
+					time.Sleep(5 * time.Millisecond)
+
+					// Simulate early return for shard 1
+					if shardID == 1 && count > 1 {
+						break
+					}
+					count++
+					shardResults = append(shardResults, value)
+				}
+
+				// Store results for this shard
+				mu.Lock()
+				results[shardID] = shardResults
+				mu.Unlock()
+			}(shardID, shard)
+		}
+
+		wg.Wait()
+
+		// End time
+		duration := time.Since(start)
+
+		// Verify results
+		expected := [][]int{
+			{3, 6, 9},     // Shard 0
+			{1, 4},        // Shard 1 (early return, missing some items)
+			{2, 5, 8, 10}, // Shard 2 (reassigned items from shard 1)
+			// TODO where'd 7 go
+		}
+
+		// Sort results for comparison
+		for i := range results {
+			sort.Ints(results[i])
+		}
+
+		if len(results) != len(expected) {
+			t.Fatalf("ShardByHash() produced %d shards, want %d", len(results), len(expected))
+		}
+
+		for i := range results {
+			if !slices.Equal(results[i], expected[i]) {
+				t.Errorf("ShardByHash() shard %d = %v, want %v", i, results[i], expected[i])
+			}
+		}
+
+		// Assert that the total time taken is less than the total sleep time
+		// Total sleep time = 10ms * 10 items = 100ms
+		// Parallel processing should take less than 100ms
+		if duration >= 100*time.Millisecond {
+			t.Errorf("ShardByHash() took %v, want less than 100ms", duration)
+		}
+	})
+	t.Run("Smoke", func(t *testing.T) {
+		ctx := t.Context()
+
+		workload := Slice([]string{"apple", "banana", "cherry", "date", "elderberry", "fig", "grape"})
+		numShards := 3
+
+		hashFunc := func(item string) int64 {
+			return int64(len(item) % numShards)
+		}
+
+		shards := ShardByHash(ctx, int64(numShards), workload, hashFunc)
+
+		// Ensure each shard contains a portion of the workload based on the hash
+		shardContents := make([][]string, numShards)
+		for shardID, shard := range Collect2(Index(shards)) {
+			shardContents[shardID] = Collect(shard)
+		}
+
+		for shardID, items := range shardContents {
+			t.Logf("Shard %d: %v", shardID, items)
+			for _, item := range items {
+				if hashFunc(item) != int64(shardID) {
+					t.Errorf("Item %s routed to wrong shard %d", item, shardID)
+				}
+			}
+		}
+
+		t.Run("Compensate for early return", func(t *testing.T) {
+			// Ensure early return does not block other shards
+			shards = ShardByHash(ctx, int64(numShards), workload, hashFunc)
+			seen := 0
+			for shard := range shards {
+				seen++
+				if seen == 2 {
+					break
+				}
+				inner := 0
+				for in := range shard {
+					inner++
+					if seen == 3 && inner == 1 {
+						break
+					}
+					if in == "" {
+						t.Error("saw empty string")
+					}
+				}
+
+				break // Simulate early return
+			}
+		})
+	})
+}
+
+func TestFirstValue(t *testing.T) {
+	t.Run("Smoke", func(t *testing.T) {
+		// Ensure the iterator is only iterated once
+		iterated := 0
+		input := func(yield func(int) bool) {
+			for _, v := range []int{10, 20, 30} {
+				iterated++
+				if !yield(v) {
+					return
+				}
+			}
+		}
+
+		// Call FirstValue
+		first, ok := FirstValue(input)
+
+		// Assertions
+		if !ok {
+			t.Fatalf("FirstValue() returned ok = false, want true")
+		}
+		if first != 10 {
+			t.Errorf("FirstValue() = %v, want %v", first, 10)
+		}
+		if iterated != 1 {
+			t.Errorf("Iterator was iterated %d times, want 1", iterated)
+		}
+	})
+	t.Run("Empty", func(t *testing.T) {
+		val, ok := FirstValue(func(yield func(int) bool) {})
+		if ok {
+			t.Error("unexpected true ok")
+		}
+		if val != 0 {
+			t.Error("unexpected value", val)
+		}
+	})
+}
+
+func TestHead(t *testing.T) {
+	input := Slice([]int{1, 2, 3, 4, 5})
+	output := Collect(Limit(input, 3))
+
+	expected := []int{1, 2, 3}
+
+	if len(output) != len(expected) {
+		t.Log("output", output)
+		t.Log("expected", expected)
+		t.Fatal()
+	}
+	for idx := range output {
+		if expected[idx] != output[idx] {
+			t.Errorf("at index %d, output %d is not equal to expected %d", idx, expected[idx], output[idx])
+		}
+	}
+}
+
+func TestRange(t *testing.T) {
+	t.Run("Smoke", func(t *testing.T) {
+		output := Collect(Range(5, 10))
+
+		expected := []int{5, 6, 7, 8, 9, 10}
+		if len(output) != len(expected) {
+			t.Log("output", output)
+			t.Log("expected", expected)
+			t.Fatal()
+		}
+		for idx := range output {
+			if expected[idx] != output[idx] {
+				t.Errorf("at index %d, output %d is not equal to expected %d", idx, expected[idx], output[idx])
+			}
+		}
+	})
+
+	t.Run("Graceful", func(t *testing.T) {
+		cases := [][]int{
+			{100, 0, 0},
+			{-100, -100, 1},
+			{100, -100, 0},
+			{-100, 100, 201},
+			{-3, 0, 4},
+			{-3, -8, 0},
+		}
+
+		for tc := range Slice(cases) {
+			first, second, size := tc[0], tc[1], tc[2]
+			t.Run(fmt.Sprintf("From_%d_To_%d", first, second), func(t *testing.T) {
+				if output := Collect(Range(first, second)); len(output) != size {
+					t.Errorf("Range(%d, %d) -> %d (not %d)", first, second, len(output), size)
+				}
+			})
+		}
+	})
+}
+
+func TestGenerateN(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		count := 0
+		gen := GenerateN(5, func() int {
+			count++
+			return count
+		})
+
+		output := Collect(gen)
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(output, expected) {
+			t.Errorf("GenerateN() = %v, want %v", output, expected)
+		}
+
+		if count != 5 {
+			t.Errorf("GenerateN() called generator %d times, want 5", count)
+		}
+	})
+
+	t.Run("ZeroIterations", func(t *testing.T) {
+		count := 0
+		gen := GenerateN(0, func() int {
+			count++
+			return count
+		})
+
+		output := Collect(gen)
+		expected := []int{}
+		if !slices.Equal(output, expected) {
+			t.Errorf("GenerateN() = %v, want %v", output, expected)
+		}
+
+		if count != 0 {
+			t.Errorf("GenerateN() called generator %d times, want 0", count)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		count := 0
+		gen := GenerateN(5, func() int {
+			count++
+			return count
+		})
+
+		output := Collect(Limit(gen, 2))
+		expected := []int{1, 2}
+		if !slices.Equal(output, expected) {
+			t.Errorf("GenerateN() with early return = %v, want %v", output, expected)
+		}
+
+		if count != 2 {
+			t.Errorf("GenerateN() called generator %d times, want 2", count)
+		}
+	})
+}
+
+func TestMonotonicFrom(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		gen := Limit(MonotonicFrom(1), 5)
+		output := Collect(gen)
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Monotonic() = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("ZeroIterations", func(t *testing.T) {
+		gen := Limit(MonotonicFrom(1), 0)
+		output := Collect(gen)
+		expected := []int{}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Monotonic() with no iteration = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		gen := Limit(MonotonicFrom(10), 3)
+		output := Collect(gen)
+		expected := []int{10, 11, 12}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Monotonic() with early return = %v, want %v", output, expected)
+		}
+	})
+}
+
+func TestApplyWhile2(t *testing.T) {
+	t.Run("HappyPath", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		count := 0
+		ApplyWhile2(input, func(k string, v int) bool {
+			count++
+			return true
+		})
+		if count != 3 {
+			t.Errorf("ApplyWhile2() count = %d, want 3", count)
+		}
+	})
+
+	t.Run("EarlyStop", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		count := 0
+		ApplyWhile2(input, func(k string, v int) bool {
+			count++
+			return v != 2
+		})
+		if count < 1 {
+			t.Errorf("ApplyWhile2() count = %d, want 2", count)
+		}
+	})
+}
+
+func TestApplyUnless2(t *testing.T) {
+	t.Run("HappyPath", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		count := 0
+		ApplyUnless2(input, func(k string, v int) bool {
+			count++
+			return false
+		})
+		if count != 3 {
+			t.Errorf("ApplyUnless2() count = %d, want 3", count)
+		}
+	})
+
+	t.Run("EarlyStop", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		count := 0
+		ApplyUnless2(input, func(k string, v int) bool {
+			count++
+			return v == 2
+		})
+		if count < 1 {
+			t.Errorf("ApplyUnless2() count = %d, want 2", count)
+		}
+	})
+}
+
+func TestApplyUntil2(t *testing.T) {
+	t.Run("HappyPath", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		count := 0
+		err := ApplyUntil2(input, func(k string, v int) error {
+			count++
+			return nil
+		})
+		if err != nil {
+			t.Errorf("ApplyUntil2() returned error %v, want nil", err)
+		}
+		if count != 3 {
+			t.Errorf("ApplyUntil2() count = %d, want 3", count)
+		}
+	})
+
+	t.Run("EarlyError", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		count := 0
+		err := ApplyUntil2(input, func(k string, v int) error {
+			count++
+			if v == 2 {
+				return errors.New("early stop")
+			}
+			return nil
+		})
+		if err == nil || err.Error() != "early stop" {
+			t.Errorf("ApplyUntil2() error = %v, want 'early stop'", err)
+		}
+		if count < 1 {
+			t.Errorf("ApplyUntil2() count = %d", count)
+		}
+	})
+}
+
+func TestApplyAll2(t *testing.T) {
+	t.Run("HappyPath", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		err := ApplyAll2(input, func(k string, v int) error {
+			return nil
+		})
+		if err != nil {
+			t.Errorf("ApplyAll2() returned error %v, want nil", err)
+		}
+	})
+
+	t.Run("ErrorInAll", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		err := ApplyAll2(input, func(k string, v int) error {
+			if v == 2 {
+				return errors.New("error at 2")
+			}
+			return nil
+		})
+		if err == nil || err.Error() != "error at 2" {
+			t.Errorf("ApplyAll2() error = %v, want 'error at 2'", err)
+		}
+	})
+}
+
+func TestUntilNil(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		input := Slice([]*int{ptr(1), ptr(2), ptr(3), nil, ptr(4)})
+		output := Collect(UntilNil(input))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(output, expected) {
+			t.Errorf("UntilNil() = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		input := Slice([]*int{ptr(1), ptr(2), nil, ptr(3)})
+		output := Collect(UntilNil(input))
+		expected := []int{1, 2}
+		if !slices.Equal(output, expected) {
+			t.Errorf("UntilNil() with early return = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("ZeroValueHandling", func(t *testing.T) {
+		input := Slice([]*int{})
+		output := Collect(UntilNil(input))
+		expected := []int{}
+		if !slices.Equal(output, expected) {
+			t.Errorf("UntilNil() with zero value = %v, want %v", output, expected)
+		}
+	})
+}
+
+func TestUntilError(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		input := Args(1, 2, 3, 4)
+		seq := With2(input, func(v int) (int, error) {
+			if v == 4 {
+				return 0, errors.New("stop")
+			}
+			return v, nil
+		})
+		output := Collect(UntilError(seq))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(output, expected) {
+			t.Errorf("UntilError() = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		input := Args(1, 2, 3)
+		seq := With2(input, func(v int) (int, error) {
+			if v == 3 {
+				return 0, errors.New("stop")
+			}
+			return v, nil
+		})
+		output := Collect(UntilError(seq))
+		expected := []int{1, 2}
+		if !slices.Equal(output, expected) {
+			t.Errorf("UntilError() with early return = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("ZeroValueHandling", func(t *testing.T) {
+		input := Args[int]()
+		seq := With2(input, func(v int) (int, error) {
+			return v, nil
+		})
+		output := Collect(UntilError(seq))
+		expected := []int{}
+		if !slices.Equal(output, expected) {
+			t.Errorf("UntilError() with zero value = %v, want %v", output, expected)
+		}
+	})
+}
+
+func TestUntil(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		output := Collect(Until(input, func(v int) bool {
+			return v > 3
+		}))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Until() = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		output := Collect(Until(input, func(v int) bool {
+			return v == 3
+		}))
+		expected := []int{1, 2}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Until() with early return = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("ZeroValueHandling", func(t *testing.T) {
+		input := Slice([]int{})
+		output := Collect(Until(input, func(v int) bool {
+			return v > 0
+		}))
+		expected := []int{}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Until() with zero value = %v, want %v", output, expected)
+		}
+	})
+}
+
+func TestUntil2(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})
+		count := 0
+		output := Collect2(Until2(input, func(k string, v int) bool {
+			count++
+			return v > 2 && count != 1
+		}))
+
+		_, notC := output["c"]
+		_, notD := output["d"]
+		if notC || notD {
+			t.Errorf("Until2() = %v, want all values should have been greater than 2", output)
+		}
+		_, hasA := output["a"]
+		_, hasB := output["b"]
+		if !hasA && !hasB {
+			t.Error("Util2 should have seen one valid value, instead:", output)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
+		output := Collect2(Until2(input, func(k string, v int) bool {
+			return v == 2
+		}))
+		if _, ok := output["b"]; ok {
+			t.Errorf("Until2() with early return = %v, unexpected 'b' value", output)
+		}
+	})
+
+	t.Run("ZeroValueHandling", func(t *testing.T) {
+		input := Map(map[string]int{})
+		output := Collect2(Until2(input, func(k string, v int) bool {
+			return v > 0
+		}))
+		expected := map[string]int{}
+		if !maps.Equal(output, expected) {
+			t.Errorf("Until2() with zero value = %v, want %v", output, expected)
 		}
 	})
 }

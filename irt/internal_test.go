@@ -693,3 +693,41 @@ func TestSplitsHelper(t *testing.T) {
 		}
 	}
 }
+
+func TestMapPop(t *testing.T) {
+	// Initialize a map with some key-value pairs
+	input := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+	}
+
+	// Test popping an existing key
+	keyToPop := "b"
+	value, ok := mapPop(input, keyToPop)
+
+	// Verify the value and existence
+	if !ok {
+		t.Fatalf("mapPop() failed to find key %q, expected it to exist", keyToPop)
+	}
+	if value != 2 {
+		t.Errorf("mapPop() returned value %v for key %q, want %v", value, keyToPop, 2)
+	}
+
+	// Verify the key is removed from the map
+	if _, exists := input[keyToPop]; exists {
+		t.Errorf("mapPop() did not remove key %q from the map", keyToPop)
+	}
+
+	// Test popping a non-existing key
+	nonExistentKey := "z"
+	value, ok = mapPop(input, nonExistentKey)
+
+	// Verify the value and existence
+	if ok {
+		t.Errorf("mapPop() found key %q, expected it to not exist", nonExistentKey)
+	}
+	if value != 0 {
+		t.Errorf("mapPop() returned value %v for non-existent key %q, want %v", value, nonExistentKey, 0)
+	}
+}
