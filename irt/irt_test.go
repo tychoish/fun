@@ -2483,6 +2483,92 @@ func TestEarlyReturnBehavior(t *testing.T) {
 			t.Errorf("Seq2 should be called 2 times, got %d", callCount2.Load())
 		}
 	})
+
+	t.Run("RemoveZerosEarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		seq := func(yield func(int) bool) {
+			for i := 0; i < 10; i++ {
+				callCount.Add(1)
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		// 0 is removed. 1, 2 are kept.
+		// We stop after 2 kept items.
+		count := 0
+		for range RemoveZeros(seq) {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+		// items processed: 0 (removed), 1 (kept), 2 (kept).
+		if callCount.Load() != 3 {
+			t.Errorf("Source should be called 3 times, got %d", callCount.Load())
+		}
+	})
+
+	t.Run("RemoveErrorsEarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		err := errors.New("error")
+		seq := func(yield func(int, error) bool) {
+			for i := 1; i <= 10; i++ {
+				callCount.Add(1)
+				e := error(nil)
+				if i%2 == 0 {
+					e = err
+				}
+				if !yield(i, e) {
+					return
+				}
+			}
+		}
+		// 1 (nil err), 2 (err), 3 (nil err), 4 (err), 5 (nil err)
+		// RemoveErrors keeps: 1, 3, 5...
+		// We stop after 2 kept items (1 and 3).
+		count := 0
+		for range RemoveErrors(seq) {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+		// items processed: 1 (kept), 2 (removed), 3 (kept).
+		if callCount.Load() != 3 {
+			t.Errorf("Source should be called 3 times, got %d", callCount.Load())
+		}
+	})
+
+	t.Run("RemoveNilsEarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		seq := func(yield func(*int) bool) {
+			for i := 1; i <= 10; i++ {
+				callCount.Add(1)
+				var p *int
+				if i%2 != 0 {
+					p = ptr(i)
+				}
+				if !yield(p) {
+					return
+				}
+			}
+		}
+		// 1 (ptr), 2 (nil), 3 (ptr), 4 (nil), 5 (ptr)
+		// RemoveNils keeps: 1, 3, 5...
+		// We stop after 2 kept items (1 and 3).
+		count := 0
+		for range RemoveNils(seq) {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+		// items processed: 1 (kept), 2 (removed), 3 (kept).
+		if callCount.Load() != 3 {
+			t.Errorf("Source should be called 3 times, got %d", callCount.Load())
+		}
+	})
 }
 
 // Additional tests for Shard and ShardByHash
@@ -3160,6 +3246,14 @@ func TestRemoveZeros(t *testing.T) {
 			}
 		})
 	}
+	t.Run("Strings", func(t *testing.T) {
+		seq := Args("a", "", "b", "")
+		result := Collect(RemoveZeros(seq))
+		expected := []string{"a", "b"}
+		if !slices.Equal(result, expected) {
+			t.Errorf("RemoveZeros() = %v, want %v", result, expected)
+		}
+	})
 }
 
 func TestRemoveErrors(t *testing.T) {
@@ -3205,6 +3299,48 @@ func TestRemoveErrors(t *testing.T) {
 			result := Collect(RemoveErrors(tt.seq))
 			if !slices.Equal(result, tt.expected) {
 				t.Errorf("RemoveErrors() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRemoveNils(t *testing.T) {
+	tests := []struct {
+		name     string
+		seq      iter.Seq[*int]
+		expected []*int
+	}{
+		{
+			name:     "Empty",
+			seq:      Args[*int](),
+			expected: []*int{},
+		},
+		{
+			name:     "NoNils",
+			seq:      Args(ptr(1), ptr(2)),
+			expected: []*int{ptr(1), ptr(2)},
+		},
+		{
+			name:     "WithNils",
+			seq:      Args(ptr(1), nil, ptr(2)),
+			expected: []*int{ptr(1), ptr(2)},
+		},
+		{
+			name:     "AllNils",
+			seq:      Args[*int](nil, nil),
+			expected: []*int{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(RemoveNils(tt.seq))
+			if len(result) != len(tt.expected) {
+				t.Errorf("RemoveNils() length = %v, want %v", len(result), len(tt.expected))
+			}
+			for i := range result {
+				if *result[i] != *tt.expected[i] {
+					t.Errorf("RemoveNils()[%d] = %v, want %v", i, *result[i], *tt.expected[i])
+				}
 			}
 		})
 	}
