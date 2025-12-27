@@ -996,6 +996,96 @@ func TestWith(t *testing.T) {
 			}
 		})
 	}
+	t.Run("LazyExecution", func(t *testing.T) {
+		var sourceCount atomic.Int32
+		var opCount atomic.Int32
+		source := func(yield func(int) bool) {
+			for i := 1; i <= 10; i++ {
+				sourceCount.Add(1)
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		seq := With(source, func(i int) int {
+			opCount.Add(1)
+			return i * 2
+		})
+		next, stop := iter.Pull2(seq)
+		defer stop()
+
+		if sourceCount.Load() != 0 || opCount.Load() != 0 {
+			t.Errorf("With should be lazy: sourceCount=%d, opCount=%d", sourceCount.Load(), opCount.Load())
+		}
+		next()
+		if sourceCount.Load() != 1 || opCount.Load() != 1 {
+			t.Errorf("With should execute on demand: sourceCount=%d, opCount=%d", sourceCount.Load(), opCount.Load())
+		}
+	})
+}
+
+func TestWithEach(t *testing.T) {
+	t.Run("NormalOperation", func(t *testing.T) {
+		var callCount atomic.Int32
+		source := Slice([]int{1, 2, 3})
+		op := func() string {
+			callCount.Add(1)
+			return "fixed"
+		}
+		seq := WithEach(source, op)
+		result := Collect2(seq)
+		if len(result) != 3 {
+			t.Errorf("expected 3 items, got %d", len(result))
+		}
+		if callCount.Load() != 3 {
+			t.Errorf("expected 3 calls, got %d", callCount.Load())
+		}
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		source := Slice([]int{1, 2, 3, 4, 5})
+		op := func() string {
+			callCount.Add(1)
+			return "fixed"
+		}
+		seq := WithEach(source, op)
+		count := 0
+		for range seq {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+		if callCount.Load() != 2 {
+			t.Errorf("expected 2 calls, got %d", callCount.Load())
+		}
+	})
+	t.Run("LazyExecution", func(t *testing.T) {
+		var sourceCount atomic.Int32
+		var opCount atomic.Int32
+		source := func(yield func(int) bool) {
+			for i := 1; i <= 10; i++ {
+				sourceCount.Add(1)
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		seq := WithEach(source, func() int {
+			opCount.Add(1)
+			return 42
+		})
+		next, stop := iter.Pull2(seq)
+		defer stop()
+
+		if sourceCount.Load() != 0 || opCount.Load() != 0 {
+			t.Errorf("WithEach should be lazy: sourceCount=%d, opCount=%d", sourceCount.Load(), opCount.Load())
+		}
+		next()
+		if sourceCount.Load() != 1 || opCount.Load() != 1 {
+			t.Errorf("WithEach should execute on demand: sourceCount=%d, opCount=%d", sourceCount.Load(), opCount.Load())
+		}
+	})
 }
 
 func TestConvert(t *testing.T) {
@@ -2366,6 +2456,40 @@ func TestEarlyReturnBehavior(t *testing.T) {
 		}
 	})
 
+	t.Run("Convert2EarlyReturn", func(t *testing.T) {
+		var sourceCallCount atomic.Int32
+		var convertCallCount atomic.Int32
+
+		source := func(yield func(string, int) bool) {
+			for i := 1; i <= 5; i++ {
+				sourceCallCount.Add(1)
+				if !yield(fmt.Sprint(i), i) {
+					return
+				}
+			}
+		}
+
+		converted := Convert2(source, func(k string, v int) (string, int) {
+			convertCallCount.Add(1)
+			return k + "!", v * 10
+		})
+
+		count := 0
+		for range converted {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+
+		if sourceCallCount.Load() != 2 {
+			t.Errorf("Source should be called 2 times, got %d", sourceCallCount.Load())
+		}
+		if convertCallCount.Load() != 2 {
+			t.Errorf("Convert2 should be called 2 times, got %d", convertCallCount.Load())
+		}
+	})
+
 	t.Run("KeepEarlyReturn", func(t *testing.T) {
 		var sourceCallCount atomic.Int32
 		var predicateCallCount atomic.Int32
@@ -3189,14 +3313,43 @@ func TestLimit2(t *testing.T) {
 }
 
 func TestConvert2(t *testing.T) {
-	input := Map(map[string]int{"a": 1, "b": 2})
-	output := Collect2(Convert2(input, func(k string, v int) (string, int) {
-		return k + "!", v * 10
-	}))
-	expected := map[string]int{"a!": 10, "b!": 20}
-	if !maps.Equal(output, expected) {
-		t.Errorf("Convert2() = %v, want %v", output, expected)
-	}
+	t.Run("NormalOperation", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2})
+		output := Collect2(Convert2(input, func(k string, v int) (string, int) {
+			return k + "!", v * 10
+		}))
+		expected := map[string]int{"a!": 10, "b!": 20}
+		if !maps.Equal(output, expected) {
+			t.Errorf("Convert2() = %v, want %v", output, expected)
+		}
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var sourceCallCount atomic.Int32
+		source := func(yield func(string, int) bool) {
+			for i := 1; i <= 5; i++ {
+				sourceCallCount.Add(1)
+				if !yield(fmt.Sprint(i), i) {
+					return
+				}
+			}
+		}
+
+		converted := Convert2(source, func(k string, v int) (string, int) {
+			return k + "!", v * 10
+		})
+
+		count := 0
+		for range converted {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+
+		if sourceCallCount.Load() != 2 {
+			t.Errorf("Source should be called 2 times, got %d", sourceCallCount.Load())
+		}
+	})
 }
 
 func TestMerge(t *testing.T) {
