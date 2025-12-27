@@ -663,7 +663,7 @@ func TestSplitsHelper(t *testing.T) {
 		{First: 2, Second: "b"},
 	}
 
-	seq := Splits(Slice(elems))
+	seq := ElemSplit(Slice(elems))
 
 	result := make([]struct {
 		a int

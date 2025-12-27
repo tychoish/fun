@@ -837,11 +837,40 @@ type Elem[A, B any] struct {
 	Second B
 }
 
-func WithElem[A, B any](a A, with func(A) B) Elem[A, B]         { return NewElem(a, with(a)) }
-func NewElem[A, B any](a A, b B) Elem[A, B]                     { return Elem[A, B]{First: a, Second: b} }
-func Elems[A, B any](seq iter.Seq2[A, B]) iter.Seq[Elem[A, B]]  { return Merge(seq, NewElem) }
-func Splits[A, B any](seq iter.Seq[Elem[A, B]]) iter.Seq2[A, B] { return With2(seq, elemSplit[A, B]) }
-func (e Elem[A, B]) Split() (A, B)                              { return e.First, e.Second }
-func (e Elem[A, B]) Apply(op func(A, B))                        { op(e.First, e.Second) }
-func elemSplit[A, B any](in Elem[A, B]) (A, B)                  { return in.Split() }
-func elemApply[A, B any](op func(A, B)) func(Elem[A, B])        { return func(e Elem[A, B]) { e.Apply(op) } }
+func WithElem[A, B any](a A, with func(A) B) Elem[A, B]            { return NewElem(a, with(a)) }
+func NewElem[A, B any](a A, b B) Elem[A, B]                        { return Elem[A, B]{First: a, Second: b} }
+func Elems[A, B any](seq iter.Seq2[A, B]) iter.Seq[Elem[A, B]]     { return Merge(seq, NewElem) }
+func ElemSplit[A, B any](seq iter.Seq[Elem[A, B]]) iter.Seq2[A, B] { return With2(seq, elemSplit) }
+func (e Elem[A, B]) Split() (A, B)                                 { return e.First, e.Second }
+func (e Elem[A, B]) Apply(op func(A, B))                           { op(e.First, e.Second) }
+func (e Elem[A, B]) AsCmp(op func(A, B) int) int                   { return op(e.First, e.Second) }
+func (e Elem[A, B]) WithCmp(rh Elem[A, B], op func(A, B) int) int {
+	return cmp.Compare(e.AsCmp(op), rh.AsCmp(op))
+}
+
+func (e Elem[A, B]) WithCmp2(rh Elem[A, B], aop func(A, A) int, bop func(B, B) int) int {
+	return cmp.Compare(aop(e.First, rh.First), bop(e.Second, rh.Second))
+}
+
+func elemSplit[A, B any](in Elem[A, B]) (A, B)           { return in.Split() }
+func elemApply[A, B any](op func(A, B)) func(Elem[A, B]) { return func(e Elem[A, B]) { e.Apply(op) } }
+
+func ElemCmp[A, B cmp.Ordered](lh, rh Elem[A, B]) int {
+	return cmp.Or(cmp.Compare(lh.First, rh.First), cmp.Compare(lh.Second, rh.Second))
+}
+
+func toCmp[T any, K cmp.Ordered](to func(T) K) func(T, T) int {
+	return func(l, r T) int { return cmp.Compare(to(l), to(r)) }
+}
+
+func toCmp2[A, B any, K cmp.Ordered](to func(A, B) K) func(Elem[A, B], Elem[A, B]) int {
+	return func(l Elem[A, B], r Elem[A, B]) int { return cmp.Compare(to(l.First, l.Second), to(r.First, l.Second)) }
+}
+
+func Sort[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
+	return slices.Values(slices.SortedFunc(seq, toCmp(cf)))
+}
+
+func Sort2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter.Seq2[A, B] {
+	return ElemSplit(Slice(slices.SortedFunc(Elems(seq), toCmp2(cf))))
+}
