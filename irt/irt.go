@@ -373,6 +373,9 @@ func Until2[A, B any](seq iter.Seq2[A, B], is func(A, B) bool) iter.Seq2[A, B] {
 
 func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if seq == nil || prd == nil {
+			return
+		}
 		for value := range seq {
 			switch {
 			case prd(value) && yield(value):
@@ -386,6 +389,9 @@ func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 
 func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
+		if seq == nil || prd == nil {
+			return
+		}
 		for key, value := range seq {
 			switch {
 			case prd(key, value) && yield(key, value):
@@ -399,6 +405,9 @@ func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] 
 
 func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if seq == nil || prd == nil {
+			return
+		}
 		for value := range seq {
 			if prd(value) && !yield(value) {
 				return
@@ -409,6 +418,9 @@ func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 
 func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
+		if seq == nil || prd == nil {
+			return
+		}
 		for key, value := range seq {
 			if prd(key, value) && !yield(key, value) {
 				return
@@ -422,12 +434,27 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 }
 
 func WithHooks[T any](seq iter.Seq[T], before func(), after func()) iter.Seq[T] {
-	return func(yield func(T) bool) { before(); defer after(); flush(seq, yield) }
+	return func(yield func(T) bool) {
+		if before != nil {
+			before()
+		}
+		if after != nil {
+			defer after()
+		}
+		flush(seq, yield)
+	}
 }
 
 func WithSetup[T any](seq iter.Seq[T], setup func()) iter.Seq[T] {
-	setup = once(setup)
-	return func(yield func(T) bool) { setup(); flush(seq, yield) }
+	if setup != nil {
+		setup = once(setup)
+	}
+	return func(yield func(T) bool) {
+		if setup != nil {
+			setup()
+		}
+		flush(seq, yield)
+	}
 }
 
 func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, notf(prd)) }
@@ -744,6 +771,9 @@ func whencall[T any](cond bool, then func(T), arg T) {
 // higher order operations
 
 func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
+	if seq == nil {
+		return true
+	}
 	for value := range seq {
 		if !yield(value) {
 			return false
