@@ -335,7 +335,7 @@ func TestIdxorzHelper(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := idxorz(tt.idx, tt.slice)
+			result := idxorz(tt.slice, tt.idx)
 			if result != tt.expected {
 				t.Errorf("idxorz(%v, %v) = %v, want %v", tt.idx, tt.slice, result, tt.expected)
 			}
