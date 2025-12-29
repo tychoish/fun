@@ -363,15 +363,10 @@ func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 		next, stop := iter.Pull(seq)
 		defer stop()
 
-		for hasMore := true; hasMore; {
-			gen := withlimit(num, next)
-			if gen != nil && !yield(func(yield func(T) bool) {
+		for hasMore, gen := true, withlimit(num, next); hasMore && gen != nil; gen = withlimit(num, next) {
+			if !yield(func(yield func(T) bool) {
 				for value, okp := gen(); okp != nil; value, okp = gen() {
-					if !deref(okp) {
-						hasMore = false
-						return
-					}
-					if !yield(value) {
+					if hasMore = deref(okp); !hasMore || !yield(value) {
 						return
 					}
 				}
@@ -411,11 +406,10 @@ func Until2[A, B any](seq iter.Seq2[A, B], is func(A, B) bool) iter.Seq2[A, B] {
 
 func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		if seq == nil || prd == nil {
-			return
-		}
 		for value := range seq {
 			switch {
+			case prd == nil:
+				return
 			case prd(value) && yield(value):
 				continue
 			default:
@@ -572,6 +566,14 @@ func Zip[A, B any](rh iter.Seq[A], lh iter.Seq[B]) iter.Seq2[A, B] {
 			}
 		}
 	}
+}
+
+func SortBy[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
+	return slices.Values(slices.SortedFunc(seq, toCmp(cf)))
+}
+
+func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter.Seq2[A, B] {
+	return ElemSplit(Slice(slices.SortedFunc(Elems(seq), toCmp2(cf))))
 }
 
 // simple implementation methods
@@ -852,14 +854,6 @@ func toCmp2[A, B any, K cmp.Ordered](to func(A, B) K) func(Elem[A, B], Elem[A, B
 	return func(l Elem[A, B], r Elem[A, B]) int { return cmp.Compare(to(l.First, l.Second), to(r.First, l.Second)) }
 }
 
-func SortBy[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
-	return slices.Values(slices.SortedFunc(seq, toCmp(cf)))
-}
-
-func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter.Seq2[A, B] {
-	return ElemSplit(Slice(slices.SortedFunc(Elems(seq), toCmp2(cf))))
-}
-
 ////////////////////////////////
 //
 // higher order operations
@@ -949,17 +943,14 @@ func grouping[K comparable, V any](mp groups[K, V]) *orderedGrouping[K, V] {
 	return &orderedGrouping[K, V]{table: mp, order: []K{}}
 }
 
-func (og *orderedGrouping[K, V]) add(key K, value V) {
-	whencallwith(not(og.table.check(key)), og.append, key)
-	og.table.add(key, value)
+func (og *orderedGrouping[K, V]) add(k K, v V) {
+	whencallwith(not(og.table.check(k)), og.append, k)
+	og.table.add(k, v)
 }
 
-func (og *orderedGrouping[K, V]) with(fn func(V) K) func(V) {
-	return func(value V) { og.add(fn(value), value) }
-}
-
-func (og *orderedGrouping[K, V]) append(key K)            { og.order = append(og.order, key) }
-func (og *orderedGrouping[K, V]) iter() iter.Seq2[K, []V] { return With(Slice(og.order), og.table.pop) }
+func (og *orderedGrouping[K, V]) with(f func(V) K) func(V) { return func(v V) { og.add(f(v), v) } }
+func (og *orderedGrouping[K, V]) append(key K)             { og.order = append(og.order, key) }
+func (og *orderedGrouping[K, V]) iter() iter.Seq2[K, []V]  { return With(Slice(og.order), og.table.pop) }
 
 func mapPop[K comparable, V any](mp map[K]V, k K) (V, bool) {
 	v, ok := mp[k]
@@ -974,6 +965,21 @@ type Elem[A, B any] struct {
 	Second B
 }
 
+func WithElem[A, B any](a A, with func(A) B) Elem[A, B]            { return NewElem(a, with(a)) }
+func NewElem[A, B any](a A, b B) Elem[A, B]                        { return Elem[A, B]{First: a, Second: b} }
+func Elems[A, B any](seq iter.Seq2[A, B]) iter.Seq[Elem[A, B]]     { return Merge(seq, NewElem) }
+func ElemSplit[A, B any](seq iter.Seq[Elem[A, B]]) iter.Seq2[A, B] { return With2(seq, elemSplit) }
+func ApplyElems[A, B any](seq iter.Seq[Elem[A, B]], op func(A, B)) { Apply(seq, elemApply(op)) }
+func ElemCmp[A, B cmp.Ordered](lh, rh Elem[A, B]) int              { return lh.Compare(cmpf, cmpf).With(rh) }
+func (e Elem[A, B]) Split() (A, B)                                 { return e.First, e.Second }
+func (e Elem[A, B]) Apply(op func(A, B))                           { op(e.First, e.Second) }
+func elemSplit[A, B any](in Elem[A, B]) (A, B)                     { return in.Split() }
+func elemApply[A, B any](op func(A, B)) func(Elem[A, B])           { return func(e Elem[A, B]) { e.Apply(op) } }
+
+func (e Elem[A, B]) Compare(aop func(A, A) int, bop func(B, B) int) interface{ With(Elem[A, B]) int } {
+	return &elemcmp[A, B]{lh: e, ac: aop, bc: bop}
+}
+
 type elemcmp[A, B any] struct {
 	lh Elem[A, B]
 	ac func(A, A) int
@@ -982,19 +988,4 @@ type elemcmp[A, B any] struct {
 
 func (ec *elemcmp[A, B]) With(rh Elem[A, B]) int {
 	return cmp.Compare(ec.ac(ec.lh.First, rh.First), ec.bc(ec.lh.Second, rh.Second))
-}
-
-func WithElem[A, B any](a A, with func(A) B) Elem[A, B]            { return NewElem(a, with(a)) }
-func NewElem[A, B any](a A, b B) Elem[A, B]                        { return Elem[A, B]{First: a, Second: b} }
-func Elems[A, B any](seq iter.Seq2[A, B]) iter.Seq[Elem[A, B]]     { return Merge(seq, NewElem) }
-func ElemSplit[A, B any](seq iter.Seq[Elem[A, B]]) iter.Seq2[A, B] { return With2(seq, elemSplit) }
-func ApplyElems[A, B any](seq iter.Seq[Elem[A, B]], op func(A, B)) { Apply(seq, elemApply(op)) }
-func ElemCmp[A, B cmp.Ordered](lh, rh Elem[A, B]) int              { return lh.Compare(cmpf, cmpf).With(rh) }
-func elemSplit[A, B any](in Elem[A, B]) (A, B)                     { return in.Split() }
-func elemApply[A, B any](op func(A, B)) func(Elem[A, B])           { return func(e Elem[A, B]) { e.Apply(op) } }
-func (e Elem[A, B]) Split() (A, B)                                 { return e.First, e.Second }
-func (e Elem[A, B]) Apply(op func(A, B))                           { op(e.First, e.Second) }
-
-func (e Elem[A, B]) Compare(aop func(A, A) int, bop func(B, B) int) interface{ With(Elem[A, B]) int } {
-	return &elemcmp[A, B]{lh: e, ac: aop, bc: bop}
 }
