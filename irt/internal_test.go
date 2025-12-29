@@ -1,7 +1,9 @@
 package irt
 
 import (
+	"context"
 	"slices"
+	"strconv"
 	"sync/atomic"
 	"testing"
 )
@@ -840,5 +842,472 @@ func TestConjunctionHelper(t *testing.T) {
 				}
 			})
 		})
+	})
+}
+
+func TestWhenopHelpers(t *testing.T) {
+	t.Run("whenop", func(t *testing.T) {
+		var called bool
+		op := func() { called = true }
+		whenop(op)
+		if !called {
+			t.Error("whenop did not call the operation")
+		}
+	})
+
+	t.Run("whenopwith", func(t *testing.T) {
+		var result int
+		op := func(v int) { result = v }
+		whenopwith(op, 42)
+		if result != 42 {
+			t.Errorf("whenopwith did not pass the correct argument, got %v, want 42", result)
+		}
+	})
+
+	t.Run("whenopdo", func(t *testing.T) {
+		op := func() int { return 42 }
+		result := whenopdo(op)
+		if result != 42 {
+			t.Errorf("whenopdo did not return the correct value, got %v, want 42", result)
+		}
+	})
+
+	t.Run("whenopdowith", func(t *testing.T) {
+		op := func(v int) string { return string(rune('a' + v)) }
+		result := whenopdowith(op, 5)
+		if result != "f" {
+			t.Errorf("whenopdowith did not return the correct value, got %v, want 'f'", result)
+		}
+	})
+}
+
+func TestFuncallHelpers(t *testing.T) {
+	t.Run("funcall", func(t *testing.T) {
+		var result int
+		op := func(v int) { result = v }
+		funcall(op, 42)
+		if result != 42 {
+			t.Errorf("funcall did not pass the correct argument, got %v, want 42", result)
+		}
+	})
+
+	t.Run("funcallok", func(t *testing.T) {
+		var result int
+		op := func(v int) { result = v }
+		ok := funcallok(op, 42)
+		if !ok {
+			t.Error("funcallok did not return true")
+		}
+		if result != 42 {
+			t.Errorf("funcallok did not pass the correct argument, got %v, want 42", result)
+		}
+	})
+	t.Run("funcallv", func(t *testing.T) {
+		var result []int
+		op := func(args ...int) {
+			result = args
+		}
+		funcallv(op, 1, 2, 3)
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("funcallv did not pass the correct arguments, got %v, want %v", result, expected)
+		}
+	})
+	t.Run("funcalls", func(t *testing.T) {
+		var result []int
+		op := func(args []int) {
+			result = args
+		}
+		funcalls(op, []int{4, 5, 6})
+		expected := []int{4, 5, 6}
+		if !slices.Equal(result, expected) {
+			t.Errorf("funcalls did not pass the correct arguments, got %v, want %v", result, expected)
+		}
+	})
+	t.Run("funcallr", func(t *testing.T) {
+		op := func(v int) string {
+			return string(rune('a' + v))
+		}
+		result := funcallr(op, 5)
+		expected := "f"
+		if result != expected {
+			t.Errorf("funcallr did not return the correct value, got %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestMethodizeHelpers(t *testing.T) {
+	t.Run("methodize", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		method := func(r receiver, v int) int { return r.value + v }
+		m := methodize(r, method)
+		result := m(8)
+		if result != 50 {
+			t.Errorf("methodize did not return the correct value, got %v, want 50", result)
+		}
+	})
+
+	t.Run("methodize1", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		method := func(r receiver, v int) int { return r.value + v }
+		m := methodize1(r, method)
+		result := m(8)
+		if result != 50 {
+			t.Errorf("methodize1 did not return the correct value, got %v, want 50", result)
+		}
+	})
+
+	t.Run("methodize2", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		method := func(r receiver, v int) (int, string) { return r.value + v, "ok" }
+		m := methodize2(r, method)
+		result1, result2 := m(8)
+		if result1 != 50 || result2 != "ok" {
+			t.Errorf("methodize2 did not return the correct values, got (%v, %v), want (50, 'ok')", result1, result2)
+		}
+	})
+
+	t.Run("methodize3", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		method := func(r receiver, v int, s string) string { return s + string(rune('a'+v)) }
+		m := methodize3(r, method)
+		result := m(5, "prefix-")
+		if result != "prefix-f" {
+			t.Errorf("methodize3 did not return the correct value, got %v, want 'prefix-f'", result)
+		}
+	})
+	t.Run("methodize4", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		method := func(r receiver, v int, s string) (int, string) {
+			return r.value + v, s + string(rune('a'+v))
+		}
+		m := methodize4(r, method)
+		result1, result2 := m(5, "prefix-")
+		if result1 != 47 {
+			t.Errorf("methodize4 did not return the correct first value, got %v, want 47", result1)
+		}
+		if result2 != "prefix-f" {
+			t.Errorf("methodize4 did not return the correct second value, got %v, want 'prefix-f'", result2)
+		}
+	})
+
+	t.Run("withctx", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		op := func(ctx context.Context, v int) int {
+			return r.value + v
+		}
+		ctx := context.Background()
+		m := withctx(ctx, op)
+		result := m(8)
+		if result != 50 {
+			t.Errorf("withctx did not return the correct value, got %v, want 50", result)
+		}
+	})
+
+	t.Run("withctx1", func(t *testing.T) {
+		ctx := context.Background()
+		op := func(ictx context.Context, v int, s string) string {
+			if ictx == nil || ictx != ctx {
+				t.Error("unexpected internal value")
+			}
+			return s + string(rune('a'+v))
+		}
+		m := withctx1(ctx, op)
+		result := m(5, "prefix-")
+		if result != "prefix-f" {
+			t.Errorf("withctx1 did not return the correct value, got %v, want 'prefix-f'", result)
+		}
+	})
+
+	t.Run("withctx2", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		ctx := context.Background()
+		r := receiver{value: 42}
+		op := func(ictx context.Context, v int, s string) (int, string) {
+			if ictx == nil || ictx != ctx {
+				t.Error("unexpected internal value")
+			}
+			return r.value + v, s + string(rune('a'+v))
+		}
+		m := withctx2(ctx, op)
+		result1, result2 := m(5, "prefix-")
+		if result1 != 47 {
+			t.Errorf("withctx2 did not return the correct first value, got %v, want 47", result1)
+		}
+		if result2 != "prefix-f" {
+			t.Errorf("withctx2 did not return the correct second value, got %v, want 'prefix-f'", result2)
+		}
+	})
+
+	t.Run("methodizethread", func(t *testing.T) {
+		type receiver struct {
+			value int
+		}
+		r := receiver{value: 42}
+		op := func(r receiver, v int) (int, string) {
+			return r.value + 100, "elephant" + strconv.Itoa(v)
+		}
+		wrap := func(i int, s string) string {
+			return s + "pig"
+		}
+		m := methodizethread(r, op, wrap)
+		result := m(8)
+		if result != "elephant8pig" {
+			t.Errorf("methodizethread did not return the correct value, got %v, want 'f5'", result)
+		}
+	})
+
+	t.Run("threadzip", func(t *testing.T) {
+		op := func(v int) (int, string) {
+			return v + 1, string(rune('a' + v))
+		}
+		wrap := func(i int, s string) string {
+			return s + string(rune('0'+i))
+		}
+		m := threadzip(op, wrap)
+		result := m(5)
+		if result != "f6" {
+			t.Errorf("threadzip did not return the correct value, got %v, want 'f6'", result)
+		}
+	})
+}
+
+func TestWraping(t *testing.T) {
+	t.Run("wrap", func(t *testing.T) {
+		op := func() int {
+			return 42
+		}
+		wrapped := wrap(op, func(v int) string {
+			if v != 42 {
+				t.Error("got unexpected input", 42)
+			}
+			return "elephant" + strconv.Itoa(v)
+		})
+		result1, result2 := wrapped()
+		if result1 != 42 {
+			t.Errorf("wrap did not return the correct first value, got %v, want 42", result1)
+		}
+		if result2 != "elephant42" {
+			t.Errorf("wrap did not return the correct second value, got %v, want 'k'", result2)
+		}
+	})
+	t.Run("curry", func(t *testing.T) {
+		op := func(v int) string {
+			return string(rune('a' + v))
+		}
+		curried := curry(op, 5)
+		result := curried()
+		expected := "f"
+		if result != expected {
+			t.Errorf("curry did not return the correct value, got %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestWhenCallHelpers(t *testing.T) {
+	t.Run("whencallok", func(t *testing.T) {
+		var called bool
+		op := func() { called = true }
+		ok := whencallok(true, op)
+		if !ok {
+			t.Error("whencallok did not return true")
+		}
+		if !called {
+			t.Error("whencallok did not call the operation")
+		}
+	})
+
+	t.Run("whencallwithok", func(t *testing.T) {
+		var result int
+		op := func(v int) { result = v }
+		ok := whencallwithok(true, op, 42)
+		if !ok {
+			t.Error("whencallwithok did not return true")
+		}
+		if result != 42 {
+			t.Errorf("whencallwithok did not pass the correct argument, got %v, want 42", result)
+		}
+	})
+
+	t.Run("whencallfn", func(t *testing.T) {
+		var called bool
+		op := func() { called = true }
+		fn := whencallfn(true, op)
+		fn()
+		if !called {
+			t.Error("whencallfn did not call the operation")
+		}
+	})
+
+	t.Run("whencallwithfn", func(t *testing.T) {
+		var result int
+		op := func(v int) { result = v }
+		fn := whencallwithfn(true, op, 42)
+		fn()
+		if result != 42 {
+			t.Errorf("whencallwithfn did not pass the correct argument, got %v, want 42", result)
+		}
+	})
+}
+
+func TestWhenDoHelpers(t *testing.T) {
+	t.Run("whendook", func(t *testing.T) {
+		op := func() int { return 42 }
+		result, ok := whendook(true, op)
+		if !ok {
+			t.Error("whendook did not return true")
+		}
+		if result != 42 {
+			t.Errorf("whendook did not return the correct value, got %v, want 42", result)
+		}
+	})
+
+	t.Run("whendofn", func(t *testing.T) {
+		op := func() int { return 42 }
+		fn := whendofn(true, op)
+		result := fn()
+		if result != 42 {
+			t.Errorf("whendofn did not return the correct value, got %v, want 42", result)
+		}
+	})
+
+	t.Run("whendowithok", func(t *testing.T) {
+		op := func(v int) string { return string(rune('a' + v)) }
+		result, ok := whendowithok(true, op, 5)
+		if !ok {
+			t.Error("whendowithok did not return true")
+		}
+		if result != "f" {
+			t.Errorf("whendowithok did not return the correct value, got %v, want 'f'", result)
+		}
+	})
+
+	t.Run("whendowithfn", func(t *testing.T) {
+		op := func(v int) string { return string(rune('a' + v)) }
+		fn := whendowithfn(true, op, 5)
+		result := fn()
+		if result != "f" {
+			t.Errorf("whendowithfn did not return the correct value, got %v, want 'f'", result)
+		}
+	})
+}
+
+func TestElemOrderingSemantics(t *testing.T) {
+	t.Run("ElemCmp", func(t *testing.T) {
+		elem1 := Elem[int, string]{First: 1, Second: "a"}
+		elem2 := Elem[int, string]{First: 2, Second: "b"}
+		elem3 := Elem[int, string]{First: 1, Second: "c"}
+
+		t.Run("Compare by First", func(t *testing.T) {
+			if ElemCmpFirst(elem1, elem2) >= 0 {
+				t.Errorf("Expected elem1 < elem2, got %v", ElemCmpFirst(elem1, elem2))
+			}
+			if ElemCmpFirst(elem2, elem1) <= 0 {
+				t.Errorf("Expected elem2 > elem1, got %v", ElemCmpFirst(elem2, elem1))
+			}
+			if ElemCmpFirst(elem1, elem3) != 0 {
+				t.Errorf("Expected elem1 == elem3, got %v", ElemCmpFirst(elem1, elem3))
+			}
+		})
+
+		t.Run("Compare by Second", func(t *testing.T) {
+			if ElemCmpSecond(elem1, elem3) >= 0 {
+				t.Errorf("Expected elem1 < elem3, got %v", ElemCmpSecond(elem1, elem3))
+			}
+			if ElemCmpSecond(elem3, elem1) <= 0 {
+				t.Errorf("Expected elem3 > elem1, got %v", ElemCmpSecond(elem3, elem1))
+			}
+			if ElemCmpSecond(elem1, elem1) != 0 {
+				t.Errorf("Expected elem1 == elem1, got %v", ElemCmpSecond(elem1, elem1))
+			}
+		})
+	})
+
+	t.Run("Compare", func(t *testing.T) {
+		elem1 := Elem[int, string]{First: 1, Second: "a"}
+		elem2 := Elem[int, string]{First: 2, Second: "b"}
+		if elem1.Compare(cmpf, cmpf).With(elem2) >= 0 {
+			t.Errorf("Expected elem1 < elem2, got %v", elem1.Compare(cmpf, cmpf).With(elem2))
+		}
+		if elem2.Compare(cmpf, cmpf).With(elem1) <= 0 {
+			t.Errorf("Expected elem2 > elem1, got %v", elem2.Compare(cmpf, cmpf).With(elem1))
+		}
+		if elem1.Compare(cmpf, cmpf).With(elem1) != 0 {
+			t.Errorf("Expected elem1 == elem1, got %v", elem1.Compare(cmpf, cmpf).With(elem1))
+		}
+	})
+
+	t.Run("ElemCmp", func(t *testing.T) {
+		elem1 := Elem[int, string]{First: 1, Second: "a"}
+		elem2 := Elem[int, string]{First: 2, Second: "b"}
+		if ElemCmp(elem1, elem2) >= 0 {
+			t.Errorf("Expected elem1 < elem2, got %v", ElemCmp(elem1, elem2))
+		}
+		if ElemCmp(elem2, elem1) <= 0 {
+			t.Errorf("Expected elem2 > elem1, got %v", ElemCmp(elem2, elem1))
+		}
+		if ElemCmp(elem1, elem1) != 0 {
+			t.Errorf("Expected elem1 == elem1, got %v", ElemCmp(elem1, elem1))
+		}
+	})
+
+	t.Run("WithPanicsWithoutComparators", func(t *testing.T) {
+		elem := elemcmp[int, int]{lh: NewElem(100, 200)}
+		defer func() {
+			if recover() == nil {
+				t.Error("expected panic")
+			}
+		}()
+		if c := elem.With(NewElem(1, 2)); c != -1 {
+			t.Error("should never run, but this is even weirder if it does", c)
+		}
+	})
+
+	t.Run("CompareFirst", func(t *testing.T) {
+		elem1 := Elem[int, string]{First: 1, Second: "a"}
+		elem2 := Elem[int, string]{First: 2, Second: "b"}
+		if elem1.CompareFirst(cmpf).With(elem2) >= 0 {
+			t.Errorf("Expected elem1 < elem2 by First, got %v", elem1.CompareFirst(cmpf).With(elem2))
+		}
+		if elem2.CompareFirst(cmpf).With(elem1) <= 0 {
+			t.Errorf("Expected elem2 > elem1 by First, got %v", elem2.CompareFirst(cmpf).With(elem1))
+		}
+		if elem1.CompareFirst(cmpf).With(elem1) != 0 {
+			t.Errorf("Expected elem1 == elem1 by First, got %v", elem1.CompareFirst(cmpf).With(elem1))
+		}
+	})
+
+	t.Run("CompareSecond", func(t *testing.T) {
+		elem1 := Elem[int, string]{First: 1, Second: "a"}
+		elem2 := Elem[int, string]{First: 1, Second: "b"}
+		if elem1.CompareSecond(cmpf).With(elem2) >= 0 {
+			t.Errorf("Expected elem1 < elem2 by Second, got %v", elem1.CompareSecond(cmpf).With(elem2))
+		}
+		if elem2.CompareSecond(cmpf).With(elem1) <= 0 {
+			t.Errorf("Expected elem2 > elem1 by Second, got %v", elem2.CompareSecond(cmpf).With(elem1))
+		}
+		if elem1.CompareSecond(cmpf).With(elem1) != 0 {
+			t.Errorf("Expected elem1 == elem1 by Second, got %v", elem1.CompareSecond(cmpf).With(elem1))
+		}
 	})
 }
