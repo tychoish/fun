@@ -421,7 +421,7 @@ func TestNtimesHelper(t *testing.T) {
 				return 42
 			}
 
-			fn := ntimes(tt.times, op)
+			fn := repeat(tt.times, op)
 			var result []int
 
 			for {
@@ -450,7 +450,7 @@ func TestWithlimitHelper(t *testing.T) {
 		input    []int
 		expected []int
 	}{
-		{"limit 0 panics", 0, []int{1, 2, 3}, nil}, // Special case
+		{"limit 0 oops", 0, []int{1, 2, 3}, nil}, // Special case
 		{"limit 1", 1, []int{1, 2, 3}, []int{1}},
 		{"limit equals input", 3, []int{1, 2, 3}, []int{1, 2, 3}},
 		{"limit exceeds input", 5, []int{1, 2, 3}, []int{1, 2, 3}},
@@ -459,27 +459,17 @@ func TestWithlimitHelper(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.limit == 0 {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("withlimit(op, 0) should panic")
-					}
-				}()
-				withlimit(0, func() (int, bool) { return 0, false })
-				return
-			}
-
 			idx := 0
-			op := func() (int, bool) {
+			op := func() (int, *bool) {
 				if idx >= len(tt.input) {
-					return 0, false
+					return 0, ptr(false)
 				}
 				val := tt.input[idx]
 				idx++
-				return val, true
+				return val, ptr(true)
 			}
 
-			fn := withlimit(tt.limit, op)
+			fn := repeat2(tt.limit, op)
 			var result []int
 
 			for {
@@ -663,7 +653,7 @@ func TestSplitsHelper(t *testing.T) {
 		{First: 2, Second: "b"},
 	}
 
-	seq := ElemSplit(Slice(elems))
+	seq := ElemsSplit(Slice(elems))
 
 	result := make([]struct {
 		a int
@@ -730,4 +720,125 @@ func TestMapPop(t *testing.T) {
 	if value != 0 {
 		t.Errorf("mapPop() returned value %v for non-existent key %q, want %v", value, nonExistentKey, 0)
 	}
+}
+
+func TestConjunctionHelper(t *testing.T) {
+	t.Run("Or", func(t *testing.T) {
+		t.Run("True", func(t *testing.T) {
+			t.Run("Late", func(t *testing.T) {
+				count := 0
+				result := orf(
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+					func() bool { count++; return true },
+					func() bool { count++; return false },
+				)
+				if !result {
+					t.Error("unexpected result")
+				}
+				if count != 7 {
+					t.Error("unexpected early return", count)
+				}
+			})
+			t.Run("Early", func(t *testing.T) {
+				count := 0
+				result := orf(
+					func() bool { count++; return true },
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+					func() bool { count++; return false },
+				)
+				if !result {
+					t.Error("unexpected result")
+				}
+				if count != 1 {
+					t.Error("unexpected early return")
+				}
+			})
+		})
+	})
+	t.Run("And", func(t *testing.T) {
+		t.Run("False", func(t *testing.T) {
+			count := 0
+			result := andf(
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { return false },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+			)
+			if result {
+				t.Error("unexpected result")
+			}
+			if count != 5 {
+				t.Error("unexpected early return", count)
+			}
+		})
+		t.Run("True", func(t *testing.T) {
+			count := 0
+			result := andf(
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+				func() bool { count++; return true },
+			)
+			if !result {
+				t.Error("unexpected result")
+			}
+			if count != 4 {
+				t.Error("unexpected early return")
+			}
+		})
+	})
+
+	t.Run("Value", func(t *testing.T) {
+		t.Run("And", func(t *testing.T) {
+			t.Run("False", func(t *testing.T) {
+				result := andv(
+					true,
+					false,
+				)
+				if result {
+					t.Error("unexpected result value")
+				}
+			})
+			t.Run("True", func(t *testing.T) {
+				result := andv(
+					true,
+					true,
+				)
+				if !result {
+					t.Error("unexpected result value")
+				}
+			})
+		})
+		t.Run("Or", func(t *testing.T) {
+			t.Run("True", func(t *testing.T) {
+				result := orv(
+					true,
+					false,
+				)
+				if !result {
+					t.Error("unexpected result value")
+				}
+			})
+			t.Run("False", func(t *testing.T) {
+				result := orv(
+					false,
+					false,
+				)
+				if result {
+					t.Error("unexpected result value")
+				}
+			})
+		})
+	})
 }

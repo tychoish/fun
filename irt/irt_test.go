@@ -8,6 +8,7 @@ import (
 	"maps"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -855,6 +856,19 @@ func TestGenerateWhile(t *testing.T) {
 			expected: []int{1, 2, 3},
 			maxCalls: 4,
 		},
+		{
+			name: "NilPred",
+			op: func() func() int {
+				count := 0
+				return func() int {
+					count++
+					return count
+				}
+			}(),
+			while:    nil,
+			expected: []int{},
+			maxCalls: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1413,26 +1427,53 @@ func TestChunk(t *testing.T) {
 	}
 
 	t.Run("ZeroChunkSize", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic for zero chunk size")
-			}
-		}()
 		seq := Chunk(func(yield func(int) bool) { yield(1) }, 0)
+		count := 0
 		for range seq {
+			count++
 			break
 		}
 	})
 
 	t.Run("NegativeChunkSize", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic for negative chunk size")
-			}
-		}()
+		count := 0
 		seq := Chunk(func(yield func(int) bool) { yield(1) }, -1)
 		for range seq {
+			count++
 			break
+		}
+		if count != 0 {
+			t.Error("should not have iterated")
+		}
+	})
+	t.Run("EarlyReaturn", func(t *testing.T) {
+		count := 0
+		chunks := 0
+		for chunk := range Chunk(GenerateN(30, func() int { count++; return count }), 3) {
+			chunks++
+			innerct := 0
+			for item := range chunk {
+				if item == 0 {
+					t.Fatal("impossible")
+				}
+				innerct++
+			}
+			if chunks == 2 {
+				break
+			}
+
+			if innerct == 0 {
+				t.Error("should iterate", innerct, chunks, count)
+			}
+			if count%3 != 0 {
+				t.Error("impossible chunk size", innerct, chunks, count)
+			}
+		}
+		if count != 6 {
+			t.Error("unexpected iteration", count)
+		}
+		if chunks != 2 {
+			t.Error("unexpected chunk iteration", count)
 		}
 	})
 }
@@ -2132,7 +2173,7 @@ func TestWith2(t *testing.T) {
 				return x * x, x * x * x
 			})
 
-			output := Collect2(ElemSplit(Limit(Elems(gen), 2)))
+			output := Collect2(ElemsSplit(Limit(Elems(gen), 2)))
 
 			expected := map[int]int{
 				1: 1,
@@ -3223,14 +3264,18 @@ func TestUntil2(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
 		input := Collect(Elems(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})))
 		slices.SortFunc(input, ElemCmp)
-
-		output := maps.Collect(Until2(ElemSplit(Slice(input)), func(k string, v int) bool {
+		//		slices.Reverse(input)
+		t.Log(input)
+		intermediate := Collect(Elems(Until2(ElemsSplit(Slice(input)), func(k string, v int) bool {
 			return v > 2
-		}))
+		})))
+		t.Log(intermediate)
 
-		_, notC := output["c"]
-		_, notD := output["d"]
-		if notC || notD {
+		output := Collect2(ElemsSplit(Slice(intermediate)))
+
+		_, hasC := output["c"]
+		_, hasD := output["d"]
+		if hasC || hasD {
 			t.Errorf("Until2() = %v, want all values should have been greater than 2", output)
 		}
 		_, hasA := output["a"]
@@ -3497,4 +3542,22 @@ func TestRemoveNils(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestElems(t *testing.T) {
+	t.Run("Apply", func(t *testing.T) {
+		count := 0
+		ElemsApply(Elems(With(GenerateN(30, func() int { return 7 }), strconv.Itoa)), func(n int, s string) {
+			count++
+			if n != 7 {
+				t.Error("unexpected value")
+			}
+			if s != "7" {
+				t.Errorf("unexpected")
+			}
+		})
+		if count == 0 {
+			t.Error("too many")
+		}
+	})
 }
