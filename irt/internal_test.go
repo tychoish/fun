@@ -2,6 +2,7 @@ package irt
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strconv"
 	"sync/atomic"
@@ -402,6 +403,40 @@ func TestIfelsedoHelper(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIfcallelsecallHelper(t *testing.T) {
+	t.Run("TrueCondition", func(t *testing.T) {
+		thenCalled := false
+		elseCalled := false
+		then := func() { thenCalled = true }
+		elsewise := func() { elseCalled = true }
+
+		ifcallelsecall[any](true, then, elsewise)
+
+		if !thenCalled {
+			t.Error("then was not called")
+		}
+		if elseCalled {
+			t.Error("elsewise was called")
+		}
+	})
+
+	t.Run("FalseCondition", func(t *testing.T) {
+		thenCalled := false
+		elseCalled := false
+		then := func() { thenCalled = true }
+		elsewise := func() { elseCalled = true }
+
+		ifcallelsecall[any](false, then, elsewise)
+
+		if thenCalled {
+			t.Error("then was called")
+		}
+		if !elseCalled {
+			t.Error("elsewise was not called")
+		}
+	})
 }
 
 func TestNtimesHelper(t *testing.T) {
@@ -1308,6 +1343,556 @@ func TestElemOrderingSemantics(t *testing.T) {
 		}
 		if elem1.CompareSecond(cmpf).With(elem1) != 0 {
 			t.Errorf("Expected elem1 == elem1 by Second, got %v", elem1.CompareSecond(cmpf).With(elem1))
+		}
+	})
+}
+
+func TestYieldHelpers(t *testing.T) {
+	t.Run("yieldTo", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ch := make(chan int, 10)
+		y := yieldTo(ctx, ch)
+
+		if !y(1) {
+			t.Error("yieldTo(1) returned false")
+		}
+		if !y(2) {
+			t.Error("yieldTo(2) returned false")
+		}
+
+		cancel()
+		// After cancel, yieldTo should return false
+		if y(3) {
+			t.Error("yieldTo(3) returned true after cancel")
+		}
+
+		close(ch)
+		var results []int
+		for v := range ch {
+			results = append(results, v)
+		}
+		if !slices.Equal(results, []int{1, 2}) {
+			t.Errorf("got %v, want [1, 2]", results)
+		}
+	})
+
+	t.Run("yieldFrom", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			ctx := context.Background()
+			ch := make(chan int, 2)
+			ch <- 1
+			ch <- 2
+			close(ch)
+
+			var results []int
+			yield := func(v int) bool {
+				results = append(results, v)
+				return true
+			}
+
+			if !yieldFrom(ctx, ch, yield) {
+				t.Error("yieldFrom returned false on first item")
+			}
+			if !yieldFrom(ctx, ch, yield) {
+				t.Error("yieldFrom returned false on second item")
+			}
+			if yieldFrom(ctx, ch, yield) {
+				t.Error("yieldFrom returned true on closed channel")
+			}
+
+			if !slices.Equal(results, []int{1, 2}) {
+				t.Errorf("got %v, want [1, 2]", results)
+			}
+		})
+
+		t.Run("ContextCancel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			ch := make(chan int, 1)
+			ch <- 1
+			cancel()
+
+			yield := func(v int) bool { return true }
+			if yieldFrom(ctx, ch, yield) {
+				t.Error("yieldFrom returned true after cancel")
+			}
+		})
+
+		t.Run("YieldFalse", func(t *testing.T) {
+			ctx := context.Background()
+			ch := make(chan int, 1)
+			ch <- 1
+
+			yield := func(v int) bool { return false }
+			if yieldFrom(ctx, ch, yield) {
+				t.Error("yieldFrom returned true when yield returned false")
+			}
+		})
+	})
+}
+
+func TestYieldHookHelpers(t *testing.T) {
+	t.Run("yieldPre", func(t *testing.T) {
+		var order []string
+		h := func() { order = append(order, "hook") }
+		yield := func(in int) bool {
+			order = append(order, "yield")
+			return in > 0
+		}
+
+		wrapped := yieldPre(h, yield)
+
+		if !wrapped(1) {
+			t.Error("expected true")
+		}
+		if !slices.Equal(order, []string{"hook", "yield"}) {
+			t.Errorf("unexpected order: %v", order)
+		}
+
+		order = nil
+		if wrapped(0) {
+			t.Error("expected false")
+		}
+		if !slices.Equal(order, []string{"hook", "yield"}) {
+			t.Errorf("unexpected order: %v", order)
+		}
+	})
+
+	t.Run("yieldPost", func(t *testing.T) {
+		var order []string
+		h := func() { order = append(order, "hook") }
+		yield := func(in int) bool {
+			order = append(order, "yield")
+			return in > 0
+		}
+
+		wrapped := yieldPost(h, yield)
+
+		if !wrapped(1) {
+			t.Error("expected true")
+		}
+		if !slices.Equal(order, []string{"yield", "hook"}) {
+			t.Errorf("unexpected order: %v", order)
+		}
+
+		order = nil
+		if wrapped(0) {
+			t.Error("expected false")
+		}
+		if !slices.Equal(order, []string{"yield", "hook"}) {
+			t.Errorf("unexpected order: %v", order)
+		}
+	})
+
+	t.Run("yieldPreHook", func(t *testing.T) {
+		var observed int
+		var order []string
+		h := func(in int) {
+			observed = in
+			order = append(order, "hook")
+		}
+		yield := func(in int) bool {
+			order = append(order, "yield")
+			return in > 0
+		}
+
+		wrapped := yieldPreHook(h, yield)
+
+		if !wrapped(42) {
+			t.Error("expected true")
+		}
+		if observed != 42 {
+			t.Errorf("expected 42, got %d", observed)
+		}
+		if !slices.Equal(order, []string{"hook", "yield"}) {
+			t.Errorf("unexpected order: %v", order)
+		}
+	})
+
+	t.Run("yieldPostHook", func(t *testing.T) {
+		var observed int
+		var order []string
+		h := func(in int) {
+			observed = in
+			order = append(order, "hook")
+		}
+		yield := func(in int) bool {
+			order = append(order, "yield")
+			return in > 0
+		}
+
+		wrapped := yieldPostHook(h, yield)
+
+		if !wrapped(42) {
+			t.Error("expected true")
+		}
+		if observed != 42 {
+			t.Errorf("expected 42, got %d", observed)
+		}
+		if !slices.Equal(order, []string{"yield", "hook"}) {
+			t.Errorf("unexpected order: %v", order)
+		}
+	})
+}
+
+func TestPredicateSemantics(t *testing.T) {
+	t.Run("Comparison", func(t *testing.T) {
+		if !predLT(10)(5) {
+			t.Error("predLT")
+		}
+		if predLT(10)(10) {
+			t.Error("predLT eq")
+		}
+		if !predGT(5)(10) {
+			t.Error("predGT")
+		}
+		if predGT(5)(5) {
+			t.Error("predGT eq")
+		}
+		if !predEQ(5)(5) {
+			t.Error("predEQ")
+		}
+		if predEQ(5)(6) {
+			t.Error("predEQ neq")
+		}
+		if !predLTE(10)(5) || !predLTE(10)(10) {
+			t.Error("predLTE")
+		}
+		if predLTE(10)(11) {
+			t.Error("predLTE gt")
+		}
+		if !predGTE(5)(10) || !predGTE(5)(5) {
+			t.Error("predGTE")
+		}
+		if predGTE(5)(4) {
+			t.Error("predGTE lt")
+		}
+	})
+
+	t.Run("Not", func(t *testing.T) {
+		if not(true) {
+			t.Error("not true")
+		}
+		if !not(false) {
+			t.Error("not false")
+		}
+
+		if notf2(func(a, b int) bool { return a == b })(1, 1) {
+			t.Error("notf2")
+		}
+	})
+
+	t.Run("NilAndZero", func(t *testing.T) {
+		var c chan int
+		if !isNilChan(c) {
+			t.Error("isNilChan nil")
+		}
+		c = make(chan int)
+		if isNilChan(c) {
+			t.Error("isNilChan non-nil")
+		}
+
+		if isNotZero(0) {
+			t.Error("isNotZero zero")
+		}
+		if !isNotZero(1) {
+			t.Error("isNotZero non-zero")
+		}
+	})
+
+	t.Run("OkAndError", func(t *testing.T) {
+		if !isOk(0, true) {
+			t.Error("isOk true")
+		}
+		if isOk(0, false) {
+			t.Error("isOk false")
+		}
+
+		err := errors.New("error")
+		if !isError(err) {
+			t.Error("isError")
+		}
+		if isError(nil) {
+			t.Error("isError nil")
+		}
+		if !isError2(0, err) {
+			t.Error("isError2")
+		}
+		if isError2(0, nil) {
+			t.Error("isError2 nil")
+		}
+
+		if isSuccess(err) {
+			t.Error("isSuccess")
+		}
+		if !isSuccess(nil) {
+			t.Error("isSuccess nil")
+		}
+		if isSuccess2(0, err) {
+			t.Error("isSuccess2")
+		}
+		if !isSuccess2(0, nil) {
+			t.Error("isSuccess2 nil")
+		}
+	})
+
+	t.Run("isWithin", func(t *testing.T) {
+		if !isWithin(0, 1) {
+			t.Error("isWithin start")
+		}
+		if !isWithin(1, 2) {
+			t.Error("isWithin end")
+		}
+		if isWithin(-1, 1) {
+			t.Error("isWithin neg")
+		}
+		if isWithin(1, 1) {
+			t.Error("isWithin out")
+		}
+	})
+
+	t.Run("withcheck", func(t *testing.T) {
+		err := errors.New("error")
+		v, ok := withcheck(42, err)
+		if !ok || v != 42 {
+			t.Errorf("withcheck err: %v, %v", v, ok)
+		}
+		v, ok = withcheck(42, nil)
+		if ok || v != 0 {
+			t.Errorf("withcheck nil: %v, %v", v, ok)
+		}
+	})
+}
+
+func TestResultManipulators(t *testing.T) {
+	t.Run("flipfn", func(t *testing.T) {
+		op := func(a int, b string) (int, string) { return a + 1, b + "!" }
+		flipped := flipfn(op)
+		s, i := flipped("hi", 10)
+		if s != "hi!" || i != 11 {
+			t.Errorf("got %v, %v", s, i)
+		}
+	})
+	t.Run("ignoreSecond", func(t *testing.T) {
+		op := func(a int) int { return a * 2 }
+		ignored := ignoreSecond[int, string](op)
+		if ignored(21, "ignored") != 42 {
+			t.Error("wrong result")
+		}
+	})
+	t.Run("ignoreFirst", func(t *testing.T) {
+		op := func(b string) string { return b + "!" }
+		ignored := ignoreFirst[int, string](op)
+		if ignored(123, "hi") != "hi!" {
+			t.Error("wrong result")
+		}
+	})
+}
+
+func TestDefaultConstructors(t *testing.T) {
+	t.Run("orDefault", func(t *testing.T) {
+		if orDefault(0, 42) != 42 {
+			t.Error("zero value not replaced")
+		}
+		if orDefault(10, 42) != 10 {
+			t.Error("non-zero value replaced")
+		}
+	})
+	t.Run("orDefaultNew", func(t *testing.T) {
+		called := false
+		op := func() int { called = true; return 42 }
+		if orDefaultNew(0, op) != 42 || !called {
+			t.Error("zero value not replaced or op not called")
+		}
+		called = false
+		if orDefaultNew(10, op) != 10 || called {
+			t.Error("non-zero value replaced or op called")
+		}
+	})
+}
+
+func TestCounterHelpersExtended(t *testing.T) {
+	t.Run("counterLT", func(t *testing.T) {
+		lt3 := counterLT(3)
+		if !lt3() {
+			t.Error("1 < 3")
+		}
+		if !lt3() {
+			t.Error("2 < 3")
+		}
+		if lt3() {
+			t.Error("3 < 3")
+		}
+	})
+	t.Run("counterLTE", func(t *testing.T) {
+		lte3 := counterLTE(3)
+		if !lte3() {
+			t.Error("1 <= 3")
+		}
+		if !lte3() {
+			t.Error("2 <= 3")
+		}
+		if !lte3() {
+			t.Error("3 <= 3")
+		}
+		if lte3() {
+			t.Error("4 <= 3")
+		}
+	})
+}
+
+func TestLazyPointerHelpers(t *testing.T) {
+	t.Run("ptrznillazy", func(t *testing.T) {
+		fn := ptrznillazy(0)
+		if fn() != nil {
+			t.Error("expected nil for zero value")
+		}
+		fn = ptrznillazy(42)
+		p := fn()
+		if p == nil || *p != 42 {
+			t.Errorf("expected 42, got %v", p)
+		}
+	})
+	t.Run("derefzlazy", func(t *testing.T) {
+		var p *int
+		fn := derefzlazy(p)
+		if fn() != 0 {
+			t.Error("expected zero value for nil pointer")
+		}
+		val := 42
+		p = &val
+		fn = derefzlazy(p)
+		if fn() != 42 {
+			t.Errorf("expected 42, got %v", fn())
+		}
+	})
+}
+
+func TestSliceAccessors(t *testing.T) {
+	sl := []int{10, 20, 30}
+	t.Run("idx", func(t *testing.T) {
+		if idx(sl, 1) != 20 {
+			t.Error("wrong value")
+		}
+	})
+	t.Run("idxfn", func(t *testing.T) {
+		fn := idxfn(sl, 2)
+		if fn() != 30 {
+			t.Error("wrong value")
+		}
+	})
+	t.Run("idxcheck", func(t *testing.T) {
+		if !idxcheck(sl, 0) {
+			t.Error("0 should be valid")
+		}
+		if idxcheck(sl, 3) {
+			t.Error("3 should be invalid")
+		}
+		if idxcheck(sl, -1) {
+			t.Error("-1 should be invalid")
+		}
+	})
+	t.Run("idxorzfn", func(t *testing.T) {
+		fn := idxorzfn(sl)
+		if fn(1) != 20 {
+			t.Error("wrong value for valid index")
+		}
+		if fn(5) != 0 {
+			t.Error("wrong value for invalid index")
+		}
+	})
+}
+
+func TestSendTo(t *testing.T) {
+	t.Run("BlockedAndCanceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		ch := make(chan int) // unbuffered
+		cancel()
+		if sendTo(ctx, 1, ch) {
+			t.Error("expected false")
+		}
+	})
+	t.Run("Success", func(t *testing.T) {
+		ctx := context.Background()
+		ch := make(chan int, 1)
+		if !sendTo(ctx, 1, ch) {
+			t.Error("expected true")
+		}
+		if <-ch != 1 {
+			t.Error("wrong value")
+		}
+	})
+}
+
+func TestRecieveFrom(t *testing.T) {
+	t.Run("Canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		ch := make(chan int)
+		cancel()
+		_, ok := recieveFrom(ctx, ch)
+		if ok {
+			t.Error("expected !ok")
+		}
+	})
+	t.Run("Success", func(t *testing.T) {
+		ctx := context.Background()
+		ch := make(chan int, 1)
+		ch <- 42
+		val, ok := recieveFrom(ctx, ch)
+		if !ok || val != 42 {
+			t.Errorf("got %v, %v", val, ok)
+		}
+	})
+}
+
+func TestMapIterators(t *testing.T) {
+	m := map[string]int{"a": 1, "b": 2}
+	t.Run("keys", func(t *testing.T) {
+		k := Collect(keys(m))
+		slices.Sort(k)
+		if !slices.Equal(k, []string{"a", "b"}) {
+			t.Errorf("got %v", k)
+		}
+	})
+	t.Run("values", func(t *testing.T) {
+		v := Collect(values(m))
+		slices.Sort(v)
+		if !slices.Equal(v, []int{1, 2}) {
+			t.Errorf("got %v", v)
+		}
+	})
+}
+
+func TestSeenKey(t *testing.T) {
+	s := seenkey[string, int]()
+	if s("a", 1) {
+		t.Error("first time should be false")
+	}
+	if !s("a", 2) {
+		t.Error("second time with same key should be true")
+	}
+	if s("b", 1) {
+		t.Error("new key should be false")
+	}
+}
+
+func TestOnceHelpers(t *testing.T) {
+	t.Run("oncev", func(t *testing.T) {
+		count := 0
+		op := func() int { count++; return 42 }
+		fn := oncev(op)
+		if fn() != 42 || fn() != 42 || count != 1 {
+			t.Errorf("count=%d", count)
+		}
+	})
+	t.Run("oncevs", func(t *testing.T) {
+		count := 0
+		op := func() (int, string) { count++; return 42, "hi" }
+		fn := oncevs(op)
+		a, b := fn()
+		c, d := fn()
+		if a != 42 || b != "hi" || c != 42 || d != "hi" || count != 1 {
+			t.Errorf("count=%d", count)
 		}
 	})
 }

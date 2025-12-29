@@ -344,26 +344,33 @@ func opwithch[T any](o func(chan T)) (chan T, func())      { c := make(chan T); 
 
 func seqToChan[T any](ctx context.Context, seq iter.Seq[T], ch chan T) { flush(seq, yieldTo(ctx, ch)) }
 
-func yieldFrom[T any](ctx context.Context, ch <-chan T, yield func(T) bool) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case item, ok := <-ch:
-		return ok && yield(item)
-	}
+func yieldTo[T any](ctx context.Context, ch chan T) func(T) bool {
+	return func(v T) bool { return ctx.Err() == nil && sendTo(ctx, v, ch) }
 }
 
-func sendTo[T any](ctx context.Context, value T, ch chan T) bool {
+func yieldFrom[T any](ctx context.Context, ch <-chan T, yield func(T) bool) bool {
+	if ctx.Err() == nil {
+		item, ok := recieveFrom(ctx, ch)
+		return ok && yield(item)
+	}
+	return false
+}
+
+func recieveFrom[T any](ctx context.Context, ch <-chan T) (out T, ok bool) {
+	select {
+	case <-ctx.Done():
+	case out, ok = <-ch:
+	}
+	return
+}
+
+func sendTo[T any](ctx context.Context, value T, ch chan<- T) bool {
 	select {
 	case <-ctx.Done():
 		return false
 	case ch <- value:
 		return true
 	}
-}
-
-func yieldTo[T any](ctx context.Context, ch chan T) func(T) bool {
-	return func(v T) bool { return sendTo(ctx, v, ch) }
 }
 
 ////////////////////////////////
