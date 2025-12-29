@@ -3262,9 +3262,13 @@ func TestUntil(t *testing.T) {
 
 func TestUntil2(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
-		input := Collect(Elems(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})))
-		slices.SortFunc(input, ElemCmp)
-		//		slices.Reverse(input)
+		input := []Elem[string, int]{
+			{First: "a", Second: 1},
+			{First: "b", Second: 2},
+			{First: "c", Second: 3},
+			{First: "d", Second: 4},
+		}
+
 		t.Log(input)
 		intermediate := Collect(Elems(Until2(ElemsSplit(Slice(input)), func(k string, v int) bool {
 			return v > 2
@@ -3273,19 +3277,26 @@ func TestUntil2(t *testing.T) {
 
 		output := Collect2(ElemsSplit(Slice(intermediate)))
 
+		if len(output) != 2 {
+			t.Fatalf("expected 2 elements, but got %d: %+v", len(output), output)
+		}
+
 		_, hasC := output["c"]
 		_, hasD := output["d"]
 		if hasC || hasD {
-			t.Errorf("Until2() = %v, want all values should have been greater than 2", output)
+			t.Errorf("Until2() = %v, want all values to be less than or equal to 2", output)
 		}
 		_, hasA := output["a"]
 		_, hasB := output["b"]
-		if !hasA && !hasB {
-			t.Error("Util2 should have seen one valid value, instead:", output)
+		if !hasA || !hasB {
+			t.Error("Until2 should have seen both a and b, instead:", output)
 		}
 	})
 
 	t.Run("EarlyReturn", func(t *testing.T) {
+		// this test is a bit weird, as it depends on the iteration
+		// order of the map. it seems to work for now, but it's
+		// a bit fragile.
 		input := Map(map[string]int{"a": 1, "b": 2, "c": 3})
 		output := Collect2(Until2(input, func(k string, v int) bool {
 			return v == 2
