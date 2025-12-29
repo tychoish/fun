@@ -391,14 +391,12 @@ func Until2[A, B any](seq iter.Seq2[A, B], is func(A, B) bool) iter.Seq2[A, B] {
 
 func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		if prd != nil && seq != nil {
-			for value := range seq {
-				switch {
-				case prd(value) && yield(value):
-					continue
-				default:
-					return
-				}
+		for value := range seq {
+			switch {
+			case prd(value) && yield(value):
+				continue
+			default:
+				return
 			}
 		}
 	}
@@ -406,14 +404,12 @@ func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 
 func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
-		if prd != nil && seq != nil {
-			for key, value := range seq {
-				switch {
-				case prd(key, value) && yield(key, value):
-					continue
-				default:
-					return
-				}
+		for key, value := range seq {
+			switch {
+			case prd(key, value) && yield(key, value):
+				continue
+			default:
+				return
 			}
 		}
 	}
@@ -421,11 +417,9 @@ func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] 
 
 func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		if prd != nil && seq != nil {
-			for value := range seq {
-				if prd(value) && !yield(value) {
-					return
-				}
+		for value := range seq {
+			if prd(value) && !yield(value) {
+				return
 			}
 		}
 	}
@@ -433,11 +427,9 @@ func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 
 func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
-		if prd != nil && seq != nil {
-			for key, value := range seq {
-				if prd(key, value) && !yield(key, value) {
-					return
-				}
+		for key, value := range seq {
+			if prd(key, value) && !yield(key, value) {
+				return
 			}
 		}
 	}
@@ -853,9 +845,6 @@ func toCmp2[A, B any, K cmp.Ordered](to func(A, B) K) func(Elem[A, B], Elem[A, B
 // higher order operations
 
 func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
-	if seq == nil {
-		return true
-	}
 	for value := range seq {
 		if !yield(value) {
 			return false

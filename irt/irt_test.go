@@ -856,19 +856,6 @@ func TestGenerateWhile(t *testing.T) {
 			expected: []int{1, 2, 3},
 			maxCalls: 4,
 		},
-		{
-			name: "NilPred",
-			op: func() func() int {
-				count := 0
-				return func() int {
-					count++
-					return count
-				}
-			}(),
-			while:    nil,
-			expected: []int{},
-			maxCalls: 0,
-		},
 	}
 
 	for _, tt := range tests {
@@ -3264,7 +3251,7 @@ func TestUntil2(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
 		input := Collect(Elems(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})))
 		slices.SortFunc(input, ElemCmp)
-		//		slices.Reverse(input)
+		slices.Reverse(input)
 		t.Log(input)
 		intermediate := Collect(Elems(Until2(ElemsSplit(Slice(input)), func(k string, v int) bool {
 			return v > 2
@@ -3560,4 +3547,200 @@ func TestElems(t *testing.T) {
 			t.Error("too many")
 		}
 	})
+}
+
+func TestKeepOk(t *testing.T) {
+	t.Run("Normal", func(t *testing.T) {
+		input := func(yield func(int, bool) bool) {
+			_ = yield(1, true) && yield(2, false) && yield(3, true)
+		}
+		got := Collect(KeepOk(input))
+		want := []int{1, 3}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var count atomic.Int32
+		input := func(yield func(int, bool) bool) {
+			for i := 0; i < 10; i++ {
+				count.Add(1)
+				if !yield(i, true) {
+					return
+				}
+			}
+		}
+		// Stop after 2 items
+		i := 0
+		for range KeepOk(input) {
+			i++
+			if i == 2 {
+				break
+			}
+		}
+		if count.Load() != 2 {
+			t.Errorf("expected 2 iterations, got %d", count.Load())
+		}
+	})
+}
+
+func TestWhileOk(t *testing.T) {
+	t.Run("Normal", func(t *testing.T) {
+		input := func(yield func(int, bool) bool) {
+			_ = yield(1, true) && yield(2, true) && yield(3, false) && yield(4, true)
+		}
+		got := Collect(WhileOk(input))
+		want := []int{1, 2}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+}
+
+func TestWhileSuccess(t *testing.T) {
+	t.Run("Normal", func(t *testing.T) {
+		err := errors.New("fail")
+		input := func(yield func(int, error) bool) {
+			_ = yield(1, nil) && yield(2, nil) && yield(3, err) && yield(4, nil)
+		}
+		got := Collect(WhileSuccess(input))
+		want := []int{1, 2}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+}
+
+func TestWithHooks(t *testing.T) {
+	t.Run("ExecutionOrder", func(t *testing.T) {
+		var log []string
+		seq := WithHooks(
+			Slice([]int{1}),
+			func() { log = append(log, "before") },
+			func() { log = append(log, "after") },
+		)
+		for range seq {
+			log = append(log, "item")
+		}
+		want := []string{"before", "item", "after"}
+		if !slices.Equal(log, want) {
+			t.Errorf("got %v, want %v", log, want)
+		}
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var afterCalled bool
+		seq := WithHooks(
+			Slice([]int{1, 2, 3}),
+			nil,
+			func() { afterCalled = true },
+		)
+		for range seq {
+			break
+		}
+		if !afterCalled {
+			t.Error("after hook should be called even on early return")
+		}
+	})
+}
+
+func TestWithSetup(t *testing.T) {
+	t.Run("Once", func(t *testing.T) {
+		var count atomic.Int32
+		seq := WithSetup(Slice([]int{1, 2}), func() { count.Add(1) })
+		Collect(seq)
+		Collect(seq)
+		if count.Load() != 1 {
+			t.Errorf("setup called %d times, want 1", count.Load())
+		}
+	})
+}
+
+func TestCount(t *testing.T) {
+	tests := []struct {
+		name  string
+		input iter.Seq[int]
+		want  int
+	}{
+		{"Empty input", Slice([]int{}), 0},
+		{"Single element", Slice([]int{1}), 1},
+		{"Two elements", Slice([]int{1, 2}), 2},
+		{"Normal input", Slice([]int{1, 2, 3, 4, 5, 6, 7, 8}), 8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Count(tt.input)
+			if got != tt.want {
+				t.Errorf("Count() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCount2(t *testing.T) {
+	tests := []struct {
+		name  string
+		input iter.Seq2[int, string]
+		want  int
+	}{
+		{"Empty input", ElemsSplit(Slice([]Elem[int, string]{})), 0},
+		{"Single element", ElemsSplit(Slice([]Elem[int, string]{{1, "a"}})), 1},
+		{"Two elements", ElemsSplit(Slice([]Elem[int, string]{{1, "a"}, {2, "b"}})), 2},
+		{"Normal input", ElemsSplit(Slice([]Elem[int, string]{
+			{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}, {5, "e"}, {6, "f"}, {7, "g"}, {8, "h"},
+		})), 8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Count2(tt.input)
+			if got != tt.want {
+				t.Errorf("Count2() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSortBy(t *testing.T) {
+	tests := []struct {
+		name  string
+		input iter.Seq[int]
+		want  []int
+	}{
+		{"Empty input", Slice([]int{}), []int{}},
+		{"Single element", Slice([]int{1}), []int{1}},
+		{"Two elements", Slice([]int{2, 1}), []int{1, 2}},
+		{"Normal input", Slice([]int{5, 3, 8, 1, 2, 7, 4, 6}), []int{1, 2, 3, 4, 5, 6, 7, 8}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Collect(SortBy(tt.input, func(v int) int { return v }))
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("SortBy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSortBy2(t *testing.T) {
+	tests := []struct {
+		name  string
+		input iter.Seq2[int, string]
+		want  []Elem[int, string]
+	}{
+		{"Empty input", ElemsSplit(Slice([]Elem[int, string]{})), []Elem[int, string]{}},
+		{"Single element", ElemsSplit(Slice([]Elem[int, string]{{1, "a"}})), []Elem[int, string]{{1, "a"}}},
+		{"Two elements", ElemsSplit(Slice([]Elem[int, string]{{2, "b"}, {1, "a"}})), []Elem[int, string]{{1, "a"}, {2, "b"}}},
+		{"Normal input", ElemsSplit(Slice([]Elem[int, string]{
+			{5, "e"}, {3, "c"}, {8, "h"}, {1, "a"}, {2, "b"}, {7, "g"}, {4, "d"}, {6, "f"},
+		})), []Elem[int, string]{
+			{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}, {5, "e"}, {6, "f"}, {7, "g"}, {8, "h"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Collect(Elems(SortBy2(tt.input, func(k int, v string) int { return k })))
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("SortBy2() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
