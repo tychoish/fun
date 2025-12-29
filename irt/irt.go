@@ -227,6 +227,9 @@ func GenerateN[T any](num int, op func() T) iter.Seq[T] {
 
 func ForEach[T any](seq iter.Seq[T], op func(T)) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if seq == nil {
+			return
+		}
 		for value := range seq {
 			op(value)
 			if !yield(value) {
@@ -238,6 +241,9 @@ func ForEach[T any](seq iter.Seq[T], op func(T)) iter.Seq[T] {
 
 func ForEachWhile[T any](seq iter.Seq[T], op func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if seq == nil {
+			return
+		}
 		for value := range seq {
 			if !op(value) || !yield(value) {
 				return
@@ -248,6 +254,9 @@ func ForEachWhile[T any](seq iter.Seq[T], op func(T) bool) iter.Seq[T] {
 
 func ForEach2[A, B any](seq iter.Seq2[A, B], op func(A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
+		if seq == nil {
+			return
+		}
 		for key, value := range seq {
 			op(key, value)
 			if !yield(key, value) {
@@ -259,6 +268,9 @@ func ForEach2[A, B any](seq iter.Seq2[A, B], op func(A, B)) iter.Seq2[A, B] {
 
 func ForEachWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
+		if seq == nil {
+			return
+		}
 		for key, value := range seq {
 			if !op(key, value) || !yield(key, value) {
 				return
