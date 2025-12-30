@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 func TestOptionProvider(t *testing.T) {
 	t.Run("Set", func(t *testing.T) {
 		conf := &WorkerGroupConf{ExcludedErrors: []error{ers.ErrLimitExceeded}}
-		newc := &WorkerGroupConf{ContinueOnPanic: true, ExcludedErrors: []error{ErrRecoveredPanic, ers.ErrInvariantViolation}}
+		newc := &WorkerGroupConf{ContinueOnPanic: true, ExcludedErrors: []error{ers.ErrRecoveredPanic, ers.ErrInvariantViolation}}
 		eone := errors.New("cat")
 		etwo := errors.New("3")
 

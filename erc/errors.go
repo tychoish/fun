@@ -238,7 +238,7 @@ func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
 // Recover can be used in a defer to collect a panic and add it to the collector.
 func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
-// WithRecover calls the provided function, collecting any.
+// WithRecover calls the provided function, collecting any .
 func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
 
 // WithRecoverHook catches a panic and adds it to the error collector

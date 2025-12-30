@@ -32,7 +32,7 @@ func TestHandlers(t *testing.T) {
 
 		ft.CallTimes(128, func() { jobs = append(jobs, op) })
 
-		err := SliceStream(jobs).Parallel(fnx.MAKE.OperationHandler(), WorkerGroupConfNumWorkers(4)).Run(ctx)
+		err := SliceStream(jobs).Parallel(fnx.MAKE.OperationHandler(), fnx.WorkerGroupConfNumWorkers(4)).Run(ctx)
 		assert.NotError(t, err)
 		check.Equal(t, count, 128)
 	})

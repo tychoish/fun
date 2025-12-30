@@ -147,7 +147,7 @@ func Wait(seq iter.Seq[fnx.Operation]) *Service {
 func ProcessStream[T any](
 	seq iter.Seq[T],
 	processor fnx.Handler[T],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) *Service {
 	st := fun.IteratorStream(seq)
 	return &Service{
@@ -177,9 +177,9 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 
 			if err := fun.InterfaceStream(pipe.Distributor()).Parallel(
 				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfContinueOnPanic(),
-				fun.WorkerGroupConfWorkerPerCPU(),
+				fnx.WorkerGroupConfContinueOnError(),
+				fnx.WorkerGroupConfContinueOnPanic(),
+				fnx.WorkerGroupConfWorkerPerCPU(),
 			).Run(ctx); err != nil {
 				return fmt.Errorf("hit timeout [%d], %w", timeout, err)
 			}
@@ -193,7 +193,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Service {
 	return &Service{
 		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(
 			func(ctx context.Context, fn fnx.Worker) error {
@@ -224,7 +224,7 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fun.OptionProvider[
 func HandlerWorkerPool(
 	workQueue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) *Service {
 	s := &Service{
 		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(

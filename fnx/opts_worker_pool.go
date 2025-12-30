@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fn"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -88,10 +89,10 @@ func (o *WorkerGroupConf) CanContinueOnError(err error) (out bool) {
 	}
 }
 
-// errorFilter is a method which can be used as an erc.Filter
+// Filter is a method which can be used as an erc.Filter
 // function, and used in worker pool implementations process as
 // configured.
-func (o *WorkerGroupConf) errorFilter(err error) error {
+func (o *WorkerGroupConf) Filter(err error) error {
 	switch {
 	case err == nil:
 		return nil
@@ -100,6 +101,10 @@ func (o *WorkerGroupConf) errorFilter(err error) error {
 	default:
 		return err
 	}
+}
+
+func (o *WorkerGroupConf) workersForPool() fn.Converter[Worker, Worker] {
+	return func(wf Worker) Worker { return wf.WithRecover().WithErrorFilter(o.Filter) }
 }
 
 // WorkerGroupConfDefaults sets the "continue-on-error" option and the

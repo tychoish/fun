@@ -48,7 +48,7 @@ func TestSmoke(t *testing.T) {
 				return rv + int16(out), nil
 			},
 			0,
-			fun.WorkerGroupConfNumWorkers(2),
+			fnx.WorkerGroupConfNumWorkers(2),
 		)
 		ctx := testt.Context(t)
 
@@ -259,7 +259,7 @@ func TestRateLimit(t *testing.T) {
 				check.True(t, in <= 100)
 				count.Add(1)
 				testt.Log(t, count.Get(), "-->", time.Now())
-			}), fun.WorkerGroupConfNumWorkers(4)).Run(testt.Context(t)))
+			}), fnx.WorkerGroupConfNumWorkers(4)).Run(testt.Context(t)))
 		end := time.Now()
 		dur := end.Sub(start)
 

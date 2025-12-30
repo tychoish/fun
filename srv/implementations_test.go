@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
@@ -50,7 +49,7 @@ func TestHelpers(t *testing.T) {
 			srv := ProcessStream(
 				makeSeq(100),
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
-				fun.WorkerGroupConfNumWorkers(2),
+				fnx.WorkerGroupConfNumWorkers(2),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -74,7 +73,7 @@ func TestHelpers(t *testing.T) {
 					count.Add(1)
 					return nil
 				},
-				fun.WorkerGroupConfNumWorkers(50),
+				fnx.WorkerGroupConfNumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -101,7 +100,7 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				fun.WorkerGroupConfWorkerPerCPU(),
+				fnx.WorkerGroupConfWorkerPerCPU(),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -121,7 +120,7 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				fun.WorkerGroupConfWorkerPerCPU(),
+				fnx.WorkerGroupConfWorkerPerCPU(),
 			)
 			ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
 
@@ -150,7 +149,7 @@ func TestHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				fun.WorkerGroupConfNumWorkers(50),
+				fnx.WorkerGroupConfNumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -178,7 +177,7 @@ func TestHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				fun.WorkerGroupConfNumWorkers(50),
+				fnx.WorkerGroupConfNumWorkers(50),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 

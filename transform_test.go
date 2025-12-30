@@ -22,7 +22,7 @@ import (
 	"github.com/tychoish/fun/fnx"
 )
 
-func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...OptionProvider[*WorkerGroupConf]) *Stream[O] {
+func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Stream[O] {
 	return Convert(mpf).Parallel(it, optp...)
 }
 
@@ -139,7 +139,7 @@ func TestMapReduce(t *testing.T) {
 
 		ChannelStream(pipe).
 			ReadAll(
-				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &WorkerGroupConf{}),
+				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &fnx.WorkerGroupConf{}),
 			).
 			Ignore().
 			Add(ctx, wg)
@@ -276,7 +276,7 @@ func TestParallelForEach(t *testing.T) {
 						seen.Add(int64(in))
 						return nil
 					},
-					WorkerGroupConfNumWorkers(int(i))).Run(ctx)
+					fnx.WorkerGroupConfNumWorkers(int(i))).Run(ctx)
 
 				check.NotError(t, err)
 
@@ -302,8 +302,8 @@ func TestParallelForEach(t *testing.T) {
 				}
 				return nil
 			},
-			WorkerGroupConfNumWorkers(3),
-			WorkerGroupConfContinueOnPanic(),
+			fnx.WorkerGroupConfNumWorkers(3),
+			fnx.WorkerGroupConfContinueOnPanic(),
 		).Run(ctx)
 		if err == nil {
 			t.Error("should have errored", err)
@@ -336,7 +336,7 @@ func TestParallelForEach(t *testing.T) {
 					seenCount.Add(1)
 					return nil
 				},
-				WorkerGroupConfNumWorkers(4),
+				fnx.WorkerGroupConfNumWorkers(4),
 			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -364,7 +364,7 @@ func TestParallelForEach(t *testing.T) {
 					}
 					return nil
 				},
-				WorkerGroupConfNumWorkers(8),
+				fnx.WorkerGroupConfNumWorkers(8),
 			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -381,8 +381,8 @@ func TestParallelForEach(t *testing.T) {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
 				},
-				WorkerGroupConfNumWorkers(4),
-				WorkerGroupConfContinueOnError(),
+				fnx.WorkerGroupConfNumWorkers(4),
+				fnx.WorkerGroupConfContinueOnError(),
 			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -405,7 +405,7 @@ func TestParallelForEach(t *testing.T) {
 				func(_ context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
-				WorkerGroupConfNumWorkers(2),
+				fnx.WorkerGroupConfNumWorkers(2),
 			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -427,7 +427,7 @@ func TestParallelForEach(t *testing.T) {
 			func(_ context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
-			WorkerGroupConfWorkerPerCPU(),
+			fnx.WorkerGroupConfWorkerPerCPU(),
 		).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -464,7 +464,7 @@ func TestParallelForEach(t *testing.T) {
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
-				WorkerGroupConfIncludeContextErrors(),
+				fnx.WorkerGroupConfIncludeContextErrors(),
 			).Run(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, context.Canceled)
@@ -548,8 +548,8 @@ func RunStreamImplementationTests[T comparable](
 								func(_ context.Context, _ T) (T, error) {
 									panic("whoop")
 								},
-								WorkerGroupConfNumWorkers(2),
-								WorkerGroupConfContinueOnError(),
+								fnx.WorkerGroupConfNumWorkers(2),
+								fnx.WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 
 							if err == nil {
@@ -598,7 +598,7 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								WorkerGroupConfContinueOnError(),
+								fnx.WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Fatal("expected error", out)
@@ -625,8 +625,8 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								WorkerGroupConfContinueOnPanic(),
-								WorkerGroupConfNumWorkers(1),
+								fnx.WorkerGroupConfContinueOnPanic(),
+								fnx.WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 
 							if err == nil {
@@ -649,7 +649,7 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								WorkerGroupConfNumWorkers(1),
+								fnx.WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -675,8 +675,8 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								WorkerGroupConfNumWorkers(4),
-								WorkerGroupConfContinueOnError(),
+								fnx.WorkerGroupConfNumWorkers(4),
+								fnx.WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -767,7 +767,7 @@ func RunStreamStringAlgoTests(
 								}
 								return strings.TrimSpace(str), nil
 							},
-							WorkerGroupConfNumWorkers(4),
+							fnx.WorkerGroupConfNumWorkers(4),
 						).Slice(t.Context())
 						if err != nil {
 							t.Error(len(vals), " >>:", err)
@@ -919,7 +919,7 @@ func RunStreamStringAlgoTests(
 		counter := 0
 		out, err := ConvertFn(func(in int) string { counter++; return fmt.Sprint(in) }).Parallel(
 			SliceStream([]int{42, 84, 21}),
-			WorkerGroupConfWithErrorCollector(nil),
+			fnx.WorkerGroupConfWithErrorCollector(nil),
 		).Slice(t.Context())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)

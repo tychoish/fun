@@ -29,7 +29,7 @@ import (
 func Map[T any, O any](
 	input *fun.Stream[T],
 	mapFn fnx.Converter[T, O],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) *fun.Stream[O] {
 	return fun.Convert(mapFn).Parallel(input, optp...)
 }
@@ -50,7 +50,7 @@ func MapReduce[T any, O any, R any](
 	mapFn fnx.Converter[T, O],
 	reduceFn func(O, R) (R, error),
 	initialReduceValue R,
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) fnx.Future[R] {
 	return Reduce(Map(input, mapFn, optp...), reduceFn, initialReduceValue)
 }

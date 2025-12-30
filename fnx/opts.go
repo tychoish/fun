@@ -1,4 +1,4 @@
-package fun
+package fnx
 
 import (
 	"github.com/tychoish/fun/erc"

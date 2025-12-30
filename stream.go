@@ -19,6 +19,7 @@ import (
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // ErrStreamContinue instructs consumers of Streams and related
@@ -186,7 +187,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 			// start a thread for reading this
 			// sub-iterator.
 
-			iter.Parallel(send.Write, WorkerGroupConfNumWorkers(pipe.Cap())).
+			iter.Parallel(send.Write, fnx.WorkerGroupConfNumWorkers(pipe.Cap())).
 				Operation(ec.Push).
 				PostHook(func() { ec.Push(iter.Close()) }).
 				Add(ctx, wg)
@@ -355,20 +356,17 @@ func (st *Stream[T]) ReadAll(fn fnx.Handler[T]) fnx.Worker {
 // This is the work-house operation of the package, and can be used as
 // the basis of worker pools, even processing, or message dispatching
 // for pubsub queues and related systems.
-func (st *Stream[T]) Parallel(fn fnx.Handler[T], opts ...OptionProvider[*WorkerGroupConf]) fnx.Worker {
+func (st *Stream[T]) Parallel(fn fnx.Handler[T], opts ...fnx.OptionProvider[*fnx.WorkerGroupConf]) fnx.Worker {
 	return func(ctx context.Context) error {
-		conf := &WorkerGroupConf{}
-		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
-			return err
-		}
-
-		st.WithHook(func(st *Stream[T]) { conf.ErrorCollector.Push(st.erc.Resolve()) }).
-			ReadAll(fn.WithRecover().WithErrorFilter(conf.errorFilter)).
-			StartGroup(ctx, conf.NumWorkers).
-			Ignore().
-			Run(ctx)
-
-		return conf.ErrorCollector.Resolve()
+		return fnx.PoolWorkers(
+			irt.Convert(
+				st.Iterator(ctx),
+				func(in T) fnx.Worker {
+					return func(ctx context.Context) error { return fn.Read(ctx, in) }
+				},
+			),
+			opts...,
+		).Run(ctx)
 	}
 }
 
@@ -451,7 +449,7 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	}
 	pipe := Blocking(make(chan T))
 
-	setup := st.Parallel(pipe.Send().Write, WorkerGroupConfNumWorkers(pipe.Cap())).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
+	setup := st.Parallel(pipe.Send().Write, fnx.WorkerGroupConfNumWorkers(pipe.Cap())).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
 	for idx := range output {
 		output[idx] = MakeStream(fnx.NewFuture(pipe.Receive().Read).PreHook(setup)).WithHook(st.CloseHook())
@@ -555,7 +553,7 @@ func (st *Stream[T]) UnmarshalJSON(in []byte) error {
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := Blocking(make(chan T, n))
-	pipe := st.Parallel(buf.Send().Write, WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
+	pipe := st.Parallel(buf.Send().Write, fnx.WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
 	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe))
 }
 
@@ -573,7 +571,7 @@ func (st *Stream[T]) BufferParallel(n int) *Stream[T] {
 	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(
 		st.Parallel(
 			buf.Send().Write,
-			WorkerGroupConfNumWorkers(n),
+			fnx.WorkerGroupConfNumWorkers(n),
 		).Operation(st.ErrorHandler()).
 			PostHook(buf.Close).Go().Once(),
 	)).WithHook(st.CloseHook())

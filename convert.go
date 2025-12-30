@@ -14,7 +14,7 @@ import (
 // another type. All errors from the original stream are propagated to the output stream.
 func Convert[T, O any](op fnx.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
-	Parallel(*Stream[T], ...OptionProvider[*WorkerGroupConf]) *Stream[O]
+	Parallel(*Stream[T], ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: op}
 }
@@ -22,7 +22,7 @@ func Convert[T, O any](op fnx.Converter[T, O]) interface {
 // ConvertFn simplifies calls to fun.Convert for fn.Convert types.
 func ConvertFn[T any, O any](op fn.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
-	Parallel(*Stream[T], ...OptionProvider[*WorkerGroupConf]) *Stream[O]
+	Parallel(*Stream[T], ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: fnx.MakeConverter(op)}
 }
@@ -66,18 +66,18 @@ func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 // WorkerGroupConf options.
 func (c converter[T, O]) Parallel(
 	iter *Stream[T],
-	opts ...OptionProvider[*WorkerGroupConf],
+	opts ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) *Stream[O] {
 	output := Blocking(make(chan O))
 
-	conf := &WorkerGroupConf{}
-	if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
+	conf := &fnx.WorkerGroupConf{}
+	if err := fnx.JoinOptionProviders(opts...).Apply(conf); err != nil {
 		return MakeStream(fnx.MakeFuture(func() (O, error) { return c.zero(), err }))
 	}
 
 	setup := iter.Parallel(
 		c.mapPullProcess(output.Send().Write, conf),
-		WorkerGroupConfSet(conf),
+		fnx.WorkerGroupConfSet(conf),
 	).PostHook(output.Close).Operation(conf.ErrorCollector.Push).Go().Once()
 
 	return MakeStream(fnx.NewFuture(output.Receive().Read).PreHook(setup)).
@@ -92,7 +92,7 @@ func (c converter[T, O]) Parallel(
 // provided processor function.
 func (c converter[T, O]) mapPullProcess(
 	output fnx.Handler[O],
-	opts *WorkerGroupConf,
+	opts *fnx.WorkerGroupConf,
 ) fnx.Handler[T] {
 	mpf := c.op.WithRecover()
 	return func(ctx context.Context, in T) error {

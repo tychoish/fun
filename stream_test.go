@@ -245,9 +245,9 @@ func TestStream(t *testing.T) {
 			count := &atomic.Int64{}
 			err := iter.Parallel(
 				func(_ context.Context, in int) error { count.Add(1); return nil },
-				WorkerGroupConfNumWorkers(2),
-				WorkerGroupConfContinueOnError(),
-				WorkerGroupConfContinueOnPanic(),
+				fnx.WorkerGroupConfNumWorkers(2),
+				fnx.WorkerGroupConfContinueOnError(),
+				fnx.WorkerGroupConfContinueOnPanic(),
 			).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count.Load())
@@ -801,7 +801,7 @@ func TestJSON(t *testing.T) {
 	t.Run("ParallelInvalidConfig", func(t *testing.T) {
 		counter := 0
 		err := SliceStream([]int{1, 1, 1}).Parallel(fnx.MakeHandler(func(in int) error { counter += in; return nil }),
-			WorkerGroupConfWithErrorCollector(nil),
+			fnx.WorkerGroupConfWithErrorCollector(nil),
 		).Run(t.Context())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
@@ -841,8 +841,8 @@ func TestJSON(t *testing.T) {
 
 func TestIteratorStream(t *testing.T) {
 	tests := []struct {
-		name   string
-		test   func(t *testing.T)
+		name string
+		test func(t *testing.T)
 	}{
 		{
 			name: "Basic",

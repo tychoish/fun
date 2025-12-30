@@ -41,13 +41,13 @@ var (
 // WorkerPool is implemented using fun.Stream[T].Parallel().
 func WorkerPool[OP fnx.Worker | fnx.Operation](
 	iter *fun.Stream[OP],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) fnx.Worker {
 	return iter.Parallel(func(ctx context.Context, op OP) error {
 		return any(op).(interface{ WithRecover() fnx.Worker }).WithRecover().Run(ctx)
 	}, append(optp,
-		fun.WorkerGroupConfWithErrorCollector(&erc.Collector{}),
-		fun.WorkerGroupConfWorkerPerCPU(),
+		fnx.WorkerGroupConfWithErrorCollector(&erc.Collector{}),
+		fnx.WorkerGroupConfWorkerPerCPU(),
 	)...)
 }
 

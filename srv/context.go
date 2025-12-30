@@ -233,7 +233,7 @@ func HasBaseContext(ctx context.Context) bool {
 func WithWorkerPool(
 	ctx context.Context,
 	key string,
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) context.Context {
 	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
@@ -264,14 +264,14 @@ func WithHandlerWorkerPool(
 	ctx context.Context,
 	key string,
 	observer fn.Handler[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) context.Context {
 	return SetHandlerWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
-	opts := &fun.WorkerGroupConf{}
-	fun.Invariant.Must(fun.JoinOptionProviders(optp...).Apply(opts))
+func getQueueForOpts(optp ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
+	opts := &fnx.WorkerGroupConf{}
+	fun.Invariant.Must(fnx.JoinOptionProviders(optp...).Apply(opts))
 
 	return risky.Force(pubsub.NewQueue[fnx.Worker](
 		pubsub.QueueOptions{
@@ -300,7 +300,7 @@ func SetWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fnx.Worker],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.Invariant.Must(orca.Add(WorkerPool(queue, optp...)))
@@ -331,7 +331,7 @@ func SetHandlerWorkerPool(
 	key string,
 	queue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...fnx.OptionProvider[*fnx.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.Invariant.Must(orca.Add(HandlerWorkerPool(queue, observer, optp...)))

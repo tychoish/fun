@@ -25,7 +25,7 @@ type Constructors struct{}
 // For more configuraable options, use the itertool.Worker() function which provides more
 // configurability and supports both fnx.Operation and Worker functions.
 func (Constructors) OperationPool(st *Stream[fnx.Operation]) fnx.Worker {
-	return st.Parallel(fnx.MAKE.OperationHandler(), WorkerGroupConfDefaults())
+	return st.Parallel(fnx.MAKE.OperationHandler(), fnx.WorkerGroupConfDefaults())
 }
 
 // WorkerPool creates a work that processes a stream of worker functions, for simple and short
@@ -37,7 +37,7 @@ func (Constructors) OperationPool(st *Stream[fnx.Operation]) fnx.Worker {
 // For more configuraable options, use the itertool.Worker() function which provides more
 // configurability and supports both fnx.Operation and Worker functions.
 func (Constructors) WorkerPool(st *Stream[fnx.Worker]) fnx.Worker {
-	return st.Parallel(fnx.MAKE.WorkerHandler(), WorkerGroupConfDefaults())
+	return st.Parallel(fnx.MAKE.WorkerHandler(), fnx.WorkerGroupConfDefaults())
 }
 
 // RunAllWorkers returns a Worker function that will run all of the Worker functions in the stream
