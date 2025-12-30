@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
@@ -156,7 +155,7 @@ func (s *Service) Start(ctx context.Context) error {
 		ctx, s.cancel = context.WithCancel(ctx)
 		sig := s.Signal
 		if sig == nil {
-			sig = fun.MAKE.ContextChannelWorker(ctx)
+			sig = fnx.MAKE.ContextChannelWorker(ctx)
 		}
 
 		shutdownSignal := make(chan struct{})

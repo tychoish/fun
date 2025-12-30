@@ -83,6 +83,7 @@ func (wf Worker) Background(ctx context.Context, ob fn.Handler[error]) Operation
 func (wf Worker) Once() Worker {
 	once := &sync.Once{}
 	var err error
+
 	return func(ctx context.Context) error {
 		once.Do(func() { err = wf(ctx) })
 		return err

@@ -167,17 +167,6 @@ func TestStream(t *testing.T) {
 		assert.Equal(t, observes, 3)
 		assert.Equal(t, count, 100)
 	})
-
-	t.Run("Monotonic", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		const size = 37017
-		count := 0
-		last := -1
-		check.NotError(t, MAKE.Counter(size).ReadAll(fnx.FromHandler(func(in int) { count++; check.True(t, last < in); last = in })).Run(ctx))
-		check.Equal(t, size, count)
-		check.Equal(t, last, count)
-	})
 	t.Run("Transform", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 )
 
 // compile-time assertions that both worker types support the "safe"
@@ -60,7 +61,7 @@ func JSON[T any](in io.Reader) *fun.Stream[T] {
 			return zero, err
 		}
 		return out, err
-	})).Stream(fun.MAKE.LinesWithSpaceTrimed(in))
+	})).Stream(fun.IteratorStream(irt.First(irt.ReadLines(in))))
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the

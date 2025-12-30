@@ -162,7 +162,7 @@ func ProcessStream[T any](
 // is canceled.) The timeout, when non-zero, is passed to the clean up
 // operation. Cleanup functions are dispatched in parallel.
 func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
-	closer, waitForSignal := fun.MAKE.Signal()
+	closer, waitForSignal := fnx.MAKE.Signal()
 
 	return &Service{
 		Run:      waitForSignal.WithErrorFilter(erc.NewFilter().WithoutContext()),

@@ -1,7 +1,9 @@
 package irt
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"iter"
@@ -9,11 +11,10 @@ import (
 	"math/rand/v2"
 	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/tychoish/fun/testt"
 )
 
 func TestCollect(t *testing.T) {
@@ -1399,8 +1400,13 @@ func TestChunk(t *testing.T) {
 					result = append(result, cv)
 				}
 			}
-			testt.Log(t, "result", result)
-			testt.Log(t, "expected", tt.expected)
+			t.Cleanup(func() {
+				if t.Failed() {
+					return
+				}
+				t.Log(t, "result", result)
+				t.Log(t, "expected", tt.expected)
+			})
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("Chunk() length = %v, want %v", len(result), len(tt.expected))
@@ -4072,4 +4078,92 @@ func TestForEachWhile2(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLegacyUtils(t *testing.T) {
+	t.Run("Lines", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		last := sha256.Sum256([]byte(fmt.Sprint(time.Now().UTC().UnixMilli())))
+		_, _ = fmt.Fprintf(buf, "%x", last)
+		for i := 1; i < 128; i++ {
+			next := sha256.Sum256(last[:])
+			_, _ = fmt.Fprintf(buf, "\n%x", next)
+		}
+
+		count := 0
+		var prev string
+		for line := range RemoveZeros(Convert(ReadLines(buf), strings.TrimSpace)) {
+			count++
+			if len(line) != 64 {
+				t.Error("unexpected line length", len(line), line)
+			}
+			if prev == line {
+				t.Errorf("duplicate line %d %q vs %q ", count, line, prev)
+			}
+		}
+
+		if count != 128 {
+			t.Error(count)
+		}
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var buf bytes.Buffer
+
+		_, _ = buf.WriteString("123\n456\n\n789")
+		count := 0
+		for line := range ReadLines(&buf) {
+			if line == "" {
+				break
+			}
+			count++
+			if len(line) != 3 {
+				t.Error("unexpected length", len(line), line)
+			}
+			if _, err := strconv.Atoi(line); err != nil {
+				t.Error("should have been able to parse as number:", line, err)
+			}
+		}
+		if count != 2 {
+			t.Error("unexpected count", count)
+		}
+	})
+	t.Run("ReadLinesErrWithError", func(t *testing.T) {
+		expectedErr := errors.New("read error")
+		reader := &testReader{
+			data: []byte("line1\nline2"),
+			err:  expectedErr,
+		}
+
+		var lines []string
+		var errs []error
+		for line, err := range ReadLinesErr(reader) {
+			if line != "" {
+				lines = append(lines, line)
+			}
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if !slices.Equal(lines, []string{"line1", "line2"}) {
+			t.Errorf("got lines %v, want %v", lines, []string{"line1", "line2"})
+		}
+		if len(errs) != 1 || !errors.Is(errs[0], expectedErr) {
+			t.Errorf("got errors %v, want [%v]", errs, expectedErr)
+		}
+	})
+}
+
+type testReader struct {
+	data []byte
+	err  error
+}
+
+func (r *testReader) Read(p []byte) (n int, err error) {
+	if len(r.data) > 0 {
+		n = copy(p, r.data)
+		r.data = r.data[n:]
+		return n, nil
+	}
+	return 0, r.err
 }

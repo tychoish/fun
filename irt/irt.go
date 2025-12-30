@@ -2,9 +2,11 @@
 package irt
 
 import (
+	"bufio"
 	"cmp"
 	"context"
 	"errors"
+	"io"
 	"iter"
 	"maps"
 	"slices"
@@ -688,4 +690,23 @@ func SortBy[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
 // of the sorted pairs.
 func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter.Seq2[A, B] {
 	return ElemsSplit(Slice(slices.SortedFunc(Elems(seq), toCmp2(cf))))
+}
+
+// ReadLines returns a sequence of strings from the reader, stopping at the first error.
+func ReadLines(reader io.Reader) iter.Seq[string] { return UntilError(ReadLinesErr(reader)) }
+
+// ReadLinesErr returns a iterator of strings and errors from the reader. It yields each line with a nil error,
+// and finally yields an empty string and the scanner's error.
+func ReadLinesErr(reader io.Reader) iter.Seq2[string, error] {
+	scanner := bufio.NewScanner(reader)
+	return func(yield func(string, error) bool) {
+		for scanner.Scan() {
+			if !yield(scanner.Text(), nil) {
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			yield("", scanner.Err())
+		}
+	}
 }
