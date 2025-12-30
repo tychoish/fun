@@ -124,6 +124,9 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
+// InterfaceStream creates a Stream from any object that implements a Read method with the following signature:
+//
+//	Read(context.Context) (T, error)
 func InterfaceStream[T any](obj interface {
 	Read(context.Context) (T, error)
 },

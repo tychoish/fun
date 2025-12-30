@@ -470,8 +470,8 @@ func TestDeque(t *testing.T) {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
 					ctx := testt.Context(t)
-					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
-					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
+					fun.Invariant.Ok(tt.Push(ctx, 1) == nil)
+					fun.Invariant.Ok(tt.Push(ctx, 1) == nil)
 
 					canceled, trigger := context.WithCancel(context.Background())
 					trigger()
@@ -491,8 +491,8 @@ func TestDeque(t *testing.T) {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
 					ctx := testt.Context(t)
-					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
-					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
+					fun.Invariant.Ok(tt.Push(ctx, 1) == nil)
+					fun.Invariant.Ok(tt.Push(ctx, 1) == nil)
 
 					if err := tt.dq.Close(); err != nil {
 						t.Fatal(err)
@@ -514,8 +514,8 @@ func TestDeque(t *testing.T) {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
 					ctx := testt.Context(t)
-					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
-					fun.Invariant.IsTrue(tt.Push(ctx, 1) == nil)
+					fun.Invariant.Ok(tt.Push(ctx, 1) == nil)
+					fun.Invariant.Ok(tt.Push(ctx, 1) == nil)
 					start := time.Now()
 					sig := make(chan struct{})
 					var end time.Time

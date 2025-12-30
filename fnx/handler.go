@@ -258,7 +258,7 @@ func (pf Handler[T]) PostHook(op func()) Handler[T] {
 	}
 }
 
-// WithErrorFilter uses an erc.Filter to process the error respose from the Handler
+// WithErrorFilter uses an erc.Filter to process the error respose from the Handler.
 func (pf Handler[T]) WithErrorFilter(ef erc.Filter) Handler[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }

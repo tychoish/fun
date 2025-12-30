@@ -137,4 +137,142 @@ func TestConstructors(t *testing.T) {
 		assert.NotError(t, wh.Read(t.Context(), worker))
 		assert.Equal(t, count, 1)
 	})
+
+	t.Run("OperationHandler", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			count := 0
+			op := Operation(func(ctx context.Context) {
+				assert.NotNil(t, ctx)
+				count++
+			})
+			handler := MAKE.OperationHandler()
+			assert.NotError(t, handler.Read(t.Context(), op))
+			assert.Equal(t, count, 1)
+		})
+
+		t.Run("PanicHandling", func(t *testing.T) {
+			t.Run("StringPanic", func(t *testing.T) {
+				op := Operation(func(ctx context.Context) {
+					panic("test panic")
+				})
+				handler := MAKE.OperationHandler()
+				err := handler.Read(t.Context(), op)
+				assert.Error(t, err)
+				assert.Substring(t, err.Error(), "test panic")
+			})
+
+			t.Run("ErrorPanic", func(t *testing.T) {
+				expectedErr := errors.New("panic error")
+				op := Operation(func(ctx context.Context) {
+					panic(expectedErr)
+				})
+				handler := MAKE.OperationHandler()
+				err := handler.Read(t.Context(), op)
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, expectedErr)
+			})
+
+			t.Run("InterfacePanic", func(t *testing.T) {
+				op := Operation(func(ctx context.Context) {
+					panic(42)
+				})
+				handler := MAKE.OperationHandler()
+				err := handler.Read(t.Context(), op)
+				assert.Error(t, err)
+			})
+
+			t.Run("StructPanic", func(t *testing.T) {
+				type testStruct struct {
+					msg string
+				}
+				op := Operation(func(ctx context.Context) {
+					panic(testStruct{msg: "structured panic"})
+				})
+				handler := MAKE.OperationHandler()
+				err := handler.Read(t.Context(), op)
+				assert.Error(t, err)
+			})
+		})
+
+		t.Run("ContextCancellation", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			executed := false
+			op := Operation(func(ctx context.Context) {
+				executed = true
+			})
+
+			handler := MAKE.OperationHandler()
+			// The operation should still execute even with a canceled context
+			// because the handler doesn't check the context before running
+			err := handler.Read(ctx, op)
+			assert.NotError(t, err)
+			assert.True(t, executed)
+		})
+
+		t.Run("MultipleOperations", func(t *testing.T) {
+			handler := MAKE.OperationHandler()
+			count := 0
+
+			for i := 0; i < 10; i++ {
+				op := Operation(func(ctx context.Context) {
+					count++
+				})
+				assert.NotError(t, handler.Read(t.Context(), op))
+			}
+
+			assert.Equal(t, count, 10)
+		})
+
+		t.Run("PanicRecoveryDoesNotAffectSubsequentCalls", func(t *testing.T) {
+			handler := MAKE.OperationHandler()
+
+			// First call panics
+			panicOp := Operation(func(ctx context.Context) {
+				panic("first panic")
+			})
+			err := handler.Read(t.Context(), panicOp)
+			assert.Error(t, err)
+
+			// Second call should work fine
+			count := 0
+			normalOp := Operation(func(ctx context.Context) {
+				count++
+			})
+			assert.NotError(t, handler.Read(t.Context(), normalOp))
+			assert.Equal(t, count, 1)
+
+			// Third call panics again
+			panicOp2 := Operation(func(ctx context.Context) {
+				panic("second panic")
+			})
+			err = handler.Read(t.Context(), panicOp2)
+			assert.Error(t, err)
+		})
+
+		t.Run("ConcurrentExecution", func(t *testing.T) {
+			handler := MAKE.OperationHandler()
+			var mu sync.Mutex
+			count := 0
+			wg := &sync.WaitGroup{}
+
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					op := Operation(func(ctx context.Context) {
+						mu.Lock()
+						count++
+						mu.Unlock()
+					})
+					err := handler.Read(context.Background(), op)
+					check.NotError(t, err)
+				}()
+			}
+
+			wg.Wait()
+			assert.Equal(t, count, 100)
+		})
+	})
 }

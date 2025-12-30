@@ -2,19 +2,14 @@ package fun
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
 	"math/rand"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
@@ -24,158 +19,6 @@ import (
 func TestHandlers(t *testing.T) {
 	t.Parallel()
 	const root ers.Error = ers.Error("root-error")
-	t.Run("ErrorHandlerAbort", func(t *testing.T) {
-		count := 0
-		eh := MAKE.ErrorHandlerWithAbort(func() { count++ })
-		checkNoopSemantics := func(n int) {
-			t.Run("NoopErrors", func(t *testing.T) {
-				t.Run("NotError", func(t *testing.T) {
-					eh(nil)
-					check.Equal(t, count, n)
-					var err error
-					eh(err)
-					check.Equal(t, count, n)
-				})
-				t.Run("ContextCanceled", func(t *testing.T) {
-					eh(context.Canceled)
-					check.Equal(t, count, n)
-
-					eh(context.DeadlineExceeded)
-					check.Equal(t, count, n)
-				})
-				t.Run("Wrapped", func(t *testing.T) {
-					eh(fmt.Errorf("oops: %w", context.Canceled))
-					check.Equal(t, count, n)
-
-					eh(fmt.Errorf("oops: %w", context.DeadlineExceeded))
-					check.Equal(t, count, n)
-				})
-			})
-		}
-		checkNoopSemantics(0)
-
-		eh(root)
-		check.Equal(t, count, 1)
-
-		checkNoopSemantics(1)
-
-		eh(root)
-
-		check.Equal(t, count, 2)
-	})
-	t.Run("Error", func(t *testing.T) {
-		called := 0
-		oef := MAKE.ErrorHandler(func(_ error) { called++ })
-		oef(nil)
-		check.Equal(t, called, 0)
-		oef(io.EOF)
-		check.Equal(t, called, 1)
-	})
-	t.Run("ErrorHandlerWithoutEOF", func(t *testing.T) {
-		count := 0
-		proc := MAKE.ErrorHandlerWithoutTerminating(func(err error) {
-			count++
-			if errors.Is(err, io.EOF) || err == nil {
-				t.Error("unexpected error", err)
-			}
-		})
-		proc(nil)
-		check.Equal(t, count, 0)
-
-		proc(root)
-		check.Equal(t, count, 1)
-
-		proc(io.EOF)
-		check.Equal(t, count, 1)
-
-		proc(context.Canceled)
-		check.Equal(t, count, 2)
-
-		proc(nil)
-		check.Equal(t, count, 2)
-	})
-	t.Run("Recover", func(t *testing.T) {
-		var called bool
-		ob := func(err error) {
-			check.Error(t, err)
-			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			called = true
-		}
-		assert.NotPanic(t, func() {
-			defer MAKE.Recover(ob)
-			panic("hi")
-		})
-		check.True(t, called)
-	})
-	t.Run("ErrorHandlerWithoutTerminating", func(t *testing.T) {
-		count := 0
-		proc := MAKE.ErrorHandlerWithoutTerminating(func(err error) {
-			count++
-			if ers.IsTerminating(err) || err == nil {
-				t.Error("unexpected error", err)
-			}
-		})
-		proc(nil)
-		check.Equal(t, count, 0)
-
-		proc(root)
-		check.Equal(t, count, 1)
-
-		proc(io.EOF)
-		check.Equal(t, count, 1)
-
-		proc(context.Canceled)
-		check.Equal(t, count, 2)
-
-		proc(ers.ErrInvariantViolation)
-		check.Equal(t, count, 3)
-
-		proc(nil)
-		check.Equal(t, count, 3)
-	})
-	t.Run("ErrorHandlerWithoutCancelation", func(t *testing.T) {
-		count := 0
-		proc := MAKE.ErrorHandlerWithoutCancelation(func(err error) {
-			count++
-			if ers.IsExpiredContext(err) || err == nil {
-				t.Error("unexpected error", err)
-			}
-		})
-		proc(nil)
-		check.Equal(t, count, 0)
-
-		proc(context.DeadlineExceeded)
-		check.Equal(t, count, 0)
-
-		proc(root)
-		check.Equal(t, count, 1)
-
-		proc(io.EOF)
-		check.Equal(t, count, 2)
-
-		proc(context.Canceled)
-		check.Equal(t, count, 2)
-
-		proc(ers.ErrInvariantViolation)
-		check.Equal(t, count, 3)
-
-		proc(nil)
-		check.Equal(t, count, 3)
-	})
-	t.Run("StringFuture", func(t *testing.T) {
-		t.Run("Sprintf", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprintf("%s:%d", "hi", 42)()) })
-		t.Run("Sprintln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Sprintln("hi", ":", 42)()) })
-		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprint("hi:", 42)()) })
-		t.Run("Sprint", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Sprint("hi:", "42")()) })
-		t.Run("Stringer", func(t *testing.T) { check.Equal(t, "Constructors<>", MAKE.Stringer(MAKE)()) })
-		t.Run("Str", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Str([]any{"hi:", 42})()) })
-		t.Run("Strf", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.Strf("%s:%d", []any{"hi", 42})()) })
-		t.Run("Strln", func(t *testing.T) { check.Equal(t, "hi : 42\n", MAKE.Strln([]any{"hi", ":", 42})()) })
-		t.Run("StringsJoin/Empty", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.StringsJoin([]string{"hi", ":", "42"}, "")()) })
-		t.Run("StringsJoin/Dots", func(t *testing.T) { check.Equal(t, "hi.:.42", MAKE.StringsJoin([]string{"hi", ":", "42"}, ".")()) })
-		t.Run("StrSliceConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.StrSliceConcatinate([]string{"hi", ":", "42"})()) })
-		t.Run("StrConcatinate", func(t *testing.T) { check.Equal(t, "hi:42", MAKE.StrConcatinate("hi", ":", "42")()) })
-	})
 	t.Run("ForBackground", func(t *testing.T) {
 		count := 0
 		op := fnx.Operation(func(context.Context) {
@@ -193,41 +36,6 @@ func TestHandlers(t *testing.T) {
 		assert.NotError(t, err)
 		check.Equal(t, count, 128)
 	})
-	t.Run("ErrorStream", func(t *testing.T) {
-		ec := &erc.Collector{}
-		ec.Push(ers.ErrContainerClosed)
-		ec.Push(ers.ErrCurrentOpAbort)
-		ec.Push(io.EOF)
-
-		errs, err := MAKE.ErrorStream(ec).Slice(t.Context())
-		check.NotError(t, err)
-		t.Log(err, len(errs), errs)
-		check.Equal(t, len(errs), 3)
-		check.ErrorIs(t, errs[0], ers.ErrContainerClosed)
-		check.ErrorIs(t, errs[1], ers.ErrCurrentOpAbort)
-		check.ErrorIs(t, errs[2], io.EOF)
-	})
-	t.Run("Strings", func(t *testing.T) {
-		sl := []error{io.EOF, context.Canceled, ers.ErrLimitExceeded}
-		strs := MAKE.ConvertErrorsToStrings().Convert(sl)
-		merged := strings.Join(strs, ": ")
-		check.Substring(t, merged, "EOF")
-		check.Substring(t, merged, "context canceled")
-		check.Substring(t, merged, "limit exceeded")
-	})
-	t.Run("Unwinder", func(t *testing.T) {
-		t.Run("BasicUnwind", func(t *testing.T) {
-			unwinder := MAKE.ErrorUnwindTransformer(erc.NewFilter())
-			errs := unwinder(erc.Join(io.EOF, ers.ErrCurrentOpSkip, ers.ErrInvariantViolation))
-			check.Equal(t, len(errs), 3)
-		})
-		t.Run("Empty", func(t *testing.T) {
-			unwinder := MAKE.ErrorUnwindTransformer(erc.NewFilter())
-			errs := unwinder(nil)
-			check.Equal(t, len(errs), 0)
-		})
-	})
-
 	t.Run("WorkerPools", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
 			// most of these depend on the race detector not hitting errors

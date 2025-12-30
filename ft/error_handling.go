@@ -11,6 +11,8 @@ import (
 // converts the error to a panic.
 func Must[T any](arg T, err error) T { Invariant(err); return arg }
 
+// Invariant produces a panic--holding an error rooted in, ers.ErrInvariantViolation, when the error
+// is non-nil.
 func Invariant(err error) {
 	CallWhen(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
 }

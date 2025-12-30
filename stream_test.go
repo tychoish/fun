@@ -838,3 +838,291 @@ func TestJSON(t *testing.T) {
 		check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 	})
 }
+
+func TestIteratorStream(t *testing.T) {
+	tests := []struct {
+		name   string
+		test   func(t *testing.T)
+	}{
+		{
+			name: "Basic",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 5; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+				defer stream.Close()
+
+				result, err := stream.Slice(t.Context())
+				assert.NotError(t, err)
+				assert.EqualItems(t, result, []int{0, 1, 2, 3, 4})
+			},
+		},
+		{
+			name: "EmptyIterator",
+			test: func(t *testing.T) {
+				emptyIter := func(yield func(int) bool) {}
+
+				stream := IteratorStream(emptyIter)
+				defer stream.Close()
+
+				result, err := stream.Slice(t.Context())
+				assert.NotError(t, err)
+				assert.Equal(t, len(result), 0)
+			},
+		},
+		{
+			name: "EarlyTermination",
+			test: func(t *testing.T) {
+				largeIter := func(yield func(int) bool) {
+					for i := 0; i < 1000; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(largeIter)
+				defer stream.Close()
+
+				var result []int
+				for i := 0; i < 3; i++ {
+					val, err := stream.Read(t.Context())
+					if err != nil {
+						break
+					}
+					result = append(result, val)
+				}
+
+				assert.EqualItems(t, result, []int{0, 1, 2})
+			},
+		},
+		{
+			name: "ContextCancellation",
+			test: func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 1000; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+				defer stream.Close()
+
+				_, err := stream.Read(ctx)
+				assert.NotError(t, err)
+
+				cancel()
+
+				_, err = stream.Read(ctx)
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, context.Canceled)
+			},
+		},
+		{
+			name: "StreamClose",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 100; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+
+				_, err := stream.Read(t.Context())
+				assert.NotError(t, err)
+
+				err = stream.Close()
+				assert.NotError(t, err)
+
+				_, err = stream.Read(t.Context())
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, io.EOF)
+			},
+		},
+		{
+			name: "ConcurrentReads",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 200; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+				defer stream.Close()
+
+				var mu sync.Mutex
+				seen := make(map[int]bool)
+				wg := &sync.WaitGroup{}
+
+				for i := 0; i < 10; i++ {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						for j := 0; j < 10; j++ {
+							val, err := stream.Read(context.Background())
+							if err != nil {
+								return
+							}
+							mu.Lock()
+							seen[val] = true
+							mu.Unlock()
+						}
+					}()
+				}
+
+				wg.Wait()
+
+				mu.Lock()
+				count := len(seen)
+				mu.Unlock()
+
+				assert.Equal(t, count, 100)
+			},
+		},
+		{
+			name: "Filter",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 10; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter).Filter(func(i int) bool { return i%2 == 0 })
+				defer stream.Close()
+
+				result, err := stream.Slice(t.Context())
+				assert.NotError(t, err)
+				assert.EqualItems(t, result, []int{0, 2, 4, 6, 8})
+			},
+		},
+		{
+			name: "Transform",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 1; i <= 5; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter).Transform(fnx.MakeConverter(func(i int) int {
+					return i * 2
+				}))
+				defer stream.Close()
+
+				result, err := stream.Slice(t.Context())
+				assert.NotError(t, err)
+				assert.EqualItems(t, result, []int{2, 4, 6, 8, 10})
+			},
+		},
+		{
+			name: "Count",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 42; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+				defer stream.Close()
+
+				count := stream.Count(t.Context())
+				assert.Equal(t, count, 42)
+			},
+		},
+		{
+			name: "StringIterator",
+			test: func(t *testing.T) {
+				words := []string{"hello", "world", "from", "iterator"}
+				iter := func(yield func(string) bool) {
+					for _, word := range words {
+						if !yield(word) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+				defer stream.Close()
+
+				result, err := stream.Slice(t.Context())
+				assert.NotError(t, err)
+				assert.EqualItems(t, result, words)
+			},
+		},
+		{
+			name: "MultipleCloseCalls",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 5; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+
+				err1 := stream.Close()
+				err2 := stream.Close()
+				err3 := stream.Close()
+
+				assert.NotError(t, err1)
+				assert.NotError(t, err2)
+				assert.NotError(t, err3)
+			},
+		},
+		{
+			name: "IteratorChannel",
+			test: func(t *testing.T) {
+				iter := func(yield func(int) bool) {
+					for i := 0; i < 10; i++ {
+						if !yield(i) {
+							return
+						}
+					}
+				}
+
+				stream := IteratorStream(iter)
+				defer stream.Close()
+
+				ch := stream.Channel(t.Context())
+
+				var result []int
+				for val := range ch {
+					result = append(result, val)
+				}
+
+				assert.Equal(t, len(result), 10)
+				assert.EqualItems(t, result, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
+}

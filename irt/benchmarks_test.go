@@ -202,7 +202,6 @@ func BenchmarkApply2(b *testing.B) {
 						}
 					})
 				})
-
 			}
 		})
 	}

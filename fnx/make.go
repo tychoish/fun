@@ -59,13 +59,17 @@ func (Constructors) ContextChannelWorker(ctx context.Context) Worker {
 // You can call the resulting worker function more than once.
 func (Constructors) ErrorChannelWorker(ch <-chan error) Worker {
 	return Worker(func(ctx context.Context) error {
+		if ch == nil {
+			return nil
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-ch:
 			return err
 		}
-	}).Once()
+	})
 }
 
 // Signal is a wrapper around the common pattern where signal channels are closed to pass

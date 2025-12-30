@@ -1426,6 +1426,9 @@ func TestChunk(t *testing.T) {
 			count++
 			break
 		}
+		if count != 0 {
+			t.Error("should not have iterated", count)
+		}
 	})
 
 	t.Run("NegativeChunkSize", func(t *testing.T) {
@@ -1436,7 +1439,7 @@ func TestChunk(t *testing.T) {
 			break
 		}
 		if count != 0 {
-			t.Error("should not have iterated")
+			t.Error("should not have iterated", count)
 		}
 	})
 	t.Run("EarlyReaturn", func(t *testing.T) {
@@ -3818,21 +3821,15 @@ func TestForEach(t *testing.T) {
 			if !slices.Equal(cs.expected, res) {
 				t.Error("unexpected result", "have=", res, "want=", cs.expected)
 			}
-			if cs.earlyExit > 0 {
-				if opcount.Load() != int64(cs.earlyExit) {
-					t.Error("op call count mismatch", "have=", opcount.Load(), "want=", cs.earlyExit)
-				}
-				if len(cs.expected) != cs.earlyExit {
-					t.Error("invalid test case")
-				}
-			} else if len(cs.expected) > 0 {
-				if opcount.Load() != int64(len(cs.expected)) {
-					t.Error("op call count mismatch", "have=", opcount.Load(), "want=", len(cs.expected))
-				}
-			} else {
-				if opcount.Load() != 0 {
-					t.Error("op call count mismatch", "have=", opcount.Load(), "want=", 0)
-				}
+			switch {
+			case cs.earlyExit > 0 && opcount.Load() != int64(cs.earlyExit):
+				t.Error("[first] op call count mismatch", "have=", opcount.Load(), "want=", cs.earlyExit)
+			case cs.earlyExit > 0 && len(cs.expected) != cs.earlyExit:
+				t.Error("[second] invalid test case")
+			case len(cs.expected) > 0 && opcount.Load() != int64(len(cs.expected)):
+				t.Error("[third] op call count mismatch", "have=", opcount.Load(), "want=", len(cs.expected))
+			case len(cs.expected) == 0 && opcount.Load() != 0:
+				t.Error("[fourth] op call count mismatch", "have=", opcount.Load(), "want=", len(cs.expected))
 			}
 		})
 	}
@@ -3900,21 +3897,15 @@ func TestForEach2(t *testing.T) {
 				t.Error("unexpected result", "have=", res, "want=", cs.expected)
 			}
 
-			if cs.earlyExit > 0 {
-				if opcount.Load() != int64(cs.earlyExit) {
-					t.Error("op call count mismatch", "have=", opcount.Load(), "want=", cs.earlyExit)
-				}
-				if len(cs.expected) != cs.earlyExit {
-					t.Error("invalid test case", len(cs.expected), cs.earlyExit)
-				}
-			} else if len(cs.expected) > 0 {
-				if opcount.Load() != int64(len(cs.expected)) {
-					t.Error("op call count mismatch", "have=", opcount.Load(), "want=", len(cs.expected))
-				}
-			} else {
-				if opcount.Load() != 0 {
-					t.Error("op call count mismatch", "have=", opcount.Load(), "want=", 0)
-				}
+			switch {
+			case cs.earlyExit > 0 && opcount.Load() != int64(cs.earlyExit):
+				t.Error("[first] op call count mismatch", "have=", opcount.Load(), "want=", cs.earlyExit)
+			case cs.earlyExit > 0 && len(cs.expected) != cs.earlyExit:
+				t.Error("[second] invalid test case")
+			case len(cs.expected) > 0 && opcount.Load() != int64(len(cs.expected)):
+				t.Error("[third] op call count mismatch", "have=", opcount.Load(), "want=", len(cs.expected))
+			case len(cs.expected) == 0 && opcount.Load() != 0:
+				t.Error("[fourth] op call count mismatch", "have=", opcount.Load(), "want=", len(cs.expected))
 			}
 		})
 	}

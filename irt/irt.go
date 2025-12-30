@@ -32,8 +32,8 @@ func Collect[T any](seq iter.Seq[T], args ...int) (s []T) {
 	return slices.AppendSeq(s, seq)
 }
 
-// Collect consumes the sequence and returns a map with all elements. This combines the operations
-// maps.Collect and make([]T).
+// Collect2 consumes the sequence and returns a map with all elements. This combines the operations
+// maps.Collect and make(map[K]V).
 //
 // Like make(map[K]V), the optional args are args[0] sets initial length.
 func Collect2[K comparable, V any](seq iter.Seq2[K, V], args ...int) map[K]V {
@@ -552,7 +552,7 @@ func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	}
 }
 
-// Shard splits the input sequence into num separate sequences. Elements are distributed
+// Shard splits the input sequence into num separate sequences. Elements are distributed.
 func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
 	return GenerateOk(repeat(num, curry2(Channel, ctx, Pipe(ctx, seq))))
 }

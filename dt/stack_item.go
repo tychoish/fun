@@ -65,6 +65,8 @@ func (it *Item[T]) Append(n *Item[T]) *Item[T] {
 	return n
 }
 
+// Push creates a new item and pushes it onto the stack following
+// this item. The returned value is new/next item.
 func (it *Item[T]) Push(v T) *Item[T] { return it.Append(NewItem(v)) }
 
 // Remove removes the item from the stack, (at some expense, for items

@@ -75,7 +75,7 @@ func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
 func GetOrchestrator(ctx context.Context) *Orchestrator {
 	or, ok := ctx.Value(orchestratorCtxKey{}).(*Orchestrator)
 
-	fun.Invariant.IsTrue(ok, "orchestrator was not correctly attached")
+	fun.Invariant.Ok(ok, "orchestrator was not correctly attached")
 
 	return or
 }
@@ -110,7 +110,7 @@ func WithCleanup(ctx context.Context) context.Context {
 
 func getCleanup(ctx context.Context) *pubsub.Queue[fnx.Worker] {
 	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fnx.Worker])
-	fun.Invariant.IsTrue(ok, "cleanup service not configured")
+	fun.Invariant.Ok(ok, "cleanup service not configured")
 	return val
 }
 
@@ -153,7 +153,7 @@ func SetShutdownSignal(ctx context.Context) context.Context {
 func GetShutdownSignal(ctx context.Context) context.CancelFunc {
 	cancel, ok := ctx.Value(shutdownTriggerCtxKey{}).(context.CancelFunc)
 
-	fun.Invariant.IsTrue(ok, "Shutdown cancel function was not correctly attached")
+	fun.Invariant.Ok(ok, "Shutdown cancel function was not correctly attached")
 
 	return cancel
 }
@@ -189,7 +189,7 @@ func SetBaseContext(ctx context.Context) context.Context {
 func GetBaseContext(ctx context.Context) context.Context {
 	bctx, ok := ctx.Value(baseContextCxtKey{}).(context.Context)
 
-	fun.Invariant.IsTrue(ok, "base context was not correctly attached")
+	fun.Invariant.Ok(ok, "base context was not correctly attached")
 
 	return bctx
 }

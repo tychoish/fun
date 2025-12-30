@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
@@ -48,7 +47,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ft.WithRecoverCall(func() { Invariant.IsTrue(false, err) })
+			se := ft.WithRecoverCall(func() { Invariant.Ok(false, err) })
 
 			assert.ErrorIs(t, se, err)
 		})
@@ -65,13 +64,13 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("NoError", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() { Invariant.IsTrue(false, 42) })
+			err := ft.WithRecoverCall(func() { Invariant.Ok(false, 42) })
 			if !strings.Contains(err.Error(), "42") {
 				t.Error(err)
 			}
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() { Invariant.IsTrue(1 == 2) })
+			err := ft.WithRecoverCall(func() { Invariant.Ok(1 == 2) })
 			if !errors.Is(err, ers.ErrInvariantViolation) {
 				t.Fatal(err)
 			}
@@ -89,7 +88,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("LongInvariant", func(t *testing.T) {
 			err := ft.WithRecoverCall(func() {
-				Invariant.IsTrue(1 == 2,
+				Invariant.Ok(1 == 2,
 					"math is a construct",
 					"1 == 2",
 				)
@@ -164,18 +163,6 @@ func TestPanics(t *testing.T) {
 			assert.Equal(t, "foo", foo)
 		})
 	})
-	t.Run("Sugar", func(t *testing.T) {
-		t.Run("IsFalse", func(t *testing.T) {
-			assert.Panic(t, func() { Invariant.IsFalse(true, "can't be false") })
-			assert.Panic(t, func() { Invariant.IsFalse(true, "can't be false") })
-			assert.Panic(t, func() { Invariant.IsFalse(true, "can't be false") })
-			assert.Panic(t, func() { Invariant.IsFalse(ft.Ptr(3) != ft.Ptr(5), "can't be false") })
-			assert.Panic(t, func() { Invariant.IsFalse(&time.Time{} != ft.Ptr(time.Now()), "can't be false") })
-			assert.NotPanic(t, func() { Invariant.IsFalse(true == false, "can't be false") })
-			assert.NotPanic(t, func() { Invariant.IsFalse(false, "can't be false") })
-			assert.NotPanic(t, func() { Invariant.IsFalse(!true, "can't be false") })
-		})
-	})
 	t.Run("Handler", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -233,14 +220,6 @@ func TestPanics(t *testing.T) {
 
 			assert.NotPanic(t, func() { ts := of.RecoverPanic; check.Error(t, ts("hi")) })
 			assert.True(t, called)
-		})
-
-		t.Run("Failure", func(t *testing.T) {
-			assert.Panic(t, func() { Invariant.Failure() })
-			assert.Panic(t, func() { Invariant.Failure("this") })
-			assert.Panic(t, func() { Invariant.Failure(true) })
-			assert.Panic(t, func() { Invariant.Failure(false) })
-			assert.Panic(t, func() { Invariant.Failure(nil) })
 		})
 	})
 }

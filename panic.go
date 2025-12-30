@@ -1,6 +1,8 @@
 package fun
 
 import (
+	"fmt"
+
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
@@ -23,20 +25,14 @@ var Invariant = RuntimeInvariant{}
 // RuntimeInvariant is a type defined to create a namespace, callable
 // (typically) via the Invariant symbol. Access these functions as in:
 //
-//	fun.Invariant.IsTrue(len(slice) > 0, "slice must have elements", len(slice))
+//	fun.Invariant.Ok(len(slice) > 0, "slice must have elements", len(slice))
 type RuntimeInvariant struct{}
-
-// New creates an error that is rooted in ers.ErrInvariantViolation,
-// aggregating errors and annotating the error.
-func (RuntimeInvariant) New(args ...any) error {
-	return erc.NewInvariantError(args...)
-}
 
 // Ok panics if the condition is false, passing an error that is
 // rooted in InvariantViolation. Otherwise the operation is a noop.
 func (RuntimeInvariant) Ok(cond bool, args ...any) {
 	if !cond {
-		panic(Invariant.New(args...))
+		panic(erc.NewInvariantError(args...))
 	}
 }
 
@@ -44,20 +40,5 @@ func (RuntimeInvariant) Ok(cond bool, args ...any) {
 // of the panic is both--via wrapping--an ErrInvariantViolation and
 // the error itself.
 func (RuntimeInvariant) Must(err error, args ...any) {
-	Invariant.Ok(err == nil, func() error { return ers.Wrap(err, MAKE.StrJoin(args).Resolve()) })
+	Invariant.Ok(err == nil, func() error { return ers.Wrap(err, fmt.Sprintln(args...)) })
 }
-
-// IsTrue provides a runtime assertion that the condition is true, and
-// annotates panic object, which is an error rooted in the
-// ErrInvariantViolation. In all other cases the operation is a noop.
-func (RuntimeInvariant) IsTrue(cond bool, args ...any) { Invariant.Ok(cond, args...) }
-
-// IsFalse provides a runtime assertion that the condition is false,
-// and annotates panic object, which is an error rooted in the
-// ErrInvariantViolation. In all other cases the operation is a noop.
-func (RuntimeInvariant) IsFalse(cond bool, args ...any) { Invariant.Ok(!cond, args...) }
-
-// Failure unconditionally raises an invariant failure error and
-// processes the arguments as with the other invariant failures:
-// extracting errors and aggregating constituent errors.
-func (RuntimeInvariant) Failure(args ...any) { Invariant.Ok(false, args...) }

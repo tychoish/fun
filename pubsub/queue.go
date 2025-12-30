@@ -432,6 +432,7 @@ func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {
 	return next, ok
 }
 
+// Iterator returns an iterator for all items in the queue. Does not block.
 func (q *Queue[T]) Iterator() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for next := q.front.link; !q.closed && next != nil && q.front != q.back && q.front != next && yield(next.item); next = next.link {

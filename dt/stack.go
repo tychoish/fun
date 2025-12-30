@@ -18,7 +18,9 @@ type Stack[T any] struct {
 }
 
 // Append adds a variadic sequence of items to the list.
-func (s *Stack[T]) Append(items ...T) *Stack[T]      { return s.Extend(irt.Slice(items)) }
+func (s *Stack[T]) Append(items ...T) *Stack[T] { return s.Extend(irt.Slice(items)) }
+
+// Extend appends all items from the iterator to the stack.
 func (s *Stack[T]) Extend(seq iter.Seq[T]) *Stack[T] { irt.Apply(seq, s.Push); return s }
 
 func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.zero(), stack: s} }

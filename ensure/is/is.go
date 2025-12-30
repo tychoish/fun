@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
@@ -59,11 +58,11 @@ func All(ops ...That) That {
 }
 
 func assert(cond bool, args ...any) That {
-	return That(fn.MakeFuture(fun.MAKE.Str(args).Slice()).If(!cond).Once())
+	return That(fn.MakeFuture(func() []string { return []string{fmt.Sprint(args...)} }).If(!cond).Once())
 }
 
 func assertf(cond bool, t string, a ...any) That {
-	return That(fn.MakeFuture(fun.MAKE.Strf(t, a).Slice()).If(!cond).Once())
+	return That(fn.MakeFuture(func() []string { return []string{fmt.Sprintf(t, a...)} }).If(!cond).Once())
 }
 
 // EqualTo asserts that two comparable values are equal to eachother.
@@ -144,7 +143,7 @@ func Substring(s, substr string) That {
 // NotSubstring asserts that the string (s) does not contain the
 // substring (substr.)
 func NotSubstring(s, substr string) That {
-	return assert(!strings.Contains(s, substr), "%q is a substring of %s", substr, s)
+	return assertf(!strings.Contains(s, substr), "%q is a substring of %s", substr, s)
 }
 
 // Contained asserts that the slice (sl) has at least one element

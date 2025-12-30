@@ -80,7 +80,7 @@ func TestTools(t *testing.T) {
 				ctx, cancel := context.WithCancel(bctx)
 				defer cancel()
 
-				pipe := make(chan string, 1)
+				pipe := make(chan string)
 				sig := make(chan struct{})
 
 				go func() {

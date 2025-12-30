@@ -1,6 +1,7 @@
 package ensure
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tychoish/fun"
@@ -92,7 +93,7 @@ func (a *Assertion) Add(sub *Assertion) *Assertion { a.subtests.PushBack(sub); r
 // unconditionally in verbose mode. Operates generally like t.Log() or
 // fmt.Sprint().
 func (a *Assertion) Log(args ...any) *Assertion {
-	a.messages.PushBack(fun.MAKE.Sprint(args...))
+	a.messages.PushBack(func() string { return fmt.Sprint(args...) })
 	return a
 }
 
@@ -100,7 +101,7 @@ func (a *Assertion) Log(args ...any) *Assertion {
 // unconditionally in verbose mode. Operates like t.Logf or
 // fmt.Sprintf.
 func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
-	a.messages.PushBack(fun.MAKE.Sprintf(tmpl, args...))
+	a.messages.PushBack(func() string { return fmt.Sprintf(tmpl, args...) })
 	return a
 }
 
@@ -108,13 +109,13 @@ func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
 //
 // Each pair is logged as it's own Log statement.
 func (a *Assertion) WithMetadata(key string, value any) *Assertion {
-	a.messages.PushBack(fun.MAKE.Sprintf(`%s: "%v"`, key, value))
+	a.messages.PushBack(func() string { return fmt.Sprintf(`%s: "%v"`, key, value) })
 	return a
 }
 
 // Run rus the test and produces the output.
 func (a *Assertion) Run(t testing.TB) {
-	fun.Invariant.IsFalse(a.constructing, "cannot execute assertion during construction")
+	fun.Invariant.Ok(ft.Not(a.constructing), "cannot execute assertion during construction")
 	t.Helper()
 	strlogger := func(in string) {
 		t.Helper()

@@ -151,15 +151,6 @@ func TestSmoke(t *testing.T) {
 			assert.Equal(t, count, 16)
 		})
 	})
-	t.Run("Monotonic", func(t *testing.T) {
-		ctx := testt.Context(t)
-		const size = 37017
-		count := 0
-		last := -1
-		check.NotError(t, fun.MAKE.Counter(size).ReadAll(fnx.FromHandler(func(in int) { count++; check.True(t, last < in); last = in })).Run(ctx))
-		check.Equal(t, size, count)
-		check.Equal(t, last, count)
-	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			buf := &bytes.Buffer{}

@@ -61,14 +61,14 @@ func JSON[T any](in io.Reader) *fun.Stream[T] {
 			return zero, err
 		}
 		return out, err
-	})).Stream(fun.IteratorStream(irt.First(irt.ReadLines(in))))
+	})).Stream(fun.IteratorStream(irt.ReadLines(in)))
 }
 
 // RateLimit wraps a stream with a rate-limiter to ensure that the
 // output stream will produce no more than <num> items in any given
 // <window>.
 func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.Stream[T] {
-	fun.Invariant.IsTrue(num > 0, "rate must be greater than zero")
+	fun.Invariant.Ok(num > 0, "rate must be greater than zero")
 
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}
@@ -92,7 +92,7 @@ func RateLimit[T any](iter *fun.Stream[T], num int, window time.Duration) *fun.S
 			}
 
 			sleepUntil := time.Until(queue.Front().Value().Add(window))
-			fun.Invariant.IsTrue(sleepUntil >= 0, "the next sleep must be in the future")
+			fun.Invariant.Ok(sleepUntil >= 0, "the next sleep must be in the future")
 
 			timer.Reset(sleepUntil)
 			select {

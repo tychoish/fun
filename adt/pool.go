@@ -57,7 +57,7 @@ func (p *Pool[T]) FinalizeSetup() { p.init(); p.locked.Store(true) }
 // and if the input function is nil, it is not set.
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
-	fun.Invariant.IsFalse(p.locked.Load(), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	fun.Invariant.Ok(ft.Not(p.locked.Load()), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
 	ft.ApplyWhen(in != nil, p.hook.Set, in)
 }
 
@@ -65,7 +65,7 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 // object with a Zero value by default) for Get/Make operations.
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
-	fun.Invariant.IsFalse(p.locked.Load(), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	fun.Invariant.Ok(ft.Not(p.locked.Load()), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
 	ft.ApplyWhen(in != nil, p.constructor.Set, in)
 }
 
