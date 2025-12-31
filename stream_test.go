@@ -2018,3 +2018,142 @@ func RunStreamStringAlgoTests(
 		check.Equal(t, newSl[0], "1")
 	})
 }
+
+func TestStreamReadAllWithErrStreamContinue(t *testing.T) {
+	t.Run("SkipErrorsAndCollectValidValues", func(t *testing.T) {
+		callCount := &atomic.Int64{}
+		valueCount := 0
+		validValues := []int{1, 3, 5, 7, 9}
+
+		// Create a stream where operation returns ErrStreamContinue for even call counts
+		st := MakeStream(func(ctx context.Context) (int, error) {
+			count := int(callCount.Add(1))
+
+			if count > 10 {
+				return 0, io.EOF
+			}
+
+			// Return ErrStreamContinue for even counts (2, 4, 6, 8, 10)
+			if count%2 == 0 {
+				return 0, ErrStreamContinue
+			}
+
+			// Return valid values for odd counts (1, 3, 5, 7, 9)
+			return count, nil
+		})
+
+		// Collect values using ReadAll
+		collected := []int{}
+		err := st.ReadAll(fnx.FromHandler(func(val int) {
+			collected = append(collected, val)
+			valueCount++
+		})).Run(t.Context())
+
+		check.NotError(t, err)
+
+		// Verify operation was called more times than values collected
+		assert.Equal(t, callCount.Load(), int64(11)) // Called 11 times (1-10 + final EOF check)
+		assert.Equal(t, valueCount, 5)               // Only 5 valid values collected
+
+		// Verify only odd values were collected
+		assert.EqualItems(t, collected, validValues)
+	})
+
+	t.Run("MultipleConsecutiveSkips", func(t *testing.T) {
+		callCount := &atomic.Int64{}
+		pattern := []bool{true, false, false, false, true, false, true, true}
+
+		st := MakeStream(func(ctx context.Context) (int, error) {
+			count := int(callCount.Add(1))
+			idx := count - 1
+
+			if idx >= len(pattern) {
+				return 0, io.EOF
+			}
+
+			if pattern[idx] {
+				return count, nil
+			}
+			return 0, ers.ErrCurrentOpSkip
+		})
+
+		collected := []int{}
+		err := st.ReadAll(fnx.FromHandler(func(val int) {
+			collected = append(collected, val)
+		})).Run(t.Context())
+
+		check.NotError(t, err)
+
+		// Operation called len(pattern) times + 1 for EOF
+		assert.Equal(t, callCount.Load(), int64(len(pattern)+1))
+
+		// Only positions where pattern is true should be collected
+		expectedValues := []int{1, 5, 7, 8}
+		assert.EqualItems(t, collected, expectedValues)
+	})
+
+	t.Run("AllSkipsUntilEOF", func(t *testing.T) {
+		callCount := &atomic.Int64{}
+		maxCalls := 10
+
+		st := MakeStream(func(ctx context.Context) (int, error) {
+			count := int(callCount.Add(1))
+
+			if count > maxCalls {
+				return 0, io.EOF
+			}
+
+			// Always return ErrStreamContinue
+			return 0, ErrStreamContinue
+		})
+
+		collected := []int{}
+		err := st.ReadAll(fnx.FromHandler(func(val int) {
+			collected = append(collected, val)
+		})).Run(t.Context())
+
+		check.NotError(t, err)
+
+		// Operation should have been called maxCalls+1 times
+		assert.Equal(t, callCount.Load(), int64(maxCalls+1))
+
+		// No values should have been collected
+		assert.Equal(t, len(collected), 0)
+	})
+
+	t.Run("HandlerReturnsErrStreamContinue", func(t *testing.T) {
+		callCount := &atomic.Int64{}
+		handlerCallCount := &atomic.Int64{}
+
+		st := MakeStream(func(ctx context.Context) (int, error) {
+			count := int(callCount.Add(1))
+
+			if count > 6 {
+				return 0, io.EOF
+			}
+
+			return count, nil
+		})
+
+		collected := []int{}
+		err := st.ReadAll(func(ctx context.Context, val int) error {
+			handlerCallCount.Add(1)
+
+			// Skip even values in the handler
+			if val%2 == 0 {
+				return ErrStreamContinue
+			}
+
+			collected = append(collected, val)
+			return nil
+		}).Run(t.Context())
+
+		check.NotError(t, err)
+
+		// Handler called 6 times (once for each value)
+		assert.Equal(t, handlerCallCount.Load(), int64(6))
+
+		// Only odd values collected
+		assert.EqualItems(t, collected, []int{1, 3, 5})
+	})
+}
