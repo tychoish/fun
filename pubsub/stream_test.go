@@ -623,7 +623,7 @@ func TestStream(t *testing.T) {
 			out, err := Chan[string]().NonBlocking().Receive().Read(ctx)
 			assert.Zero(t, out)
 			assert.Error(t, err)
-			assert.ErrorIs(t, err, ErrNonBlockingChannelOperationSkipped)
+			assert.ErrorIs(t, err, ers.ErrCurrentOpSkip)
 		})
 		t.Run("Closed", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

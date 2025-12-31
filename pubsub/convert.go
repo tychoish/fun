@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/opt"
