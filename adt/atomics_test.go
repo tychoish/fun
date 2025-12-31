@@ -1,17 +1,14 @@
 package adt
 
 import (
-	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func TestAtomics(t *testing.T) {
@@ -66,11 +63,9 @@ func TestAtomics(t *testing.T) {
 		assert.Equal(t, at.Get(), 42)
 	})
 	t.Run("AtomicSwap", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		atom := &Atomic[int]{}
 
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		// this should always pass, but we're mostly tempting
 		// the race detector.
 		for i := 1; i < 256; i++ {
@@ -81,7 +76,7 @@ func TestAtomics(t *testing.T) {
 				assert.True(t, old != id)
 			}(i)
 		}
-		wg.Wait(ctx)
+		wg.Wait()
 		assert.True(t, atom.Get() != 0)
 	})
 	t.Run("IsZero", func(t *testing.T) {
@@ -123,10 +118,9 @@ func TestAtomics(t *testing.T) {
 	t.Run("Once", func(t *testing.T) {
 		t.Run("Do", func(t *testing.T) {
 			t.Parallel()
-			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			count := &atomic.Int64{}
 			actor := &Once[int]{}
-			wg := &fnx.WaitGroup{}
+			wg := &sync.WaitGroup{}
 			for i := 0; i < 64; i++ {
 				wg.Add(1)
 				// this function panics rather than
@@ -148,7 +142,7 @@ func TestAtomics(t *testing.T) {
 				}()
 			}
 
-			wg.Wait(ctx)
+			wg.Wait()
 			assert.Equal(t, count.Load(), 1)
 		})
 		t.Run("Call", func(t *testing.T) {
@@ -163,7 +157,6 @@ func TestAtomics(t *testing.T) {
 		})
 		t.Run("Resolve", func(t *testing.T) {
 			t.Parallel()
-			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			count := &atomic.Int64{}
 			actor := NewOnce(func() int {
 				count.Add(1)
@@ -171,7 +164,7 @@ func TestAtomics(t *testing.T) {
 			})
 			check.True(t, actor.Defined())
 			check.True(t, !actor.Called())
-			wg := &fnx.WaitGroup{}
+			wg := &sync.WaitGroup{}
 			for i := 0; i < 64; i++ {
 				wg.Add(1)
 				// this function panics rather than
@@ -190,7 +183,7 @@ func TestAtomics(t *testing.T) {
 				}()
 			}
 
-			wg.Wait(ctx)
+			wg.Wait()
 			assert.Equal(t, count.Load(), 1)
 		})
 		t.Run("Zero", func(t *testing.T) {

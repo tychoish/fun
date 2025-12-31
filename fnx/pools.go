@@ -31,7 +31,6 @@ func Run[T Job](seq iter.Seq[T]) Worker {
 			default:
 				return err
 			}
-
 		}
 		return nil
 	}

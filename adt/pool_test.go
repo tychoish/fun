@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -78,7 +77,7 @@ func TestPool(t *testing.T) {
 			return in
 		})
 
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		for gr := 0; gr < 32; gr++ {
@@ -111,7 +110,7 @@ func TestPool(t *testing.T) {
 				}
 			}()
 		}
-		wg.Wait(ctx)
+		wg.Wait()
 		check.True(t, seen.Load())
 		check.True(t, called.Load())
 		testt.Log(t, "seen =", seen.Load(), "called = ", called.Load())

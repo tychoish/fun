@@ -9,7 +9,6 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
@@ -17,8 +16,6 @@ import (
 var hashSeed = adt.NewOnce(func() maphash.Seed { return maphash.MakeSeed() })
 
 var hashPool *adt.Pool[*maphash.Hash]
-
-var poolOpts = fnx.WorkerGroupConfNumWorkers
 
 const (
 	defaultSize = 32

@@ -711,6 +711,8 @@ func ReadLinesErr(reader io.Reader) iter.Seq2[string, error] {
 	}
 }
 
+// AsGenerator provides in inverse of the GenerateOk operation: the function will yield values. When
+// the boolean "ok" value is false the sequence has been exhausted.
 func AsGenerator[T any](seq iter.Seq[T]) func() (T, bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	op := oncev(func() <-chan T {

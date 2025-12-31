@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -47,7 +47,7 @@ func TestMap(t *testing.T) {
 		defer cancel()
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {
@@ -73,7 +73,7 @@ func TestMap(t *testing.T) {
 				}
 			}()
 		}
-		wg.Wait(ctx)
+		wg.Wait()
 		t.Log(mp.Len())
 		assert.True(t, passed.Load())
 	})
@@ -83,7 +83,7 @@ func TestMap(t *testing.T) {
 		defer cancel()
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {
@@ -136,7 +136,7 @@ func TestMap(t *testing.T) {
 				}
 			}()
 		}
-		wg.Wait(ctx)
+		wg.Wait()
 		t.Log(mp.Len())
 		assert.True(t, passed.Load())
 	})
