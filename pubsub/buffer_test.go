@@ -32,7 +32,7 @@ func TestDistributor(t *testing.T) {
 
 				ch := make(chan string, 1)
 				ch <- "buddy"
-				buf := DistributorChannel(ch)
+				buf := distForChannel(ch)
 				sig := make(chan struct{})
 				go func() {
 					defer close(sig)
@@ -165,7 +165,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 				}
 				close(out)
 				assert.NotError(t, input.Close())
-				return DistributorChannel(out)
+				return distForChannel(out)
 			},
 		},
 		{
@@ -186,7 +186,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 
 					check.NotError(t, input.Close())
 				}()
-				return DistributorChannel(out)
+				return distForChannel(out)
 			},
 		},
 		{
@@ -194,7 +194,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				ch := make(chan T)
-				out := DistributorChannel(ch)
+				out := distForChannel(ch)
 				go func() {
 					defer close(ch)
 					for input.Next(ctx) {

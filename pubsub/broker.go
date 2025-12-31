@@ -75,7 +75,7 @@ type BrokerOptions struct {
 // settings can have profound impacts on the semantics and ordering of
 // messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, DistributorChannel(make(chan T)), opts)
+	return makeInternalBrokerImpl(ctx, distForChannel(make(chan T)), opts)
 }
 
 // makeInternalBrokerImpl constructs a Broker that uses the provided
