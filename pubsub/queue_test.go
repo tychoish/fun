@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
@@ -502,8 +502,8 @@ func TestQueueStream(t *testing.T) {
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
 
-			fun.Invariant.Ok(tt.BlockingAdd(ctx, 1) == nil)
-			fun.Invariant.Ok(tt.BlockingAdd(ctx, 1) == nil)
+			ft.InvariantOk(tt.BlockingAdd(ctx, 1) == nil)
+			ft.InvariantOk(tt.BlockingAdd(ctx, 1) == nil)
 
 			canceled, trigger := context.WithCancel(context.Background())
 			trigger()
@@ -521,8 +521,8 @@ func TestQueueStream(t *testing.T) {
 			defer cancel()
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
-			fun.Invariant.Ok(tt.BlockingAdd(ctx, 1) == nil)
-			fun.Invariant.Ok(tt.BlockingAdd(ctx, 1) == nil)
+			ft.InvariantOk(tt.BlockingAdd(ctx, 1) == nil)
+			ft.InvariantOk(tt.BlockingAdd(ctx, 1) == nil)
 
 			if err := tt.Close(); err != nil {
 				t.Fatal(err)
@@ -542,8 +542,8 @@ func TestQueueStream(t *testing.T) {
 			defer cancel()
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
-			fun.Invariant.Ok(tt.BlockingAdd(ctx, 1) == nil)
-			fun.Invariant.Ok(tt.BlockingAdd(ctx, 1) == nil)
+			ft.InvariantOk(tt.BlockingAdd(ctx, 1) == nil)
+			ft.InvariantOk(tt.BlockingAdd(ctx, 1) == nil)
 			start := time.Now()
 			sig := make(chan struct{})
 			var end time.Time

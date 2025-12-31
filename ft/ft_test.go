@@ -54,9 +54,9 @@ func TestWhen(t *testing.T) {
 
 func TestMust(t *testing.T) {
 	assert.Panic(t, func() { Must("32", ers.Error("whoop")) })
-	assert.Panic(t, func() { MustBeOk("32", false) })
+	assert.Panic(t, func() { MustOk("32", false) })
 	assert.NotPanic(t, func() { check.Equal(t, "32", Must("32", nil)) })
-	assert.NotPanic(t, func() { check.Equal(t, "32", MustBeOk("32", true)) })
+	assert.NotPanic(t, func() { check.Equal(t, "32", MustOk("32", true)) })
 }
 
 func TestPtr(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ensure/is"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
@@ -115,7 +115,7 @@ func (a *Assertion) WithMetadata(key string, value any) *Assertion {
 
 // Run rus the test and produces the output.
 func (a *Assertion) Run(t testing.TB) {
-	fun.Invariant.Ok(ft.Not(a.constructing), "cannot execute assertion during construction")
+	erc.InvariantOk(ft.Not(a.constructing), "cannot execute assertion during construction")
 	t.Helper()
 	strlogger := func(in string) {
 		t.Helper()

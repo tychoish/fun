@@ -26,19 +26,19 @@ func TestShardedMap(t *testing.T) {
 
 		m.Store("a", 42)
 		check.Equal(t, m.Version(), 1)
-		check.Equal(t, ft.MustBeOk(m.Load("a")), 42)
+		check.Equal(t, ft.MustOk(m.Load("a")), 42)
 		_, ok := m.Load("b")
 		check.True(t, !ok)
 		check.Equal(t, m.Versioned("a").Version(), 1)
 
 		m.Store("a", 84)
 		check.Equal(t, m.Version(), 2)
-		check.Equal(t, ft.MustBeOk(m.Load("a")), 84)
+		check.Equal(t, ft.MustOk(m.Load("a")), 84)
 		check.Equal(t, m.Versioned("a").Version(), 2)
 
 		m.Store("b", 42)
 		check.Equal(t, m.Version(), 3)
-		check.Equal(t, ft.MustBeOk(m.Load("b")), 42)
+		check.Equal(t, ft.MustOk(m.Load("b")), 42)
 		check.Equal(t, m.Versioned("a").Version(), 2)
 		check.Equal(t, m.Versioned("b").Version(), 1)
 

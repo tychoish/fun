@@ -6,8 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
@@ -57,7 +57,7 @@ func (p *Pool[T]) FinalizeSetup() { p.init(); p.locked.Store(true) }
 // and if the input function is nil, it is not set.
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
-	fun.Invariant.Ok(ft.Not(p.locked.Load()), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	erc.InvariantOk(ft.Not(p.locked.Load()), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
 	ft.ApplyWhen(in != nil, p.hook.Set, in)
 }
 
@@ -65,7 +65,7 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 // object with a Zero value by default) for Get/Make operations.
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
-	fun.Invariant.Ok(ft.Not(p.locked.Load()), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	erc.InvariantOk(ft.Not(p.locked.Load()), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
 	ft.ApplyWhen(in != nil, p.constructor.Set, in)
 }
 
@@ -133,7 +133,7 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // byte slices, as you need and wish.
 func MakeBufferPool(minVal, maxVal int) *Pool[dt.Slice[byte]] {
 	minVal, maxVal = intish.Bounds(minVal, maxVal)
-	fun.Invariant.Ok(maxVal > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
+	erc.InvariantOk(maxVal > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
 	bufpool := &Pool[dt.Slice[byte]]{}
 	bufpool.SetCleanupHook(func(buf dt.Slice[byte]) dt.Slice[byte] {
 		if cap(buf) > maxVal {

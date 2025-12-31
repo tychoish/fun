@@ -5,15 +5,15 @@ import (
 	"iter"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 )
 
 // RateLimit wraps a iterator with a rate-limiter to ensure that the
 // output stream will produce no more than <num> items in any given
 // <window>.
 func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time.Duration) iter.Seq[T] {
-	fun.Invariant.Ok(num > 0, "rate must be greater than zero")
+	erc.InvariantOk(num > 0, "rate must be greater than zero")
 
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}

@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
@@ -43,7 +42,7 @@ func Group(services iter.Seq[*Service]) *Service {
 				go func(s *Service) {
 					defer ec.Recover()
 					defer wg.Done()
-					defer func() { fun.Invariant.Ok(waiters.Add(s.Wait) == nil) }()
+					defer func() { erc.InvariantOk(waiters.Add(s.Wait) == nil) }()
 					ec.Push(s.Start(ctx))
 				}(srvc)
 			}
@@ -266,7 +265,7 @@ func Broker[T any](broker *pubsub.Broker[T]) *Service {
 // until the underlying command has returned, potentially blocking
 // until the command returns.
 func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
-	fun.Invariant.Ok(c != nil, "exec.Cmd must be non-nil")
+	erc.InvariantOk(c != nil, "exec.Cmd must be non-nil")
 
 	started := make(chan struct{})
 	wg := &fnx.WaitGroup{}

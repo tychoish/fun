@@ -11,12 +11,12 @@ import (
 // converts the error to a panic.
 func Must[T any](arg T, err error) T { Invariant(err); return arg }
 
-// MustBeOk raises an invariant violation if the ok value is false,
+// MustOk raises an invariant violation if the ok value is false,
 // and returns the first value if the second value is ok. Useful as
 // in:
 //
-//	out := ft.MustBeOk(func() (string, bool) { return "hello world", true })
-func MustBeOk[T any](out T, ok bool) T {
+//	out := ft.MustOk(func() (string, bool) { return "hello world", true })
+func MustOk[T any](out T, ok bool) T {
 	CallWhen(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
 	return out
 }
