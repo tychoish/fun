@@ -5,48 +5,49 @@ import (
 	"errors"
 	"iter"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/irt"
 )
 
-func handleWorkerError(err error) (bool, error) {
-	switch {
-	case err == nil:
-		return false, nil
-	case errors.Is(err, ers.ErrCurrentOpSkip):
-		return false, nil
-	case ers.IsExpiredContext(err):
-		return true, err
-	case ers.IsTerminating(err):
-		return true, nil
-	default:
-		return true, err
-	}
+type Job interface {
+	Worker | Operation
+	WithRecover() Worker
 }
 
-func RunAllWorkers(seq iter.Seq[Worker]) Worker {
+func Run[T Job](seq iter.Seq[T]) Worker {
 	return func(ctx context.Context) error {
 		for job := range seq {
-			if abort, err := handleWorkerError(job.WithRecover().Run(ctx)); abort {
+			err := job.WithRecover().Run(ctx)
+			switch {
+			case err == nil:
+				continue
+			case errors.Is(err, ers.ErrCurrentOpSkip):
+				continue
+			case ers.IsExpiredContext(err):
+				return err
+			case ers.IsTerminating(err):
+				return nil
+			default:
 				return err
 			}
+
 		}
 		return nil
 	}
 }
 
-func RunAllOperations(seq iter.Seq[Operation]) Worker {
+func RunAll[T Job](seq iter.Seq[T]) Worker {
 	return func(ctx context.Context) error {
+		ec := &erc.Collector{}
 		for job := range seq {
-			if abort, err := handleWorkerError(job.WithRecover().Run(ctx)); abort {
-				return err
-			}
+			job.WithRecover().Operation(ec.Push).Run(ctx)
 		}
-		return nil
+		return ec.Resolve()
 	}
 }
 
-func PoolWorkers(seq iter.Seq[Worker], opts ...OptionProvider[*WorkerGroupConf]) Worker {
+func RunWithPool[T Job](seq iter.Seq[T], opts ...OptionProvider[*WorkerGroupConf]) Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
 		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
@@ -55,8 +56,9 @@ func PoolWorkers(seq iter.Seq[Worker], opts ...OptionProvider[*WorkerGroupConf])
 
 		wg := &WaitGroup{}
 
-		for shard := range irt.Shard(ctx, conf.NumWorkers, irt.Convert(seq, conf.workersForPool())) {
-			wg.Launch(ctx, RunAllWorkers(shard).
+		jobs := irt.Convert(seq, func(wf T) Worker { return wf.WithRecover().WithErrorFilter(conf.Filter) })
+		for shard := range irt.Shard(ctx, conf.NumWorkers, jobs) {
+			wg.Launch(ctx, Run(shard).
 				WithRecover().
 				Ignore())
 		}

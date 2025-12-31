@@ -1,8 +1,7 @@
-package fun
+package fnx
 
 import (
 	"context"
-	"math/rand"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -11,31 +10,21 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
-func TestHandlers(t *testing.T) {
-	t.Parallel()
-	const root ers.Error = ers.Error("root-error")
-	t.Run("ForBackground", func(t *testing.T) {
-		count := 0
-		op := fnx.Operation(func(context.Context) {
-			count++
-		}).Lock()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		jobs := []fnx.Operation{}
-
-		ft.CallTimes(128, func() { jobs = append(jobs, op) })
-
-		err := SliceStream(jobs).Parallel(fnx.MAKE.OperationHandler(), fnx.WorkerGroupConfNumWorkers(4)).Run(ctx)
-		assert.NotError(t, err)
-		check.Equal(t, count, 128)
+func TestPool(t *testing.T) {
+	t.Run("Smoke", func(t *testing.T) {
+		var ct int
+		err := RunAll(irt.GenerateN(64, func() Worker { return MakeWorker(func() error { ct++; return nil }) })).Run(t.Context())
+		if err != nil {
+			t.Error(err)
+		}
+		if ct != 64 {
+			t.Error(ct)
+		}
 	})
+
 	t.Run("WorkerPools", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
 			// most of these depend on the race detector not hitting errors
@@ -43,17 +32,17 @@ func TestHandlers(t *testing.T) {
 				t.Run("Workers", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					worker := fnx.Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; return nil })
-					check.NotError(t, MAKE.RunAllWorkers(VariadicStream(worker, worker, worker, worker, worker)).Run(tctx))
+					worker := Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; return nil })
+					check.NotError(t, Run(irt.Args(worker, worker, worker, worker, worker)).Run(tctx))
 					check.Equal(t, 5, count)
 				})
 
 				t.Run("Operations", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					op := fnx.Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++ })
+					op := Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++ })
 
-					check.NotError(t, MAKE.RunAllOperations(VariadicStream(op, op, op, op, op)).Run(tctx))
+					check.NotError(t, Run(irt.Args(op, op, op, op, op)).Run(tctx))
 					check.Equal(t, 5, count)
 				})
 			})
@@ -61,9 +50,9 @@ func TestHandlers(t *testing.T) {
 				t.Run("Workers", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					worker := fnx.Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; panic("oops") })
+					worker := Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; panic("oops") })
 					check.NotPanic(t, func() {
-						check.Error(t, MAKE.RunAllWorkers(VariadicStream(worker, worker, worker, worker, worker)).Run(tctx))
+						check.Error(t, Run(irt.Args(worker, worker, worker, worker, worker)).Run(tctx))
 					})
 					check.Equal(t, 1, count)
 				})
@@ -71,10 +60,10 @@ func TestHandlers(t *testing.T) {
 				t.Run("Operations", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					op := fnx.Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++; panic("oops") })
+					op := Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++; panic("oops") })
 
 					check.NotPanic(t, func() {
-						check.Error(t, MAKE.RunAllOperations(VariadicStream(op, op, op, op, op)).Run(tctx))
+						check.Error(t, Run(irt.Args(op, op, op, op, op)).Run(tctx))
 					})
 
 					check.Equal(t, 1, count)
@@ -87,7 +76,7 @@ func TestHandlers(t *testing.T) {
 
 			t.Run("Basic", func(t *testing.T) {
 				counter := &atomic.Int64{}
-				wfs := make([]fnx.Worker, wpJobCount)
+				wfs := make([]Worker, wpJobCount)
 				for i := 0; i < wpJobCount; i++ {
 					wfs[i] = func(context.Context) error {
 						counter.Add(1)
@@ -99,7 +88,7 @@ func TestHandlers(t *testing.T) {
 				start := time.Now()
 				assert.Equal(t, counter.Load(), 0)
 
-				err := MAKE.WorkerPool(SliceStream(wfs)).Run(t.Context())
+				err := RunWithPool(irt.Slice(wfs), WorkerGroupConfDefaults()).Run(t.Context())
 				dur := time.Since(start)
 				if dur > 500*time.Millisecond || dur < minDuration || dur < wpJobCount*time.Millisecond {
 					t.Error(dur)
@@ -111,7 +100,7 @@ func TestHandlers(t *testing.T) {
 				const experr ers.Error = "expected error"
 
 				counter := &atomic.Int64{}
-				wfs := make([]fnx.Worker, wpJobCount)
+				wfs := make([]Worker, wpJobCount)
 				for i := 0; i < wpJobCount; i++ {
 					wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(minDuration); return experr }
 				}
@@ -119,7 +108,7 @@ func TestHandlers(t *testing.T) {
 				start := time.Now()
 				assert.Equal(t, counter.Load(), 0)
 
-				err := MAKE.WorkerPool(SliceStream(wfs)).Run(t.Context())
+				err := RunWithPool(irt.Slice(wfs), WorkerGroupConfDefaults()).Run(t.Context())
 				dur := time.Since(start)
 				if dur > 500*time.Millisecond || dur < minDuration || dur < wpJobCount*time.Millisecond {
 					t.Error(dur)
@@ -137,9 +126,8 @@ func TestHandlers(t *testing.T) {
 			})
 		})
 	})
-
 	t.Run("Merge", func(t *testing.T) {
-		wfs := make([]fnx.Operation, 100)
+		wfs := make([]Operation, 100)
 		count := &atomic.Int64{}
 		for i := 0; i < 100; i++ {
 			wfs[i] = func(context.Context) {
@@ -154,7 +142,7 @@ func TestHandlers(t *testing.T) {
 		defer cancel()
 		start := time.Now()
 		t.Log("before exec:", count.Load())
-		err := MAKE.OperationPool(SliceStream(wfs)).Run(ctx)
+		err := RunWithPool(irt.Slice(wfs), WorkerGroupConfDefaults()).Run(ctx)
 		t.Log("after exec:", count.Load())
 		if err != nil {
 			t.Error(err)
@@ -168,38 +156,4 @@ func TestHandlers(t *testing.T) {
 			t.Error(t, dur, "<", 1000/runtime.NumCPU())
 		}
 	})
-	t.Run("Wait", func(t *testing.T) {
-		ops := make([]int, 100)
-		for i := 0; i < len(ops); i++ {
-			ops[i] = rand.Int()
-		}
-		seen := make(map[int]struct{})
-		counter := 0
-		var of fn.Handler[int] = func(in int) {
-			seen[in] = struct{}{}
-			counter++
-		}
-
-		wf := SliceStream(ops).ReadAll(fnx.FromHandler(of))
-
-		if len(seen) != 0 || counter != 0 {
-			t.Error("should be lazy execution", counter, seen)
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		if err := wf(ctx); err != nil {
-			t.Error(err)
-		}
-
-		if len(seen) != 100 {
-			t.Error(len(seen), seen)
-		}
-		if counter != 100 {
-			t.Error(counter)
-		}
-	})
 }
-
-func (Constructors) String() string { return "Constructors<>" }

@@ -710,3 +710,21 @@ func ReadLinesErr(reader io.Reader) iter.Seq2[string, error] {
 		}
 	}
 }
+
+func AsGenerator[T any](seq iter.Seq[T]) func() (T, bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	op := oncev(func() <-chan T {
+		ch := make(chan T)
+		go func() {
+			defer close(ch)
+			defer cancel()
+			for item := range seq {
+				if !sendTo(ctx, item, ch) {
+					return
+				}
+			}
+		}()
+		return ch
+	})
+	return func() (out T, ok bool) { out, ok = recieveFrom(ctx, op()); whencall(!ok, cancel); return }
+}

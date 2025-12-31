@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -101,10 +100,6 @@ func (o *WorkerGroupConf) Filter(err error) error {
 	default:
 		return err
 	}
-}
-
-func (o *WorkerGroupConf) workersForPool() fn.Converter[Worker, Worker] {
-	return func(wf Worker) Worker { return wf.WithRecover().WithErrorFilter(o.Filter) }
 }
 
 // WorkerGroupConfDefaults sets the "continue-on-error" option and the

@@ -7,9 +7,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
@@ -198,30 +198,28 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 				if err != nil {
 					return
 				}
-				b.dispatchMessage(ctx, fun.IteratorStream(subs.Keys()), msg)
+				b.dispatchMessage(ctx, subs.Keys(), msg)
 			}
 		}()
 	}
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T], msg T) {
+func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
 		wg := &fnx.WaitGroup{}
-		for iter.Next(ctx) {
+		for value := range seq {
 			wg.Add(1)
 			go func(msg T, ch chan T) {
 				defer wg.Done()
 				b.sendMsg(ctx, msg, ch)
-			}(msg, iter.Value())
+			}(msg, value)
 		}
-		_ = iter.Close()
 		wg.Wait(ctx)
 	} else {
-		for iter.Next(ctx) {
-			b.sendMsg(ctx, msg, iter.Value())
+		for value := range seq {
+			b.sendMsg(ctx, msg, value)
 		}
-		_ = iter.Close()
 	}
 }
 

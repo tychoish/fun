@@ -358,7 +358,7 @@ func (st *Stream[T]) ReadAll(fn fnx.Handler[T]) fnx.Worker {
 // for pubsub queues and related systems.
 func (st *Stream[T]) Parallel(fn fnx.Handler[T], opts ...fnx.OptionProvider[*fnx.WorkerGroupConf]) fnx.Worker {
 	return func(ctx context.Context) error {
-		return fnx.PoolWorkers(
+		return fnx.RunWithPool(
 			irt.Convert(
 				st.Iterator(ctx),
 				func(in T) fnx.Worker {
