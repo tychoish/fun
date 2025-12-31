@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -127,21 +127,21 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // position. MakeBufferPool panics with an invariant violation if the
 // max capacity value is zero.
 //
-// The type of the pooled object is dt.Slice[byte], a simple type
+// The type of the pooled object is stw.Slice[byte], a simple type
 // alias for Go's slice type with convenience methods for common slice
 // operations. You can use these values interchangeably with vanilla
 // byte slices, as you need and wish.
-func MakeBufferPool(minVal, maxVal int) *Pool[dt.Slice[byte]] {
+func MakeBufferPool(minVal, maxVal int) *Pool[stw.Slice[byte]] {
 	minVal, maxVal = intish.Bounds(minVal, maxVal)
 	erc.InvariantOk(maxVal > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
-	bufpool := &Pool[dt.Slice[byte]]{}
-	bufpool.SetCleanupHook(func(buf dt.Slice[byte]) dt.Slice[byte] {
+	bufpool := &Pool[stw.Slice[byte]]{}
+	bufpool.SetCleanupHook(func(buf stw.Slice[byte]) stw.Slice[byte] {
 		if cap(buf) > maxVal {
 			return nil
 		}
 		return buf[:0]
 	})
-	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.NewSlice(make([]byte, 0, minVal)) })
+	bufpool.SetConstructor(func() stw.Slice[byte] { return stw.NewSlice(make([]byte, 0, minVal)) })
 	bufpool.FinalizeSetup()
 
 	return bufpool
@@ -151,8 +151,8 @@ func MakeBufferPool(minVal, maxVal int) *Pool[dt.Slice[byte]] {
 // of 64kb. All other slices are discarded. These are the same
 // settings as used by the fmt package's buffer pool.
 //
-// The type of the pooled object is dt.Slice[byte], a simple type
+// The type of the pooled object is stw.Slice[byte], a simple type
 // alias for Go's slice type with convenience methods for common slice
 // operations. You can use these values interchangeably with vanilla
 // byte slices, as you need and wish.
-func DefaultBufferPool() *Pool[dt.Slice[byte]] { return MakeBufferPool(0, 64*1024) }
+func DefaultBufferPool() *Pool[stw.Slice[byte]] { return MakeBufferPool(0, 64*1024) }

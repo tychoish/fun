@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -25,7 +25,7 @@ type That fn.Future[[]string]
 // operation aborts.
 func And(ops ...That) That {
 	return func() []string {
-		out := dt.NewSlice(make([]string, 0, len(ops)+1))
+		out := stw.NewSlice(make([]string, 0, len(ops)+1))
 		for _, that := range ops {
 			if that == nil {
 				out.Push("encountered nil is.That operation")
@@ -46,8 +46,8 @@ func And(ops ...That) That {
 // are reported as errors.
 func All(ops ...That) That {
 	return func() []string {
-		out := dt.NewSlice(make([]string, 0, len(ops)+1))
-		dt.NewSlice(ops).ReadAll(func(op That) {
+		out := stw.NewSlice(make([]string, 0, len(ops)+1))
+		stw.NewSlice(ops).ReadAll(func(op That) {
 			ft.ApplyWhen(op == nil, out.Push,
 				"encountered nil is.That operation",
 			)

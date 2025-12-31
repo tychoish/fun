@@ -20,13 +20,6 @@ import (
 	"github.com/tychoish/fun/wpa"
 )
 
-// ErrStreamContinue instructs consumers of Streams and related
-// processors that run groups. Equivalent to the "continue" keyword in
-// other contexts.
-//
-// Deprecated: use ers.ErrCurrentOpSkip instead.
-const ErrStreamContinue ers.Error = ers.ErrCurrentOpSkip
-
 // Stream provides a safe, context-respecting iteration/sequence
 // paradigm, and entire tool kit for consumer functions, converters,
 // and generation options.
@@ -333,7 +326,7 @@ func (st *Stream[T]) ReadAll(fn fnx.Handler[T]) fnx.Worker {
 			switch {
 			case err == nil:
 				continue
-			case errors.Is(err, ErrStreamContinue):
+			case errors.Is(err, ers.ErrCurrentOpSkip):
 				continue
 			case ers.IsExpiredContext(err):
 				return err

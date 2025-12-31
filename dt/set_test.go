@@ -12,6 +12,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -400,7 +401,7 @@ func TestSet(t *testing.T) {
 			assert.Equal(t, st.Len(), ls.Len())
 			assert.Equal(t, st.Len(), setls.Len())
 
-			checker := Map[int, int]{}
+			checker := stw.Map[int, int]{}
 			for v := range setls.IteratorFront() {
 				if checker.Check(v) {
 					t.Errorf("duplicate value, %d", v)

@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 )
 
 // MapType is the enum that allows users to configure what map
@@ -71,7 +71,7 @@ type vmap[K comparable, V any] oomap[K, *Versioned[V]]
 
 type rmtxMap[K comparable, V any] struct {
 	mu sync.RWMutex
-	d  dt.Map[K, V]
+	d  stw.Map[K, V]
 }
 
 func (m *rmtxMap[K, V]) Store(k K, v V)     { defer adt.WithW(adt.LockW(&m.mu)); m.d.Store(k, v) }
@@ -93,7 +93,7 @@ func (m *rmtxMap[K, V]) Values() iter.Seq[V] {
 
 type mtxMap[K comparable, V any] struct {
 	mu sync.Mutex
-	d  dt.Map[K, V]
+	d  stw.Map[K, V]
 }
 
 func (m *mtxMap[K, V]) Store(k K, v V)     { defer adt.With(adt.Lock(&m.mu)); m.d.Store(k, v) }

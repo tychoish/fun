@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
@@ -16,7 +17,7 @@ import (
 // safety for concurrent use (via Synchronize() and WithLock() methods,)
 // and optional order tracking (via Order().)
 type Set[T comparable] struct {
-	hash Map[T, *Element[T]]
+	hash stw.Map[T, *Element[T]]
 	list *List[T]
 	mtx  atomic[*sync.Mutex]
 }
@@ -86,7 +87,7 @@ func (s *Set[T]) WithLock(mtx *sync.Mutex) {
 }
 
 func (s *Set[T]) isOrdered() bool  { return s.list != nil }
-func (s *Set[T]) init()            { s.hash = Map[T, *Element[T]]{} }
+func (s *Set[T]) init()            { s.hash = stw.Map[T, *Element[T]]{} }
 func (*Set[T]) with(m *sync.Mutex) { ft.CallWhen(m != nil, m.Unlock) }
 func (s *Set[T]) lock() *sync.Mutex {
 	m := s.mtx.Get()
@@ -129,7 +130,7 @@ func (s *Set[T]) List() *List[T] {
 }
 
 // Slice exports the contents of the set to a slice.
-func (s *Set[T]) Slice() Slice[T] {
+func (s *Set[T]) Slice() stw.Slice[T] {
 	if s.list != nil {
 		return s.list.Slice()
 	}

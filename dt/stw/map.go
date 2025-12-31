@@ -1,4 +1,4 @@
-package dt
+package stw
 
 import (
 	"iter"
@@ -6,14 +6,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 )
-
-// ErrUninitializedContainer is the content of the panic produced when you
-// attempt to perform an operation on an uninitialized sequence.
-const ErrUninitializedContainer ers.Error = ers.Error("uninitialized container")
-
-// ErrContainerStateImpossible is returned (often wrapped,) by implementations of container
-// datatypes that have reached an impossible or invalid state.
-const ErrContainerStateImpossible ers.Error = ers.Error("impossible container state")
 
 // Map is just a generic type wrapper around a map, mostly for the
 // purpose of being able to interact with Pair[K,V] objects and
@@ -42,7 +34,7 @@ func DefaultMap[K comparable, V any](input map[K]V, args ...int) map[K]V {
 	}
 }
 
-// NewMap provides a constructor to return a dt.Map without specifying types.
+// NewMap provides a constructor to return a stw.Map without specifying types.
 func NewMap[K comparable, V any](in map[K]V) Map[K, V] { return in }
 
 // Check returns true if the value K is in the map.

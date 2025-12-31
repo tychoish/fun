@@ -6,6 +6,7 @@ import (
 
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ensure/is"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
@@ -132,7 +133,7 @@ func (a *Assertion) Run(t testing.TB) {
 		}
 	})
 
-	result := &dt.Slice[string]{}
+	result := &stw.Slice[string]{}
 
 	ft.ApplyWhen(
 		!a.check.Defined() && a.subtests.Len() == 0,

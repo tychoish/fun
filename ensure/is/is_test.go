@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 )
 
 func TestFundamentals(t *testing.T) {
@@ -34,7 +34,7 @@ func TestFundamentals(t *testing.T) {
 		})
 		t.Run("NewSlice", func(t *testing.T) {
 			var base []string
-			ex := dt.NewSlice(base)
+			ex := stw.NewSlice(base)
 			check.True(t, ex == nil)
 
 			ex.Append(base...)

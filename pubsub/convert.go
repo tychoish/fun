@@ -52,7 +52,7 @@ func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 			switch {
 			case err == nil:
 				return out, nil
-			case errors.Is(err, ErrStreamContinue):
+			case errors.Is(err, ers.ErrCurrentOpSkip):
 				continue
 			default:
 				return c.zero(), err

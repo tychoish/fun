@@ -2013,13 +2013,13 @@ func RunStreamStringAlgoTests(
 	})
 }
 
-func TestStreamReadAllWithErrStreamContinue(t *testing.T) {
+func TestStreamReadAllWithErrCurrentOpSkip(t *testing.T) {
 	t.Run("SkipErrorsAndCollectValidValues", func(t *testing.T) {
 		callCount := &atomic.Int64{}
 		valueCount := 0
 		validValues := []int{1, 3, 5, 7, 9}
 
-		// Create a stream where operation returns ErrStreamContinue for even call counts
+		// Create a stream where operation returns ers.ErrCurrentOpSkip for even call counts
 		st := MakeStream(func(ctx context.Context) (int, error) {
 			count := int(callCount.Add(1))
 
@@ -2027,9 +2027,9 @@ func TestStreamReadAllWithErrStreamContinue(t *testing.T) {
 				return 0, io.EOF
 			}
 
-			// Return ErrStreamContinue for even counts (2, 4, 6, 8, 10)
+			// Return ers.ErrCurrentOpSkip for even counts (2, 4, 6, 8, 10)
 			if count%2 == 0 {
-				return 0, ErrStreamContinue
+				return 0, ers.ErrCurrentOpSkip
 			}
 
 			// Return valid values for odd counts (1, 3, 5, 7, 9)
@@ -2097,8 +2097,8 @@ func TestStreamReadAllWithErrStreamContinue(t *testing.T) {
 				return 0, io.EOF
 			}
 
-			// Always return ErrStreamContinue
-			return 0, ErrStreamContinue
+			// Always return ers.ErrCurrentOpSkip
+			return 0, ers.ErrCurrentOpSkip
 		})
 
 		collected := []int{}
@@ -2115,7 +2115,7 @@ func TestStreamReadAllWithErrStreamContinue(t *testing.T) {
 		assert.Equal(t, len(collected), 0)
 	})
 
-	t.Run("HandlerReturnsErrStreamContinue", func(t *testing.T) {
+	t.Run("HandlerReturnsers.ErrCurrentOpSkip", func(t *testing.T) {
 		callCount := &atomic.Int64{}
 		handlerCallCount := &atomic.Int64{}
 
@@ -2135,7 +2135,7 @@ func TestStreamReadAllWithErrStreamContinue(t *testing.T) {
 
 			// Skip even values in the handler
 			if val%2 == 0 {
-				return ErrStreamContinue
+				return ers.ErrCurrentOpSkip
 			}
 
 			collected = append(collected, val)

@@ -105,7 +105,7 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 
 			return obj, nil
 		default:
-			return zero, ErrNonBlockingChannelOperationSkipped
+			return zero, ers.ErrCurrentOpSkip
 		}
 	default:
 		// this is impossible without an invalid blockingMode

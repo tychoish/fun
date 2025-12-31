@@ -10,10 +10,20 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
 )
+
+func randomIntSlice(size int) stw.Slice[int] {
+	out := make([]int, size)
+	for idx := range out {
+		out[idx] = intish.Abs(rand.Intn(size) + 1)
+	}
+	return stw.NewSlice(out)
+}
 
 func GetPopulatedList(t testing.TB, size int) *List[int] {
 	t.Helper()

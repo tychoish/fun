@@ -4,11 +4,6 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
-// ErrNonBlockingChannelOperationSkipped is returned when sending into
-// a channel, in a non-blocking context, when the channel was full and
-// the send or receive was therefore skipped.
-const ErrNonBlockingChannelOperationSkipped ers.Error = ers.ErrCurrentOpSkip
-
 // blockingMode provides named constants for blocking/non-blocking
 // operations. They are fully internal, and only used indirectly.
 type blockingMode int8

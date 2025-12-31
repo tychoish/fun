@@ -62,7 +62,7 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 		case sm.ch <- it:
 			return nil
 		default:
-			return ErrNonBlockingChannelOperationSkipped
+			return ers.ErrCurrentOpSkip
 		}
 	default:
 		// it should be impossible to provoke an EOF error

@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
@@ -25,11 +25,11 @@ func (*sh[K, V]) makeVmap(impl MapType) vmap[K, V] {
 	case MapTypeSync:
 		return &adt.Map[K, *Versioned[V]]{}
 	case MapTypeStdlib:
-		return dt.Map[K, *Versioned[V]]{}
+		return stw.Map[K, *Versioned[V]]{}
 	case MapTypeRWMutex:
-		return &rmtxMap[K, *Versioned[V]]{d: dt.Map[K, *Versioned[V]]{}}
+		return &rmtxMap[K, *Versioned[V]]{d: stw.Map[K, *Versioned[V]]{}}
 	case MapTypeMutex:
-		return &mtxMap[K, *Versioned[V]]{d: dt.Map[K, *Versioned[V]]{}}
+		return &mtxMap[K, *Versioned[V]]{d: stw.Map[K, *Versioned[V]]{}}
 	default:
 		panic(erc.Join(ers.ErrInvalidInput, fmt.Errorf("map<%d> is does not exist", impl)))
 	}
