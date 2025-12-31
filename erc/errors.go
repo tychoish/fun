@@ -78,6 +78,15 @@ func AsCollector(err error) *Collector {
 // error set of errors the resulting error is convertable.
 func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
 
+// JoinSeq takes an iterator sequence of errors and aggregates them into
+// a single error. This operation is similar to Join but accepts an
+// iter.Seq[error] instead of a variadic slice. Nil errors are filtered
+// out, and if all errors are nil, JoinSeq returns nil. If only one
+// non-nil error exists, it is returned directly. Otherwise, a
+// *Collector is returned containing all non-nil errors.
+//
+// The resulting error is compatible with errors.Is and errors.As for
+// introspecting the constituent errors.
 func JoinSeq(errs iter.Seq[error]) error { st := &Collector{}; st.From(errs); return st.Err() }
 
 // with/lock are internal helpers to avoid twiddling the pointer to
@@ -183,7 +192,13 @@ func (ec *Collector) Push(err error) {
 	}
 }
 
-// From adds all (non-nil) error values from the sequence to the error collector.
+// From adds all non-nil error values from the iterator sequence to the
+// error collector. Nil errors in the sequence are automatically filtered
+// out and ignored. This method is thread-safe and can be called
+// concurrently with other Collector methods.
+//
+// The method uses irt.KeepErrors to filter the sequence, ensuring only
+// non-nil errors are added to the collector.
 func (ec *Collector) From(seq iter.Seq[error])        { irt.Apply(irt.KeepErrors(seq), ec.pushWithLock) }
 func (ec *Collector) pushWithLock(err error)          { defer ec.with(ec.lock()); ec.list.Push(err) }
 func (ec *Collector) addWithLock(seq iter.Seq[error]) { defer ec.with(ec.lock()); ec.list.From(seq) }
