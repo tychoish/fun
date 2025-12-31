@@ -103,8 +103,17 @@ func (o *WorkerGroupConf) Filter(err error) error {
 	}
 }
 
-// WorkerGroupConfDefaults sets the "continue-on-error" option and the
-// "number-of-worers-equals-numcpus" options.
+// WorkerGroupConfDefaults returns a configuration provider that sets recommended defaults
+// for worker pool operations.
+//
+// Default Settings:
+//   - ContinueOnError: true (workers continue processing jobs after encountering errors)
+//   - NumWorkers: runtime.NumCPU() (one worker per CPU core)
+//   - ContinueOnPanic: false (workers stop on panic, but panics are converted to errors)
+//   - IncludeContextExpirationErrors: false (context cancellation errors are not collected)
+//
+// This configuration is suitable for most batch processing workloads where you want
+// maximum throughput and want to collect all errors for later analysis.
 func WorkerGroupConfDefaults() opt.Provider[*WorkerGroupConf] {
 	return opt.Join(
 		WorkerGroupConfContinueOnError(),
@@ -130,22 +139,58 @@ func WorkerGroupConfAddExcludeErrors(errs ...error) opt.Provider[*WorkerGroupCon
 	}
 }
 
-// WorkerGroupConfIncludeContextErrors toggles the option that forces
-// the operation to include context errors in the output. By default
-// they are not included.
+// WorkerGroupConfIncludeContextErrors enables collection of context cancellation errors.
+//
+// When enabled:
+//   - Context cancellation errors (context.Canceled, context.DeadlineExceeded) are
+//     included in the error collector and returned to the caller
+//   - Useful for distinguishing between job failures and explicit cancellation
+//
+// When disabled (default):
+//   - Context cancellation errors are not collected
+//   - Workers stop processing when context is cancelled, but no error is returned
+//   - This is typically the desired behavior since context cancellation is usually
+//     intentional and not an error condition
+//
+// Note: Workers always respect context cancellation and stop processing; this setting
+// only controls whether cancellation is reported as an error.
 func WorkerGroupConfIncludeContextErrors() opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.IncludeContextExpirationErrors = true; return nil }
 }
 
-// WorkerGroupConfContinueOnError toggles the option that allows the
-// operation to continue when the operation encounters an
-// error. Otherwise, any option will lead to an abort.
+// WorkerGroupConfContinueOnError enables continue-on-error semantics for worker pool operations.
+//
+// When enabled:
+//   - Workers continue processing subsequent jobs after encountering an error
+//   - All errors are collected and aggregated for return to the caller
+//   - The pool continues running until all jobs are processed or the context is cancelled
+//
+// When disabled (default):
+//   - A worker stops processing its shard of jobs upon encountering an error
+//   - Other workers continue processing their shards
+//   - Errors are still collected and returned
+//
+// This setting does not affect panic recovery (see WorkerGroupConfContinueOnPanic) or
+// terminating errors (io.EOF, ers.ErrCurrentOpAbort), which have special handling.
 func WorkerGroupConfContinueOnError() opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ContinueOnError = true; return nil }
 }
 
-// WorkerGroupConfContinueOnPanic toggles the option that allows the
-// operation to continue when encountering a panic.
+// WorkerGroupConfContinueOnPanic enables continue-on-panic semantics for worker pool operations.
+//
+// When enabled:
+//   - Workers continue processing subsequent jobs after recovering from a panic
+//   - Panics are converted to errors (via Job() method) and collected
+//   - The worker continues processing its shard of jobs
+//
+// When disabled (default):
+//   - A worker stops processing its shard of jobs after recovering from a panic
+//   - The panic is still converted to an error and collected
+//   - Other workers continue processing their shards
+//
+// Note: All panics are always recovered and converted to errors; this setting only
+// controls whether the worker continues processing after recovery. Unrecovered panics
+// will crash the program.
 func WorkerGroupConfContinueOnPanic() opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ContinueOnPanic = true; return nil }
 }

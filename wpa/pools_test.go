@@ -16,6 +16,56 @@ import (
 )
 
 func TestPool(t *testing.T) {
+	t.Run("TaskJob", func(t *testing.T) {
+		ctx := context.Background()
+		t.Run("ReturnsWorker", func(t *testing.T) {
+			task := Task(func() error { return nil })
+			job := task.Job()
+			assert.NotError(t, job(ctx))
+		})
+		t.Run("RecoversPanics", func(t *testing.T) {
+			expected := ers.Error("panic error")
+			task := Task(func() error { panic(expected) })
+			job := task.Job()
+			err := job(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
+		})
+		t.Run("PropagatesErrors", func(t *testing.T) {
+			expected := ers.Error("test error")
+			task := Task(func() error { return expected })
+			job := task.Job()
+			err := job(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
+		})
+	})
+	t.Run("ThunkJob", func(t *testing.T) {
+		ctx := context.Background()
+		t.Run("ReturnsWorker", func(t *testing.T) {
+			called := &atomic.Bool{}
+			thunk := Thunk(func() { called.Store(true) })
+			job := thunk.Job()
+			assert.NotError(t, job(ctx))
+			assert.True(t, called.Load())
+		})
+		t.Run("RecoversPanics", func(t *testing.T) {
+			expected := ers.Error("panic error")
+			thunk := Thunk(func() { panic(expected) })
+			job := thunk.Job()
+			err := job(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
+		})
+		t.Run("NoErrorOnSuccess", func(t *testing.T) {
+			count := &atomic.Int64{}
+			thunk := Thunk(func() { count.Add(1) })
+			job := thunk.Job()
+			err := job(ctx)
+			assert.NotError(t, err)
+			assert.Equal(t, count.Load(), int64(1))
+		})
+	})
 	t.Run("Smoke", func(t *testing.T) {
 		var ct int
 		err := RunAll(irt.GenerateN(64, func() fnx.Worker { return fnx.MakeWorker(func() error { ct++; return nil }) })).Run(t.Context())
@@ -387,6 +437,155 @@ func TestPool(t *testing.T) {
 				assert.NotError(t, err)
 				assert.Equal(t, counter.Load(), int64(4))
 			})
+		})
+	})
+
+	t.Run("MixedJobTypesIntegration", func(t *testing.T) {
+		t.Run("RunWithThunks", func(t *testing.T) {
+			counter := &atomic.Int64{}
+
+			thunks := []Thunk{
+				func() { counter.Add(1) },
+				func() { counter.Add(1) },
+				func() { counter.Add(1) },
+			}
+
+			err := Run(irt.Slice(thunks)).Run(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, counter.Load(), int64(3))
+		})
+
+		t.Run("RunWithTasks", func(t *testing.T) {
+			counter := &atomic.Int64{}
+
+			tasks := []Task{
+				func() error { counter.Add(1); return nil },
+				func() error { counter.Add(1); return nil },
+				func() error { counter.Add(1); return nil },
+			}
+
+			err := Run(irt.Slice(tasks)).Run(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, counter.Load(), int64(3))
+		})
+
+		t.Run("RunAllWithWorkers", func(t *testing.T) {
+			counter := &atomic.Int64{}
+
+			workers := []fnx.Worker{
+				func(context.Context) error { counter.Add(1); return nil },
+				func(context.Context) error { counter.Add(1); return nil },
+				func(context.Context) error { counter.Add(1); return nil },
+			}
+
+			err := RunAll(irt.Slice(workers)).Run(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, counter.Load(), int64(3))
+		})
+
+		t.Run("RunAllWithOperations", func(t *testing.T) {
+			counter := &atomic.Int64{}
+
+			operations := []fnx.Operation{
+				func(context.Context) { counter.Add(1) },
+				func(context.Context) { counter.Add(1) },
+				func(context.Context) { counter.Add(1) },
+			}
+
+			err := RunAll(irt.Slice(operations)).Run(t.Context())
+			assert.NotError(t, err)
+			assert.Equal(t, counter.Load(), int64(3))
+		})
+
+		t.Run("RunWithPoolMixedTypes", func(t *testing.T) {
+			counter := &atomic.Int64{}
+
+			thunks := []Thunk{
+				func() { counter.Add(1); time.Sleep(5 * time.Millisecond) },
+				func() { counter.Add(1); time.Sleep(5 * time.Millisecond) },
+			}
+
+			tasks := []Task{
+				func() error { counter.Add(1); time.Sleep(5 * time.Millisecond); return nil },
+				func() error { counter.Add(1); time.Sleep(5 * time.Millisecond); return nil },
+			}
+
+			workers := []fnx.Worker{
+				func(context.Context) error { counter.Add(1); time.Sleep(5 * time.Millisecond); return nil },
+				func(context.Context) error { counter.Add(1); time.Sleep(5 * time.Millisecond); return nil },
+			}
+
+			operations := []fnx.Operation{
+				func(context.Context) { counter.Add(1); time.Sleep(5 * time.Millisecond) },
+				func(context.Context) { counter.Add(1); time.Sleep(5 * time.Millisecond) },
+			}
+
+			err := RunWithPool(irt.Slice(thunks), WorkerGroupConfDefaults()).Run(t.Context())
+			assert.NotError(t, err)
+
+			err = RunWithPool(irt.Slice(tasks), WorkerGroupConfDefaults()).Run(t.Context())
+			assert.NotError(t, err)
+
+			err = RunWithPool(irt.Slice(workers), WorkerGroupConfDefaults()).Run(t.Context())
+			assert.NotError(t, err)
+
+			err = RunWithPool(irt.Slice(operations), WorkerGroupConfDefaults()).Run(t.Context())
+			assert.NotError(t, err)
+
+			assert.Equal(t, counter.Load(), int64(8))
+		})
+
+		t.Run("TasksWithErrors", func(t *testing.T) {
+			counter := &atomic.Int64{}
+			expectedErr := ers.Error("test error")
+
+			tasks := []Task{
+				func() error { counter.Add(1); return nil },
+				func() error { counter.Add(1); return expectedErr },
+				func() error { counter.Add(1); return nil },
+			}
+
+			err := Run(irt.Slice(tasks)).Run(t.Context())
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expectedErr)
+			assert.Equal(t, counter.Load(), int64(2))
+		})
+
+		t.Run("ThunksWithPanics", func(t *testing.T) {
+			counter := &atomic.Int64{}
+			expectedErr := ers.Error("panic in thunk")
+
+			thunks := []Thunk{
+				func() { counter.Add(1) },
+				func() { counter.Add(1); panic(expectedErr) },
+				func() { counter.Add(1) },
+			}
+
+			err := Run(irt.Slice(thunks)).Run(t.Context())
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expectedErr)
+			assert.Equal(t, counter.Load(), int64(2))
+		})
+
+		t.Run("AllTypesPanicRecovery", func(t *testing.T) {
+			panicErr := ers.Error("panic error")
+
+			panicThunk := Thunk(func() { panic(panicErr) })
+			panicTask := Task(func() error { panic(panicErr) })
+			panicWorker := fnx.Worker(func(context.Context) error { panic(panicErr) })
+			panicOperation := fnx.Operation(func(context.Context) { panic(panicErr) })
+
+			check.Error(t, panicThunk.Job()(t.Context()))
+			check.ErrorIs(t, panicThunk.Job()(t.Context()), panicErr)
+
+			check.Error(t, panicTask.Job()(t.Context()))
+			check.ErrorIs(t, panicTask.Job()(t.Context()), panicErr)
+
+			check.Error(t, panicWorker.Job()(t.Context()))
+			check.ErrorIs(t, panicWorker.Job()(t.Context()), panicErr)
+
+			check.Error(t, panicOperation.Job()(t.Context()))
+			check.ErrorIs(t, panicOperation.Job()(t.Context()), panicErr)
 		})
 	})
 }

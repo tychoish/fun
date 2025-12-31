@@ -1530,6 +1530,437 @@ func TestChain(t *testing.T) {
 	}
 }
 
+func TestAppend(t *testing.T) {
+	tests := []struct {
+		name     string
+		seq      iter.Seq[int]
+		with     []int
+		expected []int
+	}{
+		{
+			name:     "EmptySequenceEmptyAppend",
+			seq:      func(yield func(int) bool) {},
+			with:     []int{},
+			expected: []int{},
+		},
+		{
+			name:     "EmptySequenceWithValues",
+			seq:      func(yield func(int) bool) {},
+			with:     []int{1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name: "SequenceWithEmptyAppend",
+			seq: func(yield func(int) bool) {
+				_ = yield(1) && yield(2) && yield(3)
+			},
+			with:     []int{},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name: "SequenceWithSingleValue",
+			seq: func(yield func(int) bool) {
+				_ = yield(1) && yield(2)
+			},
+			with:     []int{3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name: "SequenceWithMultipleValues",
+			seq: func(yield func(int) bool) {
+				_ = yield(1) && yield(2)
+			},
+			with:     []int{3, 4, 5},
+			expected: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name: "LargeAppend",
+			seq: func(yield func(int) bool) {
+				_ = yield(1)
+			},
+			with:     []int{2, 3, 4, 5, 6, 7, 8, 9, 10},
+			expected: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(Append(tt.seq, tt.with...))
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("Append() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestJoin(t *testing.T) {
+	tests := []struct {
+		name     string
+		seqs     []iter.Seq[int]
+		expected []int
+	}{
+		{
+			name:     "NoSequences",
+			seqs:     []iter.Seq[int]{},
+			expected: []int{},
+		},
+		{
+			name: "SingleEmptySequence",
+			seqs: []iter.Seq[int]{
+				func(yield func(int) bool) {},
+			},
+			expected: []int{},
+		},
+		{
+			name: "SingleSequence",
+			seqs: []iter.Seq[int]{
+				func(yield func(int) bool) {
+					_ = yield(1) && yield(2) && yield(3)
+				},
+			},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name: "TwoSequences",
+			seqs: []iter.Seq[int]{
+				func(yield func(int) bool) {
+					_ = yield(1) && yield(2)
+				},
+				func(yield func(int) bool) {
+					_ = yield(3) && yield(4)
+				},
+			},
+			expected: []int{1, 2, 3, 4},
+		},
+		{
+			name: "ThreeSequences",
+			seqs: []iter.Seq[int]{
+				func(yield func(int) bool) {
+					yield(1)
+				},
+				func(yield func(int) bool) {
+					_ = yield(2) && yield(3)
+				},
+				func(yield func(int) bool) {
+					_ = yield(4) && yield(5) && yield(6)
+				},
+			},
+			expected: []int{1, 2, 3, 4, 5, 6},
+		},
+		{
+			name: "FiveSequences",
+			seqs: []iter.Seq[int]{
+				func(yield func(int) bool) { yield(1) },
+				func(yield func(int) bool) { yield(2) },
+				func(yield func(int) bool) { yield(3) },
+				func(yield func(int) bool) { yield(4) },
+				func(yield func(int) bool) { yield(5) },
+			},
+			expected: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name: "MixedWithEmpty",
+			seqs: []iter.Seq[int]{
+				func(yield func(int) bool) {
+					_ = yield(1) && yield(2)
+				},
+				func(yield func(int) bool) {},
+				func(yield func(int) bool) {
+					yield(3)
+				},
+				func(yield func(int) bool) {},
+				func(yield func(int) bool) {
+					_ = yield(4) && yield(5)
+				},
+			},
+			expected: []int{1, 2, 3, 4, 5},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(Join(tt.seqs...))
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("Join() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestJoin2(t *testing.T) {
+	tests := []struct {
+		name         string
+		seqs         []iter.Seq2[string, int]
+		expectedKeys []string
+		expectedVals []int
+	}{
+		{
+			name:         "NoSequences",
+			seqs:         []iter.Seq2[string, int]{},
+			expectedKeys: []string{},
+			expectedVals: []int{},
+		},
+		{
+			name: "SingleEmptySequence",
+			seqs: []iter.Seq2[string, int]{
+				func(yield func(string, int) bool) {},
+			},
+			expectedKeys: []string{},
+			expectedVals: []int{},
+		},
+		{
+			name: "SingleSequence",
+			seqs: []iter.Seq2[string, int]{
+				func(yield func(string, int) bool) {
+					_ = yield("a", 1) && yield("b", 2)
+				},
+			},
+			expectedKeys: []string{"a", "b"},
+			expectedVals: []int{1, 2},
+		},
+		{
+			name: "TwoSequences",
+			seqs: []iter.Seq2[string, int]{
+				func(yield func(string, int) bool) {
+					_ = yield("a", 1) && yield("b", 2)
+				},
+				func(yield func(string, int) bool) {
+					_ = yield("c", 3) && yield("d", 4)
+				},
+			},
+			expectedKeys: []string{"a", "b", "c", "d"},
+			expectedVals: []int{1, 2, 3, 4},
+		},
+		{
+			name: "ThreeSequences",
+			seqs: []iter.Seq2[string, int]{
+				func(yield func(string, int) bool) {
+					yield("x", 10)
+				},
+				func(yield func(string, int) bool) {
+					_ = yield("y", 20) && yield("z", 30)
+				},
+				func(yield func(string, int) bool) {
+					yield("w", 40)
+				},
+			},
+			expectedKeys: []string{"x", "y", "z", "w"},
+			expectedVals: []int{10, 20, 30, 40},
+		},
+		{
+			name: "MixedWithEmpty",
+			seqs: []iter.Seq2[string, int]{
+				func(yield func(string, int) bool) {
+					yield("a", 1)
+				},
+				func(yield func(string, int) bool) {},
+				func(yield func(string, int) bool) {
+					yield("b", 2)
+				},
+				func(yield func(string, int) bool) {},
+				func(yield func(string, int) bool) {
+					yield("c", 3)
+				},
+			},
+			expectedKeys: []string{"a", "b", "c"},
+			expectedVals: []int{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var keys []string
+			var vals []int
+			for k, v := range Join2(tt.seqs...) {
+				keys = append(keys, k)
+				vals = append(vals, v)
+			}
+			if !slices.Equal(keys, tt.expectedKeys) {
+				t.Errorf("Join2() keys = %v, want %v", keys, tt.expectedKeys)
+			}
+			if !slices.Equal(vals, tt.expectedVals) {
+				t.Errorf("Join2() values = %v, want %v", vals, tt.expectedVals)
+			}
+		})
+	}
+}
+
+func TestChain2(t *testing.T) {
+	tests := []struct {
+		name         string
+		seq          iter.Seq[iter.Seq2[string, int]]
+		expectedKeys []string
+		expectedVals []int
+	}{
+		{
+			name:         "Empty",
+			seq:          func(yield func(iter.Seq2[string, int]) bool) {},
+			expectedKeys: []string{},
+			expectedVals: []int{},
+		},
+		{
+			name: "SingleEmptySequence",
+			seq: func(yield func(iter.Seq2[string, int]) bool) {
+				yield(func(yield func(string, int) bool) {})
+			},
+			expectedKeys: []string{},
+			expectedVals: []int{},
+		},
+		{
+			name: "SingleSequence",
+			seq: func(yield func(iter.Seq2[string, int]) bool) {
+				yield(func(yield func(string, int) bool) {
+					_ = yield("a", 1) && yield("b", 2)
+				})
+			},
+			expectedKeys: []string{"a", "b"},
+			expectedVals: []int{1, 2},
+		},
+		{
+			name: "MultipleSequences",
+			seq: func(yield func(iter.Seq2[string, int]) bool) {
+				if !yield(func(yield func(string, int) bool) {
+					_ = yield("a", 1) && yield("b", 2)
+				}) {
+					return
+				}
+				yield(func(yield func(string, int) bool) {
+					_ = yield("c", 3) && yield("d", 4)
+				})
+			},
+			expectedKeys: []string{"a", "b", "c", "d"},
+			expectedVals: []int{1, 2, 3, 4},
+		},
+		{
+			name: "MixedWithEmpty",
+			seq: func(yield func(iter.Seq2[string, int]) bool) {
+				if !yield(func(yield func(string, int) bool) {
+					yield("a", 1)
+				}) {
+					return
+				}
+				if !yield(func(yield func(string, int) bool) {}) {
+					return
+				}
+				if !yield(func(yield func(string, int) bool) {
+					yield("b", 2)
+				}) {
+					return
+				}
+				yield(func(yield func(string, int) bool) {
+					_ = yield("c", 3) && yield("d", 4)
+				})
+			},
+			expectedKeys: []string{"a", "b", "c", "d"},
+			expectedVals: []int{1, 2, 3, 4},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var keys []string
+			var vals []int
+			for k, v := range Chain2(tt.seq) {
+				keys = append(keys, k)
+				vals = append(vals, v)
+			}
+			if !slices.Equal(keys, tt.expectedKeys) {
+				t.Errorf("Chain2() keys = %v, want %v", keys, tt.expectedKeys)
+			}
+			if !slices.Equal(vals, tt.expectedVals) {
+				t.Errorf("Chain2() values = %v, want %v", vals, tt.expectedVals)
+			}
+		})
+	}
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var outerCount atomic.Int32
+		var innerCounts [3]atomic.Int32
+
+		seq := func(yield func(iter.Seq2[string, int]) bool) {
+			// First inner sequence
+			outerCount.Add(1)
+			if !yield(func(yield func(string, int) bool) {
+				innerCounts[0].Add(1)
+				if !yield("a", 1) {
+					return
+				}
+				innerCounts[0].Add(1)
+				yield("b", 2)
+			}) {
+				return
+			}
+
+			// Second inner sequence
+			outerCount.Add(1)
+			if !yield(func(yield func(string, int) bool) {
+				innerCounts[1].Add(1)
+				if !yield("c", 3) {
+					return
+				}
+				innerCounts[1].Add(1)
+				yield("d", 4)
+			}) {
+				return
+			}
+
+			// Third inner sequence (should not be reached)
+			outerCount.Add(1)
+			yield(func(yield func(string, int) bool) {
+				innerCounts[2].Add(1)
+				if !yield("e", 5) {
+					return
+				}
+				innerCounts[2].Add(1)
+				yield("f", 6)
+			})
+		}
+
+		var keys []string
+		var vals []int
+		count := 0
+		for k, v := range Chain2(seq) {
+			keys = append(keys, k)
+			vals = append(vals, v)
+			count++
+			// Break after 3 items: "a", "b", "c"
+			if count == 3 {
+				break
+			}
+		}
+
+		// Verify we got exactly 3 items
+		expectedKeys := []string{"a", "b", "c"}
+		expectedVals := []int{1, 2, 3}
+		if !slices.Equal(keys, expectedKeys) {
+			t.Errorf("keys = %v, want %v", keys, expectedKeys)
+		}
+		if !slices.Equal(vals, expectedVals) {
+			t.Errorf("values = %v, want %v", vals, expectedVals)
+		}
+
+		// Verify outer sequence was only iterated twice (for first two inner sequences)
+		if outerCount.Load() != 2 {
+			t.Errorf("outer sequence iterated %d times, expected 2", outerCount.Load())
+		}
+
+		// Verify first inner sequence was fully consumed (both items)
+		if innerCounts[0].Load() != 2 {
+			t.Errorf("first inner sequence iterated %d times, expected 2", innerCounts[0].Load())
+		}
+
+		// Verify second inner sequence was only partially consumed (only first item)
+		if innerCounts[1].Load() != 1 {
+			t.Errorf("second inner sequence iterated %d times, expected 1", innerCounts[1].Load())
+		}
+
+		// Verify third inner sequence was never touched
+		if innerCounts[2].Load() != 0 {
+			t.Errorf("third inner sequence iterated %d times, expected 0", innerCounts[2].Load())
+		}
+	})
+}
+
 func TestChainSlices(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -3415,6 +3846,301 @@ func TestMerge(t *testing.T) {
 	}
 }
 
+func TestModify(t *testing.T) {
+	t.Run("NilOperation", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		result := Collect(Modify(input, nil))
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Modify() with nil = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SingleTransformation", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		result := Collect(Modify(input, func(x int) int {
+			return x * 2
+		}))
+		expected := []int{2, 4, 6, 8, 10}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Modify() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StringTransformation", func(t *testing.T) {
+		input := Slice([]string{"a", "b", "c"})
+		result := Collect(Modify(input, func(s string) string {
+			return s + "!"
+		}))
+		expected := []string{"a!", "b!", "c!"}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Modify() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		input := func(yield func(int) bool) {
+			for i := 1; i <= 10; i++ {
+				callCount.Add(1)
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		modified := Modify(input, func(x int) int {
+			return x * 2
+		})
+
+		count := 0
+		for range modified {
+			count++
+			if count == 3 {
+				break
+			}
+		}
+
+		if callCount.Load() != 3 {
+			t.Errorf("expected 3 calls to source, got %d", callCount.Load())
+		}
+	})
+}
+
+func TestModifyAll(t *testing.T) {
+	t.Run("NoOperations", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3})
+		result := Collect(ModifyAll(input))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("ModifyAll() with no ops = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("AllNilOperations", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3})
+		result := Collect(ModifyAll(input, nil, nil, nil))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("ModifyAll() with all nil = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SingleOperation", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3})
+		result := Collect(ModifyAll(input, func(x int) int {
+			return x * 2
+		}))
+		expected := []int{2, 4, 6}
+		if !slices.Equal(result, expected) {
+			t.Errorf("ModifyAll() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("MultipleOperations", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3})
+		result := Collect(ModifyAll(input,
+			func(x int) int { return x * 2 },  // multiply by 2
+			func(x int) int { return x + 10 }, // add 10
+			func(x int) int { return x * 3 },  // multiply by 3
+		))
+		// 1: 1*2=2, 2+10=12, 12*3=36
+		// 2: 2*2=4, 4+10=14, 14*3=42
+		// 3: 3*2=6, 6+10=16, 16*3=48
+		expected := []int{36, 42, 48}
+		if !slices.Equal(result, expected) {
+			t.Errorf("ModifyAll() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("MixedNilAndNonNil", func(t *testing.T) {
+		input := Slice([]int{5, 10})
+		result := Collect(ModifyAll(input,
+			nil,
+			func(x int) int { return x * 2 },
+			nil,
+			func(x int) int { return x + 1 },
+			nil,
+		))
+		// 5: 5*2=10, 10+1=11
+		// 10: 10*2=20, 20+1=21
+		expected := []int{11, 21}
+		if !slices.Equal(result, expected) {
+			t.Errorf("ModifyAll() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StringOperations", func(t *testing.T) {
+		input := Slice([]string{"a", "b"})
+		result := Collect(ModifyAll(input,
+			func(s string) string { return s + "1" },
+			func(s string) string { return s + "2" },
+			func(s string) string { return s + "3" },
+		))
+		expected := []string{"a123", "b123"}
+		if !slices.Equal(result, expected) {
+			t.Errorf("ModifyAll() = %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestModify2(t *testing.T) {
+	t.Run("NilOperation", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2})
+		result := Collect2(Modify2(input, nil))
+		expected := map[string]int{"a": 1, "b": 2}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Modify2() with nil = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SingleTransformation", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2})
+		result := Collect2(Modify2(input, func(k string, v int) (string, int) {
+			return k + "!", v * 10
+		}))
+		expected := map[string]int{"a!": 10, "b!": 20}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Modify2() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SwapKeyValue", func(t *testing.T) {
+		input := func(yield func(string, int) bool) {
+			_ = yield("a", 1) && yield("b", 2) && yield("c", 3)
+		}
+		var keys []string
+		var vals []int
+		for k, v := range Modify2(input, func(k string, v int) (string, int) {
+			return fmt.Sprint(v), len(k)
+		}) {
+			keys = append(keys, k)
+			vals = append(vals, v)
+		}
+		expectedKeys := []string{"1", "2", "3"}
+		expectedVals := []int{1, 1, 1}
+		if !slices.Equal(keys, expectedKeys) {
+			t.Errorf("Modify2() keys = %v, want %v", keys, expectedKeys)
+		}
+		if !slices.Equal(vals, expectedVals) {
+			t.Errorf("Modify2() vals = %v, want %v", vals, expectedVals)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		input := func(yield func(string, int) bool) {
+			for i := 1; i <= 10; i++ {
+				callCount.Add(1)
+				if !yield(fmt.Sprint(i), i) {
+					return
+				}
+			}
+		}
+
+		modified := Modify2(input, func(k string, v int) (string, int) {
+			return k + "!", v * 2
+		})
+
+		count := 0
+		for range modified {
+			count++
+			if count == 3 {
+				break
+			}
+		}
+
+		if callCount.Load() != 3 {
+			t.Errorf("expected 3 calls to source, got %d", callCount.Load())
+		}
+	})
+}
+
+func TestModifyAll2(t *testing.T) {
+	t.Run("NoOperations", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2})
+		result := Collect2(ModifyAll2(input))
+		expected := map[string]int{"a": 1, "b": 2}
+		if !maps.Equal(result, expected) {
+			t.Errorf("ModifyAll2() with no ops = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("AllNilOperations", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2})
+		result := Collect2(ModifyAll2(input, nil, nil, nil))
+		expected := map[string]int{"a": 1, "b": 2}
+		if !maps.Equal(result, expected) {
+			t.Errorf("ModifyAll2() with all nil = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SingleOperation", func(t *testing.T) {
+		input := Map(map[string]int{"a": 1, "b": 2})
+		result := Collect2(ModifyAll2(input, func(k string, v int) (string, int) {
+			return k + "!", v * 2
+		}))
+		expected := map[string]int{"a!": 2, "b!": 4}
+		if !maps.Equal(result, expected) {
+			t.Errorf("ModifyAll2() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("MultipleOperations", func(t *testing.T) {
+		input := func(yield func(string, int) bool) {
+			_ = yield("x", 1) && yield("y", 2)
+		}
+		var keys []string
+		var vals []int
+		for k, v := range ModifyAll2(input,
+			func(k string, v int) (string, int) { return k + "1", v * 2 },
+			func(k string, v int) (string, int) { return k + "2", v + 10 },
+			func(k string, v int) (string, int) { return k + "3", v * 3 },
+		) {
+			keys = append(keys, k)
+			vals = append(vals, v)
+		}
+		// x,1: x1,2 -> x12,12 -> x123,36
+		// y,2: y1,4 -> y12,14 -> y123,42
+		expectedKeys := []string{"x123", "y123"}
+		expectedVals := []int{36, 42}
+		if !slices.Equal(keys, expectedKeys) {
+			t.Errorf("ModifyAll2() keys = %v, want %v", keys, expectedKeys)
+		}
+		if !slices.Equal(vals, expectedVals) {
+			t.Errorf("ModifyAll2() vals = %v, want %v", vals, expectedVals)
+		}
+	})
+
+	t.Run("MixedNilAndNonNil", func(t *testing.T) {
+		input := func(yield func(string, int) bool) {
+			_ = yield("a", 5) && yield("b", 10)
+		}
+		var keys []string
+		var vals []int
+		for k, v := range ModifyAll2(input,
+			nil,
+			func(k string, v int) (string, int) { return k + "x", v * 2 },
+			nil,
+			func(k string, v int) (string, int) { return k + "y", v + 1 },
+			nil,
+		) {
+			keys = append(keys, k)
+			vals = append(vals, v)
+		}
+		// a,5: ax,10 -> axy,11
+		// b,10: bx,20 -> bxy,21
+		expectedKeys := []string{"axy", "bxy"}
+		expectedVals := []int{11, 21}
+		if !slices.Equal(keys, expectedKeys) {
+			t.Errorf("ModifyAll2() keys = %v, want %v", keys, expectedKeys)
+		}
+		if !slices.Equal(vals, expectedVals) {
+			t.Errorf("ModifyAll2() vals = %v, want %v", vals, expectedVals)
+		}
+	})
+}
+
 func TestRemoveZeros(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -3599,6 +4325,154 @@ func TestKeepOk(t *testing.T) {
 		}
 		if count.Load() != 2 {
 			t.Errorf("expected 2 iterations, got %d", count.Load())
+		}
+	})
+}
+
+func TestKeepErrors(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		input := func(yield func(error) bool) {}
+		got := Collect(KeepErrors(input))
+		if len(got) != 0 {
+			t.Errorf("expected empty result, got %v", got)
+		}
+	})
+
+	t.Run("AllNilErrors", func(t *testing.T) {
+		input := func(yield func(error) bool) {
+			_ = yield(nil) && yield(nil) && yield(nil)
+		}
+		got := Collect(KeepErrors(input))
+		if len(got) != 0 {
+			t.Errorf("expected empty result, got %v", got)
+		}
+	})
+
+	t.Run("AllNonNilErrors", func(t *testing.T) {
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+		err3 := errors.New("error3")
+
+		input := func(yield func(error) bool) {
+			_ = yield(err1) && yield(err2) && yield(err3)
+		}
+		got := Collect(KeepErrors(input))
+		want := []error{err1, err2, err3}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("MixedNilAndNonNil", func(t *testing.T) {
+		err1 := errors.New("first")
+		err2 := errors.New("second")
+		err3 := errors.New("third")
+
+		input := func(yield func(error) bool) {
+			_ = yield(nil) &&
+				yield(err1) &&
+				yield(nil) &&
+				yield(nil) &&
+				yield(err2) &&
+				yield(nil) &&
+				yield(err3) &&
+				yield(nil)
+		}
+		got := Collect(KeepErrors(input))
+		want := []error{err1, err2, err3}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("WithContextErrors", func(t *testing.T) {
+		input := func(yield func(error) bool) {
+			_ = yield(context.Canceled) &&
+				yield(nil) &&
+				yield(context.DeadlineExceeded) &&
+				yield(nil)
+		}
+		got := Collect(KeepErrors(input))
+		want := []error{context.Canceled, context.DeadlineExceeded}
+		if !slices.Equal(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var count atomic.Int32
+		err1 := errors.New("err1")
+		err2 := errors.New("err2")
+
+		input := func(yield func(error) bool) {
+			for _, err := range []error{nil, err1, nil, err2, nil} {
+				count.Add(1)
+				if !yield(err) {
+					return
+				}
+			}
+		}
+
+		// Stop after collecting 1 non-nil error
+		collected := 0
+		for range KeepErrors(input) {
+			collected++
+			if collected == 1 {
+				break
+			}
+		}
+
+		// Should have iterated through: nil (skip), err1 (yield)
+		// Count should be 2 because we stopped after first non-nil error
+		if count.Load() != 2 {
+			t.Errorf("expected 2 iterations, got %d", count.Load())
+		}
+	})
+
+	t.Run("PreservesErrorTypes", func(t *testing.T) {
+		input := func(yield func(error) bool) {
+			custom := &customError{msg: "custom"}
+
+			_ = yield(nil) &&
+				yield(custom) &&
+				yield(errors.New("regular")) &&
+				yield(nil)
+		}
+
+		got := Collect(KeepErrors(input))
+		if len(got) != 2 {
+			t.Fatalf("expected 2 errors, got %d", len(got))
+		}
+
+		// Verify the custom error is preserved
+		if ce, ok := got[0].(*customError); !ok {
+			t.Errorf("expected customError, got %T", got[0])
+		} else if ce.msg != "custom" {
+			t.Errorf("expected msg 'custom', got %q", ce.msg)
+		}
+	})
+
+	t.Run("IteratorReset", func(t *testing.T) {
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+
+		input := func(yield func(error) bool) {
+			_ = yield(nil) && yield(err1) && yield(nil) && yield(err2)
+		}
+
+		seq := KeepErrors(input)
+
+		// First iteration
+		first := Collect(seq)
+		// Second iteration
+		second := Collect(seq)
+
+		want := []error{err1, err2}
+		if !slices.Equal(first, want) {
+			t.Errorf("first iteration: got %v, want %v", first, want)
+		}
+		if !slices.Equal(second, want) {
+			t.Errorf("second iteration: got %v, want %v", second, want)
 		}
 	})
 }
@@ -4335,3 +5209,9 @@ func (r *testReader) Read(p []byte) (n int, err error) {
 	}
 	return 0, r.err
 }
+
+type customError struct {
+	msg string
+}
+
+func (ce *customError) Error() string { return ce.msg }

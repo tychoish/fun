@@ -20,11 +20,14 @@ func New[T any](in func(T) error) Provider[T] { return in }
 // produces a single combined provider. With zero or nil
 // arguments, the operation becomes a noop.
 func Join[T any](op ...Provider[T]) Provider[T] {
-	var noop Provider[T] = func(T) error { return nil }
-	if len(op) == 0 {
-		return noop
+	switch len(op) {
+	case 0:
+		return New(func(T) error { return nil })
+	case 1:
+		return op[0]
+	default:
+		return op[0].Join(op[1:]...)
 	}
-	return noop.Join(op...)
 }
 
 // Apply applies the current Operation Provider to the configuration,

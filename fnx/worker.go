@@ -25,6 +25,12 @@ func MakeWorker(fn func() error) Worker { return func(context.Context) error { r
 // Run is equivalent to calling the worker function directly.
 func (wf Worker) Run(ctx context.Context) error { return wf(ctx) }
 
+// Job converts an Operation into a panic-safe worker function suitable for
+// use in worker pool implementations (e.g., wpa.RunWithPool). The returned
+// function catches any panics that occur during execution and converts them
+// to errors.
+func (wf Operation) Job() func(context.Context) error { return wf.WithRecover() }
+
 // WithRecover produces a worker function that converts the worker function's
 // panics to errors.
 func (wf Worker) WithRecover() Worker {

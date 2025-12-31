@@ -79,7 +79,6 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 					return
 				}
 			}
-
 		}
 	}
 }

@@ -81,6 +81,18 @@ func Slice[T any](sl []T) iter.Seq[T] { return slices.Values(sl) }
 // Args returns a sequence containing all provided arguments.
 func Args[T any](items ...T) iter.Seq[T] { return Slice(items) }
 
+// Append returns a sequence containing all elements from the input sequence
+// followed by additional values provided.
+func Append[T any](seq iter.Seq[T], with ...T) iter.Seq[T] { return Chain(Args(seq, Slice(with))) }
+
+// Join concatenates multiple sequences into a single sequence, yielding
+// all elements from each sequence in order.
+func Join[T any](seqs ...iter.Seq[T]) iter.Seq[T] { return Chain(Slice(seqs)) }
+
+// Join2 concatenates multiple pair sequences into a single pair sequence,
+// yielding all key-value pairs from each sequence in order.
+func Join2[A, B any](seqs ...iter.Seq2[A, B]) iter.Seq2[A, B] { return Chain2(Slice(seqs)) }
+
 // Monotonic returns an infinite sequence of integers starting from 1.
 func Monotonic() iter.Seq[int] { return Generate(counter()) }
 
@@ -186,6 +198,68 @@ func Convert2[A, B, C, D any](seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Se
 				return
 			}
 		}
+	}
+}
+
+// Modify2 applies a transformation function to each pair in the sequence.
+// If the operation is nil, the sequence is returned unchanged.
+func Modify2[A, B any](seq iter.Seq2[A, B], op func(A, B) (A, B)) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		if op != nil {
+			seq = Convert2(seq, op)
+		}
+
+		flush2(seq, yield)
+	}
+}
+
+// ModifyAll2 applies a sequence of transformation functions to each pair in the sequence.
+// Nil functions are filtered out and skipped. Each transformation is applied in order,
+// with the result of one transformation passed to the next.
+func ModifyAll2[A, B any](seq iter.Seq2[A, B], ops ...func(A, B) (A, B)) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		operations := Collect(Remove(Slice(ops), func(op func(A, B) (A, B)) bool { return op == nil }), 0, len(ops))
+		if len(operations) > 0 {
+			seq = Convert2(seq, func(a A, b B) (A, B) {
+				for op := range Slice(operations) {
+					a, b = op(a, b)
+				}
+				return a, b
+			})
+		}
+
+		flush2(seq, yield)
+	}
+}
+
+// Modify applies a transformation function to each element in the sequence.  If the operation is
+// nil, the sequence is returned unchanged.
+func Modify[T any](seq iter.Seq[T], op func(T) T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		if op != nil {
+			seq = Convert(seq, op)
+		}
+
+		flush(seq, yield)
+	}
+}
+
+// ModifyAll applies a sequence of transformation functions to each element in the sequence.  Nil
+// modification functions are skipped. Each transformation is applied in order, with the result of
+// one transformation passed to the next.
+func ModifyAll[T any](seq iter.Seq[T], ops ...func(T) T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		operations := Collect(Remove(Slice(ops), func(op func(T) T) bool { return op == nil }), 0, len(ops))
+		if len(operations) > 0 {
+			seq = Convert(seq, func(in T) T {
+				for op := range Slice(operations) {
+					in = op(in)
+				}
+				return in
+			})
+		}
+
+		flush(seq, yield)
 	}
 }
 
@@ -467,6 +541,19 @@ func Chain[T any](seq iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 	}
 }
 
+// Chain2 flattens a sequence of pair sequences into a single pair sequence.
+func Chain2[A, B any](seq iter.Seq[iter.Seq2[A, B]]) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		for inner := range seq {
+			for key, value := range inner {
+				if !yield(key, value) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // ChainSlices flattens a sequence of slices into a single sequence.
 func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T] { return Chain(Convert(seq, Slice)) }
 
@@ -479,7 +566,7 @@ func RemoveZeros[T comparable](seq iter.Seq[T]) iter.Seq[T] { return Remove(seq,
 // RemoveErrors returns a sequence containing only the values from pairs where the error is nil.
 func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T] { return First(Remove2(seq, isError2)) }
 
-// KeepErrors returns a sequence containing only the values where the error is non-nil.
+// KeepErrors returns a sequence containing only the non-nil errors from the input sequence.
 func KeepErrors(seq iter.Seq[error]) iter.Seq[error] { return Keep(seq, isError) }
 
 // KeepOk returns a sequence containing only the values from pairs where the boolean is true.

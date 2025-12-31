@@ -21,6 +21,30 @@ import (
 
 func TestWorker(t *testing.T) {
 	t.Parallel()
+	t.Run("Job", func(t *testing.T) {
+		ctx := context.Background()
+		t.Run("ReturnsWorker", func(t *testing.T) {
+			wf := Worker(func(context.Context) error { return nil })
+			job := wf.Job()
+			assert.NotError(t, job(ctx))
+		})
+		t.Run("RecoversPanics", func(t *testing.T) {
+			expected := errors.New("panic error")
+			wf := Worker(func(context.Context) error { panic(expected) })
+			job := wf.Job()
+			err := job(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
+		})
+		t.Run("PropagatesErrors", func(t *testing.T) {
+			expected := errors.New("test error")
+			wf := Worker(func(context.Context) error { return expected })
+			job := wf.Job()
+			err := job(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
+		})
+	})
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
 			start := time.Now()

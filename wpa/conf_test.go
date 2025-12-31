@@ -230,7 +230,7 @@ func TestWorkerGroupConfJoinOptions(t *testing.T) {
 		err := opt.Join[*WorkerGroupConf]().Apply(conf)
 
 		assert.NotError(t, err)
-		assert.Equal(t, conf.NumWorkers, 1)      // because it's overriden by the validate method
+		assert.Equal(t, conf.NumWorkers, 1)      // because it's overridden by the validate method
 		assert.NotNilPtr(t, conf.ErrorCollector) // set by validate method
 		assert.True(t, ft.Not(conf.ContinueOnError))
 		assert.True(t, ft.Not(conf.ContinueOnPanic))

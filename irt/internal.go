@@ -305,6 +305,15 @@ func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
 	return true
 }
 
+func flush2[A, B any](seq iter.Seq2[A, B], yield func(A, B) bool) bool {
+	for key, value := range seq {
+		if !yield(key, value) {
+			return false
+		}
+	}
+	return true
+}
+
 func repeat[T any](times int, op func() T) func() (T, bool) {
 	return func() (out T, ok bool) {
 		if times > 0 {
