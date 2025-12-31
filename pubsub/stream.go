@@ -1,8 +1,4 @@
-// Package fun is a zero-dependency collection of tools and idoms that
-// takes advantage of generics. Streams, error handling, a
-// native-feeling Set type, and a simple pub-sub framework for
-// distributing messages in fan-out patterns.
-package fun
+package pubsub
 
 import (
 	"context"
@@ -597,7 +593,7 @@ func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
 	return out.Channel()
 }
 
-// Iterator converts a fun.Stream[T] into a native go iterator.
+// Iterator converts a pubsub.Stream[T] into a native go iterator.
 func (st *Stream[T]) Iterator(ctx context.Context) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for {

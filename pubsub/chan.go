@@ -1,4 +1,4 @@
-package fun
+package pubsub
 
 import (
 	"github.com/tychoish/fun/ers"

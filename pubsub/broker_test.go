@@ -566,7 +566,7 @@ func TestBroker(t *testing.T) {
 		t.Parallel()
 		input := randomIntSlice(100)
 
-		iter := fun.SliceStream(input)
+		iter := SliceStream(input)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()

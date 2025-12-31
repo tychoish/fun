@@ -1,4 +1,4 @@
-package fun
+package pubsub
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func Convert[T, O any](op fnx.Converter[T, O]) interface {
 	return &converter[T, O]{op: op}
 }
 
-// ConvertFn simplifies calls to fun.Convert for fn.Convert types.
+// ConvertFn simplifies calls to pubsub.Convert for fn.Convert types.
 func ConvertFn[T any, O any](op fn.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
 	Parallel(*Stream[T], ...opt.Provider[*wpa.WorkerGroupConf]) *Stream[O]

@@ -11,10 +11,25 @@ import (
 // converts the error to a panic.
 func Must[T any](arg T, err error) T { Invariant(err); return arg }
 
+// MustBeOk raises an invariant violation if the ok value is false,
+// and returns the first value if the second value is ok. Useful as
+// in:
+//
+//	out := ft.MustBeOk(func() (string, bool) { return "hello world", true })
+func MustBeOk[T any](out T, ok bool) T {
+	CallWhen(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
+	return out
+}
+
 // Invariant produces a panic--holding an error rooted in, ers.ErrInvariantViolation, when the error
 // is non-nil.
 func Invariant(err error) {
 	CallWhen(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
+}
+
+// InvariantOk panics when the condition is false
+func InvariantOk(ok bool) {
+	CallWhen(!ok, func() { panic(ers.ErrInvariantViolation) })
 }
 
 // Check can wrap a the callsite of a function that returns a value
@@ -30,16 +45,6 @@ func Check[T any](value T, err error) (zero T, _ bool) {
 // WrapCheck returns a function that when called returns the result of Check on the provided value and error.
 func WrapCheck[T any](value T, err error) func() (T, bool) {
 	return func() (T, bool) { return Check(value, err) }
-}
-
-// MustBeOk raises an invariant violation if the ok value is false,
-// and returns the first value if the second value is ok. Useful as
-// in:
-//
-//	out := ft.MustBeOk(func() (string, bool) { return "hello world", true })
-func MustBeOk[T any](out T, ok bool) T {
-	CallWhen(!ok, func() { panic(fmt.Errorf("check failed: %w", ers.ErrInvariantViolation)) })
-	return out
 }
 
 // Ignore is a noop, but can be used to annotate operations rather

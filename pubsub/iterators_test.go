@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/fnx"
@@ -33,7 +32,7 @@ func TestRateLimit(t *testing.T) {
 		count := &intish.Atomic[int]{}
 
 		check.MinRuntime(t, 100*time.Millisecond, func() {
-			assert.NotError(t, fun.IteratorStream(RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond)).
+			assert.NotError(t, IteratorStream(RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond)).
 				ReadAll(fnx.FromHandler(func(in int) {
 					check.True(t, in >= 0)
 					check.True(t, in <= 100)

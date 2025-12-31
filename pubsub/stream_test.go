@@ -1,4 +1,4 @@
-package fun
+package pubsub
 
 import (
 	"context"
@@ -61,14 +61,6 @@ type FixtureStreamConstructors[T any] struct {
 type FixtureStreamFilter[T any] struct {
 	Name   string
 	Filter func(*Stream[T]) *Stream[T]
-}
-
-func makeIntSlice(size int) []int {
-	out := make([]int, size)
-	for i := 0; i < size; i++ {
-		out[i] = i
-	}
-	return out
 }
 
 type none struct{}
@@ -2005,7 +1997,7 @@ func RunStreamStringAlgoTests(
 				return 0, io.EOF
 			}
 
-			return count, ErrInvariantViolation
+			return count, ers.ErrInvariantViolation
 		}))
 
 		newSl, err := Convert(fnx.MakeConverterErr(func(in int) (string, error) {

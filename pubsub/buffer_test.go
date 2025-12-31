@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
@@ -70,7 +69,7 @@ func TestDistributor(t *testing.T) {
 				t.Fatal(queue.tracker.len())
 			}
 
-			iter := fun.InterfaceStream(dist)
+			iter := InterfaceStream(dist)
 			go func() {
 				time.Sleep(250 * time.Millisecond)
 				assert.NotError(t, queue.Close())
@@ -102,12 +101,12 @@ func TestDistributor(t *testing.T) {
 		t.Run("Integer", func(t *testing.T) {
 			t.Parallel()
 			t.Run("Buffered", func(t *testing.T) {
-				RunDistributorTests(t, iterSize, func() *fun.Stream[int] {
-					return fun.SliceStream(randomIntSlice(iterSize))
+				RunDistributorTests(t, iterSize, func() *Stream[int] {
+					return SliceStream(randomIntSlice(iterSize))
 				})
 			})
 			t.Run("Generated", func(t *testing.T) {
-				RunDistributorTests(t, iterSize, func() *fun.Stream[int] {
+				RunDistributorTests(t, iterSize, func() *Stream[int] {
 					ch := make(chan int)
 					go func() {
 						defer close(ch)
@@ -116,21 +115,21 @@ func TestDistributor(t *testing.T) {
 						}
 					}()
 
-					return fun.ChannelStream(ch)
+					return ChannelStream(ch)
 				})
 			})
 		})
 		t.Run("StringSimple", func(t *testing.T) {
-			RunDistributorTests(t, iterSize, func() *fun.Stream[string] {
+			RunDistributorTests(t, iterSize, func() *Stream[string] {
 				out := make([]string, iterSize)
 				for i := 0; i < iterSize; i++ {
 					out[i] = fmt.Sprintf("idx=%d random=%d", i, rand.Int63())
 				}
-				return fun.SliceStream(out)
+				return SliceStream(out)
 			})
 		})
 		t.Run("RandomString", func(t *testing.T) {
-			RunDistributorTests(t, iterSize, func() *fun.Stream[string] {
+			RunDistributorTests(t, iterSize, func() *Stream[string] {
 				ch := make(chan string)
 				go func() {
 					defer close(ch)
@@ -142,7 +141,7 @@ func TestDistributor(t *testing.T) {
 						ch <- string(str[:])
 					}
 				}()
-				return fun.ChannelStream(ch)
+				return ChannelStream(ch)
 			})
 		})
 	})
@@ -150,14 +149,14 @@ func TestDistributor(t *testing.T) {
 
 type DistFuture[T comparable] struct {
 	Name   string
-	Future func(*testing.T, *fun.Stream[T]) distributor[T]
+	Future func(*testing.T, *Stream[T]) distributor[T]
 }
 
 func MakeFutures[T comparable](size int) []DistFuture[T] {
 	return []DistFuture[T]{
 		{
 			Name: "ChannelBuffered",
-			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
+			Future: func(t *testing.T, input *Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T, size)
 				for input.Next(ctx) {
@@ -170,7 +169,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 		},
 		{
 			Name: "DirectChannel",
-			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
+			Future: func(t *testing.T, input *Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T)
 				go func() {
@@ -191,7 +190,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 		},
 		{
 			Name: "DistChannel",
-			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
+			Future: func(t *testing.T, input *Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				ch := make(chan T)
 				out := distForChannel(ch)
@@ -211,7 +210,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 		},
 		{
 			Name: "DistQueue",
-			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
+			Future: func(t *testing.T, input *Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
 				out := queue.distributorImpl()
@@ -337,7 +336,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 	}
 }
 
-func RunDistributorTests[T comparable](t *testing.T, size int, producer func() *fun.Stream[T]) {
+func RunDistributorTests[T comparable](t *testing.T, size int, producer func() *Stream[T]) {
 	t.Parallel()
 	for _, gent := range MakeFutures[T](size) {
 		t.Run(gent.Name, func(t *testing.T) {

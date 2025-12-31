@@ -3,7 +3,6 @@ package pubsub
 import (
 	"context"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/fnx"
 )
 
@@ -44,13 +43,13 @@ func (d distributor[T]) Read(ctx context.Context) (T, error) { return d.pop(ctx)
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
 func distForChannel[T any](ch chan T) distributor[T] {
-	c := fun.Blocking(ch)
+	c := Blocking(ch)
 	return distForChanOp(c)
 }
 
 // distForChanOp constructs a Distributor from the channel
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions.
-func distForChanOp[T any](c fun.ChanOp[T]) distributor[T] {
+func distForChanOp[T any](c ChanOp[T]) distributor[T] {
 	return makeDistributor(c.Send().Write, c.Receive().Read, c.Len)
 }

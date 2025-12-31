@@ -7,14 +7,6 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
-// ErrInvariantViolation is the root error of the error object that is
-// the content of all panics produced by the Invariant helper.
-const ErrInvariantViolation ers.Error = ers.ErrInvariantViolation
-
-// ErrRecoveredPanic is at the root of any error returned by a
-// function in the fun package that recovers from a panic.
-const ErrRecoveredPanic ers.Error = ers.ErrRecoveredPanic
-
 // Invariant provides a namespace for making runtime invariant
 // assertions. These all raise panics, passing error objects from
 // panic, which can be more easily handled. These helpers are
