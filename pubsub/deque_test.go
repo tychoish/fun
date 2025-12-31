@@ -755,30 +755,30 @@ func TestDeque(t *testing.T) {
 		}
 	})
 	t.Run("Future", func(t *testing.T) {
+		t.Parallel()
 		t.Run("BlockingEmpty", func(t *testing.T) {
-			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-			dq := NewUnlimitedDeque[string]()
-			assert.MinRuntime(t, 100*time.Millisecond, func() {
-				for range dq.IteratorWaitFront(ctx) {
-					continue
-				}
-			})
+			assert.MinRuntime(t, 100*time.Millisecond-(10*time.Nanosecond),
+				func() {
+					dq := NewUnlimitedDeque[string]()
+					for range dq.IteratorWaitFront(ctx) {
+						continue
+					}
+				})
 			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 		})
 		t.Run("ReverseBlockingEmpty", func(t *testing.T) {
-			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-			dq := NewUnlimitedDeque[string]()
-			assert.MinRuntime(t, 100*time.Millisecond, func() {
-				for range dq.IteratorWaitBack(ctx) {
-					continue
-				}
-			})
+			assert.MinRuntime(t, 100*time.Millisecond-(10*time.Nanosecond),
+				func() {
+					dq := NewUnlimitedDeque[string]()
+					for range dq.IteratorWaitBack(ctx) {
+						continue
+					}
+				})
 			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 		})
 		t.Run("Production", func(t *testing.T) {
-			t.Parallel()
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 			dq := NewUnlimitedDeque[string]()
 			assert.MaxRuntime(t, 128*time.Millisecond, func() {

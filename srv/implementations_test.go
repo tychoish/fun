@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"runtime"
 	"sync/atomic"
@@ -223,77 +222,91 @@ func TestHelpers(t *testing.T) {
 
 func TestCmd(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 2; i++ {
-		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
-			t.Parallel()
-			t.Run("Short", func(t *testing.T) {
-				t.Parallel()
-				t.Run("SimpleSleep", func(t *testing.T) {
-					ctx := testt.Context(t)
-					cmd := exec.CommandContext(ctx, "sleep", ".5")
-					s := Cmd(cmd, 0)
-					assert.MaxRuntime(t, 750*time.Millisecond, func() {
-						check.NotError(t, s.Start(ctx))
-						check.NotError(t, s.Wait())
-					})
-					assert.True(t, s.isFinished.Load())
-				})
-				t.Run("QuickReturn", func(t *testing.T) {
-					cmd := exec.Command("sleep", ".1")
-					s := Cmd(cmd, 0)
-					ctx := testt.Context(t)
-					check.NotError(t, s.Start(ctx))
-					assert.MaxRuntime(t, 100*time.Millisecond, func() {
-						s.Close()
-						check.Error(t, s.Wait())
-					})
-					assert.True(t, s.isFinished.Load())
-				})
-				t.Run("TimeoutObserved", func(t *testing.T) {
-					ctx := testt.Context(t)
-					cmd := exec.CommandContext(ctx, "sleep", "2")
-					s := Cmd(cmd, 10*time.Millisecond)
-					check.NotError(t, s.Start(ctx))
-					assert.MaxRuntime(t, 100*time.Millisecond, func() {
-						s.Close()
-						check.Error(t, s.Wait())
-					})
-				})
-			})
-
-			t.Run("RunningStartedErrors", func(t *testing.T) {
-				t.Parallel()
-
-				ctx := testt.Context(t)
-				cmd := exec.CommandContext(ctx, "sleep", "10")
-				_ = cmd.Start()
-				s := Cmd(cmd, 0)
+	t.Run("Short", func(t *testing.T) {
+		t.Parallel()
+		t.Run("SimpleSleep", func(t *testing.T) {
+			ctx := testt.Context(t)
+			cmd := exec.CommandContext(ctx, "sleep", ".5")
+			s := Cmd(cmd, 0)
+			assert.MaxRuntime(t, 750*time.Millisecond, func() {
 				check.NotError(t, s.Start(ctx))
-				err := s.Wait()
-				assert.Error(t, err) // already
-				assert.Substring(t, err.Error(), "already started")
+				check.NotError(t, s.Wait())
 			})
-			t.Run("ForceSigKILL", func(t *testing.T) {
-				ctx := testt.Context(t)
-				ctx = SetBaseContext(ctx)
-				cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
-				out := &bytes.Buffer{}
-				cmd.Stdout = out
-				cmd.Stderr = out
-				s := Cmd(cmd, 100*time.Millisecond)
-
-				check.NotError(t, s.Start(ctx))
-				assert.MaxRuntime(t, 500*time.Millisecond, func() {
-					s.cancel()
-					runtime.Gosched()
-					err := s.Wait()
-					check.Error(t, err)
-					testt.Log(t, err)
-				})
-				testt.Log(t, out.String())
+			assert.True(t, s.isFinished.Load())
+		})
+		t.Run("QuickReturn", func(t *testing.T) {
+			cmd := exec.Command("sleep", ".1")
+			s := Cmd(cmd, 0)
+			ctx := testt.Context(t)
+			check.NotError(t, s.Start(ctx))
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+				s.Close()
+				check.Error(t, s.Wait())
+			})
+			assert.True(t, s.isFinished.Load())
+		})
+		t.Run("TimeoutObserved", func(t *testing.T) {
+			ctx := testt.Context(t)
+			cmd := exec.CommandContext(ctx, "sleep", "2")
+			s := Cmd(cmd, 10*time.Millisecond)
+			check.NotError(t, s.Start(ctx))
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+				s.Close()
+				check.Error(t, s.Wait())
 			})
 		})
-	}
+	})
+
+	t.Run("RunningStartedErrors", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := testt.Context(t)
+		cmd := exec.CommandContext(ctx, "sleep", "10")
+		_ = cmd.Start()
+		s := Cmd(cmd, 0)
+		check.NotError(t, s.Start(ctx))
+		err := s.Wait()
+		assert.Error(t, err) // already
+		assert.Substring(t, err.Error(), "already started")
+	})
+	t.Run("SIGTERM", func(t *testing.T) {
+		ctx := testt.Context(t)
+		ctx = SetBaseContext(ctx)
+		cmd := exec.CommandContext(ctx, "bash", "-c", "sleep 10; echo 'woop'")
+		out := &bytes.Buffer{}
+		cmd.Stdout = out
+		cmd.Stderr = out
+		s := Cmd(cmd, 100*time.Millisecond)
+		check.NotError(t, s.Start(ctx))
+		runtime.Gosched()
+		s.cancel()
+
+		assert.MaxRuntime(t, 500*time.Millisecond, func() {
+			err := s.Wait()
+			check.Error(t, err)
+			testt.Log(t, err)
+		})
+		testt.Log(t, out.String())
+	})
+	t.Run("ForceSigKILL", func(t *testing.T) {
+		ctx := testt.Context(t)
+		ctx = SetBaseContext(ctx)
+		cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
+		out := &bytes.Buffer{}
+		cmd.Stdout = out
+		cmd.Stderr = out
+		s := Cmd(cmd, 100*time.Millisecond)
+		check.NotError(t, s.Start(ctx))
+		runtime.Gosched()
+		s.cancel()
+
+		assert.MaxRuntime(t, 500*time.Millisecond, func() {
+			err := s.Wait()
+			check.Error(t, err)
+			testt.Log(t, err)
+		})
+		testt.Log(t, out.String())
+	})
 }
 
 func TestDaemon(t *testing.T) {

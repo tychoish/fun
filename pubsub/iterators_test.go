@@ -29,51 +29,46 @@ func TestRateLimit(t *testing.T) {
 
 	t.Run("Serial", func(t *testing.T) {
 		ctx := t.Context()
-		start := time.Now()
 		count := &intish.Atomic[int]{}
-		assert.NotError(t, fun.IteratorStream(RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond)).
-			ReadAll(fnx.FromHandler(func(in int) {
-				check.True(t, in >= 0)
-				check.True(t, in <= 100)
-				count.Add(1)
-				testt.Log(t, count.Get(), "-->", time.Now())
-			})).Run(testt.Context(t)))
-		end := time.Now()
-		dur := end.Sub(start)
 
-		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
+		check.MinRuntime(t, 100*time.Millisecond, func() {
+			assert.NotError(t, fun.IteratorStream(RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond)).
+				ReadAll(fnx.FromHandler(func(in int) {
+					check.True(t, in >= 0)
+					check.True(t, in <= 100)
+					count.Add(1)
+					testt.Log(t, in, count.Get(), "-->", time.Now())
+				})).Run(testt.Context(t)))
+		})
 
-		assert.True(t, dur >= 100*time.Millisecond)
 		assert.Equal(t, 100, count.Get())
 	})
 	t.Run("Parallel", func(t *testing.T) {
-		start := time.Now()
 		count := &intish.Atomic[int]{}
 		ctx := t.Context()
-		workers := irt.Convert(RateLimit(ctx, irt.Slice(makeIntSlice(101)), 10, 10*time.Millisecond), func(in int) fnx.Worker {
-			return func(ctx context.Context) error {
-				check.True(t, in >= 0)
-				check.True(t, in <= 100)
-				count.Add(1)
-				testt.Log(t, count.Get(), "-->", time.Now())
-				return nil
+
+		check.MinRuntime(t, 100*time.Millisecond, func() {
+			workers := irt.Convert(RateLimit(ctx, irt.Slice(makeIntSlice(101)), 10, 100*time.Millisecond), func(in int) fnx.Worker {
+				return func(ctx context.Context) error {
+					check.True(t, in >= 0)
+					check.True(t, in <= 100)
+					count.Add(1)
+					testt.Log(t, in, count.Get(), "-->", time.Now())
+					return nil
+				}
+			})
+			wg := &sync.WaitGroup{}
+			for shard := range irt.Shard(ctx, 3, workers) {
+				wg.Add(1)
+				go func(seq iter.Seq[fnx.Worker]) {
+					defer wg.Done()
+					err := fnx.RunAll(seq).Run(ctx)
+					check.NotError(t, err)
+				}(shard)
 			}
+			wg.Wait()
 		})
-		wg := &sync.WaitGroup{}
-		for shard := range irt.Shard(ctx, 3, workers) {
-			wg.Add(1)
-			go func(seq iter.Seq[fnx.Worker]) {
-				err := fnx.RunAll(seq).Run(ctx)
-				assert.NotError(t, err)
-			}(shard)
-		}
-		wg.Done()
-		end := time.Now()
-		dur := end.Sub(start)
 
-		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
-
-		assert.True(t, dur >= 5*time.Millisecond)
 		assert.Equal(t, 101, count.Get())
 	})
 	t.Run("Cancelation", func(t *testing.T) {

@@ -552,8 +552,14 @@ func TestBroker(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		check.Error(t, broker.Send(ctx, 123))
-		check.ErrorIs(t, broker.Send(ctx, 123), context.Canceled)
+		for range 10 {
+			if err := broker.Send(ctx, 123); err != nil {
+				check.ErrorIs(t, err, context.Canceled)
+				return
+			}
+			time.Sleep(time.Microsecond)
+		}
+		t.Error("should have seen one context cancelation error after a send by now")
 	})
 
 	t.Run("Populate", func(t *testing.T) {

@@ -84,6 +84,7 @@ func TestMap(t *testing.T) {
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
+		count := &atomic.Int64{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {
@@ -95,6 +96,7 @@ func TestMap(t *testing.T) {
 
 					for i := 0; i < 300; i++ {
 						mp.Store(fmt.Sprint(i), rand.Int())
+						count.Add(1)
 					}
 				}
 			}()
@@ -111,33 +113,36 @@ func TestMap(t *testing.T) {
 					}
 					for i := 0; i < 300; i++ {
 						mp.Delete(fmt.Sprint(i))
+						count.Add(1)
 					}
 				}
 			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for {
-					time.Sleep(time.Millisecond)
-					if mp.Len() > 0 {
-						break
+			for range 2 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for {
+						time.Sleep(time.Millisecond)
+						if mp.Len() > 0 {
+							break
+						}
 					}
-				}
 
-				for {
-					if ctx.Err() != nil || passed.Load() {
-						return
+					for {
+						if ctx.Err() != nil || passed.Load() {
+							return
+						}
+						if mp.Len() == 0 {
+							passed.Store(true)
+							cancel()
+							return
+						}
 					}
-					if mp.Len() == 0 {
-						passed.Store(true)
-						cancel()
-						return
-					}
-				}
-			}()
+				}()
+			}
 		}
 		wg.Wait()
-		t.Log(mp.Len())
+		t.Log(mp.Len(), count.Load())
 		assert.True(t, passed.Load())
 	})
 	t.Run("EnsureSemantics", func(t *testing.T) {

@@ -85,10 +85,7 @@ func TestPool(t *testing.T) {
 
 			go func() {
 				defer wg.Done()
-				for {
-					if ctx.Err() != nil {
-						return
-					}
+				for ctx.Err() == nil {
 					ppg := p.Get()
 					ppg.value = 9001
 					p.Put(ppg)
@@ -96,9 +93,8 @@ func TestPool(t *testing.T) {
 			}()
 			go func() {
 				defer wg.Done()
-				for {
+				for ctx.Err() == nil {
 					ppg := p.Get()
-					check.NotEqual(t, ppg.value, 9001)
 					switch ppg.value {
 					case 9001:
 						t.Error("cleanup hook failed")
@@ -110,6 +106,8 @@ func TestPool(t *testing.T) {
 				}
 			}()
 		}
+		time.Sleep(5 * time.Second)
+		cancel()
 		wg.Wait()
 		check.True(t, seen.Load())
 		check.True(t, called.Load())

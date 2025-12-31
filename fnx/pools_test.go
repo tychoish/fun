@@ -2,6 +2,7 @@ package fnx
 
 import (
 	"context"
+	"io"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -155,5 +156,236 @@ func TestPool(t *testing.T) {
 		if int(dur) < (1000 / runtime.NumCPU()) {
 			t.Error(t, dur, "<", 1000/runtime.NumCPU())
 		}
+	})
+
+	t.Run("InvalidOptions", func(t *testing.T) {
+		t.Run("NilErrorCollector", func(t *testing.T) {
+			executed := &atomic.Int64{}
+			wfs := []Worker{
+				func(context.Context) error { executed.Add(1); return nil },
+				func(context.Context) error { executed.Add(1); return nil },
+			}
+
+			err := RunWithPool(
+				irt.Slice(wfs),
+				WorkerGroupConfWithErrorCollector(nil),
+			).Run(t.Context())
+
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrInvalidInput)
+			assert.Equal(t, executed.Load(), int64(0))
+		})
+
+		t.Run("ExcludeRecoveredPanic", func(t *testing.T) {
+			executed := &atomic.Int64{}
+			wfs := []Worker{
+				func(context.Context) error { executed.Add(1); return nil },
+				func(context.Context) error { executed.Add(1); return nil },
+			}
+
+			err := RunWithPool(
+				irt.Slice(wfs),
+				WorkerGroupConfAddExcludeErrors(ers.ErrRecoveredPanic),
+			).Run(t.Context())
+
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrInvalidInput)
+			assert.Equal(t, executed.Load(), int64(0))
+		})
+
+		t.Run("MultipleInvalidOptions", func(t *testing.T) {
+			executed := &atomic.Int64{}
+			wfs := []Worker{
+				func(context.Context) error { executed.Add(1); return nil },
+				func(context.Context) error { executed.Add(1); return nil },
+			}
+
+			err := RunWithPool(
+				irt.Slice(wfs),
+				WorkerGroupConfWithErrorCollector(nil),
+				WorkerGroupConfAddExcludeErrors(ers.ErrRecoveredPanic),
+			).Run(t.Context())
+
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ers.ErrInvalidInput)
+			assert.Equal(t, executed.Load(), int64(0))
+		})
+	})
+
+	t.Run("Run", func(t *testing.T) {
+		t.Run("ContextCancellation", func(t *testing.T) {
+			t.Run("StopsProcessingAndReturnsError", func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); cancel(); return context.Canceled },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(ctx)
+
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, context.Canceled)
+				assert.Equal(t, counter.Load(), int64(2))
+			})
+
+			t.Run("DeadlineExceeded", func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+				defer cancel()
+
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { time.Sleep(5 * time.Millisecond); return nil },
+					func(context.Context) error { counter.Add(1); return context.DeadlineExceeded },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(ctx)
+
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, context.DeadlineExceeded)
+			})
+		})
+
+		t.Run("TerminatingErrors", func(t *testing.T) {
+			t.Run("EOF", func(t *testing.T) {
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return io.EOF },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(t.Context())
+
+				assert.NotError(t, err)
+				assert.Equal(t, counter.Load(), int64(3))
+			})
+
+			t.Run("ErrContainerClosed", func(t *testing.T) {
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return ers.ErrContainerClosed },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(t.Context())
+
+				assert.NotError(t, err)
+				assert.Equal(t, counter.Load(), int64(2))
+			})
+
+			t.Run("ErrCurrentOpAbort", func(t *testing.T) {
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpAbort },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(t.Context())
+
+				assert.NotError(t, err)
+				assert.Equal(t, counter.Load(), int64(4))
+			})
+
+			t.Run("AllTerminatingErrors", func(t *testing.T) {
+				tests := []struct {
+					name string
+					err  error
+				}{
+					{name: "io.EOF", err: io.EOF},
+					{name: "ErrContainerClosed", err: ers.ErrContainerClosed},
+					{name: "ErrCurrentOpAbort", err: ers.ErrCurrentOpAbort},
+				}
+
+				for _, tt := range tests {
+					t.Run(tt.name, func(t *testing.T) {
+						counter := &atomic.Int64{}
+
+						jobs := []Worker{
+							func(context.Context) error { counter.Add(1); return nil },
+							func(context.Context) error { counter.Add(1); return tt.err },
+							func(context.Context) error { counter.Add(1); return nil },
+						}
+
+						err := Run(irt.Slice(jobs)).Run(t.Context())
+
+						assert.NotError(t, err)
+						assert.Equal(t, counter.Load(), int64(2))
+					})
+				}
+			})
+		})
+
+		t.Run("ErrCurrentOpSkip", func(t *testing.T) {
+			t.Run("ContinuesProcessing", func(t *testing.T) {
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(t.Context())
+
+				assert.NotError(t, err)
+				assert.Equal(t, counter.Load(), int64(5))
+			})
+		})
+
+		t.Run("RegularError", func(t *testing.T) {
+			t.Run("StopsProcessingAndReturnsError", func(t *testing.T) {
+				counter := &atomic.Int64{}
+				expectedErr := ers.Error("test error")
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return expectedErr },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(t.Context())
+
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, expectedErr)
+				assert.Equal(t, counter.Load(), int64(3))
+			})
+		})
+
+		t.Run("MixedScenarios", func(t *testing.T) {
+			t.Run("SkipThenTerminate", func(t *testing.T) {
+				counter := &atomic.Int64{}
+
+				jobs := []Worker{
+					func(context.Context) error { counter.Add(1); return nil },
+					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },
+					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },
+					func(context.Context) error { counter.Add(1); return io.EOF },
+					func(context.Context) error { counter.Add(1); return nil },
+				}
+
+				err := Run(irt.Slice(jobs)).Run(t.Context())
+
+				assert.NotError(t, err)
+				assert.Equal(t, counter.Load(), int64(4))
+			})
+		})
 	})
 }

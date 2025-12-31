@@ -18,42 +18,68 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 	timer := time.NewTimer(0)
 	queue := &dt.List[time.Time]{}
 
+	type state int
+
+	const (
+		stateComplete       state = iota // early return
+		stateRateExceded                 // try prune
+		stateOverCapacity                // after prune: wait sleep
+		stateRetrySend                   // after prune: retry send
+		stateSendSuccessful              // under threshold
+	)
+
 	return func(yield func(T) bool) {
 		next, stop := iter.Pull(seq)
 		defer stop()
 
-		send := func(now time.Time) bool {
-			queue.PushBack(now)
-			if val, ok := next(); !ok || !yield(val) {
-				return false
+		send := func(now time.Time) state {
+			if queue.Len() < num {
+				queue.PushBack(now)
+				if val, ok := next(); !ok || !yield(val) {
+					return stateComplete
+				}
+				return stateSendSuccessful
 			}
-			return true
+			return stateRateExceded
 		}
 
-		for {
-			now := time.Now()
-
-			for queue.Len() > 0 && now.After(queue.Front().Value().Add(window)) {
+		prune := func(now time.Time) state {
+			for queue.Len() > 0 && num >= queue.Len() && now.Sub(queue.Front().Value()) > window {
 				queue.PopFront()
 			}
+			if queue.Len() >= num {
+				return stateOverCapacity
+			}
+			return stateRetrySend
+		}
 
-			if queue.Len() < num {
-				if !send(now) {
+		for ctx.Err() == nil {
+			now := time.Now()
+			s := send(now)
+
+		RETRY:
+			switch s {
+			case stateComplete:
+				return
+			case stateSendSuccessful:
+				continue
+			case stateRateExceded:
+				s = prune(now)
+				goto RETRY
+			case stateRetrySend:
+				s = send(now)
+				goto RETRY
+			case stateOverCapacity:
+				sleepUntil := max(time.Nanosecond, time.Until(queue.Front().Value().Add(window)))
+				timer.Reset(sleepUntil)
+				select {
+				case <-timer.C:
+					continue
+				case <-ctx.Done():
 					return
 				}
-				continue
 			}
 
-			sleepUntil := time.Until(queue.Front().Value().Add(window))
-			fun.Invariant.Ok(sleepUntil >= 0, "the next sleep must be in the future")
-
-			timer.Reset(sleepUntil)
-			select {
-			case <-timer.C:
-				continue
-			case <-ctx.Done():
-				return
-			}
 		}
 	}
 }
