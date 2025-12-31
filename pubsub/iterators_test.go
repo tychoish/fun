@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/testt"
+	"github.com/tychoish/fun/wpa"
 )
 
 func makeIntSlice(size int) []int {
@@ -62,7 +63,7 @@ func TestRateLimit(t *testing.T) {
 				wg.Add(1)
 				go func(seq iter.Seq[fnx.Worker]) {
 					defer wg.Done()
-					err := fnx.RunAll(seq).Run(ctx)
+					err := wpa.RunAll(seq).Run(ctx)
 					check.NotError(t, err)
 				}(shard)
 			}

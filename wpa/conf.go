@@ -1,4 +1,4 @@
-package fnx
+package wpa
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 )
 
 // WorkerGroupConf describes the runtime options to several operations
@@ -104,22 +105,22 @@ func (o *WorkerGroupConf) Filter(err error) error {
 
 // WorkerGroupConfDefaults sets the "continue-on-error" option and the
 // "number-of-worers-equals-numcpus" options.
-func WorkerGroupConfDefaults() OptionProvider[*WorkerGroupConf] {
-	return JoinOptionProviders(
+func WorkerGroupConfDefaults() fnx.OptionProvider[*WorkerGroupConf] {
+	return fnx.JoinOptionProviders(
 		WorkerGroupConfContinueOnError(),
 		WorkerGroupConfWorkerPerCPU(),
 	)
 }
 
 // WorkerGroupConfSet overrides the option with the provided option.
-func WorkerGroupConfSet(opt *WorkerGroupConf) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfSet(opt *WorkerGroupConf) fnx.OptionProvider[*WorkerGroupConf] {
 	return func(o *WorkerGroupConf) error { *o = *opt; return nil }
 }
 
 // WorkerGroupConfAddExcludeErrors appends the provided errors to the
 // ExcludedErrors value. The provider will return an error if any of
 // the input streams is ErrRecoveredPanic.
-func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfAddExcludeErrors(errs ...error) fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
 		if ers.Is(ers.ErrRecoveredPanic, errs...) {
 			return fmt.Errorf("cannot exclude recovered panics: %w", ers.ErrInvalidInput)
@@ -132,33 +133,33 @@ func WorkerGroupConfAddExcludeErrors(errs ...error) OptionProvider[*WorkerGroupC
 // WorkerGroupConfIncludeContextErrors toggles the option that forces
 // the operation to include context errors in the output. By default
 // they are not included.
-func WorkerGroupConfIncludeContextErrors() OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfIncludeContextErrors() fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.IncludeContextExpirationErrors = true; return nil }
 }
 
 // WorkerGroupConfContinueOnError toggles the option that allows the
 // operation to continue when the operation encounters an
 // error. Otherwise, any option will lead to an abort.
-func WorkerGroupConfContinueOnError() OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfContinueOnError() fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ContinueOnError = true; return nil }
 }
 
 // WorkerGroupConfContinueOnPanic toggles the option that allows the
 // operation to continue when encountering a panic.
-func WorkerGroupConfContinueOnPanic() OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfContinueOnPanic() fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.ContinueOnPanic = true; return nil }
 }
 
 // WorkerGroupConfWorkerPerCPU sets the number of workers to the
 // number of detected CPUs by the runtime (e.g. runtime.NumCPU()).
-func WorkerGroupConfWorkerPerCPU() OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfWorkerPerCPU() fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.NumWorkers = runtime.NumCPU(); return nil }
 }
 
 // WorkerGroupConfNumWorkers sets the number of workers
 // configured. It is not possible to set this value to less than 1:
 // negative values and 0 are always ignored.
-func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfNumWorkers(num int) fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.NumWorkers = max(1, num); return nil }
 }
 
@@ -172,7 +173,7 @@ func WorkerGroupConfNumWorkers(num int) OptionProvider[*WorkerGroupConf] {
 //
 // ErrorCollectors are used by some operations to collect, aggregate, and
 // distribute errors from operations to the caller.
-func WorkerGroupConfWithErrorCollector(ec *erc.Collector) OptionProvider[*WorkerGroupConf] {
+func WorkerGroupConfWithErrorCollector(ec *erc.Collector) fnx.OptionProvider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) (err error) {
 		if ec == nil {
 			return ers.Wrap(ers.ErrInvalidInput, "cannot use a nil error collector")

@@ -1,4 +1,4 @@
-package fnx
+package wpa
 
 import (
 	"context"
@@ -7,15 +7,16 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 )
 
 type Job interface {
-	Worker | Operation
-	WithRecover() Worker
+	fnx.Worker | fnx.Operation
+	WithRecover() fnx.Worker
 }
 
-func Run[T Job](seq iter.Seq[T]) Worker {
+func Run[T Job](seq iter.Seq[T]) fnx.Worker {
 	return func(ctx context.Context) error {
 		for job := range seq {
 			err := job.WithRecover().Run(ctx)
@@ -36,7 +37,7 @@ func Run[T Job](seq iter.Seq[T]) Worker {
 	}
 }
 
-func RunAll[T Job](seq iter.Seq[T]) Worker {
+func RunAll[T Job](seq iter.Seq[T]) fnx.Worker {
 	return func(ctx context.Context) error {
 		ec := &erc.Collector{}
 		for job := range seq {
@@ -46,16 +47,16 @@ func RunAll[T Job](seq iter.Seq[T]) Worker {
 	}
 }
 
-func RunWithPool[T Job](seq iter.Seq[T], opts ...OptionProvider[*WorkerGroupConf]) Worker {
+func RunWithPool[T Job](seq iter.Seq[T], opts ...fnx.OptionProvider[*WorkerGroupConf]) fnx.Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
-		if err := JoinOptionProviders(opts...).Apply(conf); err != nil {
+		if err := fnx.JoinOptionProviders(opts...).Apply(conf); err != nil {
 			return err
 		}
 
-		wg := &WaitGroup{}
+		wg := &fnx.WaitGroup{}
 
-		jobs := irt.Convert(seq, func(wf T) Worker { return wf.WithRecover().WithErrorFilter(conf.Filter) })
+		jobs := irt.Convert(seq, func(wf T) fnx.Worker { return wf.WithRecover().WithErrorFilter(conf.Filter) })
 		for shard := range irt.Shard(ctx, conf.NumWorkers, jobs) {
 			wg.Launch(ctx, Run(shard).
 				WithRecover().

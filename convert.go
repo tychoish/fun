@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/wpa"
 )
 
 // Convert takes an input stream of one type, and returns a function which takes an
@@ -14,7 +15,7 @@ import (
 // another type. All errors from the original stream are propagated to the output stream.
 func Convert[T, O any](op fnx.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
-	Parallel(*Stream[T], ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Stream[O]
+	Parallel(*Stream[T], ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: op}
 }
@@ -22,7 +23,7 @@ func Convert[T, O any](op fnx.Converter[T, O]) interface {
 // ConvertFn simplifies calls to fun.Convert for fn.Convert types.
 func ConvertFn[T any, O any](op fn.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
-	Parallel(*Stream[T], ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Stream[O]
+	Parallel(*Stream[T], ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: fnx.MakeConverter(op)}
 }
@@ -66,18 +67,18 @@ func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 // WorkerGroupConf options.
 func (c converter[T, O]) Parallel(
 	iter *Stream[T],
-	opts ...fnx.OptionProvider[*fnx.WorkerGroupConf],
+	opts ...fnx.OptionProvider[*wpa.WorkerGroupConf],
 ) *Stream[O] {
 	output := Blocking(make(chan O))
 
-	conf := &fnx.WorkerGroupConf{}
+	conf := &wpa.WorkerGroupConf{}
 	if err := fnx.JoinOptionProviders(opts...).Apply(conf); err != nil {
 		return MakeStream(fnx.MakeFuture(func() (O, error) { return c.zero(), err }))
 	}
 
 	setup := iter.Parallel(
 		c.mapPullProcess(output.Send().Write, conf),
-		fnx.WorkerGroupConfSet(conf),
+		wpa.WorkerGroupConfSet(conf),
 	).PostHook(output.Close).Operation(conf.ErrorCollector.Push).Go().Once()
 
 	return MakeStream(fnx.NewFuture(output.Receive().Read).PreHook(setup)).
@@ -92,7 +93,7 @@ func (c converter[T, O]) Parallel(
 // provided processor function.
 func (c converter[T, O]) mapPullProcess(
 	output fnx.Handler[O],
-	opts *fnx.WorkerGroupConf,
+	opts *wpa.WorkerGroupConf,
 ) fnx.Handler[T] {
 	mpf := c.op.WithRecover()
 	return func(ctx context.Context, in T) error {

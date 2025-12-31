@@ -21,9 +21,10 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/wpa"
 )
 
-func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...fnx.OptionProvider[*fnx.WorkerGroupConf]) *Stream[O] {
+func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Stream[O] {
 	return Convert(mpf).Parallel(it, optp...)
 }
 
@@ -275,9 +276,9 @@ func TestStream(t *testing.T) {
 			count := &atomic.Int64{}
 			err := iter.Parallel(
 				func(_ context.Context, in int) error { count.Add(1); return nil },
-				fnx.WorkerGroupConfNumWorkers(2),
-				fnx.WorkerGroupConfContinueOnError(),
-				fnx.WorkerGroupConfContinueOnPanic(),
+				wpa.WorkerGroupConfNumWorkers(2),
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfContinueOnPanic(),
 			).Run(ctx)
 			assert.NotError(t, err)
 			check.Equal(t, 9, count.Load())
@@ -831,7 +832,7 @@ func TestJSON(t *testing.T) {
 	t.Run("ParallelInvalidConfig", func(t *testing.T) {
 		counter := 0
 		err := SliceStream([]int{1, 1, 1}).Parallel(fnx.MakeHandler(func(in int) error { counter += in; return nil }),
-			fnx.WorkerGroupConfWithErrorCollector(nil),
+			wpa.WorkerGroupConfWithErrorCollector(nil),
 		).Run(t.Context())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)
@@ -1229,7 +1230,7 @@ func TestMapReduce(t *testing.T) {
 
 		ChannelStream(pipe).
 			ReadAll(
-				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &fnx.WorkerGroupConf{}),
+				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &wpa.WorkerGroupConf{}),
 			).
 			Ignore().
 			Add(ctx, wg)
@@ -1366,7 +1367,7 @@ func TestParallelForEach(t *testing.T) {
 						seen.Add(int64(in))
 						return nil
 					},
-					fnx.WorkerGroupConfNumWorkers(int(i))).Run(ctx)
+					wpa.WorkerGroupConfNumWorkers(int(i))).Run(ctx)
 
 				check.NotError(t, err)
 
@@ -1392,8 +1393,8 @@ func TestParallelForEach(t *testing.T) {
 				}
 				return nil
 			},
-			fnx.WorkerGroupConfNumWorkers(3),
-			fnx.WorkerGroupConfContinueOnPanic(),
+			wpa.WorkerGroupConfNumWorkers(3),
+			wpa.WorkerGroupConfContinueOnPanic(),
 		).Run(ctx)
 		if err == nil {
 			t.Error("should have errored", err)
@@ -1426,7 +1427,7 @@ func TestParallelForEach(t *testing.T) {
 					seenCount.Add(1)
 					return nil
 				},
-				fnx.WorkerGroupConfNumWorkers(4),
+				wpa.WorkerGroupConfNumWorkers(4),
 			).Run(ctx)
 		if err == nil {
 			t.Fatal("should not have errored", err)
@@ -1454,7 +1455,7 @@ func TestParallelForEach(t *testing.T) {
 					}
 					return nil
 				},
-				fnx.WorkerGroupConfNumWorkers(8),
+				wpa.WorkerGroupConfNumWorkers(8),
 			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -1471,8 +1472,8 @@ func TestParallelForEach(t *testing.T) {
 					count.Add(1)
 					return fmt.Errorf("errored=%d", in)
 				},
-				fnx.WorkerGroupConfNumWorkers(4),
-				fnx.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfNumWorkers(4),
+				wpa.WorkerGroupConfContinueOnError(),
 			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -1495,7 +1496,7 @@ func TestParallelForEach(t *testing.T) {
 				func(_ context.Context, in int) error {
 					return fmt.Errorf("errored=%d", in)
 				},
-				fnx.WorkerGroupConfNumWorkers(2),
+				wpa.WorkerGroupConfNumWorkers(2),
 			).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -1517,7 +1518,7 @@ func TestParallelForEach(t *testing.T) {
 			func(_ context.Context, in int) error {
 				return fmt.Errorf("errored=%d", in)
 			},
-			fnx.WorkerGroupConfWorkerPerCPU(),
+			wpa.WorkerGroupConfWorkerPerCPU(),
 		).Run(ctx)
 		if err == nil {
 			t.Error("should have propogated an error")
@@ -1554,7 +1555,7 @@ func TestParallelForEach(t *testing.T) {
 				func(_ context.Context, _ int) error {
 					return context.Canceled
 				},
-				fnx.WorkerGroupConfIncludeContextErrors(),
+				wpa.WorkerGroupConfIncludeContextErrors(),
 			).Run(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, context.Canceled)
@@ -1638,8 +1639,8 @@ func RunStreamImplementationTests[T comparable](
 								func(_ context.Context, _ T) (T, error) {
 									panic("whoop")
 								},
-								fnx.WorkerGroupConfNumWorkers(2),
-								fnx.WorkerGroupConfContinueOnError(),
+								wpa.WorkerGroupConfNumWorkers(2),
+								wpa.WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 
 							if err == nil {
@@ -1688,7 +1689,7 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								fnx.WorkerGroupConfContinueOnError(),
+								wpa.WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Fatal("expected error", out)
@@ -1715,8 +1716,8 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								fnx.WorkerGroupConfContinueOnPanic(),
-								fnx.WorkerGroupConfNumWorkers(1),
+								wpa.WorkerGroupConfContinueOnPanic(),
+								wpa.WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 
 							if err == nil {
@@ -1739,7 +1740,7 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								fnx.WorkerGroupConfNumWorkers(1),
+								wpa.WorkerGroupConfNumWorkers(1),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -1765,8 +1766,8 @@ func RunStreamIntegerAlgoTests(
 									}
 									return input, nil
 								},
-								fnx.WorkerGroupConfNumWorkers(4),
-								fnx.WorkerGroupConfContinueOnError(),
+								wpa.WorkerGroupConfNumWorkers(4),
+								wpa.WorkerGroupConfContinueOnError(),
 							).Slice(ctx)
 							if err == nil {
 								t.Error("expected error")
@@ -1857,7 +1858,7 @@ func RunStreamStringAlgoTests(
 								}
 								return strings.TrimSpace(str), nil
 							},
-							fnx.WorkerGroupConfNumWorkers(4),
+							wpa.WorkerGroupConfNumWorkers(4),
 						).Slice(t.Context())
 						if err != nil {
 							t.Error(len(vals), " >>:", err)
@@ -1981,7 +1982,7 @@ func RunStreamStringAlgoTests(
 		counter := 0
 		out, err := ConvertFn(func(in int) string { counter++; return fmt.Sprint(in) }).Parallel(
 			SliceStream([]int{42, 84, 21}),
-			fnx.WorkerGroupConfWithErrorCollector(nil),
+			wpa.WorkerGroupConfWithErrorCollector(nil),
 		).Slice(t.Context())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrInvalidInput)

@@ -1,4 +1,4 @@
-package fnx
+package wpa
 
 import (
 	"context"
@@ -11,13 +11,14 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 )
 
 func TestPool(t *testing.T) {
 	t.Run("Smoke", func(t *testing.T) {
 		var ct int
-		err := RunAll(irt.GenerateN(64, func() Worker { return MakeWorker(func() error { ct++; return nil }) })).Run(t.Context())
+		err := RunAll(irt.GenerateN(64, func() fnx.Worker { return fnx.MakeWorker(func() error { ct++; return nil }) })).Run(t.Context())
 		if err != nil {
 			t.Error(err)
 		}
@@ -33,7 +34,7 @@ func TestPool(t *testing.T) {
 				t.Run("Workers", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					worker := Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; return nil })
+					worker := fnx.Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; return nil })
 					check.NotError(t, Run(irt.Args(worker, worker, worker, worker, worker)).Run(tctx))
 					check.Equal(t, 5, count)
 				})
@@ -41,7 +42,7 @@ func TestPool(t *testing.T) {
 				t.Run("Operations", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					op := Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++ })
+					op := fnx.Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++ })
 
 					check.NotError(t, Run(irt.Args(op, op, op, op, op)).Run(tctx))
 					check.Equal(t, 5, count)
@@ -51,7 +52,7 @@ func TestPool(t *testing.T) {
 				t.Run("Workers", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					worker := Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; panic("oops") })
+					worker := fnx.Worker(func(ctx context.Context) error { check.True(t, ctx == tctx); count++; panic("oops") })
 					check.NotPanic(t, func() {
 						check.Error(t, Run(irt.Args(worker, worker, worker, worker, worker)).Run(tctx))
 					})
@@ -61,7 +62,7 @@ func TestPool(t *testing.T) {
 				t.Run("Operations", func(t *testing.T) {
 					count := 0
 					tctx := t.Context()
-					op := Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++; panic("oops") })
+					op := fnx.Operation(func(ctx context.Context) { check.True(t, ctx == tctx); count++; panic("oops") })
 
 					check.NotPanic(t, func() {
 						check.Error(t, Run(irt.Args(op, op, op, op, op)).Run(tctx))
@@ -77,7 +78,7 @@ func TestPool(t *testing.T) {
 
 			t.Run("Basic", func(t *testing.T) {
 				counter := &atomic.Int64{}
-				wfs := make([]Worker, wpJobCount)
+				wfs := make([]fnx.Worker, wpJobCount)
 				for i := 0; i < wpJobCount; i++ {
 					wfs[i] = func(context.Context) error {
 						counter.Add(1)
@@ -101,7 +102,7 @@ func TestPool(t *testing.T) {
 				const experr ers.Error = "expected error"
 
 				counter := &atomic.Int64{}
-				wfs := make([]Worker, wpJobCount)
+				wfs := make([]fnx.Worker, wpJobCount)
 				for i := 0; i < wpJobCount; i++ {
 					wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(minDuration); return experr }
 				}
@@ -128,7 +129,7 @@ func TestPool(t *testing.T) {
 		})
 	})
 	t.Run("Merge", func(t *testing.T) {
-		wfs := make([]Operation, 100)
+		wfs := make([]fnx.Operation, 100)
 		count := &atomic.Int64{}
 		for i := 0; i < 100; i++ {
 			wfs[i] = func(context.Context) {
@@ -161,7 +162,7 @@ func TestPool(t *testing.T) {
 	t.Run("InvalidOptions", func(t *testing.T) {
 		t.Run("NilErrorCollector", func(t *testing.T) {
 			executed := &atomic.Int64{}
-			wfs := []Worker{
+			wfs := []fnx.Worker{
 				func(context.Context) error { executed.Add(1); return nil },
 				func(context.Context) error { executed.Add(1); return nil },
 			}
@@ -178,7 +179,7 @@ func TestPool(t *testing.T) {
 
 		t.Run("ExcludeRecoveredPanic", func(t *testing.T) {
 			executed := &atomic.Int64{}
-			wfs := []Worker{
+			wfs := []fnx.Worker{
 				func(context.Context) error { executed.Add(1); return nil },
 				func(context.Context) error { executed.Add(1); return nil },
 			}
@@ -195,7 +196,7 @@ func TestPool(t *testing.T) {
 
 		t.Run("MultipleInvalidOptions", func(t *testing.T) {
 			executed := &atomic.Int64{}
-			wfs := []Worker{
+			wfs := []fnx.Worker{
 				func(context.Context) error { executed.Add(1); return nil },
 				func(context.Context) error { executed.Add(1); return nil },
 			}
@@ -218,7 +219,7 @@ func TestPool(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); cancel(); return context.Canceled },
 					func(context.Context) error { counter.Add(1); return nil },
@@ -238,7 +239,7 @@ func TestPool(t *testing.T) {
 
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { time.Sleep(5 * time.Millisecond); return nil },
 					func(context.Context) error { counter.Add(1); return context.DeadlineExceeded },
 					func(context.Context) error { counter.Add(1); return nil },
@@ -255,7 +256,7 @@ func TestPool(t *testing.T) {
 			t.Run("EOF", func(t *testing.T) {
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return io.EOF },
@@ -272,7 +273,7 @@ func TestPool(t *testing.T) {
 			t.Run("ErrContainerClosed", func(t *testing.T) {
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return ers.ErrContainerClosed },
 					func(context.Context) error { counter.Add(1); return nil },
@@ -287,7 +288,7 @@ func TestPool(t *testing.T) {
 			t.Run("ErrCurrentOpAbort", func(t *testing.T) {
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return nil },
@@ -315,7 +316,7 @@ func TestPool(t *testing.T) {
 					t.Run(tt.name, func(t *testing.T) {
 						counter := &atomic.Int64{}
 
-						jobs := []Worker{
+						jobs := []fnx.Worker{
 							func(context.Context) error { counter.Add(1); return nil },
 							func(context.Context) error { counter.Add(1); return tt.err },
 							func(context.Context) error { counter.Add(1); return nil },
@@ -334,7 +335,7 @@ func TestPool(t *testing.T) {
 			t.Run("ContinuesProcessing", func(t *testing.T) {
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },
 					func(context.Context) error { counter.Add(1); return nil },
@@ -354,7 +355,7 @@ func TestPool(t *testing.T) {
 				counter := &atomic.Int64{}
 				expectedErr := ers.Error("test error")
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return expectedErr },
@@ -373,7 +374,7 @@ func TestPool(t *testing.T) {
 			t.Run("SkipThenTerminate", func(t *testing.T) {
 				counter := &atomic.Int64{}
 
-				jobs := []Worker{
+				jobs := []fnx.Worker{
 					func(context.Context) error { counter.Add(1); return nil },
 					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },
 					func(context.Context) error { counter.Add(1); return ers.ErrCurrentOpSkip },

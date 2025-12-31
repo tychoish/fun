@@ -1,4 +1,4 @@
-package fnx
+package wpa
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -56,7 +57,7 @@ func TestOptionProvider(t *testing.T) {
 		assert.True(t, n != nil)
 		assert.Equal(t, n.NumWorkers, 42)
 
-		n, err = OptionProvider[*WorkerGroupConf](func(_ *WorkerGroupConf) error { return errors.New("hi") }).Build(opt)
+		n, err = fnx.OptionProvider[*WorkerGroupConf](func(_ *WorkerGroupConf) error { return errors.New("hi") }).Build(opt)
 		assert.Error(t, err)
 		assert.True(t, n == nil)
 	})
@@ -174,7 +175,7 @@ func TestWorkerGroupConfOptions(t *testing.T) {
 			err1 := errors.New("first")
 			err2 := errors.New("second")
 
-			err := JoinOptionProviders(
+			err := fnx.JoinOptionProviders(
 				WorkerGroupConfAddExcludeErrors(err1),
 				WorkerGroupConfAddExcludeErrors(err2),
 			).Apply(conf)
@@ -226,7 +227,7 @@ func TestWorkerGroupConfOptions(t *testing.T) {
 func TestWorkerGroupConfJoinOptions(t *testing.T) {
 	t.Run("EmptyOptions", func(t *testing.T) {
 		conf := &WorkerGroupConf{}
-		err := JoinOptionProviders[*WorkerGroupConf]().Apply(conf)
+		err := fnx.JoinOptionProviders[*WorkerGroupConf]().Apply(conf)
 
 		assert.NotError(t, err)
 		assert.Equal(t, conf.NumWorkers, 1)      // because it's overriden by the validate method
@@ -239,7 +240,7 @@ func TestWorkerGroupConfJoinOptions(t *testing.T) {
 
 	t.Run("MultipleOptions", func(t *testing.T) {
 		conf := &WorkerGroupConf{}
-		err := JoinOptionProviders(
+		err := fnx.JoinOptionProviders(
 			WorkerGroupConfNumWorkers(8),
 			WorkerGroupConfContinueOnError(),
 			WorkerGroupConfContinueOnPanic(),
@@ -253,7 +254,7 @@ func TestWorkerGroupConfJoinOptions(t *testing.T) {
 
 	t.Run("ConflictingOptions", func(t *testing.T) {
 		conf := &WorkerGroupConf{}
-		err := JoinOptionProviders(
+		err := fnx.JoinOptionProviders(
 			WorkerGroupConfNumWorkers(5),
 			WorkerGroupConfNumWorkers(10),
 		).Apply(conf)
@@ -264,7 +265,7 @@ func TestWorkerGroupConfJoinOptions(t *testing.T) {
 
 	t.Run("OptionsWithError", func(t *testing.T) {
 		conf := &WorkerGroupConf{}
-		err := JoinOptionProviders(
+		err := fnx.JoinOptionProviders(
 			WorkerGroupConfNumWorkers(8),
 			WorkerGroupConfWithErrorCollector(nil),
 			WorkerGroupConfContinueOnError(),
@@ -279,7 +280,7 @@ func TestWorkerGroupConfJoinOptions(t *testing.T) {
 		ec := &erc.Collector{}
 		err1 := errors.New("exclude1")
 
-		err := JoinOptionProviders(
+		err := fnx.JoinOptionProviders(
 			WorkerGroupConfNumWorkers(4),
 			WorkerGroupConfContinueOnError(),
 			WorkerGroupConfContinueOnPanic(),

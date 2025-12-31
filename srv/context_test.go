@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/wpa"
 )
 
 func TestContext(t *testing.T) {
@@ -244,7 +245,7 @@ func TestWorkerPool(t *testing.T) {
 		defer cancel()
 		ctx = SetBaseContext(ctx)
 
-		ctx = WithWorkerPool(ctx, "kip", fnx.WorkerGroupConfNumWorkers(4), fnx.WorkerGroupConfIncludeContextErrors())
+		ctx = WithWorkerPool(ctx, "kip", wpa.WorkerGroupConfNumWorkers(4), wpa.WorkerGroupConfIncludeContextErrors())
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -266,7 +267,7 @@ func TestWorkerPool(t *testing.T) {
 	t.Run("NegativeWorkersWork", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = WithWorkerPool(ctx, "kip", fnx.WorkerGroupConfNumWorkers(4))
+		ctx = WithWorkerPool(ctx, "kip", wpa.WorkerGroupConfNumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
 		sig := make(chan struct{})
@@ -326,13 +327,13 @@ func TestWorkerPool(t *testing.T) {
 		defer cancel()
 		wpCt := &atomic.Int64{}
 		ctx = SetShutdownSignal(ctx)
-		ctx = WithWorkerPool(ctx, "buddy", fnx.WorkerGroupConfNumWorkers(50))
+		ctx = WithWorkerPool(ctx, "buddy", wpa.WorkerGroupConfNumWorkers(50))
 		obCt := &atomic.Int64{}
 		expected := errors.New("kip")
 		ctx = WithHandlerWorkerPool(ctx, "kip", func(err error) {
 			check.ErrorIs(t, err, expected)
 			obCt.Add(1)
-		}, fnx.WorkerGroupConfNumWorkers(50))
+		}, wpa.WorkerGroupConfNumWorkers(50))
 		for i := 0; i < 100; i++ {
 			err := AddToWorkerPool(ctx, "buddy", func(context.Context) error { wpCt.Add(1); return nil })
 			assert.NotError(t, err)

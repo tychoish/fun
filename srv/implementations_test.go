@@ -17,6 +17,7 @@ import (
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
+	"github.com/tychoish/fun/wpa"
 )
 
 func TestHelpers(t *testing.T) {
@@ -48,7 +49,7 @@ func TestHelpers(t *testing.T) {
 			srv := ProcessStream(
 				makeSeq(100),
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
-				fnx.WorkerGroupConfNumWorkers(2),
+				wpa.WorkerGroupConfNumWorkers(2),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -72,7 +73,7 @@ func TestHelpers(t *testing.T) {
 					count.Add(1)
 					return nil
 				},
-				fnx.WorkerGroupConfNumWorkers(50),
+				wpa.WorkerGroupConfNumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -99,7 +100,7 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				fnx.WorkerGroupConfWorkerPerCPU(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -119,7 +120,7 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				fnx.WorkerGroupConfWorkerPerCPU(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
 			)
 			ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
 
@@ -148,7 +149,7 @@ func TestHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				fnx.WorkerGroupConfNumWorkers(50),
+				wpa.WorkerGroupConfNumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -176,7 +177,7 @@ func TestHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				fnx.WorkerGroupConfNumWorkers(50),
+				wpa.WorkerGroupConfNumWorkers(50),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 
