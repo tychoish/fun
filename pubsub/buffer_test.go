@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -97,57 +96,6 @@ func TestDistributor(t *testing.T) {
 			}
 		})
 	})
-	t.Run("Filter", func(t *testing.T) {
-		t.Run("Input", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			ch := make(chan int, 100)
-			dist := DistributorChannel(ch).
-				WithInputFilter(func(in int) bool { t.Log(in); return in%2 == 0 && in != 0 })
-
-			for i := 0; i < 100; i++ {
-				assert.NotError(t, dist.Write(ctx, i))
-			}
-
-			close(ch)
-
-			count := 0
-			err := fun.InterfaceStream(dist).
-				ReadAll(fnx.FromHandler(func(in int) {
-					count++
-					check.True(t, ft.Not(in == 0))
-					check.True(t, ft.Not(in%2 != 0))
-				})).
-				Run(ctx)
-
-			check.NotError(t, err)
-			check.Equal(t, count, 49)
-		})
-		t.Run("Output", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ch := fun.Blocking(make(chan int, 100))
-			for i := 0; i < 100; i++ {
-				check.NotError(t, ch.Send().Write(ctx, i))
-			}
-
-			ch.Close()
-			count := 0
-			err := fun.InterfaceStream(DistributorChannel(ch.Channel()).
-				WithOutputFilter(func(in int) bool { return in%2 == 0 && in != 0 })).
-				ReadAll(fnx.FromHandler(func(in int) {
-					count++
-					check.True(t, ft.Not(in == 0))
-					check.True(t, ft.Not(in%2 != 0))
-				})).
-				Run(ctx)
-
-			check.NotError(t, err)
-			check.Equal(t, count, 49)
-		})
-	})
-
 	t.Run("Table", func(t *testing.T) {
 		const iterSize = 100
 		t.Parallel()

@@ -920,3 +920,285 @@ func TestDequeIntegration(t *testing.T) {
 		assert.Equal(t, sent.Load(), recv.Load())
 	})
 }
+
+func TestDequeIteratorPopFront(t *testing.T) {
+	t.Run("PopExistingItems", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		check.NotError(t, dq.PushBack("one"))
+		check.NotError(t, dq.PushBack("two"))
+		check.NotError(t, dq.PushBack("three"))
+
+		values := make([]string, 0)
+		for val := range dq.IteratorPopFront(ctx) {
+			values = append(values, val)
+		}
+
+		assert.Equal(t, len(values), 3)
+		assert.Equal(t, values[0], "one")
+		assert.Equal(t, values[1], "two")
+		assert.Equal(t, values[2], "three")
+		assert.Equal(t, dq.Len(), 0)
+	})
+
+	t.Run("NonBlocking", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 5}))
+
+		check.NotError(t, dq.PushBack(1))
+		check.NotError(t, dq.PushBack(2))
+
+		count := 0
+		for range dq.IteratorPopFront(ctx) {
+			count++
+		}
+
+		assert.Equal(t, count, 2)
+		assert.Equal(t, dq.Len(), 0)
+	})
+
+	t.Run("EmptyDeque", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 5}))
+
+		count := 0
+		for range dq.IteratorPopFront(ctx) {
+			count++
+		}
+
+		assert.Equal(t, count, 0)
+	})
+
+	t.Run("RemovesFromFront", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		for i := 1; i <= 5; i++ {
+			check.NotError(t, dq.PushBack(i))
+		}
+
+		values := make([]int, 0)
+		for val := range dq.IteratorPopFront(ctx) {
+			values = append(values, val)
+			if len(values) >= 3 {
+				break
+			}
+		}
+
+		assert.Equal(t, len(values), 3)
+		assert.Equal(t, values[0], 1)
+		assert.Equal(t, values[1], 2)
+		assert.Equal(t, values[2], 3)
+		assert.Equal(t, dq.Len(), 2)
+
+		val, ok := dq.PopFront()
+		assert.True(t, ok)
+		assert.Equal(t, val, 4)
+	})
+}
+
+func TestDequeIteratorPopBack(t *testing.T) {
+	t.Run("PopExistingItems", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		check.NotError(t, dq.PushBack("one"))
+		check.NotError(t, dq.PushBack("two"))
+		check.NotError(t, dq.PushBack("three"))
+
+		values := make([]string, 0)
+		for val := range dq.IteratorPopBack(ctx) {
+			values = append(values, val)
+		}
+
+		assert.Equal(t, len(values), 3)
+		assert.Equal(t, values[0], "three")
+		assert.Equal(t, values[1], "two")
+		assert.Equal(t, values[2], "one")
+		assert.Equal(t, dq.Len(), 0)
+	})
+
+	t.Run("NonBlocking", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 5}))
+
+		check.NotError(t, dq.PushBack(1))
+		check.NotError(t, dq.PushBack(2))
+
+		count := 0
+		for range dq.IteratorPopBack(ctx) {
+			count++
+		}
+
+		assert.Equal(t, count, 2)
+		assert.Equal(t, dq.Len(), 0)
+	})
+
+	t.Run("EmptyDeque", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 5}))
+
+		count := 0
+		for range dq.IteratorPopBack(ctx) {
+			count++
+		}
+
+		assert.Equal(t, count, 0)
+	})
+
+	t.Run("RemovesFromBack", func(t *testing.T) {
+		ctx := context.Background()
+		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		for i := 1; i <= 5; i++ {
+			check.NotError(t, dq.PushBack(i))
+		}
+
+		values := make([]int, 0)
+		for val := range dq.IteratorPopBack(ctx) {
+			values = append(values, val)
+			if len(values) >= 3 {
+				break
+			}
+		}
+
+		assert.Equal(t, len(values), 3)
+		assert.Equal(t, values[0], 5)
+		assert.Equal(t, values[1], 4)
+		assert.Equal(t, values[2], 3)
+		assert.Equal(t, dq.Len(), 2)
+
+		val, ok := dq.PopBack()
+		assert.True(t, ok)
+		assert.Equal(t, val, 2)
+	})
+}
+
+func TestDequeLIFO(t *testing.T) {
+	t.Run("BlocksOnEmptyDeque", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		count := 0
+		for range dq.LIFO(ctx) {
+			count++
+		}
+
+		assert.Equal(t, count, 0)
+	})
+
+	t.Run("ConsumesItems", func(t *testing.T) {
+		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		// Add items gradually (LIFO/FIFO wait for new items between consumptions)
+		go func() {
+			for i := 1; i <= 3; i++ {
+				time.Sleep(15 * time.Millisecond)
+				check.NotError(t, dq.PushBack(i))
+			}
+		}()
+
+		count := 0
+		for range dq.LIFO(ctx) {
+			count++
+		}
+
+		// Should have consumed items added during the window
+		assert.True(t, count >= 1)
+	})
+
+	t.Run("RemovesFromBack", func(t *testing.T) {
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		// Add both items together so they're both in the deque
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			check.NotError(t, dq.PushBack("first"))
+			check.NotError(t, dq.PushBack("second")) // Now "second" is at the back
+		}()
+
+		// Get first item - should be from back since LIFO pops from back
+		var firstVal string
+		for val := range dq.LIFO(ctx) {
+			if firstVal == "" {
+				firstVal = val
+			}
+		}
+
+		// Should consume "second" first (it's at the back)
+		assert.Equal(t, firstVal, "second")
+	})
+}
+
+func TestDequeFIFO(t *testing.T) {
+	t.Run("BlocksOnEmptyDeque", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		count := 0
+		for range dq.FIFO(ctx) {
+			count++
+		}
+
+		assert.Equal(t, count, 0)
+	})
+
+	t.Run("ConsumesItems", func(t *testing.T) {
+		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		// Add items gradually (LIFO/FIFO wait for new items between consumptions)
+		go func() {
+			for i := 1; i <= 3; i++ {
+				time.Sleep(15 * time.Millisecond)
+				check.NotError(t, dq.PushBack(i))
+			}
+		}()
+
+		count := 0
+		for range dq.FIFO(ctx) {
+			count++
+		}
+
+		// Should have consumed items added during the window
+		assert.True(t, count >= 1)
+	})
+
+	t.Run("RemovesFromFront", func(t *testing.T) {
+		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		// Add both items together so they're both in the deque
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			check.NotError(t, dq.PushBack("first"))
+			check.NotError(t, dq.PushBack("second")) // Now "second" is at the back
+		}()
+
+		// Get first item - should be from front since FIFO pops from front
+		var firstVal string
+		for val := range dq.FIFO(ctx) {
+			if firstVal == "" {
+				firstVal = val
+			}
+		}
+
+		// Should consume "first" first (it's at the front)
+		assert.Equal(t, firstVal, "first")
+	})
+}

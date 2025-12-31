@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 )
 
@@ -18,9 +17,9 @@ type distributor[T any] struct {
 	size func() int
 }
 
-// MakeDistributor builds a distributor from producer and processor
+// makeDistributor builds a distributor from producer and processor
 // functions.
-func MakeDistributor[T any](
+func makeDistributor[T any](
 	processor fnx.Handler[T],
 	producer fnx.Future[T],
 	length func() int,
@@ -32,25 +31,6 @@ func MakeDistributor[T any](
 	}
 }
 
-// WithInputFilter returns a copy of the distributor where all items
-// pass through a filter before being written/passed to Send. When the
-// filter returns true items are propagated and are skipped otherwise.
-func (d distributor[T]) WithInputFilter(filter func(T) bool) distributor[T] {
-	out := d
-	out.push = out.push.Filter(filter).WithoutErrors(ers.ErrCurrentOpSkip)
-	return out
-}
-
-// WithOutputFilter returns a copy of the distributor where all items
-// pass through the provided filter before being delivered to
-// readers/Receive. When the filter returns true items are propagated
-// and are skipped otherwise.
-func (d distributor[T]) WithOutputFilter(filter func(T) bool) distributor[T] {
-	out := d
-	out.pop = out.pop.Filter(filter)
-	return out
-}
-
 // Len returns the length of the underlying storage for the distributor.
 func (d distributor[T]) Len() int { return d.size() }
 
@@ -60,10 +40,10 @@ func (d distributor[T]) Write(ctx context.Context, in T) error { return d.push(c
 // Read pulls an object from the distributor.
 func (d distributor[T]) Read(ctx context.Context) (T, error) { return d.pop(ctx) }
 
-// DistributorChannel provides a bridge between channels and
+// distForChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
-func DistributorChannel[T any](ch chan T) distributor[T] {
+func distForChannel[T any](ch chan T) distributor[T] {
 	c := fun.Blocking(ch)
 	return distForChanOp(c)
 }
@@ -72,5 +52,5 @@ func DistributorChannel[T any](ch chan T) distributor[T] {
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions.
 func distForChanOp[T any](c fun.ChanOp[T]) distributor[T] {
-	return MakeDistributor(c.Send().Write, c.Receive().Read, c.Len)
+	return makeDistributor(c.Send().Write, c.Receive().Read, c.Len)
 }

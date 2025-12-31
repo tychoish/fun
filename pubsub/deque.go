@@ -276,16 +276,10 @@ func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqPrev, true)
 }
 
-// IteratorPopFront returns a non-blocking consuming iterator that removes items from the front
-// of the deque. Does not block; terminates when deque is empty. Each item returned is removed
-// (destructive read). Safe for concurrent access.
 func (dq *Deque[T]) IteratorPopFront(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(dq.PopFront)
 }
 
-// IteratorPopBack returns a non-blocking consuming iterator that removes items from the back
-// of the deque. Does not block; terminates when deque is empty. Each item returned is removed
-// (destructive read). Safe for concurrent access.
 func (dq *Deque[T]) IteratorPopBack(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(dq.PopBack)
 }
@@ -338,10 +332,8 @@ func (dq *Deque[T]) lifoDistImpl() distributor[T] {
 	}
 }
 
-// LIFO returns a blocking consuming iterator with Last-In-First-Out semantics (stack behavior).
-// Removes items from the back of the deque. Blocks waiting for new items when empty. Terminates
-// on context cancellation or deque closure. Each item returned is removed (destructive read).
-// Safe for concurrent access.
+// LIFO returns an iterator that removes items from the queue, with the most recent items removed
+// first. The iterator is blocking and will wait for a new item if the Deque is empty.
 func (dq *Deque[T]) LIFO(ctx context.Context) iter.Seq[T] {
 	dist := dq.lifoDistImpl()
 	return irt.GenerateOk(func() (z T, _ bool) {
@@ -352,10 +344,7 @@ func (dq *Deque[T]) LIFO(ctx context.Context) iter.Seq[T] {
 	})
 }
 
-// FIFO returns a blocking consuming iterator with First-In-First-Out semantics (queue behavior).
-// Removes items from the front of the deque. Blocks waiting for new items when empty. Terminates
-// on context cancellation or deque closure. Each item returned is removed (destructive read).
-// Safe for concurrent access.
+// LIFO returns an iterator that removes items from the queue in the order they were added. The iterator is blocking and will wait for a new item if the Deque is empty.
 func (dq *Deque[T]) FIFO(ctx context.Context) iter.Seq[T] {
 	dist := dq.fifoDistImpl()
 	return irt.GenerateOk(func() (z T, _ bool) {
