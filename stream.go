@@ -20,6 +20,7 @@ import (
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/wpa"
 )
 
@@ -357,7 +358,7 @@ func (st *Stream[T]) ReadAll(fn fnx.Handler[T]) fnx.Worker {
 // This is the work-house operation of the package, and can be used as
 // the basis of worker pools, even processing, or message dispatching
 // for pubsub queues and related systems.
-func (st *Stream[T]) Parallel(fn fnx.Handler[T], opts ...fnx.OptionProvider[*wpa.WorkerGroupConf]) fnx.Worker {
+func (st *Stream[T]) Parallel(fn fnx.Handler[T], opts ...opt.Provider[*wpa.WorkerGroupConf]) fnx.Worker {
 	return func(ctx context.Context) error {
 		return wpa.RunWithPool(
 			irt.Convert(

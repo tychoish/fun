@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/wpa"
 )
 
@@ -15,7 +16,7 @@ import (
 // another type. All errors from the original stream are propagated to the output stream.
 func Convert[T, O any](op fnx.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
-	Parallel(*Stream[T], ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Stream[O]
+	Parallel(*Stream[T], ...opt.Provider[*wpa.WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: op}
 }
@@ -23,7 +24,7 @@ func Convert[T, O any](op fnx.Converter[T, O]) interface {
 // ConvertFn simplifies calls to fun.Convert for fn.Convert types.
 func ConvertFn[T any, O any](op fn.Converter[T, O]) interface {
 	Stream(*Stream[T]) *Stream[O]
-	Parallel(*Stream[T], ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Stream[O]
+	Parallel(*Stream[T], ...opt.Provider[*wpa.WorkerGroupConf]) *Stream[O]
 } {
 	return &converter[T, O]{op: fnx.MakeConverter(op)}
 }
@@ -67,12 +68,12 @@ func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 // WorkerGroupConf options.
 func (c converter[T, O]) Parallel(
 	iter *Stream[T],
-	opts ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	opts ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Stream[O] {
 	output := Blocking(make(chan O))
 
 	conf := &wpa.WorkerGroupConf{}
-	if err := fnx.JoinOptionProviders(opts...).Apply(conf); err != nil {
+	if err := opt.Join(opts...).Apply(conf); err != nil {
 		return MakeStream(fnx.MakeFuture(func() (O, error) { return c.zero(), err }))
 	}
 

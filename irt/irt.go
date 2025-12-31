@@ -5,12 +5,12 @@ import (
 	"bufio"
 	"cmp"
 	"context"
-	"sync"
 	"errors"
 	"io"
 	"iter"
 	"maps"
 	"slices"
+	"sync"
 )
 
 // Collect consumes the sequence and returns a slice of all elements. This combines the operations
@@ -479,6 +479,9 @@ func RemoveZeros[T comparable](seq iter.Seq[T]) iter.Seq[T] { return Remove(seq,
 // RemoveErrors returns a sequence containing only the values from pairs where the error is nil.
 func RemoveErrors[T any](seq iter.Seq2[T, error]) iter.Seq[T] { return First(Remove2(seq, isError2)) }
 
+// KeepErrors returns a sequence containing only the values where the error is non-nil.
+func KeepErrors(seq iter.Seq[error]) iter.Seq[error] { return Keep(seq, isError) }
+
 // KeepOk returns a sequence containing only the values from pairs where the boolean is true.
 func KeepOk[T any](seq iter.Seq2[T, bool]) iter.Seq[T] { return First(Keep2(seq, isOk)) }
 
@@ -716,8 +719,8 @@ func ReadLinesErr(reader io.Reader) iter.Seq2[string, error] {
 // the boolean "ok" value is false the sequence has been exhausted.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
-		once sync.Once
-		ch chan T
+		once   sync.Once
+		ch     chan T
 		cancel context.CancelFunc
 	)
 

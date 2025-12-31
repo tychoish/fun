@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/opt"
 )
 
 type Job interface {
@@ -47,10 +48,10 @@ func RunAll[T Job](seq iter.Seq[T]) fnx.Worker {
 	}
 }
 
-func RunWithPool[T Job](seq iter.Seq[T], opts ...fnx.OptionProvider[*WorkerGroupConf]) fnx.Worker {
+func RunWithPool[T Job](seq iter.Seq[T], opts ...opt.Provider[*WorkerGroupConf]) fnx.Worker {
 	return func(ctx context.Context) error {
 		conf := &WorkerGroupConf{}
-		if err := fnx.JoinOptionProviders(opts...).Apply(conf); err != nil {
+		if err := opt.Join(opts...).Apply(conf); err != nil {
 			return err
 		}
 

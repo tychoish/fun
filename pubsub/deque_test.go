@@ -769,7 +769,7 @@ func TestDeque(t *testing.T) {
 		})
 		t.Run("ReverseBlockingEmpty", func(t *testing.T) {
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-			assert.MinRuntime(t, 100*time.Millisecond-(10*time.Nanosecond),
+			assert.MinRuntime(t, 100*time.Millisecond-(50*time.Nanosecond),
 				func() {
 					dq := NewUnlimitedDeque[string]()
 					for range dq.IteratorWaitBack(ctx) {

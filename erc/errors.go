@@ -14,6 +14,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // Collector is a simplified version of the error collector in
@@ -76,6 +77,8 @@ func AsCollector(err error) *Collector {
 // using errors.Join(): if you call erc.Join repeatedly on the same
 // error set of errors the resulting error is convertable.
 func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
+
+func JoinSeq(errs iter.Seq[error]) error { st := &Collector{}; st.From(errs); return st.Err() }
 
 // with/lock are internal helpers to avoid twiddling the pointer to
 // the mutex.
@@ -176,10 +179,14 @@ func (ec *Collector) Iterator() iter.Seq[error] {
 // Push collects an error if that error is non-nil.
 func (ec *Collector) Push(err error) {
 	if ers.IsError(err) {
-		defer ec.with(ec.lock())
-		ec.list.Push(err)
+		ec.pushWithLock(err)
 	}
 }
+
+// From adds all (non-nil) error values from the sequence to the error collector.
+func (ec *Collector) From(seq iter.Seq[error])        { irt.Apply(irt.KeepErrors(seq), ec.pushWithLock) }
+func (ec *Collector) pushWithLock(err error)          { defer ec.with(ec.lock()); ec.list.Push(err) }
+func (ec *Collector) addWithLock(seq iter.Seq[error]) { defer ec.with(ec.lock()); ec.list.From(seq) }
 
 // Join appends one or more errors to the collectors. Nil errors are
 // always omitted from the collector.
@@ -190,8 +197,7 @@ func (ec *Collector) Join(errs ...error) {
 	case 1:
 		ec.Push(errs[0])
 	default:
-		defer ec.with(ec.lock())
-		ec.list.Add(errs)
+		ec.addWithLock(irt.Slice(errs))
 	}
 }
 

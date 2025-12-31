@@ -21,10 +21,11 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/wpa"
 )
 
-func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Stream[O] {
+func Map[T any, O any](it *Stream[T], mpf fnx.Converter[T, O], optp ...opt.Provider[*wpa.WorkerGroupConf]) *Stream[O] {
 	return Convert(mpf).Parallel(it, optp...)
 }
 

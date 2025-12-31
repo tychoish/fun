@@ -18,6 +18,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/wpa"
 )
@@ -148,7 +149,7 @@ func Wait(seq iter.Seq[fnx.Operation]) *Service {
 func ProcessStream[T any](
 	seq iter.Seq[T],
 	processor fnx.Handler[T],
-	optp ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
 	st := fun.IteratorStream(seq)
 	return &Service{
@@ -194,7 +195,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.WorkerGroupConf]) *Service {
 	return &Service{
 		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(
 			func(ctx context.Context, fn fnx.Worker) error {
@@ -225,7 +226,7 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fnx.OptionProvider[
 func HandlerWorkerPool(
 	workQueue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
-	optp ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
 	s := &Service{
 		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(

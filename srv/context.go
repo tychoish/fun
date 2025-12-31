@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/wpa"
@@ -234,7 +235,7 @@ func HasBaseContext(ctx context.Context) bool {
 func WithWorkerPool(
 	ctx context.Context,
 	key string,
-	optp ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
@@ -265,14 +266,14 @@ func WithHandlerWorkerPool(
 	ctx context.Context,
 	key string,
 	observer fn.Handler[error],
-	optp ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return SetHandlerWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(optp ...fnx.OptionProvider[*wpa.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
+func getQueueForOpts(optp ...opt.Provider[*wpa.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
 	opts := &wpa.WorkerGroupConf{}
-	fun.Invariant.Must(fnx.JoinOptionProviders(optp...).Apply(opts))
+	fun.Invariant.Must(opt.Join(optp...).Apply(opts))
 
 	return risky.Force(pubsub.NewQueue[fnx.Worker](
 		pubsub.QueueOptions{
@@ -301,7 +302,7 @@ func SetWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fnx.Worker],
-	optp ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.Invariant.Must(orca.Add(WorkerPool(queue, optp...)))
@@ -332,7 +333,7 @@ func SetHandlerWorkerPool(
 	key string,
 	queue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
-	optp ...fnx.OptionProvider[*wpa.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
 		fun.Invariant.Must(orca.Add(HandlerWorkerPool(queue, observer, optp...)))
