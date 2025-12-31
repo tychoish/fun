@@ -635,7 +635,7 @@ func TestQueueStream(t *testing.T) {
 	t.Run("DrainAndShutdown", func(t *testing.T) {
 		t.Run("Shutdown", func(t *testing.T) {
 			queue := NewUnlimitedQueue[string]()
-			listener := fun.InterfaceStream(queue.Distributor())
+			listener := fun.InterfaceStream(queue.distributorImpl())
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -659,7 +659,7 @@ func TestQueueStream(t *testing.T) {
 		})
 		t.Run("Drain", func(t *testing.T) {
 			queue := NewUnlimitedQueue[string]()
-			listener := fun.InterfaceStream(queue.Distributor())
+			listener := fun.InterfaceStream(queue.distributorImpl())
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -685,7 +685,7 @@ func TestQueueStream(t *testing.T) {
 			cancel()
 
 			queue := NewUnlimitedQueue[string]()
-			listener := fun.InterfaceStream(queue.Distributor())
+			listener := fun.InterfaceStream(queue.distributorImpl())
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -705,5 +705,179 @@ func TestQueueStream(t *testing.T) {
 			assert.Equal(t, val, "foo")
 			check.NotError(t, queue.Shutdown(t.Context()))
 		})
+	})
+}
+
+func TestQueueIteratorPop(t *testing.T) {
+	t.Run("PopExistingItems", func(t *testing.T) {
+		ctx := context.Background()
+		queue := NewUnlimitedQueue[string]()
+
+		check.NotError(t, queue.Add("one"))
+		check.NotError(t, queue.Add("two"))
+		check.NotError(t, queue.Add("three"))
+		queue.Close()
+
+		assert.Equal(t, queue.Len(), 3)
+
+		values := irt.Collect(queue.IteratorPop(ctx))
+		assert.Equal(t, len(values), 3)
+		assert.Equal(t, values[0], "one")
+		assert.Equal(t, values[1], "two")
+		assert.Equal(t, values[2], "three")
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("BlocksWaitingForItems", func(t *testing.T) {
+		ctx := context.Background()
+		queue := NewUnlimitedQueue[string]()
+
+		iter := queue.IteratorPop(ctx)
+		sig := make(chan struct{})
+		values := make([]string, 0)
+
+		go func() {
+			defer close(sig)
+			for val := range iter {
+				values = append(values, val)
+				if len(values) >= 2 {
+					break
+				}
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+		check.NotError(t, queue.Add("first"))
+		time.Sleep(10 * time.Millisecond)
+		check.NotError(t, queue.Add("second"))
+
+		<-sig
+		assert.Equal(t, len(values), 2)
+		assert.Equal(t, values[0], "first")
+		assert.Equal(t, values[1], "second")
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		queue := NewUnlimitedQueue[string]()
+
+		check.NotError(t, queue.Add("item"))
+
+		iter := queue.IteratorPop(ctx)
+		values := make([]string, 0)
+
+		for val := range iter {
+			values = append(values, val)
+			cancel()
+		}
+
+		assert.Equal(t, len(values), 1)
+		assert.Equal(t, values[0], "item")
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("ContextCancellationWhileWaiting", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		queue := NewUnlimitedQueue[string]()
+		iter := queue.IteratorPop(ctx)
+
+		count := 0
+		for range iter {
+			count++
+		}
+
+		assert.Equal(t, count, 0)
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("QueueClosure", func(t *testing.T) {
+		ctx := context.Background()
+		queue := NewUnlimitedQueue[string]()
+
+		check.NotError(t, queue.Add("one"))
+		check.NotError(t, queue.Add("two"))
+
+		iter := queue.IteratorPop(ctx)
+		values := make([]string, 0)
+
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			queue.Close()
+		}()
+
+		for val := range iter {
+			values = append(values, val)
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		assert.Equal(t, len(values), 2)
+		assert.Equal(t, values[0], "one")
+		assert.Equal(t, values[1], "two")
+		assert.Equal(t, queue.Len(), 0)
+	})
+
+	t.Run("EmptyQueueClosed", func(t *testing.T) {
+		ctx := context.Background()
+		queue := NewUnlimitedQueue[string]()
+		queue.Close()
+
+		iter := queue.IteratorPop(ctx)
+		count := 0
+		for range iter {
+			count++
+		}
+
+		assert.Equal(t, count, 0)
+	})
+
+	t.Run("RemovesItemsFromQueue", func(t *testing.T) {
+		ctx := context.Background()
+		queue := NewUnlimitedQueue[int]()
+
+		for i := 0; i < 10; i++ {
+			check.NotError(t, queue.Add(i))
+		}
+		assert.Equal(t, queue.Len(), 10)
+
+		iter := queue.IteratorPop(ctx)
+		count := 0
+		for range iter {
+			count++
+			if count >= 5 {
+				break
+			}
+		}
+
+		assert.Equal(t, count, 5)
+		assert.Equal(t, queue.Len(), 5)
+	})
+
+	t.Run("ConcurrentProducerConsumer", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+
+		queue := NewUnlimitedQueue[int]()
+		consumed := &atomic.Int64{}
+
+		go func() {
+			iter := queue.IteratorPop(ctx)
+			for range iter {
+				consumed.Add(1)
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
+		for i := 0; i < 20; i++ {
+			check.NotError(t, queue.Add(i))
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		<-ctx.Done()
+		assert.True(t, consumed.Load() >= 10)
+		assert.True(t, queue.Len() < 10)
 	})
 }

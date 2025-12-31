@@ -62,7 +62,7 @@ func TestDistributor(t *testing.T) {
 			_ = queue.Add("strong")
 			_ = queue.Add("strung")
 
-			dist := queue.Distributor()
+			dist := queue.distributorImpl()
 
 			set := &dt.Set[string]{}
 			set.Order()
@@ -202,14 +202,14 @@ func TestDistributor(t *testing.T) {
 
 type DistFuture[T comparable] struct {
 	Name   string
-	Future func(*testing.T, *fun.Stream[T]) Distributor[T]
+	Future func(*testing.T, *fun.Stream[T]) distributor[T]
 }
 
 func MakeFutures[T comparable](size int) []DistFuture[T] {
 	return []DistFuture[T]{
 		{
 			Name: "ChannelBuffered",
-			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T, size)
 				for input.Next(ctx) {
@@ -222,7 +222,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 		},
 		{
 			Name: "DirectChannel",
-			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				out := make(chan T)
 				go func() {
@@ -243,7 +243,7 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 		},
 		{
 			Name: "DistChannel",
-			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				ch := make(chan T)
 				out := DistributorChannel(ch)
@@ -263,10 +263,10 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 		},
 		{
 			Name: "DistQueue",
-			Future: func(t *testing.T, input *fun.Stream[T]) Distributor[T] {
+			Future: func(t *testing.T, input *fun.Stream[T]) distributor[T] {
 				ctx := testt.Context(t)
 				queue := NewUnlimitedQueue[T]()
-				out := queue.Distributor()
+				out := queue.distributorImpl()
 				send := out.Write
 				go func() {
 					defer func() { _ = queue.Close() }()
@@ -287,14 +287,14 @@ func MakeFutures[T comparable](size int) []DistFuture[T] {
 
 type DistCase[T comparable] struct {
 	Name string
-	Test func(*testing.T, Distributor[T])
+	Test func(*testing.T, distributor[T])
 }
 
 func MakeCases[T comparable](size int) []DistCase[T] {
 	return []DistCase[T]{
 		{
 			Name: "Seen",
-			Test: func(t *testing.T, d Distributor[T]) {
+			Test: func(t *testing.T, d distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 				seen := &dt.Set[T]{}
 				seen.Synchronize()
@@ -316,7 +316,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 		},
 		{
 			Name: "PoolSeen",
-			Test: func(t *testing.T, d Distributor[T]) {
+			Test: func(t *testing.T, d distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 				seen := &dt.Set[T]{}
 				seen.Synchronize()
@@ -343,7 +343,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 		},
 		{
 			Name: "Count",
-			Test: func(t *testing.T, d Distributor[T]) {
+			Test: func(t *testing.T, d distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 				count := &atomic.Int64{}
 				signal := make(chan struct{})
@@ -364,7 +364,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 		},
 		{
 			Name: "PoolCount",
-			Test: func(t *testing.T, d Distributor[T]) {
+			Test: func(t *testing.T, d distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 				count := &atomic.Int64{}
 				wg := &sync.WaitGroup{}

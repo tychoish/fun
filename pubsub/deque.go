@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/risky"
 )
@@ -277,6 +276,20 @@ func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqPrev, true)
 }
 
+// IteratorPopFront returns a non-blocking consuming iterator that removes items from the front
+// of the deque. Does not block; terminates when deque is empty. Each item returned is removed
+// (destructive read). Safe for concurrent access.
+func (dq *Deque[T]) IteratorPopFront(ctx context.Context) iter.Seq[T] {
+	return irt.GenerateOk(dq.PopFront)
+}
+
+// IteratorPopBack returns a non-blocking consuming iterator that removes items from the back
+// of the deque. Does not block; terminates when deque is empty. Each item returned is removed
+// (destructive read). Safe for concurrent access.
+func (dq *Deque[T]) IteratorPopBack(ctx context.Context) iter.Seq[T] {
+	return irt.GenerateOk(dq.PopBack)
+}
+
 func (*Deque[T]) zero() (z T) { return z }
 func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, blocking bool) iter.Seq[T] {
 	var current *element[T]
@@ -302,27 +315,55 @@ func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, block
 	return irt.GenerateOk(op)
 }
 
-// BlockingDistributor produces a BlockingDistributor instance with
+// fifoDistImpl produces a fifoDistImpl instance with
 // Send/Receive operations that block if Deque is full or empty
 // (respectively). Receive operations always remove the element from
 // the Deque.
-func (dq *Deque[T]) BlockingDistributor() Distributor[T] {
-	return Distributor[T]{
+func (dq *Deque[T]) fifoDistImpl() distributor[T] {
+	return distributor[T]{
 		push: dq.WaitPushBack,
 		pop:  dq.WaitFront,
 		size: dq.Len,
 	}
 }
 
-// Distributor produces a distributor instance that always
+// lifoDistImpl produces a distributor instance that always
 // accepts send items: if the deque is full, it removes one element
 // from the front of the queue before adding them to the back.
-func (dq *Deque[T]) Distributor() Distributor[T] {
-	return Distributor[T]{
-		push: fnx.MakeHandler(dq.ForcePushBack),
-		pop:  dq.WaitFront,
+func (dq *Deque[T]) lifoDistImpl() distributor[T] {
+	return distributor[T]{
+		push: dq.WaitPushBack,
+		pop:  dq.WaitBack,
 		size: dq.Len,
 	}
+}
+
+// LIFO returns a blocking consuming iterator with Last-In-First-Out semantics (stack behavior).
+// Removes items from the back of the deque. Blocks waiting for new items when empty. Terminates
+// on context cancellation or deque closure. Each item returned is removed (destructive read).
+// Safe for concurrent access.
+func (dq *Deque[T]) LIFO(ctx context.Context) iter.Seq[T] {
+	dist := dq.lifoDistImpl()
+	return irt.GenerateOk(func() (z T, _ bool) {
+		if out, err := dist.Read(ctx); err == nil {
+			return out, true
+		}
+		return z, false
+	})
+}
+
+// FIFO returns a blocking consuming iterator with First-In-First-Out semantics (queue behavior).
+// Removes items from the front of the deque. Blocks waiting for new items when empty. Terminates
+// on context cancellation or deque closure. Each item returned is removed (destructive read).
+// Safe for concurrent access.
+func (dq *Deque[T]) FIFO(ctx context.Context) iter.Seq[T] {
+	dist := dq.fifoDistImpl()
+	return irt.GenerateOk(func() (z T, _ bool) {
+		if out, err := dist.Read(ctx); err == nil {
+			return out, true
+		}
+		return z, false
+	})
 }
 
 func (dq *Deque[T]) addAfter(value T, after *element[T]) error {

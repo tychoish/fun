@@ -177,7 +177,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 				defer cancel()
 			}
 
-			if err := fun.InterfaceStream(pipe.Distributor()).Parallel(
+			if err := fun.IteratorStream(pipe.IteratorPop(ctx)).Parallel(
 				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
 				wpa.WorkerGroupConfContinueOnError(),
 				wpa.WorkerGroupConfContinueOnPanic(),
@@ -197,12 +197,14 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 // propogated to the service's ywait function.
 func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.WorkerGroupConf]) *Service {
 	return &Service{
-		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(
-			func(ctx context.Context, fn fnx.Worker) error {
-				return fn.Run(ctx)
-			},
-			optp...,
-		),
+		Run: func(ctx context.Context) error {
+			return fun.IteratorStream(workQueue.IteratorPop(ctx)).Parallel(
+				func(ctx context.Context, fn fnx.Worker) error {
+					return fn.Run(ctx)
+				},
+				optp...,
+			).Run(ctx)
+		},
 		// TODO: have a shutdown methot that will block till
 		// the queue shutsdown.
 		Shutdown: workQueue.Close,
@@ -229,13 +231,15 @@ func HandlerWorkerPool(
 	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
 	s := &Service{
-		Run: fun.InterfaceStream(workQueue.Distributor()).Parallel(
-			func(ctx context.Context, fn fnx.Worker) error {
-				observer(fn.Run(ctx))
-				return nil
-			},
-			optp...,
-		),
+		Run: func(ctx context.Context) error {
+			return fun.IteratorStream(workQueue.IteratorPop(ctx)).Parallel(
+				func(ctx context.Context, fn fnx.Worker) error {
+					observer(fn.Run(ctx))
+					return nil
+				},
+				optp...,
+			).Run(ctx)
+		},
 		Shutdown: workQueue.Close,
 	}
 	s.ErrorHandler.Set(observer)

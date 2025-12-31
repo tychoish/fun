@@ -75,16 +75,16 @@ type BrokerOptions struct {
 // settings can have profound impacts on the semantics and ordering of
 // messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, DistributorChannel(make(chan T)), opts)
+	return makeInternalBrokerImpl(ctx, DistributorChannel(make(chan T)), opts)
 }
 
-// MakeDistributorBroker constructs a Broker that uses the provided
+// makeInternalBrokerImpl constructs a Broker that uses the provided
 // distributor to handle the buffering between the sending half and
 // the receiving half.
 //
 // In general, you should configure the distributor to provide
 // whatever buffering requirements you have, and.
-func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts BrokerOptions) *Broker[T] {
+func makeInternalBrokerImpl[T any](ctx context.Context, dist distributor[T], opts BrokerOptions) *Broker[T] {
 	b := makeBroker[T](opts)
 	ctx, b.close = context.WithCancel(ctx)
 	b.startQueueWorkers(ctx, dist)
@@ -103,7 +103,7 @@ func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, queue.Distributor(), opts)
+	return makeInternalBrokerImpl(ctx, queue.distributorImpl(), opts)
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to
@@ -114,7 +114,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, deque.BlockingDistributor(), opts)
+	return makeInternalBrokerImpl(ctx, deque.fifoDistImpl(), opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -127,7 +127,7 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // is fixed, and must be a positive integer greater than 0,
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
 func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
-	return MakeDistributorBroker(ctx, risky.Force(NewDeque[T](DequeOptions{Capacity: capacity})).Distributor(), opts)
+	return makeInternalBrokerImpl(ctx, risky.Force(NewDeque[T](DequeOptions{Capacity: capacity})).lifoDistImpl(), opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -144,7 +144,7 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 }
 
-func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) {
+func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist distributor[T]) {
 	subs := &adt.Map[chan T, struct{}]{}
 	b.wg.Add(1)
 	go func() {

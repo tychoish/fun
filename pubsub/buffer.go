@@ -8,11 +8,11 @@ import (
 	"github.com/tychoish/fun/fnx"
 )
 
-// Distributor provides a layer of indirection above queue-like
+// distributor provides a layer of indirection above queue-like
 // implementations (e.g. Queue, Deque, and channels) for buffering and
 // queuing objects for use by higher level pubsub mechanisms like the
 // Broker.
-type Distributor[T any] struct {
+type distributor[T any] struct {
 	push fnx.Handler[T]
 	pop  fnx.Future[T]
 	size func() int
@@ -24,8 +24,8 @@ func MakeDistributor[T any](
 	processor fnx.Handler[T],
 	producer fnx.Future[T],
 	length func() int,
-) Distributor[T] {
-	return Distributor[T]{
+) distributor[T] {
+	return distributor[T]{
 		push: processor,
 		pop:  producer,
 		size: length,
@@ -35,7 +35,7 @@ func MakeDistributor[T any](
 // WithInputFilter returns a copy of the distributor where all items
 // pass through a filter before being written/passed to Send. When the
 // filter returns true items are propagated and are skipped otherwise.
-func (d Distributor[T]) WithInputFilter(filter func(T) bool) Distributor[T] {
+func (d distributor[T]) WithInputFilter(filter func(T) bool) distributor[T] {
 	out := d
 	out.push = out.push.Filter(filter).WithoutErrors(ers.ErrCurrentOpSkip)
 	return out
@@ -45,25 +45,25 @@ func (d Distributor[T]) WithInputFilter(filter func(T) bool) Distributor[T] {
 // pass through the provided filter before being delivered to
 // readers/Receive. When the filter returns true items are propagated
 // and are skipped otherwise.
-func (d Distributor[T]) WithOutputFilter(filter func(T) bool) Distributor[T] {
+func (d distributor[T]) WithOutputFilter(filter func(T) bool) distributor[T] {
 	out := d
 	out.pop = out.pop.Filter(filter)
 	return out
 }
 
 // Len returns the length of the underlying storage for the distributor.
-func (d Distributor[T]) Len() int { return d.size() }
+func (d distributor[T]) Len() int { return d.size() }
 
 // Write pushes an object into the distributor.
-func (d Distributor[T]) Write(ctx context.Context, in T) error { return d.push(ctx, in) }
+func (d distributor[T]) Write(ctx context.Context, in T) error { return d.push(ctx, in) }
 
 // Read pulls an object from the distributor.
-func (d Distributor[T]) Read(ctx context.Context) (T, error) { return d.pop(ctx) }
+func (d distributor[T]) Read(ctx context.Context) (T, error) { return d.pop(ctx) }
 
 // DistributorChannel provides a bridge between channels and
 // distributors, and has expected FIFO semantics with blocking reads
 // and writes.
-func DistributorChannel[T any](ch chan T) Distributor[T] {
+func DistributorChannel[T any](ch chan T) distributor[T] {
 	c := fun.Blocking(ch)
 	return distForChanOp(c)
 }
@@ -71,6 +71,6 @@ func DistributorChannel[T any](ch chan T) Distributor[T] {
 // distForChanOp constructs a Distributor from the channel
 // operator type constructed by the root package's Blocking() and
 // NonBlocking() functions.
-func distForChanOp[T any](c fun.ChanOp[T]) Distributor[T] {
+func distForChanOp[T any](c fun.ChanOp[T]) distributor[T] {
 	return MakeDistributor(c.Send().Write, c.Receive().Read, c.Len)
 }

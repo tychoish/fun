@@ -423,6 +423,19 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(op)
 }
 
+// IteratorPop returns a consuming iterator that removes items from the queue. Blocks waiting for
+// new items when the queue is empty. Iterator terminates on context cancellation or queue closure.
+// Each item returned is removed from the queue (destructive read). Safe for concurrent access.
+func (q *Queue[T]) IteratorPop(ctx context.Context) iter.Seq[T] {
+	dist := q.distributorImpl()
+	return irt.GenerateOk(func() (z T, _ bool) {
+		if out, err := dist.Read(ctx); err == nil {
+			return out, true
+		}
+		return z, false
+	})
+}
+
 func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -441,11 +454,11 @@ func (q *Queue[T]) Iterator() iter.Seq[T] {
 	}
 }
 
-// Distributor creates a object used to process the items in the
-// queue: items yielded by the Distributor's stream, are removed
+// distributorImpl creates a object used to process the items in the
+// queue: items yielded by the distributorImpl's stream, are removed
 // from the queue.
-func (q *Queue[T]) Distributor() Distributor[T] {
-	return Distributor[T]{
+func (q *Queue[T]) distributorImpl() distributor[T] {
+	return distributor[T]{
 		push: fnx.MakeHandler(q.Add),
 		pop: func(ctx context.Context) (_ T, err error) {
 			msg, ok := q.Remove()
