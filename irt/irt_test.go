@@ -4145,6 +4145,183 @@ func TestLegacyUtils(t *testing.T) {
 	})
 }
 
+func TestAsGenerator(t *testing.T) {
+	t.Run("LazyInitialization", func(t *testing.T) {
+		started := &atomic.Bool{}
+		values := []int{1, 2, 3, 4, 5}
+
+		seq := func(yield func(int) bool) {
+			started.Store(true)
+			for _, v := range values {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+
+		gen := AsGenerator(seq)
+
+		// Verify iterator has not started before first generator call
+		if started.Load() {
+			t.Error("iterator should not have started before generator is called")
+		}
+
+		// First call should trigger initialization
+		val, ok := gen(t.Context())
+		if !ok {
+			t.Error("expected first value to be available")
+		}
+		if val != 1 {
+			t.Errorf("expected first value to be 1, got %d", val)
+		}
+
+		// Now iterator should have started
+		if !started.Load() {
+			t.Error("iterator should have started after first generator call")
+		}
+	})
+
+	t.Run("ExhaustionReturnsZeroValue", func(t *testing.T) {
+		values := []int{10, 20, 30}
+
+		seq := func(yield func(int) bool) {
+			for _, v := range values {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+
+		gen := AsGenerator(seq)
+
+		// Read all values
+		for i, expected := range values {
+			val, ok := gen(t.Context())
+			if !ok {
+				t.Errorf("iteration %d: expected value to be available", i)
+			}
+			if val != expected {
+				t.Errorf("iteration %d: expected %d, got %d", i, expected, val)
+			}
+		}
+
+		// After exhaustion, should return zero value and false
+		for i := 0; i < 5; i++ {
+			val, ok := gen(t.Context())
+			if ok {
+				t.Errorf("after exhaustion call %d: expected ok to be false", i)
+			}
+			if val != 0 {
+				t.Errorf("after exhaustion call %d: expected zero value (0), got %d", i, val)
+			}
+		}
+	})
+
+	t.Run("EmptyIterator", func(t *testing.T) {
+		seq := func(yield func(int) bool) {
+			// Empty iterator
+		}
+
+		gen := AsGenerator(seq)
+
+		// First call should return zero value and false
+		val, ok := gen(t.Context())
+		if ok {
+			t.Error("expected empty iterator to return false immediately")
+		}
+		if val != 0 {
+			t.Errorf("expected zero value (0), got %d", val)
+		}
+
+		// Subsequent calls should also return zero value and false
+		val, ok = gen(t.Context())
+		if ok {
+			t.Error("expected second call to return false")
+		}
+		if val != 0 {
+			t.Errorf("expected zero value (0), got %d", val)
+		}
+	})
+
+	t.Run("StringType", func(t *testing.T) {
+		values := []string{"hello", "world", "test"}
+
+		seq := func(yield func(string) bool) {
+			for _, v := range values {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+
+		gen := AsGenerator(seq)
+
+		// Read all values
+		for i, expected := range values {
+			val, ok := gen(t.Context())
+			if !ok {
+				t.Errorf("iteration %d: expected value to be available", i)
+			}
+			if val != expected {
+				t.Errorf("iteration %d: expected %q, got %q", i, expected, val)
+			}
+		}
+
+		// After exhaustion, should return empty string and false
+		val, ok := gen(t.Context())
+		if ok {
+			t.Error("after exhaustion: expected ok to be false")
+		}
+		if val != "" {
+			t.Errorf("after exhaustion: expected empty string, got %q", val)
+		}
+	})
+
+	t.Run("AdvancementTracking", func(t *testing.T) {
+		callCount := &atomic.Int64{}
+		values := []int{100, 200, 300}
+
+		seq := func(yield func(int) bool) {
+			for _, v := range values {
+				callCount.Add(1)
+				if !yield(v) {
+					return
+				}
+			}
+		}
+
+		gen := AsGenerator(seq)
+
+		// Before any calls, iterator should not have advanced
+		if callCount.Load() != 0 {
+			t.Errorf("expected 0 iterator calls before generator is used, got %d", callCount.Load())
+		}
+
+		// Call generator once
+		gen(t.Context())
+
+		// Give goroutine time to start
+		time.Sleep(10 * time.Millisecond)
+
+		// Iterator should have advanced at least once (possibly all values due to channel buffering)
+		if callCount.Load() == 0 {
+			t.Error("expected iterator to have advanced after first generator call")
+		}
+
+		// Consume remaining values
+		gen(t.Context())
+		gen(t.Context())
+
+		// Give goroutine time to finish
+		time.Sleep(10 * time.Millisecond)
+
+		// All values should have been generated
+		if callCount.Load() != int64(len(values)) {
+			t.Errorf("expected %d iterator calls, got %d", len(values), callCount.Load())
+		}
+	})
+}
+
 type testReader struct {
 	data []byte
 	err  error

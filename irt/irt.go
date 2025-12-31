@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"sync"
 	"errors"
 	"io"
 	"iter"
@@ -713,10 +714,15 @@ func ReadLinesErr(reader io.Reader) iter.Seq2[string, error] {
 
 // AsGenerator provides in inverse of the GenerateOk operation: the function will yield values. When
 // the boolean "ok" value is false the sequence has been exhausted.
-func AsGenerator[T any](seq iter.Seq[T]) func() (T, bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	op := oncev(func() <-chan T {
-		ch := make(chan T)
+func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
+	var (
+		once sync.Once
+		ch chan T
+		cancel context.CancelFunc
+	)
+
+	op := func(ctx context.Context) {
+		ch = make(chan T)
 		go func() {
 			defer close(ch)
 			defer cancel()
@@ -726,7 +732,15 @@ func AsGenerator[T any](seq iter.Seq[T]) func() (T, bool) {
 				}
 			}
 		}()
-		return ch
-	})
-	return func() (out T, ok bool) { out, ok = recieveFrom(ctx, op()); whencall(!ok, cancel); return }
+	}
+
+	return func(ctx context.Context) (out T, ok bool) {
+		once.Do(func() {
+			ctx, cancel = context.WithCancel(ctx)
+			op(ctx)
+		})
+		out, ok = recieveFrom(ctx, ch)
+		whencall(!ok, cancel)
+		return
+	}
 }
