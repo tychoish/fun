@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -1904,7 +1905,7 @@ func TestGoOnce(t *testing.T) {
 			count.Add(1)
 		}
 
-		fn := goOnce(op)
+		fn := oncego(op)
 
 		// Call the function multiple times
 		fn()
@@ -1928,7 +1929,7 @@ func TestGoOnce(t *testing.T) {
 			close(done)
 		}
 
-		fn := goOnce(op)
+		fn := oncego(op)
 		fn()
 
 		// Should complete asynchronously
@@ -1948,7 +1949,7 @@ func TestGoOnce(t *testing.T) {
 			close(started)
 		}
 
-		fn := goOnce(op)
+		fn := oncego(op)
 
 		// Call multiple times rapidly
 		for i := 0; i < 10; i++ {
@@ -2108,6 +2109,271 @@ func TestFlushTo(t *testing.T) {
 
 		if !slices.Equal(collected, []int{1, 2, 3}) {
 			t.Errorf("flushTo sent %v, want [1, 2, 3]", collected)
+		}
+	})
+}
+
+func TestMtxHelpers(t *testing.T) {
+	t.Run("mtxcall", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var executed bool
+		var lockHeld bool
+
+		op := func() {
+			executed = true
+			// Try to lock - should fail if mutex is held
+			if mu.TryLock() {
+				mu.Unlock()
+				lockHeld = false
+			} else {
+				lockHeld = true
+			}
+		}
+
+		wrapped := mtxcall(mu, op)
+		wrapped()
+
+		if !executed {
+			t.Error("mtxcall: operation not executed")
+		}
+
+		if !lockHeld {
+			t.Error("mtxcall: mutex was not held during operation")
+		}
+
+		// Mutex should be unlocked after wrapped() completes
+		if !mu.TryLock() {
+			t.Error("mtxcall: mutex still locked after wrapped() returned")
+		}
+		mu.Unlock()
+	})
+
+	t.Run("mtxdo", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var lockHeld bool
+
+		op := func() int {
+			// Try to lock - should fail if mutex is held
+			if mu.TryLock() {
+				mu.Unlock()
+				lockHeld = false
+			} else {
+				lockHeld = true
+			}
+			return 42
+		}
+
+		wrapped := mtxdo(mu, op)
+		result := wrapped()
+
+		if result != 42 {
+			t.Errorf("mtxdo: got %d, want 42", result)
+		}
+
+		if !lockHeld {
+			t.Error("mtxdo: mutex was not held during operation")
+		}
+
+		// Mutex should be unlocked after wrapped() completes
+		if !mu.TryLock() {
+			t.Error("mtxdo: mutex still locked after wrapped() returned")
+		}
+		mu.Unlock()
+	})
+
+	t.Run("mtxdoOK", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var lockHeld bool
+
+		op := func() (int, bool) {
+			// Try to lock - should fail if mutex is held
+			if mu.TryLock() {
+				mu.Unlock()
+				lockHeld = false
+			} else {
+				lockHeld = true
+			}
+			return 42, true
+		}
+
+		wrapped := mtxdo2(mu, op)
+		value, ok := wrapped()
+
+		if value != 42 {
+			t.Errorf("mtxdoOK: got value %d, want 42", value)
+		}
+
+		if !ok {
+			t.Error("mtxdoOK: got ok=false, want true")
+		}
+
+		if !lockHeld {
+			t.Error("mtxdoOK: mutex was not held during operation")
+		}
+
+		// Mutex should be unlocked after wrapped() completes
+		if !mu.TryLock() {
+			t.Error("mtxdoOK: mutex still locked after wrapped() returned")
+		}
+		mu.Unlock()
+	})
+
+	t.Run("mtxdoOK2", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var lockHeld bool
+
+		op := func() (int, string, bool) {
+			// Try to lock - should fail if mutex is held
+			if mu.TryLock() {
+				mu.Unlock()
+				lockHeld = false
+			} else {
+				lockHeld = true
+			}
+			return 42, "hello", true
+		}
+
+		wrapped := mtxdo3(mu, op)
+		v1, v2, ok := wrapped()
+
+		if v1 != 42 {
+			t.Errorf("mtxdoOK2: got v1=%d, want 42", v1)
+		}
+
+		if v2 != "hello" {
+			t.Errorf("mtxdoOK2: got v2=%q, want \"hello\"", v2)
+		}
+
+		if !ok {
+			t.Error("mtxdoOK2: got ok=false, want true")
+		}
+
+		if !lockHeld {
+			t.Error("mtxdoOK2: mutex was not held during operation")
+		}
+
+		// Mutex should be unlocked after wrapped() completes
+		if !mu.TryLock() {
+			t.Error("mtxdoOK2: mutex still locked after wrapped() returned")
+		}
+		mu.Unlock()
+	})
+
+	t.Run("mtxcallwith", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var executed bool
+		var lockHeld bool
+		var receivedValue int
+
+		op := func(arg int) {
+			executed = true
+			receivedValue = arg
+			// Try to lock - should fail if mutex is held
+			if mu.TryLock() {
+				mu.Unlock()
+				lockHeld = false
+			} else {
+				lockHeld = true
+			}
+		}
+
+		wrapped := mtxcallwith(mu, op)
+		wrapped(42)
+
+		if !executed {
+			t.Error("mtxcallwith: operation not executed")
+		}
+
+		if receivedValue != 42 {
+			t.Errorf("mtxcallwith: got arg %d, want 42", receivedValue)
+		}
+
+		if !lockHeld {
+			t.Error("mtxcallwith: mutex was not held during operation")
+		}
+
+		// Mutex should be unlocked after wrapped() completes
+		if !mu.TryLock() {
+			t.Error("mtxcallwith: mutex still locked after wrapped() returned")
+		}
+		mu.Unlock()
+	})
+
+	t.Run("mtxdowith", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var lockHeld bool
+		var receivedValue int
+
+		op := func(arg int) int {
+			receivedValue = arg
+			// Try to lock - should fail if mutex is held
+			if mu.TryLock() {
+				mu.Unlock()
+				lockHeld = false
+			} else {
+				lockHeld = true
+			}
+			return arg * 2
+		}
+
+		wrapped := mtxdowith(mu, op)
+		result := wrapped(21)
+
+		if result != 42 {
+			t.Errorf("mtxdowith: got result %d, want 42", result)
+		}
+
+		if receivedValue != 21 {
+			t.Errorf("mtxdowith: got arg %d, want 21", receivedValue)
+		}
+
+		if !lockHeld {
+			t.Error("mtxdowith: mutex was not held during operation")
+		}
+
+		// Mutex should be unlocked after wrapped() completes
+		if !mu.TryLock() {
+			t.Error("mtxdowith: mutex still locked after wrapped() returned")
+		}
+		mu.Unlock()
+	})
+
+	t.Run("ConcurrentSafety", func(t *testing.T) {
+		mu := &sync.Mutex{}
+		var counter atomic.Int32
+
+		op := func() int {
+			val := counter.Load()
+			counter.Add(1)
+			return int(val)
+		}
+
+		wrapped := mtxdo(mu, op)
+
+		var wg sync.WaitGroup
+		results := make([]int, 100)
+
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				results[idx] = wrapped()
+			}(i)
+		}
+
+		wg.Wait()
+
+		// All results should be unique (0-99 in some order)
+		seen := make(map[int]bool)
+		for _, v := range results {
+			if seen[v] {
+				t.Errorf("ConcurrentSafety: duplicate value %d", v)
+			}
+			seen[v] = true
+		}
+
+		if len(seen) != 100 {
+			t.Errorf("ConcurrentSafety: got %d unique values, want 100", len(seen))
 		}
 	})
 }

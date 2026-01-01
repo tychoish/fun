@@ -17,13 +17,42 @@ func oncewhenop(op func()) func()                              { op = whendowith
 func once(op func()) func()                                    { return sync.OnceFunc(op) }
 func oncev[T any](op func() T) func() T                        { return sync.OnceValue(op) }
 func oncevs[A, B any](op func() (A, B)) func() (A, B)          { return sync.OnceValues(op) }
+func oncego(op func()) func()                                  { return once(goop(op)) }
+func goop(op func()) func()                                    { return func() { go op() } }
+func with(mtx *sync.Mutex)                                     { mtx.Unlock() }
+func lock(mtx *sync.Mutex) *sync.Mutex                         { mtx.Lock(); return mtx }
+func mtxcall(mtx *sync.Mutex, op func()) func()                { return func() { defer with(lock(mtx)); op() } }
 
-func goOnce(op func()) func() { return once(func() { go op() }) }
+func mtxdo[T any](mtx *sync.Mutex, op func() T) func() T {
+	return func() T { defer with(lock(mtx)); return op() }
+}
+
+func mtxdo2[A, B any](m *sync.Mutex, o func() (A, B)) func() (A, B) {
+	return func() (A, B) { defer with(lock(m)); return o() }
+}
+
+func mtxdo3[A, B, C any](m *sync.Mutex, o func() (A, B, C)) func() (A, B, C) {
+	return func() (A, B, C) { defer with(lock(m)); return o() }
+}
+
+func mtxcallwith[T any](mtx *sync.Mutex, op func(T)) func(T) {
+	return func(arg T) { defer with(lock(mtx)); op(arg) }
+}
+
+func mtxdowith[T any](mtx *sync.Mutex, op func(T) T) func(T) T {
+	return func(arg T) T { defer with(lock(mtx)); return op(arg) }
+}
 
 func loopWhile(op func() bool) {
 	for op() {
 		continue
 	}
+}
+
+func mapPop[K comparable, V any](mp map[K]V, k K) (V, bool) {
+	v, ok := mp[k]
+	delete(mp, k)
+	return v, ok
 }
 
 // statefull function utilities
@@ -298,24 +327,6 @@ func toCmp2[A, B any, K cmp.Ordered](to func(A, B) K) func(Elem[A, B], Elem[A, B
 //
 // higher order operations
 
-func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
-	for value := range seq {
-		if !yield(value) {
-			return false
-		}
-	}
-	return true
-}
-
-func flush2[A, B any](seq iter.Seq2[A, B], yield func(A, B) bool) bool {
-	for key, value := range seq {
-		if !yield(key, value) {
-			return false
-		}
-	}
-	return true
-}
-
 func repeat[T any](times int, op func() T) func() (T, bool) {
 	return func() (out T, ok bool) {
 		if times > 0 {
@@ -384,6 +395,8 @@ func sendTo[T any](ctx context.Context, value T, ch chan<- T) bool {
 	}
 }
 
+// higher order iterator helpers
+
 func flushTo[T any](ctx context.Context, seq iter.Seq[T], ch chan<- T) bool {
 	for item := range seq {
 		if !sendTo(ctx, item, ch) {
@@ -392,6 +405,46 @@ func flushTo[T any](ctx context.Context, seq iter.Seq[T], ch chan<- T) bool {
 	}
 
 	return true
+}
+
+func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
+	for value := range seq {
+		if !yield(value) {
+			return false
+		}
+	}
+	return true
+}
+
+func flush2[A, B any](seq iter.Seq2[A, B], yield func(A, B) bool) bool {
+	for key, value := range seq {
+		if !yield(key, value) {
+			return false
+		}
+	}
+	return true
+}
+
+// unpull converts next and stop functions back into an iter.Seq.
+// This is the inverse of iter.Pull.
+func unpull[T any](next func() (T, bool), stop func()) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		defer stop()
+		for value, ok := next(); ok && yield(value); value, ok = next() {
+			continue
+		}
+	}
+}
+
+// unpull2 converts next and stop functions back into an iter.Seq2.
+// This is the inverse of iter.Pull2.
+func unpull2[A, B any](next func() (A, B, bool), stop func()) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		defer stop()
+		for key, value, ok := next(); ok && yield(key, value); key, value, ok = next() {
+			continue
+		}
+	}
 }
 
 ////////////////////////////////
@@ -431,11 +484,3 @@ func (og *orderedGrouping[K, V]) add(k K, v V) {
 func (og *orderedGrouping[K, V]) with(f func(V) K) func(V) { return func(v V) { og.add(f(v), v) } }
 func (og *orderedGrouping[K, V]) append(key K)             { og.order = append(og.order, key) }
 func (og *orderedGrouping[K, V]) iter() iter.Seq2[K, []V]  { return With(Slice(og.order), og.table.pop) }
-
-func mapPop[K comparable, V any](mp map[K]V, k K) (V, bool) {
-	v, ok := mp[k]
-	delete(mp, k)
-	return v, ok
-}
-
-// Tuple wrapper type

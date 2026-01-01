@@ -1,10 +1,14 @@
 package adt
 
 import (
+	"context"
 	"encoding/json"
 	"math/rand"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
@@ -273,6 +277,492 @@ func TestSet(t *testing.T) {
 			}
 			t.Fatal("test could not pass")
 		})
+	})
+}
+
+// TestSetConcurrentIterationAndModification tests that iterating over a Set
+// while concurrently modifying it does not cause data races or panics.
+// Run with: go test -race
+func TestSetConcurrentIterationAndModification(t *testing.T) {
+	t.Run("OrderedSet", func(t *testing.T) {
+		s := &Set[int]{}
+		s.Order()
+
+		// Pre-populate the set
+		for i := 0; i < 100; i++ {
+			s.Add(i)
+		}
+
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// Track that both goroutines ran
+		var iteratorRan atomic.Bool
+		var modifierRan atomic.Bool
+
+		// Start iterator goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			iteratorRan.Store(true)
+
+			// Iterate multiple times to increase chance of catching races
+			for i := 0; i < 5; i++ {
+				var count int
+				for range s.Iterator() {
+					count++
+					// Small sleep to allow modifications to interleave
+					time.Sleep(1 * time.Millisecond)
+				}
+				// We should see some items, but the exact count is undefined
+				// due to concurrent modifications
+				if count == 0 {
+					t.Error("Iterator returned no items")
+				}
+			}
+		}()
+
+		// Start modifier goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			modifierRan.Store(true)
+
+			for i := 0; i < 50; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// Add new items
+					s.Add(1000 + i)
+					// Delete some items
+					s.Delete(i)
+					// Check some items
+					_ = s.Check(50 + i)
+					time.Sleep(2 * time.Millisecond)
+				}
+			}
+		}()
+
+		wg.Wait()
+
+		if !iteratorRan.Load() {
+			t.Error("Iterator goroutine did not run")
+		}
+		if !modifierRan.Load() {
+			t.Error("Modifier goroutine did not run")
+		}
+	})
+
+	t.Run("UnorderedSet", func(t *testing.T) {
+		s := &Set[string]{}
+
+		// Pre-populate
+		for i := 0; i < 50; i++ {
+			s.Add(string(rune('a' + i)))
+		}
+
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// Iterator goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 10; i++ {
+				var items []string
+				for item := range s.Iterator() {
+					items = append(items, item)
+					time.Sleep(500 * time.Microsecond)
+				}
+			}
+		}()
+
+		// Multiple modifier goroutines
+		for g := 0; g < 3; g++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				for i := 0; i < 20; i++ {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						key := string(rune('A' + (id*100 + i)))
+						if i%3 == 0 {
+							s.Add(key)
+						} else if i%3 == 1 {
+							s.Delete(key)
+						} else {
+							_ = s.Check(key)
+						}
+						time.Sleep(1 * time.Millisecond)
+					}
+				}
+			}(g)
+		}
+
+		wg.Wait()
+	})
+}
+
+// TestMapConcurrentIterationAndModification tests that iterating over a Map
+// while concurrently modifying it does not cause data races or panics.
+// Run with: go test -race
+func TestMapConcurrentIterationAndModification(t *testing.T) {
+	t.Run("BasicConcurrentAccess", func(t *testing.T) {
+		m := &Map[int, string]{}
+
+		// Pre-populate
+		for i := 0; i < 100; i++ {
+			m.Store(i, string(rune('a'+(i%26))))
+		}
+
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		var iteratorRan atomic.Bool
+		var modifierRan atomic.Bool
+
+		// Iterator goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			iteratorRan.Store(true)
+
+			for i := 0; i < 5; i++ {
+				var count int
+				for k, v := range m.Iterator() {
+					count++
+					// Use the values to prevent optimization
+					_ = k
+					_ = v
+					time.Sleep(1 * time.Millisecond)
+				}
+				if count == 0 {
+					t.Error("Iterator returned no items")
+				}
+			}
+		}()
+
+		// Modifier goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			modifierRan.Store(true)
+
+			for i := 0; i < 50; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// Store new items
+					m.Store(1000+i, "new")
+					// Delete items
+					m.Delete(i)
+					// Load items
+					_, _ = m.Load(50 + i)
+					time.Sleep(2 * time.Millisecond)
+				}
+			}
+		}()
+
+		wg.Wait()
+
+		if !iteratorRan.Load() {
+			t.Error("Iterator goroutine did not run")
+		}
+		if !modifierRan.Load() {
+			t.Error("Modifier goroutine did not run")
+		}
+	})
+
+	t.Run("MultipleReaders", func(t *testing.T) {
+		m := &Map[string, int]{}
+
+		// Pre-populate
+		for i := 0; i < 50; i++ {
+			m.Store(string(rune('a'+i)), i)
+		}
+
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// Multiple iterator goroutines
+		for r := 0; r < 5; r++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				for i := 0; i < 3; i++ {
+					for k, v := range m.Iterator() {
+						_ = k
+						_ = v
+						time.Sleep(500 * time.Microsecond)
+					}
+				}
+			}(r)
+		}
+
+		// Writer goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 30; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					m.Store(string(rune('A'+i)), i*10)
+					time.Sleep(2 * time.Millisecond)
+				}
+			}
+		}()
+
+		wg.Wait()
+	})
+}
+
+// TestSetIteratorWithIRTFunctions tests that using irt functions with
+// concurrent modifications doesn't cause races.
+func TestSetIteratorWithIRTFunctions(t *testing.T) {
+	s := &Set[int]{}
+	s.Order()
+
+	// Pre-populate
+	for i := 0; i < 100; i++ {
+		s.Add(i)
+	}
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Goroutine using irt.Collect
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			result := irt.Collect(s.Iterator())
+			// Should have collected something
+			if len(result) == 0 {
+				t.Error("irt.Collect returned empty result")
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	// Goroutine using irt.Apply
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			var sum int
+			irt.Apply(s.Iterator(), func(n int) { sum += n })
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	// Goroutine using irt.Count
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			count := irt.Count(s.Iterator())
+			if count == 0 {
+				t.Error("irt.Count returned 0")
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	// Modifier goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				s.Add(200 + i)
+				s.Delete(i)
+				time.Sleep(1 * time.Millisecond)
+			}
+		}
+	}()
+
+	wg.Wait()
+}
+
+// TestMapIteratorWithIRTFunctions tests that using irt functions with
+// concurrent modifications doesn't cause races.
+func TestMapIteratorWithIRTFunctions(t *testing.T) {
+	m := &Map[string, int]{}
+
+	// Pre-populate
+	for i := 0; i < 100; i++ {
+		m.Store(string(rune('a'+(i%26))), i)
+	}
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Goroutine using irt.Collect2
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			result := irt.Collect2(m.Iterator())
+			if len(result) == 0 {
+				t.Error("irt.Collect2 returned empty result")
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	// Goroutine using irt.First
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			keys := irt.Collect(irt.First(m.Iterator()))
+			if len(keys) == 0 {
+				t.Error("irt.First returned empty result")
+			}
+			time.Sleep(3 * time.Millisecond)
+		}
+	}()
+
+	// Goroutine using irt.Count2
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			count := irt.Count2(m.Iterator())
+			if count == 0 {
+				t.Error("irt.Count2 returned 0")
+			}
+			time.Sleep(3 * time.Millisecond)
+		}
+	}()
+
+	// Modifier goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				m.Store(string(rune('A'+i)), i*100)
+				m.Delete(string(rune('a' + (i % 26))))
+				time.Sleep(1 * time.Millisecond)
+			}
+		}
+	}()
+
+	wg.Wait()
+}
+
+// TestEarlyTerminationDuringConcurrentModification tests that breaking
+// out of iteration early while modifications are happening is safe.
+func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
+	t.Run("Set", func(t *testing.T) {
+		s := &Set[int]{}
+
+		for i := 0; i < 1000; i++ {
+			s.Add(i)
+		}
+
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// Iterator that terminates early
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for round := 0; round < 20; round++ {
+				count := 0
+				for range s.Iterator() {
+					count++
+					if count >= 5 {
+						break // Early termination
+					}
+					time.Sleep(100 * time.Microsecond)
+				}
+			}
+		}()
+
+		// Heavy modifier
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 100; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					s.Add(2000 + i)
+					s.Delete(i)
+					time.Sleep(500 * time.Microsecond)
+				}
+			}
+		}()
+
+		wg.Wait()
+	})
+
+	t.Run("Map", func(t *testing.T) {
+		m := &Map[int, string]{}
+
+		for i := 0; i < 1000; i++ {
+			m.Store(i, "value")
+		}
+
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// Iterator that terminates early
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for round := 0; round < 20; round++ {
+				count := 0
+				for range m.Iterator() {
+					count++
+					if count >= 5 {
+						break // Early termination
+					}
+					time.Sleep(100 * time.Microsecond)
+				}
+			}
+		}()
+
+		// Heavy modifier
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 100; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					m.Store(2000+i, "new")
+					m.Delete(i)
+					time.Sleep(500 * time.Microsecond)
+				}
+			}
+		}()
+
+		wg.Wait()
 	})
 }
 

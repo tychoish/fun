@@ -672,6 +672,76 @@ func WithSetup[T any](seq iter.Seq[T], setup func()) iter.Seq[T] {
 	return func(yield func(T) bool) { whenop(setup); flush(seq, yield) }
 }
 
+// WithMutex returns a sequence that synchronizes all calls to the underlying iterator
+// using the provided mutex. This allows safe concurrent iteration from multiple goroutines
+// when using iter.Pull on the returned sequence.
+//
+// The mutex protects the internal state of the iterator, ensuring that calls to next()
+// are serialized. This is useful when you want to pull from a single iterator across
+// multiple goroutines, with each goroutine receiving distinct elements without data races.
+//
+// Example:
+//
+//	seq := irt.Range(1, 100)
+//	mu := &sync.Mutex{}
+//	wrapped := irt.WithMutex(seq, mu)
+//
+//	next, stop := iter.Pull(wrapped)
+//	defer stop()
+//
+//	// Multiple goroutines can safely call next() concurrently
+//	for i := 0; i < 10; i++ {
+//	    go func() {
+//	        for {
+//	            value, ok := next()
+//	            if !ok {
+//	                return
+//	            }
+//	            // process value
+//	        }
+//	    }()
+//	}
+func WithMutex[T any](seq iter.Seq[T], mtx *sync.Mutex) iter.Seq[T] {
+	next, stop := iter.Pull(seq)
+
+	return unpull(mtxdo2(mtx, next), mtxcall(mtx, stop))
+}
+
+// WithMutex2 returns a pair sequence that synchronizes all calls to the underlying iterator
+// using the provided mutex. This allows safe concurrent iteration from multiple goroutines
+// when using iter.Pull2 on the returned sequence.
+//
+// The mutex protects the internal state of the iterator, ensuring that calls to next()
+// are serialized. This is useful when you want to pull from a single pair iterator across
+// multiple goroutines, with each goroutine receiving distinct pairs without data races.
+//
+// Example:
+//
+//	seq := irt.Index(irt.Range(1, 100))
+//	mu := &sync.Mutex{}
+//	wrapped := irt.WithMutex2(seq, mu)
+//
+//	next, stop := iter.Pull2(wrapped)
+//	defer stop()
+//
+//	// Multiple goroutines can safely call next() concurrently
+//	for i := 0; i < 10; i++ {
+//	    go func() {
+//	        for {
+//	            key, value, ok := next()
+//	            if !ok {
+//	                return
+//	            }
+//	            // process key and value
+//	        }
+//	    }()
+//	}
+func WithMutex2[A, B any](seq iter.Seq2[A, B], mtx *sync.Mutex) iter.Seq2[A, B] {
+	next, stop := iter.Pull2(seq)
+
+	return unpull2(mtxdo3(mtx, next), mtxcall(mtx, stop))
+}
+
 // Remove returns a sequence containing only the elements from the input sequence that do NOT satisfy the predicate prd.
 func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, notf(prd)) }
 

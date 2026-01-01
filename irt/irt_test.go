@@ -12,10 +12,22 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// PullWithMutex wraps iter.Pull and returns thread-safe next and stop functions.
+// The mutex protects all calls to next(), allowing multiple goroutines to safely
+// pull values from the same iterator.
+func PullWithMutex[T any](seq iter.Seq[T], mu *sync.Mutex) (next func() (T, bool), stop func()) {
+	next, stop = iter.Pull(seq)
+	next = mtxdo2(mu, next)
+	stop = mtxcall(mu, stop)
+
+	return next, stop
+}
 
 func TestCollect(t *testing.T) {
 	tests := []struct {
@@ -5545,6 +5557,179 @@ func TestWithBuffer(t *testing.T) {
 
 		if !slices.Equal(consumed, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}) {
 			t.Errorf("Consumed incorrect values: %v", consumed)
+		}
+	})
+}
+
+func TestWithMutex(t *testing.T) {
+	t.Run("BasicIteration", func(t *testing.T) {
+		seq := Range(1, 5)
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex(seq, mu)
+		result := Collect(wrapped)
+
+		if len(result) != 5 {
+			t.Errorf("expected 5 elements, got %d", len(result))
+		}
+
+		for i, v := range result {
+			if v != i+1 {
+				t.Errorf("expected element %d to be %d, got %d", i, i+1, v)
+			}
+		}
+	})
+
+	t.Run("MultipleIterations", func(t *testing.T) {
+		// WithMutex allows the sequence to be safely iterated multiple times
+		// or from different goroutines sequentially
+		seq := Range(1, 10)
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex(seq, mu)
+
+		// First iteration
+		result1 := Collect(wrapped)
+
+		if len(result1) != 10 {
+			t.Errorf("first iteration: expected 10 elements, got %d", len(result1))
+		}
+
+		for i, v := range result1 {
+			if v != i+1 {
+				t.Errorf("first iteration: expected element %d to be %d, got %d", i, i+1, v)
+			}
+		}
+
+		// The sequence is exhausted after first iteration, so second would be empty
+		// unless we create a new wrapped sequence
+		seq2 := Range(1, 10)
+		wrapped2 := WithMutex(seq2, mu)
+		result2 := Collect(wrapped2)
+
+		if len(result2) != 10 {
+			t.Errorf("second iteration: expected 10 elements, got %d", len(result2))
+		}
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := Limit(Range(1, 10), 0)
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex(seq, mu)
+		result := Collect(wrapped)
+
+		if len(result) != 0 {
+			t.Errorf("expected 0 elements, got %d", len(result))
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		seq := Range(1, 100)
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex(seq, mu)
+
+		// Only take first 5 elements
+		result := CollectFirstN(wrapped, 5)
+
+		if len(result) != 5 {
+			t.Errorf("expected 5 elements, got %d", len(result))
+		}
+
+		for i, v := range result {
+			if v != i+1 {
+				t.Errorf("expected element %d to be %d, got %d", i, i+1, v)
+			}
+		}
+	})
+}
+
+func TestWithMutex2(t *testing.T) {
+	t.Run("BasicIteration", func(t *testing.T) {
+		seq := Index(Range(1, 5))
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex2(seq, mu)
+		result := Collect2(wrapped)
+
+		if len(result) != 5 {
+			t.Errorf("expected 5 pairs, got %d", len(result))
+		}
+
+		for i := 0; i < 5; i++ {
+			if result[i] != i+1 {
+				t.Errorf("expected result[%d] to be %d, got %d", i, i+1, result[i])
+			}
+		}
+	})
+
+	t.Run("MultipleIterations", func(t *testing.T) {
+		seq := Index(Range(1, 10))
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex2(seq, mu)
+
+		// First iteration
+		result1 := Collect2(wrapped)
+
+		if len(result1) != 10 {
+			t.Errorf("first iteration: expected 10 pairs, got %d", len(result1))
+		}
+
+		for i := 0; i < 10; i++ {
+			if result1[i] != i+1 {
+				t.Errorf("first iteration: expected result1[%d] to be %d, got %d", i, i+1, result1[i])
+			}
+		}
+
+		// The sequence is exhausted after first iteration
+		seq2 := Index(Range(1, 10))
+		wrapped2 := WithMutex2(seq2, mu)
+		result2 := Collect2(wrapped2)
+
+		if len(result2) != 10 {
+			t.Errorf("second iteration: expected 10 pairs, got %d", len(result2))
+		}
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := Index(Limit(Range(1, 10), 0))
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex2(seq, mu)
+		result := Collect2(wrapped)
+
+		if len(result) != 0 {
+			t.Errorf("expected 0 pairs, got %d", len(result))
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		seq := Index(Range(1, 100))
+		mu := &sync.Mutex{}
+
+		wrapped := WithMutex2(seq, mu)
+
+		// Only take first 5 pairs
+		count := 0
+		result := make(map[int]int)
+		for k, v := range wrapped {
+			result[k] = v
+			count++
+			if count >= 5 {
+				break
+			}
+		}
+
+		if len(result) != 5 {
+			t.Errorf("expected 5 pairs, got %d", len(result))
+		}
+
+		for i := 0; i < 5; i++ {
+			if result[i] != i+1 {
+				t.Errorf("expected result[%d] to be %d, got %d", i, i+1, result[i])
+			}
 		}
 	})
 }

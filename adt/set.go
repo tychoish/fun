@@ -100,9 +100,9 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 func (s *Set[T]) Iterator() iter.Seq[T] {
 	s.init()
 	if s.list != nil {
-		return s.list.IteratorFront()
+		return irt.WithMutex(s.list.IteratorFront(), &s.mtx)
 	}
-	return s.hash.Keys()
+	return irt.WithMutex(s.hash.Keys(), &s.mtx)
 }
 
 // DeleteCheck removes the item from the set, return true when the
