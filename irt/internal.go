@@ -12,11 +12,13 @@ import (
 
 func keys[K comparable, V any, M ~map[K]V](in M) iter.Seq[K]   { return maps.Keys(in) }
 func values[K comparable, V any, M ~map[K]V](in M) iter.Seq[V] { return maps.Values(in) }
+func cmpf[T cmp.Ordered](lh, rh T) int                         { return cmp.Compare(lh, rh) }
 func oncewhenop(op func()) func()                              { op = whendowith(op != nil, once, op); return op }
 func once(op func()) func()                                    { return sync.OnceFunc(op) }
 func oncev[T any](op func() T) func() T                        { return sync.OnceValue(op) }
 func oncevs[A, B any](op func() (A, B)) func() (A, B)          { return sync.OnceValues(op) }
-func cmpf[T cmp.Ordered](lh, rh T) int                         { return cmp.Compare(lh, rh) }
+
+func goOnce(op func()) func() { return once(func() { go op() }) }
 
 func loopWhile(op func() bool) {
 	for op() {
@@ -380,6 +382,16 @@ func sendTo[T any](ctx context.Context, value T, ch chan<- T) bool {
 	case ch <- value:
 		return true
 	}
+}
+
+func flushTo[T any](ctx context.Context, seq iter.Seq[T], ch chan<- T) bool {
+	for item := range seq {
+		if !sendTo(ctx, item, ch) {
+			return false
+		}
+	}
+
+	return true
 }
 
 ////////////////////////////////

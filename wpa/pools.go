@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
 )
@@ -23,6 +24,14 @@ type Job interface {
 // units of work for use with worker pool and execution functions in the wpa package.
 type Task func() error
 
+// ErrorTask wraps an error object as a task, which will the be returned by the Task.
+func ErrorTask(err error) Task { return ft.Wrap(err) }
+
+// Job converts a Task into a panic-safe worker function suitable for use in
+// worker pool implementations (e.g., wpa.RunWithPool). This exists to satisfy the wpa.Job
+// type constraint, enabling interoperability with existing function types.
+func (sf Task) Job() func(context.Context) error { return fnx.MakeWorker(sf).WithRecover() }
+
 // Thunk represents a single niladic function that can be used interchangeably in wpa pool and
 // worker execution.
 type Thunk func()
@@ -31,11 +40,6 @@ type Thunk func()
 // worker pool implementations (e.g., wpa.RunWithPool). This exists to satisfy the wpa.Job
 // type constraint, enabling interoperability with existing function types.
 func (tf Thunk) Job() func(context.Context) error { return fnx.MakeOperation(tf).WithRecover() }
-
-// Job converts a Task into a panic-safe worker function suitable for use in
-// worker pool implementations (e.g., wpa.RunWithPool). This exists to satisfy the wpa.Job
-// type constraint, enabling interoperability with existing function types.
-func (sf Task) Job() func(context.Context) error { return fnx.MakeWorker(sf).WithRecover() }
 
 func jobAsRunnable[T Job](in T) func(context.Context) error { return in.Job() }
 func jobAsWorker[T Job](in T) fnx.Worker                    { return in.Job() }

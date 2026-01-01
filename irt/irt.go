@@ -648,6 +648,18 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 	return GenerateOk(repeat(num, curry2(Channel, ctx, Pipe(ctx, seq))))
 }
 
+// WithBuffer maintains a buffer of items read from the source iterator, waiting for
+// downstream consumers of the output iterator, to consume them.
+func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		sink := make(chan T, size)
+
+		setup := goOnce(func() { defer close(sink); flushTo(ctx, seq, sink) })
+
+		flush(Channel(ctx, sink), yieldPre(setup, yield))
+	}
+}
+
 // WithHooks returns a sequence that calls before() when iteration starts and after() when iteration ends.
 // after() is called even if iteration stops early. Nil hooks are ignored.
 func WithHooks[T any](seq iter.Seq[T], before func(), after func()) iter.Seq[T] {
