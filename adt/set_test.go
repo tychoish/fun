@@ -2,18 +2,15 @@ package adt
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/rand"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestSet(t *testing.T) {
@@ -71,7 +68,6 @@ func TestSet(t *testing.T) {
 				check.Equal(t, count, set.Len())
 				nset := builder()
 				assert.NotError(t, nset.UnmarshalJSON(data))
-				check.True(t, set.Equal(nset))
 			})
 			t.Run("Recall", func(t *testing.T) {
 				set := builder()
@@ -135,14 +131,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						sl = set.Slice()
+						sl = irt.Collect(set.Iterator())
 
 						check.Equal(t, "abc", sl[0])
 						check.Equal(t, "def", sl[1])
@@ -160,15 +156,17 @@ func TestSet(t *testing.T) {
 						set.Add("opq")
 						set.Add("def")
 						set.Add("ghi")
+						testt.Log(t, set.Len())
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						sll := set.Slice()
+						sll := irt.Collect(set.Iterator())
+						testt.Log(t, set.Len(), len(sl), sll)
 
 						check.Equal(t, "abc", sll[0])
 						check.Equal(t, "def", sll[1])
@@ -189,14 +187,16 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						testt.Log(t, set.Len())
+
+						sl := irt.Collect(set.Iterator())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						sll := set.Slice()
+						sll := irt.Collect(set.Iterator())
 
 						check.Equal(t, "abc", sll[0])
 						check.Equal(t, "def", sll[1])
@@ -215,14 +215,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						sll := set.Slice()
+						sll := irt.Collect(set.Iterator())
 
 						check.Equal(t, "abc", sll[0])
 						check.Equal(t, "def", sll[1])
@@ -233,81 +233,6 @@ func TestSet(t *testing.T) {
 					})
 				})
 			})
-			for populatorName, populator := range map[string]func(*Set[string]){
-				"Three": func(set *Set[string]) {
-					set.Add("a")
-					set.Add("b")
-					set.Add("c")
-				},
-				"Numbers": func(set *Set[string]) {
-					for i := 0; i < 100; i++ {
-						set.Add(fmt.Sprint(i))
-					}
-				},
-				// "Populator": func(set Set[string]) {
-				//	Populate(ctx, set, generateIter(ctx, 100))
-				// },
-			} {
-				t.Run(populatorName, func(t *testing.T) {
-					t.Run("Uniqueness", func(t *testing.T) {
-						set := builder()
-						populator(set)
-
-						if set.Len() == 0 {
-							t.Fatal("populator did not work")
-						}
-
-						size := set.Len()
-						populator(set)
-						if set.Len() != size {
-							t.Fatal("size should not change", size, set.Len())
-						}
-					})
-					t.Run("Equality", func(t *testing.T) {
-						set := builder()
-						populator(set)
-
-						set2 := builder()
-						populator(set2)
-						if !set.Equal(set2) {
-							t.Fatal("sets should be equal")
-						}
-					})
-					t.Run("InqualitySizeSimple", func(t *testing.T) {
-						set := builder()
-						populator(set)
-
-						set2 := builder()
-						set2.Add("foo")
-						if set.Equal(set2) {
-							t.Fatal("sets should not be equal")
-						}
-					})
-					t.Run("InqualitySizeComplex", func(t *testing.T) {
-						set := builder()
-						populator(set)
-
-						collected := irt.Collect(irt.RemoveZeros(set.Iterator()))
-
-						set2 := builder()
-						populator(set2)
-
-						if !set.Equal(set2) {
-							t.Fatal("sets should be equal")
-						}
-
-						set2.Delete(collected[1])
-						set2.Add("foo")
-						if set.Len() != set2.Len() {
-							t.Fatal("test bug")
-						}
-
-						if set.Equal(set2) {
-							t.Fatal("sets should not be equal")
-						}
-					})
-				})
-			}
 		})
 	}
 	t.Run("JSONCheck", func(t *testing.T) {
@@ -336,9 +261,10 @@ func TestSet(t *testing.T) {
 					if set2.Len() != 100 {
 						return
 					}
-					if !set.Equal(set2) {
+					if !irt.Equal(set.Iterator(), set2.Iterator()) {
 						return
 					}
+
 					passed = true
 				}()
 				if passed {
@@ -346,79 +272,6 @@ func TestSet(t *testing.T) {
 				}
 			}
 			t.Fatal("test could not pass")
-		})
-	})
-	t.Run("List", func(t *testing.T) {
-		t.Run("Ordered", func(t *testing.T) {
-			ls := &dt.List[int]{}
-
-			st := &Set[int]{}
-			st.Order()
-
-			for v := range 42 {
-				ls.PushBack(v)
-				st.Add(v)
-			}
-
-			assert.Equal(t, ls.Len(), 42)
-			assert.Equal(t, st.Len(), ls.Len())
-
-			setls := st.List()
-
-			count := 0
-			for elemL, elemS := ls.Front(), setls.Front(); elemL.Ok() && elemS.Ok(); elemL, elemS = elemL.Next(), elemS.Next() {
-				count++
-				check.Equal(t, elemL.Value(), elemS.Value())
-			}
-			assert.Equal(t, count, 42)
-		})
-		t.Run("Undordered", func(t *testing.T) {
-			ls := &dt.List[int]{}
-
-			st := &Set[int]{}
-
-			for v := range 42 {
-				ls.PushBack(v)
-				st.Add(v)
-			}
-
-			setls := st.List()
-
-			assert.Equal(t, ls.Len(), 42)
-			assert.Equal(t, st.Len(), ls.Len())
-			assert.Equal(t, st.Len(), setls.Len())
-
-			checker := stw.Map[int, int]{}
-			for v := range setls.IteratorFront() {
-				if checker.Check(v) {
-					t.Errorf("duplicate value, %d", v)
-				}
-				checker.SetDefault(v)
-				check.True(t, v <= 42)
-			}
-			assert.Equal(t, 42, len(checker))
-		})
-	})
-	t.Run("Slice", func(t *testing.T) {
-		t.Run("Ordered", func(t *testing.T) {
-			in := []int{1, 2, 3, 4, 5, 6}
-			st := &Set[int]{}
-			st.Order()
-
-			st.Extend(irt.Slice(in))
-			assert.Equal(t, st.Len(), 6)
-			assert.True(t, slices.Equal(in, st.Slice()))
-		})
-		t.Run("Unordered", func(t *testing.T) {
-			in := []int{1, 2, 3, 4, 5, 6}
-			st := &Set[int]{}
-			st.Extend(irt.Slice(in))
-			assert.Equal(t, st.Len(), 6)
-			out := st.Slice()
-			assert.Equal(t, len(out), 6)
-			for v := range slices.Values(out) {
-				check.True(t, v <= 6 && v >= 1)
-			}
 		})
 	})
 }

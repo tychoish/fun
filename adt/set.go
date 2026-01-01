@@ -3,7 +3,6 @@ package adt
 import (
 	"encoding/json"
 	"iter"
-	"maps"
 	"sync"
 
 	"github.com/tychoish/fun/dt"
@@ -17,9 +16,10 @@ import (
 // Set provides a thread-safe generic set implementation with optional
 // order tracking (via Order()). All operations are synchronized.
 type Set[T comparable] struct {
+	mtx  sync.Mutex
+	once sync.Once
 	hash stw.Map[T, *dt.Element[T]]
 	list *dt.List[T]
-	mtx  sync.Mutex
 }
 
 // MakeSet constructs a map and adds all items from the input
@@ -36,10 +36,13 @@ func MakeSet[T comparable](seq iter.Seq[T]) *Set[T] {
 // this operation is a noop.
 func (s *Set[T]) Order() {
 	defer s.with(s.lock())
+	s.init()
+
 	if s.list != nil {
 		return
 	}
-	ft.Invariant(ers.When(len(s.hash) != 0, "cannot make an ordered set out of an un-ordered set that contain data"))
+
+	ft.Invariant(ers.When(s.hash.Len() != 0, "cannot make an ordered set out of an un-ordered set that contain data"))
 
 	s.list = &dt.List[T]{}
 }
@@ -66,28 +69,25 @@ func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
 }
 
 func (s *Set[T]) forceSetupOrdered() {
-	ft.Invariant(ers.If(s.list != nil, dt.ErrUninitializedContainer))
-
 	s.list = &dt.List[T]{}
-	for item := range s.hash {
+	for item := range s.hash.Iterator() {
 		s.list.PushBack(item)
 	}
 }
 
-func (s *Set[T]) isOrdered() bool    { return s.list != nil }
-func (s *Set[T]) init()              { s.hash = stw.Map[T, *dt.Element[T]]{} }
-func (s *Set[T]) doInit()            { ft.CallWhen(s.hash == nil, s.init) }
+func (s *Set[T]) init()              { s.once.Do(s.doInit) }
+func (s *Set[T]) doInit()            { s.hash = stw.Map[T, *dt.Element[T]]{} }
 func (*Set[T]) with(mtx *sync.Mutex) { mtx.Unlock() }
-func (s *Set[T]) lock() *sync.Mutex  { s.mtx.Lock(); s.doInit(); return &s.mtx }
-
-// Add attempts to add the item while holding to the mutex, and is a noop otherwise.
-func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
+func (s *Set[T]) lock() *sync.Mutex  { s.mtx.Lock(); return &s.mtx }
 
 // Len returns the number of items tracked in the set.
-func (s *Set[T]) Len() int { defer s.with(s.lock()); return len(s.hash) }
+func (s *Set[T]) Len() int { defer s.with(s.lock()); return s.hash.Len() }
 
 // Check returns true if the item is in the set.
 func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(in) }
+
+// Add attempts to add the item while holding to the mutex, and is a noop otherwise.
+func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
 
 // Delete attempts to remove the item from the set.
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
@@ -98,34 +98,19 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 //
 // When Synchrnoized, the lock is NOT held when the iterator is advanced.
 func (s *Set[T]) Iterator() iter.Seq[T] {
-	defer s.with(s.lock())
-	st := s.unsafeStream()
-
-	return st
-}
-
-// List exports the contents of the set to a List, structure which is implemented as a doubly linked list.
-func (s *Set[T]) List() *dt.List[T] {
+	s.init()
 	if s.list != nil {
-		return s.list.Copy()
+		return s.list.IteratorFront()
 	}
-	return dt.IteratorList(s.Iterator())
-}
-
-// Slice exports the contents of the set to a slice.
-func (s *Set[T]) Slice() stw.Slice[T] {
-	if s.list != nil {
-		return s.list.Slice()
-	}
-
-	return irt.Collect(s.hash.Keys(), 0, s.Len())
+	return s.hash.Keys()
 }
 
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise.
 func (s *Set[T]) DeleteCheck(in T) bool {
 	defer s.with(s.lock())
-	defer delete(s.hash, in)
+	defer s.hash.Delete(in)
+	s.init()
 
 	e, ok := s.hash.Load(in)
 	if !ok {
@@ -141,8 +126,10 @@ func (s *Set[T]) DeleteCheck(in T) bool {
 // returns, the item is a member of the set.
 func (s *Set[T]) AddCheck(in T) (ok bool) {
 	defer s.with(s.lock())
+	s.init()
 
-	if ok = s.hash.Check(in); ok {
+	ok = s.hash.Check(in)
+	if ok {
 		return
 	}
 
@@ -161,33 +148,10 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 // Extend adds all items encountered in the stream to the set.
 func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.Add) }
 
-func (s *Set[T]) unsafeStream() iter.Seq[T] {
-	if s.list != nil {
-		return s.list.IteratorFront()
-	}
-	return s.hash.Keys()
-}
-
-// Equal tests two sets, returning true if the items in the sets have
-// equal values. If the sets are ordered, order is considered.
-func (s *Set[T]) Equal(other *Set[T]) bool {
-	defer s.with(s.lock())
-
-	if len(s.hash) != other.Len() || s.isOrdered() != other.isOrdered() {
-		return false
-	}
-
-	iter := s.unsafeStream()
-
-	if s.isOrdered() {
-		return irt.Equal(iter, other.Iterator())
-	}
-
-	return maps.Equal(s.hash, other.hash)
-}
-
 // MarshalJSON generates a JSON array of the items in the set.
-func (s *Set[T]) MarshalJSON() ([]byte, error) { return json.Marshal(s.Slice()) }
+func (s *Set[T]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(irt.Collect(s.Iterator(), 0, s.Len()))
+}
 
 // UnmarshalJSON reads input JSON data, constructs an array in memory
 // and then adds items from the array to existing set. Items that are
