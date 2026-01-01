@@ -189,6 +189,7 @@ func (q *Queue[T]) Remove() (out T, ok bool) {
 		ok = true
 		if q.draining || q.closed {
 			q.nempty.Broadcast()
+			break
 		}
 		q.nempty.Signal()
 	default:
@@ -197,6 +198,7 @@ func (q *Queue[T]) Remove() (out T, ok bool) {
 
 		if q.draining || q.closed {
 			q.nupdates.Broadcast()
+			break
 		}
 		q.nupdates.Signal()
 	}
@@ -496,4 +498,3 @@ func (q *Queue[T]) Source(ctx context.Context) <-chan T {
 	}()
 	return ch
 }
-
