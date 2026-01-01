@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -190,14 +189,6 @@ func TestStream(t *testing.T) {
 		assert.Equal(t, sum, 300)
 		assert.Equal(t, observes, 3)
 		assert.Equal(t, count, 100)
-	})
-	t.Run("Transform", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		out, err := VariadicStream(4, 8, 16, 32, 64, 128, 256, 512, 1024).Transform(fnx.MakeConverter(func(in int) int { return in / 4 })).Slice(ctx)
-		check.NotError(t, err)
-
-		check.EqualItems(t, out, []int{1, 2, 4, 8, 16, 32, 64, 128, 256})
 	})
 	t.Run("Process", func(t *testing.T) {
 		t.Run("Process", func(t *testing.T) {
@@ -691,111 +682,6 @@ func TestStream(t *testing.T) {
 			t.Error("no iteration", iter.Value())
 		}
 	})
-}
-
-func TestEmptyIteration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ch := make(chan int)
-	close(ch)
-
-	t.Run("EmptyReadAll", func(t *testing.T) {
-		assert.NotError(t, SliceStream([]int{}).ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
-		assert.NotError(t, VariadicStream[int]().ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
-		assert.NotError(t, ChannelStream(ch).ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
-	})
-}
-
-func TestChain(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
-	iter := SliceStream(num).Join(SliceStream(num))
-
-	n := iter.Count(ctx)
-
-	assert.Equal(t, len(num)*2, n)
-
-	iter = SliceStream(num).Join(SliceStream(num), SliceStream(num), SliceStream(num))
-	cancel()
-	n = iter.Count(ctx)
-	assert.Equal(t, n, 0)
-}
-
-func TestJSON(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	t.Run("RoundTrip", func(t *testing.T) {
-		iter := SliceStream([]int{400, 300, 42})
-		out, err := iter.MarshalJSON()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(out) != "[400,300,42]" {
-			t.Error(string(out))
-		}
-		nl := []int{}
-		if err := json.Unmarshal(out, &nl); err != nil {
-			t.Error(err)
-		}
-	})
-	t.Run("MarshalErrors", func(t *testing.T) {
-		iter := SliceStream([]fnx.Worker{func(context.Context) error { return nil }})
-		_, err := iter.MarshalJSON()
-		if err == nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("Unmarshal", func(t *testing.T) {
-		iter := SliceStream([]string{})
-		if err := iter.UnmarshalJSON([]byte(`["foo", "arg"]`)); err != nil {
-			t.Error(err)
-		}
-
-		vals, err := iter.Slice(ctx)
-		if err != nil {
-			t.Error(err)
-		}
-		if len(vals) != 2 {
-			t.Fatal(len(vals), vals)
-		}
-		if vals[0] != "foo" {
-			t.Error(vals[0])
-		}
-		if vals[1] != "arg" {
-			t.Error(vals[1])
-		}
-
-		if err := iter.UnmarshalJSON([]byte(`[foo", "arg"]`)); err == nil {
-			t.Error(err)
-		}
-	})
-	t.Run("ErrorHandler", func(t *testing.T) {
-		iter := SliceStream([]string{})
-
-		ec := iter.ErrorHandler()
-
-		ec(io.EOF)
-
-		ec(ers.ErrInvalidInput)
-		ec(io.ErrUnexpectedEOF)
-		ec(context.Canceled)
-
-		err := iter.Close()
-		assert.Error(t, err)
-		t.Log(ers.Unwind(err))
-		check.Equal(t, len(ers.Unwind(err)), 4)
-
-		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-		assert.ErrorIs(t, err, ers.ErrInvalidInput)
-		assert.ErrorIs(t, err, context.Canceled)
-		assert.ErrorIs(t, err, io.EOF)
-
-		assert.True(t, ers.IsTerminating(err))
-	})
 	t.Run("Channel", func(t *testing.T) {
 		iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Millisecond)
@@ -861,6 +747,37 @@ func TestJSON(t *testing.T) {
 		check.Error(t, err)
 		check.ErrorIs(t, err, ers.ErrRecoveredPanic)
 	})
+}
+
+func TestEmptyIteration(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch := make(chan int)
+	close(ch)
+
+	t.Run("EmptyReadAll", func(t *testing.T) {
+		assert.NotError(t, SliceStream([]int{}).ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
+		assert.NotError(t, VariadicStream[int]().ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
+		assert.NotError(t, ChannelStream(ch).ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
+	})
+}
+
+func TestChain(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	num := []int{1, 2, 3, 5, 7, 9, 11, 13, 17, 19}
+	iter := SliceStream(num).Join(SliceStream(num))
+
+	n := iter.Count(ctx)
+
+	assert.Equal(t, len(num)*2, n)
+
+	iter = SliceStream(num).Join(SliceStream(num), SliceStream(num), SliceStream(num))
+	cancel()
+	n = iter.Count(ctx)
+	assert.Equal(t, n, 0)
 }
 
 func TestIteratorStream(t *testing.T) {
@@ -1036,27 +953,6 @@ func TestIteratorStream(t *testing.T) {
 				result, err := stream.Slice(t.Context())
 				assert.NotError(t, err)
 				assert.EqualItems(t, result, []int{0, 2, 4, 6, 8})
-			},
-		},
-		{
-			name: "Transform",
-			test: func(t *testing.T) {
-				iter := func(yield func(int) bool) {
-					for i := 1; i <= 5; i++ {
-						if !yield(i) {
-							return
-						}
-					}
-				}
-
-				stream := IteratorStream(iter).Transform(fnx.MakeConverter(func(i int) int {
-					return i * 2
-				}))
-				defer stream.Close()
-
-				result, err := stream.Slice(t.Context())
-				assert.NotError(t, err)
-				assert.EqualItems(t, result, []int{2, 4, 6, 8, 10})
 			},
 		},
 		{

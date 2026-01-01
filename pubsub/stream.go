@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"iter"
@@ -369,12 +368,6 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 	return MakeStream(fnx.NewFuture(st.operation).Filter(check)).WithHook(st.CloseHook())
 }
 
-// Transform passes each item in a stream through a converter to produce a new stream with
-// transformed items.
-func (st *Stream[T]) Transform(converter fnx.Converter[T, T]) *Stream[T] {
-	return Convert(converter).Stream(st)
-}
-
 // Reduce processes a stream with a reducer function. The output
 // function is a Future operation which runs synchronously, and no
 // processing happens before future is called. If the reducer
@@ -473,65 +466,6 @@ func (st *Stream[T]) Join(iters ...*Stream[T]) *Stream[T] {
 // will have the values encountered before the error.
 func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
 	return out, st.ReadAll(fnx.FromHandler(func(in T) { out = append(out, in) })).Run(ctx)
-}
-
-// MarshalJSON is useful for implementing json.Marshaler methods
-// from stream-supporting types. Wrapping the standard library's
-// json encoding tools.
-//
-// The contents of the stream are marshaled as elements in an JSON
-// array.
-func (st *Stream[T]) MarshalJSON() ([]byte, error) {
-	buf := &internal.IgnoreNewLinesBuffer{}
-	enc := json.NewEncoder(buf)
-	_ = buf.WriteByte('[')
-	first := true
-
-	// decide to capture a context in the
-	// stream or not care
-	ctx := context.TODO()
-
-	for val := range st.Iterator(ctx) {
-		if first {
-			first = false
-		} else {
-			_ = buf.WriteByte(',')
-		}
-
-		if err := enc.Encode(val); err != nil {
-			return nil, err
-		}
-	}
-
-	_ = buf.WriteByte(']')
-
-	return buf.Bytes(), nil
-}
-
-// UnmarshalJSON reads a byte-array of input data that contains a JSON
-// array and then processes and returns that data iteratively.
-//
-// To handle streaming data from an io.Reader that contains a stream
-// of line-separated json documents, use itertool.JSON.
-func (st *Stream[T]) UnmarshalJSON(in []byte) error {
-	rv := []json.RawMessage{}
-
-	if err := json.Unmarshal(in, &rv); err != nil {
-		return err
-	}
-	var idx int
-
-	st.operation = fnx.NewFuture(st.operation).Join(func(context.Context) (out T, err error) {
-		if idx >= len(rv) {
-			return out, io.EOF
-		}
-		err = json.Unmarshal(rv[idx], &out)
-		if err == nil {
-			idx++
-		}
-		return
-	})
-	return nil
 }
 
 // Buffer adds a buffer in the queue using a channel as buffer to
