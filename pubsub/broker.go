@@ -124,7 +124,7 @@ func makeInternalBrokerImpl[T any](
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, queue.Source(ctx), queue.Sink(), queue.Len, opts)
+	return makeInternalBrokerImpl(ctx, queue.Channel(ctx), queue.Sink(), queue.Len, opts)
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to

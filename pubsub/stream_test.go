@@ -91,7 +91,7 @@ func GenerateRandomStringSlice(size int) []string {
 	return out
 }
 
-func TestStream(t *testing.T) {
+func TestFunStream(t *testing.T) {
 	t.Run("ReadAll", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

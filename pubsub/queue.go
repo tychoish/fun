@@ -465,10 +465,10 @@ func (q *Queue[T]) Sink() func(context.Context, T) error {
 	return fnx.MakeHandler(q.Add)
 }
 
-// Source creates a channel that receives items from the queue. Items
+// Channel creates a channel that receives items from the queue. Items
 // are removed from the queue as they are sent to the channel. The
 // returned channel is closed when the context is canceled.
-func (q *Queue[T]) Source(ctx context.Context) <-chan T {
+func (q *Queue[T]) Channel(ctx context.Context) <-chan T {
 	ch := make(chan T)
 	go func() {
 		defer close(ch)
