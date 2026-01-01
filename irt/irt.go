@@ -654,9 +654,9 @@ func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[
 	return func(yield func(T) bool) {
 		sink := make(chan T, size)
 
-		setup := goOnce(func() { defer close(sink); flushTo(ctx, seq, sink) })
+		go func() { defer close(sink); flushTo(ctx, seq, sink) }()
 
-		flush(Channel(ctx, sink), yieldPre(setup, yield))
+		flush(Channel(ctx, sink), yield)
 	}
 }
 

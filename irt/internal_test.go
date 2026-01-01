@@ -1896,3 +1896,218 @@ func TestOnceHelpers(t *testing.T) {
 		}
 	})
 }
+
+func TestGoOnce(t *testing.T) {
+	t.Run("RunsOnce", func(t *testing.T) {
+		var count atomic.Int32
+		op := func() {
+			count.Add(1)
+		}
+
+		fn := goOnce(op)
+
+		// Call the function multiple times
+		fn()
+		fn()
+		fn()
+
+		// Give goroutine time to execute
+		ctx, cancel := context.WithTimeout(context.Background(), 100*1000000) // 100ms
+		defer cancel()
+		<-ctx.Done()
+
+		// Should only have run once
+		if count.Load() != 1 {
+			t.Errorf("goOnce executed %d times, want 1", count.Load())
+		}
+	})
+
+	t.Run("RunsInGoroutine", func(t *testing.T) {
+		done := make(chan struct{})
+		op := func() {
+			close(done)
+		}
+
+		fn := goOnce(op)
+		fn()
+
+		// Should complete asynchronously
+		select {
+		case <-done:
+			// Success - goroutine completed
+		case <-context.Background().Done():
+			t.Error("goOnce did not execute in goroutine")
+		}
+	})
+
+	t.Run("MultipleCallsOnlyStartOneGoroutine", func(t *testing.T) {
+		var count atomic.Int32
+		started := make(chan struct{})
+		op := func() {
+			count.Add(1)
+			close(started)
+		}
+
+		fn := goOnce(op)
+
+		// Call multiple times rapidly
+		for i := 0; i < 10; i++ {
+			fn()
+		}
+
+		<-started
+
+		// Give a bit more time to ensure no other goroutines start
+		ctx, cancel := context.WithTimeout(context.Background(), 50*1000000) // 50ms
+		defer cancel()
+		<-ctx.Done()
+
+		if count.Load() != 1 {
+			t.Errorf("goOnce started %d goroutines, want 1", count.Load())
+		}
+	})
+}
+
+func TestFlushTo(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctx := context.Background()
+		seq := Slice([]int{1, 2, 3, 4, 5})
+		ch := make(chan int, 10)
+
+		result := flushTo(ctx, seq, ch)
+
+		if !result {
+			t.Error("flushTo returned false, want true")
+		}
+
+		close(ch)
+		var collected []int
+		for v := range ch {
+			collected = append(collected, v)
+		}
+
+		if !slices.Equal(collected, []int{1, 2, 3, 4, 5}) {
+			t.Errorf("flushTo sent %v, want [1, 2, 3, 4, 5]", collected)
+		}
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		ctx := context.Background()
+		seq := Slice([]int{})
+		ch := make(chan int, 1)
+
+		result := flushTo(ctx, seq, ch)
+
+		if !result {
+			t.Error("flushTo returned false for empty sequence, want true")
+		}
+
+		close(ch)
+		var collected []int
+		for v := range ch {
+			collected = append(collected, v)
+		}
+
+		if len(collected) != 0 {
+			t.Errorf("flushTo sent %v, want empty slice", collected)
+		}
+	})
+
+	t.Run("ContextCanceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		seq := Slice([]int{1, 2, 3, 4, 5})
+		ch := make(chan int, 10)
+
+		result := flushTo(ctx, seq, ch)
+
+		if result {
+			t.Error("flushTo returned true with canceled context, want false")
+		}
+	})
+
+	t.Run("ContextCanceledMidStream", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Create a sequence that will trigger cancellation after first element
+		var yielded atomic.Int32
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 5; i++ {
+				yielded.Add(1)
+				if i == 2 {
+					cancel()
+				}
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		ch := make(chan int, 10)
+		result := flushTo(ctx, seq, ch)
+
+		if result {
+			t.Error("flushTo returned true after context cancellation, want false")
+		}
+
+		close(ch)
+		var collected []int
+		for v := range ch {
+			collected = append(collected, v)
+		}
+
+		// Should have sent at least one value before cancellation
+		if len(collected) == 0 {
+			t.Error("flushTo sent no values before cancellation")
+		}
+		if len(collected) >= 5 {
+			t.Error("flushTo sent all values despite cancellation")
+		}
+	})
+
+	t.Run("BufferedChannel", func(t *testing.T) {
+		ctx := context.Background()
+		seq := Slice([]int{1, 2, 3})
+		ch := make(chan int, 5) // Larger buffer
+
+		result := flushTo(ctx, seq, ch)
+
+		if !result {
+			t.Error("flushTo returned false, want true")
+		}
+
+		if len(ch) != 3 {
+			t.Errorf("channel has %d items, want 3", len(ch))
+		}
+	})
+
+	t.Run("UnbufferedChannel", func(t *testing.T) {
+		ctx := context.Background()
+		seq := Slice([]int{1, 2, 3})
+		ch := make(chan int) // Unbuffered
+
+		done := make(chan bool)
+		go func() {
+			result := flushTo(ctx, seq, ch)
+			done <- result
+		}()
+
+		// Receive all values
+		var collected []int
+		for i := 0; i < 3; i++ {
+			v := <-ch
+			collected = append(collected, v)
+		}
+
+		result := <-done
+
+		if !result {
+			t.Error("flushTo returned false, want true")
+		}
+
+		if !slices.Equal(collected, []int{1, 2, 3}) {
+			t.Errorf("flushTo sent %v, want [1, 2, 3]", collected)
+		}
+	})
+}

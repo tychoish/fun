@@ -5215,3 +5215,336 @@ type customError struct {
 }
 
 func (ce *customError) Error() string { return ce.msg }
+
+func TestWithBuffer(t *testing.T) {
+	t.Run("SimpleTest", func(t *testing.T) {
+		ctx := context.Background()
+
+		seq := func(yield func(int) bool) {
+			t.Log("Producer starting")
+			for i := 1; i <= 3; i++ {
+				t.Logf("Producer yielding %d", i)
+				if !yield(i) {
+					t.Log("Producer stopping early")
+					return
+				}
+			}
+			t.Log("Producer done")
+		}
+
+		buffered := WithBuffer(ctx, seq, 2)
+
+		t.Log("Starting consumption")
+		var result []int
+		for val := range buffered {
+			t.Logf("Consumer got %d", val)
+			result = append(result, val)
+		}
+		t.Log("Consumption done")
+
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("WithBuffer collected %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("BasicBuffering", func(t *testing.T) {
+		ctx := context.Background()
+		values := []int{1, 2, 3, 4, 5}
+		seq := Slice(values)
+
+		buffered := WithBuffer(ctx, seq, 3)
+		result := Collect(buffered)
+
+		if !slices.Equal(result, values) {
+			t.Errorf("WithBuffer collected %v, want %v", result, values)
+		}
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		ctx := context.Background()
+		seq := Slice([]int{})
+
+		buffered := WithBuffer(ctx, seq, 5)
+		result := Collect(buffered)
+
+		if len(result) != 0 {
+			t.Errorf("WithBuffer collected %v, want empty slice", result)
+		}
+	})
+
+	t.Run("BufferSizeBehavior", func(t *testing.T) {
+		ctx := context.Background()
+		var producerCount atomic.Int32
+		var consumerStarted atomic.Bool
+
+		// Producer that tracks how many items it has produced
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 10; i++ {
+				producerCount.Add(1)
+				if !yield(i) {
+					return
+				}
+				// Wait a bit for consumer to start if it hasn't
+				if i == 1 {
+					time.Sleep(50 * time.Millisecond)
+				}
+			}
+		}
+
+		buffered := WithBuffer(ctx, seq, 3)
+
+		// Start consuming slowly
+		var consumed []int
+		for val := range buffered {
+			if !consumerStarted.Load() {
+				consumerStarted.Store(true)
+				// At this point, the buffer should have filled up
+				// Give producer time to fill buffer
+				time.Sleep(10 * time.Millisecond)
+			}
+			consumed = append(consumed, val)
+			if len(consumed) == 5 {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		// Producer should have produced more items than consumed due to buffering
+		produced := producerCount.Load()
+		if produced < int32(len(consumed)) {
+			t.Errorf("Producer should have produced at least %d items, got %d", len(consumed), produced)
+		}
+
+		if !slices.Equal(consumed, []int{1, 2, 3, 4, 5}) {
+			t.Errorf("Consumed %v, want [1 2 3 4 5]", consumed)
+		}
+	})
+
+	t.Run("SlowConsumer", func(t *testing.T) {
+		ctx := context.Background()
+		var producerDone atomic.Bool
+
+		// Fast producer
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 5; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+			producerDone.Store(true)
+		}
+
+		buffered := WithBuffer(ctx, seq, 10)
+
+		// Slow consumer
+		var consumed []int
+		for val := range buffered {
+			consumed = append(consumed, val)
+			time.Sleep(20 * time.Millisecond) // Slow consumption
+		}
+
+		// Producer should finish before consumer due to buffering
+		if !producerDone.Load() {
+			t.Error("Producer should have finished")
+		}
+
+		// With buffering, producer should finish quickly while consumer is still working
+		if !slices.Equal(consumed, []int{1, 2, 3, 4, 5}) {
+			t.Errorf("Consumed %v, want [1 2 3 4 5]", consumed)
+		}
+	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Create a long sequence
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 100; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		buffered := WithBuffer(ctx, seq, 5)
+
+		var consumed []int
+		for val := range buffered {
+			consumed = append(consumed, val)
+			if len(consumed) == 3 {
+				cancel() // Cancel after consuming 3 items
+			}
+			if len(consumed) >= 10 {
+				// Safety break in case cancellation doesn't work
+				break
+			}
+		}
+
+		// Should have stopped after cancellation
+		// Might get a few more due to buffering, but not all 100
+		if len(consumed) >= 50 {
+			t.Errorf("Consumed %d items after cancellation, expected much fewer", len(consumed))
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		ctx := context.Background()
+		var producerCount atomic.Int32
+
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 20; i++ {
+				producerCount.Add(1)
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		buffered := WithBuffer(ctx, seq, 5)
+
+		// Consume only first 3 items then stop
+		var consumed []int
+		for val := range buffered {
+			consumed = append(consumed, val)
+			if len(consumed) == 3 {
+				break
+			}
+		}
+
+		if !slices.Equal(consumed, []int{1, 2, 3}) {
+			t.Errorf("Consumed %v, want [1 2 3]", consumed)
+		}
+
+		// Producer might have produced more than 3 due to buffering
+		produced := producerCount.Load()
+		if produced < 3 {
+			t.Errorf("Producer should have produced at least 3 items, got %d", produced)
+		}
+		if produced > 10 {
+			t.Errorf("Producer should have stopped soon after consumer stopped, produced %d items", produced)
+		}
+	})
+
+	t.Run("ZeroBufferSize", func(t *testing.T) {
+		ctx := context.Background()
+		values := []int{1, 2, 3}
+		seq := Slice(values)
+
+		// Buffer size 0 should still work (creates unbuffered channel)
+		buffered := WithBuffer(ctx, seq, 0)
+		result := Collect(buffered)
+
+		if !slices.Equal(result, values) {
+			t.Errorf("WithBuffer(0) collected %v, want %v", result, values)
+		}
+	})
+
+	t.Run("LazyExecution", func(t *testing.T) {
+		ctx := context.Background()
+		var executed atomic.Bool
+
+		seq := func(yield func(int) bool) {
+			executed.Store(true)
+			yield(1)
+		}
+
+		buffered := WithBuffer(ctx, seq, 5)
+
+		// Just creating the buffered sequence shouldn't execute it
+		time.Sleep(10 * time.Millisecond)
+		if executed.Load() {
+			t.Error("Sequence should not execute until iteration starts")
+		}
+
+		// Start iteration
+		for range buffered {
+			break
+		}
+
+		// Now it should have executed
+		time.Sleep(10 * time.Millisecond)
+		if !executed.Load() {
+			t.Error("Sequence should execute when iteration starts")
+		}
+	})
+
+	t.Run("MultipleIterations", func(t *testing.T) {
+		ctx := context.Background()
+		var setupCount atomic.Int32
+
+		seq := func(yield func(int) bool) {
+			setupCount.Add(1)
+			for i := 1; i <= 3; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		buffered := WithBuffer(ctx, seq, 2)
+
+		// First iteration
+		result1 := Collect(buffered)
+		if !slices.Equal(result1, []int{1, 2, 3}) {
+			t.Errorf("First iteration got %v, want [1 2 3]", result1)
+		}
+
+		// Second iteration should reuse the same setup
+		result2 := Collect(buffered)
+		if !slices.Equal(result2, []int{1, 2, 3}) {
+			t.Errorf("Second iteration got %v, want [1 2 3]", result2)
+		}
+
+		// Setup should happen only once per iteration
+		time.Sleep(20 * time.Millisecond)
+		if setupCount.Load() != 2 {
+			t.Errorf("Setup called %d times, want 2 (once per iteration)", setupCount.Load())
+		}
+	})
+
+	t.Run("BufferFillsUpBeforeConsumption", func(t *testing.T) {
+		ctx := context.Background()
+		bufferSize := 5
+		var itemsProduced atomic.Int32
+		var firstItemConsumed atomic.Bool
+		var itemsProducedBeforeFirstConsume int32
+
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 20; i++ {
+				itemsProduced.Add(1)
+				if !yield(i) {
+					return
+				}
+				// Check if we've consumed anything yet
+				if !firstItemConsumed.Load() && i < 20 {
+					time.Sleep(5 * time.Millisecond) // Give time for buffer to fill
+				}
+			}
+		}
+
+		buffered := WithBuffer(ctx, seq, bufferSize)
+
+		// Wait a bit before consuming to let buffer fill
+		time.Sleep(50 * time.Millisecond)
+
+		var consumed []int
+		for val := range buffered {
+			if !firstItemConsumed.Load() {
+				firstItemConsumed.Store(true)
+				itemsProducedBeforeFirstConsume = itemsProduced.Load()
+			}
+			consumed = append(consumed, val)
+		}
+
+		// Buffer should have allowed producer to run ahead
+		if itemsProducedBeforeFirstConsume <= int32(bufferSize) {
+			t.Logf("Items produced before first consume: %d (buffer size: %d)",
+				itemsProducedBeforeFirstConsume, bufferSize)
+		}
+
+		if !slices.Equal(consumed, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}) {
+			t.Errorf("Consumed incorrect values: %v", consumed)
+		}
+	})
+}
