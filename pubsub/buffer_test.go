@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
@@ -243,8 +244,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 			Name: "Seen",
 			Test: func(t *testing.T, d distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-				seen := &dt.Set[T]{}
-				seen.Synchronize()
+				seen := &adt.Set[T]{}
 				signal := make(chan struct{})
 				go func() {
 					defer close(signal)
@@ -265,8 +265,7 @@ func MakeCases[T comparable](size int) []DistCase[T] {
 			Name: "PoolSeen",
 			Test: func(t *testing.T, d distributor[T]) {
 				ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-				seen := &dt.Set[T]{}
-				seen.Synchronize()
+				seen := &adt.Set[T]{}
 				wg := &sync.WaitGroup{}
 				receive := d.pop
 				for i := 0; i < 8; i++ {

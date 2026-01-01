@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
@@ -572,8 +572,7 @@ func TestBroker(t *testing.T) {
 		defer cancel()
 
 		broker := NewBroker[int](ctx, BrokerOptions{})
-		seen := &dt.Set[int]{}
-		seen.Synchronize()
+		seen := &adt.Set[int]{}
 		sig := make(chan struct{})
 		sub := broker.Subscribe(ctx)
 		go func() {

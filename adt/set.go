@@ -1,10 +1,12 @@
-package dt
+package adt
 
 import (
 	"encoding/json"
 	"iter"
 	"maps"
+	"sync"
 
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
@@ -12,20 +14,20 @@ import (
 	"github.com/tychoish/fun/irt"
 )
 
-// Set provides a generic set implementation with optional
-// order tracking (via Order()). This implementation is not
-// thread-safe. For a synchronized version, use adt.Set.
+// Set provides a thread-safe generic set implementation with optional
+// order tracking (via Order()). All operations are synchronized.
 type Set[T comparable] struct {
-	hash stw.Map[T, *Element[T]]
-	list *List[T]
+	hash stw.Map[T, *dt.Element[T]]
+	list *dt.List[T]
+	mtx  sync.Mutex
 }
 
-// MakeSet constructs a set and adds all items from the input
-// sequence to set. These sets are ordered.
-func MakeSet[T comparable](in iter.Seq[T]) *Set[T] {
+// MakeSet constructs a map and adds all items from the input
+// sequence. These sets are ordered.
+func MakeSet[T comparable](seq iter.Seq[T]) *Set[T] {
 	out := &Set[T]{}
 	out.Order()
-	out.Extend(in)
+	out.Extend(seq)
 	return out
 }
 
@@ -33,13 +35,13 @@ func MakeSet[T comparable](in iter.Seq[T]) *Set[T] {
 // is more than one item in the map. If order tracking is enabled,
 // this operation is a noop.
 func (s *Set[T]) Order() {
-	s.init()
+	defer s.with(s.lock())
 	if s.list != nil {
 		return
 	}
 	ft.Invariant(ers.When(len(s.hash) != 0, "cannot make an ordered set out of an un-ordered set that contain data"))
 
-	s.list = &List[T]{}
+	s.list = &dt.List[T]{}
 }
 
 // SortQuick sorts the elements in the set using
@@ -48,7 +50,7 @@ func (s *Set[T]) Order() {
 // will become ordered. Unlike the Order() method, you can use this
 // method on a populated but unordered set.
 func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
-	s.init()
+	defer s.with(s.lock())
 	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
 	s.list.SortQuick(lt)
 }
@@ -58,35 +60,34 @@ func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
 // ordered. Unlike the Order() method, you can use this method on a
 // populated but unordered set.
 func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
-	s.init()
+	defer s.with(s.lock())
 	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
 	s.list.SortMerge(lt)
 }
 
 func (s *Set[T]) forceSetupOrdered() {
-	ft.Invariant(ers.If(s.list != nil, ErrUninitializedContainer))
+	ft.Invariant(ers.If(s.list != nil, dt.ErrUninitializedContainer))
 
-	s.list = &List[T]{}
+	s.list = &dt.List[T]{}
 	for item := range s.hash {
 		s.list.PushBack(item)
 	}
 }
 
-func (s *Set[T]) isOrdered() bool { return s.list != nil }
-func (s *Set[T]) init() {
-	if s.hash == nil {
-		s.hash = stw.Map[T, *Element[T]]{}
-	}
-}
+func (s *Set[T]) isOrdered() bool    { return s.list != nil }
+func (s *Set[T]) init()              { s.hash = stw.Map[T, *dt.Element[T]]{} }
+func (s *Set[T]) doInit()            { ft.CallWhen(s.hash == nil, s.init) }
+func (*Set[T]) with(mtx *sync.Mutex) { mtx.Unlock() }
+func (s *Set[T]) lock() *sync.Mutex  { s.mtx.Lock(); s.doInit(); return &s.mtx }
 
 // Add attempts to add the item while holding to the mutex, and is a noop otherwise.
 func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
 
 // Len returns the number of items tracked in the set.
-func (s *Set[T]) Len() int { return len(s.hash) }
+func (s *Set[T]) Len() int { defer s.with(s.lock()); return len(s.hash) }
 
 // Check returns true if the item is in the set.
-func (s *Set[T]) Check(in T) bool { return s.hash.Check(in) }
+func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(in) }
 
 // Delete attempts to remove the item from the set.
 func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
@@ -94,18 +95,21 @@ func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
 // Iterator returns a new-style native Go iterator for the items in the set. Provides items in
 // iteration order if the set is ordered. If the Set is ordered, then the future produces items in
 // the set's order.
+//
+// When Synchrnoized, the lock is NOT held when the iterator is advanced.
 func (s *Set[T]) Iterator() iter.Seq[T] {
+	defer s.with(s.lock())
 	st := s.unsafeStream()
 
 	return st
 }
 
 // List exports the contents of the set to a List, structure which is implemented as a doubly linked list.
-func (s *Set[T]) List() *List[T] {
+func (s *Set[T]) List() *dt.List[T] {
 	if s.list != nil {
 		return s.list.Copy()
 	}
-	return IteratorList(s.Iterator())
+	return dt.IteratorList(s.Iterator())
 }
 
 // Slice exports the contents of the set to a slice.
@@ -120,8 +124,7 @@ func (s *Set[T]) Slice() stw.Slice[T] {
 // DeleteCheck removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise.
 func (s *Set[T]) DeleteCheck(in T) bool {
-	s.init()
-
+	defer s.with(s.lock())
 	defer delete(s.hash, in)
 
 	e, ok := s.hash.Load(in)
@@ -137,9 +140,9 @@ func (s *Set[T]) DeleteCheck(in T) bool {
 // been in the set before AddCheck. In all cases when AddCheck
 // returns, the item is a member of the set.
 func (s *Set[T]) AddCheck(in T) (ok bool) {
-	s.init()
-	ok = s.hash.Check(in)
-	if ok {
+	defer s.with(s.lock())
+
+	if ok = s.hash.Check(in); ok {
 		return
 	}
 
@@ -148,7 +151,7 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 		return
 	}
 
-	elem := NewElement(in)
+	elem := dt.NewElement(in)
 	s.list.Back().Append(elem)
 	s.hash.Add(in, elem)
 
@@ -168,6 +171,8 @@ func (s *Set[T]) unsafeStream() iter.Seq[T] {
 // Equal tests two sets, returning true if the items in the sets have
 // equal values. If the sets are ordered, order is considered.
 func (s *Set[T]) Equal(other *Set[T]) bool {
+	defer s.with(s.lock())
+
 	if len(s.hash) != other.Len() || s.isOrdered() != other.isOrdered() {
 		return false
 	}

@@ -1,4 +1,4 @@
-package dt
+package adt
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/irt"
@@ -349,7 +350,7 @@ func TestSet(t *testing.T) {
 	})
 	t.Run("List", func(t *testing.T) {
 		t.Run("Ordered", func(t *testing.T) {
-			ls := &List[int]{}
+			ls := &dt.List[int]{}
 
 			st := &Set[int]{}
 			st.Order()
@@ -372,7 +373,7 @@ func TestSet(t *testing.T) {
 			assert.Equal(t, count, 42)
 		})
 		t.Run("Undordered", func(t *testing.T) {
-			ls := &List[int]{}
+			ls := &dt.List[int]{}
 
 			st := &Set[int]{}
 

@@ -263,5 +263,5 @@ func (s Slice[T]) Ptrs() []*T {
 // reflection), if the value is nil, and only adds the item when it is
 // not-nil.
 func (s Slice[T]) Sparse() Slice[T] {
-	return irt.Collect(irt.Remove(irt.Slice(s), func(in T) bool { return ft.IsNil(in) }))
+	return irt.Collect(irt.Remove(s.Iterator(), func(in T) bool { return ft.IsNil(in) }))
 }
