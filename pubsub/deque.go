@@ -276,10 +276,13 @@ func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] {
 	return dq.confFuture(ctx, dqPrev, true)
 }
 
+// IteratorPopFront returns a sequence that removes and returns objects from the
+// front of the deque.
 func (dq *Deque[T]) IteratorPopFront(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(dq.PopFront)
 }
 
+// IteratorPopBack returns a sequence that removes and returns objects from the back of the deque.
 func (dq *Deque[T]) IteratorPopBack(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(dq.PopBack)
 }

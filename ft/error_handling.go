@@ -27,7 +27,7 @@ func Invariant(err error) {
 	CallWhen(err != nil, func() { panic(errors.Join(err, ers.ErrInvariantViolation)) })
 }
 
-// InvariantOk panics when the condition is false
+// InvariantOk panics when the condition is false.
 func InvariantOk(ok bool) {
 	CallWhen(!ok, func() { panic(ers.ErrInvariantViolation) })
 }

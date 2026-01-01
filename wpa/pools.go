@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
 )
@@ -23,9 +22,6 @@ type Job interface {
 // Task represents a simple error-returning function that takes no arguments.  Tasks are more simple
 // units of work for use with worker pool and execution functions in the wpa package.
 type Task func() error
-
-// ErrorTask wraps an error object as a task, which will the be returned by the Task.
-func ErrorTask(err error) Task { return ft.Wrap(err) }
 
 // Job converts a Task into a panic-safe worker function suitable for use in
 // worker pool implementations (e.g., wpa.RunWithPool). This exists to satisfy the wpa.Job
