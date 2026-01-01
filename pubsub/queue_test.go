@@ -635,7 +635,7 @@ func TestQueueStream(t *testing.T) {
 	t.Run("DrainAndShutdown", func(t *testing.T) {
 		t.Run("Shutdown", func(t *testing.T) {
 			queue := NewUnlimitedQueue[string]()
-			listener := InterfaceStream(queue.distributorImpl())
+			listener := IteratorStream(queue.Iterator())
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -659,7 +659,7 @@ func TestQueueStream(t *testing.T) {
 		})
 		t.Run("Drain", func(t *testing.T) {
 			queue := NewUnlimitedQueue[string]()
-			listener := InterfaceStream(queue.distributorImpl())
+			listener := IteratorStream(queue.Iterator())
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -685,7 +685,7 @@ func TestQueueStream(t *testing.T) {
 			cancel()
 
 			queue := NewUnlimitedQueue[string]()
-			listener := InterfaceStream(queue.distributorImpl())
+			listener := IteratorStream(queue.Iterator())
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})

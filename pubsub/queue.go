@@ -427,9 +427,12 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 // new items when the queue is empty. Iterator terminates on context cancellation or queue closure.
 // Each item returned is removed from the queue (destructive read). Safe for concurrent access.
 func (q *Queue[T]) IteratorPop(ctx context.Context) iter.Seq[T] {
-	dist := q.distributorImpl()
 	return irt.GenerateOk(func() (z T, _ bool) {
-		if out, err := dist.Read(ctx); err == nil {
+		msg, ok := q.Remove()
+		if ok {
+			return msg, true
+		}
+		if out, err := q.Wait(ctx); err == nil {
 			return out, true
 		}
 		return z, false
@@ -454,20 +457,43 @@ func (q *Queue[T]) Iterator() iter.Seq[T] {
 	}
 }
 
-// distributorImpl creates a object used to process the items in the
-// queue: items yielded by the distributorImpl's stream, are removed
-// from the queue.
-func (q *Queue[T]) distributorImpl() distributor[T] {
-	return distributor[T]{
-		push: fnx.MakeHandler(q.Add),
-		pop: func(ctx context.Context) (_ T, err error) {
-			msg, ok := q.Remove()
-			if ok {
-				return msg, nil
-			}
-			msg, err = q.Wait(ctx)
-			return msg, err
-		},
-		size: q.tracker.len,
-	}
+// Sink returns a function that adds items to the queue, suitable for
+// use with broker implementations.
+func (q *Queue[T]) Sink() func(context.Context, T) error {
+	return fnx.MakeHandler(q.Add)
 }
+
+// Source creates a channel that receives items from the queue. Items
+// are removed from the queue as they are sent to the channel. The
+// returned channel is closed when the context is canceled.
+func (q *Queue[T]) Source(ctx context.Context) <-chan T {
+	ch := make(chan T)
+	go func() {
+		defer close(ch)
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			msg, ok := q.Remove()
+			if !ok {
+				msg, err := q.Wait(ctx)
+				if err != nil {
+					return
+				}
+				select {
+				case ch <- msg:
+				case <-ctx.Done():
+					return
+				}
+				continue
+			}
+			select {
+			case ch <- msg:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch
+}
+

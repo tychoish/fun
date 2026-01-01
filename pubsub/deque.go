@@ -312,46 +312,85 @@ func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, block
 	return irt.GenerateOk(op)
 }
 
-// fifoDistImpl produces a fifoDistImpl instance with
-// Send/Receive operations that block if Deque is full or empty
-// (respectively). Receive operations always remove the element from
-// the Deque.
-func (dq *Deque[T]) fifoDistImpl() distributor[T] {
-	return distributor[T]{
-		push: dq.WaitPushBack,
-		pop:  dq.WaitFront,
-		size: dq.Len,
-	}
+// FIFOSink returns a function that adds items to the back of the deque,
+// suitable for use with broker implementations.
+func (dq *Deque[T]) FIFOSink() func(context.Context, T) error {
+	return dq.WaitPushBack
 }
 
-// lifoDistImpl produces a distributor instance that always
-// accepts send items: if the deque is full, it removes one element
-// from the front of the queue before adding them to the back.
-func (dq *Deque[T]) lifoDistImpl() distributor[T] {
-	return distributor[T]{
-		push: dq.WaitPushBack,
-		pop:  dq.WaitBack,
-		size: dq.Len,
-	}
+// FIFOSource creates a channel that receives items from the front of
+// the deque in FIFO order. Items are removed from the deque as they
+// are sent to the channel. The returned channel is closed when the
+// context is canceled.
+func (dq *Deque[T]) FIFOSource(ctx context.Context) <-chan T {
+	ch := make(chan T)
+	go func() {
+		defer close(ch)
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			msg, err := dq.WaitFront(ctx)
+			if err != nil {
+				return
+			}
+			select {
+			case ch <- msg:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch
+}
+
+// LIFOSink returns a function that adds items to the back of the deque,
+// suitable for use with broker implementations.
+func (dq *Deque[T]) LIFOSink() func(context.Context, T) error {
+	return dq.WaitPushBack
+}
+
+// LIFOSource creates a channel that receives items from the back of
+// the deque in LIFO order. Items are removed from the deque as they
+// are sent to the channel. The returned channel is closed when the
+// context is canceled.
+func (dq *Deque[T]) LIFOSource(ctx context.Context) <-chan T {
+	ch := make(chan T)
+	go func() {
+		defer close(ch)
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			msg, err := dq.WaitBack(ctx)
+			if err != nil {
+				return
+			}
+			select {
+			case ch <- msg:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch
 }
 
 // LIFO returns an iterator that removes items from the queue, with the most recent items removed
 // first. The iterator is blocking and will wait for a new item if the Deque is empty.
 func (dq *Deque[T]) LIFO(ctx context.Context) iter.Seq[T] {
-	dist := dq.lifoDistImpl()
 	return irt.GenerateOk(func() (z T, _ bool) {
-		if out, err := dist.Read(ctx); err == nil {
+		if out, err := dq.WaitBack(ctx); err == nil {
 			return out, true
 		}
 		return z, false
 	})
 }
 
-// LIFO returns an iterator that removes items from the queue in the order they were added. The iterator is blocking and will wait for a new item if the Deque is empty.
+// FIFO returns an iterator that removes items from the queue in the order they were added. The iterator is blocking and will wait for a new item if the Deque is empty.
 func (dq *Deque[T]) FIFO(ctx context.Context) iter.Seq[T] {
-	dist := dq.fifoDistImpl()
 	return irt.GenerateOk(func() (z T, _ bool) {
-		if out, err := dist.Read(ctx); err == nil {
+		if out, err := dq.WaitFront(ctx); err == nil {
 			return out, true
 		}
 		return z, false

@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -75,19 +76,39 @@ type BrokerOptions struct {
 // settings can have profound impacts on the semantics and ordering of
 // messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, distForChannel(make(chan T)), opts)
+	ch := make(chan T)
+	return makeInternalBrokerImpl(
+		ctx,
+		ch,
+		func(ctx context.Context, msg T) error {
+			select {
+			case ch <- msg:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		},
+		func() int { return len(ch) },
+		opts,
+	)
 }
 
 // makeInternalBrokerImpl constructs a Broker that uses the provided
-// distributor to handle the buffering between the sending half and
-// the receiving half.
+// channel source for message distribution, with sink handling incoming
+// published messages and length reporting buffer depth.
 //
-// In general, you should configure the distributor to provide
-// whatever buffering requirements you have, and.
-func makeInternalBrokerImpl[T any](ctx context.Context, dist distributor[T], opts BrokerOptions) *Broker[T] {
+// In general, you should configure the source channel to provide
+// whatever buffering requirements you have.
+func makeInternalBrokerImpl[T any](
+	ctx context.Context,
+	source <-chan T,
+	sink func(context.Context, T) error,
+	length func() int,
+	opts BrokerOptions,
+) *Broker[T] {
 	b := makeBroker[T](opts)
 	ctx, b.close = context.WithCancel(ctx)
-	b.startQueueWorkers(ctx, dist)
+	b.startQueueWorkers(ctx, source, sink, length)
 	return b
 }
 
@@ -103,7 +124,7 @@ func makeInternalBrokerImpl[T any](ctx context.Context, dist distributor[T], opt
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, queue.distributorImpl(), opts)
+	return makeInternalBrokerImpl(ctx, queue.Source(ctx), queue.Sink(), queue.Len, opts)
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to
@@ -114,7 +135,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, deque.fifoDistImpl(), opts)
+	return makeInternalBrokerImpl(ctx, deque.FIFOSource(ctx), deque.FIFOSink(), deque.Len, opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -127,7 +148,8 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // is fixed, and must be a positive integer greater than 0,
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
 func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, risky.Force(NewDeque[T](DequeOptions{Capacity: capacity})).lifoDistImpl(), opts)
+	deque := risky.Force(NewDeque[T](DequeOptions{Capacity: capacity}))
+	return makeInternalBrokerImpl(ctx, deque.LIFOSource(ctx), deque.LIFOSink(), deque.Len, opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -144,7 +166,12 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 }
 
-func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist distributor[T]) {
+func (b *Broker[T]) startQueueWorkers(
+	ctx context.Context,
+	source <-chan T,
+	sink func(context.Context, T) error,
+	length func() int,
+) {
 	subs := &adt.Map[chan T, struct{}]{}
 	b.wg.Add(1)
 	go func() {
@@ -161,12 +188,12 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist distributor[T]) 
 			case fn := <-b.stats:
 				fn(BrokerStats{
 					Subscriptions: subs.Len(),
-					BufferDepth:   dist.Len(),
+					BufferDepth:   length(),
 					MessageCount:  count,
 				})
 			case msg := <-b.publishCh:
 				count++
-				if err := dist.Write(ctx, msg); err != nil {
+				if err := sink(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
 					// result of user configuration (and we don't log anyway,) or
 					// the queue has been closed (return), but otherwise
@@ -193,11 +220,7 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist distributor[T]) 
 		b.wg.Add(1)
 		go func() {
 			defer b.wg.Done()
-			for {
-				msg, err := dist.Read(ctx)
-				if err != nil {
-					return
-				}
+			for msg := range irt.Channel(ctx, source) {
 				b.dispatchMessage(ctx, subs.Keys(), msg)
 			}
 		}()

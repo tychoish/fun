@@ -36,7 +36,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return makeInternalBrokerImpl(ctx, d.fifoDistImpl(), BrokerOptions{})
+				return makeInternalBrokerImpl(ctx, d.FIFOSource(ctx), d.FIFOSink(), d.Len, BrokerOptions{})
 			},
 		},
 		{
