@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/irt"
 )
 
 // PullWithMutex wraps iter.Pull and returns thread-safe next and stop functions.
@@ -5745,7 +5744,7 @@ func TestWith3(t *testing.T) {
 			return "item" + string(rune('0'+i)), i%2 == 0
 		}
 
-		seq := irt.With3(func(yield func(int) bool) {
+		seq := With3(func(yield func(int) bool) {
 			if !yield(1) {
 				return
 			}
@@ -5756,14 +5755,14 @@ func TestWith3(t *testing.T) {
 		}, op)
 
 		type result struct {
-			elem  irt.Elem[int, string]
+			elem  Elem[int, string]
 			check bool
 		}
 
 		expected := []result{
-			{irt.NewElem(1, "item1"), false},
-			{irt.NewElem(2, "item2"), true},
-			{irt.NewElem(3, "item3"), false},
+			{NewElem(1, "item1"), false},
+			{NewElem(2, "item2"), true},
+			{NewElem(3, "item3"), false},
 		}
 
 		i := 0
@@ -5798,7 +5797,7 @@ func TestWith3(t *testing.T) {
 			return "value", i * 2
 		}
 
-		seq := irt.With3(irt.Slice([]int{}), op)
+		seq := With3(Slice([]int{}), op)
 
 		count := 0
 		for range seq {
@@ -5814,16 +5813,16 @@ func TestWith3(t *testing.T) {
 			return i * i, i * i * i
 		}
 
-		seq := irt.With3(irt.Slice([]int{5}), op)
+		seq := With3(Slice([]int{5}), op)
 
 		var results []struct {
-			elem  irt.Elem[int, int]
+			elem  Elem[int, int]
 			third int
 		}
 
 		for elem, third := range seq {
 			results = append(results, struct {
-				elem  irt.Elem[int, int]
+				elem  Elem[int, int]
 				third int
 			}{elem, third})
 		}
@@ -5841,7 +5840,7 @@ func TestWith3(t *testing.T) {
 			return i * 10, i > 2
 		}
 
-		seq := irt.With3(irt.Slice([]int{1, 2, 3, 4, 5}), op)
+		seq := With3(Slice([]int{1, 2, 3, 4, 5}), op)
 
 		count := 0
 		for _, shouldStop := range seq {
@@ -5860,12 +5859,12 @@ func TestWith3(t *testing.T) {
 			return len(name), len(name) > 5
 		}
 
-		seq := irt.With3(
-			irt.Slice([]string{"Alice", "Bob", "Charlotte", "Dan"}),
+		seq := With3(
+			Slice([]string{"Alice", "Bob", "Charlotte", "Dan"}),
 			op,
 		)
 
-		results := irt.Collect(irt.Elems(seq))
+		results := Collect(Elems(seq))
 
 		check.Equal(t, len(results), 4)
 
@@ -5897,7 +5896,7 @@ func TestWith3(t *testing.T) {
 			return "x", i
 		}
 
-		seq := irt.With3(irt.Slice([]int{10, 20, 30}), op)
+		seq := With3(Slice([]int{10, 20, 30}), op)
 
 		count := 0
 		for range seq {
@@ -5916,9 +5915,9 @@ func TestWith3(t *testing.T) {
 			return i * 2, i * 3
 		}
 
-		seq := irt.With3(irt.Range(1, 6), op)
+		seq := With3(Range(1, 6), op)
 
-		results := irt.Collect(irt.Elems(seq))
+		results := Collect(Elems(seq))
 
 		for i := 0; i < 5; i++ {
 			expectedInput := i + 1
@@ -5935,9 +5934,9 @@ func TestWith3(t *testing.T) {
 			return &val, &str
 		}
 
-		seq := irt.With3(irt.Slice([]int{1, 2}), op)
+		seq := With3(Slice([]int{1, 2}), op)
 
-		results := irt.Collect(irt.Elems(seq))
+		results := Collect(Elems(seq))
 
 		check.Equal(t, len(results), 2)
 		check.Equal(t, results[0].First.First, 1)
@@ -5959,9 +5958,9 @@ func TestWith3(t *testing.T) {
 			return &val, &str
 		}
 
-		seq := irt.With3(irt.Slice([]int{1, 2, 3, 4}), op)
+		seq := With3(Slice([]int{1, 2, 3, 4}), op)
 
-		results := irt.Collect(irt.Elems(seq))
+		results := Collect(Elems(seq))
 
 		check.Equal(t, len(results), 4)
 
@@ -5981,7 +5980,7 @@ func TestWith3(t *testing.T) {
 			return i * i, i > 500
 		}
 
-		seq := irt.With3(irt.Range(0, 999), op)
+		seq := With3(Range(0, 999), op)
 
 		count := 0
 		for elem, isLarge := range seq {
