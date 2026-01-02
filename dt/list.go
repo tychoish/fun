@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
@@ -108,9 +107,6 @@ func (l *List[T]) Front() *Element[T] { return l.root().next }
 //	       // operate
 //	}
 func (l *List[T]) Back() *Element[T] { return l.root().prev }
-
-// Slice exports the contents of the list to a slice.
-func (l *List[T]) Slice() stw.Slice[T] { return irt.Collect(l.IteratorFront(), 0, l.Len()) }
 
 // IteratorFront returns an iterator to the items in the list starting at the front and moving toward the
 // back of the list.

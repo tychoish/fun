@@ -114,7 +114,7 @@ func TestSort(t *testing.T) {
 				list.PushBack(9)
 
 				if list.IsSorted(cmp.LessThanNative[int]) {
-					t.Error("list isn't sorted", list.Slice())
+					t.Error("list isn't sorted", irt.Collect(list.IteratorFront(), 0, list.Len()))
 				}
 			})
 		})
