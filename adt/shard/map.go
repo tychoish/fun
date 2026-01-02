@@ -167,16 +167,16 @@ func (m *Map[K, V]) ItemsSharded() iter.Seq[iter.Seq[MapItem[K, V]]] {
 	})
 }
 
-// IteratorSharded provides the elements of
+// IteratorSharded provides access to independent iterators for each constituent shard in the map.
+func (m *Map[K, V]) IteratorSharded() iter.Seq[iter.Seq2[K, V]] {
+	return irt.Convert(m.ItemsSharded(), m.iSplit)
+}
 
 // Iterator provides an iterator over all items in the sharded map.
 func (m *Map[K, V]) Iterator() iter.Seq2[K, V]                        { return m.iSplit(m.Items()) }
 func (m *Map[K, V]) iSplit(s iter.Seq[MapItem[K, V]]) iter.Seq2[K, V] { return irt.With2(s, m.mi2kv) }
 func (*Map[K, V]) mi2kv(mi MapItem[K, V]) (K, V)                      { return mi.Key, mi.Value }
 func (*Map[K, V]) filter(mi MapItem[K, V]) bool                       { return mi.Exists }
-func (m *Map[K, V]) IteratorSharded() iter.Seq[iter.Seq2[K, V]] {
-	return irt.Convert(m.ItemsSharded(), m.iSplit)
-}
 
 // MapItem wraps the value stored in a sharded map, with synchronized
 // sharding and versioning information.
