@@ -21,16 +21,6 @@ func TestOptional(t *testing.T) {
 		check.True(t, ft.Not(ok))
 		check.Equal(t, out, "")
 	})
-	t.Run("Functions", func(t *testing.T) {
-		opt := NewOptional(400)
-		future := opt.Future()
-		handler := opt.Handler()
-		check.Equal(t, 400, future.Resolve())
-		handler.Read(100)
-		check.Equal(t, 100, future.Resolve())
-		handler.Read(300)
-		check.Equal(t, 300, future.Resolve())
-	})
 	t.Run("SetAndGet", func(t *testing.T) {
 		opt := NewOptional(400)
 		check.Equal(t, 400, opt.Resolve())

@@ -11,7 +11,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -58,18 +57,6 @@ func (o *Optional[T]) Swap(next T) (prev T) { prev = o.v; o.Set(next); return }
 // Get returns the current value of the optional and the ok value. Use
 // this to disambiguate zero values.
 func (o *Optional[T]) Get() (T, bool) { return o.v, o.defined }
-
-// Future provides access to the value of the optional as a Future
-// function. This does not disambiguate zero values. Use in
-// conjunction with Optional.Handler and adt.AccessorsWithLock and
-// adt.AccessorsWithReadLock to handle concurency control.
-func (o *Optional[T]) Future() fn.Future[T] { return o.Resolve }
-
-// Handler provides access to setting the optional value as
-// fn.Handler function. Use in conjunction with Optional.Future and
-// adt.AccessorsWithLock and adt.AccessorsWithReadLock to handle
-// concurency control.
-func (o *Optional[T]) Handler() fn.Handler[T] { return o.Set }
 
 // Ok returns true when the optional.
 func (o Optional[T]) Ok() bool { return o.defined }
