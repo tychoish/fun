@@ -3,11 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/tychoish/fun.svg)](https://pkg.go.dev/github.com/tychoish/fun)
 
 `fun` is a simple, well-tested, zero-dependency "Core Library" for
-Go, with support for common patterns and paradigms. Stream processing,
-error handling, pubsub/message queues, and service
-architectures. If you've maintained a piece of Go software, you've
-probably written one-off versions of some of these tools: let's avoid
-needing to _keep_ writing these tools.
+Go. Think of it as a collection of the best parts of the `utils` package or `shared` or `common` packages in any given Go application, but with solid design, highly ergonomic interfaces, and thorough testing.
 
 `fun` aims to be easy to adopt: the interfaces (and implementations!)
 are simple and (hopefully!) easy to use. There are no external
@@ -15,87 +11,80 @@ dependencies and _all_ of the code is well-tested. You can (and
 should!) always adopt the tools that make the most sense to use for
 your project.
 
-## Use Cases and Highlights
+## Highlights
 
-- Error Handling tools. The `erc.Collector` type allow you to wrap,
-  annotate, and aggregate errors. This makes continue-on-error
-  patterns simple to implement. Because `erc.Collector` can be used
-  concurrently, handling errors in Go routines, becomes much less of a
-  headache. In addition, the `ers.Error` type, as a string alias,
-  permits `const` definition of errors.
+- Every **iterator** tool you always wish you had in the `irt` (ha!)
+  package. Easily create, manipulate, and transform iterators, and
+  avoid writing (and rewriting,) basic logic again and again.
 
-- Service Management. `srv.Service` handles the lifecycle of
+- **Error tools**. `erc.Collector` is an error aggregator safe for
+  concurrent access, with methods to collect errors conditionally (for
+  validation), and annotating errors. The `ers` collection has a
+  string-derived error type `ers.Error` so that you can have `const`
+  errors.
+
+- A set of **worker pools** helpers and tools in the `wpa` package for
+  both ephemeral workloads as well as long-running
+  pipelines. Particularly powerful in combination with the data types,
+  iterator tools, and pubsub tooling.
+
+- Powerful synchronization and **atomic** primitives, updated for the
+  era of generics in `adt`:
+
+  - `adt.Map[K,V]` means now you can use `sync.Map` without
+    (terrifying) type casts everywhere.
+
+  - `adt.Pool[T]` provides a type-safe `sync.Pool` with cleanup and
+    constructor hooks.
+
+  - `adt.Atomic[T]` is an atomic value container, that you can use to
+    avoid littering your code with mutexes. (n.b. you _can_ store
+    mutable atomic values in `adt.Atomic[T]` which are (of course) not
+    safe for concurrent use, which is a bit of a gotcha, but for this
+    `adt.Locked[T]` steps in to handle the mutex for you.
+
+  - `adt.Once[T]` means you can get `sync.OnceFunc`, and friends, but
+    as a type that you can add as a field to your on types for mutexes
+    that you don't have to manage yourself.
+
+  - within `adt`, `shard.Map[K,V]` provides a write-optimized, fully
+    versioned map implementation that divides the keyspace among a
+    number of constituent maps (shards) to reduce mutex contention for
+    certain workloads.
+
+- Delightful **data types** you always wish you had, in the `dt`
+  package:
+
+  - a ring buffer (`dt.Ring[T]`)
+  - single and doubly linked lists (`dt.Stack[T]` and `dt.List[T]`)
+  - sets (`dt.Set[K]` and `dt.OrderedSet[T]`)
+  - an ordered map `dt.OrderedMap[K,V]` (also thread safe, and
+    accessible via `adt`.)
+  - histograms (in `dt/hdrhist`)
+  - an "optional" wrapper (`dt.Optional[T]`) so you can avoid
+    overloading pointer values in your type definitions.
+
+- A collection of **function object tools**, wrappers for common
+  function type in `fn` (without contexts) and `fnx` (with contexts),
+  and operations in `ft`.
+
+- Higher order **pubsub** tools, notably threadsafe queue and deque
+  implementations--`pubsub.Queue[T]` and `pubsub.Deque[T]` which avoid
+  channels entirely, and have support for unlimited, fixed-buffered,
+  and burstable limits. Also a one-to-many or a many-to-many message
+  broker, so you can have a "broadcast channel."
+
+- **Service orchestration**. `srv.Service` handles the lifecycle of
   "background" processes inside of an application. You can now start
   services like HTTP servers, background monitoring and workloads, and
   sub-processes, and ensure that they exit cleanly (at the right
   time!) and that their errors propagate clearly back to the "main"
   thread.
 
-- Streams. The `fun.Stream[T]` type provides a stream/iterator,
-  interface and tool kit for developing Go applications that lean
-  heavily into streaming data and message-passing patterns. The
-  associated `fun.Future[T]` and `fun.Handler[T]` functions
-  provide a comfortable abstraction for interacting with these data.
-
-- Pubsub. The `pubsub` package provides queue and message broker
-  primitives for concurrent applications to support writing
-  applications that use message-passing patterns inside of single
-  application. The `pubsub.Broker[T]` provides one-to-many or
-  many-to-many (e.g. broadcast) communication. The and deque and queue
-  structures provide configurable queue abstractions to provide
-  control for many workloads.
-
-- High-level data types: `dt` (data type) hosts a collection of
-  wrappers and helpers, the `dt.Ring[T]` type provides a simple
-  ring-buffer, in addition singl-ly (`dt.Stack[T]`)and doubly linked
-  lists (`dt.List[T]`). The `adt` package provides type-specific
-  helpers and wrappers around Go's atomic/synchronization primitives,
-  including the `adt.Pool[T]`, `adt.Map[T]` and `adt.Atomic[T]`
-  types. Finally the `adt/shard.Map[T]` provides a logical thread-safe
-  hash map, that is sharded across a collection of maps to reduce mutex
-  contention.
-
-## Packages
-
-- Data Types and Function Tools:
-  - [dt](https://pkg.go.dev/github.com/tychoish/fun/dt) (generic
-    container data-types, including ordered and unordered sets, singly
-    and doubly linked list, as well as wrappers around maps and slices.)
-  - [adt](https://pkg.go.dev/github.com/tychoish/fun/adt) (strongly typed
-    atomic data structures, wrappers, tools, and operations.)
-  - [shard](https://pkg.go.dev/github.com/tychoish/fun/adt/shard) (a
-    "sharded map" to reduce contention for multi-threaded access of
-    synchronized maps.)
-  - [ft](https://pkg.go.dev/github.com/tychoish/fun/ft) function tools:
-    simple tools for handling function objects.
-  - [itertool](https://pkg.go.dev/github.com/tychoish/fun/itertool)
-    (stream/iteration tools and helpers.)
-- Service Architecture:
-  - [srv](https://pkg.go.dev/github.com/tychoish/fun/srv) (service
-    orchestration and management framework.)
-  - [pubsub](https://pkg.go.dev/github.com/tychoish/fun/pubsub) (message
-	broker and concurrency-safe queue and deque.)
-- Error Handling:
-  - [erc](https://pkg.go.dev/github.com/tychoish/fun/erc) (error
-    collection, annotation, panic handling utilities for aggregating
-    errors and managing panics, in concurrent contexts.)
-  - [ers](https://pkg.go.dev/github.com/tychoish/fun/erc) (constant
-    errors and low level error primitives used throughout the package.)
-- Test Infrastructure:
-  - [assert](https://pkg.go.dev/github.com/tychoish/fun/assert)
-	(minimal generic-based assertion library, in the tradition of
-	testify.) The assertions in `assert` abort the flow of the test
-	while check](https://pkg.go.dev/github.com/tychoish/fun/assert/check),
-	provide non-critical assertions.
-  - [testt](https://pkg.go.dev/github.com/tychoish/fun/testt) (testy;
-    a collection of "nice to have" test helpers and utilities.)
-  - [ensure](https://pkg.go.dev/github.com/tychoish/fun/ensure) (an
-    experimental test harness and orchestration tool with more
-    "natural" assertions.)
-
-## Examples
-
-(coming soon.)
+- Lightweight **test infrastructure**: `assert` and `check`
+  (testify-style assertions, but with generics,) testing tools and
+  helpers in `testt` (testy!), and a fluent-style interface with
+  `ensure`.
 
 ## Version History
 
@@ -104,10 +93,14 @@ changes increment the second (major) release value, and limited
 maintenance releases are possible/considered to maintain
 compatibility.
 
+- `v0.14.0`: go1.24 and greater. Re-focus API; new `irt` and `wpa`
+  packages. Move all code out of the root package. (current)
+- `v0.13.0`: go1.24 and greater. Reorganization of function API, and a
+  bridge to the next major release. (experimental)
 - `v0.12.0`: go1.24 and greater. Major API impacting
-  release. (current)
-- `v0.11.0`: go1.23 and greater. (maintained)
-- `v0.10.0`: go1.20 and greater. (maintained)
+  release. (maintained)
+- `v0.11.0`: go1.23 and greater.
+- `v0.10.0`: go1.20 and greater.
 - `v0.9.0`: go1.19 and greater.
 
 There may be small changes to exported APIs within a release series,
@@ -120,7 +113,7 @@ Contributions welcome, the general goals of the project:
 - superior API ergonomics.
 - great high-level abstractions.
 - obvious and clear implementations.
-- minimal dependencies.
+- no external dependencies.
 
 Please feel free to open issues or file pull requests.
 
