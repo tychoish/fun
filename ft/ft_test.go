@@ -467,6 +467,19 @@ func TestContexts(t *testing.T) {
 		}))
 		assert.ErrorIs(t, cc.Err(), context.Canceled)
 	})
+	t.Run("Noop", func(t *testing.T) {
+		assert.Equal(t, Noop(t), t)
+		assert.Equal(t, Noop(1), 1)
+		assert.Equal(t, Noop("1000"), "1000")
+	})
+	t.Run("Zero", func(t *testing.T) {
+		assert.Nil(t, Zero[*testing.T]())
+		assert.Zero(t, Zero[string]())
+	})
+	t.Run("Zero", func(t *testing.T) {
+		assert.Nil(t, ZeroFor(t))
+		assert.Zero(t, ZeroFor("1000"))
+	})
 }
 
 func TestJoin(t *testing.T) {

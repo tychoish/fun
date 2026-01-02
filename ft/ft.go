@@ -3,6 +3,15 @@ package ft
 
 import "iter"
 
+// Noop returns the input value.
+func Noop[T any](in T) T { return in }
+
+// Zero returns the zero value for a given type. The compiler can't often determine the the type automatically so you often have to call this as `Zero[int]()`.
+func Zero[T any]() (zero T) { return zero }
+
+// ZeroFor returns the zero value for a given type, but ignores the input. This makes it easier to use than Zero in cases where you just need a zero value of a type you already have.
+func ZeroFor[T any](_ T) T { return Zero[T]() }
+
 // Wrap produces a function that always returns the value
 // provided. Useful for bridging interface paradigms, and for storing
 // interface-typed objects in atomics.
