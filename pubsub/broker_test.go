@@ -657,70 +657,83 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create broker using the limited queue
-		broker := NewQueueBroker(ctx, queue, BrokerOptions{
-			WorkerPoolSize: 1,
-		})
+		// Create broker using non-blocking Add which returns ErrQueueFull immediately
+		broker := makeInternalBrokerImpl(
+			ctx,
+			queue.IteratorWaitPop(ctx),
+			fnx.MakeHandler(queue.Add), // Non-blocking add
+			queue.Len,
+			BrokerOptions{
+				WorkerPoolSize: 1,
+			},
+		)
 		defer broker.Stop()
 
-		// Subscribe to receive messages
-		sub := broker.Subscribe(ctx)
-		if sub == nil {
+		// Subscribe immediately but don't read from it
+		// This blocks workers on dispatch, allowing queue to fill
+		blockingSub := broker.Subscribe(ctx)
+		if blockingSub == nil {
 			t.Fatal("failed to subscribe")
 		}
-		defer broker.Unsubscribe(ctx, sub)
+		defer broker.Unsubscribe(ctx, blockingSub)
 
-		// Fill the queue to capacity by publishing without consuming
-		for i := 0; i < 3; i++ {
+		// Send first message - worker will pull it and block trying to dispatch
+		err = broker.Send(ctx, fmt.Sprintf("msg-0"))
+		check.NotError(t, err)
+		time.Sleep(20 * time.Millisecond)
+
+		// Now fill the queue to capacity while worker is blocked
+		for i := 1; i <= 3; i++ {
 			err := broker.Send(ctx, fmt.Sprintf("msg-%d", i))
 			check.NotError(t, err)
 		}
 
 		// Give time for messages to reach the queue
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
-		// Queue should be at capacity
+		// Queue should be at capacity (msg-0 is held by worker, msg-1,2,3 are in queue)
 		stats := broker.Stats(ctx)
 		check.Equal(t, stats.BufferDepth, 3)
 
 		// Try to publish more messages - these should be dropped due to queue full
 		droppedCount := 5
-		for i := 3; i < 3+droppedCount; i++ {
+		for i := 4; i < 4+droppedCount; i++ {
 			err := broker.Send(ctx, fmt.Sprintf("msg-%d", i))
 			// Send should succeed even though messages are dropped
 			check.NotError(t, err)
 		}
 
 		// Give time for the publish goroutine to process
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
 		// Queue should still be at capacity (messages were dropped)
 		stats = broker.Stats(ctx)
 		check.Equal(t, stats.BufferDepth, 3)
 
-		// Now consume the messages - we should only get the first 3
+		// Now consume the messages from blockingSub - we should get first 4 (0-3)
 		received := make([]string, 0)
-		timeout := time.After(100 * time.Millisecond)
+		timeout := time.After(200 * time.Millisecond)
 
 	receiveLoop:
-		for len(received) < 3 {
+		for len(received) < 4 {
 			select {
-			case msg := <-sub:
+			case msg := <-blockingSub:
 				received = append(received, msg)
 			case <-timeout:
 				break receiveLoop
 			}
 		}
 
-		// Should have received exactly 3 messages (the ones before queue filled)
-		check.Equal(t, len(received), 3)
+		// Should have received exactly 4 messages (msg-0 through msg-3)
+		check.Equal(t, len(received), 4)
 		check.Equal(t, received[0], "msg-0")
 		check.Equal(t, received[1], "msg-1")
 		check.Equal(t, received[2], "msg-2")
+		check.Equal(t, received[3], "msg-3")
 
 		// Try to receive more - should timeout, confirming dropped messages weren't delivered
 		select {
-		case msg := <-sub:
+		case msg := <-blockingSub:
 			t.Errorf("unexpected message received: %s (messages should have been dropped)", msg)
 		case <-time.After(100 * time.Millisecond):
 			// Expected - no more messages
@@ -741,10 +754,16 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create broker using the limited queue
-		broker := NewQueueBroker(ctx, queue, BrokerOptions{
-			WorkerPoolSize: 1,
-		})
+		// Create broker using non-blocking Add
+		broker := makeInternalBrokerImpl(
+			ctx,
+			queue.IteratorWaitPop(ctx),
+			fnx.MakeHandler(queue.Add),
+			queue.Len,
+			BrokerOptions{
+				WorkerPoolSize: 1,
+			},
+		)
 		defer broker.Stop()
 
 		// Subscribe to receive messages
@@ -807,7 +826,13 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
+		broker := makeInternalBrokerImpl(
+			ctx,
+			queue.IteratorWaitPop(ctx),
+			fnx.MakeHandler(queue.Add),
+			queue.Len,
+			BrokerOptions{},
+		)
 		defer broker.Stop()
 
 		sub := broker.Subscribe(ctx)
@@ -816,27 +841,47 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		}
 		defer broker.Unsubscribe(ctx, sub)
 
-		// Fill the queue
-		broker.Send(ctx, "first")
-		broker.Send(ctx, "second")
-		time.Sleep(50 * time.Millisecond)
+		// Send first message - worker pulls and blocks on dispatch
+		broker.Send(ctx, "msg-0")
+		time.Sleep(20 * time.Millisecond)
 
-		// These should be dropped
-		broker.Send(ctx, "dropped-1")
-		broker.Send(ctx, "dropped-2")
-		time.Sleep(50 * time.Millisecond)
+		// Fill the queue to capacity (HardLimit: 2)
+		broker.Send(ctx, "msg-1")
+		broker.Send(ctx, "msg-2")
+		time.Sleep(20 * time.Millisecond)
 
-		// Consume the initial messages
-		msg1 := <-sub
-		msg2 := <-sub
-		check.Equal(t, msg1, "first")
-		check.Equal(t, msg2, "second")
+		// Try to send more - these should be dropped (queue full)
+		broker.Send(ctx, "dropped-3")
+		broker.Send(ctx, "dropped-4")
+		broker.Send(ctx, "dropped-5")
+		time.Sleep(20 * time.Millisecond)
+
+		// Consume messages
+		received := []string{}
+		for i := 0; i < 3; i++ {
+			msg := <-sub
+			received = append(received, msg)
+		}
+
+		// Should have received only the 3 messages before queue filled
+		check.Equal(t, len(received), 3)
+		check.Equal(t, received[0], "msg-0")
+		check.Equal(t, received[1], "msg-1")
+		check.Equal(t, received[2], "msg-2")
 
 		// Now queue has space - new messages should go through
 		broker.Send(ctx, "after-drop")
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
-		msg3 := <-sub
-		check.Equal(t, msg3, "after-drop")
+		msg := <-sub
+		check.Equal(t, msg, "after-drop")
+
+		// Verify no more messages (dropped ones aren't delivered)
+		select {
+		case unexpected := <-sub:
+			t.Errorf("unexpected message: %s", unexpected)
+		case <-time.After(50 * time.Millisecond):
+			// Expected - no more messages
+		}
 	})
 }
