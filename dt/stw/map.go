@@ -52,15 +52,17 @@ func (m Map[K, V]) Get(key K) V { return m[key] }
 // which is true if that item is present in the map.
 func (m Map[K, V]) Load(key K) (V, bool) { v, ok := m[key]; return v, ok }
 
-// SetDefault set's sets the provided key in the map to the zero value
-// for the value type.
-func (m Map[K, V]) SetDefault(key K) { var vl V; m[key] = vl }
+func (Map[K, V]) zerov() (zero V) { return }
 
-// Add adds a key value pair directly to the map.
-func (m Map[K, V]) Add(k K, v V) { m[k] = v }
+// Ensure set's sets the provided key in the map to the zero value
+// for the value type.
+func (m Map[K, V]) Ensure(key K) bool { return m.Set(key, m.zerov()) }
+
+// Set adds a key value pair directly to the map.
+func (m Map[K, V]) Set(k K, v V) bool { ok := m.Check(k); m[k] = v; return ok }
 
 // Store adds a key value pair directly to the map.
-func (m Map[K, V]) Store(k K, v V) { m.Add(k, v) }
+func (m Map[K, V]) Store(k K, v V) { m.Set(k, v) }
 
 // Delete removes a key from the map.
 func (m Map[K, V]) Delete(k K) { delete(m, k) }

@@ -59,7 +59,7 @@ func (s *Set[T]) Add(in T) (existed bool) {
 	s.init()
 
 	if existed = s.hash.Check(in); !existed {
-		s.hash.SetDefault(in)
+		s.hash.Ensure(in)
 	}
 
 	return

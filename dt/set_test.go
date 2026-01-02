@@ -250,7 +250,7 @@ func TestSet(t *testing.T) {
 				if checker.Check(v) {
 					t.Errorf("duplicate value, %d", v)
 				}
-				checker.SetDefault(v)
+				checker.Ensure(v)
 				check.True(t, v <= 42)
 			}
 			assert.Equal(t, 42, len(checker))

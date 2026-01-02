@@ -29,9 +29,9 @@ func TestMap(t *testing.T) {
 		assert.True(t, !mp.Check("hi"))
 		assert.True(t, !mp.Check("kip"))
 		assert.True(t, !mp.Check("buddy"))
-		mp.SetDefault("hi")
-		mp.SetDefault("kip")
-		mp.SetDefault("buddy")
+		mp.Ensure("hi")
+		mp.Ensure("kip")
+		mp.Ensure("buddy")
 		assert.True(t, mp.Check("hi"))
 		assert.True(t, mp.Check("kip"))
 		assert.True(t, mp.Check("buddy"))
@@ -44,7 +44,7 @@ func TestMap(t *testing.T) {
 		assert.True(t, !v)
 		assert.True(t, !ok)
 
-		mp.SetDefault("foo")
+		mp.Ensure("foo")
 		assert.True(t, !mp.Get("foo"))
 
 		v, ok = mp.Load("foo")
@@ -116,9 +116,9 @@ func TestMap(t *testing.T) {
 		})
 		t.Run("MapValues", func(t *testing.T) {
 			mp := Map[string, int]{}
-			mp.Add("big", 42)
-			mp.Add("small", 4)
-			mp.Add("orange", 400)
+			mp.Set("big", 42)
+			mp.Set("small", 4)
+			mp.Set("orange", 400)
 
 			keys := mp.Values()
 
@@ -180,7 +180,7 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("Delete", func(t *testing.T) {
 		mp := Map[string, int]{}
-		mp.Add("hi", 1)
+		mp.Set("hi", 1)
 		assert.Equal(t, mp.Len(), 1)
 		mp.Delete("boo")
 		assert.Equal(t, mp.Len(), 1)

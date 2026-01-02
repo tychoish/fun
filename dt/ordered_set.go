@@ -82,7 +82,7 @@ func (s *OrderedSet[T]) Add(in T) (ok bool) {
 
 	elem := NewElement(in)
 	s.list.Back().Append(elem)
-	s.hash.Add(in, elem)
+	s.hash.Set(in, elem)
 
 	return
 }

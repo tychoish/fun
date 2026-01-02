@@ -274,7 +274,7 @@ func TestSlice(t *testing.T) {
 			check.True(t, sl != nil)
 			slCp := sl
 			check.EqualItems(t, sl, slCp)
-			sl = DefaultSlice[int](sl, 12)
+			sl = DefaultSlice(sl, 12)
 			check.True(t, sl != nil)
 			check.Equal(t, cap(sl), 0)
 			check.EqualItems(t, sl, slCp)
@@ -284,7 +284,7 @@ func TestSlice(t *testing.T) {
 			check.Equal(t, cap(sl), 12)
 		})
 		t.Run("Passthrough", func(t *testing.T) {
-			sl := DefaultSlice[string]([]string{"hello"}, 11)
+			sl := DefaultSlice([]string{"hello"}, 11)
 			assert.Equal(t, len(sl), 1)
 			check.Equal(t, sl[0], "hello")
 		})
