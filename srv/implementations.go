@@ -204,9 +204,14 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.W
 				optp...,
 			).Run(ctx)
 		},
-		// TODO: have a shutdown methot that will block till
-		// the queue shutsdown.
-		Shutdown: workQueue.Close,
+		Shutdown: func() error {
+			// Create a context with timeout for shutdown
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Shutdown drains the queue (waits for all jobs to complete) and then closes it
+			return workQueue.Shutdown(ctx)
+		},
 	}
 }
 
@@ -239,7 +244,14 @@ func HandlerWorkerPool(
 				optp...,
 			).Run(ctx)
 		},
-		Shutdown: workQueue.Close,
+		Shutdown: func() error {
+			// Create a context with timeout for shutdown
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Shutdown drains the queue (waits for all jobs to complete) and then closes it
+			return workQueue.Shutdown(ctx)
+		},
 	}
 	s.ErrorHandler.Set(observer)
 	return s

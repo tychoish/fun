@@ -135,6 +135,67 @@ func TestHelpers(t *testing.T) {
 			}
 			assert.NotError(t, ctx.Err())
 		})
+		t.Run("ShutdownDrainsQueue", func(t *testing.T) {
+			count := &atomic.Int64{}
+			queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
+
+			// Add jobs to the queue without closing it
+			for i := 0; i < 50; i++ {
+				assert.NotError(t, queue.Add(func(_ context.Context) error {
+					time.Sleep(10 * time.Millisecond)
+					count.Add(1)
+					return nil
+				}))
+			}
+
+			srv := WorkerPool(queue, wpa.WorkerGroupConfNumWorkers(5))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Start the service
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			// Give workers time to start processing
+			time.Sleep(50 * time.Millisecond)
+
+			// Add more jobs after service started
+			for i := 0; i < 30; i++ {
+				assert.NotError(t, queue.Add(func(_ context.Context) error {
+					time.Sleep(5 * time.Millisecond)
+					count.Add(1)
+					return nil
+				}))
+			}
+
+			// Verify jobs are being processed but not all completed yet
+			check.True(t, count.Load() > 0)
+			check.True(t, count.Load() < 80)
+
+			// Call shutdown - this should drain the queue
+			shutdownStart := time.Now()
+			if err := srv.Shutdown(); err != nil {
+				t.Fatal(err)
+			}
+			shutdownDuration := time.Since(shutdownStart)
+
+			// Wait for service to complete
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+
+			// Verify all 80 jobs were processed
+			check.Equal(t, int64(80), count.Load())
+
+			// Shutdown should have taken some time (waiting for queue to drain)
+			// With 5 workers and jobs taking 5-10ms, this should take at least 50ms
+			check.True(t, shutdownDuration > 50*time.Millisecond)
+
+			// Queue should be empty and closed
+			check.Equal(t, 0, queue.Len())
+		})
 	})
 
 	t.Run("HandlerWorkerPool", func(t *testing.T) {
