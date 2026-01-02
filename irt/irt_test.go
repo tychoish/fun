@@ -16,6 +16,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/irt"
 )
 
 // PullWithMutex wraps iter.Pull and returns thread-safe next and stop functions.
@@ -5731,5 +5734,265 @@ func TestWithMutex2(t *testing.T) {
 				t.Errorf("expected result[%d] to be %d, got %d", i, i+1, result[i])
 			}
 		}
+	})
+}
+
+func TestWith3(t *testing.T) {
+	t.Run("BasicOperation", func(t *testing.T) {
+		var callCount atomic.Int32
+		op := func(i int) (string, bool) {
+			callCount.Add(1)
+			return "item" + string(rune('0'+i)), i%2 == 0
+		}
+
+		seq := irt.With3(func(yield func(int) bool) {
+			if !yield(1) {
+				return
+			}
+			if !yield(2) {
+				return
+			}
+			yield(3)
+		}, op)
+
+		type result struct {
+			elem  irt.Elem[int, string]
+			check bool
+		}
+
+		expected := []result{
+			{irt.NewElem(1, "item1"), false},
+			{irt.NewElem(2, "item2"), true},
+			{irt.NewElem(3, "item3"), false},
+		}
+
+		i := 0
+		for elem, c := range seq {
+			if i >= len(expected) {
+				t.Errorf("With3() yielded more items than expected")
+				break
+			}
+			if elem.First != expected[i].elem.First || elem.Second != expected[i].elem.Second {
+				t.Errorf("With3() yielded elem (%v, %v), want (%v, %v)",
+					elem.First, elem.Second, expected[i].elem.First, expected[i].elem.Second)
+			}
+			if c != expected[i].check {
+				t.Errorf("With3() yielded check %v, want %v", c, expected[i].check)
+			}
+			i++
+		}
+
+		if i != len(expected) {
+			t.Errorf("With3() yielded %d items, want %d", i, len(expected))
+		}
+
+		if callCount.Load() != 3 {
+			t.Errorf("With3() called op %d times, want 3", callCount.Load())
+		}
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		var callCount atomic.Int32
+		op := func(i int) (string, int) {
+			callCount.Add(1)
+			return "value", i * 2
+		}
+
+		seq := irt.With3(irt.Slice([]int{}), op)
+
+		count := 0
+		for range seq {
+			count++
+		}
+
+		check.Equal(t, count, 0)
+		check.Equal(t, callCount.Load(), int32(0))
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		op := func(i int) (int, int) {
+			return i * i, i * i * i
+		}
+
+		seq := irt.With3(irt.Slice([]int{5}), op)
+
+		var results []struct {
+			elem  irt.Elem[int, int]
+			third int
+		}
+
+		for elem, third := range seq {
+			results = append(results, struct {
+				elem  irt.Elem[int, int]
+				third int
+			}{elem, third})
+		}
+
+		check.Equal(t, len(results), 1)
+		check.Equal(t, results[0].elem.First, 5)   // original input
+		check.Equal(t, results[0].elem.Second, 25) // 5^2
+		check.Equal(t, results[0].third, 125)      // 5^3
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		var callCount atomic.Int32
+		op := func(i int) (int, bool) {
+			callCount.Add(1)
+			return i * 10, i > 2
+		}
+
+		seq := irt.With3(irt.Slice([]int{1, 2, 3, 4, 5}), op)
+
+		count := 0
+		for _, shouldStop := range seq {
+			count++
+			if shouldStop {
+				break
+			}
+		}
+
+		check.Equal(t, count, 3) // Should process 1, 2, 3 and stop at 3
+		check.Equal(t, callCount.Load(), int32(3))
+	})
+
+	t.Run("MultipleTypes", func(t *testing.T) {
+		op := func(name string) (int, bool) {
+			return len(name), len(name) > 5
+		}
+
+		seq := irt.With3(
+			irt.Slice([]string{"Alice", "Bob", "Charlotte", "Dan"}),
+			op,
+		)
+
+		results := irt.Collect(irt.Elems(seq))
+
+		check.Equal(t, len(results), 4)
+
+		// First result
+		check.Equal(t, results[0].First.First, "Alice")
+		check.Equal(t, results[0].First.Second, 5)
+		check.Equal(t, results[0].Second, false)
+
+		// Second result
+		check.Equal(t, results[1].First.First, "Bob")
+		check.Equal(t, results[1].First.Second, 3)
+		check.Equal(t, results[1].Second, false)
+
+		// Third result
+		check.Equal(t, results[2].First.First, "Charlotte")
+		check.Equal(t, results[2].First.Second, 9)
+		check.Equal(t, results[2].Second, true)
+
+		// Fourth result
+		check.Equal(t, results[3].First.First, "Dan")
+		check.Equal(t, results[3].First.Second, 3)
+		check.Equal(t, results[3].Second, false)
+	})
+
+	t.Run("OperationCalledForEachElement", func(t *testing.T) {
+		callOrder := []int{}
+		op := func(i int) (string, int) {
+			callOrder = append(callOrder, i)
+			return "x", i
+		}
+
+		seq := irt.With3(irt.Slice([]int{10, 20, 30}), op)
+
+		count := 0
+		for range seq {
+			count++
+		}
+
+		check.Equal(t, count, 3)
+		check.Equal(t, len(callOrder), 3)
+		check.Equal(t, callOrder[0], 10)
+		check.Equal(t, callOrder[1], 20)
+		check.Equal(t, callOrder[2], 30)
+	})
+
+	t.Run("PreservesOrder", func(t *testing.T) {
+		op := func(i int) (int, int) {
+			return i * 2, i * 3
+		}
+
+		seq := irt.With3(irt.Range(1, 6), op)
+
+		results := irt.Collect(irt.Elems(seq))
+
+		for i := 0; i < 5; i++ {
+			expectedInput := i + 1
+			check.Equal(t, results[i].First.First, expectedInput)
+			check.Equal(t, results[i].First.Second, expectedInput*2)
+			check.Equal(t, results[i].Second, expectedInput*3)
+		}
+	})
+
+	t.Run("WithPointers", func(t *testing.T) {
+		op := func(i int) (*int, *string) {
+			val := i * 2
+			str := "test"
+			return &val, &str
+		}
+
+		seq := irt.With3(irt.Slice([]int{1, 2}), op)
+
+		results := irt.Collect(irt.Elems(seq))
+
+		check.Equal(t, len(results), 2)
+		check.Equal(t, results[0].First.First, 1)
+		check.Equal(t, *results[0].First.Second, 2)
+		check.Equal(t, *results[0].Second, "test")
+
+		check.Equal(t, results[1].First.First, 2)
+		check.Equal(t, *results[1].First.Second, 4)
+		check.Equal(t, *results[1].Second, "test")
+	})
+
+	t.Run("WithNilReturns", func(t *testing.T) {
+		op := func(i int) (*int, *string) {
+			if i%2 == 0 {
+				return nil, nil
+			}
+			val := i
+			str := "odd"
+			return &val, &str
+		}
+
+		seq := irt.With3(irt.Slice([]int{1, 2, 3, 4}), op)
+
+		results := irt.Collect(irt.Elems(seq))
+
+		check.Equal(t, len(results), 4)
+
+		// Odd numbers
+		check.Equal(t, results[0].First.First, 1)
+		check.True(t, results[0].First.Second != nil)
+		check.True(t, results[0].Second != nil)
+
+		// Even numbers
+		check.Equal(t, results[1].First.First, 2)
+		check.True(t, results[1].First.Second == nil)
+		check.True(t, results[1].Second == nil)
+	})
+
+	t.Run("LargeSequence", func(t *testing.T) {
+		op := func(i int) (int, bool) {
+			return i * i, i > 500
+		}
+
+		seq := irt.With3(irt.Range(0, 999), op)
+
+		count := 0
+		for elem, isLarge := range seq {
+			count++
+			if elem.First <= 500 {
+				check.True(t, !isLarge)
+			} else {
+				check.True(t, isLarge)
+			}
+		}
+
+		check.Equal(t, count, 1000)
 	})
 }

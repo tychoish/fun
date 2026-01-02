@@ -337,6 +337,19 @@ func With2[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[B, C] {
 	}
 }
 
+// With3 returns a iterator where each pair is produced by applying op
+// to each element of the input sequence.
+func With3[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[Elem[A, B], C] {
+	return func(yield func(Elem[A, B], C) bool) {
+		for key := range seq {
+			value, check := op(key)
+			if !yield(NewElem(key, value), check) {
+				return
+			}
+		}
+	}
+}
+
 // WithEach returns a iterator where each element from the input
 // sequence is paired with a value produced by calling op.
 func WithEach[A, B any](seq iter.Seq[A], op func() B) iter.Seq2[A, B] {
