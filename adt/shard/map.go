@@ -87,8 +87,9 @@ func (m *Map[K, V]) Check(key K) bool { return m.shard(key).read().Check(key) }
 // values as needed.
 func (m *Map[K, V]) Store(key K, value V) { m.inc().shard(key).store(key, value) }
 
-// Store adds a key and value to the map, replacing any existing
-// values as needed.
+// Set adds a key and value to the map, replacing any existing values
+// as needed. Returns true if the key was already present it the map
+// and false otherwise.
 func (m *Map[K, V]) Set(key K, value V) bool { return m.inc().shard(key).set(key, value) }
 
 // Get returns the value stored in the map, or the zero value for that
