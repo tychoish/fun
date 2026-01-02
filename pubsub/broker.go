@@ -76,19 +76,12 @@ type BrokerOptions struct {
 // settings can have profound impacts on the semantics and ordering of
 // messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
-	ch := make(chan T)
+	ch := Blocking(make(chan T))
 	return makeInternalBrokerImpl(
 		ctx,
-		ch,
-		func(ctx context.Context, msg T) error {
-			select {
-			case ch <- msg:
-				return nil
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		},
-		func() int { return len(ch) },
+		irt.Channel(ctx, ch.Channel()),
+		ch.Send().Write,
+		ch.Len,
 		opts,
 	)
 }
@@ -101,7 +94,7 @@ func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
 // whatever buffering requirements you have.
 func makeInternalBrokerImpl[T any](
 	ctx context.Context,
-	source <-chan T,
+	source iter.Seq[T],
 	sink func(context.Context, T) error,
 	length func() int,
 	opts BrokerOptions,
@@ -124,7 +117,7 @@ func makeInternalBrokerImpl[T any](
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, queue.Channel(ctx), queue.Sink(), queue.Len, opts)
+	return makeInternalBrokerImpl(ctx, queue.IteratorWait(ctx), queue.BlockingAdd, queue.Len, opts)
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to
@@ -135,7 +128,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, deque.FIFOSource(ctx), deque.FIFOSink(), deque.Len, opts)
+	return makeInternalBrokerImpl(ctx, deque.IteratorWaitPopBack(ctx), deque.WaitPushFront, deque.Len, opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -149,7 +142,7 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
 func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
 	deque := risky.Force(NewDeque[T](DequeOptions{Capacity: capacity}))
-	return makeInternalBrokerImpl(ctx, deque.LIFOSource(ctx), deque.LIFOSink(), deque.Len, opts)
+	return makeInternalBrokerImpl(ctx, deque.IteratorWaitPopBack(ctx), deque.WaitPushBack, deque.Len, opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -168,7 +161,7 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 
 func (b *Broker[T]) startQueueWorkers(
 	ctx context.Context,
-	source <-chan T,
+	source iter.Seq[T],
 	sink func(context.Context, T) error,
 	length func() int,
 ) {
@@ -220,7 +213,7 @@ func (b *Broker[T]) startQueueWorkers(
 		b.wg.Add(1)
 		go func() {
 			defer b.wg.Done()
-			for msg := range irt.Channel(ctx, source) {
+			for msg := range source {
 				b.dispatchMessage(ctx, subs.Keys(), msg)
 			}
 		}()

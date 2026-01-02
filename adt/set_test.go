@@ -282,7 +282,10 @@ func TestSet(t *testing.T) {
 
 // TestSetConcurrentIterationAndModification tests that iterating over a Set
 // while concurrently modifying it does not cause data races or panics.
-// Run with: go test -race
+//
+// Run with:
+//
+//	go test -race
 func TestSetConcurrentIterationAndModification(t *testing.T) {
 	t.Run("OrderedSet", func(t *testing.T) {
 		s := &Set[int]{}
@@ -410,7 +413,10 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 
 // TestMapConcurrentIterationAndModification tests that iterating over a Map
 // while concurrently modifying it does not cause data races or panics.
-// Run with: go test -race
+//
+// Run with:
+//
+//	go test -race
 func TestMapConcurrentIterationAndModification(t *testing.T) {
 	t.Run("BasicConcurrentAccess", func(t *testing.T) {
 		m := &Map[int, string]{}

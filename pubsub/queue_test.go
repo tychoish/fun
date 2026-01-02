@@ -636,7 +636,7 @@ func TestQueueStream(t *testing.T) {
 		t.Run("Shutdown", func(t *testing.T) {
 			ctx := t.Context()
 			queue := NewUnlimitedQueue[string]()
-			listener := IteratorStream(queue.IteratorPop(ctx))
+			listener := IteratorStream(queue.IteratorWaitPop(ctx))
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -663,7 +663,7 @@ func TestQueueStream(t *testing.T) {
 		t.Run("Drain", func(t *testing.T) {
 			ctx := t.Context()
 			queue := NewUnlimitedQueue[string]()
-			listener := IteratorStream(queue.IteratorPop(ctx))
+			listener := IteratorStream(queue.IteratorWaitPop(ctx))
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -691,7 +691,7 @@ func TestQueueStream(t *testing.T) {
 			cancel()
 
 			queue := NewUnlimitedQueue[string]()
-			listener := IteratorStream(queue.IteratorPop(ctx))
+			listener := IteratorStream(queue.IteratorWaitPop(ctx))
 			assert.NotError(t, queue.Add("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -731,7 +731,7 @@ func TestQueueIteratorPop(t *testing.T) {
 
 		assert.Equal(t, queue.Len(), 3)
 
-		values := irt.Collect(queue.IteratorPop(ctx))
+		values := irt.Collect(queue.IteratorWaitPop(ctx))
 		assert.Equal(t, len(values), 3)
 		assert.Equal(t, values[0], "one")
 		assert.Equal(t, values[1], "two")
@@ -743,7 +743,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		ctx := context.Background()
 		queue := NewUnlimitedQueue[string]()
 
-		iter := queue.IteratorPop(ctx)
+		iter := queue.IteratorWaitPop(ctx)
 		sig := make(chan struct{})
 		values := make([]string, 0)
 
@@ -775,7 +775,7 @@ func TestQueueIteratorPop(t *testing.T) {
 
 		check.NotError(t, queue.Add("item"))
 
-		iter := queue.IteratorPop(ctx)
+		iter := queue.IteratorWaitPop(ctx)
 		values := make([]string, 0)
 
 		for val := range iter {
@@ -793,7 +793,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		defer cancel()
 
 		queue := NewUnlimitedQueue[string]()
-		iter := queue.IteratorPop(ctx)
+		iter := queue.IteratorWaitPop(ctx)
 
 		count := 0
 		for range iter {
@@ -811,7 +811,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		check.NotError(t, queue.Add("one"))
 		check.NotError(t, queue.Add("two"))
 
-		iter := queue.IteratorPop(ctx)
+		iter := queue.IteratorWaitPop(ctx)
 		values := make([]string, 0)
 
 		go func() {
@@ -835,7 +835,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 		queue.Close()
 
-		iter := queue.IteratorPop(ctx)
+		iter := queue.IteratorWaitPop(ctx)
 		count := 0
 		for range iter {
 			count++
@@ -853,7 +853,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		}
 		assert.Equal(t, queue.Len(), 10)
 
-		iter := queue.IteratorPop(ctx)
+		iter := queue.IteratorWaitPop(ctx)
 		count := 0
 		for range iter {
 			count++
@@ -874,7 +874,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		consumed := &atomic.Int64{}
 
 		go func() {
-			iter := queue.IteratorPop(ctx)
+			iter := queue.IteratorWaitPop(ctx)
 			for range iter {
 				consumed.Add(1)
 			}
@@ -890,5 +890,302 @@ func TestQueueIteratorPop(t *testing.T) {
 		<-ctx.Done()
 		assert.True(t, consumed.Load() >= 10)
 		assert.True(t, queue.Len() < 10)
+	})
+}
+
+func TestQueueDrain(t *testing.T) {
+	t.Run("EmptyQueueDrainsImmediately", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+		queue := NewUnlimitedQueue[int]()
+
+		start := time.Now()
+		err := queue.Drain(ctx)
+		duration := time.Since(start)
+
+		assert.NotError(t, err)
+		assert.True(t, duration < 50*time.Millisecond)
+		assert.Equal(t, 0, queue.Len())
+	})
+
+	t.Run("BlocksUntilQueueEmpty", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 2*time.Second)
+		queue := NewUnlimitedQueue[string]()
+
+		// Add items to queue
+		assert.NotError(t, queue.Add("item1"))
+		assert.NotError(t, queue.Add("item2"))
+		assert.NotError(t, queue.Add("item3"))
+		assert.Equal(t, 3, queue.Len())
+
+		drainComplete := &atomic.Bool{}
+		drainErr := make(chan error, 1)
+
+		// Start draining in background
+		go func() {
+			err := queue.Drain(ctx)
+			drainComplete.Store(true)
+			drainErr <- err
+		}()
+
+		// Give drain a moment to start
+		time.Sleep(10 * time.Millisecond)
+
+		// Drain should be waiting
+		assert.True(t, !drainComplete.Load())
+		assert.Equal(t, 3, queue.Len())
+
+		// Remove items one by one
+		val, ok := queue.Remove()
+		assert.True(t, ok)
+		assert.Equal(t, "item1", val)
+		time.Sleep(5 * time.Millisecond)
+		assert.True(t, !drainComplete.Load())
+
+		val, ok = queue.Remove()
+		assert.True(t, ok)
+		assert.Equal(t, "item2", val)
+		time.Sleep(5 * time.Millisecond)
+		assert.True(t, !drainComplete.Load())
+
+		// Remove last item - drain should complete
+		val, ok = queue.Remove()
+		assert.True(t, ok)
+		assert.Equal(t, "item3", val)
+
+		// Wait for drain to complete
+		select {
+		case err := <-drainErr:
+			assert.NotError(t, err)
+			assert.True(t, drainComplete.Load())
+			assert.Equal(t, 0, queue.Len())
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("drain did not complete after queue was emptied")
+		}
+	})
+
+	t.Run("PreventsNewAddsWhileDraining", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 2*time.Second)
+		queue := NewUnlimitedQueue[int]()
+
+		// Add items
+		assert.NotError(t, queue.Add(1))
+		assert.NotError(t, queue.Add(2))
+
+		drainStarted := make(chan struct{})
+		drainErr := make(chan error, 1)
+
+		// Start draining
+		go func() {
+			close(drainStarted)
+			drainErr <- queue.Drain(ctx)
+		}()
+
+		<-drainStarted
+		time.Sleep(10 * time.Millisecond)
+
+		// Try to add while draining - should fail
+		err := queue.Add(3)
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		// Try BlockingAdd while draining - should also fail
+		blockCtx := testt.ContextWithTimeout(t, 50*time.Millisecond)
+		err = queue.BlockingAdd(blockCtx, 4)
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		// Empty the queue to complete drain
+		queue.Remove()
+		queue.Remove()
+
+		// Wait for drain to complete
+		select {
+		case err := <-drainErr:
+			assert.NotError(t, err)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("drain did not complete")
+		}
+	})
+
+	t.Run("QueueNotClosedAfterDrain", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 1*time.Second)
+		queue := NewUnlimitedQueue[string]()
+
+		// Add and drain
+		assert.NotError(t, queue.Add("first"))
+		assert.NotError(t, queue.Add("second"))
+
+		drainComplete := make(chan error, 1)
+		go func() {
+			drainComplete <- queue.Drain(ctx)
+		}()
+
+		// Remove items to complete drain
+		time.Sleep(10 * time.Millisecond)
+		queue.Remove()
+		queue.Remove()
+
+		// Wait for drain
+		err := <-drainComplete
+		assert.NotError(t, err)
+
+		// After drain, queue should accept new items (not closed)
+		err = queue.Add("after-drain-1")
+		assert.NotError(t, err)
+
+		err = queue.Add("after-drain-2")
+		assert.NotError(t, err)
+
+		assert.Equal(t, 2, queue.Len())
+
+		// Can remove items
+		val, ok := queue.Remove()
+		assert.True(t, ok)
+		assert.Equal(t, "after-drain-1", val)
+
+		val, ok = queue.Remove()
+		assert.True(t, ok)
+		assert.Equal(t, "after-drain-2", val)
+	})
+
+	t.Run("ContextCancellationDuringDrain", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		queue := NewUnlimitedQueue[int]()
+
+		// Add items that won't be removed
+		assert.NotError(t, queue.Add(1))
+		assert.NotError(t, queue.Add(2))
+		assert.NotError(t, queue.Add(3))
+
+		drainErr := make(chan error, 1)
+		go func() {
+			drainErr <- queue.Drain(ctx)
+		}()
+
+		// Give drain time to start waiting
+		time.Sleep(20 * time.Millisecond)
+
+		// Cancel context
+		cancel()
+
+		// Drain should return with error
+		select {
+		case err := <-drainErr:
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+			// Queue should still have items
+			assert.True(t, queue.Len() > 0)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("drain did not return after context cancellation")
+		}
+
+		// After failed drain, queue should accept new adds again
+		freshCtx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+		err := queue.BlockingAdd(freshCtx, 4)
+		assert.NotError(t, err)
+	})
+
+	t.Run("ConcurrentDrainAndConsume", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 2*time.Second)
+		queue := NewUnlimitedQueue[int]()
+
+		// Add many items
+		for i := 0; i < 100; i++ {
+			assert.NotError(t, queue.Add(i))
+		}
+
+		drainErr := make(chan error, 1)
+		consumed := &atomic.Int32{}
+
+		// Start draining
+		go func() {
+			drainErr <- queue.Drain(ctx)
+		}()
+
+		// Concurrently consume items
+		go func() {
+			for queue.Len() > 0 || consumed.Load() < 100 {
+				if val, ok := queue.Remove(); ok {
+					consumed.Add(1)
+					_ = val
+					time.Sleep(time.Millisecond)
+				} else {
+					time.Sleep(time.Millisecond)
+				}
+			}
+		}()
+
+		// Drain should complete once all items consumed
+		select {
+		case err := <-drainErr:
+			assert.NotError(t, err)
+			assert.Equal(t, int32(100), consumed.Load())
+			assert.Equal(t, 0, queue.Len())
+		case <-time.After(3 * time.Second):
+			t.Fatal("drain did not complete")
+		}
+	})
+
+	t.Run("MultipleDrainCalls", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 2*time.Second)
+		queue := NewUnlimitedQueue[string]()
+
+		// First drain on empty queue
+		err := queue.Drain(ctx)
+		assert.NotError(t, err)
+
+		// Add items
+		assert.NotError(t, queue.Add("a"))
+		assert.NotError(t, queue.Add("b"))
+
+		drainErr := make(chan error, 1)
+		go func() {
+			drainErr <- queue.Drain(ctx)
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Empty queue
+		queue.Remove()
+		queue.Remove()
+
+		err = <-drainErr
+		assert.NotError(t, err)
+
+		// Third drain on empty queue
+		err = queue.Drain(ctx)
+		assert.NotError(t, err)
+	})
+
+	t.Run("DrainWithWait", func(t *testing.T) {
+		ctx := testt.ContextWithTimeout(t, 2*time.Second)
+		queue := NewUnlimitedQueue[int]()
+
+		// Add items
+		assert.NotError(t, queue.Add(10))
+		assert.NotError(t, queue.Add(20))
+
+		drainErr := make(chan error, 1)
+		go func() {
+			drainErr <- queue.Drain(ctx)
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Use Wait() to consume items
+		val, err := queue.Wait(ctx)
+		assert.NotError(t, err)
+		assert.Equal(t, 10, val)
+
+		val, err = queue.Wait(ctx)
+		assert.NotError(t, err)
+		assert.Equal(t, 20, val)
+
+		// Drain should complete
+		select {
+		case err := <-drainErr:
+			assert.NotError(t, err)
+			assert.Equal(t, 0, queue.Len())
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("drain did not complete")
+		}
 	})
 }

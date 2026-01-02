@@ -176,7 +176,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 				defer cancel()
 			}
 
-			if err := pubsub.IteratorStream(pipe.IteratorPop(ctx)).Parallel(
+			if err := pubsub.IteratorStream(pipe.IteratorWaitPop(ctx)).Parallel(
 				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
 				wpa.WorkerGroupConfContinueOnError(),
 				wpa.WorkerGroupConfContinueOnPanic(),
@@ -197,7 +197,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.WorkerGroupConf]) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			return pubsub.IteratorStream(workQueue.IteratorPop(ctx)).Parallel(
+			return pubsub.IteratorStream(workQueue.IteratorWaitPop(ctx)).Parallel(
 				func(ctx context.Context, fn fnx.Worker) error {
 					return fn.Run(ctx)
 				},
@@ -231,7 +231,7 @@ func HandlerWorkerPool(
 ) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {
-			return pubsub.IteratorStream(workQueue.IteratorPop(ctx)).Parallel(
+			return pubsub.IteratorStream(workQueue.IteratorWaitPop(ctx)).Parallel(
 				func(ctx context.Context, fn fnx.Worker) error {
 					observer(fn.Run(ctx))
 					return nil

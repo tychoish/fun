@@ -147,18 +147,18 @@ func (dq *Deque[T]) PopBack() (T, bool) {
 	return dq.pop(dq.root.prev)
 }
 
-// WaitFront pops the first (head) item in the deque, and if the queue is
+// WaitPopFront pops the first (head) item in the deque, and if the queue is
 // empty, will block until an item is added, returning an error if the
 // context canceled or the queue is closed.
-func (dq *Deque[T]) WaitFront(ctx context.Context) (v T, err error) {
+func (dq *Deque[T]) WaitPopFront(ctx context.Context) (v T, err error) {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.waitPop(ctx, dqNext)
 }
 
-// WaitBack pops the last (tail) item in the deque, and if the queue
+// WaitPopBack pops the last (tail) item in the deque, and if the queue
 // is empty, will block until an item is added, returning an error if
 // the context canceled or the queue is closed.
-func (dq *Deque[T]) WaitBack(ctx context.Context) (T, error) {
+func (dq *Deque[T]) WaitPopBack(ctx context.Context) (T, error) {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.waitPop(ctx, dqPrev)
 }
@@ -242,53 +242,56 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	return dq.addAfter(it, afterGetter())
 }
 
-// IteratorFront starts at the front of the queue and iterates towards
+// IteratorFront starts at the front of the Deque and iterates towards
 // the back. When the stream reaches the beginning of the queue it
 // ends.
-func (dq *Deque[T]) IteratorFront(ctx context.Context) iter.Seq[T] {
-	return dq.confFuture(ctx, dqNext, false)
-}
+func (dq *Deque[T]) IteratorFront(ctx context.Context) iter.Seq[T] { return dq.iterFrontEnd(ctx) }
 
-// IteratorBack starts at the back of the queue and iterates
+// IteratorBack starts at the back of the Deque  and iterates
 // towards the front. When the stream reaches the end of the queue
 // it ends.
-func (dq *Deque[T]) IteratorBack(ctx context.Context) iter.Seq[T] {
-	return dq.confFuture(ctx, dqPrev, false)
+func (dq *Deque[T]) IteratorBack(ctx context.Context) iter.Seq[T] { return dq.iterBackEnd(ctx) }
+
+// IteratorWaitFront yields items from the front of the Deque to the
+// back. When it reaches the last element, it waits for a new element
+// to be added. It does not modify the elements in the Deque.
+func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] { return dq.iterBackWait(ctx) }
+
+// IteratorWaitBack yields items from the back of the Deque to the
+// front. When it reaches the first element, it waits for a new element
+// to be added. It does not modify the elements in the Deque.
+func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] { return dq.iterFrontWait(ctx) }
+
+// IteratorWaitPopFront returns a sequence that removes
+// and returns objects from the front of the deque.
+// When the Deque is empty, iteration ends.
+func (dq *Deque[T]) IteratorWaitPopFront(ctx context.Context) iter.Seq[T] {
+	return irt.GenerateOk(dq.wrapsrc(ctx, dq.WaitPopFront))
 }
 
-// IteratorWaitFront exposes the deque to a single-function interface
-// for iteration. The future function operation will not modify the
-// contents of the Deque, but will produce elements from the deque,
-// front to back, and will block for a new element if the deque is
-// empty or the future reaches the end, the operation will block
-// until another item is added.
-func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] {
-	return dq.confFuture(ctx, dqNext, true)
+// IteratorWaitPopBack returns a sequence that removes
+// and returns objects from the back of the deque.
+// When the Deque is empty, iteration ends.
+func (dq *Deque[T]) IteratorWaitPopBack(ctx context.Context) iter.Seq[T] {
+	return irt.GenerateOk(dq.wrapsrc(ctx, dq.WaitPopBack))
 }
 
-// IteratorWaitBack exposes the deque to a single-function interface
-// for iteration. The future function operation will not modify the
-// contents of the Deque, but will produce elements from the deque,
-// back to fron, and will block for a new element if the deque is
-// empty or the future reaches the end, the operation will block
-// until another item is added.
-func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] {
-	return dq.confFuture(ctx, dqPrev, true)
+func (*Deque[T]) wrapsrc(ctx context.Context, op func(ctx context.Context) (T, error)) func() (T, bool) {
+	return func() (zero T, _ bool) {
+		value, err := op(ctx)
+		if err != nil {
+			return zero, false
+		}
+		return value, true
+	}
 }
-
-// IteratorPopFront returns a sequence that removes and returns objects from the
-// front of the deque.
-func (dq *Deque[T]) IteratorPopFront(ctx context.Context) iter.Seq[T] {
-	return irt.GenerateOk(dq.PopFront)
-}
-
-// IteratorPopBack returns a sequence that removes and returns objects from the back of the deque.
-func (dq *Deque[T]) IteratorPopBack(ctx context.Context) iter.Seq[T] {
-	return irt.GenerateOk(dq.PopBack)
-}
+func (dq *Deque[T]) iterFrontEnd(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqNext, false) }
+func (dq *Deque[T]) iterBackEnd(ctx context.Context) iter.Seq[T]   { return dq.iter(ctx, dqPrev, false) }
+func (dq *Deque[T]) iterFrontWait(ctx context.Context) iter.Seq[T] { return dq.iter(ctx, dqNext, true) }
+func (dq *Deque[T]) iterBackWait(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqNext, true) }
 
 func (*Deque[T]) zero() (z T) { return z }
-func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, blocking bool) iter.Seq[T] {
+func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bool) iter.Seq[T] {
 	var current *element[T]
 
 	op := func() (T, bool) {
@@ -310,91 +313,6 @@ func (dq *Deque[T]) confFuture(ctx context.Context, direction dqDirection, block
 		return current.item, true
 	}
 	return irt.GenerateOk(op)
-}
-
-// FIFOSink returns a function that adds items to the back of the deque,
-// suitable for use with broker implementations.
-func (dq *Deque[T]) FIFOSink() func(context.Context, T) error {
-	return dq.WaitPushBack
-}
-
-// FIFOSource creates a channel that receives items from the front of
-// the deque in FIFO order. Items are removed from the deque as they
-// are sent to the channel. The returned channel is closed when the
-// context is canceled.
-func (dq *Deque[T]) FIFOSource(ctx context.Context) <-chan T {
-	ch := make(chan T)
-	go func() {
-		defer close(ch)
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-			msg, err := dq.WaitFront(ctx)
-			if err != nil {
-				return
-			}
-			select {
-			case ch <- msg:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return ch
-}
-
-// LIFOSink returns a function that adds items to the back of the deque,
-// suitable for use with broker implementations.
-func (dq *Deque[T]) LIFOSink() func(context.Context, T) error {
-	return dq.WaitPushBack
-}
-
-// LIFOSource creates a channel that receives items from the back of
-// the deque in LIFO order. Items are removed from the deque as they
-// are sent to the channel. The returned channel is closed when the
-// context is canceled.
-func (dq *Deque[T]) LIFOSource(ctx context.Context) <-chan T {
-	ch := make(chan T)
-	go func() {
-		defer close(ch)
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-			msg, err := dq.WaitBack(ctx)
-			if err != nil {
-				return
-			}
-			select {
-			case ch <- msg:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return ch
-}
-
-// LIFO returns an iterator that removes items from the queue, with the most recent items removed
-// first. The iterator is blocking and will wait for a new item if the Deque is empty.
-func (dq *Deque[T]) LIFO(ctx context.Context) iter.Seq[T] {
-	return irt.GenerateOk(func() (z T, _ bool) {
-		if out, err := dq.WaitBack(ctx); err == nil {
-			return out, true
-		}
-		return z, false
-	})
-}
-
-// FIFO returns an iterator that removes items from the queue in the order they were added. The iterator is blocking and will wait for a new item if the Deque is empty.
-func (dq *Deque[T]) FIFO(ctx context.Context) iter.Seq[T] {
-	return irt.GenerateOk(func() (z T, _ bool) {
-		if out, err := dq.WaitFront(ctx); err == nil {
-			return out, true
-		}
-		return z, false
-	})
 }
 
 func (dq *Deque[T]) addAfter(value T, after *element[T]) error {

@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -264,9 +263,6 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 }
 
 func (q *Queue[T]) waitForNew(ctx context.Context) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
 	go func() { <-ctx.Done(); q.nupdates.Broadcast() }()
@@ -398,22 +394,19 @@ type entry[T any] struct {
 func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
 	op := func() (o T, ok bool) {
+		q.mu.Lock()
+		defer q.mu.Unlock()
+
 		if next == nil {
-			q.mu.Lock()
 			next = q.front
-			q.mu.Unlock()
 		}
 
-		q.mu.Lock()
 		if next.link == q.front || (next.link == nil && q.closed) || ctx.Err() != nil {
-			q.mu.Unlock()
 			return o, false
 		} else if next.link != nil {
 			next = next.link
-			q.mu.Unlock()
 			return next.item, true
 		} else {
-			q.mu.Unlock()
 			if err := q.waitForNew(ctx); err != nil {
 				return o, false
 			}
@@ -425,12 +418,13 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(op)
 }
 
-// IteratorPop returns a consuming iterator that removes items from the queue. Blocks waiting for
-// new items when the queue is empty. Iterator terminates on context cancellation or queue closure.
-// Each item returned is removed from the queue (destructive read). Safe for concurrent access.
-func (q *Queue[T]) IteratorPop(ctx context.Context) iter.Seq[T] {
+// IteratorWaitPop returns a consuming iterator that removes items from the
+// queue. Blocks waiting for new items when the queue is empty. Iterator
+// terminates on context cancellation or queue closure.  Each item returned is
+// removed from the queue (destructive read). Safe for concurrent access.
+func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(func() (z T, _ bool) {
-		msg, ok := q.Remove()
+		msg, ok := q.Remove() // holds lock
 		if ok {
 			return msg, true
 		}
@@ -441,60 +435,18 @@ func (q *Queue[T]) IteratorPop(ctx context.Context) iter.Seq[T] {
 	})
 }
 
+// Iterator returns an iterator for all items in the queue. Does not block.
+func (q *Queue[T]) Iterator() iter.Seq[T] {
+	return irt.WithMutex(func(yield func(T) bool) {
+		for next := q.front.link; !q.closed && next != nil && q.front != q.back && q.front != next && yield(next.item); next = next.link {
+			continue
+		}
+	}, &q.mu)
+}
+
 func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
 	if next.link != q.front && next.link != nil {
 		next, ok = next.link, true
 	}
 	return next, ok
-}
-
-// Iterator returns an iterator for all items in the queue. Does not block.
-func (q *Queue[T]) Iterator() iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for next := q.front.link; !q.closed && next != nil && q.front != q.back && q.front != next && yield(next.item); next = next.link {
-			continue
-		}
-	}
-}
-
-// Sink returns a function that adds items to the queue, suitable for
-// use with broker implementations.
-func (q *Queue[T]) Sink() func(context.Context, T) error {
-	return fnx.MakeHandler(q.Add)
-}
-
-// Channel creates a channel that receives items from the queue. Items
-// are removed from the queue as they are sent to the channel. The
-// returned channel is closed when the context is canceled.
-func (q *Queue[T]) Channel(ctx context.Context) <-chan T {
-	ch := make(chan T)
-	go func() {
-		defer close(ch)
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-			msg, ok := q.Remove()
-			if !ok {
-				msg, err := q.Wait(ctx)
-				if err != nil {
-					return
-				}
-				select {
-				case ch <- msg:
-				case <-ctx.Done():
-					return
-				}
-				continue
-			}
-			select {
-			case ch <- msg:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return ch
 }

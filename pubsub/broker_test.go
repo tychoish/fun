@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"runtime"
 	"sync/atomic"
@@ -36,7 +37,7 @@ func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return makeInternalBrokerImpl(ctx, d.FIFOSource(ctx), d.FIFOSink(), d.Len, BrokerOptions{})
+				return makeInternalBrokerImpl(ctx, d.IteratorWaitPopBack(ctx), d.WaitPushBack, d.Len, BrokerOptions{})
 			},
 		},
 		{
@@ -640,4 +641,202 @@ func checkMatchingSets[T comparable](t *testing.T, set1, set2 map[T]struct{}) {
 			t.Error("saw unknown key in set1", k)
 		}
 	}
+}
+
+func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
+	t.Run("QueueFullDropsMessages", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Create a queue with very limited capacity
+		queue, err := NewQueue[string](QueueOptions{
+			HardLimit: 3,
+			SoftQuota: 3,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create broker using the limited queue
+		broker := NewQueueBroker(ctx, queue, BrokerOptions{
+			WorkerPoolSize: 1,
+		})
+		defer broker.Stop()
+
+		// Subscribe to receive messages
+		sub := broker.Subscribe(ctx)
+		if sub == nil {
+			t.Fatal("failed to subscribe")
+		}
+		defer broker.Unsubscribe(ctx, sub)
+
+		// Fill the queue to capacity by publishing without consuming
+		for i := 0; i < 3; i++ {
+			err := broker.Send(ctx, fmt.Sprintf("msg-%d", i))
+			check.NotError(t, err)
+		}
+
+		// Give time for messages to reach the queue
+		time.Sleep(50 * time.Millisecond)
+
+		// Queue should be at capacity
+		stats := broker.Stats(ctx)
+		check.Equal(t, stats.BufferDepth, 3)
+
+		// Try to publish more messages - these should be dropped due to queue full
+		droppedCount := 5
+		for i := 3; i < 3+droppedCount; i++ {
+			err := broker.Send(ctx, fmt.Sprintf("msg-%d", i))
+			// Send should succeed even though messages are dropped
+			check.NotError(t, err)
+		}
+
+		// Give time for the publish goroutine to process
+		time.Sleep(50 * time.Millisecond)
+
+		// Queue should still be at capacity (messages were dropped)
+		stats = broker.Stats(ctx)
+		check.Equal(t, stats.BufferDepth, 3)
+
+		// Now consume the messages - we should only get the first 3
+		received := make([]string, 0)
+		timeout := time.After(100 * time.Millisecond)
+
+	receiveLoop:
+		for len(received) < 3 {
+			select {
+			case msg := <-sub:
+				received = append(received, msg)
+			case <-timeout:
+				break receiveLoop
+			}
+		}
+
+		// Should have received exactly 3 messages (the ones before queue filled)
+		check.Equal(t, len(received), 3)
+		check.Equal(t, received[0], "msg-0")
+		check.Equal(t, received[1], "msg-1")
+		check.Equal(t, received[2], "msg-2")
+
+		// Try to receive more - should timeout, confirming dropped messages weren't delivered
+		select {
+		case msg := <-sub:
+			t.Errorf("unexpected message received: %s (messages should have been dropped)", msg)
+		case <-time.After(100 * time.Millisecond):
+			// Expected - no more messages
+		}
+	})
+
+	t.Run("QueueNoCreditDropsMessages", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Create a queue with soft quota (will return ErrQueueNoCredit when exceeded)
+		queue, err := NewQueue[int](QueueOptions{
+			HardLimit:   10,
+			SoftQuota:   3,
+			BurstCredit: 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create broker using the limited queue
+		broker := NewQueueBroker(ctx, queue, BrokerOptions{
+			WorkerPoolSize: 1,
+		})
+		defer broker.Stop()
+
+		// Subscribe to receive messages
+		sub := broker.Subscribe(ctx)
+		if sub == nil {
+			t.Fatal("failed to subscribe")
+		}
+		defer broker.Unsubscribe(ctx, sub)
+
+		// Fill queue to soft quota
+		for i := 0; i < 3; i++ {
+			err := broker.Send(ctx, i)
+			check.NotError(t, err)
+		}
+
+		time.Sleep(50 * time.Millisecond)
+
+		// Publish more messages - these may hit ErrQueueNoCredit and be dropped
+		for i := 3; i < 8; i++ {
+			err := broker.Send(ctx, i)
+			check.NotError(t, err)
+		}
+
+		time.Sleep(50 * time.Millisecond)
+
+		// The important part: broker should still be running (not crashed)
+		// and can publish messages
+		stats := broker.Stats(ctx)
+		check.Equal(t, stats.Subscriptions, 1)
+
+		// Consume all available messages
+		received := make([]int, 0)
+		timeout := time.After(200 * time.Millisecond)
+
+	consumeLoop:
+		for {
+			select {
+			case msg := <-sub:
+				received = append(received, msg)
+			case <-timeout:
+				break consumeLoop
+			}
+		}
+
+		// Should have received some messages (at least the initial ones)
+		check.True(t, len(received) >= 3)
+		check.True(t, len(received) < 8) // But not all, some were dropped
+	})
+
+	t.Run("BrokerContinuesAfterDrops", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Create a queue with very limited capacity
+		queue, err := NewQueue[string](QueueOptions{
+			HardLimit: 2,
+			SoftQuota: 2,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		broker := NewQueueBroker(ctx, queue, BrokerOptions{})
+		defer broker.Stop()
+
+		sub := broker.Subscribe(ctx)
+		if sub == nil {
+			t.Fatal("failed to subscribe")
+		}
+		defer broker.Unsubscribe(ctx, sub)
+
+		// Fill the queue
+		broker.Send(ctx, "first")
+		broker.Send(ctx, "second")
+		time.Sleep(50 * time.Millisecond)
+
+		// These should be dropped
+		broker.Send(ctx, "dropped-1")
+		broker.Send(ctx, "dropped-2")
+		time.Sleep(50 * time.Millisecond)
+
+		// Consume the initial messages
+		msg1 := <-sub
+		msg2 := <-sub
+		check.Equal(t, msg1, "first")
+		check.Equal(t, msg2, "second")
+
+		// Now queue has space - new messages should go through
+		broker.Send(ctx, "after-drop")
+		time.Sleep(50 * time.Millisecond)
+
+		msg3 := <-sub
+		check.Equal(t, msg3, "after-drop")
+	})
 }
