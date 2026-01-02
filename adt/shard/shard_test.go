@@ -8,6 +8,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func TestShardedMap(t *testing.T) {
@@ -24,23 +25,26 @@ func TestShardedMap(t *testing.T) {
 		m := &Map[string, int]{}
 		check.Equal(t, m.Version(), 0)
 
-		m.Store("a", 42)
+		check.True(t, ft.Not(m.Set("a", 12)))
 		check.Equal(t, m.Version(), 1)
+		check.True(t, m.Set("a", 42))
+		check.Equal(t, m.Version(), 2)
 		check.Equal(t, ft.MustOk(m.Load("a")), 42)
 		_, ok := m.Load("b")
 		check.True(t, !ok)
-		check.Equal(t, m.Versioned("a").Version(), 1)
+		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 2)
 
+		check.Zero(t, m.Get("c"))
 		m.Store("a", 84)
-		check.Equal(t, m.Version(), 2)
-		check.Equal(t, ft.MustOk(m.Load("a")), 84)
-		check.Equal(t, m.Versioned("a").Version(), 2)
+		check.Equal(t, m.Version(), 3)
+		check.Equal(t, m.Get("a"), 84)
+		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 3)
 
 		m.Store("b", 42)
-		check.Equal(t, m.Version(), 3)
-		check.Equal(t, ft.MustOk(m.Load("b")), 42)
-		check.Equal(t, m.Versioned("a").Version(), 2)
-		check.Equal(t, m.Versioned("b").Version(), 1)
+		check.Equal(t, m.Version(), 4)
+		check.Equal(t, m.Get("b"), 42)
+		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 3)
+		check.Equal(t, ft.IgnoreSecond(m.Versioned("b")).Version(), 1)
 
 		assert.Equal(t, m.Version(), m.Clocks()[0])
 	})
@@ -67,6 +71,8 @@ func TestShardedMap(t *testing.T) {
 	})
 	t.Run("Iterator", func(t *testing.T) {
 		m := &Map[string, int]{}
+		m.Extend(irt.Map(map[string]int{"one": 1, "two": 2, "three": 3}))
+
 		m.Store("one", 1)
 		m.Store("two", 2)
 		m.Store("three", 3)

@@ -38,19 +38,19 @@ func (*sh[K, V]) makeVmap(impl MapType) vmap[K, V] {
 func (*sh[K, V]) inner(vv *Versioned[V]) V          { return vv.Load() }
 func (sh *sh[K, V]) read() vmap[K, V]               { return sh.data }
 func (sh *sh[K, V]) write() vmap[K, V]              { sh.clock.Add(1); return sh.data }
+func (sh *sh[K, V]) store(k K, v V)                 { sh.set(k, v) }
 func (sh *sh[K, V]) load(k K) (V, bool)             { v, ok := sh.read().Load(k); return v.Load(), ok }
 func (sh *sh[K, V]) keys() iter.Seq[K]              { return sh.read().Keys() }
 func (sh *sh[K, V]) vvals() iter.Seq[*Versioned[V]] { return sh.read().Values() }
 func (sh *sh[K, V]) values() iter.Seq[V]            { return to(sh.inner).Iterator(sh.vvals()) }
 
-func (sh *sh[K, V]) store(k K, v V) {
+func (sh *sh[K, V]) set(k K, v V) bool {
 	mp := sh.write()
 	if val, ok := mp.Load(k); ok {
 		val.Set(v)
-		mp.Store(k, val)
-	} else {
-		mp.Store(k, Version(v))
+		return mp.Set(k, val)
 	}
+	return mp.Set(k, Version(v))
 }
 
 func (sh *sh[K, V]) fetch(k K) (out V, _uint64, _ uint64, _ bool) {

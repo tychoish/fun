@@ -52,19 +52,113 @@ type Map[K comparable, V any] struct {
 	imp   MapType
 }
 
-// Setup initializes the shard with non-default shard size and backing
-// map implementation. Once the Map is initialized (e.g. after calling
-// this function, modifying the map, or accessing the contents of the
-// map, this function becomes a no-op.)
-func (m *Map[K, V]) Setup(n int, mi MapType) { m.sh.Do(func() []sh[K, V] { return m.init(n, mi) }) }
-
-func (m *Map[K, V]) init(n int, mi MapType) []sh[K, V] {
-	// ONLY called within the sync.Once scope.
-
-	m.num = ft.Default(uint64(max(0, n)), defaultSize)
-	m.imp = ft.Default(mi, MapTypeDefault)
-	return m.makeShards()
+// MapItem wraps the value stored in a sharded map, with synchronized
+// sharding and versioning information. Returned by some map iterator
+// methods.
+type MapItem[K comparable, V any] struct {
+	Exists        bool
+	GlobalVersion uint64
+	ShardVersion  uint64
+	Version       uint64
+	ShardID       uint64
+	NumShards     uint64
+	Key           K
+	Value         V
 }
+
+////////////////////////////////////
+//
+// Standard Accessor Methods
+
+// Load retrieves the value from the map. The semantics are the same
+// as for maps in go: if the value does not exist it always returns
+// the zero value for the type, while the second value indicates if
+// the key was present in the map.
+func (m *Map[K, V]) Load(key K) (V, bool) { return m.shard(key).load(key) }
+
+// Delete removes a key--and its corresponding value--from the map, if
+// it exists.
+func (m *Map[K, V]) Delete(key K) { m.inc().shard(key).write().Delete(key) }
+
+// Check returns true if the key exists in the map or false otherwise.
+func (m *Map[K, V]) Check(key K) bool { return m.shard(key).read().Check(key) }
+
+// Store adds a key and value to the map, replacing any existing
+// values as needed.
+func (m *Map[K, V]) Store(key K, value V) { m.inc().shard(key).store(key, value) }
+
+// Store adds a key and value to the map, replacing any existing
+// values as needed.
+func (m *Map[K, V]) Set(key K, value V) bool { return m.inc().shard(key).set(key, value) }
+
+// Get returns the value stored in the map, or the zero value for that
+// type if it isn't present.
+func (m *Map[K, V]) Get(key K) V {
+	return ft.IgnoreSecond(m.shard(key).read().Load(key)).Load()
+}
+
+// Extend adds items from the sequence to the sharded map
+// (sequentially.) Interleaving of operations is possible (and likely.)
+func (m *Map[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, m.Store) }
+
+////////////////////////////////////
+//
+// Standard (global) Iterators
+
+// Items provides a stream over all items in the map. The MapItem type
+// captures the version information and information about the sharded
+// configuration.
+func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] { return irt.Keep(m.itemItr(), m.filter) }
+
+// Iterator provides a unified sequence over all key value pairs in
+// the sharded map..
+func (m *Map[K, V]) Iterator() iter.Seq2[K, V] { return m.itrsplit(m.Items()) }
+
+// Keys returns a stream for all the keys in the map. Items are
+// provdied from shards sequentially, and in the same sequence, but
+// are randomized within the shard. The keys are NOT captured in a
+// snapshot, so keys reflecting different logical moments will appear
+// in the stream. No key will appear more than once.
+func (m *Map[K, V]) Keys() iter.Seq[K] { return irt.Chain(m.KeysSharded()) }
+
+// Values returns a stream for all of the keys in the map. Values are
+// provided from shards sequentially, and always in the same
+// sequences, but randomized within each shard. The values are NOT
+// captured in a snapshot, so values reflecting different logical
+// moments will appear in the stream.
+func (m *Map[K, V]) Values() iter.Seq[V] { return irt.Chain(m.ValuesSharded()) }
+
+////////////////////////////////////
+//
+// Sharded Iterators
+
+// ItemsSharded provides an iterator holding the items of each shard's
+// items. Use the sharded iterator to fan out workloads.
+func (m *Map[K, V]) ItemsSharded() iter.Seq[iter.Seq[MapItem[K, V]]] {
+	return irt.Convert(m.keyItr(), func(seq iter.Seq[K]) iter.Seq[MapItem[K, V]] {
+		return irt.Keep(irt.Convert(seq, m.key2Item()), m.filter)
+	})
+}
+
+// IteratorSharded provides access to independent iterators for each
+// constituent shard in the map.
+func (m *Map[K, V]) IteratorSharded() iter.Seq[iter.Seq2[K, V]] {
+	return irt.Convert(m.ItemsSharded(), m.itrsplit)
+}
+
+// KeysSharded returns an iterator of iterators, with each iterator
+// provided access to the keys of one of the map's underlying
+// shard. Use sharded iterators to fan out a workload.
+func (m *Map[K, V]) KeysSharded() iter.Seq[iter.Seq[K]] { return m.keyItr() }
+
+// ValuesSharded returns an iterator of iterators, with each iterator
+// provided access to the values of one of the map's underlying
+// shard. Use sharded iterators to fan out a workload.
+func (m *Map[K, V]) ValuesSharded() iter.Seq[iter.Seq[V]] { return m.valItr() }
+
+////////////////////////////////////////////////////////////////////////
+//
+// Internal/Implementation details.
 
 // String reports the type name, number of configured shards, and
 // current version of the map.
@@ -79,45 +173,6 @@ func (m *Map[K, V]) String() string {
 	return fmt.Sprintf("ShardedMap[%T, %T]<%s> Shards(%d) Version(%d)", k, v, m.imp, m.num, m.clock.Load())
 }
 
-func (m *Map[K, V]) makeShards() []sh[K, V] {
-	// ONLY called within the sync.Once scope.
-
-	shards := make([]sh[K, V], m.num)
-	for idx := range shards {
-		shards[idx].data = shards[idx].makeVmap(m.imp)
-	}
-	return shards
-}
-
-func (m *Map[K, V]) defaultShards() []sh[K, V]                  { return m.init(defaultSize, MapTypeDefault) }
-func (m *Map[K, V]) shards() stw.Slice[sh[K, V]]                { return m.sh.Call(m.defaultShards) }
-func (m *Map[K, V]) shard(key K) *sh[K, V]                      { return m.shards().Ptr(int(m.shardID(key))) }
-func (m *Map[K, V]) inc() *Map[K, V]                            { m.clock.Add(1); return m }
-func (*Map[K, V]) shKeys(sh *sh[K, V]) iter.Seq[K]              { return sh.keys() }
-func (*Map[K, V]) shValues(sh *sh[K, V]) iter.Seq[V]            { return sh.values() }
-func (m *Map[K, V]) shPtrs() stw.Slice[*sh[K, V]]               { return m.shards().Ptrs() }
-func (m *Map[K, V]) shIter() iter.Seq[*sh[K, V]]                { return m.shPtrs().Iterator() }
-func (m *Map[K, V]) keyItr() iter.Seq[iter.Seq[K]]              { return m.s2ks().Iterator(m.shIter()) }
-func (m *Map[K, V]) valItr() iter.Seq[iter.Seq[V]]              { return m.s2vs().Iterator(m.shIter()) }
-func (m *Map[K, V]) itemItr() iter.Seq[MapItem[K, V]]           { return m.key2Item().Iterator(m.Keys()) }
-func to[T, O any](in func(T) O) fn.Converter[T, O]              { return fn.MakeConverter(in) }
-func (m *Map[K, V]) s2ks() fn.Converter[*sh[K, V], iter.Seq[K]] { return to(m.shKeys) }
-func (m *Map[K, V]) s2vs() fn.Converter[*sh[K, V], iter.Seq[V]] { return to(m.shValues) }
-func (m *Map[K, V]) key2Item() fn.Converter[K, MapItem[K, V]]   { return to(m.Fetch) }
-
-func (m *Map[K, V]) shardID(key K) uint64 {
-	h := hashPool.Get()
-	defer hashPool.Put(h)
-
-	maphash.WriteComparable(h, key)
-
-	return h.Sum64() % m.num
-}
-
-// Store adds a key and value to the map, replacing any existing
-// values as needed.
-func (m *Map[K, V]) Store(key K, value V) { m.inc().shard(key).store(key, value) }
-
 // Version returns the version for the entire sharded map.
 func (m *Map[K, V]) Version() uint64 { return m.clock.Load() }
 
@@ -130,65 +185,6 @@ func (m *Map[K, V]) Clocks() []uint64 {
 		out[idx+1] = shards[idx].clock.Load()
 	}
 	return out
-}
-
-// Keys returns a stream for all the keys in the map. Items are
-// provdied from shards sequentially, and in the same sequence, but
-// are randomized within the shard. The keys are NOT captured in a
-// snapshot, so keys reflecting different logical moments will appear
-// in the stream. No key will appear more than once.
-func (m *Map[K, V]) Keys() iter.Seq[K] { return irt.Chain(m.KeysSharded()) }
-
-// KeysSharded returns an iterator of iterators, with each iterator provided access to the keys of one of the
-// map's underlying shard. Use sharded iterators to fan out a workload.
-func (m *Map[K, V]) KeysSharded() iter.Seq[iter.Seq[K]] { return m.keyItr() }
-
-// Values returns a stream for all of the keys in the map. Values
-// are provided from shards sequentially, and always in the same
-// sequences, but randomized within each shard. The values are NOT
-// captured in a snapshot, so values reflecting different logical
-// moments will appear in the stream.
-func (m *Map[K, V]) Values() iter.Seq[V] { return irt.Chain(m.ValuesSharded()) }
-
-// ValuesSharded returns an iterator of iterators, with each iterator provided access to the values of one of the
-// map's underlying shard. Use sharded iterators to fan out a workload.
-func (m *Map[K, V]) ValuesSharded() iter.Seq[iter.Seq[V]] { return m.valItr() }
-
-// Items provides a stream over all items in the map. The
-// MapItem type captures the version information and information about
-// the sharded configuration.
-func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] { return irt.Keep(m.itemItr(), m.filter) }
-
-// ItemsSharded provides an iterator holding the items of each shard's items. Use the sharded
-// iterator to fan out workloads.
-func (m *Map[K, V]) ItemsSharded() iter.Seq[iter.Seq[MapItem[K, V]]] {
-	return irt.Convert(m.keyItr(), func(seq iter.Seq[K]) iter.Seq[MapItem[K, V]] {
-		return irt.Keep(irt.Convert(seq, m.key2Item()), m.filter)
-	})
-}
-
-// IteratorSharded provides access to independent iterators for each constituent shard in the map.
-func (m *Map[K, V]) IteratorSharded() iter.Seq[iter.Seq2[K, V]] {
-	return irt.Convert(m.ItemsSharded(), m.iSplit)
-}
-
-// Iterator provides an iterator over all items in the sharded map.
-func (m *Map[K, V]) Iterator() iter.Seq2[K, V]                        { return m.iSplit(m.Items()) }
-func (m *Map[K, V]) iSplit(s iter.Seq[MapItem[K, V]]) iter.Seq2[K, V] { return irt.With2(s, m.mi2kv) }
-func (*Map[K, V]) mi2kv(mi MapItem[K, V]) (K, V)                      { return mi.Key, mi.Value }
-func (*Map[K, V]) filter(mi MapItem[K, V]) bool                       { return mi.Exists }
-
-// MapItem wraps the value stored in a sharded map, with synchronized
-// sharding and versioning information.
-type MapItem[K comparable, V any] struct {
-	Exists        bool
-	GlobalVersion uint64
-	ShardVersion  uint64
-	Version       uint64
-	ShardID       uint64
-	NumShards     uint64
-	Key           K
-	Value         V
 }
 
 // Fetch returns an item from the sharded map, reporting all of the
@@ -206,19 +202,59 @@ func (m *Map[K, V]) Fetch(k K) MapItem[K, V] {
 	}
 }
 
-// Load retrieves the value from the map. The semantics are the same
-// as for maps in go: if the value does not exist it always returns
-// the zero value for the type, while the second value indicates if
-// the key was present in the map.
-func (m *Map[K, V]) Load(key K) (V, bool) { return m.shard(key).load(key) }
-
-// Delete removes a key--and its corresponding value--from the map, if
-// it exists.
-func (m *Map[K, V]) Delete(key K) { m.inc().shard(key).write().Delete(key) }
-
-// Check returns true if the key exists in the map or false otherwise.
-func (m *Map[K, V]) Check(key K) bool { return m.shard(key).read().Check(key) }
-
 // Versioned returns the wrapped Versioned object which tracks the
 // version (modification count) of the stored object.
-func (m *Map[K, V]) Versioned(k K) *Versioned[V] { return ft.IgnoreSecond(m.shard(k).read().Load(k)) }
+func (m *Map[K, V]) Versioned(k K) (*Versioned[V], bool) { return m.shard(k).read().Load(k) }
+
+// Setup initializes the shard with non-default shard size and backing
+// map implementation. Once the Map is initialized (e.g. after calling
+// this function, modifying the map, or accessing the contents of the
+// map, this function becomes a no-op.)
+func (m *Map[K, V]) Setup(n int, mi MapType) { m.sh.Do(func() []sh[K, V] { return m.init(n, mi) }) }
+
+func (m *Map[K, V]) init(n int, mi MapType) []sh[K, V] {
+	// ONLY called within the sync.Once scope.
+
+	m.num = ft.Default(uint64(max(0, n)), defaultSize)
+	m.imp = ft.Default(mi, MapTypeDefault)
+	return m.makeShards()
+}
+
+func (m *Map[K, V]) makeShards() []sh[K, V] {
+	// ONLY called within the sync.Once scope.
+
+	shards := make([]sh[K, V], m.num)
+	for idx := range shards {
+		shards[idx].data = shards[idx].makeVmap(m.imp)
+	}
+	return shards
+}
+
+func (m *Map[K, V]) defaultShards() []sh[K, V]                          { return m.init(defaultSize, MapTypeDefault) }
+func (m *Map[K, V]) shards() stw.Slice[sh[K, V]]                        { return m.sh.Call(m.defaultShards) }
+func (m *Map[K, V]) shard(key K) *sh[K, V]                              { return m.shards().Ptr(int(m.shardID(key))) }
+func (m *Map[K, V]) inc() *Map[K, V]                                    { m.clock.Add(1); return m }
+func (*Map[K, V]) shKeys(sh *sh[K, V]) iter.Seq[K]                      { return sh.keys() }
+func (*Map[K, V]) shValues(sh *sh[K, V]) iter.Seq[V]                    { return sh.values() }
+func (m *Map[K, V]) shPtrs() stw.Slice[*sh[K, V]]                       { return m.shards().Ptrs() }
+func (m *Map[K, V]) shIter() iter.Seq[*sh[K, V]]                        { return m.shPtrs().Iterator() }
+func (m *Map[K, V]) keyItr() iter.Seq[iter.Seq[K]]                      { return m.s2ks().Iterator(m.shIter()) }
+func (m *Map[K, V]) valItr() iter.Seq[iter.Seq[V]]                      { return m.s2vs().Iterator(m.shIter()) }
+func (m *Map[K, V]) itemItr() iter.Seq[MapItem[K, V]]                   { return m.key2Item().Iterator(m.Keys()) }
+func to[T, O any](in func(T) O) fn.Converter[T, O]                      { return fn.MakeConverter(in) }
+func (m *Map[K, V]) s2ks() fn.Converter[*sh[K, V], iter.Seq[K]]         { return to(m.shKeys) }
+func (m *Map[K, V]) s2vs() fn.Converter[*sh[K, V], iter.Seq[V]]         { return to(m.shValues) }
+func (m *Map[K, V]) key2Item() fn.Converter[K, MapItem[K, V]]           { return to(m.Fetch) }
+func (m *Map[K, V]) itrsplit(s iter.Seq[MapItem[K, V]]) iter.Seq2[K, V] { return irt.With2(s, m.mi2kv) }
+func (*Map[K, V]) mi2kv(mi MapItem[K, V]) (K, V)                        { return mi.Key, mi.Value }
+func (*Map[K, V]) filter(mi MapItem[K, V]) bool                         { return mi.Exists }
+
+func (m *Map[K, V]) withHasher(op func(h *maphash.Hash) uint64) uint64 {
+	h := hashPool.Get()
+	defer hashPool.Put(h)
+	return op(h)
+}
+
+func (m *Map[K, V]) shardID(key K) uint64 {
+	return m.withHasher(func(h *maphash.Hash) uint64 { maphash.WriteComparable(h, key); return h.Sum64() % m.num })
+}

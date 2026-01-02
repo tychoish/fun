@@ -60,7 +60,7 @@ func (mi MapType) String() string {
 
 type oomap[K comparable, V any] interface {
 	Load(K) (V, bool)
-	Store(K, V)
+	Set(K, V) bool
 	Delete(K)
 	Check(K) bool
 	Keys() iter.Seq[K]
@@ -74,8 +74,8 @@ type rmtxMap[K comparable, V any] struct {
 	d  stw.Map[K, V]
 }
 
-func (m *rmtxMap[K, V]) Store(k K, v V)     { defer adt.WithW(adt.LockW(&m.mu)); m.d.Store(k, v) }
 func (m *rmtxMap[K, V]) Delete(k K)         { defer adt.WithW(adt.LockW(&m.mu)); m.d.Delete(k) }
+func (m *rmtxMap[K, V]) Set(k K, v V) bool  { defer adt.WithW(adt.LockW(&m.mu)); return m.d.Set(k, v) }
 func (m *rmtxMap[K, V]) Load(k K) (V, bool) { defer adt.WithR(adt.LockR(&m.mu)); return m.d.Load(k) }
 func (m *rmtxMap[K, V]) Check(k K) bool     { defer adt.WithR(adt.LockR(&m.mu)); return m.d.Check(k) }
 
@@ -96,8 +96,8 @@ type mtxMap[K comparable, V any] struct {
 	d  stw.Map[K, V]
 }
 
-func (m *mtxMap[K, V]) Store(k K, v V)     { defer adt.With(adt.Lock(&m.mu)); m.d.Store(k, v) }
 func (m *mtxMap[K, V]) Delete(k K)         { defer adt.With(adt.Lock(&m.mu)); m.d.Delete(k) }
+func (m *mtxMap[K, V]) Set(k K, v V) bool  { defer adt.With(adt.Lock(&m.mu)); return m.d.Set(k, v) }
 func (m *mtxMap[K, V]) Load(k K) (V, bool) { defer adt.With(adt.Lock(&m.mu)); return m.d.Load(k) }
 func (m *mtxMap[K, V]) Check(k K) bool     { defer adt.With(adt.Lock(&m.mu)); return m.d.Check(k) }
 

@@ -23,6 +23,24 @@ type Map[K comparable, V any] struct {
 	mp      sync.Map
 }
 
+// Len counts and reports on the number of items in the map. This is
+// provided by iterating and counting the values in the map, and has
+// O(n) performance.
+//
+// Len uses a range function and therefore does not reflect a specific
+// snapshot of the map at any time if keys are being deleted while Len
+// is running. Len will never report a number that is larger than the
+// total number of items in the map while Len is running, but the
+// number of items in the map may be smaller at the beginning and/or
+// the end than reported.
+func (mp *Map[K, V]) Len() (count int) {
+	mp.mp.Range(func(any, any) bool { count++; return true })
+	return
+}
+
+// Check returns true if the key exists in the map or false otherwise.
+func (mp *Map[K, V]) Check(key K) bool { return ft.IsOk(mp.mp.Load(key)) }
+
 // Delete removes a key--and its corresponding value--from the map, if
 // it exists.
 func (mp *Map[K, V]) Delete(key K) { mp.mp.Delete(key) }
@@ -31,23 +49,19 @@ func (mp *Map[K, V]) Delete(key K) { mp.mp.Delete(key) }
 // values as needed.
 func (mp *Map[K, V]) Store(k K, v V) { mp.mp.Store(k, v) }
 
-// Ensure adds a key to the map if it does not already exist, using
-// the default value. The default value, is taken from the pool, which
-// has a configurable constructor if you want a different default
-// value.
-func (mp *Map[K, V]) Ensure(key K) { mp.EnsureDefault(key, mp.Default.Make) }
-
-// Check returns true if the key exists in the map or false otherwise.
-func (mp *Map[K, V]) Check(key K) bool { return ft.IsOk(mp.mp.Load(key)) }
-
 // Load retrieves the value from the map. The semantics are the same
 // as for maps in go: if the value does not exist it always returns
 // the zero value for the type, while the second value indicates if
 // the key was present in the map.
 func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key)) }
 
-// EnsureStore takes a value and returns true if the value was stored in the map.
-func (mp *Map[K, V]) EnsureStore(k K, v V) bool { _, loaded := mp.mp.LoadOrStore(k, v); return !loaded }
+// Get returns the value from the map. If the key is not present in the map,
+// this returns the zero value for V.
+func (mp *Map[K, V]) Get(key K) V { return ft.IgnoreSecond(mp.Load(key)) }
+
+// Set adds the value to the map, overriding any existing value. The return reports if the key
+// existed in the map before the operation.
+func (mp *Map[K, V]) Set(key K, value V) bool { return ft.IgnoreFirst(mp.mp.Swap(key, value)) }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {
@@ -56,19 +70,7 @@ func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	return v.(V), ok
 }
 
-// Get retrieves the value from the map at the given value. If the key
-// is not present in the map a default value is created and added to
-// the map.
-func (mp *Map[K, V]) Get(key K) V {
-	defaultValue := mp.Default.Get()
-	out, loaded := mp.mp.LoadOrStore(key, defaultValue)
-	if !loaded {
-		mp.Default.Put(defaultValue)
-	}
-	return out.(V)
-}
-
-// EnsureDefault is similar to EnsureStore and Ensure, but provides
+// Ensure is similar to EnsureStore but provides
 // the default value as a function that produces a value rather than
 // the value directly. The returned value is *always* the value of the
 // key, which is either the value from the map or the value produced
@@ -78,10 +80,22 @@ func (mp *Map[K, V]) Get(key K) V {
 // exists in the map. Unlike Get and Ensure which have similar
 // semantics and roles, the value produced by function does not
 // participate in the default object pool.
-func (mp *Map[K, V]) EnsureDefault(key K, constr func() V) V {
-	out, _ := mp.mp.LoadOrStore(key, constr())
-	return out.(V)
+func (mp *Map[K, V]) Ensure(key K) bool {
+	defaultValue := mp.Default.Get()
+	_, loaded := mp.mp.LoadOrStore(key, defaultValue)
+	if !loaded {
+		mp.Default.Put(defaultValue)
+	}
+	return loaded
 }
+
+// Extend adds values from the input sequence to the current map.  If
+// keys in the input sequence exist in the map already, they're
+// overridden. There is no isolation. While the operation is entirely
+// thread safe (or at least as safe as the input iterator is), adding
+// individual key/value pairs to the map may interleave with other
+// operations.
+func (mp *Map[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, mp.Store) }
 
 // MarshalJSON produces a JSON form of the map, using a Range function
 // to iterate through the values in the map. Range functions do not
@@ -104,23 +118,6 @@ func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
 	}
 
 	return nil
-}
-
-// Len counts and reports on the number of items in the map. This is
-// provided by iterating and counting the values in the map, and has
-// O(n) performance.
-//
-// Len uses a range function and therefore does not reflect a specific
-// snapshot of the map at any time if keys are being deleted while Len
-// is running. Len will never report a number that is larger than the
-// total number of items in the map while Len is running, but the
-// number of items in the map may be smaller at the beginning and/or
-// the end than reported.
-func (mp *Map[K, V]) Len() int {
-	count := 0
-	mp.mp.Range(func(any, any) bool { count++; return true })
-
-	return count
 }
 
 // Iterator returns a native go iterator for a fun/dt.Map object.

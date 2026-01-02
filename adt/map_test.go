@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/ft"
 )
 
 // When implementing the Map[K,V] type, I wrote a number of
@@ -37,7 +36,7 @@ import (
 // results if the input map is mutated during the operation. Keys and
 // values from the input map will replace keys and values from the
 // output map.
-func (mp *Map[K, V]) Join(in *Map[K, V]) { irt.Apply2(in.Iterator(), mp.Store) }
+func (mp *Map[K, V]) Join(in *Map[K, V]) { mp.Extend(in.Iterator()) }
 
 func TestMap(t *testing.T) {
 	t.Parallel()
@@ -54,7 +53,7 @@ func TestMap(t *testing.T) {
 				defer wg.Done()
 				for ctx.Err() == nil && !passed.Load() {
 					for i := 0; i < 100; i++ {
-						mp.Store(fmt.Sprint(i), rand.Int())
+						mp.Set(fmt.Sprint(i), rand.Int())
 					}
 					runtime.Gosched()
 				}
@@ -193,21 +192,6 @@ func TestMap(t *testing.T) {
 		assert.True(t, !mp.Check("baz"))
 		assert.Equal(t, 2, mp.Len())
 	})
-	t.Run("Get", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		assert.Zero(t, mp.Len())
-		val := mp.Get("foo")
-		assert.Zero(t, val)
-		assert.Equal(t, 1, mp.Len())
-		mp.Default.SetConstructor(func() int { return 42 })
-		_ = mp.Default.Get()
-		_ = mp.Default.Get()
-		_ = mp.Default.Get()
-		val = mp.Get("bar")
-		assert.Equal(t, 42, val)
-		val = mp.Get("foo")
-		assert.Zero(t, val)
-	})
 	t.Run("Join", func(t *testing.T) {
 		t.Run("Disjoint", func(t *testing.T) {
 			mp := &Map[string, int]{}
@@ -240,7 +224,7 @@ func TestMap(t *testing.T) {
 
 			assert.Equal(t, 2, mp2.Len())
 			assert.Equal(t, 3, mp.Len())
-			assert.Equal(t, mp.Get("foo"), 500)
+			assert.Equal(t, ft.IgnoreSecond(mp.Load("foo")), 500)
 		})
 	})
 	t.Run("JSON", func(t *testing.T) {
@@ -261,16 +245,6 @@ func TestMap(t *testing.T) {
 			err := json.Unmarshal([]byte(`{"foo": []}`), mp)
 			assert.Error(t, err)
 		})
-	})
-
-	t.Run("Ensure", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		ok := mp.EnsureStore("hi", 100)
-		check.True(t, ok)
-		ok = mp.EnsureStore("hi", 100)
-		check.True(t, !ok)
-		ok = mp.EnsureStore("hi", 10)
-		check.True(t, !ok)
 	})
 	t.Run("Streams", func(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
