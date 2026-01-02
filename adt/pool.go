@@ -38,8 +38,8 @@ type Pool[T any] struct {
 func (p *Pool[T]) init() { p.once.Do(p.doInit) }
 
 func (p *Pool[T]) doInit() {
-	p.hook = NewAtomic(func(in T) T { return in })
-	p.constructor = NewAtomic(func() (out T) { return out })
+	p.hook = NewAtomic(ft.Noop[T])
+	p.constructor = NewAtomic(ft.Zero[T])
 	p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
 	var zero T
 	p.typeIsPtr = ft.IsPtr(zero)
