@@ -219,4 +219,262 @@ func TestShardedMap(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("IteratorSharded", func(t *testing.T) {
+		t.Run("Basic", func(t *testing.T) {
+			m := &Map[string, int]{}
+			m.Store("one", 1)
+			m.Store("two", 2)
+			m.Store("three", 3)
+
+			seen := make(map[string]int)
+			shardCount := 0
+
+			for shardIter := range m.IteratorSharded() {
+				shardCount++
+				for k, v := range shardIter {
+					seen[k] = v
+				}
+			}
+
+			// Verify all items were seen
+			assert.Equal(t, len(seen), 3)
+			assert.Equal(t, seen["one"], 1)
+			assert.Equal(t, seen["two"], 2)
+			assert.Equal(t, seen["three"], 3)
+			// Should have at least one shard with items
+			assert.True(t, shardCount > 0 && shardCount <= 32)
+		})
+
+		t.Run("EmptyMap", func(t *testing.T) {
+			m := &Map[string, int]{}
+
+			count := 0
+			shardCount := 0
+			for shardIter := range m.IteratorSharded() {
+				shardCount++
+				for range shardIter {
+					count++
+				}
+			}
+
+			assert.Equal(t, count, 0)
+			// All shards are still returned, just empty
+			assert.Equal(t, shardCount, 32) // default number of shards
+		})
+
+		t.Run("LargeDataset", func(t *testing.T) {
+			m := &Map[int, int]{}
+
+			// Populate with 1000 items
+			for i := 0; i < 1000; i++ {
+				m.Store(i, i*10)
+			}
+
+			seen := make(map[int]int)
+			shardCount := 0
+			itemsPerShard := make(map[int]int)
+
+			for shardIter := range m.IteratorSharded() {
+				currentShard := shardCount
+				shardCount++
+				itemCount := 0
+
+				for k, v := range shardIter {
+					itemCount++
+					seen[k] = v
+					check.Equal(t, v, k*10) // Verify value matches expected
+				}
+
+				itemsPerShard[currentShard] = itemCount
+			}
+
+			// Verify all 1000 items were seen
+			assert.Equal(t, len(seen), 1000)
+			for i := 0; i < 1000; i++ {
+				val, ok := seen[i]
+				check.True(t, ok)
+				check.Equal(t, val, i*10)
+			}
+
+			// Verify items are distributed across shards
+			shardsWithItems := 0
+			for _, count := range itemsPerShard {
+				if count > 0 {
+					shardsWithItems++
+				}
+			}
+			// With 1000 items and good hashing, we should have multiple shards with items
+			assert.True(t, shardsWithItems > 1)
+		})
+
+		t.Run("EarlyTermination", func(t *testing.T) {
+			m := &Map[int, int]{}
+
+			for i := 0; i < 100; i++ {
+				m.Store(i, i*10)
+			}
+
+			// Break after first shard with items
+			foundItems := false
+			for shardIter := range m.IteratorSharded() {
+				hasItems := false
+				for range shardIter {
+					hasItems = true
+					break // Break from shard iterator
+				}
+				if hasItems {
+					foundItems = true
+					break // Break from sharded iterator
+				}
+			}
+
+			assert.True(t, foundItems)
+		})
+
+		t.Run("ConcurrentAccess", func(t *testing.T) {
+			m := &Map[int, int]{}
+
+			// Populate the map with initial values
+			for i := 0; i < 100; i++ {
+				m.Store(i, i*10)
+			}
+
+			// Use channels to coordinate goroutines
+			done := make(chan bool, 3)
+
+			// Goroutine 1: Read items concurrently using IteratorSharded
+			go func() {
+				defer func() { done <- true }()
+				for i := 0; i < 10; i++ {
+					count := 0
+					for shardIter := range m.IteratorSharded() {
+						for k, v := range shardIter {
+							count++
+							// Basic sanity check
+							check.True(t, v == k*10 || v == k*20)
+						}
+					}
+					// We should see at least the initial items
+					check.True(t, count >= 100)
+				}
+			}()
+
+			// Goroutine 2: Write new items concurrently
+			go func() {
+				defer func() { done <- true }()
+				for i := 100; i < 200; i++ {
+					m.Store(i, i*10)
+				}
+			}()
+
+			// Goroutine 3: Update existing items concurrently
+			go func() {
+				defer func() { done <- true }()
+				for i := 0; i < 50; i++ {
+					m.Store(i, i*20)
+				}
+			}()
+
+			// Wait for all goroutines to complete
+			<-done
+			<-done
+			<-done
+
+			// Verify final state using IteratorSharded
+			finalCount := 0
+			finalSeen := make(map[int]int)
+			for shardIter := range m.IteratorSharded() {
+				for k, v := range shardIter {
+					finalCount++
+					finalSeen[k] = v
+				}
+			}
+			assert.Equal(t, finalCount, 200)
+			assert.Equal(t, len(finalSeen), 200)
+		})
+
+		t.Run("CompareWithNonSharded", func(t *testing.T) {
+			m := &Map[string, int]{}
+			m.Store("alpha", 1)
+			m.Store("beta", 2)
+			m.Store("gamma", 3)
+			m.Store("delta", 4)
+			m.Store("epsilon", 5)
+
+			// Collect results from regular Iterator
+			regularSeen := make(map[string]int)
+			for k, v := range m.Iterator() {
+				regularSeen[k] = v
+			}
+
+			// Collect results from IteratorSharded
+			shardedSeen := make(map[string]int)
+			for shardIter := range m.IteratorSharded() {
+				for k, v := range shardIter {
+					shardedSeen[k] = v
+				}
+			}
+
+			// Both should see the same items
+			assert.Equal(t, len(regularSeen), len(shardedSeen))
+			for k, v := range regularSeen {
+				val, ok := shardedSeen[k]
+				check.True(t, ok)
+				check.Equal(t, val, v)
+			}
+		})
+
+		t.Run("NoItemDuplication", func(t *testing.T) {
+			m := &Map[int, string]{}
+
+			// Store 500 items
+			for i := 0; i < 500; i++ {
+				m.Store(i, fmt.Sprintf("value-%d", i))
+			}
+
+			// Track all keys seen across all shards
+			seenKeys := make(map[int]int) // maps key to count
+
+			for shardIter := range m.IteratorSharded() {
+				for k := range shardIter {
+					seenKeys[k]++
+				}
+			}
+
+			// Verify we saw all 500 items
+			assert.Equal(t, len(seenKeys), 500)
+
+			// Verify no key appeared more than once
+			for k, count := range seenKeys {
+				if count != 1 {
+					t.Errorf("key %d appeared %d times (expected 1)", k, count)
+				}
+			}
+		})
+
+		t.Run("CustomShardCount", func(t *testing.T) {
+			m := &Map[int, int]{}
+			m.Setup(8, MapTypeDefault) // Use 8 shards instead of default 32
+
+			for i := 0; i < 100; i++ {
+				m.Store(i, i*2)
+			}
+
+			shardCount := 0
+			totalItems := 0
+
+			for shardIter := range m.IteratorSharded() {
+				shardCount++
+				for range shardIter {
+					totalItems++
+				}
+			}
+
+			// Should see all 8 shards
+			assert.Equal(t, shardCount, 8)
+			// Should see all 100 items
+			assert.Equal(t, totalItems, 100)
+		})
+	})
 }

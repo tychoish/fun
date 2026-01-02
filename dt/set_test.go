@@ -420,6 +420,351 @@ func TestSet(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Equal", func(t *testing.T) {
+		t.Run("BothEmpty", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set2 := &Set[int]{}
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("BothEmptyOrdered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set2 := &Set[int]{}
+			set2.Order()
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("EmptyOrderedVsUnordered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set2 := &Set[int]{}
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("Reflexive", func(t *testing.T) {
+			set := &Set[int]{}
+			set.Add(1)
+			set.Add(2)
+			set.Add(3)
+			assert.True(t, set.Equal(set))
+		})
+
+		t.Run("ReflexiveOrdered", func(t *testing.T) {
+			set := &Set[int]{}
+			set.Order()
+			set.Add(1)
+			set.Add(2)
+			set.Add(3)
+			assert.True(t, set.Equal(set))
+		})
+
+		t.Run("DifferentLengths", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Add(1)
+			set1.Add(2)
+
+			set2 := &Set[int]{}
+			set2.Add(1)
+			set2.Add(2)
+			set2.Add(3)
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("DifferentLengthsOrdered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set1.Add(1)
+			set1.Add(2)
+
+			set2 := &Set[int]{}
+			set2.Order()
+			set2.Add(1)
+			set2.Add(2)
+			set2.Add(3)
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("UnorderedSameItems", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Add(3)
+			set1.Add(1)
+			set1.Add(2)
+
+			set2 := &Set[int]{}
+			set2.Add(1)
+			set2.Add(3)
+			set2.Add(2)
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("UnorderedDifferentItems", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Add(1)
+			set1.Add(2)
+			set1.Add(3)
+
+			set2 := &Set[int]{}
+			set2.Add(1)
+			set2.Add(2)
+			set2.Add(4)
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("OrderedSameItemsSameOrder", func(t *testing.T) {
+			set1 := &Set[string]{}
+			set1.Order()
+			set1.Add("a")
+			set1.Add("b")
+			set1.Add("c")
+
+			set2 := &Set[string]{}
+			set2.Order()
+			set2.Add("a")
+			set2.Add("b")
+			set2.Add("c")
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("OrderedSameItemsDifferentOrder", func(t *testing.T) {
+			set1 := &Set[string]{}
+			set1.Order()
+			set1.Add("a")
+			set1.Add("b")
+			set1.Add("c")
+
+			set2 := &Set[string]{}
+			set2.Order()
+			set2.Add("c")
+			set2.Add("b")
+			set2.Add("a")
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("OrderedVsUnordered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set1.Add(1)
+			set1.Add(2)
+			set1.Add(3)
+
+			set2 := &Set[int]{}
+			set2.Add(1)
+			set2.Add(2)
+			set2.Add(3)
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("SingleItem", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Add(42)
+
+			set2 := &Set[int]{}
+			set2.Add(42)
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("SingleItemOrdered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set1.Add(42)
+
+			set2 := &Set[int]{}
+			set2.Order()
+			set2.Add(42)
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("SingleItemDifferent", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Add(42)
+
+			set2 := &Set[int]{}
+			set2.Add(43)
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("EmptyVsNonEmpty", func(t *testing.T) {
+			set1 := &Set[int]{}
+
+			set2 := &Set[int]{}
+			set2.Add(1)
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("LargeSetUnordered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set2 := &Set[int]{}
+
+			// Add 1000 items in different orders
+			for i := 0; i < 1000; i++ {
+				set1.Add(i)
+			}
+			for i := 999; i >= 0; i-- {
+				set2.Add(i)
+			}
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("LargeSetOrdered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set2 := &Set[int]{}
+			set2.Order()
+
+			// Add same items in same order
+			for i := 0; i < 1000; i++ {
+				set1.Add(i)
+				set2.Add(i)
+			}
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("LargeSetOrderedDifferentOrder", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set2 := &Set[int]{}
+			set2.Order()
+
+			// Add same items in different orders
+			for i := 0; i < 1000; i++ {
+				set1.Add(i)
+			}
+			for i := 999; i >= 0; i-- {
+				set2.Add(i)
+			}
+
+			assert.True(t, !set1.Equal(set2))
+			assert.True(t, !set2.Equal(set1))
+		})
+
+		t.Run("AfterDeletionUnordered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Add(1)
+			set1.Add(2)
+			set1.Add(3)
+			set1.Delete(2)
+
+			set2 := &Set[int]{}
+			set2.Add(1)
+			set2.Add(3)
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("AfterDeletionOrdered", func(t *testing.T) {
+			set1 := &Set[int]{}
+			set1.Order()
+			set1.Add(1)
+			set1.Add(2)
+			set1.Add(3)
+			set1.Delete(2)
+
+			set2 := &Set[int]{}
+			set2.Order()
+			set2.Add(1)
+			set2.Add(3)
+
+			assert.True(t, set1.Equal(set2))
+			assert.True(t, set2.Equal(set1))
+		})
+
+		t.Run("StringSet", func(t *testing.T) {
+			set1 := &Set[string]{}
+			set1.Add("hello")
+			set1.Add("world")
+
+			set2 := &Set[string]{}
+			set2.Add("world")
+			set2.Add("hello")
+
+			assert.True(t, set1.Equal(set2))
+		})
+
+		t.Run("StringSetOrdered", func(t *testing.T) {
+			set1 := &Set[string]{}
+			set1.Order()
+			set1.Add("hello")
+			set1.Add("world")
+
+			set2 := &Set[string]{}
+			set2.Order()
+			set2.Add("hello")
+			set2.Add("world")
+
+			assert.True(t, set1.Equal(set2))
+
+			set3 := &Set[string]{}
+			set3.Order()
+			set3.Add("world")
+			set3.Add("hello")
+
+			assert.True(t, !set1.Equal(set3))
+		})
+
+		t.Run("Symmetric", func(t *testing.T) {
+			// Test that Equal is symmetric across various scenarios
+			scenarios := []struct {
+				name string
+				s1   *Set[int]
+				s2   *Set[int]
+			}{
+				{
+					name: "Empty",
+					s1:   &Set[int]{},
+					s2:   &Set[int]{},
+				},
+				{
+					name: "SingleItem",
+					s1:   func() *Set[int] { s := &Set[int]{}; s.Add(1); return s }(),
+					s2:   func() *Set[int] { s := &Set[int]{}; s.Add(1); return s }(),
+				},
+				{
+					name: "MultipleItems",
+					s1:   func() *Set[int] { s := &Set[int]{}; s.Add(1); s.Add(2); s.Add(3); return s }(),
+					s2:   func() *Set[int] { s := &Set[int]{}; s.Add(3); s.Add(1); s.Add(2); return s }(),
+				},
+			}
+
+			for _, scenario := range scenarios {
+				t.Run(scenario.name, func(t *testing.T) {
+					result1 := scenario.s1.Equal(scenario.s2)
+					result2 := scenario.s2.Equal(scenario.s1)
+					check.Equal(t, result1, result2)
+				})
+			}
+		})
+	})
 }
 
 func BenchmarkSet(b *testing.B) {
