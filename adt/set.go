@@ -54,7 +54,7 @@ func (s *Set[T]) Order() {
 // method on a populated but unordered set.
 func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
 	defer s.with(s.lock())
-	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
+	s.setupOrdered()
 	s.list.SortQuick(lt)
 }
 
@@ -64,14 +64,16 @@ func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
 // populated but unordered set.
 func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
 	defer s.with(s.lock())
-	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
+	s.setupOrdered()
 	s.list.SortMerge(lt)
 }
 
-func (s *Set[T]) forceSetupOrdered() {
-	s.list = &dt.List[T]{}
-	for item := range s.hash.Iterator() {
-		s.list.PushBack(item)
+func (s *Set[T]) setupOrdered() {
+	if s.list == nil {
+		s.list = &dt.List[T]{}
+		for item := range s.hash.Iterator() {
+			s.list.PushBack(item)
+		}
 	}
 }
 
@@ -86,12 +88,6 @@ func (s *Set[T]) Len() int { defer s.with(s.lock()); return s.hash.Len() }
 // Check returns true if the item is in the set.
 func (s *Set[T]) Check(in T) bool { defer s.with(s.lock()); return s.hash.Check(in) }
 
-// Add attempts to add the item while holding to the mutex, and is a noop otherwise.
-func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
-
-// Delete attempts to remove the item from the set.
-func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
-
 // Iterator returns a new-style native Go iterator for the items in the set. Provides items in
 // iteration order if the set is ordered. If the Set is ordered, then the future produces items in
 // the set's order.
@@ -105,9 +101,9 @@ func (s *Set[T]) Iterator() iter.Seq[T] {
 	return irt.WithMutex(s.hash.Keys(), &s.mtx)
 }
 
-// DeleteCheck removes the item from the set, return true when the
-// item had been in the Set, and returning false othewise.
-func (s *Set[T]) DeleteCheck(in T) bool {
+// Delete removes the item from the set, returning true when the item
+// existed in the Set and false otherwise
+func (s *Set[T]) Delete(in T) bool {
 	defer s.with(s.lock())
 	defer s.hash.Delete(in)
 	s.init()
@@ -121,10 +117,10 @@ func (s *Set[T]) DeleteCheck(in T) bool {
 	return true
 }
 
-// AddCheck adds an item to the set and returns true if the item had
-// been in the set before AddCheck. In all cases when AddCheck
+// Add adds an item to the set and returns true if the item had
+// been in the set before Add. In all cases when Add
 // returns, the item is a member of the set.
-func (s *Set[T]) AddCheck(in T) (ok bool) {
+func (s *Set[T]) Add(in T) (ok bool) {
 	defer s.with(s.lock())
 	s.init()
 
@@ -146,7 +142,8 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 }
 
 // Extend adds all items encountered in the stream to the set.
-func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.Add) }
+func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.add) }
+func (s *Set[T]) add(in T)                { s.Add(in) }
 
 // MarshalJSON generates a JSON array of the items in the set.
 func (s *Set[T]) MarshalJSON() ([]byte, error) {
@@ -160,7 +157,7 @@ func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	var items []T
 	err := json.Unmarshal(in, &items)
 	if err == nil {
-		ft.ApplyMany(s.Add, items)
+		ft.ApplyMany(s.add, items)
 	}
 	return err
 }

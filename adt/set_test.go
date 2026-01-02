@@ -105,21 +105,21 @@ func TestSet(t *testing.T) {
 				set := builder()
 				set.Add("abc")
 
-				if !set.DeleteCheck("abc") {
+				if !set.Delete("abc") {
 					t.Error("set item should have been present")
 				}
 
-				if set.DeleteCheck("abc") {
+				if set.Delete("abc") {
 					t.Error("set item should not have been present")
 				}
 			})
 			t.Run("AddCheck", func(t *testing.T) {
 				set := builder()
 
-				if set.AddCheck("abc") {
+				if set.Add("abc") {
 					t.Error("set item should not have been present")
 				}
-				if !set.AddCheck("abc") {
+				if !set.Add("abc") {
 					t.Error("set item should have been present")
 				}
 			})

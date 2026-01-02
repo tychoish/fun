@@ -104,21 +104,21 @@ func TestSet(t *testing.T) {
 				set := builder()
 				set.Add("abc")
 
-				if !set.DeleteCheck("abc") {
+				if !set.Delete("abc") {
 					t.Error("set item should have been present")
 				}
 
-				if set.DeleteCheck("abc") {
+				if set.Delete("abc") {
 					t.Error("set item should not have been present")
 				}
 			})
 			t.Run("AddCheck", func(t *testing.T) {
 				set := builder()
 
-				if set.AddCheck("abc") {
+				if set.Add("abc") {
 					t.Error("set item should not have been present")
 				}
-				if !set.AddCheck("abc") {
+				if !set.Add("abc") {
 					t.Error("set item should have been present")
 				}
 			})
@@ -134,14 +134,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator(), 0, set.Len())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						sl = set.Slice()
+						sl = irt.Collect(set.Iterator(), 0, set.Len())
 
 						check.Equal(t, "abc", sl[0])
 						check.Equal(t, "def", sl[1])
@@ -160,14 +160,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator(), 0, set.Len())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortQuick(cmp.LessThanNative[string])
 
-						sll := set.Slice()
+						sll := irt.Collect(set.Iterator(), 0, set.Len())
 
 						check.Equal(t, "abc", sll[0])
 						check.Equal(t, "def", sll[1])
@@ -188,14 +188,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator(), 0, set.Len())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						sll := set.Slice()
+						sll := irt.Collect(set.Iterator(), 0, set.Len())
 
 						check.Equal(t, "abc", sll[0])
 						check.Equal(t, "def", sll[1])
@@ -214,14 +214,14 @@ func TestSet(t *testing.T) {
 						set.Add("def")
 						set.Add("ghi")
 
-						sl := set.Slice()
+						sl := irt.Collect(set.Iterator(), 0, set.Len())
 
 						if sl[0] == "abc" && sl[1] == "def" && sl[2] == "lmn" && sl[3] == "opq" && sl[4] == "xyz" {
 							t.Fatal("should not be ordred by default")
 						}
 						set.SortMerge(cmp.LessThanNative[string])
 
-						sll := set.Slice()
+						sll := irt.Collect(set.Iterator(), 0, set.Len())
 
 						check.Equal(t, "abc", sll[0])
 						check.Equal(t, "def", sll[1])
@@ -362,7 +362,7 @@ func TestSet(t *testing.T) {
 			assert.Equal(t, ls.Len(), 42)
 			assert.Equal(t, st.Len(), ls.Len())
 
-			setls := st.List()
+			setls := IteratorList(st.Iterator())
 
 			count := 0
 			for elemL, elemS := ls.Front(), setls.Front(); elemL.Ok() && elemS.Ok(); elemL, elemS = elemL.Next(), elemS.Next() {
@@ -381,7 +381,7 @@ func TestSet(t *testing.T) {
 				st.Add(v)
 			}
 
-			setls := st.List()
+			setls := IteratorList(st.Iterator())
 
 			assert.Equal(t, ls.Len(), 42)
 			assert.Equal(t, st.Len(), ls.Len())
@@ -406,14 +406,14 @@ func TestSet(t *testing.T) {
 
 			st.Extend(irt.Slice(in))
 			assert.Equal(t, st.Len(), 6)
-			assert.True(t, slices.Equal(in, st.Slice()))
+			assert.True(t, slices.Equal(in, irt.Collect(st.Iterator())))
 		})
 		t.Run("Unordered", func(t *testing.T) {
 			in := []int{1, 2, 3, 4, 5, 6}
-			st := &Set[int]{}
-			st.Extend(irt.Slice(in))
-			assert.Equal(t, st.Len(), 6)
-			out := st.Slice()
+			set := &Set[int]{}
+			set.Extend(irt.Slice(in))
+			assert.Equal(t, set.Len(), 6)
+			out := irt.Collect(set.Iterator(), 0, set.Len())
 			assert.Equal(t, len(out), 6)
 			for v := range slices.Values(out) {
 				check.True(t, v <= 6 && v >= 1)

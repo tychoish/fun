@@ -47,40 +47,26 @@ func (s *Set[T]) Order() {
 // more memory intensive for some types. If the set is not ordered, it
 // will become ordered. Unlike the Order() method, you can use this
 // method on a populated but unordered set.
-func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) {
-	s.init()
-	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
-	s.list.SortQuick(lt)
-}
+func (s *Set[T]) SortQuick(lt cmp.LessThan[T]) { s.init(); s.setupOrdered(); s.list.SortQuick(lt) }
 
 // SortMerge sorts the elements in an ordered set using a merge sort
 // algorithm. If the set is not ordered, it will become
 // ordered. Unlike the Order() method, you can use this method on a
 // populated but unordered set.
-func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) {
-	s.init()
-	ft.CallWhen(s.list == nil, s.forceSetupOrdered)
-	s.list.SortMerge(lt)
-}
+func (s *Set[T]) SortMerge(lt cmp.LessThan[T]) { s.init(); s.setupOrdered(); s.list.SortMerge(lt) }
 
-func (s *Set[T]) forceSetupOrdered() {
-	ft.Invariant(ers.If(s.list != nil, ErrUninitializedContainer))
-
-	s.list = &List[T]{}
-	for item := range s.hash {
-		s.list.PushBack(item)
+func (s *Set[T]) setupOrdered() {
+	if s.list == nil {
+		s.list = &List[T]{}
+		for item := range s.hash {
+			s.list.PushBack(item)
+		}
 	}
 }
 
 func (s *Set[T]) isOrdered() bool { return s.list != nil }
-func (s *Set[T]) init() {
-	if s.hash == nil {
-		s.hash = stw.Map[T, *Element[T]]{}
-	}
-}
-
-// Add attempts to add the item while holding to the mutex, and is a noop otherwise.
-func (s *Set[T]) Add(in T) { _ = s.AddCheck(in) }
+func (s *Set[T]) init()           { ft.CallWhen(s.hash == nil, s.initHash) }
+func (s *Set[T]) initHash()       { s.hash = stw.Map[T, *Element[T]]{} }
 
 // Len returns the number of items tracked in the set.
 func (s *Set[T]) Len() int { return len(s.hash) }
@@ -88,38 +74,19 @@ func (s *Set[T]) Len() int { return len(s.hash) }
 // Check returns true if the item is in the set.
 func (s *Set[T]) Check(in T) bool { return s.hash.Check(in) }
 
-// Delete attempts to remove the item from the set.
-func (s *Set[T]) Delete(in T) { _ = s.DeleteCheck(in) }
-
 // Iterator returns a new-style native Go iterator for the items in the set. Provides items in
 // iteration order if the set is ordered. If the Set is ordered, then the future produces items in
 // the set's order.
 func (s *Set[T]) Iterator() iter.Seq[T] {
-	st := s.unsafeStream()
-
-	return st
-}
-
-// List exports the contents of the set to a List, structure which is implemented as a doubly linked list.
-func (s *Set[T]) List() *List[T] {
 	if s.list != nil {
-		return s.list.Copy()
+		return s.list.IteratorFront()
 	}
-	return IteratorList(s.Iterator())
+	return s.hash.Keys()
 }
 
-// Slice exports the contents of the set to a slice.
-func (s *Set[T]) Slice() stw.Slice[T] {
-	if s.list != nil {
-		return s.list.Slice()
-	}
-
-	return irt.Collect(s.hash.Keys(), 0, s.Len())
-}
-
-// DeleteCheck removes the item from the set, return true when the
+// Delete removes the item from the set, return true when the
 // item had been in the Set, and returning false othewise.
-func (s *Set[T]) DeleteCheck(in T) bool {
+func (s *Set[T]) Delete(in T) bool {
 	s.init()
 
 	defer delete(s.hash, in)
@@ -133,10 +100,10 @@ func (s *Set[T]) DeleteCheck(in T) bool {
 	return true
 }
 
-// AddCheck adds an item to the set and returns true if the item had
-// been in the set before AddCheck. In all cases when AddCheck
+// Add adds an item to the set and returns true if the item had
+// been in the set before Add. In all cases when Add
 // returns, the item is a member of the set.
-func (s *Set[T]) AddCheck(in T) (ok bool) {
+func (s *Set[T]) Add(in T) (ok bool) {
 	s.init()
 	ok = s.hash.Check(in)
 	if ok {
@@ -156,33 +123,28 @@ func (s *Set[T]) AddCheck(in T) (ok bool) {
 }
 
 // Extend adds all items encountered in the stream to the set.
-func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.Add) }
-
-func (s *Set[T]) unsafeStream() iter.Seq[T] {
-	if s.list != nil {
-		return s.list.IteratorFront()
-	}
-	return s.hash.Keys()
-}
+func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.add) }
+func (s *Set[T]) add(in T)                { s.Add(in) }
 
 // Equal tests two sets, returning true if the items in the sets have
 // equal values. If the sets are ordered, order is considered.
 func (s *Set[T]) Equal(other *Set[T]) bool {
-	if len(s.hash) != other.Len() || s.isOrdered() != other.isOrdered() {
+	switch {
+	case len(s.hash) != other.Len():
 		return false
+	case s.isOrdered() != other.isOrdered():
+		return false
+	case s.isOrdered():
+		return irt.Equal(s.Iterator(), other.Iterator())
+	default:
+		return maps.Equal(s.hash, other.hash)
 	}
-
-	iter := s.unsafeStream()
-
-	if s.isOrdered() {
-		return irt.Equal(iter, other.Iterator())
-	}
-
-	return maps.Equal(s.hash, other.hash)
 }
 
 // MarshalJSON generates a JSON array of the items in the set.
-func (s *Set[T]) MarshalJSON() ([]byte, error) { return json.Marshal(s.Slice()) }
+func (s *Set[T]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(irt.Collect(s.Iterator(), 0, s.Len()))
+}
 
 // UnmarshalJSON reads input JSON data, constructs an array in memory
 // and then adds items from the array to existing set. Items that are
@@ -191,7 +153,7 @@ func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	var items []T
 	err := json.Unmarshal(in, &items)
 	if err == nil {
-		ft.ApplyMany(s.Add, items)
+		ft.ApplyMany(s.add, items)
 	}
 	return err
 }
