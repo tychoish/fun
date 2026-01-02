@@ -5,9 +5,15 @@ import (
 	"iter"
 	"sync"
 
+	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
+
+// OrderedMap is an alias of the `dt` package's ordered map
+// implementation, which is (incidentally as an implementation detail)
+// safe for concurrent use.
+type OrderedMap[K comparable, V any] = dt.OrderedMap[K, V]
 
 // Map provides a wrapper around the standard library's sync.Map type
 // with key/value types enforced by generics. Additional helpers

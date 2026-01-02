@@ -69,6 +69,10 @@ func (m *OrderedMap[K, V]) Delete(k K) {
 // before the operation.
 func (m *OrderedMap[K, V]) Set(key K, value V) bool {
 	defer m.with(m.lock())
+	return m.innerSet(key, value)
+}
+
+func (m *OrderedMap[K, V]) innerSet(key K, value V) bool {
 	elem, ok := m.hash.Load(key)
 	if !ok {
 		elem = NewElement(irt.NewElem(key, value))
@@ -84,11 +88,12 @@ func (m *OrderedMap[K, V]) Set(key K, value V) bool {
 // Ensure sets the provided key in the map to the zero value
 // for the value type. If the key already exists, it is not modified.
 func (m *OrderedMap[K, V]) Ensure(key K) bool {
-	if m.Check(key) {
+	defer m.with(m.lock())
+	if m.hash.Check(key) {
 		return true
 	}
 
-	return m.Set(key, m.zerov())
+	return m.innerSet(key, m.zerov())
 }
 
 // Store adds a key-value pair directly to the map. Alias for Add.
@@ -97,13 +102,16 @@ func (m *OrderedMap[K, V]) Store(k K, v V) { m.Set(k, v) }
 // Extend adds a sequence of key-value pairs to the map.
 func (m *OrderedMap[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, m.Store) }
 
-// Iterator returns a standard Go iterator interface to the key-value pairs
-// of the map in insertion order.
+// Iterator returns a standard Go iterator interface to the key-value
+// pairs of the map in insertion order.
 func (m *OrderedMap[K, V]) Iterator() iter.Seq2[K, V] {
 	return irt.ElemsSplit(
-		irt.Keep(
-			m.elems(),
-			func(e irt.Elem[K, V]) bool { m.mtx.Lock(); defer m.mtx.Unlock(); return m.hash.Check(e.First) },
+		irt.WithMutex(
+			irt.Keep(
+				m.list.IteratorFront(),
+				m.checkForElem,
+			),
+			&m.mtx,
 		),
 	)
 }
@@ -111,6 +119,7 @@ func (m *OrderedMap[K, V]) Iterator() iter.Seq2[K, V] {
 // Keys provides a stream over just the keys in the map in insertion order.
 func (m *OrderedMap[K, V]) Keys() iter.Seq[K] { m.init(); return irt.First(irt.ElemsSplit(m.elems())) }
 
+func (m *OrderedMap[K, V]) checkForElem(e irt.Elem[K, V]) bool { return m.hash.Check(e.First) }
 func (m *OrderedMap[K, V]) elems() iter.Seq[irt.Elem[K, V]] {
 	return irt.WithMutex(m.list.IteratorFront(), &m.mtx)
 }
