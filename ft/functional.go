@@ -1,6 +1,6 @@
 package ft
 
-import "iter"
+import "github.com/tychoish/fun/irt"
 
 // Join creates a function that iterates over all of the input
 // functions and calls all non-nil functions sequentially. Nil
@@ -9,6 +9,12 @@ func Join(fns ...func()) func() { return func() { CallMany(fns) } }
 
 // Call executes the provided function.
 func Call(op func()) { op() }
+
+// CallMany calls each of the provided function, skipping any nil functions.
+func CallMany(ops []func()) { irt.Apply(irt.Slice(ops), CallSafe) }
+
+// CallTimes runs the specified operation n times.
+func CallTimes(n int, op func()) { irt.Apply(irt.GenerateN(n, Wrap(op)), CallSafe) }
 
 // Do executes the provided function and returns its result.
 func Do[T any](op func() T) T { return op() }
@@ -53,73 +59,4 @@ func FilterSafe[T any](fn func(T) T, arg T) T {
 		return fn(arg)
 	}
 	return arg
-}
-
-// CallMany calls each of the provided function, skipping any nil functions.
-func CallMany(ops []func()) {
-	for idx := range ops {
-		CallSafe(ops[idx])
-	}
-}
-
-// DoMany calls each of the provided functions and returns an iterator
-// of their results.
-func DoMany[T any](ops []func() T) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for idx := range ops {
-			if op := ops[idx]; op == nil {
-				continue
-			} else if !yield(op()) {
-				return
-			}
-		}
-	}
-}
-
-// DoMany2 calls each of the provided functions and returns an iterator of their results.
-func DoMany2[A any, B any](ops []func() (A, B)) iter.Seq2[A, B] {
-	return func(yield func(A, B) bool) {
-		for idx := range ops {
-			if op := ops[idx]; op == nil {
-				continue
-			} else if !yield(op()) {
-				return
-			}
-		}
-	}
-}
-
-// ApplyMany calls the function on each of the items in the provided
-// slice. ApplyMany is a noop if the function is nil.
-func ApplyMany[T any](fn func(T), args []T) {
-	for idx := 0; idx < len(args) && fn != nil; idx++ {
-		// don't need to use the safe variant because we check
-		// if it's nil in the loop
-		Apply(fn, args[idx])
-	}
-}
-
-// CallTimes runs the specified operation n times.
-func CallTimes(n int, op func()) {
-	for range n {
-		op()
-	}
-}
-
-// ApplyTimes runs the provided function with the argument the specified number of times.
-func ApplyTimes[T any](n int, fn func(T), arg T) {
-	for range n {
-		fn(arg)
-	}
-}
-
-// DoTimes calls the provided function n times and returns an iterator of their results.
-func DoTimes[T any](n int, op func() T) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for range n {
-			if op == nil || !yield(op()) {
-				return
-			}
-		}
-	}
 }

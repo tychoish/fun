@@ -1,8 +1,6 @@
 // Package ft provides high-level function tools for manipulating common function objects and types.
 package ft
 
-import "iter"
-
 // Noop returns the input value.
 func Noop[T any](in T) T { return in }
 
@@ -23,18 +21,6 @@ func Wrap[T any](in T) func() T { return func() T { return in } }
 // order. Intended to wrap other functions to reduce the friction when
 // briding APIs.
 func Flip[A any, B any](first A, second B) (B, A) { return second, first }
-
-// Convert takes a sequence of A and converts it, lazily into a
-// sequence of B, using the mapper function.
-func Convert[A any, B any](mapper func(A) B, values iter.Seq[A]) iter.Seq[B] {
-	return func(yield func(B) bool) {
-		for input := range values {
-			if !yield(mapper(input)) {
-				return
-			}
-		}
-	}
-}
 
 // Slice returns a slice for the variadic arguments. Useful for
 // adapting functions that take slice arguments where it's easier to

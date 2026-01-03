@@ -7,6 +7,7 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // WaitGroup works like sync.WaitGroup, except that the Wait method
@@ -108,7 +109,7 @@ func (wg *WaitGroup) Group(n int, op Operation) Operation {
 // StartGroup starts <n> copies of the operation in separate threads
 // and returns an operation that waits on the wait group.
 func (wg *WaitGroup) StartGroup(ctx context.Context, n int, op Operation) Operation {
-	ft.ApplyTimes(n, wg.OperationHandler(ctx), op)
+	_ = irt.Count(irt.GenerateN(n, func() bool { wg.OperationHandler(ctx).Read(op); return true }))
 	return wg.Operation()
 }
 

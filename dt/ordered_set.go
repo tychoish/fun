@@ -112,7 +112,7 @@ func (s *OrderedSet[T]) UnmarshalJSON(in []byte) error {
 	var items []T
 	err := json.Unmarshal(in, &items)
 	if err == nil {
-		ft.ApplyMany(s.add, items)
+		irt.Apply(irt.Slice(items), s.add)
 	}
 	return err
 }

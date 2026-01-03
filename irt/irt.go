@@ -802,15 +802,13 @@ func UniqueBy[K comparable, V any](seq iter.Seq[V], kfn func(V) K) iter.Seq[V] {
 // elements.
 func Count[T any](seq iter.Seq[T]) (size int) {
 	inc := counter()
-	Apply(seq, func(T) { size = inc() })
-	return
+	return Apply(seq, func(T) { size = inc() })
 }
 
 // Count2 consumes the iterator and returns the total number of pairs.
 func Count2[A, B any](seq iter.Seq2[A, B]) (size int) {
 	inc := counter()
-	Apply2(seq, func(A, B) { size = inc() })
-	return
+	return Apply2(seq, func(A, B) { size = inc() })
 }
 
 // Reduce consumes the sequence and reduces it to a single value by

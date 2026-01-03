@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/dt/stw"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -91,7 +90,7 @@ func (s *Set[T]) UnmarshalJSON(in []byte) error {
 	var items []T
 	err := json.Unmarshal(in, &items)
 	if err == nil {
-		ft.ApplyMany(s.add, items)
+		irt.Apply(irt.Slice(items), s.add)
 	}
 	return err
 }
