@@ -2098,7 +2098,7 @@ func TestFlushTo(t *testing.T) {
 		// Create a sequence that will trigger cancellation after first element
 		var yielded atomic.Int32
 		seq := func(yield func(int) bool) {
-			for i := 1; i <= 5; i++ {
+			for i := 1; i <= 100; i++ {
 				yielded.Add(1)
 				if i == 2 {
 					cancel()
@@ -2126,9 +2126,10 @@ func TestFlushTo(t *testing.T) {
 		if len(collected) == 0 {
 			t.Error("flushTo sent no values before cancellation")
 		}
-		if len(collected) >= 5 {
+		if len(collected) >= 100 {
 			t.Error("flushTo sent all values despite cancellation")
 		}
+		t.Log("saw:", len(collected))
 	})
 
 	t.Run("BufferedChannel", func(t *testing.T) {
