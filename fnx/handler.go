@@ -26,19 +26,18 @@ func MakeHandler[T any](fn func(T) error) Handler[T] {
 
 // FromHandler up-converts a fn.Handler (e.g. a more simple handler
 // function that doesn't return an error or take a context,) into a
-// fun.Handler. the underlying function runs with a panic handler (so
+// Handler. The underlying function runs with a panic handler (so
 // fn.Handler panics are converted to errors.)
 func FromHandler[T any](f fn.Handler[T]) Handler[T] {
 	return MakeHandler(func(in T) error { f(in); return nil })
 }
 
-// NewHandler returns a Handler Function. This is a convenience
-// function to avoid the extra cast when creating new function
-// objects.
+// NewHandler returns a Handler Function. This is a convenience function to avoid the extra cast
+// when creating new function objects.
 func NewHandler[T any](fn func(context.Context, T) error) Handler[T] { return fn }
 
 // JoinHandlers takes a collection of Handler functions and merges
-// them into a single chain, eliding any nil processors.
+// them into a single chain, eliding any nil Handlers.
 func JoinHandlers[T any](pfs ...Handler[T]) Handler[T] {
 	var pf Handler[T]
 	for _, fn := range pfs {
@@ -65,15 +64,13 @@ func (pf Handler[T]) Ignore(ctx context.Context, in T) { ft.Ignore(pf(ctx, in)) 
 // and false when there was an error.
 func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.IsOk(pf(ctx, in)) }
 
-// Force processes the input, but discards the error and uses a
-// context that will not expire.
+// Force processes the input, but discards the error and uses a background context.
 func (pf Handler[T]) Force(in T) { ft.Ignore(pf.Wait(in)) }
 
 // Must calls the underlying handler, but converts all errors returned by the handler into panics.
 func (pf Handler[T]) Must(ctx context.Context, in T) { must(pf.Read(ctx, in)) }
 
-// WithRecover runs the producer, converted all panics into errors. WithRecover is
-// itself a processor.
+// WithRecover runs the producer, converted all panics into errors.
 func (pf Handler[T]) WithRecover() Handler[T] {
 	return func(ctx context.Context, in T) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
@@ -81,8 +78,7 @@ func (pf Handler[T]) WithRecover() Handler[T] {
 	}
 }
 
-// After produces a Handler that will execute after the provided
-// timestamp.
+// After produces a Handler that will execute after the provided timestamp.
 func (pf Handler[T]) After(ts time.Time) Handler[T] { return pf.Delay(time.Until(ts)) }
 
 // Delay wraps a Handler in a function that will always wait for the
@@ -93,7 +89,7 @@ func (pf Handler[T]) Delay(dur time.Duration) Handler[T] { return pf.Jitter(ft.W
 
 // Jitter wraps a Handler that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
-// resulting duration before running the processor.
+// resulting duration before running the Handler.
 //
 // If the function produces a negative duration, there is no delay.
 func (pf Handler[T]) Jitter(jf func() time.Duration) Handler[T] {
@@ -109,16 +105,16 @@ func (pf Handler[T]) Jitter(jf func() time.Duration) Handler[T] {
 	}
 }
 
-// If runs the processor function if, and only if the condition is
-// true. Otherwise the function does not run and the processor returns
+// If runs the Handler function if, and only if the condition is
+// true. Otherwise the function does not run and the Handler returns
 // nil.
 //
-// The resulting processor can be used more than once.
+// The resulting Handler can be used more than once.
 func (pf Handler[T]) If(c bool) Handler[T] { return pf.When(ft.Wrap(c)) }
 
-// When returns a processor function that runs if the conditional function
+// When returns a Handler function that runs if the conditional function
 // returns true, and does not run otherwise. The conditional function
-// is evaluated every time the returned processor is run.
+// is evaluated every time the returned Handler is run.
 func (pf Handler[T]) When(c func() bool) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		if c() {
@@ -128,8 +124,8 @@ func (pf Handler[T]) When(c func() bool) Handler[T] {
 	}
 }
 
-// Filter returns a wrapping processor that takes a function a
-// function that only calls the processor when the filter function
+// Filter returns a wrapping Handler that takes a function a
+// function that only calls the Handler when the filter function
 // returns true, and returns ers.ErrCurrentOpSkip otherwise.
 func (pf Handler[T]) Filter(fl func(T) bool) Handler[T] {
 	return func(ctx context.Context, in T) error {
@@ -140,7 +136,7 @@ func (pf Handler[T]) Filter(fl func(T) bool) Handler[T] {
 	}
 }
 
-// Join combines a sequence of processors on the same input, calling
+// Join combines a sequence of Handlers on the same input, calling
 // each function in order, as long as there is no error and the
 // context does not expire. Context expiration errors are not
 // propagated.
@@ -161,17 +157,17 @@ func (pf Handler[T]) merge(next Handler[T]) Handler[T] {
 }
 
 // Capture creates a handler function that like, Handler.Force,
-// passes a background context and ignores the processors error.
+// passes a background context and ignores the Handlers error.
 func (pf Handler[T]) Capture() fn.Handler[T] { return pf.Force }
 
-// Handler converts a processor into an observer, handling the error
+// Handler converts a Handler into an observer, handling the error
 // with the error observer and using the provided context.
 func (pf Handler[T]) Handler(ctx context.Context, oe fn.Handler[error]) fn.Handler[T] {
 	return func(in T) { oe(pf(ctx, in)) }
 }
 
-// Once make a processor that can only run once. Subsequent calls to
-// the processor return the cached error of the original run.
+// Once make a Handler that can only run once. Subsequent calls to
+// the Handler return the cached error of the original run.
 func (pf Handler[T]) Once() Handler[T] {
 	once := &sync.Once{}
 	var err error
@@ -203,7 +199,7 @@ func (pf Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
 	}
 }
 
-// Limit ensures that the processor is called at most n times.
+// Limit ensures that the Handler is called at most n times.
 func (pf Handler[T]) Limit(n int) Handler[T] {
 	resolver := ft.Must(internal.LimitExec[error](n))
 
@@ -215,7 +211,7 @@ func (pf Handler[T]) Limit(n int) Handler[T] {
 // TTL returns a Handler that runs once in the specified window, and
 // returns the error from the last run in between this interval. While
 // the executions of the underlying function happen in isolation,
-// in between, the processor is concurrently accessible.
+// in between, the Handler is concurrently accessible.
 func (pf Handler[T]) TTL(dur time.Duration) Handler[T] {
 	resolver := ft.Must(internal.TTLExec[error](dur))
 
@@ -241,35 +237,33 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 }
 
 // PreHook creates an amalgamated Handler that runs the operation
-// before the root processor. If the operation panics that panic is
-// converted to an error and merged with the processor's error. Use
+// before the root Handler. If the operation panics that panic is
+// converted to an error and merged with the Handler's error. Use
 // with Operation.Once() to create an "init" function that runs once
-// before a processor is called the first time.
+// before a Handler is called the first time.
 func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		return erc.Join(ft.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
 	}
 }
 
-// PostHook produces an amalgamated processor that runs after the
-// processor completes. Panics are caught, converted to errors, and
-// aggregated with the processors error. The hook operation is
-// unconditionally called after the processor function (except in the
-// case of a processor panic.)
+// PostHook produces an amalgamated Handler that runs after the
+// Handler completes. Panics are caught, converted to errors, and
+// aggregated with the Handlers error. The hook operation is
+// unconditionally called after the Handler function (except in the
+// case of a Handler panic.)
 func (pf Handler[T]) PostHook(op func()) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		return erc.Join(ft.Flip(pf(ctx, in), ft.WithRecoverCall(op)))
 	}
 }
 
-// WithErrorFilter uses an erc.Filter to process the error respose from
-// the processor.
+// WithErrorFilter uses an erc.Filter to process the error respose from the Handler.
 func (pf Handler[T]) WithErrorFilter(ef erc.Filter) Handler[T] {
 	return func(ctx context.Context, in T) error { return ef(pf(ctx, in)) }
 }
 
-// WithoutErrors returns a producer that will convert a non-nil error
-// of the provided types to a nil error.
+// WithoutErrors returns a producer that will convert a non-nil error of the provided types to a nil error.
 func (pf Handler[T]) WithoutErrors(errs ...error) Handler[T] {
 	return pf.WithErrorFilter(erc.NewFilter().Without(errs...))
 }

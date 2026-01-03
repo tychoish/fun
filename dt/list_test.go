@@ -1,18 +1,18 @@
 package dt
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
 	"runtime"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 type jsonMarshlerError struct{}
@@ -40,7 +40,7 @@ func TestList(t *testing.T) {
 		assert.Zero(t, l.Len())
 	})
 	t.Run("IteratorList", func(t *testing.T) {
-		list := IteratorList(NewSlice([]int{1, 2, 3, 4, 5}).Iterator())
+		list := IteratorList(stw.NewSlice([]int{1, 2, 3, 4, 5}).Iterator())
 		assert.Equal(t, list.Len(), 5)
 		assert.Equal(t, list.Front().Value(), 1)
 		assert.Equal(t, list.Back().Value(), 5)
@@ -123,7 +123,7 @@ func TestList(t *testing.T) {
 		expected := []int{19, 17, 15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20}
 
 		seen := 0
-		for item := range list.Iterator() {
+		for item := range list.IteratorFront() {
 			if expected[seen] != item {
 				t.Error(seen, expected[seen], item)
 			}
@@ -133,7 +133,7 @@ func TestList(t *testing.T) {
 			t.Error(list.Len(), seen)
 		}
 		if seen != len(expected) {
-			t.Log(seen, list.Len(), ft.Must(list.StreamFront().Slice(t.Context())))
+			t.Log(seen, list.Len(), irt.Collect(list.IteratorFront()))
 			t.Error(seen, len(expected), expected)
 		}
 	})
@@ -250,11 +250,9 @@ func TestList(t *testing.T) {
 			list := &List[int]{}
 			ct := 0
 			assert.NotPanic(t, func() {
-				iter := list.StreamFront()
-				for iter.Next(t.Context()) {
+				for range list.IteratorFront() {
 					ct++
 				}
-				check.NotError(t, iter.Close())
 			})
 			assert.Zero(t, ct)
 		})
@@ -268,23 +266,19 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.StreamFront()
 			seen := 0
 			last := -1*math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(t.Context()) {
-				if iter.Value() < 0 && iter.Value() > 100 {
-					t.Fatal(iter.Value())
+			for value := range list.IteratorFront() {
+				if value < 0 && value > 100 {
+					t.Fatal(value)
 				}
-				if last > iter.Value() {
-					t.Fatal(last, ">", iter.Value())
+				if last > value {
+					t.Fatal(last, ">", value)
 				}
 
-				last = iter.Value()
+				last = value
 				seen++
-			}
-			if err := iter.Close(); err != nil {
-				t.Fatal(err)
 			}
 		})
 		t.Run("ForwardPop", func(t *testing.T) {
@@ -297,23 +291,19 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.StreamPopFront()
 			seen := 0
 			last := 0
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(t.Context()) {
-				if iter.Value() < 0 && iter.Value() > 100 {
-					t.Fatal(iter.Value())
+			for value := range list.IteratorPopFront() {
+				if value < 0 && value > 100 {
+					t.Fatal(value)
 				}
-				if last > iter.Value() {
-					t.Fatal(last, ">", iter.Value())
+				if last > value {
+					t.Fatal(last, ">", value)
 				}
 
-				last = iter.Value()
+				last = value
 				seen++
-			}
-			if err := iter.Close(); err != nil {
-				t.Fatal(err)
 			}
 			if seen != 100 {
 				t.Error("didn't observe enough items", seen)
@@ -332,23 +322,19 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.StreamBack()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(t.Context()) {
-				if iter.Value() < 0 && iter.Value() > 100 {
-					t.Fatal(iter.Value())
+			for value := range list.IteratorBack() {
+				if value < 0 && value > 100 {
+					t.Fatal(value)
 				}
-				if last < iter.Value() {
-					t.Fatal(last, ">", iter.Value())
+				if last < value {
+					t.Fatal(last, ">", value)
 				}
 
-				last = iter.Value()
+				last = value
 				seen++
-			}
-			if err := iter.Close(); err != nil {
-				t.Fatal(err)
 			}
 		})
 		t.Run("PopReverse", func(t *testing.T) {
@@ -361,47 +347,25 @@ func TestList(t *testing.T) {
 				t.Error(list.Front().Value())
 			}
 
-			iter := list.StreamPopBack()
 			seen := 0
 			last := math.MaxInt - 1
 			t.Log(list.Front().Value(), "->", list.Back().Value())
-			for iter.Next(t.Context()) {
-				if iter.Value() < 0 && iter.Value() > 100 {
-					t.Fatal(iter.Value())
+			for value := range list.IteratorPopBack() {
+				if value < 0 && value > 100 {
+					t.Fatal(value)
 				}
-				if last < iter.Value() {
-					t.Fatal(last, ">", iter.Value())
+				if last < value {
+					t.Fatal(last, ">", value)
 				}
 
-				last = iter.Value()
+				last = value
 				seen++
-			}
-			if err := iter.Close(); err != nil {
-				t.Fatal(err)
 			}
 			if seen != 100 {
 				t.Error("didn't observe enough items")
 			}
 			if list.Len() != 0 {
 				t.Error("did not consume enough items")
-			}
-		})
-		t.Run("Closed", func(t *testing.T) {
-			list := &List[int]{}
-			for i := 1; i <= 100; i++ {
-				list.PushBack(i)
-			}
-			iter := list.StreamFront()
-			for i := 0; i < 50; i++ {
-				if !iter.Next(t.Context()) {
-					t.Error("stream should be open", i)
-				}
-			}
-			fun.Invariant.IsTrue(iter.Close() == nil)
-			for i := 0; i < 50; i++ {
-				if iter.Next(t.Context()) {
-					t.Error("stream should be closed", i)
-				}
 			}
 		})
 	})
@@ -554,14 +518,14 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 			// ["hello", "world"]
 			if list.Front().Value() != "hello" && list.Front().Next().Value() != "world" {
-				t.Fatal(list.StreamFront().Slice(t.Context()))
+				t.Fatal(irt.Collect(list.IteratorFront()))
 			}
 			if !list.Front().Swap(list.Back()) {
-				t.Fatal(list.StreamFront().Slice(t.Context()))
+				t.Fatal(irt.Collect(list.IteratorFront()))
 			}
 
 			if list.Front().Value() != "world" && list.Front().Next().Value() != "hello" {
-				t.Fatal(list.StreamFront().Slice(t.Context()))
+				t.Fatal(irt.Collect(list.IteratorFront()))
 			}
 		})
 		t.Run("Self", func(t *testing.T) {
@@ -570,7 +534,7 @@ func TestList(t *testing.T) {
 			list.PushBack("world")
 
 			if list.Front().Swap(list.Front()) {
-				t.Fatal(list.StreamFront().Slice(t.Context()))
+				t.Fatal(irt.Collect(list.IteratorFront()))
 			}
 		})
 		t.Run("NilList", func(t *testing.T) {
@@ -578,7 +542,7 @@ func TestList(t *testing.T) {
 			list.PushFront("hello")
 
 			if list.Front().Swap(NewElement("world")) {
-				t.Fatal(list.StreamFront().Slice(t.Context()))
+				t.Fatal(irt.Collect(list.IteratorFront()))
 			}
 		})
 		t.Run("Root", func(t *testing.T) {
@@ -607,20 +571,19 @@ func TestList(t *testing.T) {
 
 			if !list.Back().Swap(list.Front().Next()) {
 				t.Log("should have swapped")
-				t.Fatal(list.StreamFront().Slice(t.Context()))
+				t.Fatal(irt.Collect(list.IteratorFront()))
 			}
 			// expected: [42, 840, 420, 84]
-			slice := ft.Must(list.StreamFront().Slice(t.Context()))
+			slice := irt.Collect(list.IteratorFront())
 			if list.Len() != 4 {
 				t.Log(list.Len(), slice)
 				t.Fatal(list.Len())
 			}
 
 			idx := 0
-			iter := list.StreamFront()
-			for iter.Next(t.Context()) {
-				if slice[idx] != iter.Value() {
-					t.Error(idx, slice[idx], iter.Value())
+			for value := range list.IteratorFront() {
+				if slice[idx] != value {
+					t.Error(idx, slice[idx], value)
 				}
 				idx++
 			}
@@ -651,8 +614,11 @@ func TestList(t *testing.T) {
 			l1 := GetPopulatedList(t, 100)
 			l2 := GetPopulatedList(t, 100)
 			l2tail := l2.Back()
+			if l1.Len() != 100 {
+				t.Error(l1.Len())
+			}
 
-			l1.AppendList(l2)
+			l1.Extend(l2.IteratorPopFront())
 			if l1.Len() != 200 {
 				t.Error(l1.Len())
 			}
@@ -664,13 +630,16 @@ func TestList(t *testing.T) {
 			if l2.Len() != 0 {
 				t.Error(l2.Len())
 			}
+			if l1.Len() != 200 {
+				t.Error(l2.Len())
+			}
 		})
 		t.Run("Order", func(t *testing.T) {
 			lOne := GetPopulatedList(t, 100)
-			itemsOne := ft.Must(lOne.StreamFront().Slice(t.Context()))
+			itemsOne := irt.Collect(lOne.IteratorFront())
 
 			lTwo := GetPopulatedList(t, 100)
-			itemsTwo := ft.Must(lTwo.StreamFront().Slice(t.Context()))
+			itemsTwo := irt.Collect(lTwo.IteratorFront())
 
 			if len(itemsOne) != lOne.Len() {
 				t.Fatal("incorrect items", len(itemsOne), lOne.Len())
@@ -679,13 +648,12 @@ func TestList(t *testing.T) {
 				t.Fatal("incorrect items")
 			}
 
-			lOne.AppendList(lTwo)
+			lOne.Extend(lTwo.IteratorPopFront())
 			combined := append(itemsOne, itemsTwo...)
-			iter := lOne.StreamFront()
 			idx := 0
-			for iter.Next(t.Context()) {
-				if combined[idx] != iter.Value() {
-					t.Error("missmatch", idx, combined[idx], iter.Value())
+			for value := range lOne.IteratorFront() {
+				if combined[idx] != value {
+					t.Error("missmatch", idx, combined[idx], value)
 				}
 
 				idx++
@@ -716,9 +684,9 @@ func TestList(t *testing.T) {
 			if err := nl.UnmarshalJSON(out); err != nil {
 				t.Error(err)
 			}
-			fun.Invariant.IsTrue(nl.Front().Value() == list.Front().Value())
-			fun.Invariant.IsTrue(nl.Front().Next().Value() == list.Front().Next().Value())
-			fun.Invariant.IsTrue(nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
+			assert.True(t, nl.Front().Value() == list.Front().Value())
+			assert.True(t, nl.Front().Next().Value() == list.Front().Next().Value())
+			assert.True(t, nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
 			list := VariadicList(400, 300, 42)
@@ -813,9 +781,6 @@ func BenchmarkList(b *testing.B) {
 		}
 		runtime.GC()
 	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	const size = 1000
 	b.Run("Append", func(b *testing.B) {
@@ -951,13 +916,12 @@ func BenchmarkList(b *testing.B) {
 				}
 
 				b.ResetTimer()
-				iter := list.StreamFront()
 				value := -1
 				for j := 0; j < b.N; j++ {
 					idx := 0
-					for iter.Next(ctx) {
+					for inner := range list.IteratorFront() {
 						if idx > 2 && idx%2 != 0 {
-							value = iter.Value()
+							value = inner
 						}
 						idx++
 					}

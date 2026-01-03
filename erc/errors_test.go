@@ -412,6 +412,275 @@ func TestError(t *testing.T) {
 	})
 }
 
+func TestJoinSeq(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(error) bool) {}
+		err := JoinSeq(seq)
+		assert.NotError(t, err)
+	})
+
+	t.Run("AllNilErrors", func(t *testing.T) {
+		seq := func(yield func(error) bool) {
+			yield(nil)
+			yield(nil)
+			yield(nil)
+		}
+		err := JoinSeq(seq)
+		assert.NotError(t, err)
+	})
+
+	t.Run("SingleError", func(t *testing.T) {
+		expectedErr := errors.New("single error")
+		seq := func(yield func(error) bool) {
+			yield(expectedErr)
+		}
+		err := JoinSeq(seq)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, expectedErr)
+		assert.Equal(t, "single error", err.Error())
+	})
+
+	t.Run("SingleErrorWithNils", func(t *testing.T) {
+		expectedErr := errors.New("only error")
+		seq := func(yield func(error) bool) {
+			yield(nil)
+			yield(expectedErr)
+			yield(nil)
+		}
+		err := JoinSeq(seq)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, expectedErr)
+		assert.Equal(t, "only error", err.Error())
+	})
+
+	t.Run("MultipleErrors", func(t *testing.T) {
+		err1 := errors.New("first")
+		err2 := errors.New("second")
+		err3 := errors.New("third")
+
+		seq := func(yield func(error) bool) {
+			yield(err1)
+			yield(err2)
+			yield(err3)
+		}
+
+		err := JoinSeq(seq)
+		assert.Error(t, err)
+
+		// Verify it's a Collector
+		collector, ok := err.(*Collector)
+		assert.True(t, ok)
+		assert.Equal(t, 3, collector.Len())
+
+		// Verify all errors are present
+		assert.ErrorIs(t, err, err1)
+		assert.ErrorIs(t, err, err2)
+		assert.ErrorIs(t, err, err3)
+	})
+
+	t.Run("MultipleErrorsWithNils", func(t *testing.T) {
+		err1 := io.EOF
+		err2 := context.Canceled
+		err3 := context.DeadlineExceeded
+
+		seq := func(yield func(error) bool) {
+			yield(nil)
+			yield(err1)
+			yield(nil)
+			yield(err2)
+			yield(nil)
+			yield(err3)
+			yield(nil)
+		}
+
+		err := JoinSeq(seq)
+		assert.Error(t, err)
+
+		collector, ok := err.(*Collector)
+		assert.True(t, ok)
+		assert.Equal(t, 3, collector.Len())
+
+		assert.ErrorIs(t, err, err1)
+		assert.ErrorIs(t, err, err2)
+		assert.ErrorIs(t, err, err3)
+	})
+
+	t.Run("ErrorsIsCompatibility", func(t *testing.T) {
+		targetErr := io.EOF
+		seq := func(yield func(error) bool) {
+			yield(errors.New("first"))
+			yield(targetErr)
+			yield(errors.New("third"))
+		}
+
+		err := JoinSeq(seq)
+		assert.True(t, errors.Is(err, targetErr))
+	})
+
+	t.Run("ErrorsAsCompatibility", func(t *testing.T) {
+		customErr := &customError{msg: "custom"}
+		seq := func(yield func(error) bool) {
+			yield(errors.New("first"))
+			yield(customErr)
+			yield(errors.New("third"))
+		}
+
+		err := JoinSeq(seq)
+		var target *customError
+		assert.True(t, errors.As(err, &target))
+		assert.Equal(t, "custom", target.msg)
+	})
+}
+
+func TestCollectorFrom(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		ec := &Collector{}
+		seq := func(yield func(error) bool) {}
+		ec.From(seq)
+		assert.True(t, ec.Ok())
+		assert.Equal(t, 0, ec.Len())
+		assert.NotError(t, ec.Resolve())
+	})
+
+	t.Run("AllNilErrors", func(t *testing.T) {
+		ec := &Collector{}
+		seq := func(yield func(error) bool) {
+			yield(nil)
+			yield(nil)
+			yield(nil)
+		}
+		ec.From(seq)
+		assert.True(t, ec.Ok())
+		assert.Equal(t, 0, ec.Len())
+		assert.NotError(t, ec.Resolve())
+	})
+
+	t.Run("SingleError", func(t *testing.T) {
+		ec := &Collector{}
+		expectedErr := errors.New("single error")
+		seq := func(yield func(error) bool) {
+			yield(expectedErr)
+		}
+		ec.From(seq)
+		assert.True(t, !ec.Ok())
+		assert.Equal(t, 1, ec.Len())
+		assert.ErrorIs(t, ec.Resolve(), expectedErr)
+	})
+
+	t.Run("MultipleErrors", func(t *testing.T) {
+		ec := &Collector{}
+		err1 := errors.New("first")
+		err2 := errors.New("second")
+		err3 := errors.New("third")
+
+		seq := func(yield func(error) bool) {
+			yield(err1)
+			yield(err2)
+			yield(err3)
+		}
+
+		ec.From(seq)
+		assert.Equal(t, 3, ec.Len())
+		assert.ErrorIs(t, ec.Resolve(), err1)
+		assert.ErrorIs(t, ec.Resolve(), err2)
+		assert.ErrorIs(t, ec.Resolve(), err3)
+	})
+
+	t.Run("FiltersNilErrors", func(t *testing.T) {
+		ec := &Collector{}
+		err1 := io.EOF
+		err2 := context.Canceled
+
+		seq := func(yield func(error) bool) {
+			yield(nil)
+			yield(err1)
+			yield(nil)
+			yield(nil)
+			yield(err2)
+			yield(nil)
+		}
+
+		ec.From(seq)
+		assert.Equal(t, 2, ec.Len())
+		assert.ErrorIs(t, ec.Resolve(), err1)
+		assert.ErrorIs(t, ec.Resolve(), err2)
+	})
+
+	t.Run("AddsToExistingErrors", func(t *testing.T) {
+		ec := &Collector{}
+		ec.Push(errors.New("existing"))
+
+		seq := func(yield func(error) bool) {
+			yield(errors.New("new1"))
+			yield(errors.New("new2"))
+		}
+
+		ec.From(seq)
+		assert.Equal(t, 3, ec.Len())
+	})
+
+	t.Run("ThreadSafety", func(t *testing.T) {
+		ec := &Collector{}
+		wg := &sync.WaitGroup{}
+
+		// Spawn multiple goroutines adding errors concurrently
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				seq := func(yield func(error) bool) {
+					for j := 0; j < 10; j++ {
+						yield(fmt.Errorf("error %d-%d", id, j))
+					}
+				}
+				ec.From(seq)
+			}(i)
+		}
+
+		wg.Wait()
+		assert.Equal(t, 100, ec.Len())
+	})
+
+	t.Run("WithFilter", func(t *testing.T) {
+		ec := &Collector{}
+		filterCount := 0
+		ec.SetFilter(func(err error) error {
+			filterCount++
+			// Filter out EOF errors
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		})
+
+		seq := func(yield func(error) bool) {
+			yield(io.EOF)
+			yield(errors.New("keep1"))
+			yield(io.EOF)
+			yield(errors.New("keep2"))
+			yield(nil)
+			yield(nil)
+			yield(nil)
+			yield(nil)
+		}
+
+		ec.From(seq)
+		// Should have 2 errors (the non-EOF ones)
+		assert.Equal(t, 2, ec.Len())
+		// Filter should have been called for all non-nil errors, in addition to the removed
+		// ones
+		assert.Equal(t, 4, filterCount)
+	})
+}
+
+type customError struct {
+	msg string
+}
+
+func (e *customError) Error() string {
+	return e.msg
+}
+
 func BenchmarkErrorList(b *testing.B) {
 	const count int = 8
 

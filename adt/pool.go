@@ -6,8 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
@@ -38,8 +38,8 @@ type Pool[T any] struct {
 func (p *Pool[T]) init() { p.once.Do(p.doInit) }
 
 func (p *Pool[T]) doInit() {
-	p.hook = NewAtomic(func(in T) T { return in })
-	p.constructor = NewAtomic(func() (out T) { return out })
+	p.hook = NewAtomic(ft.Noop[T])
+	p.constructor = NewAtomic(ft.Zero[T])
 	p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
 	var zero T
 	p.typeIsPtr = ft.IsPtr(zero)
@@ -57,7 +57,7 @@ func (p *Pool[T]) FinalizeSetup() { p.init(); p.locked.Store(true) }
 // and if the input function is nil, it is not set.
 func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	p.init()
-	fun.Invariant.IsFalse(p.locked.Load(), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	erc.InvariantOk(ft.Not(p.locked.Load()), "SetCleaupHook", "after FinalizeSetup", ers.ErrImmutabilityViolation)
 	ft.ApplyWhen(in != nil, p.hook.Set, in)
 }
 
@@ -65,7 +65,7 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 // object with a Zero value by default) for Get/Make operations.
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
-	fun.Invariant.IsFalse(p.locked.Load(), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
+	erc.InvariantOk(ft.Not(p.locked.Load()), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
 	ft.ApplyWhen(in != nil, p.constructor.Set, in)
 }
 
@@ -127,21 +127,21 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 // position. MakeBufferPool panics with an invariant violation if the
 // max capacity value is zero.
 //
-// The type of the pooled object is dt.Slice[byte], a simple type
+// The type of the pooled object is stw.Slice[byte], a simple type
 // alias for Go's slice type with convenience methods for common slice
 // operations. You can use these values interchangeably with vanilla
 // byte slices, as you need and wish.
-func MakeBufferPool(minVal, maxVal int) *Pool[dt.Slice[byte]] {
+func MakeBufferPool(minVal, maxVal int) *Pool[stw.Slice[byte]] {
 	minVal, maxVal = intish.Bounds(minVal, maxVal)
-	fun.Invariant.Ok(maxVal > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
-	bufpool := &Pool[dt.Slice[byte]]{}
-	bufpool.SetCleanupHook(func(buf dt.Slice[byte]) dt.Slice[byte] {
+	erc.InvariantOk(maxVal > 0, "buffer pool capacity max cannot be zero", ers.ErrInvalidInput)
+	bufpool := &Pool[stw.Slice[byte]]{}
+	bufpool.SetCleanupHook(func(buf stw.Slice[byte]) stw.Slice[byte] {
 		if cap(buf) > maxVal {
 			return nil
 		}
 		return buf[:0]
 	})
-	bufpool.SetConstructor(func() dt.Slice[byte] { return dt.NewSlice(make([]byte, 0, minVal)) })
+	bufpool.SetConstructor(func() stw.Slice[byte] { return stw.NewSlice(make([]byte, 0, minVal)) })
 	bufpool.FinalizeSetup()
 
 	return bufpool
@@ -151,8 +151,8 @@ func MakeBufferPool(minVal, maxVal int) *Pool[dt.Slice[byte]] {
 // of 64kb. All other slices are discarded. These are the same
 // settings as used by the fmt package's buffer pool.
 //
-// The type of the pooled object is dt.Slice[byte], a simple type
+// The type of the pooled object is stw.Slice[byte], a simple type
 // alias for Go's slice type with convenience methods for common slice
 // operations. You can use these values interchangeably with vanilla
 // byte slices, as you need and wish.
-func DefaultBufferPool() *Pool[dt.Slice[byte]] { return MakeBufferPool(0, 64*1024) }
+func DefaultBufferPool() *Pool[stw.Slice[byte]] { return MakeBufferPool(0, 64*1024) }

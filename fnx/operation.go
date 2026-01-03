@@ -19,6 +19,12 @@ type Operation func(context.Context)
 // an Operation.
 func MakeOperation(in func()) Operation { return func(context.Context) { in() } }
 
+// Job converts a Worker into a panic-safe worker function suitable for use
+// in worker pool implementations (e.g., wpa.RunWithPool). The returned
+// function catches any panics that occur during execution and converts them
+// to errors.
+func (wf Worker) Job() func(context.Context) error { return wf.WithRecover() }
+
 // WaitChannel converts a channel (typically, a `chan struct{}`) to a
 // Operation. The Operation blocks till it's context is canceled or the
 // channel is either closed or returns one item.

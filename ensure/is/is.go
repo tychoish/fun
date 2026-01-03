@@ -8,22 +8,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
-
-// Plist is a simple constructor for making metadata pairs for the
-// ensure.Assertion.Metadata() method. The return value is chainable,
-// as in:
-//
-//	ensure.That(is.True(os.IsNotExists(err))).Metadata(
-//		  is.Plist().Pair("name", name).
-//			     Pair("path", path)).Run(t)
-func Plist() *dt.Pairs[string, any] { return &dt.Pairs[string, any]{} }
 
 // That is the root type for the assertion helpers in this
 // package. Implementations return nil for no-errors, and one or more
@@ -35,14 +25,14 @@ type That fn.Future[[]string]
 // operation aborts.
 func And(ops ...That) That {
 	return func() []string {
-		out := dt.NewSlice(make([]string, 0, len(ops)+1))
+		out := stw.NewSlice(make([]string, 0, len(ops)+1))
 		for _, that := range ops {
 			if that == nil {
 				out.Push("encountered nil is.That operation")
 				break
 			}
 			if results := that(); len(results) > 0 {
-				out.AppendSlice(results)
+				out.Append(results...)
 				break
 			}
 		}
@@ -56,23 +46,23 @@ func And(ops ...That) That {
 // are reported as errors.
 func All(ops ...That) That {
 	return func() []string {
-		out := dt.NewSlice(make([]string, 0, len(ops)+1))
-		dt.NewSlice(ops).ReadAll(func(op That) {
+		out := stw.NewSlice(make([]string, 0, len(ops)+1))
+		stw.NewSlice(ops).ReadAll(func(op That) {
 			ft.ApplyWhen(op == nil, out.Push,
 				"encountered nil is.That operation",
 			)
-			out.AppendSlice(ft.DoSafe(op))
+			out.Append(ft.DoSafe(op)...)
 		})
 		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
 	}
 }
 
 func assert(cond bool, args ...any) That {
-	return That(fn.MakeFuture(fun.MAKE.Str(args).Slice()).If(!cond).Once())
+	return That(fn.MakeFuture(func() []string { return []string{fmt.Sprint(args...)} }).If(!cond).Once())
 }
 
 func assertf(cond bool, t string, a ...any) That {
-	return That(fn.MakeFuture(fun.MAKE.Strf(t, a).Slice()).If(!cond).Once())
+	return That(fn.MakeFuture(func() []string { return []string{fmt.Sprintf(t, a...)} }).If(!cond).Once())
 }
 
 // EqualTo asserts that two comparable values are equal to eachother.
@@ -153,7 +143,7 @@ func Substring(s, substr string) That {
 // NotSubstring asserts that the string (s) does not contain the
 // substring (substr.)
 func NotSubstring(s, substr string) That {
-	return assert(!strings.Contains(s, substr), "%q is a substring of %s", substr, s)
+	return assertf(!strings.Contains(s, substr), "%q is a substring of %s", substr, s)
 }
 
 // Contained asserts that the slice (sl) has at least one element

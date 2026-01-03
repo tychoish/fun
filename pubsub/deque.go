@@ -3,13 +3,12 @@ package pubsub
 import (
 	"context"
 	"fmt"
-	"io"
+	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/risky"
 )
 
@@ -35,9 +34,6 @@ type Deque[T any] struct {
 // DequeOptions configure the semantics of the deque. The Validate()
 // method ensures that you do not produce a configuration that is
 // impossible.
-//
-// Capcaity puts a firm upper cap on the number of items in the deque,
-// while the Unlimited options.
 type DequeOptions struct {
 	Unlimited    bool
 	Capacity     int
@@ -48,23 +44,17 @@ type DequeOptions struct {
 // convenience function. All errors have ErrConfigurationMalformed as
 // their root.
 func (opts *DequeOptions) Validate() error {
-	if opts.QueueOptions != nil {
-		if err := opts.QueueOptions.Validate(); err != nil {
-			return err
-		}
-	} else if opts.Unlimited && opts.Capacity == 0 {
+	switch {
+	case opts.Unlimited && (opts.Capacity != 0 || opts.QueueOptions != nil):
+		return ers.Wrap(ers.ErrMalformedConfiguration, "unlimited deque specified with impossible options")
+	case opts.QueueOptions != nil && opts.Capacity != 0:
+		return fmt.Errorf("unexpected capacity of %d: %w", opts.Capacity, ers.ErrMalformedConfiguration)
+	case opts.QueueOptions != nil:
+		return opts.QueueOptions.Validate()
+	case opts.Unlimited:
 		return nil
-	} else if opts.Capacity <= 0 {
+	case opts.Capacity <= 0:
 		opts.Capacity = 1
-	}
-
-	if opts.Capacity > 0 && opts.QueueOptions != nil {
-		return fmt.Errorf("cannot specify a capcity with queue options: %w", ers.ErrMalformedConfiguration)
-	}
-
-	// positive capcity and another valid configuration
-	if opts.Unlimited {
-		return fmt.Errorf("cannot specify unlimited with another configuration: %w", ers.ErrMalformedConfiguration)
 	}
 	return nil
 }
@@ -148,18 +138,18 @@ func (dq *Deque[T]) PopBack() (T, bool) {
 	return dq.pop(dq.root.prev)
 }
 
-// WaitFront pops the first (head) item in the deque, and if the queue is
+// WaitPopFront pops the first (head) item in the deque, and if the queue is
 // empty, will block until an item is added, returning an error if the
 // context canceled or the queue is closed.
-func (dq *Deque[T]) WaitFront(ctx context.Context) (v T, err error) {
+func (dq *Deque[T]) WaitPopFront(ctx context.Context) (v T, err error) {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.waitPop(ctx, dqNext)
 }
 
-// WaitBack pops the last (tail) item in the deque, and if the queue
+// WaitPopBack pops the last (tail) item in the deque, and if the queue
 // is empty, will block until an item is added, returning an error if
 // the context canceled or the queue is closed.
-func (dq *Deque[T]) WaitBack(ctx context.Context) (T, error) {
+func (dq *Deque[T]) WaitPopBack(ctx context.Context) (T, error) {
 	defer adt.With(adt.Lock(dq.mtx))
 	return dq.waitPop(ctx, dqPrev)
 }
@@ -243,84 +233,77 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	return dq.addAfter(it, afterGetter())
 }
 
-// StreamFront starts at the front of the queue and iterates towards
+// IteratorFront starts at the front of the Deque and iterates towards
 // the back. When the stream reaches the beginning of the queue it
 // ends.
-func (dq *Deque[T]) StreamFront() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqNext, false))
-}
+func (dq *Deque[T]) IteratorFront(ctx context.Context) iter.Seq[T] { return dq.iterFrontEnd(ctx) }
 
-// StreamBack starts at the back of the queue and iterates
+// IteratorBack starts at the back of the Deque  and iterates
 // towards the front. When the stream reaches the end of the queue
 // it ends.
-func (dq *Deque[T]) StreamBack() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqPrev, false))
+func (dq *Deque[T]) IteratorBack(ctx context.Context) iter.Seq[T] { return dq.iterBackEnd(ctx) }
+
+// IteratorWaitFront yields items from the front of the Deque to the
+// back. When it reaches the last element, it waits for a new element
+// to be added. It does not modify the elements in the Deque.
+func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] { return dq.iterBackWait(ctx) }
+
+// IteratorWaitBack yields items from the back of the Deque to the
+// front. When it reaches the first element, it waits for a new element
+// to be added. It does not modify the elements in the Deque.
+func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] { return dq.iterFrontWait(ctx) }
+
+// IteratorWaitPopFront returns a sequence that removes
+// and returns objects from the front of the deque.
+// When the Deque is empty, iteration ends.
+func (dq *Deque[T]) IteratorWaitPopFront(ctx context.Context) iter.Seq[T] {
+	return irt.GenerateOk(dq.wrapsrc(ctx, dq.WaitPopFront))
 }
 
-// BlockingStreamFront exposes the deque to a single-function interface
-// for iteration. The future function operation will not modify the
-// contents of the Deque, but will produce elements from the deque,
-// front to back, and will block for a new element if the deque is
-// empty or the future reaches the end, the operation will block
-// until another item is added.
-func (dq *Deque[T]) BlockingStreamFront() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqNext, true))
+// IteratorWaitPopBack returns a sequence that removes
+// and returns objects from the back of the deque.
+// When the Deque is empty, iteration ends.
+func (dq *Deque[T]) IteratorWaitPopBack(ctx context.Context) iter.Seq[T] {
+	return irt.GenerateOk(dq.wrapsrc(ctx, dq.WaitPopBack))
 }
 
-// BlockingStreamBack exposes the deque to a single-function interface
-// for iteration. The future function operation will not modify the
-// contents of the Deque, but will produce elements from the deque,
-// back to fron, and will block for a new element if the deque is
-// empty or the future reaches the end, the operation will block
-// until another item is added.
-func (dq *Deque[T]) BlockingStreamBack() *fun.Stream[T] {
-	return fun.MakeStream(dq.confFuture(dqPrev, true))
+func (*Deque[T]) wrapsrc(ctx context.Context, op func(ctx context.Context) (T, error)) func() (T, bool) {
+	return func() (zero T, _ bool) {
+		value, err := op(ctx)
+		if err != nil {
+			return zero, false
+		}
+		return value, true
+	}
 }
+func (dq *Deque[T]) iterFrontEnd(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqNext, false) }
+func (dq *Deque[T]) iterBackEnd(ctx context.Context) iter.Seq[T]   { return dq.iter(ctx, dqPrev, false) }
+func (dq *Deque[T]) iterFrontWait(ctx context.Context) iter.Seq[T] { return dq.iter(ctx, dqNext, true) }
+func (dq *Deque[T]) iterBackWait(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqNext, true) }
 
-func (dq *Deque[T]) confFuture(direction dqDirection, blocking bool) fnx.Future[T] {
+func (*Deque[T]) zero() (z T) { return z }
+func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bool) iter.Seq[T] {
 	var current *element[T]
-	return func(ctx context.Context) (out T, _ error) {
+
+	op := func() (T, bool) {
 		defer adt.With(adt.Lock(dq.mtx))
 		if current == nil {
 			current = dq.root
 		}
-
 		if current.getNextOrPrevious(direction) == dq.root && blocking {
 			if err := current.wait(ctx, direction); err != nil {
-				return out, err
+				return dq.zero(), false
 			}
 		}
 		next := current.getNextOrPrevious(direction)
 		if next == nil || next == dq.root {
-			return out, io.EOF
+			return dq.zero(), false
 		}
 
 		current = next
-		return current.item, nil
+		return current.item, true
 	}
-}
-
-// BlockingDistributor produces a BlockingDistributor instance with
-// Send/Receive operations that block if Deque is full or empty
-// (respectively). Receive operations always remove the element from
-// the Deque.
-func (dq *Deque[T]) BlockingDistributor() Distributor[T] {
-	return Distributor[T]{
-		push: dq.WaitPushBack,
-		pop:  dq.WaitFront,
-		size: dq.Len,
-	}
-}
-
-// Distributor produces a distributor instance that always
-// accepts send items: if the deque is full, it removes one element
-// from the front of the queue before adding them to the back.
-func (dq *Deque[T]) Distributor() Distributor[T] {
-	return Distributor[T]{
-		push: fnx.MakeHandler(dq.ForcePushBack),
-		pop:  dq.WaitFront,
-		size: dq.Len,
-	}
+	return irt.GenerateOk(op)
 }
 
 func (dq *Deque[T]) addAfter(value T, after *element[T]) error {

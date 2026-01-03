@@ -7,9 +7,7 @@ import (
 	"github.com/tychoish/fun/adt/shard"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/testt"
 )
 
 func sumUint64(in []uint64) (out uint64) {
@@ -35,7 +33,7 @@ func TestShardedMap(t *testing.T) {
 
 				m.Store("a", 42)
 				check.Equal(t, m.Version(), 1)
-				check.Equal(t, ft.MustBeOk(m.Load("a")), 42)
+				check.Equal(t, ft.MustOk(m.Load("a")), 42)
 				_, ok := m.Load("b")
 				check.True(t, !ok)
 
@@ -44,11 +42,10 @@ func TestShardedMap(t *testing.T) {
 
 				m.Store("b", 42)
 				check.Equal(t, m.Version(), 3)
-				check.Equal(t, ft.MustBeOk(m.Load("b")), 42)
+				check.Equal(t, ft.MustOk(m.Load("b")), 42)
 				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
 			})
 			t.Run("Stream", func(t *testing.T) {
-				ctx := testt.Context(t)
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
 
@@ -73,15 +70,7 @@ func TestShardedMap(t *testing.T) {
 
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
-					for item := range m.Stream().Iterator(ctx) {
-						ct++
-						check(t, item)
-					}
-					assert.Equal(t, ct, 3)
-				})
-				t.Run("Parallel", func(t *testing.T) {
-					ct := 0
-					for item := range m.ParallelStream().Iterator(ctx) {
+					for item := range m.Items() {
 						ct++
 						check(t, item)
 					}
@@ -94,7 +83,7 @@ func TestShardedMap(t *testing.T) {
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
 
-				m.Set(dt.MakePair("one", 37))
+				m.Store("one", 37)
 				item = m.Fetch("one")
 				assert.True(t, item.Exists)
 				assert.Equal(t, item.Value, 37)
@@ -116,7 +105,7 @@ func TestShardedMap(t *testing.T) {
 					assert.Equal(t, 42+1, len(m.Clocks()))
 				})
 				t.Run("AfterPopulated", func(t *testing.T) {
-					m.Set(dt.MakePair("one", 37))
+					m.Store("one", 37)
 					assert.True(t, m.Check("one"))
 					item = m.Fetch("one")
 					assert.True(t, item.Exists)
@@ -135,7 +124,6 @@ func TestShardedMap(t *testing.T) {
 				})
 			})
 			t.Run("Keys", func(t *testing.T) {
-				ctx := testt.Context(t)
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
 
@@ -145,7 +133,7 @@ func TestShardedMap(t *testing.T) {
 				keys := map[string]struct{}{"one": {}, "two": {}, "three": {}}
 				t.Run("Standard", func(t *testing.T) {
 					ct := 0
-					for item := range m.Keys().Iterator(ctx) {
+					for item := range m.Keys() {
 						ct++
 						_, ok := keys[item]
 						assert.True(t, ok)
@@ -164,27 +152,7 @@ func TestShardedMap(t *testing.T) {
 
 				obsum := 0
 				ct := 0
-				ctx := testt.Context(t)
-				for val := range m.Values().Iterator(ctx) {
-					obsum += val
-					ct++
-				}
-				assert.Equal(t, obsum, sum)
-				assert.Equal(t, ct, 100*32)
-			})
-			t.Run("ParallelValues", func(t *testing.T) {
-				m := &shard.Map[string, int]{}
-				m.Setup(32, impl)
-				sum := 0
-				for idx := range 100 * 32 {
-					sum += idx
-					m.Store(fmt.Sprint(idx), idx)
-				}
-
-				obsum := 0
-				ct := 0
-				ctx := testt.Context(t)
-				for val := range m.ParallelValues().Iterator(ctx) {
+				for val := range m.Values() {
 					obsum += val
 					ct++
 				}
@@ -204,7 +172,7 @@ func TestShardedMap(t *testing.T) {
 			assert.Equal(t, item.NumShards, 32)
 		})
 		t.Run("AfterPopulated", func(t *testing.T) {
-			m.Set(dt.MakePair("one", 37))
+			m.Store("one", 37)
 			assert.True(t, m.Check("one"))
 			item = m.Fetch("one")
 			assert.True(t, item.Exists)

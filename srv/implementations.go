@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"net"
 	"net/http"
 	"os"
@@ -12,12 +13,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/pubsub"
+	"github.com/tychoish/fun/wpa"
 )
 
 // Group makes it possible to have a collection of services, provided
@@ -28,21 +30,21 @@ import (
 //
 // Use Group(itertool.Slice([]*Service)) to produce a group from a
 // slice of *Services,.
-func Group(services *fun.Stream[*Service]) *Service {
+func Group(services iter.Seq[*Service]) *Service {
 	waiters := pubsub.NewUnlimitedQueue[func() error]()
 	wg := &fnx.WaitGroup{}
 	ec := &erc.Collector{}
 
 	return &Service{
 		Run: func(ctx context.Context) error {
-			for services.Next(ctx) {
+			for srvc := range services {
 				wg.Add(1)
 				go func(s *Service) {
 					defer ec.Recover()
 					defer wg.Done()
-					defer func() { fun.Invariant.IsTrue(waiters.Add(s.Wait) == nil) }()
+					defer func() { erc.InvariantOk(waiters.Add(s.Wait) == nil) }()
 					ec.Push(s.Start(ctx))
-				}(services.Value())
+				}(srvc)
 			}
 			wg.Wait(ctx)
 			ec.Push(waiters.Close())
@@ -50,25 +52,25 @@ func Group(services *fun.Stream[*Service]) *Service {
 		},
 		Cleanup: func() error {
 			defer ec.Recover()
-			// we're calling each service's wait() here, which
-			// might be a recipe for deadlocks, but it gives us
-			// the chance to collect all errors from the contained
-			// services. This will cause our "group service" to
-			// have the same semantics as a single service, however.
-			iter := waiters.Stream()
-
 			// because we know that the implementation of the
 			// waiters stream won't block in this context, it's
 			// safe to call it with a background context, though
 			// it's worth being careful here
 			ctx := context.Background()
-			for iter.Next(ctx) {
+
+			// we're calling each service's wait() here, which
+			// might be a recipe for deadlocks, but it gives us
+			// the chance to collect all errors from the contained
+			// services. This will cause our "group service" to
+			// have the same semantics as a single service, however.
+
+			for value := range waiters.IteratorWait(ctx) {
 				wg.Add(1)
 				go func(wait func() error) {
 					defer ec.Recover()
 					defer wg.Done()
 					ec.Push(wait())
-				}(iter.Value())
+				}(value)
 			}
 
 			wg.Operation().Wait()
@@ -119,17 +121,12 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // When the service returns all worker Goroutines as well as the input
 // worker will have returned. Use a blocking pubsub stream to
 // dispatch wait functions throughout the lifecycle of your program.
-func Wait(iter *fun.Stream[fnx.Operation]) *Service {
+func Wait(seq iter.Seq[fnx.Operation]) *Service {
 	wg := &sync.WaitGroup{}
 	ec := &erc.Collector{}
 	return &Service{
 		Run: func(ctx context.Context) error {
-			for {
-				value, err := iter.Read(ctx)
-				if err != nil {
-					break
-				}
-
+			for value := range seq {
 				wg.Add(1)
 				go func(fn fnx.Operation) {
 					defer ec.Recover()
@@ -138,12 +135,10 @@ func Wait(iter *fun.Stream[fnx.Operation]) *Service {
 				}(value)
 			}
 
-			ec.Push(iter.Close())
 			wg.Wait()
 			return nil
 		},
-		Cleanup:  func() error { wg.Wait(); return ec.Resolve() },
-		Shutdown: iter.Close,
+		Cleanup: func() error { wg.Wait(); return ec.Resolve() },
 	}
 }
 
@@ -151,13 +146,14 @@ func Wait(iter *fun.Stream[fnx.Operation]) *Service {
 // *Service. For a long running service, use a stream that is
 // blocking (e.g. based on a pubsub queue/deque or a channel.)
 func ProcessStream[T any](
-	iter *fun.Stream[T],
+	seq iter.Seq[T],
 	processor fnx.Handler[T],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
+	st := pubsub.IteratorStream(seq)
 	return &Service{
-		Run:      iter.Parallel(processor, optp...),
-		Shutdown: iter.Close,
+		Run:      st.Parallel(processor, optp...),
+		Shutdown: st.Close,
 	}
 }
 
@@ -167,7 +163,7 @@ func ProcessStream[T any](
 // is canceled.) The timeout, when non-zero, is passed to the clean up
 // operation. Cleanup functions are dispatched in parallel.
 func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
-	closer, waitForSignal := fun.MAKE.Signal()
+	closer, waitForSignal := fnx.MAKE.Signal()
 
 	return &Service{
 		Run:      waitForSignal.WithErrorFilter(erc.NewFilter().WithoutContext()),
@@ -180,11 +176,11 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 				defer cancel()
 			}
 
-			if err := pipe.Distributor().Stream().Parallel(
+			if err := pubsub.IteratorStream(pipe.IteratorWaitPop(ctx)).Parallel(
 				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
-				fun.WorkerGroupConfContinueOnError(),
-				fun.WorkerGroupConfContinueOnPanic(),
-				fun.WorkerGroupConfWorkerPerCPU(),
+				wpa.WorkerGroupConfContinueOnError(),
+				wpa.WorkerGroupConfContinueOnPanic(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
 			).Run(ctx); err != nil {
 				return fmt.Errorf("hit timeout [%d], %w", timeout, err)
 			}
@@ -198,17 +194,24 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 // configured by the itertool.Options, with regards to error handling,
 // panic handling, and parallelism. Errors are collected and
 // propogated to the service's ywait function.
-func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *Service {
+func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.WorkerGroupConf]) *Service {
 	return &Service{
-		Run: workQueue.Distributor().Stream().Parallel(
-			func(ctx context.Context, fn fnx.Worker) error {
-				return fn.Run(ctx)
-			},
-			optp...,
-		),
-		// TODO: have a shutdown methot that will block till
-		// the queue shutsdown.
-		Shutdown: workQueue.Close,
+		Run: func(ctx context.Context) error {
+			return pubsub.IteratorStream(workQueue.IteratorWaitPop(ctx)).Parallel(
+				func(ctx context.Context, fn fnx.Worker) error {
+					return fn.Run(ctx)
+				},
+				optp...,
+			).Run(ctx)
+		},
+		Shutdown: func() error {
+			// Create a context with timeout for shutdown
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Shutdown drains the queue (waits for all jobs to complete) and then closes it
+			return workQueue.Shutdown(ctx)
+		},
 	}
 }
 
@@ -229,17 +232,26 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...fun.OptionProvider[
 func HandlerWorkerPool(
 	workQueue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
 	s := &Service{
-		Run: workQueue.Distributor().Stream().Parallel(
-			func(ctx context.Context, fn fnx.Worker) error {
-				observer(fn.Run(ctx))
-				return nil
-			},
-			optp...,
-		),
-		Shutdown: workQueue.Close,
+		Run: func(ctx context.Context) error {
+			return pubsub.IteratorStream(workQueue.IteratorWaitPop(ctx)).Parallel(
+				func(ctx context.Context, fn fnx.Worker) error {
+					observer(fn.Run(ctx))
+					return nil
+				},
+				optp...,
+			).Run(ctx)
+		},
+		Shutdown: func() error {
+			// Create a context with timeout for shutdown
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Shutdown drains the queue (waits for all jobs to complete) and then closes it
+			return workQueue.Shutdown(ctx)
+		},
 	}
 	s.ErrorHandler.Set(observer)
 	return s
@@ -265,7 +277,7 @@ func Broker[T any](broker *pubsub.Broker[T]) *Service {
 // until the underlying command has returned, potentially blocking
 // until the command returns.
 func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
-	fun.Invariant.IsTrue(c != nil, "exec.Cmd must be non-nil")
+	erc.InvariantOk(c != nil, "exec.Cmd must be non-nil")
 
 	started := make(chan struct{})
 	wg := &fnx.WaitGroup{}

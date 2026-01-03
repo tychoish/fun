@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 )
 
 func TestFundamentals(t *testing.T) {
@@ -34,26 +34,18 @@ func TestFundamentals(t *testing.T) {
 		})
 		t.Run("NewSlice", func(t *testing.T) {
 			var base []string
-			ex := dt.NewSlice(base)
+			ex := stw.NewSlice(base)
 			check.True(t, ex == nil)
 
-			ex.AppendSlice(base)
+			ex.Append(base...)
 			check.True(t, ex == nil)
 
 			exx := []string{}
 			check.True(t, exx != nil)
 
-			ex.AppendSlice(exx)
+			ex.Append(exx...)
 			check.True(t, ex == nil)
 		})
-	})
-	t.Run("Plist", func(t *testing.T) {
-		metadata := Plist()
-		check.True(t, metadata != nil)
-		check.Equal(t, metadata.Len(), 0)
-		metadata.Add("one", 2)
-		metadata.Add("two", 3)
-		check.Equal(t, metadata.Len(), 2)
 	})
 }
 

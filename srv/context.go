@@ -10,11 +10,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tychoish/fun"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/wpa"
 )
 
 type (
@@ -64,7 +66,7 @@ func WithOrchestrator(ctx context.Context) context.Context {
 func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
 	svc := or.Service()
 	if !svc.Running() {
-		fun.Invariant.Must(svc.Start(ctx), "orchestrator must start")
+		erc.Invariant(svc.Start(ctx), "orchestrator must start")
 	}
 
 	return context.WithValue(ctx, orchestratorCtxKey{}, or)
@@ -75,7 +77,7 @@ func SetOrchestrator(ctx context.Context, or *Orchestrator) context.Context {
 func GetOrchestrator(ctx context.Context) *Orchestrator {
 	or, ok := ctx.Value(orchestratorCtxKey{}).(*Orchestrator)
 
-	fun.Invariant.IsTrue(ok, "orchestrator was not correctly attached")
+	erc.InvariantOk(ok, "orchestrator was not correctly attached")
 
 	return or
 }
@@ -103,14 +105,14 @@ func WithCleanup(ctx context.Context) context.Context {
 	}
 	pipe := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
-	fun.Invariant.Must(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
+	erc.Invariant(GetOrchestrator(ctx).Add(Cleanup(pipe, 0)))
 
 	return context.WithValue(ctx, cleanupCtxKey{}, pipe)
 }
 
 func getCleanup(ctx context.Context) *pubsub.Queue[fnx.Worker] {
 	val, ok := ctx.Value(cleanupCtxKey{}).(*pubsub.Queue[fnx.Worker])
-	fun.Invariant.IsTrue(ok, "cleanup service not configured")
+	erc.InvariantOk(ok, "cleanup service not configured")
 	return val
 }
 
@@ -119,7 +121,7 @@ func getCleanup(ctx context.Context) *pubsub.Queue[fnx.Worker] {
 // service was not previously configured, or if you attempt to add a
 // new cleanup function while shutdown is running.
 func AddCleanup(ctx context.Context, cleanup fnx.Worker) {
-	fun.Invariant.Must(getCleanup(ctx).Add(cleanup))
+	erc.Invariant(getCleanup(ctx).Add(cleanup))
 }
 
 // AddCleanupError adds an error to the cleanup handler which is
@@ -153,7 +155,7 @@ func SetShutdownSignal(ctx context.Context) context.Context {
 func GetShutdownSignal(ctx context.Context) context.CancelFunc {
 	cancel, ok := ctx.Value(shutdownTriggerCtxKey{}).(context.CancelFunc)
 
-	fun.Invariant.IsTrue(ok, "Shutdown cancel function was not correctly attached")
+	erc.InvariantOk(ok, "Shutdown cancel function was not correctly attached")
 
 	return cancel
 }
@@ -189,7 +191,7 @@ func SetBaseContext(ctx context.Context) context.Context {
 func GetBaseContext(ctx context.Context) context.Context {
 	bctx, ok := ctx.Value(baseContextCxtKey{}).(context.Context)
 
-	fun.Invariant.IsTrue(ok, "base context was not correctly attached")
+	erc.InvariantOk(ok, "base context was not correctly attached")
 
 	return bctx
 }
@@ -233,7 +235,7 @@ func HasBaseContext(ctx context.Context) bool {
 func WithWorkerPool(
 	ctx context.Context,
 	key string,
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return SetWorkerPool(ctx, key, getQueueForOpts(optp...), optp...)
 }
@@ -264,14 +266,14 @@ func WithHandlerWorkerPool(
 	ctx context.Context,
 	key string,
 	observer fn.Handler[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return SetHandlerWorkerPool(ctx, key, getQueueForOpts(optp...), observer, optp...)
 }
 
-func getQueueForOpts(optp ...fun.OptionProvider[*fun.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
-	opts := &fun.WorkerGroupConf{}
-	fun.Invariant.Must(fun.JoinOptionProviders(optp...).Apply(opts))
+func getQueueForOpts(optp ...opt.Provider[*wpa.WorkerGroupConf]) *pubsub.Queue[fnx.Worker] {
+	opts := &wpa.WorkerGroupConf{}
+	erc.Invariant(opt.Join(optp...).Apply(opts))
 
 	return risky.Force(pubsub.NewQueue[fnx.Worker](
 		pubsub.QueueOptions{
@@ -300,10 +302,10 @@ func SetWorkerPool(
 	ctx context.Context,
 	key string,
 	queue *pubsub.Queue[fnx.Worker],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.Invariant.Must(orca.Add(WorkerPool(queue, optp...)))
+		erc.Invariant(orca.Add(WorkerPool(queue, optp...)))
 	})
 }
 
@@ -331,10 +333,10 @@ func SetHandlerWorkerPool(
 	key string,
 	queue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
-	optp ...fun.OptionProvider[*fun.WorkerGroupConf],
+	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		fun.Invariant.Must(orca.Add(HandlerWorkerPool(queue, observer, optp...)))
+		erc.Invariant(orca.Add(HandlerWorkerPool(queue, observer, optp...)))
 	})
 }
 

@@ -106,15 +106,6 @@ func TestOperations(t *testing.T) {
 			assert.Equal(t, 100, output)
 		})
 	})
-	t.Run("Check", func(t *testing.T) {
-		value, ok := Check(100, errors.New("foo"))
-		check.True(t, !ok)
-		check.Equal(t, 100, value)
-
-		value, ok = Check(100, nil)
-		check.True(t, ok)
-		check.Equal(t, 100, value)
-	})
 	t.Run("Force", func(t *testing.T) {
 		value := Force(100, errors.New("foo"))
 		check.Equal(t, 100, value)
@@ -165,11 +156,6 @@ func TestOperations(t *testing.T) {
 		assert.Panic(t, func() { Cast[int]("hello") })
 		assert.Equal(t, Cast[int](100), 100)
 		assert.Equal(t, Cast[string]("bond"), "bond")
-	})
-
-	t.Run("Ignore", func(t *testing.T) {
-		check.NotPanic(t, func() { Ignore(errors.New("new")) })
-		check.NotPanic(t, func() { Ignore(nil) })
 	})
 }
 

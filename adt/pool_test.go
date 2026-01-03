@@ -11,8 +11,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/testt"
 )
@@ -78,7 +77,7 @@ func TestPool(t *testing.T) {
 			return in
 		})
 
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		for gr := 0; gr < 32; gr++ {
@@ -86,10 +85,7 @@ func TestPool(t *testing.T) {
 
 			go func() {
 				defer wg.Done()
-				for {
-					if ctx.Err() != nil {
-						return
-					}
+				for ctx.Err() == nil {
 					ppg := p.Get()
 					ppg.value = 9001
 					p.Put(ppg)
@@ -97,9 +93,8 @@ func TestPool(t *testing.T) {
 			}()
 			go func() {
 				defer wg.Done()
-				for {
+				for ctx.Err() == nil {
 					ppg := p.Get()
-					check.NotEqual(t, ppg.value, 9001)
 					switch ppg.value {
 					case 9001:
 						t.Error("cleanup hook failed")
@@ -111,7 +106,9 @@ func TestPool(t *testing.T) {
 				}
 			}()
 		}
-		wg.Wait(ctx)
+		time.Sleep(5 * time.Second)
+		cancel()
+		wg.Wait()
 		check.True(t, seen.Load())
 		check.True(t, called.Load())
 		testt.Log(t, "seen =", seen.Load(), "called = ", called.Load())
@@ -203,7 +200,7 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("BytesBuffer", func(t *testing.T) {
 		t.Run("Resizes", func(t *testing.T) {
-			for name, bufpool := range map[string]*Pool[dt.Slice[byte]]{
+			for name, bufpool := range map[string]*Pool[stw.Slice[byte]]{
 				"Small":   MakeBufferPool(0, 32),
 				"Default": DefaultBufferPool(),
 			} {
@@ -258,7 +255,7 @@ func TestPool(t *testing.T) {
 			check.NotPanic(t, func() { MakeBufferPool(100, -100) })
 		})
 		t.Run("FlipsIfNeeded", func(t *testing.T) {
-			for name, bufpool := range map[string]*Pool[dt.Slice[byte]]{
+			for name, bufpool := range map[string]*Pool[stw.Slice[byte]]{
 				"MinMax": MakeBufferPool(32, 64),
 				"MaxMin": MakeBufferPool(64, 32),
 			} {

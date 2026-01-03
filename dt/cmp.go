@@ -9,9 +9,9 @@
 package dt
 
 import (
-	"github.com/tychoish/fun"
+	"iter"
+
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/fnx"
 )
 
 // Heap provides a min-order heap using the Heap.LT comparison
@@ -20,12 +20,6 @@ import (
 type Heap[T any] struct {
 	LT   cmp.LessThan[T]
 	data *List[T]
-}
-
-// AppendStream returns a Worker that, when called, will add all the items of from the stream to the Heap, returning only when
-// the stream has closed.
-func (h *Heap[T]) AppendStream(iter *fun.Stream[T]) fnx.Worker {
-	return iter.ReadAll(fnx.FromHandler(h.Push))
 }
 
 func (h *Heap[T]) list() *List[T] {
@@ -68,7 +62,5 @@ func (h *Heap[T]) Len() int { return h.list().Len() }
 // it, with an Ok value, which is true when the value returned is valid.
 func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), e.Ok() }
 
-// Stream provides an fun.Stream interface to the heap. The
-// stream consumes items from the heap, and will return when the
-// heap is empty.
-func (h *Heap[T]) Stream() *fun.Stream[T] { ; return h.list().StreamFront() }
+// Iterator provides an iterator to the items in the heap.
+func (h *Heap[T]) Iterator() iter.Seq[T] { ; return h.list().IteratorFront() }

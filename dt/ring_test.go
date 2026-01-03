@@ -1,13 +1,12 @@
 package dt
 
 import (
-	"context"
 	"math"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func TestRing(t *testing.T) {
@@ -24,29 +23,18 @@ func TestRing(t *testing.T) {
 			assert.Equal(t, ring.Len(), 2)
 		})
 		t.Run("FIFO", func(t *testing.T) {
-			items, err := ring.FIFO().Slice(t.Context())
-			assert.NotError(t, err)
+			items := irt.Collect(ring.FIFO())
 			assert.Equal(t, len(items), ring.Len())
 			// ordering:
 			check.Equal(t, items[0], 42)
 			check.Equal(t, items[1], 84)
 		})
 		t.Run("LIFO", func(t *testing.T) {
-			items, err := ring.LIFO().Slice(t.Context())
-			assert.NotError(t, err)
+			items := irt.Collect(ring.LIFO())
 			assert.Equal(t, len(items), ring.Len())
 			// ordering:
 			assert.Equal(t, items[0], 84)
 			assert.Equal(t, items[1], 42)
-		})
-		t.Run("Canceled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			cancel()
-
-			items, err := ring.LIFO().Slice(ctx)
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, context.Canceled)
-			assert.Equal(t, len(items), 0)
 		})
 	})
 	t.Run("Zero", func(t *testing.T) {
@@ -56,6 +44,27 @@ func TestRing(t *testing.T) {
 		assert.Zero(t, ring.Tail())
 		assert.Equal(t, ring.Cap(), 1024)
 		assert.Equal(t, 0, ring.Len())
+	})
+	t.Run("EarlyReturn", func(t *testing.T) {
+		ring := &Ring[int]{}
+		ring.Setup(10)
+		ring.Push(42)
+		ring.Push(42)
+		ring.Push(42)
+		ring.Push(24)
+		ring.Push(42)
+		ring.Push(42)
+		count := 0
+		assert.Equal(t, ring.Len(), 6)
+		for val := range ring.LIFO() {
+			count++
+			t.Log(val)
+			check.True(t, val == 42 || val == 24)
+			if val == 24 {
+				break
+			}
+		}
+		assert.Equal(t, count, 3)
 	})
 
 	t.Run("Setup", func(t *testing.T) {
@@ -81,7 +90,7 @@ func TestRing(t *testing.T) {
 			assert.Equal(t, ring.Len(), 8)
 			assert.Equal(t, ring.Cap(), 8)
 			assert.Equal(t, ring.Total(), 16)
-			assert.Equal(t, sum(ft.Must(ring.FIFO().Slice(t.Context()))), 2*8)
+			assert.Equal(t, sum(irt.Collect(ring.FIFO())), 2*8)
 		})
 
 		t.Run("Order", func(t *testing.T) {
@@ -99,7 +108,7 @@ func TestRing(t *testing.T) {
 				assert.Equal(t, ring.Cap(), 5)
 				assert.Equal(t, ring.Total(), 25)
 
-				fifo := ft.Must(ring.FIFO().Slice(t.Context()))
+				fifo := irt.Collect(ring.FIFO())
 				expected := []int{0, 1, 2, 3, 4}
 				for idx := range fifo {
 					check.Equal(t, fifo[idx], expected[idx])
@@ -119,7 +128,7 @@ func TestRing(t *testing.T) {
 				assert.Equal(t, ring.Cap(), 5)
 				assert.Equal(t, ring.Total(), 25)
 
-				lifo := ft.Must(ring.LIFO().Slice(t.Context()))
+				lifo := irt.Collect(ring.LIFO())
 				expected := []int{4, 3, 2, 1, 0}
 				for idx := range lifo {
 					check.Equal(t, lifo[idx], expected[idx])
@@ -190,7 +199,7 @@ func TestRing(t *testing.T) {
 		assert.Equal(t, int(ring.Total()), 2*defaultRingSize)
 
 		count := 0
-		for value := range ring.PopFIFO().Iterator(t.Context()) {
+		for value := range ring.PopFIFO() {
 			count++
 			assert.True(t, value >= count)
 		}

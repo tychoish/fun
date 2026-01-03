@@ -18,6 +18,32 @@ import (
 
 func TestOperation(t *testing.T) {
 	t.Parallel()
+	t.Run("Job", func(t *testing.T) {
+		ctx := context.Background()
+		t.Run("ReturnsWorker", func(t *testing.T) {
+			called := &atomic.Bool{}
+			op := Operation(func(context.Context) { called.Store(true) })
+			job := op.Job()
+			assert.NotError(t, job(ctx))
+			assert.True(t, called.Load())
+		})
+		t.Run("RecoversPanics", func(t *testing.T) {
+			expected := errors.New("panic error")
+			op := Operation(func(context.Context) { panic(expected) })
+			job := op.Job()
+			err := job(ctx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, expected)
+		})
+		t.Run("NoErrorOnSuccess", func(t *testing.T) {
+			count := &atomic.Int64{}
+			op := Operation(func(context.Context) { count.Add(1) })
+			job := op.Job()
+			err := job(ctx)
+			assert.NotError(t, err)
+			assert.Equal(t, count.Load(), int64(1))
+		})
+	})
 	t.Run("WaitGroupEndToEnd", func(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())

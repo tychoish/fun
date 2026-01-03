@@ -6,15 +6,13 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/testt"
+	"github.com/tychoish/fun/ft"
 )
 
 // When implementing the Map[K,V] type, I wrote a number of
@@ -38,19 +36,7 @@ import (
 // results if the input map is mutated during the operation. Keys and
 // values from the input map will replace keys and values from the
 // output map.
-func (mp *Map[K, V]) Join(in *Map[K, V]) {
-	in.Range(func(k K, v V) bool { mp.Store(k, v); return true })
-}
-
-// Append adds a sequence of pairs to the map.
-func (mp *Map[K, V]) Append(its ...dt.Pair[K, V]) { mp.Extend(its) }
-
-// Extend adds a slice of pairs to the map.
-func (mp *Map[K, V]) Extend(its []dt.Pair[K, V]) {
-	for _, it := range its {
-		mp.Store(it.Key, it.Value)
-	}
-}
+func (mp *Map[K, V]) Join(in *Map[K, V]) { mp.Extend(in.Iterator()) }
 
 func TestMap(t *testing.T) {
 	t.Parallel()
@@ -60,14 +46,14 @@ func TestMap(t *testing.T) {
 		defer cancel()
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				for ctx.Err() == nil && !passed.Load() {
 					for i := 0; i < 100; i++ {
-						mp.Store(fmt.Sprint(i), rand.Int())
+						mp.Set(fmt.Sprint(i), rand.Int())
 					}
 					runtime.Gosched()
 				}
@@ -86,7 +72,7 @@ func TestMap(t *testing.T) {
 				}
 			}()
 		}
-		wg.Wait(ctx)
+		wg.Wait()
 		t.Log(mp.Len())
 		assert.True(t, passed.Load())
 	})
@@ -96,7 +82,8 @@ func TestMap(t *testing.T) {
 		defer cancel()
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
-		wg := &fnx.WaitGroup{}
+		wg := &sync.WaitGroup{}
+		count := &atomic.Int64{}
 		for i := 0; i < 32; i++ {
 			wg.Add(1)
 			go func() {
@@ -108,6 +95,7 @@ func TestMap(t *testing.T) {
 
 					for i := 0; i < 300; i++ {
 						mp.Store(fmt.Sprint(i), rand.Int())
+						count.Add(1)
 					}
 				}
 			}()
@@ -124,59 +112,59 @@ func TestMap(t *testing.T) {
 					}
 					for i := 0; i < 300; i++ {
 						mp.Delete(fmt.Sprint(i))
+						count.Add(1)
 					}
 				}
 			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for {
-					time.Sleep(time.Millisecond)
-					if mp.Len() > 0 {
-						break
+			for range 2 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for {
+						time.Sleep(time.Millisecond)
+						if mp.Len() > 0 {
+							break
+						}
 					}
-				}
 
-				for {
-					if ctx.Err() != nil || passed.Load() {
-						return
+					for {
+						if ctx.Err() != nil || passed.Load() {
+							return
+						}
+						if mp.Len() == 0 {
+							passed.Store(true)
+							cancel()
+							return
+						}
 					}
-					if mp.Len() == 0 {
-						passed.Store(true)
-						cancel()
-						return
-					}
-				}
-			}()
+				}()
+			}
 		}
-		wg.Wait(ctx)
-		t.Log(mp.Len())
+		wg.Wait()
+		t.Log(mp.Len(), count.Load())
 		assert.True(t, passed.Load())
 	})
 	t.Run("EnsureSemantics", func(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 100; i++ {
-			mp.Set(dt.Pair[int, int]{Key: i, Value: rand.Int() + 43})
+			mp.Store(i, rand.Int()+43)
 		}
 
 		for i := 0; i < 200; i++ {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
-		iter := mp.Stream()
-		ctx := testt.Context(t)
+
 		count := 0
-		for iter.Next(ctx) {
+		for key, value := range mp.Iterator() {
 			count++
-			pair := iter.Value()
-			if pair.Key < 100 {
-				assert.True(t, pair.Value >= 43)
+			if key < 100 {
+				assert.True(t, value >= 43)
 				continue
 			}
-			assert.True(t, pair.Value == 42)
+			assert.True(t, value == 42)
 		}
-		assert.NotError(t, iter.Close())
 		assert.Equal(t, count, 200)
 	})
 	t.Run("Stream", func(t *testing.T) {
@@ -186,22 +174,13 @@ func TestMap(t *testing.T) {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
-		iter := mp.Stream()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		count := 0
-		for iter.Next(ctx) {
+		for value := range mp.Values() {
 			count++
-			pair := iter.Value()
-			assert.True(t, pair.Value == 42)
-			if count == 100 {
-				cancel()
-			}
+			assert.True(t, value == 42)
 		}
-		assert.NotError(t, iter.Close())
-		assert.Equal(t, count, 100)
+		assert.Equal(t, count, 200)
 	})
 	t.Run("Contains", func(t *testing.T) {
 		mp := &Map[string, int]{}
@@ -212,21 +191,6 @@ func TestMap(t *testing.T) {
 		assert.True(t, mp.Check("bar"))
 		assert.True(t, !mp.Check("baz"))
 		assert.Equal(t, 2, mp.Len())
-	})
-	t.Run("Get", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		assert.Zero(t, mp.Len())
-		val := mp.Get("foo")
-		assert.Zero(t, val)
-		assert.Equal(t, 1, mp.Len())
-		mp.Default.SetConstructor(func() int { return 42 })
-		_ = mp.Default.Get()
-		_ = mp.Default.Get()
-		_ = mp.Default.Get()
-		val = mp.Get("bar")
-		assert.Equal(t, 42, val)
-		val = mp.Get("foo")
-		assert.Zero(t, val)
 	})
 	t.Run("Join", func(t *testing.T) {
 		t.Run("Disjoint", func(t *testing.T) {
@@ -260,19 +224,8 @@ func TestMap(t *testing.T) {
 
 			assert.Equal(t, 2, mp2.Len())
 			assert.Equal(t, 3, mp.Len())
-			assert.Equal(t, mp.Get("foo"), 500)
+			assert.Equal(t, ft.IgnoreSecond(mp.Load("foo")), 500)
 		})
-	})
-	t.Run("Append", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		assert.Equal(t, 0, mp.Len())
-		mp.Append(dt.MakePair("foo", 400))
-		assert.Equal(t, 1, mp.Len())
-		mp.Append(dt.MakePair("foo", 42), dt.MakePair("bar", 3))
-		assert.Equal(t, 2, mp.Len())
-		assert.Equal(t, 42, mp.Get("foo"))
-		mp.Append(dt.MakePair("foofoo", 42), dt.MakePair("baz", 3))
-		assert.Equal(t, 4, mp.Len())
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("HappyPath", func(t *testing.T) {
@@ -293,16 +246,6 @@ func TestMap(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
-
-	t.Run("Ensure", func(t *testing.T) {
-		mp := &Map[string, int]{}
-		ok := mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 100})
-		check.True(t, ok)
-		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 100})
-		check.True(t, !ok)
-		ok = mp.EnsureSet(dt.Pair[string, int]{Key: "hi", Value: 10})
-		check.True(t, !ok)
-	})
 	t.Run("Streams", func(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
 			mp := &Map[string, int]{}
@@ -311,14 +254,12 @@ func TestMap(t *testing.T) {
 				mp.Ensure(fmt.Sprint(i))
 			}
 
-			ctx := testt.Context(t)
 			assert.Equal(t, mp.Len(), 100)
-			iter := mp.Keys()
 			count := 0
 			seen := map[string]struct{}{}
-			for iter.Next(ctx) {
+			for key := range mp.Keys() {
 				count++
-				seen[iter.Value()] = struct{}{}
+				seen[key] = struct{}{}
 			}
 			assert.Equal(t, count, 100)
 			assert.Equal(t, len(seen), 100)
@@ -330,13 +271,11 @@ func TestMap(t *testing.T) {
 				mp.Ensure(fmt.Sprint(i))
 			}
 
-			ctx := testt.Context(t)
 			assert.Equal(t, mp.Len(), 100)
-			iter := mp.Values()
 			count := 0
-			for iter.Next(ctx) {
+			for value := range mp.Values() {
 				count++
-				assert.Equal(t, iter.Value(), 38)
+				assert.Equal(t, value, 38)
 			}
 			assert.Equal(t, count, 100)
 		})

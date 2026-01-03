@@ -1,10 +1,12 @@
 package dt
 
 import (
-	"github.com/tychoish/fun"
-	"github.com/tychoish/fun/fnx"
+	"iter"
+
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
+	"github.com/tychoish/fun/irt"
 )
 
 // the maximum size for the ring: given that we divide to find the
@@ -41,8 +43,8 @@ func (r *Ring[T]) init() { ft.CallWhen(r.buf.ring == nil, r.innerInit) }
 func (r *Ring[T]) innerInit() {
 	r.size = ft.Default(r.size, defaultRingSize)
 
-	fun.Invariant.IsTrue(int64(r.size) <= maxRingSize, "invalid size", r.size, "max:", maxRingSize)
-	fun.Invariant.IsTrue(r.size >= 2, "invalid size", r.size, "(must be > 1)")
+	ft.Invariant(ers.Whenf(int64(r.size) > maxRingSize, "invalid size (%d) max: %d", r.size, maxRingSize))
+	ft.Invariant(ers.Whenf(r.size < 2, "invalid size %d (must be > 1)", r.size))
 
 	r.buf.ring = make([]T, r.size)
 	r.buf.nils = make([]*T, r.size)
@@ -120,35 +122,32 @@ func (r *Ring[T]) Pop() *T {
 // FIFO returns a stream that begins at the first (oldest; Head) element
 // and streams forward to the current or most recently added element
 // in the buffer.
-func (r *Ring[T]) FIFO() *fun.Stream[T] { r.init(); return r.iterate(r.oldest(), r.after) }
+func (r *Ring[T]) FIFO() iter.Seq[T] { r.init(); return r.iterate(r.oldest(), r.after) }
 
 // LIFO returns the element that was most recently added to buffer and
 // iterates backwords to the oldest element in the buffer.
-func (r *Ring[T]) LIFO() *fun.Stream[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
+func (r *Ring[T]) LIFO() iter.Seq[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
 
 // PopFIFO returns a FIFO stream that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
 // through all elements. The stream is exhusted when the buffer is empty.
-func (r *Ring[T]) PopFIFO() *fun.Stream[T] { return fun.MakeStream(fnx.PtrFuture(r.Pop)) }
+func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Generate(r.Pop)) }
 
-func (r *Ring[T]) iterate(from int, advance func(int) int) *fun.Stream[T] {
-	var count int
+func (r *Ring[T]) iterate(from int, advance func(int) int) iter.Seq[T] {
 	var current int
-
+	var count int
 	next := from
 
-	return fun.MakeStream(fnx.CheckedFuture(func() (T, bool) {
+	return func(yield func(T) bool) {
 		for r.count > 0 && (count == 0 || next != from) {
 			current = next
 			next = advance(current)
 
 			count++
 
-			if r.buf.nils[current] != nil {
-				return r.buf.ring[current], true
+			if r.buf.nils[current] != nil && !yield(r.buf.ring[current]) {
+				return
 			}
 		}
-
-		return r.zero(), false
-	}))
+	}
 }

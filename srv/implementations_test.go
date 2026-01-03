@@ -4,20 +4,20 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/testt"
+	"github.com/tychoish/fun/wpa"
 )
 
 func TestHelpers(t *testing.T) {
@@ -27,7 +27,7 @@ func TestHelpers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		svc := Wait(fun.VariadicStream(fnx.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
+		svc := Wait(irt.One(fnx.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
 		start := time.Now()
 		if err := svc.Start(ctx); err != nil {
 			t.Error(err)
@@ -47,9 +47,9 @@ func TestHelpers(t *testing.T) {
 		t.Run("Large", func(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessStream(
-				makeStream(100),
+				makeSeq(100),
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
-				fun.WorkerGroupConfNumWorkers(2),
+				wpa.WorkerGroupConfNumWorkers(2),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -67,13 +67,13 @@ func TestHelpers(t *testing.T) {
 		t.Run("Medium", func(t *testing.T) {
 			count := atomic.Int64{}
 			srv := ProcessStream(
-				makeStream(50),
+				makeSeq(50),
 				func(_ context.Context, _ int) error {
 					time.Sleep(10 * time.Millisecond)
 					count.Add(1)
 					return nil
 				},
-				fun.WorkerGroupConfNumWorkers(50),
+				wpa.WorkerGroupConfNumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -100,7 +100,7 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				fun.WorkerGroupConfWorkerPerCPU(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -120,7 +120,7 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			srv := WorkerPool(
 				makeQueue(t, 100, count),
-				fun.WorkerGroupConfWorkerPerCPU(),
+				wpa.WorkerGroupConfWorkerPerCPU(),
 			)
 			ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
 
@@ -134,6 +134,67 @@ func TestHelpers(t *testing.T) {
 				t.Error(count.Load())
 			}
 			assert.NotError(t, ctx.Err())
+		})
+		t.Run("ShutdownDrainsQueue", func(t *testing.T) {
+			count := &atomic.Int64{}
+			queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
+
+			// Add jobs to the queue without closing it
+			for i := 0; i < 50; i++ {
+				assert.NotError(t, queue.Add(func(_ context.Context) error {
+					time.Sleep(10 * time.Millisecond)
+					count.Add(1)
+					return nil
+				}))
+			}
+
+			srv := WorkerPool(queue, wpa.WorkerGroupConfNumWorkers(5))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Start the service
+			if err := srv.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			// Give workers time to start processing
+			time.Sleep(50 * time.Millisecond)
+
+			// Add more jobs after service started
+			for i := 0; i < 30; i++ {
+				assert.NotError(t, queue.Add(func(_ context.Context) error {
+					time.Sleep(5 * time.Millisecond)
+					count.Add(1)
+					return nil
+				}))
+			}
+
+			// Verify jobs are being processed but not all completed yet
+			check.True(t, count.Load() > 0)
+			check.True(t, count.Load() < 80)
+
+			// Call shutdown - this should drain the queue
+			shutdownStart := time.Now()
+			if err := srv.Shutdown(); err != nil {
+				t.Fatal(err)
+			}
+			shutdownDuration := time.Since(shutdownStart)
+
+			// Wait for service to complete
+			if err := srv.Wait(); err != nil {
+				t.Fatal(err)
+			}
+
+			// Verify all 80 jobs were processed
+			check.Equal(t, int64(80), count.Load())
+
+			// Shutdown should have taken some time (waiting for queue to drain)
+			// With 5 workers and jobs taking 5-10ms, this should take at least 50ms
+			check.True(t, shutdownDuration > 50*time.Millisecond)
+
+			// Queue should be empty and closed
+			check.Equal(t, 0, queue.Len())
 		})
 	})
 
@@ -149,7 +210,7 @@ func TestHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				fun.WorkerGroupConfNumWorkers(50),
+				wpa.WorkerGroupConfNumWorkers(50),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -177,7 +238,7 @@ func TestHelpers(t *testing.T) {
 					check.Error(t, err)
 					errCount.Add(1)
 				},
-				fun.WorkerGroupConfNumWorkers(50),
+				wpa.WorkerGroupConfNumWorkers(50),
 			)
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
 
@@ -222,78 +283,87 @@ func TestHelpers(t *testing.T) {
 }
 
 func TestCmd(t *testing.T) {
-	t.Parallel()
-	for i := 0; i < 2; i++ {
-		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
-			t.Parallel()
-			t.Run("Short", func(t *testing.T) {
-				t.Parallel()
-				t.Run("SimpleSleep", func(t *testing.T) {
-					ctx := testt.Context(t)
-					cmd := exec.CommandContext(ctx, "sleep", ".5")
-					s := Cmd(cmd, 0)
-					assert.MaxRuntime(t, 750*time.Millisecond, func() {
-						check.NotError(t, s.Start(ctx))
-						check.NotError(t, s.Wait())
-					})
-					assert.True(t, s.isFinished.Load())
-				})
-				t.Run("QuickReturn", func(t *testing.T) {
-					cmd := exec.Command("sleep", ".1")
-					s := Cmd(cmd, 0)
-					ctx := testt.Context(t)
-					check.NotError(t, s.Start(ctx))
-					assert.MaxRuntime(t, 100*time.Millisecond, func() {
-						s.Close()
-						check.Error(t, s.Wait())
-					})
-					assert.True(t, s.isFinished.Load())
-				})
-				t.Run("TimeoutObserved", func(t *testing.T) {
-					ctx := testt.Context(t)
-					cmd := exec.CommandContext(ctx, "sleep", "2")
-					s := Cmd(cmd, 10*time.Millisecond)
-					check.NotError(t, s.Start(ctx))
-					assert.MaxRuntime(t, 100*time.Millisecond, func() {
-						s.Close()
-						check.Error(t, s.Wait())
-					})
-				})
-			})
-
-			t.Run("RunningStartedErrors", func(t *testing.T) {
-				t.Parallel()
-
-				ctx := testt.Context(t)
-				cmd := exec.CommandContext(ctx, "sleep", "10")
-				_ = cmd.Start()
-				s := Cmd(cmd, 0)
+	t.Run("Short", func(t *testing.T) {
+		t.Run("SimpleSleep", func(t *testing.T) {
+			ctx := testt.Context(t)
+			cmd := exec.CommandContext(ctx, "sleep", ".5")
+			s := Cmd(cmd, 0)
+			assert.MaxRuntime(t, 750*time.Millisecond, func() {
 				check.NotError(t, s.Start(ctx))
-				err := s.Wait()
-				assert.Error(t, err) // already
-				assert.Substring(t, err.Error(), "already started")
+				check.NotError(t, s.Wait())
 			})
-			t.Run("ForceSigKILL", func(t *testing.T) {
-				ctx := testt.Context(t)
-				ctx = SetBaseContext(ctx)
-				cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
-				out := &bytes.Buffer{}
-				cmd.Stdout = out
-				cmd.Stderr = out
-				s := Cmd(cmd, 100*time.Millisecond)
-
-				check.NotError(t, s.Start(ctx))
-				assert.MaxRuntime(t, 500*time.Millisecond, func() {
-					s.Close()
-					runtime.Gosched()
-					err := s.Wait()
-					check.Error(t, err)
-					testt.Log(t, err)
-				})
-				testt.Log(t, out.String())
+			assert.True(t, s.isFinished.Load())
+		})
+		t.Run("QuickReturn", func(t *testing.T) {
+			cmd := exec.Command("sleep", ".1")
+			s := Cmd(cmd, 0)
+			ctx := testt.Context(t)
+			check.NotError(t, s.Start(ctx))
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+				s.Close()
+				check.Error(t, s.Wait())
+			})
+			assert.True(t, s.isFinished.Load())
+		})
+		t.Run("TimeoutObserved", func(t *testing.T) {
+			ctx := testt.Context(t)
+			cmd := exec.CommandContext(ctx, "sleep", "2")
+			s := Cmd(cmd, 10*time.Millisecond)
+			check.NotError(t, s.Start(ctx))
+			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+				s.Close()
+				check.Error(t, s.Wait())
 			})
 		})
-	}
+	})
+
+	t.Run("RunningStartedErrors", func(t *testing.T) {
+		ctx := testt.Context(t)
+		cmd := exec.CommandContext(ctx, "sleep", "10")
+		_ = cmd.Start()
+		s := Cmd(cmd, 0)
+		check.NotError(t, s.Start(ctx))
+		err := s.Wait()
+		assert.Error(t, err) // already
+		assert.Substring(t, err.Error(), "already started")
+	})
+	t.Run("SIGTERM", func(t *testing.T) {
+		ctx := testt.Context(t)
+		ctx = SetBaseContext(ctx)
+		cmd := exec.CommandContext(ctx, "bash", "-c", "sleep 10; echo 'woop'")
+		out := &bytes.Buffer{}
+		cmd.Stdout = out
+		cmd.Stderr = out
+		s := Cmd(cmd, 100*time.Millisecond)
+		check.NotError(t, s.Start(ctx))
+		runtime.Gosched()
+		s.Shutdown()
+
+		assert.MaxRuntime(t, 500*time.Millisecond, func() {
+			err := s.Wait()
+			check.Error(t, err)
+			testt.Log(t, err)
+		})
+		testt.Log(t, out.String())
+	})
+	t.Run("ForceSigKILL", func(t *testing.T) {
+		ctx := testt.Context(t)
+		ctx = SetBaseContext(ctx)
+		cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
+		out := &bytes.Buffer{}
+		cmd.Stdout = out
+		cmd.Stderr = out
+		s := Cmd(cmd, 100*time.Millisecond)
+		check.NotError(t, s.Start(ctx))
+		s.Shutdown()
+
+		assert.MaxRuntime(t, 500*time.Millisecond, func() {
+			err := s.Wait()
+			check.Error(t, err)
+			testt.Log(t, err)
+		})
+		testt.Log(t, out.String())
+	})
 }
 
 func TestDaemon(t *testing.T) {

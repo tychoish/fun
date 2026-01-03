@@ -44,7 +44,8 @@ func TestEnsure(t *testing.T) {
 			m.T = t
 			tt := ensure.That(is.True(true)).
 				Verbose().
-				Metadata(is.Plist().Add("hello", "world").Add("name", t.Name())).
+				WithMetadata("hello", "world").
+				WithMetadata("name", t.Name()).
 				Logf("the-end: %d", 42)
 			tt.Verbose().Run(m)
 		})

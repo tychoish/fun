@@ -7,12 +7,13 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 	"sync"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/risky"
+	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 // stole this from
@@ -74,19 +75,32 @@ type BrokerOptions struct {
 // settings can have profound impacts on the semantics and ordering of
 // messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, DistributorChannel(make(chan T)), opts)
+	ch := Blocking(make(chan T))
+	return makeInternalBrokerImpl(
+		ctx,
+		irt.Channel(ctx, ch.Channel()),
+		ch.Send().Write,
+		ch.Len,
+		opts,
+	)
 }
 
-// MakeDistributorBroker constructs a Broker that uses the provided
-// distributor to handle the buffering between the sending half and
-// the receiving half.
+// makeInternalBrokerImpl constructs a Broker that uses the provided
+// channel source for message distribution, with sink handling incoming
+// published messages and length reporting buffer depth.
 //
-// In general, you should configure the distributor to provide
-// whatever buffering requirements you have, and.
-func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts BrokerOptions) *Broker[T] {
+// In general, you should configure the source channel to provide
+// whatever buffering requirements you have.
+func makeInternalBrokerImpl[T any](
+	ctx context.Context,
+	source iter.Seq[T],
+	sink func(context.Context, T) error,
+	length func() int,
+	opts BrokerOptions,
+) *Broker[T] {
 	b := makeBroker[T](opts)
 	ctx, b.close = context.WithCancel(ctx)
-	b.startQueueWorkers(ctx, dist)
+	b.startQueueWorkers(ctx, source, sink, length)
 	return b
 }
 
@@ -102,7 +116,7 @@ func MakeDistributorBroker[T any](ctx context.Context, dist Distributor[T], opts
 // should use non-blocking sends. All channels between the broker and
 // the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, queue.Distributor(), opts)
+	return makeInternalBrokerImpl(ctx, queue.IteratorWait(ctx), queue.BlockingAdd, queue.Len, opts)
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to
@@ -113,7 +127,7 @@ func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOpti
 // This broker distributes messages in a FIFO order, dropping older
 // messages to make room for new messages.
 func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
-	return MakeDistributorBroker(ctx, deque.BlockingDistributor(), opts)
+	return makeInternalBrokerImpl(ctx, deque.IteratorWaitPopBack(ctx), deque.WaitPushFront, deque.Len, opts)
 }
 
 // NewLIFOBroker constructs a broker that uses the queue object to
@@ -125,8 +139,8 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // messages to make room for new messages. The capacity of the queue
 // is fixed, and must be a positive integer greater than 0,
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
-func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
-	return MakeDistributorBroker(ctx, risky.Force(NewDeque[T](DequeOptions{Capacity: capacity})).Distributor(), opts)
+func NewLIFOBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
+	return makeInternalBrokerImpl(ctx, deque.IteratorWaitPopBack(ctx), deque.WaitPushBack, deque.Len, opts)
 }
 
 func makeBroker[T any](opts BrokerOptions) *Broker[T] {
@@ -143,7 +157,12 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 }
 
-func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) {
+func (b *Broker[T]) startQueueWorkers(
+	ctx context.Context,
+	source iter.Seq[T],
+	sink func(context.Context, T) error,
+	length func() int,
+) {
 	subs := &adt.Map[chan T, struct{}]{}
 	b.wg.Add(1)
 	go func() {
@@ -160,12 +179,12 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 			case fn := <-b.stats:
 				fn(BrokerStats{
 					Subscriptions: subs.Len(),
-					BufferDepth:   dist.Len(),
+					BufferDepth:   length(),
 					MessageCount:  count,
 				})
 			case msg := <-b.publishCh:
 				count++
-				if err := dist.Send(ctx, msg); err != nil {
+				if err := sink(ctx, msg); err != nil {
 					// ignore most push errors: either they're queue full issues, which are the
 					// result of user configuration (and we don't log anyway,) or
 					// the queue has been closed (return), but otherwise
@@ -192,45 +211,31 @@ func (b *Broker[T]) startQueueWorkers(ctx context.Context, dist Distributor[T]) 
 		b.wg.Add(1)
 		go func() {
 			defer b.wg.Done()
-			for {
-				msg, err := dist.Receive(ctx)
-				if err != nil {
-					return
-				}
+			for msg := range source {
 				b.dispatchMessage(ctx, subs.Keys(), msg)
 			}
 		}()
 	}
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, iter *fun.Stream[chan T], msg T) {
+func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq[chan T], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
 		wg := &fnx.WaitGroup{}
-		for iter.Next(ctx) {
+		for value := range seq {
 			wg.Add(1)
 			go func(msg T, ch chan T) {
 				defer wg.Done()
 				b.sendMsg(ctx, msg, ch)
-			}(msg, iter.Value())
+			}(msg, value)
 		}
-		_ = iter.Close()
 		wg.Wait(ctx)
 	} else {
-		for iter.Next(ctx) {
-			b.sendMsg(ctx, msg, iter.Value())
+		for value := range seq {
+			b.sendMsg(ctx, msg, value)
 		}
-		_ = iter.Close()
 	}
 }
-
-// Populate creates a fun.Worker function that publishes items from
-// the input stream to the broker, returning when its context
-// expires or the stream is closed (propagating its error).
-//
-// Callers should avoid using a stream that will retain input
-// items in memory.
-func (b *Broker[T]) Populate(iter *fun.Stream[T]) fnx.Worker { return iter.ReadAll(b.Send) }
 
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
@@ -311,7 +316,7 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 }
 
 // Publish distributes a message to all subscribers.
-func (b *Broker[T]) Publish(ctx context.Context, msg T) { risky.Ignore(b.Send(ctx, msg)) }
+func (b *Broker[T]) Publish(ctx context.Context, msg T) { ft.Ignore(b.Send(ctx, msg)) }
 
 // Send distributes a message to all subscribers.
 func (b *Broker[T]) Send(ctx context.Context, msg T) error {

@@ -190,7 +190,7 @@ func TestService(t *testing.T) {
 				},
 			})
 		}
-		s := Group(list.StreamPopFront())
+		s := Group(list.IteratorPopFront())
 		if err := s.Start(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -357,7 +357,6 @@ func TestService(t *testing.T) {
 				resp, err := http.DefaultClient.Do(
 					risky.Force(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
 				)
-
 				if err != nil {
 					t.Error(err)
 				}

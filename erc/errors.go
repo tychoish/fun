@@ -14,6 +14,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // Collector is a simplified version of the error collector in
@@ -76,6 +77,17 @@ func AsCollector(err error) *Collector {
 // using errors.Join(): if you call erc.Join repeatedly on the same
 // error set of errors the resulting error is convertable.
 func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
+
+// JoinSeq takes an iterator sequence of errors and aggregates them into
+// a single error. This operation is similar to Join but accepts an
+// iter.Seq[error] instead of a variadic slice. Nil errors are filtered
+// out, and if all errors are nil, JoinSeq returns nil. If only one
+// non-nil error exists, it is returned directly. Otherwise, a
+// *Collector is returned containing all non-nil errors.
+//
+// The resulting error is compatible with errors.Is and errors.As for
+// introspecting the constituent errors.
+func JoinSeq(errs iter.Seq[error]) error { st := &Collector{}; st.From(errs); return st.Err() }
 
 // with/lock are internal helpers to avoid twiddling the pointer to
 // the mutex.
@@ -176,10 +188,20 @@ func (ec *Collector) Iterator() iter.Seq[error] {
 // Push collects an error if that error is non-nil.
 func (ec *Collector) Push(err error) {
 	if ers.IsError(err) {
-		defer ec.with(ec.lock())
-		ec.list.Push(err)
+		ec.pushWithLock(err)
 	}
 }
+
+// From adds all non-nil error values from the iterator sequence to the
+// error collector. Nil errors in the sequence are automatically filtered
+// out and ignored. This method is thread-safe and can be called
+// concurrently with other Collector methods.
+//
+// The method uses irt.KeepErrors to filter the sequence, ensuring only
+// non-nil errors are added to the collector.
+func (ec *Collector) From(seq iter.Seq[error])        { irt.Apply(irt.KeepErrors(seq), ec.pushWithLock) }
+func (ec *Collector) pushWithLock(err error)          { defer ec.with(ec.lock()); ec.list.Push(err) }
+func (ec *Collector) addWithLock(seq iter.Seq[error]) { defer ec.with(ec.lock()); ec.list.From(seq) }
 
 // Join appends one or more errors to the collectors. Nil errors are
 // always omitted from the collector.
@@ -190,8 +212,7 @@ func (ec *Collector) Join(errs ...error) {
 	case 1:
 		ec.Push(errs[0])
 	default:
-		defer ec.with(ec.lock())
-		ec.list.Add(errs)
+		ec.addWithLock(irt.Slice(errs))
 	}
 }
 
@@ -238,7 +259,7 @@ func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
 // Recover can be used in a defer to collect a panic and add it to the collector.
 func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
-// WithRecover calls the provided function, collecting any.
+// WithRecover calls the provided function, collecting any .
 func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
 
 // WithRecoverHook catches a panic and adds it to the error collector

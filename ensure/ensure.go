@@ -1,14 +1,15 @@
 package ensure
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/tychoish/fun"
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ensure/is"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 )
 
@@ -93,7 +94,7 @@ func (a *Assertion) Add(sub *Assertion) *Assertion { a.subtests.PushBack(sub); r
 // unconditionally in verbose mode. Operates generally like t.Log() or
 // fmt.Sprint().
 func (a *Assertion) Log(args ...any) *Assertion {
-	a.messages.PushBack(fun.MAKE.Sprint(args...))
+	a.messages.PushBack(func() string { return fmt.Sprint(args...) })
 	return a
 }
 
@@ -101,24 +102,21 @@ func (a *Assertion) Log(args ...any) *Assertion {
 // unconditionally in verbose mode. Operates like t.Logf or
 // fmt.Sprintf.
 func (a *Assertion) Logf(tmpl string, args ...any) *Assertion {
-	a.messages.PushBack(fun.MAKE.Sprintf(tmpl, args...))
+	a.messages.PushBack(func() string { return fmt.Sprintf(tmpl, args...) })
 	return a
 }
 
-// Metadata adds structured logging pairs, which can be constructed
-// using the is.Plist().Add(k,v) constructor and chaining.
+// WithMetadata annotates the assertion with additional (structured, keyed) logging.
 //
 // Each pair is logged as it's own Log statement.
-func (a *Assertion) Metadata(md *dt.Pairs[string, any]) *Assertion {
-	fun.Invariant.Must(md.Stream().ReadAll(fnx.FromHandler(func(p dt.Pair[string, any]) {
-		a.messages.PushBack(fun.MAKE.Sprintf(`%s: "%v"`, p.Key, p.Value))
-	})).Wait())
+func (a *Assertion) WithMetadata(key string, value any) *Assertion {
+	a.messages.PushBack(func() string { return fmt.Sprintf(`%s: "%v"`, key, value) })
 	return a
 }
 
 // Run rus the test and produces the output.
 func (a *Assertion) Run(t testing.TB) {
-	fun.Invariant.IsFalse(a.constructing, "cannot execute assertion during construction")
+	erc.InvariantOk(ft.Not(a.constructing), "cannot execute assertion during construction")
 	t.Helper()
 	strlogger := func(in string) {
 		t.Helper()
@@ -135,7 +133,7 @@ func (a *Assertion) Run(t testing.TB) {
 		}
 	})
 
-	result := &dt.Slice[string]{}
+	result := &stw.Slice[string]{}
 
 	ft.ApplyWhen(
 		!a.check.Defined() && a.subtests.Len() == 0,
@@ -143,7 +141,7 @@ func (a *Assertion) Run(t testing.TB) {
 		"no tests defined",
 	)
 
-	result.AppendSlice(a.check.Resolve())
+	result.Append(a.check.Resolve()...)
 
 	for sub := a.subtests.Front(); sub.Ok(); sub = sub.Next() {
 		st := sub.Value()
