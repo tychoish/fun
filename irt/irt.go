@@ -567,16 +567,14 @@ func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 		next, stop := iter.Pull(seq)
 		defer stop()
 
-		shouldContinue := true
-
-		for num > 0 && yield(func(yield func(T) bool) {
+		for shouldContinue := num > 0; shouldContinue && yield(func(yield func(T) bool) {
 			for range num {
 				if value, ok := next(); !ok || !yield(value) {
 					shouldContinue = false
 					return
 				}
 			}
-		}) && shouldContinue {
+		}); {
 			continue
 		}
 	}
