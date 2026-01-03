@@ -479,6 +479,70 @@ func TestNtimesHelper(t *testing.T) {
 			}
 		})
 	}
+	t.Run("RepatOK", func(t *testing.T) {
+		t.Run("Normal", func(t *testing.T) {
+			count := 0
+			op := repeatok(4, func() (int, bool) { count++; return count, true })
+			for seen, tri := op(); tri != nil && deref(tri); seen, tri = op() {
+				if count != seen {
+					t.Error("unexpected value, count=", count, "seen=", seen)
+				}
+			}
+			thenNum, thenVal := op()
+			if thenNum != 0 {
+				t.Error("got", thenNum)
+			}
+			if thenVal != nil {
+				t.Error("did got over limit signal", deref(thenVal))
+			}
+			if count != 4 {
+				t.Error("unexpected:", count)
+			}
+		})
+		t.Run("EarlyReturn", func(t *testing.T) {
+			count := 0
+			op := repeatok(4, func() (int, bool) { count++; return count, true })
+			for seen, tri := op(); tri != nil && deref(tri); seen, tri = op() {
+				if count == 2 {
+					break
+				}
+				if count != seen {
+					t.Error("unexpected value, count=", count, "seen=", seen)
+				}
+			}
+			thenNum, thenVal := op()
+			if thenNum != 3 {
+				t.Error("got", thenNum)
+			}
+			if thenVal == nil {
+				t.Fatal("got over limit signal")
+			}
+			if !deref(thenVal) {
+				t.Error("there should be one more iteration ")
+			}
+			if count != 3 {
+				t.Error("unexpected:", count)
+			}
+			thenNum, thenVal = op()
+			if thenNum != 4 {
+				t.Error(thenNum)
+			}
+			if thenVal == nil || !deref(thenVal) {
+				t.Error(thenVal, deref(thenVal))
+			}
+
+			thenNum, thenVal = op()
+			if thenNum != 0 {
+				t.Error("got", thenNum)
+			}
+			if thenVal != nil {
+				t.Error("did not get over limit signal")
+			}
+			if count != 4 {
+				t.Error("unexpected:", count)
+			}
+		})
+	})
 }
 
 func TestWithlimitHelper(t *testing.T) {
