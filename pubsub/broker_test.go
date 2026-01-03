@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 type BrokerFixture[T comparable] struct {
@@ -300,8 +301,8 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 					t.Error(stat)
 				}
 
-				seen1 := make(map[T]struct{}, len(elems))
-				seen2 := make(map[T]struct{}, len(elems))
+				seen1 := &adt.Set[T]{}
+				seen2 := &adt.Set[T]{}
 				wg := &fnx.WaitGroup{}
 				wg.Add(3)
 				sig := make(chan struct{})
@@ -323,12 +324,12 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 						case <-sig:
 							return
 						case str := <-ch1:
-							seen1[str] = struct{}{}
+							seen1.Add(str)
 						}
-						if len(seen1) == total {
+						if seen1.Len() == total {
 							return
 						}
-						if len(seen1)/2 > total {
+						if seen1.Len()/2 > total {
 							return
 						}
 					}
@@ -345,12 +346,12 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 						case <-sig:
 							return
 						case str := <-ch2:
-							seen2[str] = struct{}{}
+							seen2.Add(str)
 						}
-						if len(seen2) == total {
+						if seen2.Len() == total {
 							return
 						}
-						if len(seen2)/2 > total {
+						if seen2.Len()/2 > total {
 							return
 						}
 					}
@@ -396,9 +397,9 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 				}()
 
 				wg.Wait(ctx)
-				if len(seen1) == len(seen2) {
-					checkMatchingSets(t, seen1, seen2)
-				} else if len(seen1) == 0 && len(seen2) == 0 {
+				if seen1.Len() == seen2.Len() {
+					irt.Equal(seen1.Iterator(), seen2.Iterator())
+				} else if seen1.Len() == 0 && seen2.Len() == 0 {
 					t.Error("should observe some events")
 				}
 
