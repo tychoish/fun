@@ -283,9 +283,7 @@ func TestHelpers(t *testing.T) {
 }
 
 func TestCmd(t *testing.T) {
-	t.Parallel()
 	t.Run("Short", func(t *testing.T) {
-		t.Parallel()
 		t.Run("SimpleSleep", func(t *testing.T) {
 			ctx := testt.Context(t)
 			cmd := exec.CommandContext(ctx, "sleep", ".5")
@@ -320,8 +318,6 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("RunningStartedErrors", func(t *testing.T) {
-		t.Parallel()
-
 		ctx := testt.Context(t)
 		cmd := exec.CommandContext(ctx, "sleep", "10")
 		_ = cmd.Start()
@@ -341,7 +337,7 @@ func TestCmd(t *testing.T) {
 		s := Cmd(cmd, 100*time.Millisecond)
 		check.NotError(t, s.Start(ctx))
 		runtime.Gosched()
-		s.cancel()
+		s.Shutdown()
 
 		assert.MaxRuntime(t, 500*time.Millisecond, func() {
 			err := s.Wait()
@@ -359,8 +355,7 @@ func TestCmd(t *testing.T) {
 		cmd.Stderr = out
 		s := Cmd(cmd, 100*time.Millisecond)
 		check.NotError(t, s.Start(ctx))
-		runtime.Gosched()
-		s.cancel()
+		s.Shutdown()
 
 		assert.MaxRuntime(t, 500*time.Millisecond, func() {
 			err := s.Wait()
