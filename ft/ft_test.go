@@ -3,14 +3,12 @@ package ft
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ers"
 )
 
 func TestWhen(t *testing.T) {
@@ -47,13 +45,6 @@ func TestWhen(t *testing.T) {
 		check.Equal(t, 100, IfElse(true, 100, 900))
 		check.Equal(t, 900, IfElse(false, 100, 900))
 	})
-}
-
-func TestMust(t *testing.T) {
-	assert.Panic(t, func() { Must("32", ers.Error("whoop")) })
-	assert.Panic(t, func() { MustOk("32", false) })
-	assert.NotPanic(t, func() { check.Equal(t, "32", Must("32", nil)) })
-	assert.NotPanic(t, func() { check.Equal(t, "32", MustOk("32", true)) })
 }
 
 func TestPtr(t *testing.T) {
@@ -404,100 +395,6 @@ func TestError(t *testing.T) {
 }
 
 func TestPanicProtection(t *testing.T) {
-	const perr ers.Error = "panic error"
-
-	t.Run("Wrap", func(t *testing.T) {
-		t.Run("RecoverCall", func(t *testing.T) {
-			fn := func() { panic(perr) }
-			assert.NotPanic(t, func() {
-				assert.Error(t, WrapRecoverCall(fn)())
-				assert.ErrorIs(t, WrapRecoverCall(fn)(), perr)
-			})
-		})
-		t.Run("RecoverDo", func(t *testing.T) {
-			fn := func() int { panic(perr) }
-			assert.NotPanic(t, func() {
-				out, err := WrapRecoverDo(fn)()
-				assert.Error(t, err)
-				assert.Zero(t, out)
-				assert.ErrorIs(t, err, perr)
-			})
-		})
-	})
-	t.Run("Helpers", func(t *testing.T) {
-		t.Run("Apply", func(t *testing.T) {
-			if err := WithRecoverApply(nil, 123); err == nil {
-				t.Error("expected error")
-			}
-
-			if err := WithRecoverApply(func(in int) { panic(in) }, 123); err == nil {
-				t.Error("expected error")
-			}
-
-			if err := WithRecoverApply(func(in int) {
-				if in != 123 {
-					t.Fatal(in)
-				}
-			}, 123); err != nil {
-				t.Error(err)
-			}
-		})
-	})
-	t.Run("Check", func(t *testing.T) {
-		t.Run("NoError", func(t *testing.T) {
-			err := WithRecoverCall(func() { t.Log("function runs") })
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-		t.Run("WithPanic", func(t *testing.T) {
-			err := WithRecoverCall(func() { panic("function runs") })
-			if err == nil {
-				t.Fatal(err)
-			}
-			errText := err.Error()
-			if !strings.Contains(errText, "recovered panic") {
-				t.Error(err, "!=", errText)
-			}
-
-			if !strings.Contains(errText, "function runs") {
-				t.Error(err, "!=", errText)
-			}
-		})
-	})
-	t.Run("SafeWithPanic", func(t *testing.T) {
-		ok, err := WithRecoverDo(func() bool {
-			panic(errors.New("error"))
-		})
-		assert.Error(t, err)
-		check.True(t, !ok)
-	})
-	t.Run("SafeOK", func(t *testing.T) {
-		t.Run("Not", func(t *testing.T) {
-			num, ok := Check(WithRecoverDo(func() int { panic("error?") }))
-			assert.True(t, !ok)
-			assert.Zero(t, num)
-		})
-		t.Run("Passes", func(t *testing.T) {
-			num, ok := Check(WithRecoverDo(func() int { return 42 }))
-			assert.True(t, ok)
-			assert.Equal(t, 42, num)
-		})
-	})
-	t.Run("Recover", func(t *testing.T) {
-		var called bool
-		ob := func(err error) {
-			check.Error(t, err)
-			check.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			called = true
-		}
-		assert.NotPanic(t, func() {
-			defer Recover(ob)
-			assert.True(t, !called)
-			panic("hi")
-		})
-		assert.True(t, called)
-	})
 	t.Run("Ignore", func(t *testing.T) {
 		t.Run("FirstAndSecond", func(t *testing.T) {
 			const first int = 42

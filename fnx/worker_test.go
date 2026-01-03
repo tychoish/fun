@@ -151,26 +151,27 @@ func TestWorker(t *testing.T) {
 			})
 			t.Run("Must", func(t *testing.T) {
 				expected := errors.New("buddy")
-				err := ft.WithRecoverCall(func() {
+				ec := &erc.Collector{}
+				ec.WithRecover(func() {
 					wf := Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
 					t.Log(wf)
 				})
 				// declaration shouldn't call
-				assert.NotError(t, err)
+				assert.NotError(t, ec.Resolve())
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
-				err = ft.WithRecoverCall(func() {
+				ec.WithRecover(func() {
 					wf := Worker(func(context.Context) error {
 						panic(expected)
 					}).Must()
 					wf(ctx)
 				})
-				assert.Error(t, err)
-				assert.ErrorIs(t, err, expected)
+				assert.Error(t, ec.Resolve())
+				assert.ErrorIs(t, ec.Resolve(), expected)
+				assert.ErrorIs(t, ec.Resolve(), ers.ErrRecoveredPanic)
 			})
 		})
 		t.Run("Signal", func(t *testing.T) {

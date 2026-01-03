@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
@@ -157,7 +158,11 @@ func (wf Operation) Wait() { wf(context.Background()) }
 // WithRecover converts the Operation into a Worker function that catchers
 // panics and returns them as errors using fun.Check.
 func (wf Operation) WithRecover() Worker {
-	return func(ctx context.Context) error { return ft.WithRecoverApply(wf, ctx) }
+	return func(ctx context.Context) (err error) {
+		defer func() { err = erc.ParsePanic(recover()) }()
+		wf.Run(ctx)
+		return
+	}
 }
 
 // Worker converts a wait function into a fun.Worker. If the context
@@ -227,7 +232,7 @@ func (wf Operation) Limit(in int) Operation {
 // TTL runs an operation, and if the operation is called before the
 // specified duration, the operation is a noop.
 func (wf Operation) TTL(dur time.Duration) Operation {
-	resolver := ft.Must(internal.TTLExec[bool](dur))
+	resolver := erc.Must(internal.TTLExec[bool](dur))
 	return func(ctx context.Context) { resolver(func() bool { wf(ctx); return true }) }
 }
 

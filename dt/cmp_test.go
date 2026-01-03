@@ -1,7 +1,6 @@
 package dt
 
 import (
-	"errors"
 	"math"
 	"math/rand"
 	"sort"
@@ -11,8 +10,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/dt/stw"
-	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
 )
@@ -154,23 +151,15 @@ func TestSort(t *testing.T) {
 	})
 	t.Run("Heap", func(t *testing.T) {
 		t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-			ok, err := ft.WithRecoverDo(func() bool {
-				var list *Heap[string]
-				list.Push("hi")
-				return true
-			})
-			if ok {
-				t.Error("should have errored")
-			}
-			if err == nil {
-				t.Fatal("should have gotten failure")
-			}
-			if !errors.Is(err, ErrUninitializedContainer) {
-				t.Error(err)
-			}
+			var err error
+			defer func() {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, ErrUninitializedContainer)
+			}()
+			defer func() { err = recover().(error) }()
 
-			assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			assert.ErrorIs(t, err, ErrUninitializedContainer)
+			var list *Heap[string]
+			list.Push("hi")
 		})
 		t.Run("Stream", func(t *testing.T) {
 			heap := &Heap[int]{LT: cmp.LessThanNative[int]}

@@ -169,7 +169,7 @@ func (wf Worker) Jitter(jf func() time.Duration) Worker {
 // result of the *last* worker to execute is cached concurrent access
 // to that value is possible.
 func (wf Worker) Limit(n int) Worker {
-	resolver := ft.Must(internal.LimitExec[error](n))
+	resolver := erc.Must(internal.LimitExec[error](n))
 	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
 }
 
@@ -179,7 +179,7 @@ func (wf Worker) Limit(n int) Worker {
 // of the root worker is protected by a mutex, the resulting worker
 // can be used in parallel during the intervals between calls.
 func (wf Worker) TTL(dur time.Duration) Worker {
-	resolver := ft.Must(internal.TTLExec[error](dur))
+	resolver := erc.Must(internal.TTLExec[error](dur))
 	return func(ctx context.Context) error { return resolver(func() error { return wf(ctx) }) }
 }
 

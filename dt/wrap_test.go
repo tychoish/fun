@@ -24,6 +24,7 @@ func TestWrap(t *testing.T) {
 		errs := Unwind(err)
 
 		check.Equal(t, 3, len(errs))
+		t.Log(errs)
 	})
 	t.Run("Wrap", func(t *testing.T) {
 		l := &wrapTestType{value: 42}

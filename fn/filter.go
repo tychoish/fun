@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ft"
-	prv "github.com/tychoish/fun/internal"
 )
 
 // Filter describes a common function object and provides higher level operations on the functions themselves. These functions
@@ -34,7 +33,7 @@ func (fl Filter[T]) Lock() Filter[T] { return fl.WithLock(&sync.Mutex{}) }
 
 // WithLock returns a filter that protects the execution of the filter operation with the provided mutex.
 func (fl Filter[T]) WithLock(mu *sync.Mutex) Filter[T] {
-	return func(v T) T { defer prv.With(prv.Lock(mu)); return fl.Apply(v) }
+	return func(v T) T { mu.Lock(); defer mu.Unlock(); return fl.Apply(v) }
 }
 
 // PreHook returns a filter that executes the provided hook function before applying the filter.

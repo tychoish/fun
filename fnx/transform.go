@@ -6,7 +6,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
 )
 
 // Converter is a function type that converts T objects int objects of
@@ -52,7 +51,9 @@ func (mpf Converter[T, O]) Lock() Converter[T, O] {
 // provided mutex.
 func (mpf Converter[T, O]) WithLock(mu *sync.Mutex) Converter[T, O] {
 	return func(ctx context.Context, val T) (O, error) {
-		defer internal.With(internal.Lock(mu))
+		mu.Lock()
+		defer mu.Unlock()
+
 		return mpf.Convert(ctx, val)
 	}
 }

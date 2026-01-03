@@ -3,8 +3,8 @@ package fn
 import (
 	"sync"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
 )
 
 // Handler describes a function that operates on a single object, but
@@ -49,7 +49,11 @@ func (of Handler[T]) WithRecover(oe Handler[error]) Handler[T] {
 
 // RecoverPanic runs the handler function with a panic handler and converts
 // a possible panic to an error.
-func (of Handler[T]) RecoverPanic(in T) error { return ft.WithRecoverApply(of, in) }
+func (of Handler[T]) RecoverPanic(in T) (err error) {
+	defer func() { err = erc.ParsePanic(recover()) }()
+	of.Read(in)
+	return
+}
 
 // If returns an handler that only executes the root handler if the
 // condition is true.
@@ -113,12 +117,12 @@ func (of Handler[T]) Lock() Handler[T] { return of.WithLock(&sync.Mutex{}) }
 
 // WithLock protects the action of the handler with the provied mutex.
 func (of Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
-	return func(in T) { defer internal.With(internal.Lock(mtx)); of(in) }
+	return func(in T) { mtx.Lock(); defer mtx.Unlock(); of(in) }
 }
 
 // WithLocker protects the action of the handler with the provied mutex.
 func (of Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
-	return func(in T) { defer internal.WithL(internal.LockL(mtx)); of(in) }
+	return func(in T) { mtx.Lock(); defer mtx.Unlock(); of(in) }
 }
 
 // All processes all inputs with the specified handler.

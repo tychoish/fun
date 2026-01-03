@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
@@ -217,7 +218,7 @@ func (s Slice[T]) Zero() {
 // outside of the bounds of the slice, an invariant violation panic is
 // raised.
 func (s Slice[T]) ZeroRange(start, end int) {
-	ft.Invariant(ers.Whenf(
+	erc.Invariant(ers.Whenf(
 		start < 0 || end < start || end > len(s)-1,
 		"start = %d, end = %d, are not valid bounds", start, end,
 	))
@@ -230,7 +231,7 @@ func (s Slice[T]) ZeroRange(start, end int) {
 // FillTo appends zero values to the slice until it reaches the
 // specified length, and returns the resulting slice.
 func (s Slice[T]) FillTo(length int) Slice[T] {
-	ft.Invariant(
+	erc.Invariant(
 		ers.Whenf(
 			length < len(s),
 			"%w: cannot grow a slice to a length that is less than the current length: fill %d <=, %d", ers.ErrInvalidInput, length, len(s),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
@@ -29,7 +30,7 @@ func TestShardedMap(t *testing.T) {
 		check.Equal(t, m.Version(), 1)
 		check.True(t, m.Set("a", 42))
 		check.Equal(t, m.Version(), 2)
-		check.Equal(t, ft.MustOk(m.Load("a")), 42)
+		check.Equal(t, erc.MustOk(m.Load("a")), 42)
 		_, ok := m.Load("b")
 		check.True(t, !ok)
 		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 2)

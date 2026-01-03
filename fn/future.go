@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
@@ -25,7 +26,11 @@ func AsFuture[T any](in T) Future[T] { return ft.Wrap(in) }
 func (f Future[T]) Resolve() T { return f() }
 
 // RecoverPanic resolves the future, catching any panics and converting them to errors.
-func (f Future[T]) RecoverPanic() (T, error) { return ft.WithRecoverDo(f) }
+func (f Future[T]) RecoverPanic() (out T, err error) {
+	defer func() { err = erc.ParsePanic(recover()) }()
+	out = f()
+	return
+}
 
 // Once returns a future that will only run the underlying future
 // exactly once.
@@ -52,13 +57,13 @@ func (f Future[T]) Lock() Future[T] { return f.WithLock(&sync.Mutex{}) }
 
 // WithLock return a future that is protected with the provided mutex.
 func (f Future[T]) WithLock(m *sync.Mutex) Future[T] {
-	return func() T { defer internal.With(internal.Lock(m)); return f() }
+	return func() T { m.Lock(); defer m.Unlock(); return f() }
 }
 
 // WithLocker return a future that is protected with the provided
 // sync.Locker implementation.
 func (f Future[T]) WithLocker(m sync.Locker) Future[T] {
-	return func() T { defer internal.WithL(internal.LockL(m)); return f() }
+	return func() T { m.Lock(); defer m.Unlock(); return f() }
 }
 
 // PreHook unconditionally runs the provided function before running
@@ -96,13 +101,13 @@ func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 // TTL returns a future that will cache (and return) the value returned by the inner future, for the period described by the
 // value of dur.
 func (f Future[T]) TTL(dur time.Duration) Future[T] {
-	resolver := ft.Must(internal.TTLExec[T](dur))
+	resolver := erc.Must(internal.TTLExec[T](dur))
 	return func() T { return resolver(f) }
 }
 
 // Limit returns a future that will call the inner future exactly the specified number of times, and return the last value
 // provided thereafter.
 func (f Future[T]) Limit(in int) Future[T] {
-	resolver := ft.Must(internal.LimitExec[T](in))
+	resolver := erc.Must(internal.LimitExec[T](in))
 	return func() T { return resolver(f) }
 }

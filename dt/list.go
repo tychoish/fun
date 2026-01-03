@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/tychoish/fun/dt/cmp"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
@@ -172,7 +173,7 @@ func (l *List[T]) Copy() *List[T] {
 func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != nil }
 
 func (l *List[T]) root() *Element[T] {
-	ft.Invariant(ers.If(l == nil, ErrUninitializedContainer))
+	erc.Invariant(ers.If(l == nil, ErrUninitializedContainer))
 
 	ft.CallWhen(l.head == nil, l.uncheckedSetup)
 

@@ -9,9 +9,9 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// IsOk returns true when the error is nil, and false otherwise. It
-// should always be inlined, and mostly exists for clarity at call
-// sites in bool/IsOk check relevant contexts.
+// IsOk returns true when the error is nil, and false otherwise, and
+// mostly exists for clarity at call sites in bool/IsOk check relevant
+// contexts.
 func IsOk(err error) bool {
 	switch e := err.(type) {
 	case nil:
@@ -24,7 +24,7 @@ func IsOk(err error) bool {
 }
 
 // IsError returns true when the error is non-nill. Provides the
-// inverse of Ok().
+// inverse of IsOk().
 func IsError(err error) bool { return !IsOk(err) }
 
 // Cast returns e if e is an error and otherwise returns nil.

@@ -199,3 +199,71 @@ func TestPanics(t *testing.T) {
 		})
 	})
 }
+
+func TestPanic(t *testing.T) {
+	t.Run("InvariantOk", func(t *testing.T) {
+		t.Run("TrueCondition", func(t *testing.T) {
+			assert.NotPanic(t, func() {
+				InvariantOk(true)
+			})
+		})
+		t.Run("FalseCondition", func(t *testing.T) {
+			var err error
+			defer func() {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, ers.ErrInvariantViolation)
+				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+				assert.True(t, ers.IsInvariantViolation(err))
+			}()
+			defer func() { err = ParsePanic(recover()) }()
+
+			InvariantOk(false)
+		})
+		t.Run("TrueExpression", func(t *testing.T) {
+			assert.NotPanic(t, func() {
+				InvariantOk(1 == 1)
+			})
+		})
+		t.Run("FalseExpression", func(t *testing.T) {
+			var err error
+			defer func() {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, ers.ErrInvariantViolation)
+				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+				assert.True(t, ers.IsInvariantViolation(err))
+			}()
+			defer func() { err = ParsePanic(recover()) }()
+
+			InvariantOk(1 == 2)
+		})
+	})
+	t.Run("Invariant", func(t *testing.T) {
+		t.Run("NilError", func(t *testing.T) {
+			assert.NotPanic(t, func() {
+				Invariant(nil)
+			})
+		})
+		t.Run("NonNilError", func(t *testing.T) {
+			root := errors.New("test error")
+
+			var err error
+
+			defer func() {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, ers.ErrInvariantViolation)
+				assert.ErrorIs(t, err, root)
+				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+				assert.True(t, ers.IsInvariantViolation(err))
+			}()
+			defer func() { err = ParsePanic(recover()) }()
+
+			Invariant(root)
+		})
+	})
+	t.Run("Must", func(t *testing.T) {
+		assert.Panic(t, func() { Must("32", errors.New("whoop")) })
+		assert.Panic(t, func() { MustOk("32", false) })
+		assert.NotPanic(t, func() { check.Equal(t, "32", Must("32", nil)) })
+		assert.NotPanic(t, func() { check.Equal(t, "32", MustOk("32", true)) })
+	})
+}

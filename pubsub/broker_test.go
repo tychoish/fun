@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -98,7 +97,7 @@ func GenerateFixtures[T comparable](axis string, elems []T, opts BrokerOptions) 
 			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewDequeBroker(
 					ctx,
-					ft.Must(NewDeque[T](DequeOptions{
+					erc.Must(NewDeque[T](DequeOptions{
 						Capacity: 8,
 					})),
 					opts,
@@ -110,7 +109,7 @@ func GenerateFixtures[T comparable](axis string, elems []T, opts BrokerOptions) 
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
 				return NewLIFOBroker(
 					ctx,
-					ft.Must(NewDeque[T](DequeOptions{
+					erc.Must(NewDeque[T](DequeOptions{
 						Capacity: 8,
 					})),
 					opts,

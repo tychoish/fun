@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -91,8 +90,9 @@ func JoinSeq(errs iter.Seq[error]) error { st := &Collector{}; st.From(errs); re
 
 // with/lock are internal helpers to avoid twiddling the pointer to
 // the mutex.
-func (*Collector) with(m *sync.Mutex)   { internal.With(m) }
-func (ec *Collector) lock() *sync.Mutex { return internal.Lock(&ec.mu) }
+func (*Collector) with(m *sync.Mutex)   { m.Unlock() }
+func (ec *Collector) mtx() *sync.Mutex  { return &ec.mu }
+func (ec *Collector) lock() *sync.Mutex { m := ec.mtx(); m.Lock(); return m }
 
 // SetFilter sets (or overrides) the current filter on the
 // collector. Errors errors collected by the filter are passed to the
@@ -259,7 +259,8 @@ func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
 // Recover can be used in a defer to collect a panic and add it to the collector.
 func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
-// WithRecover calls the provided function, collecting any .
+// WithRecover calls the provided function, collecting any panic and
+// converting it to an error// that is added to the collector.
 func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
 
 // WithRecoverHook catches a panic and adds it to the error collector

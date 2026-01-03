@@ -11,32 +11,38 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 )
+
+func withPanicAsError(op func()) (err error) {
+	defer func() {
+		err = recover().(error)
+	}()
+	op()
+	return
+}
 
 func TestPanics(t *testing.T) {
 	t.Run("MustNoPanic", func(t *testing.T) {
-		ok := ft.Must(func() (bool, error) {
+		ok := erc.Must(func() (bool, error) {
 			return true, nil
 		}())
 		assert.True(t, ok)
 	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
-		ok, err := ft.WithRecoverDo(func() bool {
-			return ft.Must(func() (bool, error) {
+		ec := erc.Collector{}
+		out := true
+		ec.WithRecover(func() {
+			out = false
+			erc.Must(func() (bool, error) {
 				return true, nil
 			}())
 		})
-		if err != nil {
-			t.Error("error should be non-nil")
-		}
-		if !ok {
-			t.Error("should be zero value of T")
-		}
+		assert.NotError(t, ec.Resolve())
+		assert.True(t, out)
 	})
 	t.Run("InvariantOk", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.InvariantOk(1 == 2, "math is a construct")
 			})
 			assert.Error(t, err)
@@ -46,13 +52,13 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Error", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ft.WithRecoverCall(func() { erc.InvariantOk(false, err) })
+			se := withPanicAsError(func() { erc.InvariantOk(false, err) })
 
 			assert.ErrorIs(t, se, err)
 		})
 		t.Run("ErrorPlus", func(t *testing.T) {
 			err := errors.New("kip")
-			se := ft.WithRecoverCall(func() { erc.InvariantOk(false, err, 42) })
+			se := withPanicAsError(func() { erc.InvariantOk(false, err, 42) })
 			if !errors.Is(se, err) {
 				t.Log("se", se)
 				t.Log("err", err)
@@ -63,13 +69,13 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("NoError", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() { erc.InvariantOk(false, 42) })
+			err := withPanicAsError(func() { erc.InvariantOk(false, 42) })
 			if !strings.Contains(err.Error(), "42") {
 				t.Error(err)
 			}
 		})
 		t.Run("WithoutArgs", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() { erc.InvariantOk(1 == 2) })
+			err := withPanicAsError(func() { erc.InvariantOk(1 == 2) })
 			if !errors.Is(err, ers.ErrInvariantViolation) {
 				t.Fatal(err)
 			}
@@ -86,7 +92,7 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("LongInvariant", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.InvariantOk(1 == 2,
 					"math is a construct",
 					"1 == 2",
@@ -102,21 +108,21 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("Invariant", func(t *testing.T) {
 		t.Run("Nil", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() { erc.Invariant(nil, "hello") })
+			err := withPanicAsError(func() { erc.Invariant(nil, "hello") })
 			if err != nil {
 				t.Fatal(err)
 			}
 		})
 		t.Run("Expected", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ft.WithRecoverCall(func() { erc.Invariant(root, "hello") })
+			err := withPanicAsError(func() { erc.Invariant(root, "hello") })
 			if err == nil {
 				t.Fatal("expected error")
 			}
 		})
 		t.Run("Panic", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ft.WithRecoverCall(func() { erc.Invariant(root) })
+			err := withPanicAsError(func() { erc.Invariant(root) })
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -125,7 +131,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Propagate", func(t *testing.T) {
 			root := errors.New("kip")
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.Invariant(root, "annotate")
 			})
 			if err == nil {
@@ -144,7 +150,7 @@ func TestPanics(t *testing.T) {
 			}
 		})
 		t.Run("NilAgain", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.Invariant(nil, "annotate")
 			})
 			if err != nil {
@@ -154,11 +160,11 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("MustBeOk", func(t *testing.T) {
 		assert.NotPanic(t, func() {
-			foo := ft.MustOk(func() (string, bool) { return "foo", true }())
+			foo := erc.MustOk(func() (string, bool) { return "foo", true }())
 			assert.Equal(t, "foo", foo)
 		})
 		assert.Panic(t, func() {
-			foo := ft.MustOk(func() (string, bool) { return "foo", false }())
+			foo := erc.MustOk(func() (string, bool) { return "foo", false }())
 			assert.Equal(t, "foo", foo)
 		})
 	})
@@ -225,7 +231,7 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("NonNilError", func(t *testing.T) {
 			testErr := errors.New("test error")
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.Must(42, testErr)
 			})
 			assert.Error(t, err)
@@ -257,7 +263,7 @@ func TestPanics(t *testing.T) {
 			})
 		})
 		t.Run("FalseCondition", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.MustOk("fail", false)
 			})
 			assert.Error(t, err)
@@ -277,7 +283,7 @@ func TestPanics(t *testing.T) {
 			})
 		})
 		t.Run("WithFunctionFail", func(t *testing.T) {
-			err := ft.WithRecoverCall(func() {
+			err := withPanicAsError(func() {
 				erc.MustOk(func() (string, bool) { return "hello world", false }())
 			})
 			assert.Error(t, err)

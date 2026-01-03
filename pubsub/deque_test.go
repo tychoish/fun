@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
@@ -468,8 +467,8 @@ func TestDeque(t *testing.T) {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
 					ctx := testt.Context(t)
-					ft.InvariantOk(tt.Push(ctx, 1) == nil)
-					ft.InvariantOk(tt.Push(ctx, 1) == nil)
+					assert.True(t, tt.Push(ctx, 1) == nil)
+					assert.True(t, tt.Push(ctx, 1) == nil)
 
 					canceled, trigger := context.WithCancel(context.Background())
 					trigger()
@@ -489,8 +488,8 @@ func TestDeque(t *testing.T) {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
 					ctx := testt.Context(t)
-					ft.InvariantOk(tt.Push(ctx, 1) == nil)
-					ft.InvariantOk(tt.Push(ctx, 1) == nil)
+					assert.True(t, tt.Push(ctx, 1) == nil)
+					assert.True(t, tt.Push(ctx, 1) == nil)
 
 					if err := tt.dq.Close(); err != nil {
 						t.Fatal(err)
@@ -512,8 +511,8 @@ func TestDeque(t *testing.T) {
 				t.Run(tt.Name, func(t *testing.T) {
 					tt.check(t)
 					ctx := testt.Context(t)
-					ft.InvariantOk(tt.Push(ctx, 1) == nil)
-					ft.InvariantOk(tt.Push(ctx, 1) == nil)
+					assert.True(t, tt.Push(ctx, 1) == nil)
+					assert.True(t, tt.Push(ctx, 1) == nil)
 					start := time.Now()
 					sig := make(chan struct{})
 					var end time.Time

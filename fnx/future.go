@@ -167,7 +167,7 @@ func (pf Future[T]) Ignore(ctx context.Context) fn.Future[T] {
 // Must returns a future that resolves the future returning the
 // constructed value and panicing if the future errors.
 func (pf Future[T]) Must(ctx context.Context) fn.Future[T] {
-	return func() T { return ft.Must(pf.Read(ctx)) }
+	return func() T { return erc.Must(pf.Read(ctx)) }
 }
 
 // Force combines the semantics of Must and Wait as a future: when the
@@ -277,12 +277,12 @@ func (pf Future[T]) Lock() Future[T] { return pf.WithLock(&sync.Mutex{}) }
 
 // WithLock uses the provided mutex to protect the execution of the future.
 func (pf Future[T]) WithLock(mtx *sync.Mutex) Future[T] {
-	return func(ctx context.Context) (T, error) { defer internal.With(internal.Lock(mtx)); return pf(ctx) }
+	return func(ctx context.Context) (T, error) { mtx.Lock(); defer mtx.Unlock(); return pf(ctx) }
 }
 
 // WithLocker uses the provided mutex to protect the execution of the future.
 func (pf Future[T]) WithLocker(mtx sync.Locker) Future[T] {
-	return func(ctx context.Context) (T, error) { defer internal.WithL(internal.LockL(mtx)); return pf(ctx) }
+	return func(ctx context.Context) (T, error) { mtx.Lock(); defer mtx.Unlock(); return pf(ctx) }
 }
 
 // WithCancel creates a Future and a cancel function which will
@@ -305,7 +305,7 @@ func (pf Future[T]) WithCancel() (Future[T], context.CancelFunc) {
 // result of the last execution and returns that value for any
 // subsequent executions.
 func (pf Future[T]) Limit(in int) Future[T] {
-	resolver := ft.Must(internal.LimitExec[tuple[T, error]](in))
+	resolver := erc.Must(internal.LimitExec[tuple[T, error]](in))
 
 	return func(ctx context.Context) (T, error) {
 		out := resolver(func() (val tuple[T, error]) {
@@ -363,7 +363,7 @@ type tuple[T, U any] struct {
 // TTL runs the future only one time per specified interval. The
 // interval must me greater than 0.
 func (pf Future[T]) TTL(dur time.Duration) Future[T] {
-	resolver := ft.Must(internal.TTLExec[tuple[T, error]](dur))
+	resolver := erc.Must(internal.TTLExec[tuple[T, error]](dur))
 
 	return func(ctx context.Context) (T, error) {
 		out := resolver(func() (val tuple[T, error]) {
@@ -380,9 +380,11 @@ func (pf Future[T]) TTL(dur time.Duration) Future[T] {
 // returned with the future's output.
 func (pf Future[T]) PreHook(op Operation) Future[T] {
 	return func(ctx context.Context) (out T, err error) {
-		e := ft.WithRecoverCall(func() { op(ctx) })
+		var ec erc.Collector
+		ec.Push(op.WithRecover().Run(ctx))
 		out, err = pf(ctx)
-		return out, erc.Join(err, e)
+		ec.Push(err)
+		return out, ec.Resolve()
 	}
 }
 
@@ -394,8 +396,10 @@ func (pf Future[T]) PreHook(op Operation) Future[T] {
 // counters as necessary.
 func (pf Future[T]) PostHook(op func()) Future[T] {
 	return func(ctx context.Context) (o T, e error) {
+		var ec erc.Collector
 		o, e = pf(ctx)
-		e = erc.Join(ft.WithRecoverCall(op), e)
+		ec.Push(e)
+		ec.WithRecover(op)
 		return
 	}
 }

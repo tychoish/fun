@@ -11,6 +11,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
 )
@@ -648,13 +649,16 @@ func TestProcess(t *testing.T) {
 		})
 		assert.Equal(t, called, 2)
 
-		err := ft.WithRecoverCall(func() {
+		var ec erc.Collector
+		ec.WithRecover(func() {
 			MakeHandler(func(in int) error {
 				called++
 				check.Equal(t, in, 42)
 				return errors.New("beep")
 			}).Must(t.Context(), 42)
 		})
+		err := ec.Resolve()
+
 		assert.Equal(t, called, 3)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)

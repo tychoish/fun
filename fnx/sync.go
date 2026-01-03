@@ -5,8 +5,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -27,19 +25,22 @@ import (
 // additional performance hit.
 type WaitGroup struct {
 	mu      sync.Mutex
+	once    sync.Once
 	cond    *sync.Cond
 	counter int
 }
 
-func (wg *WaitGroup) initOp()            { wg.cond = sync.NewCond(&wg.mu) }
-func (wg *WaitGroup) init()              { ft.CallWhen(wg.cond == nil, wg.initOp) }
-func (wg *WaitGroup) mutex() *sync.Mutex { return &wg.mu }
+func (wg *WaitGroup) doInit()                         { wg.cond = sync.NewCond(&wg.mu) }
+func (wg *WaitGroup) init()                           { wg.once.Do(wg.doInit) }
+func (wg *WaitGroup) mtx() *sync.Mutex                { return &wg.mu }
+func (*WaitGroup) with(mu *sync.Mutex)                { mu.Unlock() }
+func (wg *WaitGroup) lock(mu *sync.Mutex) *sync.Mutex { mu.Lock(); return mu }
 
 // Add modifies the internal counter. Raises an ErrInvariantViolation
 // error if any modification causes the internal coutner to be less
 // than 0.
 func (wg *WaitGroup) Add(num int) {
-	defer internal.With(internal.Lock(wg.mutex()))
+	defer wg.with(wg.lock(wg.mtx()))
 	wg.init()
 
 	invariant(wg.counter+num >= 0, "cannot decrement waitgroup to less than 0: ", wg.counter, " + ", num)
@@ -59,13 +60,13 @@ func (wg *WaitGroup) Inc() { wg.Add(1) }
 
 // Num returns the number of pending workers.
 func (wg *WaitGroup) Num() int {
-	defer internal.With(internal.Lock(wg.mutex()))
+	defer wg.with(wg.lock(wg.mtx()))
 	return wg.counter
 }
 
 // IsDone returns true if there is pending work, and false otherwise.
 func (wg *WaitGroup) IsDone() bool {
-	defer internal.With(internal.Lock(wg.mutex()))
+	defer wg.with(wg.lock(wg.mtx()))
 	return wg.counter == 0
 }
 
@@ -131,7 +132,7 @@ func (wg *WaitGroup) StartGroup(ctx context.Context, n int, op Operation) Operat
 // Consider using `fnx.Operation(wg.Wait).Block()` if you want blocking
 // semantics with the other features of this WaitGroup implementation.
 func (wg *WaitGroup) Wait(ctx context.Context) {
-	defer internal.With(internal.Lock(wg.mutex()))
+	defer wg.with(wg.lock(wg.mtx()))
 
 	if wg.counter == 0 || ctx.Err() != nil {
 		return

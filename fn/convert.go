@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/ft"
-	prv "github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -63,13 +62,13 @@ func (cf Converter[I, O]) PostFilter(f Filter[O]) Converter[I, O] {
 // WithLock returns a converter that protects the execution of the converter with the provided
 // mutex.
 func (cf Converter[I, O]) WithLock(m *sync.Mutex) Converter[I, O] {
-	return func(in I) O { defer prv.With(prv.Lock(m)); return cf(in) }
+	return func(in I) O { m.Lock(); defer m.Unlock(); return cf(in) }
 }
 
 // WithLocker returns a converter that protects the execution of the conversion with the provided
 // sync.Locker instance.
 func (cf Converter[I, O]) WithLocker(m sync.Locker) Converter[I, O] {
-	return func(in I) O { defer prv.WithL(prv.LockL(m)); return cf(in) }
+	return func(in I) O { m.Lock(); defer m.Unlock(); return cf(in) }
 }
 
 // WithContext returns a wrapped version of the converter function that has he same signature as

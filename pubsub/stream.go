@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/wpa"
@@ -143,7 +142,8 @@ func IteratorStream[T any](it iter.Seq[T]) *Stream[T] {
 		case <-cc.Done():
 		}
 
-		defer internal.With(internal.Lock(mtx))
+		mtx.Lock()
+		defer mtx.Unlock()
 		stop()
 	}).PostHook(cancel).Go().Once()))
 }

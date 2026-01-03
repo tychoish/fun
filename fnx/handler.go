@@ -194,14 +194,15 @@ func (pf Handler[T]) WithLock(mtx *sync.Mutex) Handler[T] {
 // always held while the root Handler is called.
 func (pf Handler[T]) WithLocker(mtx sync.Locker) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		defer internal.WithL(internal.LockL(mtx))
+		mtx.Lock()
+		defer mtx.Unlock()
 		return pf.Read(ctx, in)
 	}
 }
 
 // Limit ensures that the Handler is called at most n times.
 func (pf Handler[T]) Limit(n int) Handler[T] {
-	resolver := ft.Must(internal.LimitExec[error](n))
+	resolver := erc.Must(internal.LimitExec[error](n))
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })
@@ -213,7 +214,7 @@ func (pf Handler[T]) Limit(n int) Handler[T] {
 // the executions of the underlying function happen in isolation,
 // in between, the Handler is concurrently accessible.
 func (pf Handler[T]) TTL(dur time.Duration) Handler[T] {
-	resolver := ft.Must(internal.TTLExec[error](dur))
+	resolver := erc.Must(internal.TTLExec[error](dur))
 
 	return func(ctx context.Context, arg T) error {
 		return resolver(func() error { return pf(ctx, arg) })
@@ -243,7 +244,10 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 // before a Handler is called the first time.
 func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		return erc.Join(ft.WithRecoverCall(func() { op(ctx) }), pf(ctx, in))
+		var ec erc.Collector
+		ec.Push(op.WithRecover().Run(ctx))
+		ec.Push(pf(ctx, in))
+		return ec.Resolve()
 	}
 }
 
@@ -254,7 +258,10 @@ func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 // case of a Handler panic.)
 func (pf Handler[T]) PostHook(op func()) Handler[T] {
 	return func(ctx context.Context, in T) error {
-		return erc.Join(ft.Flip(pf(ctx, in), ft.WithRecoverCall(op)))
+		var ec erc.Collector
+		defer ec.WithRecover(op)
+		ec.Push(pf(ctx, in))
+		return ec.Resolve()
 	}
 }
 

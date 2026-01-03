@@ -1,7 +1,5 @@
 package ft
 
-import "github.com/tychoish/fun/irt"
-
 // Join creates a function that iterates over all of the input
 // functions and calls all non-nil functions sequentially. Nil
 // functions are ignored.
@@ -11,10 +9,18 @@ func Join(fns ...func()) func() { return func() { CallMany(fns) } }
 func Call(op func()) { op() }
 
 // CallMany calls each of the provided function, skipping any nil functions.
-func CallMany(ops []func()) { irt.Apply(irt.Slice(ops), CallSafe) }
+func CallMany(ops []func()) {
+	for _, item := range ops {
+		CallSafe(item)
+	}
+}
 
 // CallTimes runs the specified operation n times.
-func CallTimes(n int, op func()) { irt.Apply(irt.GenerateN(n, Wrap(op)), CallSafe) }
+func CallTimes(n int, op func()) {
+	for range n {
+		CallSafe(op)
+	}
+}
 
 // Do executes the provided function and returns its result.
 func Do[T any](op func() T) T { return op() }
