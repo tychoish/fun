@@ -296,7 +296,7 @@ func TestWrap(t *testing.T) {
 func TestContexts(t *testing.T) {
 	t.Run("Timeout", func(t *testing.T) {
 		var cc context.Context
-		CallWithTimeout(10*time.Millisecond, func(ctx context.Context) {
+		WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
 			assert.NotError(t, ctx.Err())
 			cc = ctx
 			time.Sleep(100 * time.Millisecond)
@@ -307,7 +307,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("ScopeTimeout", func(t *testing.T) {
 		var cc context.Context
-		CallWithTimeout(10*time.Millisecond, func(ctx context.Context) {
+		WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
 			cc = ctx
 			assert.NotError(t, ctx.Err())
 		})
@@ -315,7 +315,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("Scope", func(t *testing.T) {
 		var cc context.Context
-		CallWithContext(func(ctx context.Context) {
+		WithContextCall(func(ctx context.Context) {
 			cc = ctx
 			assert.NotError(t, ctx.Err())
 		})
@@ -323,7 +323,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("Do", func(t *testing.T) {
 		var cc context.Context
-		assert.Equal(t, 42, DoWithContext(func(ctx context.Context) int {
+		assert.Equal(t, 42, WithContextDo(func(ctx context.Context) int {
 			cc = ctx
 			check.NotError(t, ctx.Err())
 			return 42
