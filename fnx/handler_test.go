@@ -379,10 +379,10 @@ func TestProcess(t *testing.T) {
 			count := 0
 			pf := NewHandler(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
-				assert.Zero(t, count)
+				check.Zero(t, count)
 				count++
 				return nil
-			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
+			}).PostHook(func() { check.Equal(t, count, 1); count++; panic(root) })
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := pf(ctx, 42)
@@ -393,10 +393,10 @@ func TestProcess(t *testing.T) {
 			count := 0
 			pf := NewHandler(func(_ context.Context, in int) error {
 				check.Equal(t, in, 42)
-				assert.Zero(t, count)
+				check.Zero(t, count)
 				count++
 				return nil
-			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
+			}).PostHook(func() { check.Equal(t, count, 1); count++ })
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := pf(ctx, 42)

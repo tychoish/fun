@@ -400,6 +400,7 @@ func (pf Future[T]) PostHook(op func()) Future[T] {
 		o, e = pf(ctx)
 		ec.Push(e)
 		ec.WithRecover(op)
+		e = ec.Resolve()
 		return
 	}
 }

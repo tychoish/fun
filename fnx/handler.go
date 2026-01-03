@@ -246,6 +246,7 @@ func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 	return func(ctx context.Context, in T) error {
 		var ec erc.Collector
 		ec.Push(op.WithRecover().Run(ctx))
+		defer ec.Recover()
 		ec.Push(pf(ctx, in))
 		return ec.Resolve()
 	}
@@ -257,11 +258,14 @@ func (pf Handler[T]) PreHook(op Operation) Handler[T] {
 // unconditionally called after the Handler function (except in the
 // case of a Handler panic.)
 func (pf Handler[T]) PostHook(op func()) Handler[T] {
-	return func(ctx context.Context, in T) error {
-		var ec erc.Collector
+	return func(ctx context.Context, in T) (err error) {
+		ec := &erc.Collector{}
+		defer func() { err = ec.Resolve() }()
+		defer ec.Recover()
 		defer ec.WithRecover(op)
+
 		ec.Push(pf(ctx, in))
-		return ec.Resolve()
+		return
 	}
 }
 

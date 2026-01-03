@@ -15,7 +15,9 @@ import (
 
 func withPanicAsError(op func()) (err error) {
 	defer func() {
-		err = recover().(error)
+		if p := recover(); p != nil {
+			err = erc.Join(p.(error), ers.ErrRecoveredPanic)
+		}
 	}()
 	op()
 	return
@@ -30,10 +32,9 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("SafeNoPanic", func(t *testing.T) {
 		ec := erc.Collector{}
-		out := true
+		out := false
 		ec.WithRecover(func() {
-			out = false
-			erc.Must(func() (bool, error) {
+			out = erc.Must(func() (bool, error) {
 				return true, nil
 			}())
 		})

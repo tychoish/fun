@@ -261,7 +261,10 @@ func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
 // WithRecover calls the provided function, collecting any panic and
 // converting it to an error// that is added to the collector.
-func (ec *Collector) WithRecover(fn func()) { ec.Recover(); defer ec.Recover(); fn() }
+func (ec *Collector) WithRecover(fn func()) {
+	defer func() { ec.Push(ParsePanic(recover())) }()
+	fn()
+}
 
 // WithRecoverHook catches a panic and adds it to the error collector
 // and THEN runs the specified hook if. If there was no panic, this
