@@ -16,14 +16,14 @@ import (
 type OrderedMap[K comparable, V any] struct {
 	mtx  sync.Mutex
 	once sync.Once
-	hash stw.Map[K, *Element[irt.Elem[K, V]]]
-	list *List[irt.Elem[K, V]]
+	hash stw.Map[K, *Element[irt.KV[K, V]]]
+	list *List[irt.KV[K, V]]
 }
 
 func (m *OrderedMap[K, V]) init() { m.once.Do(m.doInit) }
 func (m *OrderedMap[K, V]) doInit() {
-	m.hash = stw.Map[K, *Element[irt.Elem[K, V]]]{}
-	m.list = &List[irt.Elem[K, V]]{}
+	m.hash = stw.Map[K, *Element[irt.KV[K, V]]]{}
+	m.list = &List[irt.KV[K, V]]{}
 }
 func (*OrderedMap[K, V]) zerov() (out V)       { return }
 func (*OrderedMap[K, V]) with(mtx *sync.Mutex) { mtx.Unlock() }
@@ -45,7 +45,7 @@ func (m *OrderedMap[K, V]) Load(key K) (V, bool) {
 	defer m.with(m.lock())
 	elem, ok := m.hash.Load(key)
 	if ok {
-		return elem.Value().Second, true
+		return elem.Value().Value, true
 	}
 	return m.zerov(), false
 }
@@ -105,7 +105,7 @@ func (m *OrderedMap[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, m.Store
 // Iterator returns a standard Go iterator interface to the key-value
 // pairs of the map in insertion order.
 func (m *OrderedMap[K, V]) Iterator() iter.Seq2[K, V] {
-	return irt.ElemsSplit(
+	return irt.KVsplit(
 		irt.WithMutex(
 			irt.Keep(
 				m.list.IteratorFront(),
@@ -117,10 +117,10 @@ func (m *OrderedMap[K, V]) Iterator() iter.Seq2[K, V] {
 }
 
 // Keys provides a stream over just the keys in the map in insertion order.
-func (m *OrderedMap[K, V]) Keys() iter.Seq[K] { m.init(); return irt.First(irt.ElemsSplit(m.elems())) }
+func (m *OrderedMap[K, V]) Keys() iter.Seq[K] { m.init(); return irt.First(irt.KVsplit(m.elems())) }
 
-func (m *OrderedMap[K, V]) checkForElem(e irt.Elem[K, V]) bool { return m.hash.Check(e.First) }
-func (m *OrderedMap[K, V]) elems() iter.Seq[irt.Elem[K, V]] {
+func (m *OrderedMap[K, V]) checkForElem(e irt.KV[K, V]) bool { return m.hash.Check(e.Key) }
+func (m *OrderedMap[K, V]) elems() iter.Seq[irt.KV[K, V]] {
 	return irt.WithMutex(m.list.IteratorFront(), &m.mtx)
 }
 

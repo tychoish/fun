@@ -2614,7 +2614,7 @@ func TestWith2(t *testing.T) {
 				return x * x, x * x * x
 			})
 
-			output := Collect2(ElemsSplit(Limit(Elems(gen), 2)))
+			output := Collect2(KVsplit(Limit(Elems(gen), 2)))
 
 			expected := map[int]int{
 				1: 1,
@@ -3703,14 +3703,14 @@ func TestUntil(t *testing.T) {
 
 func TestUntil2(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
-		input := slices.SortedFunc(Elems(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})), ElemCmpSecond)
+		input := slices.SortedFunc(Elems(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})), KVcmpSecond)
 		t.Log(input)
 
 		if len(input) != 4 {
 			t.Error(input)
 		}
 
-		intermediate := Collect(Elems(Until2(ElemsSplit(Slice(input)), func(k string, v int) bool {
+		intermediate := Collect(Elems(Until2(KVsplit(Slice(input)), func(k string, v int) bool {
 			return v > 2
 		})))
 
@@ -3718,7 +3718,7 @@ func TestUntil2(t *testing.T) {
 			t.Error(intermediate)
 		}
 
-		output := Collect2(ElemsSplit(Slice(intermediate)))
+		output := Collect2(KVsplit(Slice(intermediate)))
 
 		if len(output) != 2 {
 			t.Error(output)
@@ -4293,7 +4293,7 @@ func TestRemoveNils(t *testing.T) {
 func TestElems(t *testing.T) {
 	t.Run("Apply", func(t *testing.T) {
 		count := 0
-		ElemsApply(Elems(With(GenerateN(30, func() int { return 7 }), strconv.Itoa)), func(n int, s string) {
+		KVapply(Elems(With(GenerateN(30, func() int { return 7 }), strconv.Itoa)), func(n int, s string) {
 			count++
 			if n != 7 {
 				t.Error("unexpected value")
@@ -4589,10 +4589,10 @@ func TestCount2(t *testing.T) {
 		input iter.Seq2[int, string]
 		want  int
 	}{
-		{"Empty input", ElemsSplit(Slice([]Elem[int, string]{})), 0},
-		{"Single element", ElemsSplit(Slice([]Elem[int, string]{{1, "a"}})), 1},
-		{"Two elements", ElemsSplit(Slice([]Elem[int, string]{{1, "a"}, {2, "b"}})), 2},
-		{"Normal input", ElemsSplit(Slice([]Elem[int, string]{
+		{"Empty input", KVsplit(Slice([]KV[int, string]{})), 0},
+		{"Single element", KVsplit(Slice([]KV[int, string]{{1, "a"}})), 1},
+		{"Two elements", KVsplit(Slice([]KV[int, string]{{1, "a"}, {2, "b"}})), 2},
+		{"Normal input", KVsplit(Slice([]KV[int, string]{
 			{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}, {5, "e"}, {6, "f"}, {7, "g"}, {8, "h"},
 		})), 8},
 	}
@@ -4631,14 +4631,14 @@ func TestSortBy2(t *testing.T) {
 	tests := []struct {
 		name  string
 		input iter.Seq2[int, string]
-		want  []Elem[int, string]
+		want  []KV[int, string]
 	}{
-		{"Empty input", ElemsSplit(Slice([]Elem[int, string]{})), []Elem[int, string]{}},
-		{"Single element", ElemsSplit(Slice([]Elem[int, string]{{1, "a"}})), []Elem[int, string]{{1, "a"}}},
-		{"Two elements", ElemsSplit(Slice([]Elem[int, string]{{2, "b"}, {1, "a"}})), []Elem[int, string]{{1, "a"}, {2, "b"}}},
-		{"Normal input", ElemsSplit(Slice([]Elem[int, string]{
+		{"Empty input", KVsplit(Slice([]KV[int, string]{})), []KV[int, string]{}},
+		{"Single element", KVsplit(Slice([]KV[int, string]{{1, "a"}})), []KV[int, string]{{1, "a"}}},
+		{"Two elements", KVsplit(Slice([]KV[int, string]{{2, "b"}, {1, "a"}})), []KV[int, string]{{1, "a"}, {2, "b"}}},
+		{"Normal input", KVsplit(Slice([]KV[int, string]{
 			{5, "e"}, {3, "c"}, {8, "h"}, {1, "a"}, {2, "b"}, {7, "g"}, {4, "d"}, {6, "f"},
-		})), []Elem[int, string]{
+		})), []KV[int, string]{
 			{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}, {5, "e"}, {6, "f"}, {7, "g"}, {8, "h"},
 		}},
 	}
@@ -5755,7 +5755,7 @@ func TestWith3(t *testing.T) {
 		}, op)
 
 		type result struct {
-			elem  Elem[int, string]
+			elem  KV[int, string]
 			check bool
 		}
 
@@ -5771,9 +5771,9 @@ func TestWith3(t *testing.T) {
 				t.Errorf("With3() yielded more items than expected")
 				break
 			}
-			if elem.First != expected[i].elem.First || elem.Second != expected[i].elem.Second {
+			if elem.Key != expected[i].elem.Key || elem.Value != expected[i].elem.Value {
 				t.Errorf("With3() yielded elem (%v, %v), want (%v, %v)",
-					elem.First, elem.Second, expected[i].elem.First, expected[i].elem.Second)
+					elem.Key, elem.Value, expected[i].elem.Key, expected[i].elem.Value)
 			}
 			if c != expected[i].check {
 				t.Errorf("With3() yielded check %v, want %v", c, expected[i].check)
@@ -5816,21 +5816,21 @@ func TestWith3(t *testing.T) {
 		seq := With3(Slice([]int{5}), op)
 
 		var results []struct {
-			elem  Elem[int, int]
+			elem  KV[int, int]
 			third int
 		}
 
 		for elem, third := range seq {
 			results = append(results, struct {
-				elem  Elem[int, int]
+				elem  KV[int, int]
 				third int
 			}{elem, third})
 		}
 
 		check.Equal(t, len(results), 1)
-		check.Equal(t, results[0].elem.First, 5)   // original input
-		check.Equal(t, results[0].elem.Second, 25) // 5^2
-		check.Equal(t, results[0].third, 125)      // 5^3
+		check.Equal(t, results[0].elem.Key, 5)    // original input
+		check.Equal(t, results[0].elem.Value, 25) // 5^2
+		check.Equal(t, results[0].third, 125)     // 5^3
 	})
 
 	t.Run("EarlyReturn", func(t *testing.T) {
@@ -5869,24 +5869,24 @@ func TestWith3(t *testing.T) {
 		check.Equal(t, len(results), 4)
 
 		// First result
-		check.Equal(t, results[0].First.First, "Alice")
-		check.Equal(t, results[0].First.Second, 5)
-		check.Equal(t, results[0].Second, false)
+		check.Equal(t, results[0].Key.Key, "Alice")
+		check.Equal(t, results[0].Key.Value, 5)
+		check.Equal(t, results[0].Value, false)
 
 		// Second result
-		check.Equal(t, results[1].First.First, "Bob")
-		check.Equal(t, results[1].First.Second, 3)
-		check.Equal(t, results[1].Second, false)
+		check.Equal(t, results[1].Key.Key, "Bob")
+		check.Equal(t, results[1].Key.Value, 3)
+		check.Equal(t, results[1].Value, false)
 
 		// Third result
-		check.Equal(t, results[2].First.First, "Charlotte")
-		check.Equal(t, results[2].First.Second, 9)
-		check.Equal(t, results[2].Second, true)
+		check.Equal(t, results[2].Key.Key, "Charlotte")
+		check.Equal(t, results[2].Key.Value, 9)
+		check.Equal(t, results[2].Value, true)
 
 		// Fourth result
-		check.Equal(t, results[3].First.First, "Dan")
-		check.Equal(t, results[3].First.Second, 3)
-		check.Equal(t, results[3].Second, false)
+		check.Equal(t, results[3].Key.Key, "Dan")
+		check.Equal(t, results[3].Key.Value, 3)
+		check.Equal(t, results[3].Value, false)
 	})
 
 	t.Run("OperationCalledForEachElement", func(t *testing.T) {
@@ -5921,9 +5921,9 @@ func TestWith3(t *testing.T) {
 
 		for i := 0; i < 5; i++ {
 			expectedInput := i + 1
-			check.Equal(t, results[i].First.First, expectedInput)
-			check.Equal(t, results[i].First.Second, expectedInput*2)
-			check.Equal(t, results[i].Second, expectedInput*3)
+			check.Equal(t, results[i].Key.Key, expectedInput)
+			check.Equal(t, results[i].Key.Value, expectedInput*2)
+			check.Equal(t, results[i].Value, expectedInput*3)
 		}
 	})
 
@@ -5939,13 +5939,13 @@ func TestWith3(t *testing.T) {
 		results := Collect(Elems(seq))
 
 		check.Equal(t, len(results), 2)
-		check.Equal(t, results[0].First.First, 1)
-		check.Equal(t, *results[0].First.Second, 2)
-		check.Equal(t, *results[0].Second, "test")
+		check.Equal(t, results[0].Key.Key, 1)
+		check.Equal(t, *results[0].Key.Value, 2)
+		check.Equal(t, *results[0].Value, "test")
 
-		check.Equal(t, results[1].First.First, 2)
-		check.Equal(t, *results[1].First.Second, 4)
-		check.Equal(t, *results[1].Second, "test")
+		check.Equal(t, results[1].Key.Key, 2)
+		check.Equal(t, *results[1].Key.Value, 4)
+		check.Equal(t, *results[1].Value, "test")
 	})
 
 	t.Run("WithNilReturns", func(t *testing.T) {
@@ -5965,14 +5965,14 @@ func TestWith3(t *testing.T) {
 		check.Equal(t, len(results), 4)
 
 		// Odd numbers
-		check.Equal(t, results[0].First.First, 1)
-		check.True(t, results[0].First.Second != nil)
-		check.True(t, results[0].Second != nil)
+		check.Equal(t, results[0].Key.Key, 1)
+		check.True(t, results[0].Key.Value != nil)
+		check.True(t, results[0].Value != nil)
 
 		// Even numbers
-		check.Equal(t, results[1].First.First, 2)
-		check.True(t, results[1].First.Second == nil)
-		check.True(t, results[1].Second == nil)
+		check.Equal(t, results[1].Key.Key, 2)
+		check.True(t, results[1].Key.Value == nil)
+		check.True(t, results[1].Value == nil)
 	})
 
 	t.Run("LargeSequence", func(t *testing.T) {
@@ -5985,7 +5985,7 @@ func TestWith3(t *testing.T) {
 		count := 0
 		for elem, isLarge := range seq {
 			count++
-			if elem.First <= 500 {
+			if elem.Key <= 500 {
 				check.True(t, !isLarge)
 			} else {
 				check.True(t, isLarge)

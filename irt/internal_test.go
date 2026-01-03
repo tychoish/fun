@@ -697,13 +697,13 @@ func TestOrderedGroupingHelper(t *testing.T) {
 func TestElemHelper(t *testing.T) {
 	// Test NewElem
 	elem := NewElem(42, "hello")
-	if elem.First != 42 || elem.Second != "hello" {
+	if elem.Key != 42 || elem.Value != "hello" {
 		t.Errorf("NewElem(42, 'hello') = %v, want {42, 'hello'}", elem)
 	}
 
 	// Test WithElem
 	elem2 := WithElem(5, func(i int) string { return string(rune('a' + i)) })
-	if elem2.First != 5 || elem2.Second != "f" {
+	if elem2.Key != 5 || elem2.Value != "f" {
 		t.Errorf("WithElem(5, func) = %v, want {5, 'f'}", elem2)
 	}
 
@@ -734,28 +734,28 @@ func TestElemsHelper(t *testing.T) {
 	elemSeq := Elems(seq)
 	result := Collect(elemSeq)
 
-	expected := []Elem[int, string]{
-		{First: 1, Second: "a"},
-		{First: 2, Second: "b"},
+	expected := []KV[int, string]{
+		{Key: 1, Value: "a"},
+		{Key: 2, Value: "b"},
 	}
 
 	if len(result) != len(expected) {
 		t.Errorf("Elems() length = %v, want %v", len(result), len(expected))
 	}
 	for i, elem := range result {
-		if i < len(expected) && (elem.First != expected[i].First || elem.Second != expected[i].Second) {
+		if i < len(expected) && (elem.Key != expected[i].Key || elem.Value != expected[i].Value) {
 			t.Errorf("Elems()[%d] = %v, want %v", i, elem, expected[i])
 		}
 	}
 }
 
 func TestSplitsHelper(t *testing.T) {
-	elems := []Elem[int, string]{
-		{First: 1, Second: "a"},
-		{First: 2, Second: "b"},
+	elems := []KV[int, string]{
+		{Key: 1, Value: "a"},
+		{Key: 2, Value: "b"},
 	}
 
-	seq := ElemsSplit(Slice(elems))
+	seq := KVsplit(Slice(elems))
 
 	result := make([]struct {
 		a int
@@ -1314,38 +1314,38 @@ func TestWhenDoHelpers(t *testing.T) {
 
 func TestElemOrderingSemantics(t *testing.T) {
 	t.Run("ElemCmp", func(t *testing.T) {
-		elem1 := Elem[int, string]{First: 1, Second: "a"}
-		elem2 := Elem[int, string]{First: 2, Second: "b"}
-		elem3 := Elem[int, string]{First: 1, Second: "c"}
+		elem1 := KV[int, string]{Key: 1, Value: "a"}
+		elem2 := KV[int, string]{Key: 2, Value: "b"}
+		elem3 := KV[int, string]{Key: 1, Value: "c"}
 
 		t.Run("Compare by First", func(t *testing.T) {
-			if ElemCmpFirst(elem1, elem2) >= 0 {
-				t.Errorf("Expected elem1 < elem2, got %v", ElemCmpFirst(elem1, elem2))
+			if KVcmpFirst(elem1, elem2) >= 0 {
+				t.Errorf("Expected elem1 < elem2, got %v", KVcmpFirst(elem1, elem2))
 			}
-			if ElemCmpFirst(elem2, elem1) <= 0 {
-				t.Errorf("Expected elem2 > elem1, got %v", ElemCmpFirst(elem2, elem1))
+			if KVcmpFirst(elem2, elem1) <= 0 {
+				t.Errorf("Expected elem2 > elem1, got %v", KVcmpFirst(elem2, elem1))
 			}
-			if ElemCmpFirst(elem1, elem3) != 0 {
-				t.Errorf("Expected elem1 == elem3, got %v", ElemCmpFirst(elem1, elem3))
+			if KVcmpFirst(elem1, elem3) != 0 {
+				t.Errorf("Expected elem1 == elem3, got %v", KVcmpFirst(elem1, elem3))
 			}
 		})
 
 		t.Run("Compare by Second", func(t *testing.T) {
-			if ElemCmpSecond(elem1, elem3) >= 0 {
-				t.Errorf("Expected elem1 < elem3, got %v", ElemCmpSecond(elem1, elem3))
+			if KVcmpSecond(elem1, elem3) >= 0 {
+				t.Errorf("Expected elem1 < elem3, got %v", KVcmpSecond(elem1, elem3))
 			}
-			if ElemCmpSecond(elem3, elem1) <= 0 {
-				t.Errorf("Expected elem3 > elem1, got %v", ElemCmpSecond(elem3, elem1))
+			if KVcmpSecond(elem3, elem1) <= 0 {
+				t.Errorf("Expected elem3 > elem1, got %v", KVcmpSecond(elem3, elem1))
 			}
-			if ElemCmpSecond(elem1, elem1) != 0 {
-				t.Errorf("Expected elem1 == elem1, got %v", ElemCmpSecond(elem1, elem1))
+			if KVcmpSecond(elem1, elem1) != 0 {
+				t.Errorf("Expected elem1 == elem1, got %v", KVcmpSecond(elem1, elem1))
 			}
 		})
 	})
 
 	t.Run("Compare", func(t *testing.T) {
-		elem1 := Elem[int, string]{First: 1, Second: "a"}
-		elem2 := Elem[int, string]{First: 2, Second: "b"}
+		elem1 := KV[int, string]{Key: 1, Value: "a"}
+		elem2 := KV[int, string]{Key: 2, Value: "b"}
 		if elem1.Compare(cmpf, cmpf).With(elem2) >= 0 {
 			t.Errorf("Expected elem1 < elem2, got %v", elem1.Compare(cmpf, cmpf).With(elem2))
 		}
@@ -1358,21 +1358,21 @@ func TestElemOrderingSemantics(t *testing.T) {
 	})
 
 	t.Run("ElemCmp", func(t *testing.T) {
-		elem1 := Elem[int, string]{First: 1, Second: "a"}
-		elem2 := Elem[int, string]{First: 2, Second: "b"}
-		if ElemCmp(elem1, elem2) >= 0 {
-			t.Errorf("Expected elem1 < elem2, got %v", ElemCmp(elem1, elem2))
+		elem1 := KV[int, string]{Key: 1, Value: "a"}
+		elem2 := KV[int, string]{Key: 2, Value: "b"}
+		if KVcmp(elem1, elem2) >= 0 {
+			t.Errorf("Expected elem1 < elem2, got %v", KVcmp(elem1, elem2))
 		}
-		if ElemCmp(elem2, elem1) <= 0 {
-			t.Errorf("Expected elem2 > elem1, got %v", ElemCmp(elem2, elem1))
+		if KVcmp(elem2, elem1) <= 0 {
+			t.Errorf("Expected elem2 > elem1, got %v", KVcmp(elem2, elem1))
 		}
-		if ElemCmp(elem1, elem1) != 0 {
-			t.Errorf("Expected elem1 == elem1, got %v", ElemCmp(elem1, elem1))
+		if KVcmp(elem1, elem1) != 0 {
+			t.Errorf("Expected elem1 == elem1, got %v", KVcmp(elem1, elem1))
 		}
 	})
 
 	t.Run("WithPanicsWithoutComparators", func(t *testing.T) {
-		elem := elemcmp[int, int]{lh: NewElem(100, 200)}
+		elem := kvcmp[int, int]{lh: NewElem(100, 200)}
 		defer func() {
 			if recover() == nil {
 				t.Error("expected panic")
@@ -1384,8 +1384,8 @@ func TestElemOrderingSemantics(t *testing.T) {
 	})
 
 	t.Run("CompareFirst", func(t *testing.T) {
-		elem1 := Elem[int, string]{First: 1, Second: "a"}
-		elem2 := Elem[int, string]{First: 2, Second: "b"}
+		elem1 := KV[int, string]{Key: 1, Value: "a"}
+		elem2 := KV[int, string]{Key: 2, Value: "b"}
 		if elem1.CompareFirst(cmpf).With(elem2) >= 0 {
 			t.Errorf("Expected elem1 < elem2 by First, got %v", elem1.CompareFirst(cmpf).With(elem2))
 		}
@@ -1398,8 +1398,8 @@ func TestElemOrderingSemantics(t *testing.T) {
 	})
 
 	t.Run("CompareSecond", func(t *testing.T) {
-		elem1 := Elem[int, string]{First: 1, Second: "a"}
-		elem2 := Elem[int, string]{First: 1, Second: "b"}
+		elem1 := KV[int, string]{Key: 1, Value: "a"}
+		elem2 := KV[int, string]{Key: 1, Value: "b"}
 		if elem1.CompareSecond(cmpf).With(elem2) >= 0 {
 			t.Errorf("Expected elem1 < elem2 by Second, got %v", elem1.CompareSecond(cmpf).With(elem2))
 		}

@@ -151,7 +151,7 @@ func BenchmarkApply2(b *testing.B) {
 			for _, op := range []func() (string, iter.Seq2[int, int]){
 				func() (string, iter.Seq2[int, int]) { return "Map", Map(mdata) },
 				func() (string, iter.Seq2[int, int]) {
-					return "Elems", ElemsSplit(Slice(Collect(Elems(Map(mdata)))))
+					return "Elems", KVsplit(Slice(Collect(Elems(Map(mdata)))))
 				},
 			} {
 				name, _ := op()
@@ -183,7 +183,7 @@ func BenchmarkApply2(b *testing.B) {
 			for _, op := range []func() (string, iter.Seq2[string, string]){
 				func() (string, iter.Seq2[string, string]) { return "Map", Map(mdata) },
 				func() (string, iter.Seq2[string, string]) {
-					return "Elems", ElemsSplit(Slice(Collect(Elems(Map(mdata)))))
+					return "Elems", KVsplit(Slice(Collect(Elems(Map(mdata)))))
 				},
 			} {
 				name, _ := op()

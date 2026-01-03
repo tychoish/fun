@@ -339,8 +339,8 @@ func With2[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[B, C] {
 
 // With3 returns a iterator where each pair is produced by applying op
 // to each element of the input sequence.
-func With3[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[Elem[A, B], C] {
-	return func(yield func(Elem[A, B], C) bool) {
+func With3[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[KV[A, B], C] {
+	return func(yield func(KV[A, B], C) bool) {
 		for key := range seq {
 			value, check := op(key)
 			if !yield(NewElem(key, value), check) {
@@ -887,7 +887,7 @@ func SortBy[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
 // SortBy2 consumes the iterator, sorts it based on the keys produced
 // by cf, and returns a new iterator of the sorted pairs.
 func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter.Seq2[A, B] {
-	return ElemsSplit(Slice(slices.SortedFunc(Elems(seq), toCmp2(cf))))
+	return KVsplit(Slice(slices.SortedFunc(Elems(seq), toCmp2(cf))))
 }
 
 // ReadLines returns a sequence of strings from the reader, stopping
