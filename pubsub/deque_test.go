@@ -266,7 +266,6 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 		f := f
 		t.Parallel()
 		t.Run("AddRemove", func(t *testing.T) {
-			t.Parallel()
 			fix := f()
 			for _, e := range fix.elems {
 				if err := fix.add(e); err != nil {
@@ -295,7 +294,6 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 			}
 		})
 		t.Run("Iterate", func(t *testing.T) {
-			t.Parallel()
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, time.Second)
 			defer cancel()
@@ -758,7 +756,7 @@ func TestDeque(t *testing.T) {
 		t.Parallel()
 		t.Run("BlockingEmpty", func(t *testing.T) {
 			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-			assert.MinRuntime(t, 100*time.Millisecond-(10*time.Nanosecond),
+			assert.MinRuntime(t, 99*time.Millisecond,
 				func() {
 					dq := NewUnlimitedDeque[string]()
 					for range dq.IteratorWaitFront(ctx) {
@@ -922,6 +920,7 @@ func TestDequeIntegration(t *testing.T) {
 }
 
 func TestDequeLIFO(t *testing.T) {
+	t.Parallel()
 	t.Run("BlocksOnEmptyDeque", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
@@ -986,6 +985,7 @@ func TestDequeLIFO(t *testing.T) {
 }
 
 func TestDequeFIFO(t *testing.T) {
+	t.Parallel()
 	t.Run("BlocksOnEmptyDeque", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()

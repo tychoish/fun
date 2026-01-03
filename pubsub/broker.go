@@ -14,7 +14,6 @@ import (
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
-	"github.com/tychoish/fun/risky"
 )
 
 // stole this from
@@ -140,8 +139,7 @@ func NewDequeBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOpti
 // messages to make room for new messages. The capacity of the queue
 // is fixed, and must be a positive integer greater than 0,
 // NewLIFOBroker will panic if the capcity is less than or equal to 0.
-func NewLIFOBroker[T any](ctx context.Context, opts BrokerOptions, capacity int) *Broker[T] {
-	deque := risky.Force(NewDeque[T](DequeOptions{Capacity: capacity}))
+func NewLIFOBroker[T any](ctx context.Context, deque *Deque[T], opts BrokerOptions) *Broker[T] {
 	return makeInternalBrokerImpl(ctx, deque.IteratorWaitPopBack(ctx), deque.WaitPushBack, deque.Len, opts)
 }
 

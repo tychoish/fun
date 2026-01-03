@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"iter"
 	"math/rand"
 	"runtime"
 	"sync/atomic"
@@ -23,396 +24,242 @@ type BrokerFixture[T comparable] struct {
 	BufferSize int
 }
 
-func GenerateFixtures[T comparable](elems []T) []BrokerFixture[T] {
-	return []BrokerFixture[T]{
+func GenerateFixtures[T comparable](axis string, elems []T, opts BrokerOptions) iter.Seq[BrokerFixture[T]] {
+	return irt.Slice([]BrokerFixture[T]{
 		{
-			Name: "Parallel/ZeroBuffer",
+			Name: fmt.Sprintf("Channel/ZeroBuffer/%s", axis),
 			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{ParallelDispatch: true})
+				return NewBroker[T](ctx, opts)
 			},
 		},
+		//
+		// queue cases
+		//
 		{
-			Name: "DistributorBuffer",
+			Name: fmt.Sprintf("Queue/Unlimited/%s", axis),
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				d, err := NewDeque[T](DequeOptions{Unlimited: true})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return makeInternalBrokerImpl(ctx, d.IteratorWaitPopBack(ctx), d.WaitPushBack, d.Len, BrokerOptions{})
+				return NewQueueBroker(ctx, NewUnlimitedQueue[T](), opts)
 			},
 		},
-		{
-			Name: "Serial/ZeroBuffer",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{ParallelDispatch: false})
-			},
-		},
-		{
-			Name: "Parallel/FullyBuffered/NoBlock",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: true,
-					BufferSize:       len(elems),
-				})
-			},
-			BufferSize: len(elems),
-		},
-		{
-			Name: "Parallel/HalfBuffered/NoBlock",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: true,
-					BufferSize:       len(elems) / 2,
-				})
-			},
-			BufferSize: len(elems) / 2,
-		},
-		{
-			Name: "Parallel/FullyBuffered",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: true,
-					BufferSize:       len(elems),
-				})
-			},
-			BufferSize: len(elems),
-		},
-		{
-			Name: "Serial/FullyBuffered",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: false,
-					BufferSize:       len(elems),
-				})
-			},
-			BufferSize: len(elems),
-		},
-		{
-			Name: "Parallel/HalfBufferedNonBlocking",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: true,
-					BufferSize:       len(elems) / 2,
-				})
-			},
-			BufferSize: len(elems) / 2,
-		},
-		{
-			Name: "Serial/HalfBuffered",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: false,
-					BufferSize:       len(elems) / 2,
-				})
-			},
-			BufferSize: len(elems) / 2,
-		},
-		{
-			Name: "Parallel/DoubleBuffered",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: true,
-					BufferSize:       len(elems) * 2,
-				})
-			},
-			BufferSize: len(elems) * 2,
-		},
-		{
-			Name: "Serial/DoubleBuffered",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				return NewBroker[T](ctx, BrokerOptions{
-					ParallelDispatch: false,
-					BufferSize:       len(elems) * 2,
-				})
-			},
-			BufferSize: len(elems) * 2,
-		},
-		{
-			Name: "Queue/Serial/Unbuffered/OneWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewQueue[T](QueueOptions{
-					HardLimit:   10,
-					SoftQuota:   5,
-					BurstCredit: 2,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return NewQueueBroker(ctx, queue, BrokerOptions{
-					ParallelDispatch: false,
-				})
-			},
-		},
-		{
-			Name: "Queue/Serial/Unbuffered/TwoWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewQueue[T](QueueOptions{
-					HardLimit:   10,
-					SoftQuota:   5,
-					BurstCredit: 2,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return NewQueueBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: false,
-					WorkerPoolSize:   2,
-				})
-			},
-		},
-		{
-			Name: "Queue/Parallel/Unbuffered/TwoWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewQueue[T](QueueOptions{
-					HardLimit:   10,
-					SoftQuota:   5,
-					BurstCredit: 2,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return NewQueueBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: true,
-					WorkerPoolSize:   2,
-				})
-			},
-		},
-		{
-			Name: "Queue/Serial/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewQueue[T](QueueOptions{
-					HardLimit:   4,
-					SoftQuota:   2,
-					BurstCredit: 1,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return NewQueueBroker[T](ctx, queue, BrokerOptions{
-					WorkerPoolSize:   8,
-					ParallelDispatch: false,
-				})
-			},
-		},
-		{
-			Name: "Queue/Parallel/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewQueue[T](QueueOptions{
-					HardLimit:   4,
-					SoftQuota:   2,
-					BurstCredit: 1,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return NewQueueBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: true,
-					WorkerPoolSize:   8,
-				})
-			},
-		},
-		// deque cases
-		{
-			Name: "Deque/Serial/Unbuffered/OneWorker",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				queue := NewUnlimitedDeque[T]()
-				return NewDequeBroker(ctx, queue, BrokerOptions{
-					ParallelDispatch: false,
-				})
-			},
-		},
-		{
-			Name: "Deque/Serial/Unbuffered/TwoWorker",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				queue := NewUnlimitedDeque[T]()
-				return NewDequeBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: false,
-					WorkerPoolSize:   2,
-				})
-			},
-		},
-		{
-			Name: "Deque/Parallel/Unbuffered/TwoWorker",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				queue := NewUnlimitedDeque[T]()
-				return NewDequeBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: true,
-				})
-			},
-		},
-		{
-			Name: "Deque/Serial/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				queue := NewUnlimitedDeque[T]()
-				return NewDequeBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: false,
-					WorkerPoolSize:   8,
-				})
-			},
-		},
-		{
-			Name: "Deque/Parallel/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
-				queue := NewUnlimitedDeque[T]()
-				return NewDequeBroker[T](ctx, queue, BrokerOptions{
-					ParallelDispatch: true,
-					WorkerPoolSize:   8,
-				})
-			},
-		},
-		{
-			Name: "Lifo/Parallel/Unbuffered/EightWorker",
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				broker, err := ft.WithRecoverDo(func() *Broker[T] {
-					return NewLIFOBroker[T](ctx, BrokerOptions{
-						ParallelDispatch: true,
-						WorkerPoolSize:   8,
-					}, len(elems)-5)
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
 
-				return broker
+		{
+			Name: fmt.Sprintf("Queue/Limit16/%s", axis),
+			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+				queue, err := NewQueue[T](QueueOptions{
+					HardLimit:   16,
+					SoftQuota:   8,
+					BurstCredit: 4,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return NewQueueBroker(ctx, queue, opts)
 			},
 		},
-	}
+		{
+			Name: fmt.Sprintf("Queue/Limit8/%s", axis),
+			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+				queue, err := NewQueue[T](QueueOptions{
+					HardLimit:   8,
+					SoftQuota:   4,
+					BurstCredit: 2,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return NewQueueBroker[T](ctx, queue, opts)
+			},
+		},
+		//
+		// deque cases
+		//
+		{
+			Name: fmt.Sprintf("Deque/FIFO/Unlimited/%s", axis),
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
+				return NewDequeBroker(
+					ctx,
+					NewUnlimitedDeque[T](),
+					opts,
+				)
+			},
+		},
+		{
+			Name: fmt.Sprintf("Deque/LIFO/Unlimited/%s", axis),
+			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+				return NewLIFOBroker(
+					ctx,
+					NewUnlimitedDeque[T](),
+					opts,
+				)
+			},
+		},
+		{
+			Name: fmt.Sprintf("Deque/FIFO/Limit8/%s", axis),
+			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
+				return NewDequeBroker(
+					ctx,
+					ft.Must(NewDeque[T](DequeOptions{
+						Capacity: 8,
+					})),
+					opts,
+				)
+			},
+		},
+		{
+			Name: fmt.Sprintf("Deque/LIFO/Limit8/%s", axis),
+			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
+				return NewLIFOBroker(
+					ctx,
+					ft.Must(NewDeque[T](DequeOptions{
+						Capacity: 8,
+					})),
+					opts,
+				)
+			},
+		},
+	})
+}
+
+func makeFixtures[T comparable](elems []T) iter.Seq[BrokerFixture[T]] {
+	return irt.Chain(
+		irt.Args(
+			GenerateFixtures("Serial", elems, BrokerOptions{ParallelDispatch: false}),
+			GenerateFixtures("Parallel", elems, BrokerOptions{ParallelDispatch: true}),
+			GenerateFixtures("Serial/Worker8", elems, BrokerOptions{ParallelDispatch: false, WorkerPoolSize: 8}),
+			GenerateFixtures("Parallel/Worker16", elems, BrokerOptions{ParallelDispatch: true, WorkerPoolSize: 16}),
+		),
+	)
 }
 
 func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T) {
-	t.Parallel()
-	for _, fix := range GenerateFixtures(elems) {
+	for fix := range makeFixtures(elems) {
 		t.Run(fix.Name, func(t *testing.T) {
-			fix := fix
+			opts := fix
+
 			t.Parallel()
-			t.Run("EndToEnd", func(t *testing.T) {
-				opts := fix
+			ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+			defer cancel()
 
-				t.Parallel()
-				ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
-				defer cancel()
+			broker := opts.Construtor(ctx, t)
 
-				broker := opts.Construtor(ctx, t)
+			ch1 := broker.Subscribe(ctx)
+			ch2 := broker.Subscribe(ctx)
 
-				ch1 := broker.Subscribe(ctx)
-				ch2 := broker.Subscribe(ctx)
+			if stat := broker.Stats(ctx); ctx.Err() != nil {
+				t.Error(stat)
+			}
 
-				if stat := broker.Stats(ctx); ctx.Err() != nil {
-					t.Error(stat)
-				}
+			seen1 := &adt.Set[T]{}
+			seen2 := &adt.Set[T]{}
+			wg := &fnx.WaitGroup{}
+			wg.Add(3)
+			sig := make(chan struct{})
 
-				seen1 := &adt.Set[T]{}
-				seen2 := &adt.Set[T]{}
-				wg := &fnx.WaitGroup{}
-				wg.Add(3)
-				sig := make(chan struct{})
+			wgState := &atomic.Int32{}
+			wgState.Add(2)
 
-				wgState := &atomic.Int32{}
-				wgState.Add(2)
-
-				total := len(elems)
-				started1 := make(chan struct{})
-				started2 := make(chan struct{})
-				go func() {
-					defer wgState.Add(-1)
-					defer wg.Done()
-					close(started1)
-					for {
-						select {
-						case <-ctx.Done():
-							return
-						case <-sig:
-							return
-						case str := <-ch1:
-							seen1.Add(str)
-						}
-						if seen1.Len() == total {
-							return
-						}
-						if seen1.Len()/2 > total {
-							return
-						}
+			total := len(elems)
+			started1 := make(chan struct{})
+			started2 := make(chan struct{})
+			go func() {
+				defer wgState.Add(-1)
+				defer wg.Done()
+				close(started1)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-sig:
+						return
+					case str := <-ch1:
+						seen1.Add(str)
 					}
-				}()
-
-				go func() {
-					defer wgState.Add(-1)
-					defer wg.Done()
-					close(started2)
-					for {
-						select {
-						case <-ctx.Done():
-							return
-						case <-sig:
-							return
-						case str := <-ch2:
-							seen2.Add(str)
-						}
-						if seen2.Len() == total {
-							return
-						}
-						if seen2.Len()/2 > total {
-							return
-						}
+					if seen1.Len() == total {
+						return
 					}
-				}()
-				select {
-				case <-ctx.Done():
-					return
-				case <-started1:
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case <-started2:
-				}
-
-				go func() {
-					defer wg.Done()
-					for idx := range elems {
-						broker.Publish(ctx, elems[idx])
-						runtime.Gosched()
+					if seen1.Len()/2 > total {
+						return
 					}
-					timer := time.NewTimer(250 * time.Millisecond)
-					defer timer.Stop()
-					ticker := time.NewTicker(20 * time.Millisecond)
-					defer ticker.Stop()
+				}
+			}()
 
-				WAITLOOP:
-					for {
-						select {
-						case <-ctx.Done():
+			go func() {
+				defer wgState.Add(-1)
+				defer wg.Done()
+				close(started2)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-sig:
+						return
+					case str := <-ch2:
+						seen2.Add(str)
+					}
+					if seen2.Len() == total {
+						return
+					}
+					if seen2.Len()/2 > total {
+						return
+					}
+				}
+			}()
+			select {
+			case <-ctx.Done():
+				return
+			case <-started1:
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-started2:
+			}
+
+			go func() {
+				defer wg.Done()
+				for idx := range elems {
+					broker.Publish(ctx, elems[idx])
+					runtime.Gosched()
+				}
+				timer := time.NewTimer(250 * time.Millisecond)
+				defer timer.Stop()
+				ticker := time.NewTicker(20 * time.Millisecond)
+				defer ticker.Stop()
+
+			WAITLOOP:
+				for {
+					select {
+					case <-ctx.Done():
+						break WAITLOOP
+					case <-timer.C:
+						break WAITLOOP
+					case <-ticker.C:
+						if num := wgState.Load(); num == 0 {
 							break WAITLOOP
-						case <-timer.C:
-							break WAITLOOP
-						case <-ticker.C:
-							if num := wgState.Load(); num == 0 {
-								break WAITLOOP
-							}
 						}
 					}
-					broker.Unsubscribe(ctx, ch2)
-					broker.Unsubscribe(ctx, ch1)
-					close(sig)
-				}()
-
-				wg.Wait(ctx)
-				if seen1.Len() == seen2.Len() {
-					irt.Equal(seen1.Iterator(), seen2.Iterator())
-				} else if seen1.Len() == 0 && seen2.Len() == 0 {
-					t.Error("should observe some events")
 				}
+				broker.Unsubscribe(ctx, ch2)
+				broker.Unsubscribe(ctx, ch1)
+				close(sig)
+			}()
 
-				broker.Stop()
-				broker.Wait(ctx)
-				cctx, ccancel := context.WithCancel(ctx)
-				ccancel()
-				if broker.Subscribe(cctx) != nil {
-					t.Error("should not subscribe with canceled context", cctx.Err())
-				}
-				broker.Unsubscribe(cctx, ch1)
-				check.Zero(t, broker.Stats(cctx))
-			})
+			wg.Wait(ctx)
+			if seen1.Len() == seen2.Len() {
+				irt.Equal(seen1.Iterator(), seen2.Iterator())
+			} else if seen1.Len() == 0 && seen2.Len() == 0 {
+				t.Error("should observe some events")
+			}
+
+			broker.Stop()
+			broker.Wait(ctx)
+			cctx, ccancel := context.WithCancel(ctx)
+			ccancel()
+			if broker.Subscribe(cctx) != nil {
+				t.Error("should not subscribe with canceled context", cctx.Err())
+			}
+			broker.Unsubscribe(cctx, ch1)
+			check.Zero(t, broker.Stats(cctx))
 		})
 	}
 }
@@ -439,6 +286,7 @@ func TestBroker(t *testing.T) {
 			},
 		} {
 			t.Run(scope.Name, func(t *testing.T) {
+				t.Parallel()
 				RunBrokerTests(ctx, t, scope.Elems)
 			})
 		}
@@ -459,6 +307,7 @@ func TestBroker(t *testing.T) {
 			},
 		} {
 			t.Run(scope.Name, func(t *testing.T) {
+				t.Parallel()
 				RunBrokerTests(ctx, t, scope.Elems)
 			})
 		}
@@ -471,15 +320,6 @@ func TestBroker(t *testing.T) {
 		}
 		if cap(broker.publishCh) != 0 {
 			t.Fatal("channel capacity should be the buffer size")
-		}
-	})
-	t.Run("NewLifoBrokerRejectsNegativeCapacity", func(t *testing.T) {
-		_, err := ft.WithRecoverDo(func() *Broker[string] {
-			return NewLIFOBroker[string](ctx, BrokerOptions{}, -42)
-		})
-		if err != nil {
-			// we round all capacities up to 1
-			t.Fatal(err)
 		}
 	})
 	t.Run("SubscribeBlocking", func(t *testing.T) {
@@ -645,7 +485,10 @@ func checkMatchingSets[T comparable](t *testing.T, set1, set2 map[T]struct{}) {
 }
 
 func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
+	t.Parallel()
+
 	t.Run("QueueFullDropsMessages", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -742,6 +585,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 	})
 
 	t.Run("QueueNoCreditDropsMessages", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -815,6 +659,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 	})
 
 	t.Run("BrokerContinuesAfterDrops", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 

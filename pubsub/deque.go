@@ -34,9 +34,6 @@ type Deque[T any] struct {
 // DequeOptions configure the semantics of the deque. The Validate()
 // method ensures that you do not produce a configuration that is
 // impossible.
-//
-// Capcaity puts a firm upper cap on the number of items in the deque,
-// while the Unlimited options.
 type DequeOptions struct {
 	Unlimited    bool
 	Capacity     int
@@ -47,23 +44,17 @@ type DequeOptions struct {
 // convenience function. All errors have ErrConfigurationMalformed as
 // their root.
 func (opts *DequeOptions) Validate() error {
-	if opts.QueueOptions != nil {
-		if err := opts.QueueOptions.Validate(); err != nil {
-			return err
-		}
-	} else if opts.Unlimited && opts.Capacity == 0 {
+	switch {
+	case opts.Unlimited && (opts.Capacity != 0 || opts.QueueOptions != nil):
+		return ers.Wrap(ers.ErrMalformedConfiguration, "unlimited deque specified with impossible options")
+	case opts.QueueOptions != nil && opts.Capacity != 0:
+		return fmt.Errorf("unexpected capacity of %d: %w", opts.Capacity, ers.ErrMalformedConfiguration)
+	case opts.QueueOptions != nil:
+		return opts.QueueOptions.Validate()
+	case opts.Unlimited:
 		return nil
-	} else if opts.Capacity <= 0 {
+	case opts.Capacity <= 0:
 		opts.Capacity = 1
-	}
-
-	if opts.Capacity > 0 && opts.QueueOptions != nil {
-		return fmt.Errorf("cannot specify a capcity with queue options: %w", ers.ErrMalformedConfiguration)
-	}
-
-	// positive capcity and another valid configuration
-	if opts.Unlimited {
-		return fmt.Errorf("cannot specify unlimited with another configuration: %w", ers.ErrMalformedConfiguration)
 	}
 	return nil
 }
