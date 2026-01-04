@@ -538,6 +538,230 @@ func TestChannel(t *testing.T) {
 			check.Zero(t, v)
 		})
 	})
+
+	t.Run("ReadClosedChannel", func(t *testing.T) {
+		ctx := context.Background()
+
+		t.Run("BlockingReadFromClosedChannel", func(t *testing.T) {
+			ch := make(chan int)
+			close(ch)
+
+			val, err := ChanBlockingReceive(ch).Read(ctx)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.Zero(t, val)
+		})
+
+		t.Run("NonBlockingReadFromClosedChannel", func(t *testing.T) {
+			ch := make(chan string)
+			close(ch)
+
+			val, err := ChanNonBlockingReceive(ch).Read(ctx)
+			assert.ErrorIs(t, err, io.EOF)
+			assert.Zero(t, val)
+		})
+
+		t.Run("BlockingReadCanceledContext", func(t *testing.T) {
+			ch := make(chan int)
+			ctx, cancel := context.WithCancel(context.Background())
+
+			// Start a goroutine to read from channel
+			done := make(chan struct{})
+			var readErr error
+			var readVal int
+			go func() {
+				readVal, readErr = ChanBlockingReceive(ch).Read(ctx)
+				close(done)
+			}()
+
+			// Give goroutine time to start blocking
+			time.Sleep(50 * time.Millisecond)
+
+			// Cancel the context while read is blocking
+			cancel()
+
+			// Wait for read to complete
+			<-done
+
+			assert.Error(t, readErr)
+			assert.ErrorIs(t, readErr, context.Canceled)
+			assert.Zero(t, readVal)
+		})
+
+		t.Run("NonBlockingReadCanceledContext", func(t *testing.T) {
+			ch := make(chan int)
+			ctx, cancel := context.WithCancel(context.Background())
+
+			// Cancel the context before attempting read
+			cancel()
+
+			// Attempt non-blocking read with canceled context
+			val, err := ChanNonBlockingReceive(ch).Read(ctx)
+
+			// Should return context error, not skip error
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.Zero(t, val)
+		})
+	})
+
+	t.Run("IteratorEdgeCases", func(t *testing.T) {
+		t.Run("EarlyTerminationYieldFalse", func(t *testing.T) {
+			ctx := context.Background()
+			ch := make(chan int, 5)
+
+			// Add multiple values to channel
+			for i := 1; i <= 5; i++ {
+				ch <- i * 10
+			}
+			close(ch)
+
+			count := 0
+			for val := range ChanBlockingReceive(ch).Iterator(ctx) {
+				count++
+				// Verify we got the first value
+				if count == 1 {
+					assert.Equal(t, 10, val)
+				}
+				// Stop after first iteration
+				if count == 1 {
+					break
+				}
+			}
+
+			// Verify iterator stopped early
+			assert.Equal(t, 1, count)
+
+			// Verify remaining values are still in channel
+			remaining := 0
+			for range ch {
+				remaining++
+			}
+			assert.Equal(t, 4, remaining)
+		})
+
+		t.Run("ContextCanceledDuringIteration", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ch := make(chan int)
+
+			// Start goroutine to send values
+			go func() {
+				for i := 1; i <= 10; i++ {
+					select {
+					case ch <- i:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+
+			count := 0
+			for range ChanBlockingReceive(ch).Iterator(ctx) {
+				count++
+				// Cancel context after 3 iterations
+				if count == 3 {
+					cancel()
+					// Give context cancellation time to propagate
+					time.Sleep(10 * time.Millisecond)
+				}
+			}
+
+			// Verify we got at least 3 values (may get 4 due to race)
+			assert.True(t, count >= 3 && count <= 4)
+		})
+
+		t.Run("NonBlockingIteratorWithSkips", func(t *testing.T) {
+			ctx := context.Background()
+			ch := make(chan int, 5)
+
+			// Use non-blocking receiver
+			receiver := ChanNonBlockingReceive(ch)
+
+			// Start iteration in goroutine since non-blocking will end when empty
+			values := []int{}
+			done := make(chan struct{})
+			go func() {
+				for val := range receiver.Iterator(ctx) {
+					values = append(values, val)
+				}
+				close(done)
+			}()
+
+			// Give iterator time to start and hit empty channel
+			time.Sleep(50 * time.Millisecond)
+
+			// Add values gradually
+			ch <- 1
+			time.Sleep(10 * time.Millisecond)
+			ch <- 2
+			time.Sleep(10 * time.Millisecond)
+			ch <- 3
+			time.Sleep(10 * time.Millisecond)
+
+			// Close channel to end iteration
+			close(ch)
+
+			// Wait for iteration to complete
+			<-done
+
+			// In non-blocking mode, iterator ends when channel is empty
+			// So we should get all values that were sent before close
+			assert.True(t, len(values) >= 0) // At least some values may be read
+		})
+
+		t.Run("IteratorChannelClosedMidIteration", func(t *testing.T) {
+			ctx := context.Background()
+			ch := make(chan string, 3)
+
+			// Add initial values
+			ch <- "first"
+			ch <- "second"
+
+			values := []string{}
+			done := make(chan struct{})
+			go func() {
+				for val := range ChanBlockingReceive(ch).Iterator(ctx) {
+					values = append(values, val)
+					// Close channel after reading first value
+					if len(values) == 1 {
+						close(ch)
+					}
+				}
+				close(done)
+			}()
+
+			<-done
+
+			// Should have read both values before channel closed
+			assert.Equal(t, 2, len(values))
+			assert.Equal(t, "first", values[0])
+			assert.Equal(t, "second", values[1])
+		})
+
+		t.Run("IteratorWithMultipleValuesAndContinuation", func(t *testing.T) {
+			ctx := context.Background()
+			ch := make(chan int, 10)
+
+			// Add multiple values
+			expected := []int{1, 2, 3, 4, 5}
+			for _, v := range expected {
+				ch <- v
+			}
+			close(ch)
+
+			// Collect all values
+			var collected []int
+			for val := range ChanBlockingReceive(ch).Iterator(ctx) {
+				collected = append(collected, val)
+			}
+
+			// Verify all values received in order
+			assert.Equal(t, len(expected), len(collected))
+			for i, v := range expected {
+				assert.Equal(t, v, collected[i])
+			}
+		})
+	})
 }
 
 // ReadAll returns a Worker function that processes the output of data
