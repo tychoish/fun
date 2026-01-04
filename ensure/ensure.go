@@ -11,6 +11,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 // Assertion values are produced by the ensure.That() constructor, and
@@ -157,7 +158,7 @@ func (a *Assertion) Run(t testing.TB) {
 	}
 
 	if result.Len() > 0 {
-		result.ReadAll(strlogger)
+		irt.Apply(result.Iterator(), strlogger)
 
 		if a.continueOnError {
 			t.Fail()

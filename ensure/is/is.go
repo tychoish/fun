@@ -13,6 +13,7 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // That is the root type for the assertion helpers in this
@@ -37,7 +38,10 @@ func And(ops ...That) That {
 			}
 		}
 
-		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
+		if len(out) == 0 {
+			return nil
+		}
+		return irt.Collect(irt.RemoveZeros(irt.Slice(out)))
 	}
 }
 
@@ -47,13 +51,18 @@ func And(ops ...That) That {
 func All(ops ...That) That {
 	return func() []string {
 		out := stw.NewSlice(make([]string, 0, len(ops)+1))
-		stw.NewSlice(ops).ReadAll(func(op That) {
-			ft.ApplyWhen(op == nil, out.Push,
-				"encountered nil is.That operation",
-			)
-			out.Append(ft.DoSafe(op)...)
-		})
-		return ft.DoWhen(len(out) > 0, out.FilterFuture(ft.NotZero[string]))
+		for isThat := range irt.Slice(ops) {
+			if op == nil {
+				out.Push("encountered nil is.That operation")
+				continue
+			}
+			out.Append(op()...)
+		}
+
+		if len(out) == 0 {
+			return nil
+		}
+		return irt.Collect(irt.RemoveZeros(irt.Slice(out)))
 	}
 }
 

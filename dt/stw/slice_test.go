@@ -1,19 +1,17 @@
 package stw
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 func randomIntSlice(size int) Slice[int] {
 	out := make([]int, size)
 	for idx := range out {
-		out[idx] = intish.Abs(rand.Intn(size) + 1)
+		out[idx] = rand.IntN(size) + 1
 	}
 	return NewSlice(out)
 }
@@ -103,15 +101,6 @@ func TestSlice(t *testing.T) {
 			check.Equal(t, cap(s), 32)
 			check.Equal(t, len(s), 3)
 		})
-	})
-	t.Run("Sparse", func(t *testing.T) {
-		s := Slice[*int]{ft.Ptr(1), ft.Ptr(42), nil, nil}
-		check.Equal(t, len(s), 4)
-		sp := s.Sparse()
-		check.Equal(t, len(sp), 2)
-		check.NotNil(t, sp[0])
-		check.NotNil(t, sp[1])
-		check.Equal(t, ft.Ref(sp[1]), 42)
 	})
 	t.Run("Last", func(t *testing.T) {
 		t.Run("Populated", func(t *testing.T) {
@@ -235,23 +224,6 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, s.Len(), 0)
 		check.True(t, s.IsEmpty())
 	})
-	t.Run("Filter", func(t *testing.T) {
-		sl := Slice[int]{100, 100, 40, 42}
-		check.Equal(t, sl.Len(), 4)
-		next := sl.Filter(func(in int) bool { return in != 100 })
-		check.Equal(t, next.Len(), 2)
-		check.Equal(t, next[0], 40)
-		check.Equal(t, next[1], 42)
-	})
-	t.Run("FilterFuture", func(t *testing.T) {
-		sl := Slice[int]{100, 100, 40, 42}
-		check.Equal(t, sl.Len(), 4)
-		future := sl.FilterFuture(func(in int) bool { return in != 100 })
-		next := future()
-		check.Equal(t, next.Len(), 2)
-		check.Equal(t, next[0], 40)
-		check.Equal(t, next[1], 42)
-	})
 	t.Run("Ptr", func(t *testing.T) {
 		strs := Slice[int]{100}
 		assert.Equal(t, *strs.Ptr(0), 100)
@@ -325,6 +297,13 @@ func TestSlice(t *testing.T) {
 				check.Equal(t, sl[idx], *psl[idx])
 			}
 		})
+
+		var (
+			one   string = "one"
+			two          = "two"
+			three        = "three"
+		)
+
 		t.Run("Ref", func(t *testing.T) {
 			t.Run("RoundTrip", func(t *testing.T) {
 				rsl := SliceRefs(NewSlice(sl).Ptrs())
@@ -334,24 +313,24 @@ func TestSlice(t *testing.T) {
 				}
 			})
 			t.Run("NilHandling", func(t *testing.T) {
-				pstrs := []*string{nil, nil, nil, ft.Ptr("one"), ft.Ptr("two"), ft.Ptr("three")}
+				pstrs := []*string{nil, nil, nil, &one, &two, &three}
 				sl := SliceRefs(pstrs)
 				check.Equal(t, len(sl), 6)
 				check.Equal(t, sl[0], "")
 				check.Equal(t, sl[1], "")
 				check.Equal(t, sl[2], "")
-				check.Equal(t, sl[3], "one")
-				check.Equal(t, sl[4], "two")
-				check.Equal(t, sl[5], "three")
+				check.Equal(t, sl[3], one)
+				check.Equal(t, sl[4], two)
+				check.Equal(t, sl[5], three)
 			})
 		})
 		t.Run("Sparse", func(t *testing.T) {
-			pstrs := []*string{nil, nil, nil, ft.Ptr("one"), ft.Ptr("two"), ft.Ptr("three")}
+			pstrs := []*string{nil, nil, nil, &one, &two, &three}
 			sl := SliceSparseRefs(pstrs)
 			check.Equal(t, len(sl), 3)
-			check.Equal(t, sl[0], "one")
-			check.Equal(t, sl[1], "two")
-			check.Equal(t, sl[2], "three")
+			check.Equal(t, sl[0], one)
+			check.Equal(t, sl[1], two)
+			check.Equal(t, sl[2], three)
 		})
 	})
 	t.Run("Prepend", func(t *testing.T) {

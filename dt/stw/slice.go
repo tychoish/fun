@@ -7,9 +7,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/irt"
 )
 
 // Slice is just a local wrapper around a slice, providing a similarly
@@ -137,27 +134,6 @@ func (s *Slice[T]) Empty() { *s = (*s)[:0] }
 // allocation.
 func (s *Slice[T]) Reset() { o := make([]T, 0); *s = o }
 
-// ReadAll calls the observer function on every item in the slice.
-func (s Slice[T]) ReadAll(of fn.Handler[T]) {
-	for idx := range s {
-		of(s[idx])
-	}
-}
-
-// Filter returns a new slice, having passed all the items in the
-// input slice. Items that the filter function returns true for are
-// included and others are skipped.
-func (s *Slice[T]) Filter(p func(T) bool) (o Slice[T]) {
-	s.ReadAll(func(in T) { ft.ApplyWhen(p(in), o.Push, in) })
-	return
-}
-
-// FilterFuture returns a future that generates a new slice using the
-// filter to select items from the root slice.
-func (s *Slice[T]) FilterFuture(p func(T) bool) fn.Future[Slice[T]] {
-	return func() Slice[T] { return s.Filter(p) }
-}
-
 // Reslice modifies the slice to set the new start and end indexes.
 //
 // Slicing operations, can lead to panics if the indexes are out of
@@ -257,12 +233,4 @@ func (s Slice[T]) Ptrs() []*T {
 		out[idx] = &s[idx]
 	}
 	return out
-}
-
-// Sparse always returns a new slice. It iterates through the elements
-// in the source slice and checks, using ft.IsNil() (which uses
-// reflection), if the value is nil, and only adds the item when it is
-// not-nil.
-func (s Slice[T]) Sparse() Slice[T] {
-	return irt.Collect(irt.Remove(s.Iterator(), func(in T) bool { return ft.IsNil(in) }))
 }

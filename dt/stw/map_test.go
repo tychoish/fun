@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/irt"
 )
 
 func makeMap(size int) Map[string, int] {
@@ -99,8 +98,9 @@ func TestMap(t *testing.T) {
 			keys := mp.Keys()
 
 			count := 0
-			report := irt.Apply(keys, func(in string) {
-				switch in {
+
+			for key := range keys {
+				switch key {
 				case "big":
 					count++
 				case "small":
@@ -108,11 +108,10 @@ func TestMap(t *testing.T) {
 				case "orange":
 					count++
 				default:
-					t.Error("unexpected", in)
+					t.Error("unexpected", key)
 				}
-			})
+			}
 			assert.Equal(t, 3, count)
-			assert.Equal(t, 3, report)
 		})
 		t.Run("MapValues", func(t *testing.T) {
 			mp := Map[string, int]{}
@@ -123,8 +122,9 @@ func TestMap(t *testing.T) {
 			keys := mp.Values()
 
 			count := 0
-			report := irt.Apply(keys, func(in int) {
-				switch in {
+
+			for key := range keys {
+				switch key {
 				case 42:
 					count++
 				case 4:
@@ -132,11 +132,10 @@ func TestMap(t *testing.T) {
 				case 400:
 					count++
 				default:
-					t.Error("unexpected", in)
+					t.Error("unexpected", key)
 				}
-			})
+			}
 			assert.Equal(t, 3, count)
-			assert.Equal(t, 3, report)
 		})
 	})
 	t.Run("Default", func(t *testing.T) {

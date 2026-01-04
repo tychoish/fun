@@ -1,6 +1,11 @@
 package pubsub
 
 import (
+	"context"
+	"errors"
+	"io"
+	"iter"
+
 	"github.com/tychoish/fun/ers"
 )
 
@@ -98,3 +103,197 @@ func (op ChanOp[T]) Send() ChanSend[T] { return ChanSend[T]{mode: op.mode, ch: o
 // Receive returns a ChanReceive object that acts on the same
 // underlying sender.
 func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// RECEIVE
+
+// ChanReceive wraps a channel fore <-chan T operations. It is the type
+// returned by the ChanReceive() method on ChannelOp. The primary method
+// is Read(), with other methods provided as "self-documenting"
+// helpers.
+type ChanReceive[T any] struct {
+	mode blockingMode
+	ch   <-chan T
+}
+
+func makeChanRecv[T any](m blockingMode, ch <-chan T) ChanReceive[T] {
+	return ChanReceive[T]{mode: m, ch: ch}
+}
+
+// Iterator provides access to the contents of the channel as a
+// new-style standard library stream. For ChanRecieve objects in
+// non-blocking mode, iteration ends when there are no items in the
+// channel. In blocking mode, iteration ends when the context is
+// canceled or the channel is closed.
+func (ro ChanReceive[T]) Iterator(ctx context.Context) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for {
+			value, err := ro.Read(ctx)
+			switch {
+			case err != nil && errors.Is(err, ers.ErrCurrentOpSkip):
+				continue
+			case err != nil:
+				return
+			case !yield(value):
+				return
+			}
+		}
+	}
+}
+
+// Drop performs a read operation and drops the response. If an item
+// was dropped (e.g. Read would return an error), Drop() returns
+// false, and true when the Drop was successful.
+func (ro ChanReceive[T]) Drop(ctx context.Context) bool { _, ok := ro.Check(ctx); return ok }
+
+// Ignore reads one item from the channel and discards it.
+func (ro ChanReceive[T]) Ignore(ctx context.Context) { _, _ = ro.Read(ctx) }
+
+// Force ignores the error returning only the value from Read. This is
+// either the value sent through the channel, or the zero value for
+// T. Because zero values can be sent through channels, Force does not
+// provide a way to distinguish between "channel-closed" and "received
+// a zero value".
+func (ro ChanReceive[T]) Force(ctx context.Context) (out T) { out, _ = ro.Read(ctx); return }
+
+// Check performs the read operation and converts the error into an
+// "ok" value, returning true if receive was successful and false
+// otherwise.
+func (ro ChanReceive[T]) Check(ctx context.Context) (T, bool) {
+	out, err := ro.Read(ctx)
+	return out, err == nil
+}
+
+// Ok attempts to read from a channel returns false when the channel has been closed and true
+// otherwise.
+func (ro ChanReceive[T]) Ok() bool {
+	switch ro.mode {
+	case modeBlocking:
+		_, ok := <-ro.ch
+		return ok
+	case modeNonBlocking:
+		select {
+		case _, ok := <-ro.ch:
+			return ok
+		default:
+			return true
+		}
+	default:
+		// should be impossible outside of the package,
+		panic(ers.ErrInvariantViolation)
+	}
+}
+
+// Read performs the read operation according to the
+// blocking/non-blocking semantics of the receive operation.
+//
+// In general errors are either: io.EOF if channel is closed; a
+// context cancellation error if the context passed to Read() is
+// canceled, or ErrSkippedNonBlockingChannelOperation in the
+// non-blocking case if the channel was empty.
+//
+// In all cases when Read() returns an error, the return value is the
+// zero value for T.
+func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
+	var zero T
+	switch ro.mode {
+	case modeBlocking:
+		select {
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		case obj, ok := <-ro.ch:
+			if !ok {
+				return zero, io.EOF
+			}
+
+			return obj, nil
+		}
+	case modeNonBlocking:
+		select {
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		case obj, ok := <-ro.ch:
+			if !ok {
+				return zero, io.EOF
+			}
+
+			return obj, nil
+		default:
+			return zero, ers.ErrCurrentOpSkip
+		}
+	default:
+		// this is impossible without an invalid blockingMode
+		// value
+		return zero, io.EOF
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// SEND
+
+// ChanSend provides access to channel send operations, and is
+// contstructed by the ChanSend() method on the channel operation. The
+// primary method is Write(), with other methods provided for clarity.
+type ChanSend[T any] struct {
+	mode blockingMode
+	ch   chan<- T
+}
+
+// Check performs a send and returns true when the send was successful
+// and false otherwise.
+func (sm ChanSend[T]) Check(ctx context.Context, it T) bool { return sm.Write(ctx, it) == nil }
+
+// Ignore performs a send and omits the error.
+func (sm ChanSend[T]) Ignore(ctx context.Context, it T) { _ = sm.Check(ctx, it) }
+
+// Zero sends the zero value of T through the channel.
+func (sm ChanSend[T]) Zero(ctx context.Context) error { var v T; return sm.Write(ctx, v) }
+
+// Signal attempts to sends the Zero value of T through the channel
+// and returns when: the send succeeds, the channel is full and this
+// is a non-blocking send, the context is canceled, or the channel is
+// closed.
+func (sm ChanSend[T]) Signal(ctx context.Context) { var v T; sm.Ignore(ctx, v) }
+
+// Write sends the item into the channel captured by
+// Blocking/NonBlocking returning the appropriate error.
+//
+// The returned error is nil if the send was successful, and an io.EOF
+// if the channel is closed (or nil) rather than a panic (as with the
+// equivalent direct operation.) The error value is a context
+// cancelation error when the context is canceled, and for
+// non-blocking sends, if the channel did not accept the write,
+// ErrSkippedNonBlockingChannelOperation is returned.
+func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = io.EOF
+		}
+	}()
+
+	switch sm.mode {
+	case modeBlocking:
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case sm.ch <- it:
+			return nil
+		}
+	case modeNonBlocking:
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case sm.ch <- it:
+			return nil
+		default:
+			return ers.ErrCurrentOpSkip
+		}
+	default:
+		// it should be impossible to provoke an EOF error
+		// outside of this project, because you'd need to
+		// construct an invalid Send object.
+		return io.EOF
+	}
+}
