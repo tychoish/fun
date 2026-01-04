@@ -4,9 +4,9 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // OrderedMap provides a map implementation that maintains insertion order.

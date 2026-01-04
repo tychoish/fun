@@ -101,7 +101,7 @@ type ChanReceive[T any] struct {
 
 // ChanBlockingReceive returns a Chan wrapper for <-chan T operation, that
 // will block while waiting for new items to be sent through the
-// channel
+// channel.
 func ChanBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
 	return ChanReceive[T]{mode: modeBlocking, ch: ch}
 }

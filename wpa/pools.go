@@ -108,7 +108,6 @@ func Pull[T any, HF Handler[T]](ctx context.Context, seq iter.Seq[T], hf HF) ite
 				yield(err)
 				return
 			}
-
 		}
 	}
 }

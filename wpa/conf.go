@@ -186,10 +186,16 @@ func WorkerGroupConfWithErrorCollector(ec *erc.Collector) opt.Provider[*WorkerGr
 	}
 }
 
+// WorkerGroupConfDisableErrorCollector disales the default error collector, that collects all
+// non-filtered errors. Use this option for all long-running operations that may collect a large
+// number of errors. These could be.
 func WorkerGroupConfDisableErrorCollector() opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.DisableErrorCollection = true; return nil }
 }
 
+// WorkerGroupConfCustomValidatorAppend provides a chance to add additional worker group
+// configuration checks (or in practice, default settings), when callers need to enforce more strict
+// validation constraints.
 func WorkerGroupConfCustomValidatorAppend(vf func(*WorkerGroupConf) error) opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
 		opts.CustomValidators = append(opts.CustomValidators, vf)
@@ -197,6 +203,7 @@ func WorkerGroupConfCustomValidatorAppend(vf func(*WorkerGroupConf) error) opt.P
 	}
 }
 
+// WorkerGroupConfCustomValidatorReset removes all custom validation functions.
 func WorkerGroupConfCustomValidatorReset() opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error { opts.CustomValidators = nil; return nil }
 }

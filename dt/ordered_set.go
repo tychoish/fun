@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // OrderedSet provides a generic set implementation that always
