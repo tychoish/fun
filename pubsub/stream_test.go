@@ -1569,12 +1569,13 @@ func RunStreamIntegerAlgoTests(
 						t.Run("ErrorDoesNotAbort", func(t *testing.T) {
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
+							expected := errors.New("root error")
 
 							out, err := Map(
 								baseBuilder(elems),
 								func(_ context.Context, input int) (int, error) {
 									if input == elems[2] {
-										return 0, errors.New("whoop")
+										return 0, fmt.Errorf("whoop: %w", expected)
 									}
 									return input, nil
 								},
@@ -1584,7 +1585,7 @@ func RunStreamIntegerAlgoTests(
 								t.Fatal("expected error", out)
 							}
 
-							if err.Error() != "whoop: whoop" {
+							if !errors.Is(err, expected) {
 								t.Error(err)
 							}
 

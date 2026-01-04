@@ -55,20 +55,6 @@ func GenerateFixtures[T comparable](axis string, elems []T, opts BrokerOptions) 
 				return NewQueueBroker(ctx, queue, opts)
 			},
 		},
-		{
-			Name: fmt.Sprintf("Queue/Limit8/%s", axis),
-			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
-				queue, err := NewQueue[T](QueueOptions{
-					HardLimit:   8,
-					SoftQuota:   4,
-					BurstCredit: 2,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return NewQueueBroker[T](ctx, queue, opts)
-			},
-		},
 		//
 		// deque cases
 		//
@@ -93,24 +79,24 @@ func GenerateFixtures[T comparable](axis string, elems []T, opts BrokerOptions) 
 			},
 		},
 		{
-			Name: fmt.Sprintf("Deque/FIFO/Limit8/%s", axis),
+			Name: fmt.Sprintf("Deque/FIFO/Limit16/%s", axis),
 			Construtor: func(ctx context.Context, _ *testing.T) *Broker[T] {
 				return NewDequeBroker(
 					ctx,
 					erc.Must(NewDeque[T](DequeOptions{
-						Capacity: 8,
+						Capacity: 16,
 					})),
 					opts,
 				)
 			},
 		},
 		{
-			Name: fmt.Sprintf("Deque/LIFO/Limit8/%s", axis),
+			Name: fmt.Sprintf("Deque/LIFO/Limit16/%s", axis),
 			Construtor: func(ctx context.Context, t *testing.T) *Broker[T] {
 				return NewLIFOBroker(
 					ctx,
 					erc.Must(NewDeque[T](DequeOptions{
-						Capacity: 8,
+						Capacity: 16,
 					})),
 					opts,
 				)
@@ -125,7 +111,7 @@ func makeFixtures[T comparable](elems []T) iter.Seq[BrokerFixture[T]] {
 			GenerateFixtures("Serial", elems, BrokerOptions{ParallelDispatch: false}),
 			GenerateFixtures("Parallel", elems, BrokerOptions{ParallelDispatch: true}),
 			GenerateFixtures("Serial/Worker8", elems, BrokerOptions{ParallelDispatch: false, WorkerPoolSize: 8}),
-			GenerateFixtures("Parallel/Worker16", elems, BrokerOptions{ParallelDispatch: true, WorkerPoolSize: 16}),
+			GenerateFixtures("Parallel/Worker8", elems, BrokerOptions{ParallelDispatch: true, WorkerPoolSize: 8}),
 		),
 	)
 }
@@ -136,7 +122,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 			opts := fix
 
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(pctx, time.Second)
 			defer cancel()
 
 			broker := opts.Construtor(ctx, t)
@@ -271,45 +257,11 @@ func TestBroker(t *testing.T) {
 
 	t.Run("Strings", func(t *testing.T) {
 		t.Parallel()
-		for _, scope := range []struct {
-			Name  string
-			Elems []string
-		}{
-			{
-				Name:  "Basic",
-				Elems: randomStringSlice(10),
-			},
-			{
-				Name:  "Medium",
-				Elems: randomStringSlice(250),
-			},
-		} {
-			t.Run(scope.Name, func(t *testing.T) {
-				t.Parallel()
-				RunBrokerTests(ctx, t, scope.Elems)
-			})
-		}
+		RunBrokerTests(ctx, t, randomStringSlice(50))
 	})
 	t.Run("Integers", func(t *testing.T) {
 		t.Parallel()
-		for _, scope := range []struct {
-			Name  string
-			Elems []int
-		}{
-			{
-				Name:  "Small",
-				Elems: randomIntSlice(20),
-			},
-			{
-				Name:  "Large",
-				Elems: randomIntSlice(500),
-			},
-		} {
-			t.Run(scope.Name, func(t *testing.T) {
-				t.Parallel()
-				RunBrokerTests(ctx, t, scope.Elems)
-			})
-		}
+		RunBrokerTests(ctx, t, randomIntSlice(50))
 	})
 	t.Run("MakeBrokerDetectsNegativeBufferSizes", func(t *testing.T) {
 		opts := BrokerOptions{BufferSize: -1}

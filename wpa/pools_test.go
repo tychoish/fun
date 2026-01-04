@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/testt"
 )
 
 func TestPool(t *testing.T) {
@@ -20,22 +22,19 @@ func TestPool(t *testing.T) {
 		ctx := context.Background()
 		t.Run("ReturnsWorker", func(t *testing.T) {
 			task := Task(func() error { return nil })
-			job := task.Job()
-			assert.NotError(t, job(ctx))
+			assert.NotError(t, task.Job()(ctx))
 		})
 		t.Run("RecoversPanics", func(t *testing.T) {
 			expected := ers.Error("panic error")
 			task := Task(func() error { panic(expected) })
-			job := task.Job()
-			err := job(ctx)
+			err := task.Job()(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, expected)
 		})
 		t.Run("PropagatesErrors", func(t *testing.T) {
 			expected := ers.Error("test error")
 			task := Task(func() error { return expected })
-			job := task.Job()
-			err := job(ctx)
+			err := task.Job()(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, expected)
 		})
@@ -45,23 +44,21 @@ func TestPool(t *testing.T) {
 		t.Run("ReturnsWorker", func(t *testing.T) {
 			called := &atomic.Bool{}
 			thunk := Thunk(func() { called.Store(true) })
-			job := thunk.Job()
-			assert.NotError(t, job(ctx))
+			err := thunk.Job()(ctx)
+			assert.NotError(t, err)
 			assert.True(t, called.Load())
 		})
 		t.Run("RecoversPanics", func(t *testing.T) {
 			expected := ers.Error("panic error")
 			thunk := Thunk(func() { panic(expected) })
-			job := thunk.Job()
-			err := job(ctx)
+			err := thunk.Job()(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, expected)
 		})
 		t.Run("NoErrorOnSuccess", func(t *testing.T) {
 			count := &atomic.Int64{}
 			thunk := Thunk(func() { count.Add(1) })
-			job := thunk.Job()
-			err := job(ctx)
+			err := thunk.Job()(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, count.Load(), int64(1))
 		})
@@ -464,7 +461,7 @@ func TestPool(t *testing.T) {
 				func() error { counter.Add(1); return nil },
 			}
 
-			err := Run(irt.Slice(tasks)).Run(t.Context())
+			err := Run(irt.Slice(tasks)).Job()(t.Context())
 			assert.NotError(t, err)
 			assert.Equal(t, counter.Load(), int64(3))
 		})
@@ -569,23 +566,1577 @@ func TestPool(t *testing.T) {
 
 		t.Run("AllTypesPanicRecovery", func(t *testing.T) {
 			panicErr := ers.Error("panic error")
+			ctx := t.Context()
 
-			panicThunk := Thunk(func() { panic(panicErr) })
-			panicTask := Task(func() error { panic(panicErr) })
-			panicWorker := fnx.Worker(func(context.Context) error { panic(panicErr) })
-			panicOperation := fnx.Operation(func(context.Context) { panic(panicErr) })
+			panicThunkErr := TaskHandler(ctx, Thunk(func() { panic(panicErr) }))
+			panicTaskErr := TaskHandler(ctx, Task(func() error { panic(panicErr) }))
+			panicWorkerErr := TaskHandler(ctx, fnx.Worker(func(context.Context) error { panic(panicErr) }))
+			panicOperationErr := TaskHandler(ctx, fnx.Operation(func(context.Context) { panic(panicErr) }))
 
-			check.Error(t, panicThunk.Job()(t.Context()))
-			check.ErrorIs(t, panicThunk.Job()(t.Context()), panicErr)
+			check.Error(t, panicThunkErr)
+			check.ErrorIs(t, panicThunkErr, panicErr)
 
-			check.Error(t, panicTask.Job()(t.Context()))
-			check.ErrorIs(t, panicTask.Job()(t.Context()), panicErr)
+			check.Error(t, panicTaskErr)
+			check.ErrorIs(t, panicTaskErr, panicErr)
 
-			check.Error(t, panicWorker.Job()(t.Context()))
-			check.ErrorIs(t, panicWorker.Job()(t.Context()), panicErr)
+			check.Error(t, panicWorkerErr)
+			check.ErrorIs(t, panicWorkerErr, panicErr)
 
-			check.Error(t, panicOperation.Job()(t.Context()))
-			check.ErrorIs(t, panicOperation.Job()(t.Context()), panicErr)
+			check.Error(t, panicOperationErr)
+			check.ErrorIs(t, panicOperationErr, panicErr)
 		})
+	})
+}
+
+func TestJobs(t *testing.T) {
+	t.Run("ConvertsThunksToWorkers", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		thunks := []Thunk{
+			func() { counter.Add(1) },
+			func() { counter.Add(1) },
+			func() { counter.Add(1) },
+		}
+
+		workers := irt.Collect(Jobs(irt.Slice(thunks)))
+		check.Equal(t, len(workers), 3)
+
+		for _, w := range workers {
+			check.NotError(t, w(t.Context()))
+		}
+		check.Equal(t, counter.Load(), int64(3))
+	})
+
+	t.Run("ConvertsTasksToWorkers", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		tasks := []Task{
+			func() error { counter.Add(1); return nil },
+			func() error { counter.Add(1); return nil },
+		}
+
+		workers := irt.Collect(Jobs(irt.Slice(tasks)))
+		check.Equal(t, len(workers), 2)
+
+		for _, w := range workers {
+			check.NotError(t, w(t.Context()))
+		}
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("ConvertsWorkersToWorkers", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		inputWorkers := []fnx.Worker{
+			func(context.Context) error { counter.Add(1); return nil },
+			func(context.Context) error { counter.Add(1); return nil },
+		}
+
+		workers := irt.Collect(Jobs(irt.Slice(inputWorkers)))
+		check.Equal(t, len(workers), 2)
+
+		for _, w := range workers {
+			check.NotError(t, w(t.Context()))
+		}
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("ConvertsOperationsToWorkers", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		ops := []fnx.Operation{
+			func(context.Context) { counter.Add(1) },
+			func(context.Context) { counter.Add(1) },
+		}
+
+		workers := irt.Collect(Jobs(irt.Slice(ops)))
+		check.Equal(t, len(workers), 2)
+
+		for _, w := range workers {
+			check.NotError(t, w(t.Context()))
+		}
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		workers := irt.Collect(Jobs(irt.Slice([]Thunk{})))
+		check.Equal(t, len(workers), 0)
+	})
+}
+
+func TestTaskHandler(t *testing.T) {
+	t.Run("RunsThunk", func(t *testing.T) {
+		called := &atomic.Bool{}
+		thunk := Thunk(func() { called.Store(true) })
+
+		err := TaskHandler(t.Context(), thunk)
+		check.NotError(t, err)
+		check.True(t, called.Load())
+	})
+
+	t.Run("RunsTask", func(t *testing.T) {
+		called := &atomic.Bool{}
+		task := Task(func() error { called.Store(true); return nil })
+
+		err := TaskHandler(t.Context(), task)
+		check.NotError(t, err)
+		check.True(t, called.Load())
+	})
+
+	t.Run("RunsWorker", func(t *testing.T) {
+		called := &atomic.Bool{}
+		worker := fnx.Worker(func(context.Context) error { called.Store(true); return nil })
+
+		err := TaskHandler(t.Context(), worker)
+		check.NotError(t, err)
+		check.True(t, called.Load())
+	})
+
+	t.Run("RunsOperation", func(t *testing.T) {
+		called := &atomic.Bool{}
+		op := fnx.Operation(func(context.Context) { called.Store(true) })
+
+		err := TaskHandler(t.Context(), op)
+		check.NotError(t, err)
+		check.True(t, called.Load())
+	})
+
+	t.Run("PropagatesErrors", func(t *testing.T) {
+		expectedErr := ers.Error("test error")
+		task := Task(func() error { return expectedErr })
+
+		err := TaskHandler(t.Context(), task)
+		check.Error(t, err)
+		check.ErrorIs(t, err, expectedErr)
+	})
+
+	t.Run("RecoversPanics", func(t *testing.T) {
+		panicErr := ers.Error("panic error")
+		thunk := Thunk(func() { panic(panicErr) })
+
+		err := TaskHandler(t.Context(), thunk)
+		check.Error(t, err)
+		check.ErrorIs(t, err, panicErr)
+	})
+
+	t.Run("RespectsContext", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		called := &atomic.Bool{}
+		worker := fnx.Worker(func(ctx context.Context) error {
+			called.Store(true)
+			return ctx.Err()
+		})
+
+		err := TaskHandler(ctx, worker)
+		check.Error(t, err)
+		check.ErrorIs(t, err, context.Canceled)
+		check.True(t, called.Load())
+	})
+}
+
+func TestWithHandler(t *testing.T) {
+	t.Run("BasicReaderConversion", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		workers := WithHandler(reader).For(seq)
+
+		err := Run(workers).Run(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(15)) // 1+2+3+4+5
+	})
+
+	t.Run("ReaderWithMultipleItems", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{10, 20, 30})
+		workers := WithHandler(reader).For(seq)
+
+		err := Run(workers).Run(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(60))
+	})
+
+	t.Run("ReaderWithErrors", func(t *testing.T) {
+		expectedErr := ers.Error("processing error")
+		reader := Reader[int](func(value int) error {
+			if value == 2 {
+				return expectedErr
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3})
+		workers := WithHandler(reader).For(seq)
+
+		err := Run(workers).Run(t.Context())
+		check.Error(t, err)
+		check.ErrorIs(t, err, expectedErr)
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{})
+		workers := WithHandler(reader).For(seq)
+
+		err := Run(workers).Run(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+
+	t.Run("WithRunAll", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return ers.Error("even number")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		workers := WithHandler(reader).For(seq)
+
+		err := RunAll(workers).Run(t.Context())
+		check.Error(t, err)
+		check.Equal(t, counter.Load(), int64(5)) // All items processed despite errors
+
+		errs := ers.Unwind(err)
+		check.Equal(t, len(errs), 2) // Two even numbers: 2 and 4
+	})
+
+	t.Run("WithRunWithPool", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8})
+		workers := WithHandler(reader).For(seq)
+
+		err := RunWithPool(workers, WorkerGroupConfDefaults()).Run(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(8))
+	})
+
+	t.Run("StringReader", func(t *testing.T) {
+		var result []string
+		reader := Reader[string](func(s string) error {
+			result = append(result, s)
+			return nil
+		})
+
+		seq := irt.Slice([]string{"a", "b", "c"})
+		workers := WithHandler(reader).For(seq)
+
+		err := Run(workers).Run(t.Context())
+		check.NotError(t, err)
+		check.Equal(t, len(result), 3)
+	})
+}
+
+func TestWithHandlerRun(t *testing.T) {
+	t.Run("BasicExecution", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).Run().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(15))
+	})
+
+	t.Run("StopsOnFirstError", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		expectedErr := ers.Error("processing error")
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 3 {
+				return expectedErr
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).Run().For(seq).Run(t.Context())
+
+		check.Error(t, err)
+		check.ErrorIs(t, err, expectedErr)
+		check.Equal(t, counter.Load(), int64(3))
+	})
+
+	t.Run("SkipsOnErrCurrentOpSkip", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return ers.ErrCurrentOpSkip
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).Run().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(5)) // All items processed
+	})
+
+	t.Run("TerminatesOnEOF", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 3 {
+				return io.EOF
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).Run().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(3))
+	})
+
+	t.Run("TerminatesOnErrCurrentOpAbort", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 4 {
+				return ers.ErrCurrentOpAbort
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).Run().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(4))
+	})
+
+	t.Run("RespectsContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 2 {
+				cancel()
+				return context.Canceled
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).Run().For(seq).Run(ctx)
+
+		check.Error(t, err)
+		check.ErrorIs(t, err, context.Canceled)
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{})
+		err := WithHandler(reader).Run().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+}
+
+func TestWithHandlerRunAll(t *testing.T) {
+	t.Run("ProcessesAllItemsDespiteErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return ers.Error("even number error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).RunAll().For(seq).Run(t.Context())
+
+		check.Error(t, err)
+		check.Equal(t, counter.Load(), int64(5)) // All items processed
+
+		errs := ers.Unwind(err)
+		check.Equal(t, len(errs), 2) // Two errors for 2 and 4
+	})
+
+	t.Run("ReturnsNilWhenNoErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3})
+		err := WithHandler(reader).RunAll().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(6))
+	})
+
+	t.Run("CollectsMultipleErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).RunAll().For(seq).Run(t.Context())
+
+		check.Error(t, err)
+		check.Equal(t, counter.Load(), int64(5))
+
+		errs := ers.Unwind(err)
+		check.Equal(t, len(errs), 5)
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{})
+		err := WithHandler(reader).RunAll().For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+
+	t.Run("MixedSuccessAndFailure", func(t *testing.T) {
+		var results []int
+		var mu sync.Mutex
+
+		reader := Reader[int](func(value int) error {
+			mu.Lock()
+			results = append(results, value)
+			mu.Unlock()
+
+			if value == 3 || value == 5 {
+				return ers.Error("specific error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+		err := WithHandler(reader).RunAll().For(seq).Run(t.Context())
+
+		check.Error(t, err)
+		check.Equal(t, len(results), 6)
+
+		errs := ers.Unwind(err)
+		check.Equal(t, len(errs), 2)
+	})
+}
+
+func TestWithHandlerRunWithPool(t *testing.T) {
+	t.Run("ConcurrentExecution", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8})
+		start := time.Now()
+
+		err := WithHandler(reader).RunWithPool(WorkerGroupConfDefaults()).For(seq).Run(t.Context())
+
+		dur := time.Since(start)
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(8))
+
+		// Should complete faster than serial execution (80ms)
+		// but slower than single item (10ms)
+		if dur > 200*time.Millisecond {
+			t.Errorf("took too long: %v", dur)
+		}
+		if dur < 10*time.Millisecond {
+			t.Errorf("completed too quickly, might not be concurrent: %v", dur)
+		}
+	})
+
+	t.Run("CollectsAllErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		err := WithHandler(reader).RunWithPool(WorkerGroupConfDefaults()).For(seq).Run(t.Context())
+
+		check.Error(t, err)
+		check.Equal(t, counter.Load(), int64(5))
+
+		errs := ers.Unwind(err)
+		check.Equal(t, len(errs), 5)
+	})
+
+	t.Run("WithCustomNumWorkers", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4})
+		err := WithHandler(reader).RunWithPool(WorkerGroupConfNumWorkers(2)).For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(4))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{})
+		err := WithHandler(reader).RunWithPool(WorkerGroupConfDefaults()).For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+
+	t.Run("SomeSuccessSomeFailure", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			if value%2 == 0 {
+				return ers.Error("even error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+		err := WithHandler(reader).RunWithPool(WorkerGroupConfDefaults()).For(seq).Run(t.Context())
+
+		check.Error(t, err)
+		check.Equal(t, counter.Load(), int64(6))
+
+		errs := ers.Unwind(err)
+		check.Equal(t, len(errs), 3) // 2, 4, 6
+	})
+
+	t.Run("StringsWithPool", func(t *testing.T) {
+		var results sync.Map
+		counter := &atomic.Int64{}
+
+		reader := Reader[string](func(s string) error {
+			counter.Add(1)
+			results.Store(s, true)
+			time.Sleep(5 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]string{"a", "b", "c", "d", "e"})
+		err := WithHandler(reader).RunWithPool(WorkerGroupConfDefaults()).For(seq).Run(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, counter.Load(), int64(5))
+
+		for _, s := range []string{"a", "b", "c", "d", "e"} {
+			_, ok := results.Load(s)
+			check.True(t, ok)
+		}
+	})
+}
+
+func TestWithHandlerForEachPull(t *testing.T) {
+	t.Run("BasicExecution", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for err := range errorSeq {
+			t.Errorf("unexpected error: %v", err)
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(15)) // 1+2+3+4+5
+	})
+
+	t.Run("StopsOnFirstError", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		expectedErr := ers.Error("processing error")
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 3 {
+				return expectedErr
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		var firstError error
+		for err := range errorSeq {
+			if firstError == nil {
+				firstError = err
+			}
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 1)
+		check.Error(t, firstError)
+		check.ErrorIs(t, firstError, expectedErr)
+		check.Equal(t, counter.Load(), int64(3)) // Stops after error
+	})
+
+	t.Run("SkipsOnErrCurrentOpSkip", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		processed := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return ers.ErrCurrentOpSkip
+			}
+			processed.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)              // ErrCurrentOpSkip doesn't yield errors
+		check.Equal(t, counter.Load(), int64(5))   // All items processed
+		check.Equal(t, processed.Load(), int64(9)) // 1+3+5
+	})
+
+	t.Run("TerminatesOnEOF", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 3 {
+				return io.EOF
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)            // io.EOF is terminating, doesn't yield error
+		check.Equal(t, counter.Load(), int64(3)) // Stopped at EOF
+	})
+
+	t.Run("TerminatesOnErrCurrentOpAbort", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 4 {
+				return ers.ErrCurrentOpAbort
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)            // ErrCurrentOpAbort is terminating
+		check.Equal(t, counter.Load(), int64(4)) // Stopped at abort
+	})
+
+	t.Run("TerminatesOnErrContainerClosed", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 2 {
+				return ers.ErrContainerClosed
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("YieldsOnRecoveredPanic", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		panicErr := ers.Error("panic error")
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 2 {
+				panic(panicErr)
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		var firstError error
+		for err := range errorSeq {
+			if firstError == nil {
+				firstError = err
+			}
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 1)
+		check.Error(t, firstError)
+		check.ErrorIs(t, firstError, panicErr)
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("RespectsContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 2 {
+				cancel()
+				return context.Canceled
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(ctx)
+
+		errorCount := 0
+		var firstError error
+		for err := range errorSeq {
+			if firstError == nil {
+				firstError = err
+			}
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 1)
+		check.Error(t, firstError)
+		check.ErrorIs(t, firstError, context.Canceled)
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+
+	t.Run("MultipleErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		expectedErr := ers.Error("test error")
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 2 {
+				return expectedErr
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		// Should only yield one error and stop
+		check.Equal(t, errorCount, 1)
+		check.Equal(t, counter.Load(), int64(2))
+	})
+
+	t.Run("StringsWithErrors", func(t *testing.T) {
+		var processed []string
+		expectedErr := ers.Error("bad string")
+
+		reader := Reader[string](func(s string) error {
+			if s == "bad" {
+				return expectedErr
+			}
+			processed = append(processed, s)
+			return nil
+		})
+
+		seq := irt.Slice([]string{"a", "b", "bad", "c", "d"})
+		errorSeq := WithHandler(reader).ForEach(seq).Pull(t.Context())
+
+		errorCount := 0
+		for err := range errorSeq {
+			errorCount++
+			check.ErrorIs(t, err, expectedErr)
+		}
+
+		check.Equal(t, errorCount, 1)
+		check.Equal(t, len(processed), 2) // "a", "b"
+	})
+}
+
+func TestWithHandlerForEachPullAll(t *testing.T) {
+	t.Run("ProcessesAllItemsDespiteErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return ers.Error("even number error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 2)            // Two errors for 2 and 4
+		check.Equal(t, counter.Load(), int64(5)) // All items processed
+	})
+
+	t.Run("ReturnsNoErrorsWhenAllSucceed", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(6))
+	})
+
+	t.Run("YieldsAllErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 5) // All 5 items yield errors
+		check.Equal(t, counter.Load(), int64(5))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+
+	t.Run("MixedSuccessAndFailure", func(t *testing.T) {
+		var processed []int
+
+		reader := Reader[int](func(value int) error {
+			processed = append(processed, value)
+			if value == 3 || value == 5 {
+				return ers.Error("specific error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 2)     // Errors for 3 and 5
+		check.Equal(t, len(processed), 6) // All items processed
+	})
+
+	t.Run("IncludesErrCurrentOpSkip", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return ers.ErrCurrentOpSkip
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errorCount := 0
+		for err := range errorSeq {
+			errorCount++
+			check.ErrorIs(t, err, ers.ErrCurrentOpSkip)
+		}
+
+		// PullAll yields ALL errors, including ErrCurrentOpSkip
+		check.Equal(t, errorCount, 2) // 2 and 4
+		check.Equal(t, counter.Load(), int64(5))
+	})
+
+	t.Run("IncludesTerminatingErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 3 {
+				return io.EOF
+			}
+			if value == 5 {
+				return ers.ErrCurrentOpAbort
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errors := irt.Collect(errorSeq)
+
+		// PullAll processes all items and yields all errors
+		check.Equal(t, len(errors), 2)
+		check.ErrorIs(t, errors[0], io.EOF)
+		check.ErrorIs(t, errors[1], ers.ErrCurrentOpAbort)
+		check.Equal(t, counter.Load(), int64(6))
+	})
+
+	t.Run("YieldsPanicErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		panicErr1 := ers.Error("panic 1")
+		panicErr2 := ers.Error("panic 2")
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 2 {
+				panic(panicErr1)
+			}
+			if value == 4 {
+				panic(panicErr2)
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		errors := irt.Collect(errorSeq)
+
+		check.Equal(t, len(errors), 2)
+		check.ErrorIs(t, errors[0], panicErr1)
+		check.ErrorIs(t, errors[1], panicErr2)
+		check.Equal(t, counter.Load(), int64(5))
+	})
+
+	t.Run("ContextCancellationYieldsError", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value == 3 {
+				cancel()
+				return context.Canceled
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(ctx)
+
+		errors := irt.Collect(errorSeq)
+
+		// Should yield the context.Canceled error
+		check.Equal(t, len(errors), 1)
+		check.ErrorIs(t, errors[0], context.Canceled)
+		check.Equal(t, counter.Load(), int64(5)) // Continues processing all items
+	})
+
+	t.Run("EarlyBreak", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		// Consumer breaks after first error
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+			if errorCount == 1 {
+				break
+			}
+		}
+
+		check.Equal(t, errorCount, 1)
+		// Note: depending on buffering, some items might still be processed
+		check.True(t, counter.Load() >= 1)
+	})
+
+	t.Run("EarlyReturnAbortsProcessing", func(t *testing.T) {
+		started := &atomic.Int64{}
+		completed := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			started.Add(1)
+			// Add delay to ensure we can detect early termination
+			time.Sleep(10 * time.Millisecond)
+			completed.Add(1)
+			return ers.Error("error")
+		})
+
+		// Create a larger sequence to ensure there's work in progress
+		items := make([]int, 50)
+		for i := range items {
+			items[i] = i
+		}
+		seq := irt.Slice(items)
+
+		errorSeq := WithHandler(reader).ForEach(seq).PullAll(t.Context())
+
+		// Consumer breaks after receiving just 3 errors
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+			if errorCount == 3 {
+				break
+			}
+		}
+
+		check.Equal(t, errorCount, 3)
+
+		// Give a moment for any in-flight operations to potentially complete
+		time.Sleep(20 * time.Millisecond)
+
+		// Verify that processing was aborted - we should have far fewer than 50 items processed
+		startedCount := started.Load()
+		completedCount := completed.Load()
+
+		t.Logf("Started: %d, Completed: %d out of 50 items", startedCount, completedCount)
+
+		// We should have significantly fewer items processed than the total
+		// The exact number depends on timing, but should be much less than 50
+		check.True(t, completedCount < 50)
+		check.True(t, completedCount <= startedCount) // Sanity check
+
+		// We should have at least processed the 3 that yielded errors
+		check.True(t, completedCount >= 3)
+	})
+}
+
+func TestWithHandlerForEachPullWithPool(t *testing.T) {
+	t.Run("ConcurrentExecution", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8})
+		start := time.Now()
+
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		dur := time.Since(start)
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(8))
+
+		// Should complete faster than serial (80ms) but slower than instant
+		if dur > 200*time.Millisecond {
+			t.Errorf("took too long: %v", dur)
+		}
+		if dur < 10*time.Millisecond {
+			t.Errorf("completed too quickly, might not be concurrent: %v", dur)
+		}
+	})
+
+	t.Run("YieldsAllErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			return ers.Error("error")
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 5)
+		check.Equal(t, counter.Load(), int64(5))
+	})
+
+	t.Run("WithCustomNumWorkers", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(
+			t.Context(),
+			WorkerGroupConfNumWorkers(2),
+		)
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(4))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(0))
+	})
+
+	t.Run("SomeSuccessSomeFailure", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			if value%2 == 0 {
+				return ers.Error("even error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 3) // 2, 4, 6
+		check.Equal(t, counter.Load(), int64(6))
+	})
+
+	t.Run("FiltersNilErrors", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			if value%2 == 0 {
+				return nil
+			}
+			return ers.Error("odd error")
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		var errors []error
+		for err := range errorSeq {
+			errors = append(errors, err)
+		}
+
+		// Should yield errors only for odd numbers (1, 3, 5)
+		check.Equal(t, len(errors), 3)
+		check.Equal(t, counter.Load(), int64(6))
+	})
+
+	t.Run("ContinueOnErrorBehavior", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			if value%2 == 0 {
+				return ers.Error("even error")
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
+
+		// With continue on error (default), all items should be processed
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(
+			t.Context(),
+			WorkerGroupConfDefaults(),
+		)
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		// Should yield 3 errors (2, 4, 6)
+		check.Equal(t, errorCount, 3)
+		check.Equal(t, counter.Load(), int64(6))
+	})
+
+	t.Run("StringsWithPool", func(t *testing.T) {
+		var results sync.Map
+		counter := &atomic.Int64{}
+
+		reader := Reader[string](func(s string) error {
+			counter.Add(1)
+			results.Store(s, true)
+			time.Sleep(5 * time.Millisecond)
+			return nil
+		})
+
+		seq := irt.Slice([]string{"a", "b", "c", "d", "e"})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(5))
+
+		for _, s := range []string{"a", "b", "c", "d", "e"} {
+			_, ok := results.Load(s)
+			check.True(t, ok)
+		}
+	})
+
+	t.Run("PanicRecovery", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		panicErr := ers.Error("panic error")
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			if value == 3 {
+				panic(panicErr)
+			}
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5})
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
+
+		var errors []error
+		for err := range errorSeq {
+			errors = append(errors, err)
+		}
+
+		// Should have one panic error
+		check.Equal(t, len(errors), 1)
+		check.ErrorIs(t, errors[0], panicErr)
+		check.Equal(t, counter.Load(), int64(5))
+	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		counter := &atomic.Int64{}
+		started := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			started.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+
+		// Cancel context after short delay
+		go func() {
+			time.Sleep(time.Millisecond)
+			cancel()
+		}()
+
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(ctx, WorkerGroupConfDefaults())
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		// With 50ms per task and cancellation at 25ms, some tasks should not complete
+		// (Note: some may start but not finish due to the sleep duration)
+		testt.Log(t, counter.Load(), errorCount)
+		check.True(t, counter.Load() < 12)
+	})
+
+	t.Run("InvalidOptions", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			return nil
+		})
+
+		seq := irt.Slice([]int{1, 2, 3})
+
+		// Test with nil error collector
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(
+			t.Context(),
+			WorkerGroupConfWithErrorCollector(nil),
+		)
+
+		var errors []error
+		for err := range errorSeq {
+			errors = append(errors, err)
+		}
+
+		// Should yield the validation error
+		check.Equal(t, len(errors), 1)
+		check.ErrorIs(t, errors[0], ers.ErrInvalidInput)
+		check.Equal(t, counter.Load(), int64(0)) // No processing should occur
+	})
+
+	t.Run("LargeSequenceConcurrent", func(t *testing.T) {
+		counter := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			counter.Add(1)
+			time.Sleep(2 * time.Millisecond)
+			return nil
+		})
+
+		// Create large sequence
+		items := make([]int, 100)
+		for i := range items {
+			items[i] = i
+		}
+
+		seq := irt.Slice(items)
+		start := time.Now()
+
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(
+			t.Context(),
+			WorkerGroupConfNumWorkers(10),
+		)
+
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+		}
+
+		dur := time.Since(start)
+
+		check.Equal(t, errorCount, 0)
+		check.Equal(t, counter.Load(), int64(100))
+
+		// With 10 workers and 2ms per item, should complete much faster than 200ms (serial)
+		if dur > 100*time.Millisecond {
+			t.Errorf("took too long: %v", dur)
+		}
+	})
+
+	t.Run("EarlyReturnAbortsProcessing", func(t *testing.T) {
+		started := &atomic.Int64{}
+		completed := &atomic.Int64{}
+
+		reader := Reader[int](func(value int) error {
+			started.Add(1)
+			// Add delay to ensure we can detect early termination
+			time.Sleep(20 * time.Millisecond)
+			completed.Add(1)
+			return ers.Error("error")
+		})
+
+		// Create a large sequence
+		items := make([]int, 100)
+		for i := range items {
+			items[i] = i
+		}
+		seq := irt.Slice(items)
+
+		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(
+			t.Context(),
+			WorkerGroupConfNumWorkers(4),
+		)
+
+		// Consumer breaks after receiving just 5 errors
+		errorCount := 0
+		for range errorSeq {
+			errorCount++
+			if errorCount == 5 {
+				break
+			}
+		}
+
+		check.Equal(t, errorCount, 5)
+
+		// Give a moment for any in-flight operations to potentially complete
+		time.Sleep(50 * time.Millisecond)
+
+		// Verify that processing was aborted
+		startedCount := started.Load()
+		completedCount := completed.Load()
+
+		t.Logf("Started: %d, Completed: %d out of 100 items", startedCount, completedCount)
+
+		// With 4 workers, we might start a few more tasks before they all receive the cancellation
+		// But we should have significantly fewer than 100 items completed
+		check.True(t, completedCount < 100)
+		check.True(t, completedCount <= startedCount) // Sanity check
+
+		// We should have at least completed the 5 that yielded errors
+		check.True(t, completedCount >= 5)
+
+		// Due to concurrent execution, we might have started more than completed
+		// but should still be far less than the total
+		check.True(t, startedCount < 50) // Should be much less than 100
 	})
 }

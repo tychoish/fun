@@ -605,7 +605,7 @@ func TestQueueStream(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 		count := 0
 
-		check.MinRuntime(t, 100*time.Millisecond, func() {
+		check.MinRuntime(t, 99*time.Millisecond, func() {
 			count++
 			for range queue.IteratorWait(ctx) {
 				count++

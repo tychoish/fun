@@ -47,6 +47,12 @@ func WaitContext(ctx context.Context) Operation { return WaitChannel(ctx.Done())
 // Run is equivalent to calling the operation directly.
 func (wf Operation) Run(ctx context.Context) { wf(ctx) }
 
+// Job converts an Operation into a panic-safe worker function suitable for
+// use in worker pool implementations (e.g., wpa.RunWithPool). The returned
+// function catches any panics that occur during execution and converts them
+// to errors.
+func (wf Operation) Job() func(context.Context) error { return wf.WithRecover() }
+
 // WithCancel creates a Operation and a cancel function which will
 // terminate the context that the root Operation is running
 // with. This context isn't canceled *unless* the cancel function is

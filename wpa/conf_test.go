@@ -577,3 +577,216 @@ func TestWorkerGroupConfFilter(t *testing.T) {
 		assert.Equal(t, conf.ErrorCollector.Len(), 1)
 	})
 }
+
+func TestCustomValidators(t *testing.T) {
+	t.Run("ValidatorReturnsError", func(t *testing.T) {
+		expectedErr := errors.New("custom validation failed")
+		validator := func(conf *WorkerGroupConf) error {
+			return expectedErr
+		}
+
+		conf := &WorkerGroupConf{}
+		// Apply automatically calls Validate, so we expect the error here
+		err := WorkerGroupConfCustomValidatorAppend(validator).Apply(conf)
+		assert.Error(t, err)
+		assert.Substring(t, err.Error(), expectedErr.Error())
+		assert.Equal(t, len(conf.CustomValidators), 1)
+	})
+
+	t.Run("ValidatorReturnsNil", func(t *testing.T) {
+		validator := func(conf *WorkerGroupConf) error {
+			return nil
+		}
+
+		conf := &WorkerGroupConf{}
+		err := WorkerGroupConfCustomValidatorAppend(validator).Apply(conf)
+		assert.NotError(t, err)
+
+		// Validate should not return error
+		err = conf.Validate()
+		assert.NotError(t, err)
+	})
+
+	t.Run("MultipleValidators", func(t *testing.T) {
+		err1 := errors.New("validation error 1")
+		err2 := errors.New("validation error 2")
+
+		validator1 := func(conf *WorkerGroupConf) error {
+			if conf.NumWorkers < 2 {
+				return err1
+			}
+			return nil
+		}
+		validator2 := func(conf *WorkerGroupConf) error {
+			if conf.NumWorkers > 10 {
+				return err2
+			}
+			return nil
+		}
+
+		t.Run("BothPass", func(t *testing.T) {
+			conf := &WorkerGroupConf{NumWorkers: 5}
+			err := opt.Join(
+				WorkerGroupConfCustomValidatorAppend(validator1),
+				WorkerGroupConfCustomValidatorAppend(validator2),
+			).Apply(conf)
+			assert.NotError(t, err)
+
+			err = conf.Validate()
+			assert.NotError(t, err)
+		})
+
+		t.Run("FirstFails", func(t *testing.T) {
+			conf := &WorkerGroupConf{NumWorkers: 1}
+			// Apply calls Validate, so we get the error here
+			err := opt.Join(
+				WorkerGroupConfCustomValidatorAppend(validator1),
+				WorkerGroupConfCustomValidatorAppend(validator2),
+			).Apply(conf)
+			assert.Error(t, err)
+			assert.Substring(t, err.Error(), err1.Error())
+		})
+
+		t.Run("SecondFails", func(t *testing.T) {
+			conf := &WorkerGroupConf{NumWorkers: 15}
+			// Apply calls Validate, so we get the error here
+			err := opt.Join(
+				WorkerGroupConfCustomValidatorAppend(validator1),
+				WorkerGroupConfCustomValidatorAppend(validator2),
+			).Apply(conf)
+			assert.Error(t, err)
+			assert.Substring(t, err.Error(), err2.Error())
+		})
+
+		t.Run("BothFail", func(t *testing.T) {
+			// NumWorkers will be set to 1 by Validate (from 0)
+			// Then validator1 will fail
+			conf := &WorkerGroupConf{NumWorkers: 0}
+			// Apply calls Validate, so we get the error here
+			err := opt.Join(
+				WorkerGroupConfCustomValidatorAppend(validator1),
+				WorkerGroupConfCustomValidatorAppend(validator2),
+			).Apply(conf)
+			assert.Error(t, err)
+			// Both validator errors should be present
+			assert.Substring(t, err.Error(), err1.Error())
+		})
+	})
+
+	t.Run("ValidatorReset", func(t *testing.T) {
+		expectedErr := errors.New("should not be called")
+		validator := func(conf *WorkerGroupConf) error {
+			return expectedErr
+		}
+
+		conf := &WorkerGroupConf{}
+		err := opt.Join(
+			WorkerGroupConfCustomValidatorAppend(validator),
+			WorkerGroupConfCustomValidatorReset(),
+		).Apply(conf)
+		assert.NotError(t, err)
+		assert.Equal(t, len(conf.CustomValidators), 0)
+
+		// Validate should not return error since validators were reset
+		err = conf.Validate()
+		assert.NotError(t, err)
+	})
+
+	t.Run("ValidatorResetThenAppend", func(t *testing.T) {
+		err1 := errors.New("first validator")
+		err2 := errors.New("second validator")
+
+		validator1 := func(conf *WorkerGroupConf) error {
+			return err1
+		}
+		validator2 := func(conf *WorkerGroupConf) error {
+			return err2
+		}
+
+		conf := &WorkerGroupConf{}
+		// Apply calls Validate, which will run validator2 (validator1 was reset)
+		err := opt.Join(
+			WorkerGroupConfCustomValidatorAppend(validator1),
+			WorkerGroupConfCustomValidatorReset(),
+			WorkerGroupConfCustomValidatorAppend(validator2),
+		).Apply(conf)
+		assert.Error(t, err)
+		assert.Equal(t, len(conf.CustomValidators), 1)
+		// Should only get err2, not err1
+		assert.Substring(t, err.Error(), err2.Error())
+		assert.True(t, ft.Not(errors.Is(err, err1)))
+	})
+
+	t.Run("ValidatorWithConfModification", func(t *testing.T) {
+		validator := func(conf *WorkerGroupConf) error {
+			// Validator can also modify the config
+			if conf.NumWorkers > 100 {
+				conf.NumWorkers = 100
+			}
+			return nil
+		}
+
+		conf := &WorkerGroupConf{NumWorkers: 200}
+		err := WorkerGroupConfCustomValidatorAppend(validator).Apply(conf)
+		assert.NotError(t, err)
+
+		err = conf.Validate()
+		assert.NotError(t, err)
+		assert.Equal(t, conf.NumWorkers, 100)
+	})
+
+	t.Run("EmptyValidatorsList", func(t *testing.T) {
+		conf := &WorkerGroupConf{}
+		err := conf.Validate()
+		assert.NotError(t, err)
+	})
+
+	t.Run("ValidatorOrderMatters", func(t *testing.T) {
+		var callOrder []int
+
+		validator1 := func(conf *WorkerGroupConf) error {
+			callOrder = append(callOrder, 1)
+			return nil
+		}
+		validator2 := func(conf *WorkerGroupConf) error {
+			callOrder = append(callOrder, 2)
+			return nil
+		}
+		validator3 := func(conf *WorkerGroupConf) error {
+			callOrder = append(callOrder, 3)
+			return nil
+		}
+
+		conf := &WorkerGroupConf{}
+		err := opt.Join(
+			WorkerGroupConfCustomValidatorAppend(validator1),
+			WorkerGroupConfCustomValidatorAppend(validator2),
+			WorkerGroupConfCustomValidatorAppend(validator3),
+		).Apply(conf)
+		assert.NotError(t, err)
+
+		err = conf.Validate()
+		assert.NotError(t, err)
+
+		// Validators should be called in order
+		assert.True(t, len(callOrder) >= 3)
+
+		// Find first occurrence of each validator
+		first1, first2, first3 := -1, -1, -1
+		for i, v := range callOrder {
+			if v == 1 && first1 == -1 {
+				first1 = i
+			}
+			if v == 2 && first2 == -1 {
+				first2 = i
+			}
+			if v == 3 && first3 == -1 {
+				first3 = i
+			}
+		}
+
+		// Check order is preserved
+		assert.True(t, first1 < first2)
+		assert.True(t, first2 < first3)
+	})
+}

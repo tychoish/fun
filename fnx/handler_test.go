@@ -677,3 +677,142 @@ func TestProcess(t *testing.T) {
 		})
 	})
 }
+
+func TestHandlerJob(t *testing.T) {
+	t.Run("ReturnsWorker", func(t *testing.T) {
+		called := &atomic.Bool{}
+		handler := Handler[int](func(ctx context.Context, value int) error {
+			called.Store(true)
+			check.Equal(t, value, 42)
+			return nil
+		})
+
+		worker := handler.Job(42)
+		err := worker(t.Context())
+
+		check.NotError(t, err)
+		check.True(t, called.Load())
+	})
+
+	t.Run("PropagatesErrors", func(t *testing.T) {
+		expectedErr := ers.Error("test error")
+		handler := Handler[string](func(ctx context.Context, value string) error {
+			check.Equal(t, value, "test")
+			return expectedErr
+		})
+
+		worker := handler.Job("test")
+		err := worker(t.Context())
+
+		check.Error(t, err)
+		check.ErrorIs(t, err, expectedErr)
+	})
+
+	t.Run("RecoversPanics", func(t *testing.T) {
+		panicErr := ers.Error("panic error")
+		handler := Handler[int](func(ctx context.Context, value int) error {
+			panic(panicErr)
+		})
+
+		worker := handler.Job(100)
+		err := worker(t.Context())
+
+		check.Error(t, err)
+		check.ErrorIs(t, err, panicErr)
+	})
+
+	t.Run("RespectsContext", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		called := &atomic.Bool{}
+		handler := Handler[int](func(ctx context.Context, value int) error {
+			called.Store(true)
+			return ctx.Err()
+		})
+
+		worker := handler.Job(42)
+		err := worker(ctx)
+
+		check.Error(t, err)
+		check.ErrorIs(t, err, context.Canceled)
+		check.True(t, called.Load())
+	})
+
+	t.Run("CapturesInputValue", func(t *testing.T) {
+		var capturedValue string
+		handler := Handler[string](func(ctx context.Context, value string) error {
+			capturedValue = value
+			return nil
+		})
+
+		worker := handler.Job("captured")
+		err := worker(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, capturedValue, "captured")
+	})
+
+	t.Run("MultipleInvocations", func(t *testing.T) {
+		counter := &atomic.Int64{}
+		handler := Handler[int](func(ctx context.Context, value int) error {
+			counter.Add(int64(value))
+			return nil
+		})
+
+		worker1 := handler.Job(10)
+		worker2 := handler.Job(20)
+		worker3 := handler.Job(30)
+
+		check.NotError(t, worker1(t.Context()))
+		check.NotError(t, worker2(t.Context()))
+		check.NotError(t, worker3(t.Context()))
+
+		check.Equal(t, counter.Load(), int64(60))
+	})
+
+	t.Run("PointerValue", func(t *testing.T) {
+		type Data struct{ Value int }
+		data := &Data{Value: 42}
+
+		var capturedData *Data
+		handler := Handler[*Data](func(ctx context.Context, value *Data) error {
+			capturedData = value
+			return nil
+		})
+
+		worker := handler.Job(data)
+		err := worker(t.Context())
+
+		check.NotError(t, err)
+		check.Equal(t, capturedData, data)
+		check.Equal(t, capturedData.Value, 42)
+	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+
+		handler := Handler[int](func(ctx context.Context, value int) error {
+			time.Sleep(50 * time.Millisecond)
+			return ctx.Err()
+		})
+
+		worker := handler.Job(42)
+		err := worker(ctx)
+
+		check.Error(t, err)
+		check.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("NilError", func(t *testing.T) {
+		handler := Handler[int](func(ctx context.Context, value int) error {
+			return nil
+		})
+
+		worker := handler.Job(0)
+		err := worker(t.Context())
+
+		check.NotError(t, err)
+	})
+}
