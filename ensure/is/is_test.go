@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt/stw"
+	"github.com/tychoish/fun/stw"
 )
 
 func TestFundamentals(t *testing.T) {

@@ -1975,7 +1975,7 @@ func TestChain2(t *testing.T) {
 	})
 }
 
-func TestChainSlices(t *testing.T) {
+func TestChainStandardTypes(t *testing.T) {
 	tests := []struct {
 		name     string
 		seq      iter.Seq[[]int]
@@ -2053,6 +2053,25 @@ func TestChainSlices(t *testing.T) {
 
 		if callCount.Load() != 1 {
 			t.Errorf("Should stop after first slice, callCount = %d, want 1", callCount.Load())
+		}
+	})
+	t.Run("SmokeMap", func(t *testing.T) {
+		elems := ChainMaps(Args(map[string]string{"a": "b"}, map[string]string{"c": "d"}))
+		seen := 0
+		for k, v := range elems {
+			seen++
+			switch k {
+			case "a":
+				if v != "b" {
+					t.Errorf("a saw %s", v)
+				}
+			case "c":
+				if v != "d" {
+					t.Errorf("c saw %s", v)
+				}
+			default:
+				t.Errorf("unexpected pair %s, %s", k, v)
+			}
 		}
 	})
 }

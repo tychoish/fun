@@ -9,9 +9,9 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt/cmp"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 func randomIntSlice(size int) stw.Slice[int] {

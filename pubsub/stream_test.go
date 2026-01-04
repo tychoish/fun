@@ -21,6 +21,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/opt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/wpa"
 )
 
@@ -533,7 +534,7 @@ func TestFunStream(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		ch <- "buddy"
 		defer cancel()
-		out, err := Blocking(ch).Receive().Read(ctx)
+		out, err := stw.ChanBlocking(ch).Receive().Read(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -546,7 +547,7 @@ func TestFunStream(t *testing.T) {
 		seenCondition := false
 		for i := 0; i < 10; i++ {
 			t.Log(i)
-			_, err = Blocking(ch).Receive().Read(ctx)
+			_, err = stw.ChanBlocking(ch).Receive().Read(ctx)
 			if errors.Is(err, context.Canceled) {
 				seenCondition = true
 			}
@@ -568,7 +569,7 @@ func TestFunStream(t *testing.T) {
 		ch := make(chan string, 1)
 		close(ch)
 
-		_, err := Blocking(ch).Receive().Read(ctx)
+		_, err := stw.ChanBlocking(ch).Receive().Read(ctx)
 		if !errors.Is(err, io.EOF) {
 			t.Fatal(err)
 		}
@@ -580,7 +581,7 @@ func TestFunStream(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			ch <- "buddy"
 			defer cancel()
-			out, err := NonBlocking(ch).Receive().Read(ctx)
+			out, err := stw.ChanNonBlocking(ch).Receive().Read(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -592,7 +593,7 @@ func TestFunStream(t *testing.T) {
 			cancel()
 			seenCondition := false
 			for i := 0; i < 10; i++ {
-				_, err = NonBlocking(ch).Receive().Read(ctx)
+				_, err = stw.ChanNonBlocking(ch).Receive().Read(ctx)
 				if errors.Is(err, context.Canceled) {
 					seenCondition = true
 				}
@@ -611,7 +612,8 @@ func TestFunStream(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			out, err := Chan[string]().NonBlocking().Receive().Read(ctx)
+			ch := make(chan string)
+			out, err := stw.ChanNonBlocking(ch).Receive().Read(ctx)
 			assert.Zero(t, out)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, ers.ErrCurrentOpSkip)
@@ -622,7 +624,7 @@ func TestFunStream(t *testing.T) {
 
 			ch := make(chan string)
 			close(ch)
-			out, err := NonBlocking(ch).Receive().Read(ctx)
+			out, err := stw.ChanNonBlocking(ch).Receive().Read(ctx)
 			assert.Zero(t, out)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, io.EOF)
@@ -1119,7 +1121,7 @@ func TestMapReduce(t *testing.T) {
 
 		ChannelStream(pipe).
 			ReadAll(
-				(&converter[string, int]{op: mf}).mapPullProcess(Blocking(output).Send().Write, &wpa.WorkerGroupConf{}),
+				(&converter[string, int]{op: mf}).mapPullProcess(stw.ChanBlocking(output).Send().Write, &wpa.WorkerGroupConf{}),
 			).
 			Ignore().
 			Add(ctx, wg)

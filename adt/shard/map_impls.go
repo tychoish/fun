@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt/stw"
+	"github.com/tychoish/fun/stw"
 )
 
 // MapType is the enum that allows users to configure what map

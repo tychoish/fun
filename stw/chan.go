@@ -1,4 +1,4 @@
-package pubsub
+package stw
 
 import (
 	"context"
@@ -33,43 +33,18 @@ type ChanOp[T any] struct {
 	ch   chan T
 }
 
-// Chan constructs a channel op, like "make(chan T)", with the
-// optionally specified length. Operations (like read from and write
-// to a channel) on the channel are blocking by default, but the.
-func Chan[T any](args ...int) ChanOp[T] {
-	switch len(args) {
-	case 0:
-		return Blocking(make(chan T))
-	case 1:
-		return Blocking(make(chan T, args[0]))
-	default:
-		panic(ers.Wrap(ers.ErrInvariantViolation, "cannot specify >2 arguments to make() for a slice"))
-	}
-}
-
-// DefaultChan takes a channel value and if it is non-nil, returns it;
-// otherwise it constructs a new ChanOp of the specified type with the
-// optionally provided length and returns it.
-func DefaultChan[T any](input chan T, args ...int) ChanOp[T] {
-	if input != nil {
-		return ChanOp[T]{ch: input}
-	}
-
-	return Chan[T](args...)
-}
-
-// Blocking produces a blocking Send instance. All Send/Check/Ignore
+// ChanBlocking produces a blocking Send instance. All Send/Check/Ignore
 // operations will block until the context is canceled, the channel is
 // canceled, or the send succeeds.
-func Blocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeBlocking, ch: ch} }
+func ChanBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeBlocking, ch: ch} }
 
-// NonBlocking produces a send instance that performs a non-blocking
+// ChanNonBlocking produces a send instance that performs a non-blocking
 // send.
 //
 // The Send() method, for non-blocking sends, will return
 // ErrSkipedNonBlockingSend if the channel was full and the object was
 // not sent.
-func NonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlocking, ch: ch} }
+func ChanNonBlocking[T any](ch chan T) ChanOp[T] { return ChanOp[T]{mode: modeNonBlocking, ch: ch} }
 
 // Close closes the underlying channel.
 //
@@ -85,24 +60,31 @@ func (op ChanOp[T]) Len() int { return len(op.ch) }
 // Cap returns the current capacity of the channel.
 func (op ChanOp[T]) Cap() int { return cap(op.ch) }
 
-// Blocking returns a version of the ChanOp in blocking mode. This is
-// not an atomic operation.
-func (op ChanOp[T]) Blocking() ChanOp[T] { op.mode = modeBlocking; return op }
-
-// NonBlocking returns a version of the ChanOp in non-blocking mode.
-// This is not an atomic operation.
-func (op ChanOp[T]) NonBlocking() ChanOp[T] { op.mode = modeNonBlocking; return op }
-
-// Channel returns the underlying channel.
-func (op ChanOp[T]) Channel() chan T { return op.ch }
-
 // Send returns a ChanSend object that acts on the same underlying
 // channel.
-func (op ChanOp[T]) Send() ChanSend[T] { return ChanSend[T]{mode: op.mode, ch: op.ch} }
+func (op ChanOp[T]) Send() ChanSend[T] {
+	switch op.mode {
+	case modeBlocking:
+		return BlockingSend(op.ch)
+	case modeNonBlocking:
+		return NonBlockingSend(op.ch)
+	default:
+		panic(errors.Join(ers.ErrInvariantViolation, ers.Error("unreachable")))
+	}
+}
 
 // Receive returns a ChanReceive object that acts on the same
 // underlying sender.
-func (op ChanOp[T]) Receive() ChanReceive[T] { return ChanReceive[T]{mode: op.mode, ch: op.ch} }
+func (op ChanOp[T]) Receive() ChanReceive[T] {
+	switch op.mode {
+	case modeBlocking:
+		return ChanBlockingReceive(op.ch)
+	case modeNonBlocking:
+		return ChanNonBlockingReceive(op.ch)
+	default:
+		panic(errors.Join(ers.ErrInvariantViolation, ers.Error("unreachable")))
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -117,8 +99,18 @@ type ChanReceive[T any] struct {
 	ch   <-chan T
 }
 
-func makeChanRecv[T any](m blockingMode, ch <-chan T) ChanReceive[T] {
-	return ChanReceive[T]{mode: m, ch: ch}
+// ChanBlockingReceive returns a Chan wrapper for <-chan T operation, that
+// will block while waiting for new items to be sent through the
+// channel
+func ChanBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
+	return ChanReceive[T]{mode: modeBlocking, ch: ch}
+}
+
+// ChanNonBlockingReceive returns a non-blocking wrapper for <-chan T
+// objects, for which read operations will return early when reading
+// from an empty channel.
+func ChanNonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
+	return ChanReceive[T]{mode: modeNonBlocking, ch: ch}
 }
 
 // Iterator provides access to the contents of the channel as a
@@ -180,8 +172,7 @@ func (ro ChanReceive[T]) Ok() bool {
 			return true
 		}
 	default:
-		// should be impossible outside of the package,
-		panic(ers.ErrInvariantViolation)
+		panic(errors.Join(ers.ErrInvariantViolation, ers.Error("unreachable")))
 	}
 }
 
@@ -223,9 +214,7 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 			return zero, ers.ErrCurrentOpSkip
 		}
 	default:
-		// this is impossible without an invalid blockingMode
-		// value
-		return zero, io.EOF
+		panic(errors.Join(ers.ErrInvariantViolation, ers.Error("unreachable")))
 	}
 }
 
@@ -239,6 +228,20 @@ func (ro ChanReceive[T]) Read(ctx context.Context) (T, error) {
 type ChanSend[T any] struct {
 	mode blockingMode
 	ch   chan<- T
+}
+
+// BlockingSend returns a Chan wrapper for chan<- T operation, that
+// will block when sending into a channel that is full or that doesn't
+// have a listener.
+func BlockingSend[T any](ch chan<- T) ChanSend[T] {
+	return ChanSend[T]{mode: modeBlocking, ch: ch}
+}
+
+// NonBlockingSend returns a non-blocking wrapper for <-chan T
+// objects, for which read operations will return early when reading
+// from an empty channel.
+func NonBlockingSend[T any](ch chan<- T) ChanSend[T] {
+	return ChanSend[T]{mode: modeNonBlocking, ch: ch}
 }
 
 // Check performs a send and returns true when the send was successful
@@ -291,9 +294,6 @@ func (sm ChanSend[T]) Write(ctx context.Context, it T) (err error) {
 			return ers.ErrCurrentOpSkip
 		}
 	default:
-		// it should be impossible to provoke an EOF error
-		// outside of this project, because you'd need to
-		// construct an invalid Send object.
-		return io.EOF
+		panic(errors.Join(ers.ErrInvariantViolation, ers.Error("unreachable")))
 	}
 }

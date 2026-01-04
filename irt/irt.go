@@ -77,10 +77,10 @@ func One[T any](v T) iter.Seq[T] { return func(yield func(T) bool) { yield(v) } 
 func Two[A, B any](a A, b B) iter.Seq2[A, B] { return func(yield func(A, B) bool) { yield(a, b) } }
 
 // Map returns a iterator containing all key-value pairs from the map.
-func Map[K comparable, V any](mp map[K]V) iter.Seq2[K, V] { return maps.All(mp) }
+func Map[K comparable, V any, M ~map[K]V](mp M) iter.Seq2[K, V] { return maps.All(mp) }
 
 // Slice returns a sequence containing all elements from the slice.
-func Slice[T any](sl []T) iter.Seq[T] { return slices.Values(sl) }
+func Slice[T any, S ~[]T](sl S) iter.Seq[T] { return slices.Values(sl) }
 
 // Args returns a sequence containing all provided arguments.
 func Args[T any](items ...T) iter.Seq[T] { return Slice(items) }
@@ -608,7 +608,12 @@ func Chain2[A, B any](seq iter.Seq[iter.Seq2[A, B]]) iter.Seq2[A, B] {
 }
 
 // ChainSlices flattens a sequence of slices into a single sequence.
-func ChainSlices[T any](seq iter.Seq[[]T]) iter.Seq[T] { return Chain(Convert(seq, Slice)) }
+func ChainSlices[T any, S ~[]T](seq iter.Seq[S]) iter.Seq[T] { return Chain(Convert(seq, Slice)) }
+
+// ChainMaps flattens a sequence of maps into a single sequence.
+func ChainMaps[A comparable, B any, M ~map[A]B](seq iter.Seq[M]) iter.Seq2[A, B] {
+	return Chain2(Convert(seq, Map))
+}
 
 // RemoveNils returns a sequence containing all non-nil pointers from
 // the input sequence.

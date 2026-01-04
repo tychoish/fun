@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 var hashSeed = adt.NewOnce(func() maphash.Seed { return maphash.MakeSeed() })
@@ -238,7 +238,7 @@ func (m *Map[K, V]) inc() *Map[K, V]                                    { m.cloc
 func (*Map[K, V]) shKeys(sh *sh[K, V]) iter.Seq[K]                      { return sh.keys() }
 func (*Map[K, V]) shValues(sh *sh[K, V]) iter.Seq[V]                    { return sh.values() }
 func (m *Map[K, V]) shPtrs() stw.Slice[*sh[K, V]]                       { return m.shards().Ptrs() }
-func (m *Map[K, V]) shIter() iter.Seq[*sh[K, V]]                        { return m.shPtrs().Iterator() }
+func (m *Map[K, V]) shIter() iter.Seq[*sh[K, V]]                        { return irt.Slice(m.shPtrs()) }
 func (m *Map[K, V]) keyItr() iter.Seq[iter.Seq[K]]                      { return m.s2ks().Iterator(m.shIter()) }
 func (m *Map[K, V]) valItr() iter.Seq[iter.Seq[V]]                      { return m.s2vs().Iterator(m.shIter()) }
 func (m *Map[K, V]) itemItr() iter.Seq[MapItem[K, V]]                   { return m.key2Item().Iterator(m.Keys()) }

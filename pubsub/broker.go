@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // stole this from
@@ -75,12 +76,13 @@ type BrokerOptions struct {
 // settings can have profound impacts on the semantics and ordering of
 // messages in the broker.
 func NewBroker[T any](ctx context.Context, opts BrokerOptions) *Broker[T] {
-	ch := Blocking(make(chan T))
+	ch := make(chan T)
+	chw := stw.ChanBlocking(ch)
 	return makeInternalBrokerImpl(
 		ctx,
-		irt.Channel(ctx, ch.Channel()),
-		ch.Send().Write,
-		ch.Len,
+		irt.Channel(ctx, ch),
+		chw.Send().Write,
+		chw.Len,
 		opts,
 	)
 }

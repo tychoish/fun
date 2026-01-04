@@ -15,6 +15,7 @@ import (
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/wpa"
 )
 
@@ -93,7 +94,7 @@ func VariadicStream[T any](in ...T) *Stream[T] { return SliceStream(in) }
 // ChannelStream exposes access to an existing "receive" channel as
 // a stream.
 func ChannelStream[T any](ch <-chan T) *Stream[T] {
-	return InterfaceStream(makeChanRecv(modeBlocking, ch))
+	return InterfaceStream(stw.ChanBlockingReceive(ch))
 }
 
 // SliceStream provides Stream access to the elements in a slice.
@@ -165,7 +166,7 @@ func IteratorStream[T any](it iter.Seq[T]) *Stream[T] {
 // amount of time. Use ChainStreams or FlattenStreams if order is
 // important. Use FlattenStream for larger numbers of streams.
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
-	pipe := Blocking(make(chan T))
+	pipe := stw.ChanBlocking(make(chan T))
 	ec := &erc.Collector{}
 	ec.SetFilter(erc.NewFilter().WithoutContext().WithoutTerminating())
 
@@ -431,7 +432,7 @@ func (st *Stream[T]) Split(num int) []*Stream[T] {
 	if num <= 0 {
 		return nil
 	}
-	pipe := Blocking(make(chan T))
+	pipe := stw.ChanBlocking(make(chan T))
 
 	setup := st.Parallel(pipe.Send().Write, wpa.WorkerGroupConfNumWorkers(pipe.Cap())).PostHook(pipe.Close).Operation(st.AddError).Go().Once()
 	output := make([]*Stream[T], num)
@@ -477,7 +478,7 @@ func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
 // The ordering of elements in the output stream is the same as the
 // order of elements in the input stream.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
-	buf := Blocking(make(chan T, n))
+	buf := stw.ChanBlocking(make(chan T, n))
 	pipe := st.Parallel(buf.Send().Write, wpa.WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
 	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe))
 }
@@ -491,7 +492,7 @@ func (st *Stream[T]) Buffer(n int) *Stream[T] {
 // purpose: process the items from a stream without blocking the
 // consumer of the stream.
 func (st *Stream[T]) BufferParallel(n int) *Stream[T] {
-	buf := Blocking(make(chan T, n))
+	buf := stw.ChanBlocking(make(chan T, n))
 
 	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(
 		st.Parallel(
@@ -510,14 +511,15 @@ func (st *Stream[T]) Channel(ctx context.Context) <-chan T { return st.BufferedC
 // a buffered channel that is closed when the stream is
 // exhausted.
 func (st *Stream[T]) BufferedChannel(ctx context.Context, size int) <-chan T {
-	out := Blocking(make(chan T, size))
+	ch := make(chan T, size)
+	out := stw.ChanBlocking(ch)
 
 	st.ReadAll(out.Send().Write).
 		PostHook(out.Close).
 		Operation(st.AddError).
 		Launch(ctx)
 
-	return out.Channel()
+	return ch
 }
 
 // Iterator converts a pubsub.Stream[T] into a native go iterator.

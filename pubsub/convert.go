@@ -9,6 +9,7 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/opt"
+	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/wpa"
 )
 
@@ -71,7 +72,7 @@ func (c converter[T, O]) Parallel(
 	iter *Stream[T],
 	opts ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Stream[O] {
-	output := Blocking(make(chan O))
+	output := stw.ChanBlocking(make(chan O))
 
 	conf := &wpa.WorkerGroupConf{}
 	if err := opt.Join(opts...).Apply(conf); err != nil {

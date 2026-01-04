@@ -6,8 +6,8 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // Set provides a generic unordered set implementation. This implementation

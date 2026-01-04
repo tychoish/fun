@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/stw"
 )
 
 type sh[K comparable, V any] struct {

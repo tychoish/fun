@@ -6,12 +6,12 @@ import (
 
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ensure/is"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // Assertion values are produced by the ensure.That() constructor, and
@@ -134,7 +134,7 @@ func (a *Assertion) Run(t testing.TB) {
 		}
 	})
 
-	result := &stw.Slice[string]{}
+	result := stw.Slice[string]{}
 
 	ft.ApplyWhen(
 		!a.check.Defined() && a.subtests.Len() == 0,
@@ -158,7 +158,7 @@ func (a *Assertion) Run(t testing.TB) {
 	}
 
 	if result.Len() > 0 {
-		irt.Apply(result.Iterator(), strlogger)
+		irt.Apply(irt.Slice(result), strlogger)
 
 		if a.continueOnError {
 			t.Fail()

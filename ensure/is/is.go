@@ -8,12 +8,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // That is the root type for the assertion helpers in this
@@ -52,11 +52,11 @@ func All(ops ...That) That {
 	return func() []string {
 		out := stw.NewSlice(make([]string, 0, len(ops)+1))
 		for isThat := range irt.Slice(ops) {
-			if op == nil {
+			if isThat == nil {
 				out.Push("encountered nil is.That operation")
 				continue
 			}
-			out.Append(op()...)
+			out.Append(isThat()...)
 		}
 
 		if len(out) == 0 {

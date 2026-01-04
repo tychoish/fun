@@ -9,7 +9,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt/stw"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -38,7 +37,7 @@ func TestList(t *testing.T) {
 		assert.Zero(t, l.Len())
 	})
 	t.Run("IteratorList", func(t *testing.T) {
-		list := IteratorList(stw.NewSlice([]int{1, 2, 3, 4, 5}).Iterator())
+		list := IteratorList(irt.Slice([]int{1, 2, 3, 4, 5}))
 		assert.Equal(t, list.Len(), 5)
 		assert.Equal(t, list.Front().Value(), 1)
 		assert.Equal(t, list.Back().Value(), 5)

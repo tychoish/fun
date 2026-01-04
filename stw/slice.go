@@ -93,9 +93,6 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 	}
 }
 
-// Iterator returns the contents of a slice as a standard Go iterator, equivalent/wrapping slices.Values().
-func (s Slice[T]) Iterator() iter.Seq[T] { return slices.Values(s) }
-
 // Sort reorders the slice using the provided com parator function,
 // which should return true if a is less than b and, false
 // otherwise. The slice is sorted in "lowest" to "highest" order.
