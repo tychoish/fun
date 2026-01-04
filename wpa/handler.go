@@ -15,8 +15,16 @@ import (
 // Run/RunAll/RunWithPool functions with arbitrary sequences.
 type Handler[T any] interface {
 	fnx.Handler[T] | fn.Handler[T] | Reader[T]
-	Job(T) fnx.Worker
+	Job(T) func(context.Context) error
 }
+
+// Reader describes a common function signature for use in the
+// WithHandler().For() operation.
+type Reader[T any] func(T) error
+
+// Job converts a Reader method into an fnx.Worker to satisfy the
+// Handler[T] constraint for use with the WithHandler().For() operation.
+func (hf Reader[T]) Job(in T) func(context.Context) error { return fnx.MakeHandler(hf).Job(in) }
 
 // TaskHandler runs a task. Because this function which has the signature of an fnx.Handler function,
 // can be used as a Handler for WithHandler operations, as needed.
@@ -45,8 +53,9 @@ type handlerImpl[T any, H Handler[T]] struct {
 
 func newHandler[T any, H Handler[T]](in H) handlerImpl[T, H] { return handlerImpl[T, H]{hf: in} }
 func (h handlerImpl[T, H]) runner() *runnerImpl[T, H]        { return &runnerImpl[T, H]{hn: h} }
+func (h handlerImpl[T, H]) into(in T) fnx.Worker             { return h.hf.Job(in) }
 func (h handlerImpl[T, H]) For(seq iter.Seq[T]) iter.Seq[fnx.Worker] {
-	return irt.Convert(seq, h.hf.Job)
+	return irt.Convert(seq, h.into)
 }
 
 func (h handlerImpl[T, H]) ForEach(seq iter.Seq[T]) interface {

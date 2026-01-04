@@ -78,11 +78,11 @@ func (pf Handler[T]) WithRecover() Handler[T] {
 	}
 }
 
-// Job converts an Operation into a panic-safe worker function suitable for
+// Job converts a Handler into a panic-safe worker function suitable for
 // use in worker pool implementations (e.g., wpa.RunWithPool). The returned
 // function catches any panics that occur during execution and converts them
 // to errors.
-func (pf Handler[T]) Job(in T) Worker {
+func (pf Handler[T]) Job(in T) func(context.Context) error {
 	return func(ctx context.Context) error { return pf.WithRecover().Read(ctx, in) }
 }
 

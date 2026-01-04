@@ -11,18 +11,21 @@ type KV[A, B any] struct {
 	Value B
 }
 
-// WithElem creates an Elem by applying a function to the first value to derive the second value.
-func WithElem[A, B any](a A, with func(A) B) KV[A, B] { return NewElem(a, with(a)) }
+// WithKV creates a KV by applying a function to the first value to derive the second value.
+func WithKV[A, B any](a A, with func(A) B) KV[A, B] { return MakeKV(a, with(a)) }
 
-// NewElem creates an Elem from two values.
-func NewElem[A, B any](a A, b B) KV[A, B] { return KV[A, B]{Key: a, Value: b} }
+// MakeKV creates a KV from two values.
+func MakeKV[A, B any](a A, b B) KV[A, B] { return KV[A, B]{Key: a, Value: b} }
 
-// Elems converts an iter.Seq2 into an iter.Seq of Elem pairs.
-func Elems[A, B any](seq iter.Seq2[A, B]) iter.Seq[KV[A, B]] { return Merge(seq, NewElem) }
+// KVargs takes a variadic sequence of KV args and returns a pair iterator.
+func KVargs[A, B any](elems ...KV[A, B]) iter.Seq2[A, B] { return KVsplit(Slice(elems)) }
 
 ////////////////////////////////////////////////////////////////////////
 //
 // Split/Apply
+
+// KVjoin converts an iter.Seq2 into an iter.Seq of Elem pairs.
+func KVjoin[A, B any](seq iter.Seq2[A, B]) iter.Seq[KV[A, B]] { return Merge(seq, MakeKV) }
 
 // KVsplit converts an iter.Seq of Elem pairs into an iter.Seq2.
 func KVsplit[A, B any](seq iter.Seq[KV[A, B]]) iter.Seq2[A, B] { return With2(seq, elemSplit) }

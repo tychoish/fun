@@ -75,13 +75,13 @@ func (m *OrderedMap[K, V]) Set(key K, value V) bool {
 func (m *OrderedMap[K, V]) innerSet(key K, value V) bool {
 	elem, ok := m.hash.Load(key)
 	if !ok {
-		elem = NewElement(irt.NewElem(key, value))
+		elem = NewElement(irt.MakeKV(key, value))
 		m.list.Back().Append(elem)
 		m.hash.Set(key, elem)
 		return ok
 	}
 
-	elem.Set(irt.NewElem(key, value))
+	elem.Set(irt.MakeKV(key, value))
 	return ok
 }
 

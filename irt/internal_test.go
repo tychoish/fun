@@ -696,13 +696,13 @@ func TestOrderedGroupingHelper(t *testing.T) {
 
 func TestElemHelper(t *testing.T) {
 	// Test NewElem
-	elem := NewElem(42, "hello")
+	elem := MakeKV(42, "hello")
 	if elem.Key != 42 || elem.Value != "hello" {
 		t.Errorf("NewElem(42, 'hello') = %v, want {42, 'hello'}", elem)
 	}
 
 	// Test WithElem
-	elem2 := WithElem(5, func(i int) string { return string(rune('a' + i)) })
+	elem2 := WithKV(5, func(i int) string { return string(rune('a' + i)) })
 	if elem2.Key != 5 || elem2.Value != "f" {
 		t.Errorf("WithElem(5, func) = %v, want {5, 'f'}", elem2)
 	}
@@ -727,17 +727,13 @@ func TestElemHelper(t *testing.T) {
 
 func TestElemsHelper(t *testing.T) {
 	seq := func(yield func(int, string) bool) {
-		yield(1, "a")
-		yield(2, "b")
+		_ = yield(1, "a") && yield(2, "b")
 	}
 
-	elemSeq := Elems(seq)
+	elemSeq := KVjoin(seq)
 	result := Collect(elemSeq)
 
-	expected := []KV[int, string]{
-		{Key: 1, Value: "a"},
-		{Key: 2, Value: "b"},
-	}
+	expected := Collect(KVjoin(KVargs(MakeKV(1, "a"), MakeKV(2, "b"))))
 
 	if len(result) != len(expected) {
 		t.Errorf("Elems() length = %v, want %v", len(result), len(expected))
@@ -1372,13 +1368,13 @@ func TestElemOrderingSemantics(t *testing.T) {
 	})
 
 	t.Run("WithPanicsWithoutComparators", func(t *testing.T) {
-		elem := kvcmp[int, int]{lh: NewElem(100, 200)}
+		elem := kvcmp[int, int]{lh: MakeKV(100, 200)}
 		defer func() {
 			if recover() == nil {
 				t.Error("expected panic")
 			}
 		}()
-		if c := elem.With(NewElem(1, 2)); c != -1 {
+		if c := elem.With(MakeKV(1, 2)); c != -1 {
 			t.Error("should never run, but this is even weirder if it does", c)
 		}
 	})

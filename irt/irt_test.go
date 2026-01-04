@@ -2633,7 +2633,7 @@ func TestWith2(t *testing.T) {
 				return x * x, x * x * x
 			})
 
-			output := Collect2(KVsplit(Limit(Elems(gen), 2)))
+			output := Collect2(KVsplit(Limit(KVjoin(gen), 2)))
 
 			expected := map[int]int{
 				1: 1,
@@ -3722,14 +3722,14 @@ func TestUntil(t *testing.T) {
 
 func TestUntil2(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
-		input := slices.SortedFunc(Elems(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})), KVcmpSecond)
+		input := slices.SortedFunc(KVjoin(Map(map[string]int{"a": 1, "b": 2, "c": 3, "d": 4})), KVcmpSecond)
 		t.Log(input)
 
 		if len(input) != 4 {
 			t.Error(input)
 		}
 
-		intermediate := Collect(Elems(Until2(KVsplit(Slice(input)), func(k string, v int) bool {
+		intermediate := Collect(KVjoin(Until2(KVsplit(Slice(input)), func(k string, v int) bool {
 			return v > 2
 		})))
 
@@ -4312,7 +4312,7 @@ func TestRemoveNils(t *testing.T) {
 func TestElems(t *testing.T) {
 	t.Run("Apply", func(t *testing.T) {
 		count := 0
-		KVapply(Elems(With(GenerateN(30, func() int { return 7 }), strconv.Itoa)), func(n int, s string) {
+		KVapply(KVjoin(With(GenerateN(30, func() int { return 7 }), strconv.Itoa)), func(n int, s string) {
 			count++
 			if n != 7 {
 				t.Error("unexpected value")
@@ -4663,7 +4663,7 @@ func TestSortBy2(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Collect(Elems(SortBy2(tt.input, func(k int, v string) int { return k })))
+			got := Collect(KVjoin(SortBy2(tt.input, func(k int, v string) int { return k })))
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("SortBy2() = %v, want %v", got, tt.want)
 			}
@@ -5779,9 +5779,9 @@ func TestWith3(t *testing.T) {
 		}
 
 		expected := []result{
-			{NewElem(1, "item1"), false},
-			{NewElem(2, "item2"), true},
-			{NewElem(3, "item3"), false},
+			{MakeKV(1, "item1"), false},
+			{MakeKV(2, "item2"), true},
+			{MakeKV(3, "item3"), false},
 		}
 
 		i := 0
@@ -5883,7 +5883,7 @@ func TestWith3(t *testing.T) {
 			op,
 		)
 
-		results := Collect(Elems(seq))
+		results := Collect(KVjoin(seq))
 
 		check.Equal(t, len(results), 4)
 
@@ -5936,7 +5936,7 @@ func TestWith3(t *testing.T) {
 
 		seq := With3(Range(1, 6), op)
 
-		results := Collect(Elems(seq))
+		results := Collect(KVjoin(seq))
 
 		for i := 0; i < 5; i++ {
 			expectedInput := i + 1
@@ -5955,7 +5955,7 @@ func TestWith3(t *testing.T) {
 
 		seq := With3(Slice([]int{1, 2}), op)
 
-		results := Collect(Elems(seq))
+		results := Collect(KVjoin(seq))
 
 		check.Equal(t, len(results), 2)
 		check.Equal(t, results[0].Key.Key, 1)
@@ -5979,7 +5979,7 @@ func TestWith3(t *testing.T) {
 
 		seq := With3(Slice([]int{1, 2, 3, 4}), op)
 
-		results := Collect(Elems(seq))
+		results := Collect(KVjoin(seq))
 
 		check.Equal(t, len(results), 4)
 

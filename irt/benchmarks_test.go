@@ -151,7 +151,7 @@ func BenchmarkApply2(b *testing.B) {
 			for _, op := range []func() (string, iter.Seq2[int, int]){
 				func() (string, iter.Seq2[int, int]) { return "Map", Map(mdata) },
 				func() (string, iter.Seq2[int, int]) {
-					return "Elems", KVsplit(Slice(Collect(Elems(Map(mdata)))))
+					return "Elems", KVsplit(Slice(Collect(KVjoin(Map(mdata)))))
 				},
 			} {
 				name, _ := op()
@@ -166,7 +166,7 @@ func BenchmarkApply2(b *testing.B) {
 
 					b.Run("Alternative", func(b *testing.B) {
 						for i := 0; i < b.N; i++ {
-							Apply(Elems(data), elemApply(func(k, v int) {}))
+							Apply(KVjoin(data), elemApply(func(k, v int) {}))
 						}
 					})
 				})
@@ -183,7 +183,7 @@ func BenchmarkApply2(b *testing.B) {
 			for _, op := range []func() (string, iter.Seq2[string, string]){
 				func() (string, iter.Seq2[string, string]) { return "Map", Map(mdata) },
 				func() (string, iter.Seq2[string, string]) {
-					return "Elems", KVsplit(Slice(Collect(Elems(Map(mdata)))))
+					return "Elems", KVsplit(Slice(Collect(KVjoin(Map(mdata)))))
 				},
 			} {
 				name, _ := op()
@@ -198,7 +198,7 @@ func BenchmarkApply2(b *testing.B) {
 
 					b.Run("Alternative", func(b *testing.B) {
 						for i := 0; i < b.N; i++ {
-							Apply(Elems(data), elemApply(func(k, v string) {}))
+							Apply(KVjoin(data), elemApply(func(k, v string) {}))
 						}
 					})
 				})

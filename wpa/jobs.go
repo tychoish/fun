@@ -38,14 +38,6 @@ type Thunk func()
 // interoperability with existing function types.
 func (tf Thunk) Job() func(ctx context.Context) error { return fnx.MakeOperation(tf).WithRecover() }
 
-// Reader describes a common function signature for use in the
-// WithHandler().For() operation.
-type Reader[T any] func(T) error
-
-// Job converts a Reader method into an fnx.Worker to satisfy the
-// Handler[T] constraint for use with the WithHandler().For() operation.
-func (hf Reader[T]) Job(in T) fnx.Worker { return fnx.MakeHandler(hf).Job(in) }
-
 // Jobs is a simple wrapper to convert a sequence of Job objects to
 // fnx.Workers.
 func Jobs[T Job](seq iter.Seq[T]) iter.Seq[fnx.Worker] { return irt.Convert(seq, toWorker) }

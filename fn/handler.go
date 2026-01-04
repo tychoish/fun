@@ -1,6 +1,7 @@
 package fn
 
 import (
+	"context"
 	"sync"
 
 	"github.com/tychoish/fun/erc"
@@ -20,6 +21,14 @@ func NewHandler[T any](in func(T)) Handler[T] { return in }
 
 // NewNoopHandler creates a handler function that performs no action.
 func NewNoopHandler[T any]() Handler[T] { return func(T) {} }
+
+// Job converts a Handler into a panic-safe worker function suitable for
+// use in worker pool implementations (e.g., wpa.RunWithPool). The returned
+// function catches any panics that occur during execution and converts them
+// to errors.
+func (pf Handler[T]) Job(in T) func(context.Context) error {
+	return func(ctx context.Context) error { return pf.RecoverPanic(in) }
+}
 
 // JoinHandlers returns a function that combines a collection of
 // handlers.

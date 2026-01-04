@@ -18,6 +18,18 @@ func TestHandler(t *testing.T) {
 		}
 		assert.ErrorIs(t, ob.RecoverPanic(100), io.EOF)
 	})
+	t.Run("Smoke", func(t *testing.T) {
+		counter := 0
+		var ob Handler[int] = func(in int) {
+			check.Equal(t, in, 42)
+			counter++
+		}
+		ob(42)
+		check.Equal(t, counter, 1)
+		ob.Job(42)(t.Context())
+		check.Equal(t, counter, 2)
+	})
+
 	t.Run("Safe", func(t *testing.T) {
 		count := 0
 		oe := func(err error) {
