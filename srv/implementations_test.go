@@ -327,42 +327,43 @@ func TestCmd(t *testing.T) {
 		assert.Error(t, err) // already
 		assert.Substring(t, err.Error(), "already started")
 	})
-	t.Run("SIGTERM", func(t *testing.T) {
-		ctx := testt.Context(t)
-		ctx = SetBaseContext(ctx)
-		cmd := exec.CommandContext(ctx, "bash", "-c", "sleep 10; echo 'woop'")
-		out := &bytes.Buffer{}
-		cmd.Stdout = out
-		cmd.Stderr = out
-		s := Cmd(cmd, 100*time.Millisecond)
-		check.NotError(t, s.Start(ctx))
-		runtime.Gosched()
-		s.Shutdown()
+	t.Run("Termination", func(t *testing.T) {
+		t.Run("SIGTERM", func(t *testing.T) {
+			ctx := testt.Context(t)
+			ctx = SetBaseContext(ctx)
+			cmd := exec.CommandContext(ctx, "bash", "-c", "sleep 5; echo 'woop'")
+			out := &bytes.Buffer{}
+			cmd.Stdout = out
+			cmd.Stderr = out
+			s := Cmd(cmd, 100*time.Millisecond)
+			check.NotError(t, s.Start(ctx))
+			s.Shutdown()
 
-		assert.MaxRuntime(t, 500*time.Millisecond, func() {
-			err := s.Wait()
-			check.Error(t, err)
-			testt.Log(t, err)
+			assert.MaxRuntime(t, 500*time.Millisecond, func() {
+				err := s.Wait()
+				check.Error(t, err)
+				testt.Log(t, err)
+			})
+			testt.Log(t, out.String())
 		})
-		testt.Log(t, out.String())
-	})
-	t.Run("ForceSigKILL", func(t *testing.T) {
-		ctx := testt.Context(t)
-		ctx = SetBaseContext(ctx)
-		cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 10; echo 'woop'")
-		out := &bytes.Buffer{}
-		cmd.Stdout = out
-		cmd.Stderr = out
-		s := Cmd(cmd, 100*time.Millisecond)
-		check.NotError(t, s.Start(ctx))
-		s.Shutdown()
+		t.Run("ForceSigKILL", func(t *testing.T) {
+			ctx := testt.Context(t)
+			ctx = SetBaseContext(ctx)
+			cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 5; echo 'woop'")
+			out := &bytes.Buffer{}
+			cmd.Stdout = out
+			cmd.Stderr = out
+			s := Cmd(cmd, 100*time.Millisecond)
+			check.NotError(t, s.Start(ctx))
+			s.Shutdown()
 
-		assert.MaxRuntime(t, 500*time.Millisecond, func() {
-			err := s.Wait()
-			check.Error(t, err)
-			testt.Log(t, err)
+			assert.MaxRuntime(t, 500*time.Millisecond, func() {
+				err := s.Wait()
+				check.Error(t, err)
+				testt.Log(t, err)
+			})
+			testt.Log(t, out.String())
 		})
-		testt.Log(t, out.String())
 	})
 }
 

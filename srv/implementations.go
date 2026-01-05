@@ -281,46 +281,50 @@ func Cmd(c *exec.Cmd, shutdownTimeout time.Duration) *Service {
 
 	started := make(chan struct{})
 	wg := &fnx.WaitGroup{}
-
-	return &Service{
-		Run: func(_ context.Context) error {
-			wg.Add(1)
-			defer wg.Done()
-
-			if err := c.Start(); err != nil {
-				close(started)
-				return err
-			}
-			close(started)
-
-			return c.Wait()
-		},
-		Shutdown: func() error {
-			<-started
-			ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-			defer cancel()
-
-			if wg.IsDone() || sendSignal(c, syscall.SIGTERM) {
-				// any of the cases that could cause
-				// us to fail to signal mean the
-				// process is dead.
-				return nil
-			}
-
-			<-ctx.Done()
-
-			if wg.IsDone() {
-				return nil
-			}
-			sendSignal(c, syscall.SIGKILL)
-
-			return nil
-		},
+	srvc := &Service{
 		Cleanup: func() error {
 			wg.Operation().Wait()
 			return nil
 		},
 	}
+	srvc.Shutdown = func() error {
+		<-started
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		if wg.IsDone() || sendSignal(c, syscall.SIGTERM) {
+			// any of the cases that could cause
+			// us to fail to signal mean the
+			// process is dead.
+			return nil
+		}
+
+		<-ctx.Done()
+
+		if wg.IsDone() {
+			return nil
+		}
+		sendSignal(c, syscall.SIGKILL)
+
+		return nil
+	}
+	srvc.Run = func(ctx context.Context) error {
+		wg.Add(1)
+		defer wg.Done()
+
+		if err := c.Start(); err != nil {
+			close(started)
+			return err
+		}
+		close(started)
+		go func() {
+			<-ctx.Done()
+			srvc.ec.Push(srvc.Shutdown())
+		}()
+
+		return c.Wait()
+	}
+	return srvc
 }
 
 func sendSignal(c *exec.Cmd, sig os.Signal) bool { err := c.Process.Signal(sig); return err != nil }
