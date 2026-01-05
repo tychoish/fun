@@ -2803,25 +2803,48 @@ func TestApplyAll(t *testing.T) {
 }
 
 func TestReduce(t *testing.T) {
-	result := Reduce(
-		func(yield func(int) bool) {
-			if !yield(1) {
-				return
-			}
-			if !yield(2) {
-				return
-			}
-			if !yield(3) {
-				return
-			}
-			yield(4)
-		},
-		func(acc, val int) int { return acc + val },
-	)
+	t.Run("Single", func(t *testing.T) {
+		result := Reduce(
+			func(yield func(int) bool) {
+				if !yield(1) {
+					return
+				}
+				if !yield(2) {
+					return
+				}
+				if !yield(3) {
+					return
+				}
+				yield(4)
+			},
+			func(acc, val int) int { return acc + val },
+		)
 
-	if result != 10 {
-		t.Errorf("Reduce() = %v, want 10", result)
-	}
+		if result != 10 {
+			t.Errorf("Reduce() = %v, want 10", result)
+		}
+	})
+	t.Run("Double", func(t *testing.T) {
+		result := Reduce2(
+			func(yield func(int, int) bool) {
+				if !yield(1, 1) {
+					return
+				}
+				if !yield(2, 2) {
+					return
+				}
+				if !yield(3, 3) {
+					return
+				}
+				yield(4, 4)
+			},
+			func(acc, a, b int) int { return acc + a + b },
+		)
+
+		if result != 20 {
+			t.Errorf("Reduce() = %v, want 20", result)
+		}
+	})
 }
 
 func TestGroupBy(t *testing.T) {

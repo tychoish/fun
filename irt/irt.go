@@ -828,9 +828,18 @@ func Count2[A, B any](seq iter.Seq2[A, B]) (size int) {
 
 // Reduce consumes the sequence and reduces it to a single value by
 // repeatedly applying rfn.
-func Reduce[T any](seq iter.Seq[T], rfn func(T, T) T) (out T) {
+func Reduce[A, B any](seq iter.Seq[A], rfn func(B, A) B) (out B) {
 	for v := range seq {
 		out = rfn(out, v)
+	}
+	return out
+}
+
+// Reduce2 consumes a sequence o pairs and reduces it to a single value by
+// repeatedly applying rfn.
+func Reduce2[A, B, C any](seq iter.Seq2[A, B], rfn func(C, A, B) C) (out C) {
+	for a, b := range seq {
+		out = rfn(out, a, b)
 	}
 	return out
 }
