@@ -39,7 +39,7 @@ func BlockForce[T any](fn func(context.Context) T) T { return fn(context.Backgro
 // the output value.
 func BlockForceIgnore[T any](fn func(context.Context) (T, error)) T {
 	defer Recover()
-	return ignoreSecond(Block(fn))
+	return Force(Block(fn))
 }
 
 // WithRecover runs a function that takes an arbitrary argument and ignores
@@ -51,8 +51,6 @@ func BlockForceIgnore[T any](fn func(context.Context) (T, error)) T {
 // within the ignored function will not run unless there is a call to
 // recover *before* the defer.
 func WithRecover[T any](fn func(T) error, arg T) { defer Recover(); _ = fn(arg) }
-
-func ignoreSecond[A, B any](a A, _ B) A { return a }
 
 // Recover catches a panic and discards its value.
 func Recover() { _ = recover() }
