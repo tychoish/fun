@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -104,9 +103,13 @@ func (f Future[T]) Reduce(merge func(T, T) T, next Future[T]) Future[T] {
 // merge function MUST NOT be nil.
 func (f Future[T]) Join(merge func(T, T) T, ops ...Future[T]) Future[T] {
 	return func() (out T) {
-		out = ft.DoSafe(f)
-		for idx := range ops {
-			out = merge(out, ft.DoSafe(ops[idx]))
+		if f != nil {
+			out = f()
+		}
+		for _, op := range ops {
+			if op != nil {
+				out = merge(out, op())
+			}
 		}
 		return out
 	}
