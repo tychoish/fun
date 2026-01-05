@@ -5,7 +5,6 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
@@ -31,11 +30,11 @@ func MakeOrderedSet[T comparable](in iter.Seq[T]) *OrderedSet[T] {
 // SortQuick sorts the elements in the set using
 // sort.StableSort. Typically faster than SortMerge, but potentially
 // more memory intensive for some types.
-func (s *OrderedSet[T]) SortQuick(lt cmp.LessThan[T]) { s.init(); s.list.SortQuick(lt) }
+func (s *OrderedSet[T]) SortQuick(cf func(T, T) int) { s.init(); s.list.SortQuick(cf) }
 
 // SortMerge sorts the elements in the set using a merge sort
 // algorithm.
-func (s *OrderedSet[T]) SortMerge(lt cmp.LessThan[T]) { s.init(); s.list.SortMerge(lt) }
+func (s *OrderedSet[T]) SortMerge(cf func(T, T) int) { s.init(); s.list.SortMerge(cf) }
 
 func (s *OrderedSet[T]) init() { s.once.Do(s.doInit) }
 func (s *OrderedSet[T]) doInit() {

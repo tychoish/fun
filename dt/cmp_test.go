@@ -1,14 +1,13 @@
 package dt
 
 import (
+	"cmp"
 	"math"
 	"math/rand"
 	"sort"
 	"testing"
 
-	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
@@ -58,20 +57,20 @@ func TestSort(t *testing.T) {
 		t.Run("IsSorted", func(t *testing.T) {
 			t.Run("RejectsRandomList", func(t *testing.T) {
 				list := GetPopulatedList(t, 1000)
-				if list.IsSorted(cmp.LessThanNative[int]) {
+				if list.IsSorted(cmp.Compare) {
 					t.Fatal("random list should not be sorted")
 				}
 			})
 			t.Run("Empty", func(t *testing.T) {
 				list := &List[int]{}
-				if !list.IsSorted(cmp.LessThanNative[int]) {
+				if !list.IsSorted(cmp.Compare) {
 					t.Fatal("empty lists are sorted")
 				}
 			})
 			t.Run("BuildSortedList", func(t *testing.T) {
 				list := &List[int]{}
 				list.PushBack(0)
-				if !list.IsSorted(cmp.LessThanNative[int]) {
+				if !list.IsSorted(cmp.Compare) {
 					t.Fatal("lists with one item are not sorted")
 				}
 				list.PushBack(1)
@@ -79,7 +78,7 @@ func TestSort(t *testing.T) {
 					list.PushBack(i)
 				}
 
-				if !list.IsSorted(cmp.LessThanNative[int]) {
+				if !list.IsSorted(cmp.Compare) {
 					t.Error("list should be sorted")
 				}
 
@@ -89,7 +88,7 @@ func TestSort(t *testing.T) {
 			})
 			t.Run("Uninitialized", func(t *testing.T) {
 				var list *List[int]
-				if !list.IsSorted(cmp.LessThanNative[int]) {
+				if !list.IsSorted(cmp.Compare) {
 					t.Error("list is not yet valid")
 				}
 				var slice []int
@@ -110,22 +109,22 @@ func TestSort(t *testing.T) {
 				list.PushBack(rand.Int())
 				list.PushBack(9)
 
-				if list.IsSorted(cmp.LessThanNative[int]) {
+				if list.IsSorted(cmp.Compare) {
 					t.Error("list isn't sorted", irt.Collect(list.IteratorFront(), 0, list.Len()))
 				}
 			})
 		})
 		t.Run("BasicMergeSort", func(t *testing.T) {
 			list := GetPopulatedList(t, 16)
-			if list.IsSorted(cmp.LessThanNative[int]) {
+			if list.IsSorted(cmp.Compare) {
 				t.Fatal("should not be sorted")
 			}
-			list.SortMerge(cmp.LessThanNative[int])
+			list.SortMerge(cmp.Compare)
 			if !stdCheckSortedIntsFromList(t, list) {
 				t.Log(irt.Collect(list.IteratorFront()))
 				t.Fatal("sort should be verified, externally")
 			}
-			if !list.IsSorted(cmp.LessThanNative[int]) {
+			if !list.IsSorted(cmp.Compare) {
 				t.Log(irt.Collect(list.IteratorFront()))
 				t.Fatal("should be sorted")
 			}
@@ -133,8 +132,8 @@ func TestSort(t *testing.T) {
 		t.Run("ComparisonValidation", func(t *testing.T) {
 			list := GetPopulatedList(t, 10)
 			lcopy := list.Copy()
-			list.SortMerge(cmp.LessThanNative[int])
-			lcopy.SortQuick(cmp.LessThanNative[int])
+			list.SortMerge(cmp.Compare)
+			lcopy.SortQuick(cmp.Compare)
 			listVals := irt.Collect(list.IteratorFront())
 			copyVals := irt.Collect(lcopy.IteratorFront())
 			check.Equal(t, len(listVals), len(copyVals))
@@ -151,18 +150,21 @@ func TestSort(t *testing.T) {
 	})
 	t.Run("Heap", func(t *testing.T) {
 		t.Run("ExpectedPanicUnitialized", func(t *testing.T) {
-			var err error
-			defer func() {
-				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrUninitializedContainer)
-			}()
-			defer func() { err = recover().(error) }()
-
-			var list *Heap[string]
-			list.Push("hi")
+			check.Panic(t, func() {
+				var list *Heap[string]
+				list.Push("hi")
+			})
+			check.Panic(t, func() {
+				heap := &Heap[string]{}
+				heap.Push("hi")
+			})
+			check.Panic(t, func() {
+				heap := &Heap[string]{data: &List[string]{}}
+				heap.Push("hi")
+			})
 		})
 		t.Run("Stream", func(t *testing.T) {
-			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
+			heap := &Heap[int]{CF: cmp.Compare[int]}
 			if heap.Len() != 0 {
 				t.Fatal("heap should be empty to start")
 			}
@@ -196,7 +198,7 @@ func TestSort(t *testing.T) {
 			}
 		})
 		t.Run("Pop", func(t *testing.T) {
-			heap := &Heap[int]{LT: cmp.LessThanNative[int]}
+			heap := &Heap[int]{CF: cmp.Compare[int]}
 
 			slice := randomIntSlice(100)
 			if sort.IntsAreSorted(slice) {
@@ -263,14 +265,14 @@ func BenchmarkSorts(b *testing.B) {
 				b.StopTimer()
 				list := GetPopulatedList(b, size)
 				b.StartTimer()
-				list.SortQuick(cmp.LessThanNative[int])
+				list.SortQuick(cmp.Compare)
 			}
 		})
 		b.Run("Merge", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				list := GetPopulatedList(b, size)
 				b.StartTimer()
-				list = mergeSort(list, cmp.LessThanNative[int])
+				list = mergeSort(list, cmp.Compare)
 				b.StopTimer()
 				if list.Len() != size {
 					b.Fatal("incorrect size")

@@ -1,6 +1,7 @@
 package dt
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -149,7 +149,7 @@ func TestOrderedSet(t *testing.T) {
 			t.Fatal("should not be sorted initially")
 		}
 
-		set.SortQuick(cmp.LessThanNative[string])
+		set.SortQuick(cmp.Compare)
 
 		sorted := irt.Collect(set.Iterator())
 
@@ -176,7 +176,7 @@ func TestOrderedSet(t *testing.T) {
 			t.Fatal("should not be sorted initially")
 		}
 
-		set.SortMerge(cmp.LessThanNative[string])
+		set.SortMerge(cmp.Compare)
 
 		sorted := irt.Collect(set.Iterator())
 

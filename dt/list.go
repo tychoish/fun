@@ -2,9 +2,8 @@ package dt
 
 import (
 	"iter"
-	"sort"
+	"slices"
 
-	"github.com/tychoish/fun/dt/cmp"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
@@ -207,13 +206,15 @@ func (l *List[T]) pop(it *Element[T]) *Element[T] {
 
 // IsSorted reports if the list is sorted from low to high, according
 // to the LessThan function.
-func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
+func (l *List[T]) IsSorted(cf func(T, T) int) bool {
 	if l == nil || l.Len() <= 1 {
 		return true
 	}
 
+	comp := l.compareFunc(cf)
+
 	for item := l.Front(); item.Next().Ok(); item = item.Next() {
-		if lt(item.Value(), item.Previous().Value()) {
+		if comp(item, item.Previous()) < 0 {
 			return false
 		}
 	}
@@ -228,34 +229,41 @@ func (l *List[T]) IsSorted(lt cmp.LessThan[T]) bool {
 //
 // The operation will modify the input list, replacing it with an new
 // list operation.
-func (l *List[T]) SortMerge(lt cmp.LessThan[T]) { *l = *mergeSort(l, lt) }
+func (l *List[T]) SortMerge(cf func(T, T) int) { *l = *mergeSort(l, cf) }
+
+func (*List[T]) forCompare(x, y *Element[T]) (T, T) { return x.item, y.item }
+func (l *List[T]) compareFunc(cf func(T, T) int) func(x, y *Element[T]) int {
+	return func(x, y *Element[T]) int { return cf(l.forCompare(x, y)) }
+}
 
 // SortQuick sorts the list, by removing the elements, adding them
 // to a slice, and then using sort.SliceStable(). In many cases this
 // performs better than the merge sort implementation.
-func (l *List[T]) SortQuick(lt cmp.LessThan[T]) {
+func (l *List[T]) SortQuick(cf func(T, T) int) {
 	elems := make([]*Element[T], 0, l.Len())
 
 	for l.Len() > 0 {
 		elems = append(elems, l.PopFront())
 	}
-	sort.SliceStable(elems, func(i, j int) bool { return lt(elems[i].item, elems[j].item) })
+
+	slices.SortStableFunc(elems, l.compareFunc(cf))
+
 	for idx := range elems {
 		l.Back().Append(elems[idx])
 	}
 }
 
-func mergeSort[T any](head *List[T], lt cmp.LessThan[T]) *List[T] {
+func mergeSort[T any](head *List[T], cf func(T, T) int) *List[T] {
 	if head.Len() < 2 {
 		return head
 	}
 
 	tail := split(head)
 
-	head = mergeSort(head, lt)
-	tail = mergeSort(tail, lt)
+	head = mergeSort(head, cf)
+	tail = mergeSort(tail, cf)
 
-	return merge(lt, head, tail)
+	return merge(cf, head, tail)
 }
 
 func split[T any](list *List[T]) *List[T] {
@@ -267,10 +275,10 @@ func split[T any](list *List[T]) *List[T] {
 	return out
 }
 
-func merge[T any](lt cmp.LessThan[T], a, b *List[T]) *List[T] {
+func merge[T any](cf func(T, T) int, a, b *List[T]) *List[T] {
 	out := &List[T]{}
 	for a.Len() != 0 && b.Len() != 0 {
-		if lt(a.Front().Value(), b.Front().Value()) {
+		if cf(a.Front().Value(), b.Front().Value()) < 0 {
 			out.Back().Append(a.PopFront())
 		} else {
 			out.Back().Append(b.PopFront())

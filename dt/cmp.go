@@ -10,20 +10,18 @@ package dt
 
 import (
 	"iter"
-
-	"github.com/tychoish/fun/dt/cmp"
 )
 
 // Heap provides a min-order heap using the Heap.LT comparison
 // operator to sort from lowest to highest. Push operations will panic
 // if LT is not set.
 type Heap[T any] struct {
-	LT   cmp.LessThan[T]
+	CF   func(T, T) int
 	data *List[T]
 }
 
 func (h *Heap[T]) list() *List[T] {
-	if h == nil || h.LT == nil {
+	if h.CF == nil {
 		panic(ErrUninitializedContainer)
 	}
 
@@ -43,7 +41,7 @@ func (h *Heap[T]) Push(t T) {
 	}
 
 	for item := list.Back(); item.Ok(); item = item.Previous() {
-		if h.LT(t, item.item) {
+		if h.CF(t, item.item) < 0 {
 			continue
 		}
 
