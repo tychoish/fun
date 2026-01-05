@@ -20,7 +20,7 @@ func MakeFuture[T any](f func() T) Future[T] { return f }
 
 // AsFuture wraps a value and returns a future object that, when
 // called, will return the provided value.
-func AsFuture[T any](in T) Future[T] { return ft.Wrap(in) }
+func AsFuture[T any](in T) Future[T] { return func() T { return in } }
 
 // Resolve executes the future and returns its value.
 func (f Future[T]) Resolve() T { return f() }
@@ -43,13 +43,27 @@ func (f Future[T]) Ignore() func() { return func() { _ = f() } }
 // If produces a future that only runs when the condition value is
 // true. If the condition is false, the future will return the zero
 // value of T.
-func (f Future[T]) If(cond bool) Future[T] { return func() T { return ft.DoWhen(cond, f) } }
+func (f Future[T]) If(cond bool) Future[T] {
+	return func() (z T) {
+		if cond {
+			return f()
+		}
+		return z
+	}
+}
 
 // When produces a new future wrapping the input future that executes
 // when the condition function returns true, returning the zero
 // value for T when the condition is false. The condition value is
 // checked every time the future is called.
-func (f Future[T]) When(c func() bool) Future[T] { return func() T { return ft.DoWhen(c(), f) } }
+func (f Future[T]) When(c func() bool) Future[T] {
+	return func() (z T) {
+		if c() {
+			return f()
+		}
+		return z
+	}
+}
 
 // Lock returns a wrapped future that ensure that all calls to the
 // future are protected by a mutex.

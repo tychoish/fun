@@ -8,7 +8,7 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/irt"
 )
 
 func TestHandler(t *testing.T) {
@@ -64,7 +64,7 @@ func TestHandler(t *testing.T) {
 			check.Equal(t, in, 100)
 			count++
 		}
-		wob := ob.Skip(func(int) bool { return should })
+		wob := ob.When(func() bool { return should })
 		wob(100)
 		assert.Equal(t, 0, count)
 		should = true
@@ -233,7 +233,7 @@ func TestHandler(t *testing.T) {
 		handler := NewHandler(func(i int) { count++; sum += i })
 		t.Run("One", func(t *testing.T) {
 			defer reset()
-			metaHandler := JoinHandlers(ft.Slice(handler, handler, handler, handler, handler))
+			metaHandler := JoinHandlers(irt.Args(handler, handler, handler, handler, handler))
 
 			metaHandler(1)
 			assert.Equal(t, sum, 5)
@@ -242,7 +242,7 @@ func TestHandler(t *testing.T) {
 
 		t.Run("Five", func(t *testing.T) {
 			defer reset()
-			metaHandler := JoinHandlers(ft.Slice(handler, handler, handler, handler, handler))
+			metaHandler := JoinHandlers(irt.Args(handler, handler, handler, handler, handler))
 
 			metaHandler(5)
 			assert.Equal(t, sum, 25)
@@ -250,7 +250,7 @@ func TestHandler(t *testing.T) {
 		})
 		t.Run("NilHandling", func(t *testing.T) {
 			defer reset()
-			metaHandler := JoinHandlers(ft.Slice(handler, nil, handler, nil, handler, handler))
+			metaHandler := JoinHandlers(irt.Args(handler, nil, handler, nil, handler, handler))
 
 			metaHandler(4)
 			assert.Equal(t, sum, 16)

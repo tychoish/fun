@@ -2,10 +2,10 @@ package fn
 
 import (
 	"context"
+	"iter"
 	"sync"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 )
 
 // Handler describes a function that operates on a single object, but
@@ -32,10 +32,12 @@ func (pf Handler[T]) Job(in T) func(context.Context) error {
 
 // JoinHandlers returns a function that combines a collection of
 // handlers.
-func JoinHandlers[T any](ops []Handler[T]) Handler[T] {
+func JoinHandlers[T any](seq iter.Seq[Handler[T]]) Handler[T] {
 	return func(value T) {
-		for idx := range ops {
-			ft.ApplySafe(ops[idx], value)
+		for op := range seq {
+			if op != nil {
+				op(value)
+			}
 		}
 	}
 }
@@ -66,13 +68,23 @@ func (of Handler[T]) RecoverPanic(in T) (err error) {
 
 // If returns an handler that only executes the root handler if the
 // condition is true.
-func (of Handler[T]) If(cond bool) Handler[T] { return of.When(ft.Wrap(cond)) }
+func (of Handler[T]) If(cond bool) Handler[T] {
+	return func(in T) {
+		if cond {
+			of(in)
+		}
+	}
+}
 
 // When returns an handler function that only executes the handler
 // function if the condition function returns true. The condition
 // function is run every time the handler function runs.
 func (of Handler[T]) When(cond func() bool) Handler[T] {
-	return func(in T) { ft.ApplyWhen(cond(), of, in) }
+	return func(in T) {
+		if cond != nil && cond() {
+			of(in)
+		}
+	}
 }
 
 // Skip runs a check before passing the object to the obsever, when
@@ -80,7 +92,11 @@ func (of Handler[T]) When(cond func() bool) Handler[T] {
 // true, the underlying Handler is called, otherwise, the observation
 // is a noop.
 func (of Handler[T]) Skip(hook func(T) bool) Handler[T] {
-	return func(in T) { ft.ApplyWhen(hook != nil && hook(in), of, in) }
+	return func(in T) {
+		if hook != nil && hook(in) {
+			of(in)
+		}
+	}
 }
 
 // Filter creates an handler that only executes the root handler Use

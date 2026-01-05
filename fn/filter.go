@@ -2,8 +2,6 @@ package fn
 
 import (
 	"sync"
-
-	"github.com/tychoish/fun/ft"
 )
 
 // Filter describes a common function object and provides higher level operations on the functions themselves. These functions
@@ -25,7 +23,14 @@ func (fl Filter[T]) Ptr(v *T) { *v = fl(*v) }
 func (fl Filter[T]) WithNext(next Filter[T]) Filter[T] { return func(v T) T { return next(fl(v)) } }
 
 // If returns a filter that only executes when the condition is true, otherwise the filter will return the input as is.
-func (fl Filter[T]) If(cond bool) Filter[T] { return func(v T) T { return ft.FilterWhen(cond, fl, v) } }
+func (fl Filter[T]) If(cond bool) Filter[T] {
+	return func(v T) T {
+		if cond {
+			return fl(v)
+		}
+		return v
+	}
+}
 
 // Lock returns a filter that executes the filter operation using a new mutex, ensuring only one instance of the filter runs at
 // a time.
