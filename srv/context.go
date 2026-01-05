@@ -121,7 +121,7 @@ func getCleanup(ctx context.Context) *pubsub.Queue[fnx.Worker] {
 // service was not previously configured, or if you attempt to add a
 // new cleanup function while shutdown is running.
 func AddCleanup(ctx context.Context, cleanup fnx.Worker) {
-	erc.Invariant(getCleanup(ctx).Add(cleanup))
+	erc.Invariant(getCleanup(ctx).Push(cleanup))
 }
 
 // AddCleanupError adds an error to the cleanup handler which is
@@ -365,7 +365,7 @@ func AddToWorkerPool(ctx context.Context, key string, fn fnx.Worker) error {
 	if !ok {
 		return fmt.Errorf("worker pool named %q is not registered [%T]", key, ctx.Value(workerPoolNameCtxKey(key)))
 	}
-	if err := queue.Add(fn); err != nil {
+	if err := queue.Push(fn); err != nil {
 		return fmt.Errorf("queue=%s: %w", key, err)
 	}
 	return nil

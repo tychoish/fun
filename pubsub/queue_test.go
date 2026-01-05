@@ -51,7 +51,7 @@ type testQueue struct {
 
 func (q testQueue) mustAdd(item string) {
 	q.t.Helper()
-	if err := q.Add(item); err != nil {
+	if err := q.Push(item); err != nil {
 		q.t.Errorf("Add(%q): unexpected error: %v", item, err)
 	}
 }
@@ -79,7 +79,7 @@ func mustQueue(t *testing.T, opts QueueOptions) testQueue {
 func TestQueueHardLimit(t *testing.T) {
 	q := mustQueue(t, QueueOptions{SoftQuota: 1, HardLimit: 1})
 	q.mustAdd("foo")
-	if err := q.Add("bar"); err != ErrQueueFull {
+	if err := q.Push("bar"); err != ErrQueueFull {
 		t.Errorf("Add: got err=%v, want %v", err, ErrQueueFull)
 	}
 }
@@ -88,7 +88,7 @@ func TestQueueSoftQuota(t *testing.T) {
 	q := mustQueue(t, QueueOptions{SoftQuota: 1, HardLimit: 4})
 	q.mustAdd("foo")
 	q.mustAdd("bar")
-	if err := q.Add("baz"); err != ErrQueueNoCredit {
+	if err := q.Push("baz"); err != ErrQueueNoCredit {
 		t.Errorf("Add: got err=%v, want %v", err, ErrQueueNoCredit)
 	}
 }
@@ -129,7 +129,7 @@ func TestQueueClose(t *testing.T) {
 	assert.NotError(t, q.Close())
 
 	// After closing the queue, subsequent writes should fail.
-	if err := q.Add("foxtrot"); err == nil {
+	if err := q.Push("foxtrot"); err == nil {
 		t.Error("Add should have failed after Close")
 	}
 
@@ -221,13 +221,13 @@ func TestQueueStream(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := queue.Add("one"); err != nil {
+		if err := queue.Push("one"); err != nil {
 			t.Fatal(err)
 		}
-		if err := queue.Add("two"); err != nil {
+		if err := queue.Push("two"); err != nil {
 			t.Fatal(err)
 		}
-		if err := queue.Add("thr"); err != nil {
+		if err := queue.Push("thr"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -271,7 +271,7 @@ func TestQueueStream(t *testing.T) {
 			}
 		}()
 		time.Sleep(10 * time.Millisecond)
-		if err := queue.Add("four"); err != nil {
+		if err := queue.Push("four"); err != nil {
 			t.Fatal(err)
 		}
 		select {
@@ -316,7 +316,7 @@ func TestQueueStream(t *testing.T) {
 		}()
 		time.Sleep(10 * time.Millisecond)
 
-		if err := queue.Add("one"); err != nil {
+		if err := queue.Push("one"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -345,7 +345,7 @@ func TestQueueStream(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 
 		for i := 0; i < 100; i++ {
-			if err := queue.Add(fmt.Sprint("item ", i)); err != nil {
+			if err := queue.Push(fmt.Sprint("item ", i)); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -366,7 +366,7 @@ func TestQueueStream(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 
 		for i := 0; i < 100; i++ {
-			if err := queue.Add(fmt.Sprint("item ", i)); err != nil {
+			if err := queue.Push(fmt.Sprint("item ", i)); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -391,7 +391,7 @@ func TestQueueStream(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err = queue.Add("one"); err != nil {
+		if err = queue.Push("one"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -427,7 +427,7 @@ func TestQueueStream(t *testing.T) {
 		ctx := testt.Context(t)
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
 		assert.NotError(t, err)
-		assert.NotError(t, queue.Add("one"))
+		assert.NotError(t, queue.Push("one"))
 
 		count := 0
 		for range queue.Iterator() {
@@ -481,7 +481,7 @@ func TestQueueStream(t *testing.T) {
 		}
 		go func() {
 			time.Sleep(5 * time.Millisecond)
-			_ = queue.Add(31)
+			_ = queue.Push(31)
 		}()
 		time.Sleep(20 * time.Millisecond)
 		assert.Zero(t, count)
@@ -501,13 +501,13 @@ func TestQueueStream(t *testing.T) {
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
 
-			assert.True(t, tt.BlockingAdd(ctx, 1) == nil)
-			assert.True(t, tt.BlockingAdd(ctx, 1) == nil)
+			assert.True(t, tt.WaitPush(ctx, 1) == nil)
+			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 
 			canceled, trigger := context.WithCancel(context.Background())
 			trigger()
 
-			err := tt.BlockingAdd(canceled, 4)
+			err := tt.WaitPush(canceled, 4)
 			if err == nil {
 				t.Fatal("should be error")
 			}
@@ -520,14 +520,14 @@ func TestQueueStream(t *testing.T) {
 			defer cancel()
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
-			assert.True(t, tt.BlockingAdd(ctx, 1) == nil)
-			assert.True(t, tt.BlockingAdd(ctx, 1) == nil)
+			assert.True(t, tt.WaitPush(ctx, 1) == nil)
+			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 
 			if err := tt.Close(); err != nil {
 				t.Fatal(err)
 			}
 
-			err := tt.BlockingAdd(ctx, 4)
+			err := tt.WaitPush(ctx, 4)
 			if err == nil {
 				t.Fatal("should be error")
 			}
@@ -541,15 +541,15 @@ func TestQueueStream(t *testing.T) {
 			defer cancel()
 
 			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
-			assert.True(t, tt.BlockingAdd(ctx, 1) == nil)
-			assert.True(t, tt.BlockingAdd(ctx, 1) == nil)
+			assert.True(t, tt.WaitPush(ctx, 1) == nil)
+			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 			start := time.Now()
 			sig := make(chan struct{})
 			var end time.Time
 			go func() {
 				defer close(sig)
 				defer func() { end = time.Now() }()
-				if err := tt.BlockingAdd(ctx, 42); err != nil {
+				if err := tt.WaitPush(ctx, 42); err != nil {
 					t.Error(err)
 				}
 			}()
@@ -636,7 +636,7 @@ func TestQueueStream(t *testing.T) {
 			ctx := t.Context()
 			queue := NewUnlimitedQueue[string]()
 			listener := IteratorStream(queue.IteratorWaitPop(ctx))
-			assert.NotError(t, queue.Add("foo"))
+			assert.NotError(t, queue.Push("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
 			go func() {
@@ -648,7 +648,7 @@ func TestQueueStream(t *testing.T) {
 				check.NotError(t, queue.Shutdown(ctx))
 			}()
 			time.Sleep(time.Millisecond)
-			assert.ErrorIs(t, queue.Add("bar"), ErrQueueDraining)
+			assert.ErrorIs(t, queue.Push("bar"), ErrQueueDraining)
 			assert.Equal(t, flag.Load(), 1)
 			val, err := listener.Read(t.Context())
 			assert.NotError(t, err)
@@ -663,7 +663,7 @@ func TestQueueStream(t *testing.T) {
 			ctx := t.Context()
 			queue := NewUnlimitedQueue[string]()
 			listener := IteratorStream(queue.IteratorWaitPop(ctx))
-			assert.NotError(t, queue.Add("foo"))
+			assert.NotError(t, queue.Push("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
 			go func() {
@@ -675,7 +675,7 @@ func TestQueueStream(t *testing.T) {
 				check.NotError(t, queue.Shutdown(ctx))
 			}()
 			time.Sleep(time.Millisecond)
-			assert.ErrorIs(t, queue.BlockingAdd(ctx, "bar"), ErrQueueDraining)
+			assert.ErrorIs(t, queue.WaitPush(ctx, "bar"), ErrQueueDraining)
 			assert.Equal(t, flag.Load(), 1)
 			val, err := listener.Read(t.Context())
 			assert.NotError(t, err)
@@ -691,7 +691,7 @@ func TestQueueStream(t *testing.T) {
 
 			queue := NewUnlimitedQueue[string]()
 			listener := IteratorStream(queue.IteratorWaitPop(ctx))
-			assert.NotError(t, queue.Add("foo"))
+			assert.NotError(t, queue.Push("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
 			go func() {
@@ -723,9 +723,9 @@ func TestQueueIteratorPop(t *testing.T) {
 		ctx := context.Background()
 		queue := NewUnlimitedQueue[string]()
 
-		check.NotError(t, queue.Add("one"))
-		check.NotError(t, queue.Add("two"))
-		check.NotError(t, queue.Add("three"))
+		check.NotError(t, queue.Push("one"))
+		check.NotError(t, queue.Push("two"))
+		check.NotError(t, queue.Push("three"))
 		queue.Close()
 
 		assert.Equal(t, queue.Len(), 3)
@@ -757,9 +757,9 @@ func TestQueueIteratorPop(t *testing.T) {
 		}()
 
 		time.Sleep(10 * time.Millisecond)
-		check.NotError(t, queue.Add("first"))
+		check.NotError(t, queue.Push("first"))
 		time.Sleep(10 * time.Millisecond)
-		check.NotError(t, queue.Add("second"))
+		check.NotError(t, queue.Push("second"))
 
 		<-sig
 		assert.Equal(t, len(values), 2)
@@ -772,7 +772,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		queue := NewUnlimitedQueue[string]()
 
-		check.NotError(t, queue.Add("item"))
+		check.NotError(t, queue.Push("item"))
 
 		iter := queue.IteratorWaitPop(ctx)
 		values := make([]string, 0)
@@ -807,8 +807,8 @@ func TestQueueIteratorPop(t *testing.T) {
 		ctx := context.Background()
 		queue := NewUnlimitedQueue[string]()
 
-		check.NotError(t, queue.Add("one"))
-		check.NotError(t, queue.Add("two"))
+		check.NotError(t, queue.Push("one"))
+		check.NotError(t, queue.Push("two"))
 
 		iter := queue.IteratorWaitPop(ctx)
 		values := make([]string, 0)
@@ -848,7 +848,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 
 		for i := 0; i < 10; i++ {
-			check.NotError(t, queue.Add(i))
+			check.NotError(t, queue.Push(i))
 		}
 		assert.Equal(t, queue.Len(), 10)
 
@@ -882,7 +882,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		for i := 0; i < 20; i++ {
-			check.NotError(t, queue.Add(i))
+			check.NotError(t, queue.Push(i))
 			time.Sleep(5 * time.Millisecond)
 		}
 
@@ -911,9 +911,9 @@ func TestQueueDrain(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 
 		// Add items to queue
-		assert.NotError(t, queue.Add("item1"))
-		assert.NotError(t, queue.Add("item2"))
-		assert.NotError(t, queue.Add("item3"))
+		assert.NotError(t, queue.Push("item1"))
+		assert.NotError(t, queue.Push("item2"))
+		assert.NotError(t, queue.Push("item3"))
 		assert.Equal(t, 3, queue.Len())
 
 		drainComplete := &atomic.Bool{}
@@ -967,8 +967,8 @@ func TestQueueDrain(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 
 		// Add items
-		assert.NotError(t, queue.Add(1))
-		assert.NotError(t, queue.Add(2))
+		assert.NotError(t, queue.Push(1))
+		assert.NotError(t, queue.Push(2))
 
 		drainStarted := make(chan struct{})
 		drainErr := make(chan error, 1)
@@ -983,12 +983,12 @@ func TestQueueDrain(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Try to add while draining - should fail
-		err := queue.Add(3)
+		err := queue.Push(3)
 		assert.ErrorIs(t, err, ErrQueueDraining)
 
 		// Try BlockingAdd while draining - should also fail
 		blockCtx := testt.ContextWithTimeout(t, 50*time.Millisecond)
-		err = queue.BlockingAdd(blockCtx, 4)
+		err = queue.WaitPush(blockCtx, 4)
 		assert.ErrorIs(t, err, ErrQueueDraining)
 
 		// Empty the queue to complete drain
@@ -1009,8 +1009,8 @@ func TestQueueDrain(t *testing.T) {
 		queue := NewUnlimitedQueue[string]()
 
 		// Add and drain
-		assert.NotError(t, queue.Add("first"))
-		assert.NotError(t, queue.Add("second"))
+		assert.NotError(t, queue.Push("first"))
+		assert.NotError(t, queue.Push("second"))
 
 		drainComplete := make(chan error, 1)
 		go func() {
@@ -1027,10 +1027,10 @@ func TestQueueDrain(t *testing.T) {
 		assert.NotError(t, err)
 
 		// After drain, queue should accept new items (not closed)
-		err = queue.Add("after-drain-1")
+		err = queue.Push("after-drain-1")
 		assert.NotError(t, err)
 
-		err = queue.Add("after-drain-2")
+		err = queue.Push("after-drain-2")
 		assert.NotError(t, err)
 
 		assert.Equal(t, 2, queue.Len())
@@ -1050,9 +1050,9 @@ func TestQueueDrain(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 
 		// Add items that won't be removed
-		assert.NotError(t, queue.Add(1))
-		assert.NotError(t, queue.Add(2))
-		assert.NotError(t, queue.Add(3))
+		assert.NotError(t, queue.Push(1))
+		assert.NotError(t, queue.Push(2))
+		assert.NotError(t, queue.Push(3))
 
 		drainErr := make(chan error, 1)
 		go func() {
@@ -1078,7 +1078,7 @@ func TestQueueDrain(t *testing.T) {
 
 		// After failed drain, queue should accept new adds again
 		freshCtx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-		err := queue.BlockingAdd(freshCtx, 4)
+		err := queue.WaitPush(freshCtx, 4)
 		assert.NotError(t, err)
 	})
 
@@ -1088,7 +1088,7 @@ func TestQueueDrain(t *testing.T) {
 
 		// Add many items
 		for i := 0; i < 100; i++ {
-			assert.NotError(t, queue.Add(i))
+			assert.NotError(t, queue.Push(i))
 		}
 
 		drainErr := make(chan error, 1)
@@ -1132,8 +1132,8 @@ func TestQueueDrain(t *testing.T) {
 		assert.NotError(t, err)
 
 		// Add items
-		assert.NotError(t, queue.Add("a"))
-		assert.NotError(t, queue.Add("b"))
+		assert.NotError(t, queue.Push("a"))
+		assert.NotError(t, queue.Push("b"))
 
 		drainErr := make(chan error, 1)
 		go func() {
@@ -1159,8 +1159,8 @@ func TestQueueDrain(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 
 		// Add items
-		assert.NotError(t, queue.Add(10))
-		assert.NotError(t, queue.Add(20))
+		assert.NotError(t, queue.Push(10))
+		assert.NotError(t, queue.Push(20))
 
 		drainErr := make(chan error, 1)
 		go func() {

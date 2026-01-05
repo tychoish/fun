@@ -61,7 +61,7 @@ func (or *Orchestrator) Add(s *Service) error {
 		return nil
 	}
 
-	return or.input.Add(s)
+	return or.input.Push(s)
 }
 
 // Start is a convenience function that run's the service's start

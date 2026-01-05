@@ -141,7 +141,7 @@ func TestHelpers(t *testing.T) {
 
 			// Add jobs to the queue without closing it
 			for i := 0; i < 50; i++ {
-				assert.NotError(t, queue.Add(func(_ context.Context) error {
+				assert.NotError(t, queue.Push(func(_ context.Context) error {
 					time.Sleep(10 * time.Millisecond)
 					count.Add(1)
 					return nil
@@ -163,7 +163,7 @@ func TestHelpers(t *testing.T) {
 
 			// Add more jobs after service started
 			for i := 0; i < 30; i++ {
-				assert.NotError(t, queue.Add(func(_ context.Context) error {
+				assert.NotError(t, queue.Push(func(_ context.Context) error {
 					time.Sleep(5 * time.Millisecond)
 					count.Add(1)
 					return nil
@@ -522,7 +522,7 @@ func TestCleanup(t *testing.T) {
 
 		check.Equal(t, 0, count.Load())
 		for i := 0; i < 100; i++ {
-			check.NotError(t, pipe.Add(func(context.Context) error {
+			check.NotError(t, pipe.Push(func(context.Context) error {
 				count.Add(1)
 				return nil
 			}))

@@ -42,7 +42,7 @@ func Group(services iter.Seq[*Service]) *Service {
 				go func(s *Service) {
 					defer ec.Recover()
 					defer wg.Done()
-					defer func() { erc.InvariantOk(waiters.Add(s.Wait) == nil) }()
+					defer func() { erc.InvariantOk(waiters.Push(s.Wait) == nil) }()
 					ec.Push(s.Start(ctx))
 				}(srvc)
 			}

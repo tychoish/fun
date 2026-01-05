@@ -92,10 +92,10 @@ func makeQueue[T any](tracker queueLimitTracker) *Queue[T] {
 	return q
 }
 
-// Add adds item to the back of the queue. It reports an error and does not
+// Push adds item to the back of the queue. It reports an error and does not
 // enqueue the item if the queue is full or closed, or if it exceeds its soft
 // quota and there is not enough burst credit.
-func (q *Queue[T]) Add(item T) error {
+func (q *Queue[T]) Push(item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -136,11 +136,11 @@ func (q *Queue[T]) doAdd(item T) error {
 	return nil
 }
 
-// BlockingAdd attempts to add an item to the queue, as with Add, but
+// WaitPush attempts to add an item to the queue, as with Add, but
 // if the queue is full, blocks until the queue has capacity, is
 // closed, or the context is canceled. Returns an error if the context
 // is canceled or the queue is closed.
-func (q *Queue[T]) BlockingAdd(ctx context.Context, item T) error {
+func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.draining {

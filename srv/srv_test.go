@@ -121,7 +121,7 @@ func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fnx.Wo
 	queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
 	for i := 0; i < size; i++ {
-		assert.NotError(t, queue.Add(func(_ context.Context) error {
+		assert.NotError(t, queue.Push(func(_ context.Context) error {
 			time.Sleep(2 * time.Millisecond)
 			count.Add(1)
 			return nil
@@ -137,7 +137,7 @@ func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queu
 
 	for i := 0; i < size; i++ {
 		idx := i
-		assert.NotError(t, queue.Add(func(_ context.Context) error {
+		assert.NotError(t, queue.Push(func(_ context.Context) error {
 			time.Sleep(2 * time.Millisecond)
 			count.Add(1)
 			return fmt.Errorf("%d.%q", idx, t.Name())

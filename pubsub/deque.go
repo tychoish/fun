@@ -27,8 +27,9 @@ type Deque[T any] struct {
 	updates *sync.Cond
 	root    *element[T]
 
-	tracker queueLimitTracker
-	closed  bool
+	tracker  queueLimitTracker
+	draining bool
+	closed   bool
 }
 
 // DequeOptions configure the semantics of the deque. The Validate()
@@ -106,7 +107,63 @@ func (dq *Deque[T]) Len() int { defer adt.With(adt.Lock(dq.mtx)); return dq.trac
 // Close marks the deque as closed, after which point all streams
 // will stop and no more operations will succeed. The error value is
 // not used in the current operation.
-func (dq *Deque[T]) Close() error { defer adt.With(adt.Lock(dq.mtx)); dq.closed = true; return nil }
+func (dq *Deque[T]) Close() error {
+	defer adt.With(adt.Lock(dq.mtx))
+	dq.doClose()
+	return nil
+}
+
+// Drain marks the deque as draining so that new items cannot be added, and then blocks until the deque is empty (or its
+// context is canceled.) This does not close the deque: when Drain returns the deque is empty, but new work can then be
+// added. To Drain and shutdown, use the Shutdown method.
+func (dq *Deque[T]) Drain(ctx context.Context) error {
+	dq.mtx.Lock()
+	defer dq.mtx.Unlock()
+	return dq.waitForDrain(ctx)
+}
+
+// Shutdown drains the deque, waiting for all items to be removed from the deque and then closes it so no additional work can be
+// added to the deque.
+func (dq *Deque[T]) Shutdown(ctx context.Context) error {
+	dq.mtx.Lock()
+	defer dq.mtx.Unlock()
+
+	if err := dq.waitForDrain(ctx); err != nil {
+		return err
+	}
+
+	dq.doClose()
+
+	return nil
+}
+
+func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
+	// when the function returns wake all other waiters.
+	ctx, cancel := context.WithCancel(ctx)
+	go func() { <-ctx.Done(); dq.updates.Broadcast() }()
+	defer cancel()
+	dq.draining = true
+	defer func() { dq.draining = false }()
+
+	// Broadcast to wake up any waiting push operations so they can check draining flag
+	dq.updates.Broadcast()
+
+	for dq.tracker.len() > 0 {
+		if err := ctx.Err(); err != nil {
+			return ers.Wrapf(err, "Drain() returned early with %d items remaining", dq.tracker.len())
+		}
+		dq.updates.Wait()
+	}
+
+	return nil
+}
+
+func (dq *Deque[T]) doClose() {
+	dq.closed = true
+	dq.nfront.Broadcast()
+	dq.nback.Broadcast()
+	dq.updates.Broadcast()
+}
 
 // PushFront adds an item to the front or head of the deque, and
 // erroring if the queue is closed, at capacity, or has reached its
@@ -203,6 +260,10 @@ func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 }
 
 func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() *element[T]) error {
+	if dq.draining {
+		return ErrQueueDraining
+	}
+
 	if dq.tracker.cap() > dq.tracker.len() {
 		if dq.tracker.len() == 0 {
 			defer dq.updates.Signal()
@@ -217,6 +278,9 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	defer cancel()
 
 	for dq.tracker.cap() <= dq.tracker.len() {
+		if dq.draining {
+			return ErrQueueDraining
+		}
 		if dq.closed {
 			return ErrQueueClosed
 		}
@@ -307,6 +371,10 @@ func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bo
 }
 
 func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
+	if dq.draining {
+		return ErrQueueDraining
+	}
+
 	if dq.closed {
 		return ErrQueueClosed
 	}
@@ -347,7 +415,13 @@ func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 	if it.next.isRoot() {
 		defer dq.nback.Signal()
 	}
-	defer dq.updates.Broadcast()
+
+	// If draining or closed, broadcast to wake all waiters
+	if dq.draining || dq.closed {
+		defer dq.updates.Broadcast()
+	} else {
+		defer dq.updates.Signal()
+	}
 
 	dq.tracker.remove()
 

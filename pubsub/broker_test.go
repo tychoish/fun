@@ -456,7 +456,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		broker := makeInternalBrokerImpl(
 			ctx,
 			queue.IteratorWaitPop(ctx),
-			fnx.MakeHandler(queue.Add), // Non-blocking add
+			fnx.MakeHandler(queue.Push), // Non-blocking add
 			queue.Len,
 			BrokerOptions{
 				WorkerPoolSize: 1,
@@ -554,7 +554,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		broker := makeInternalBrokerImpl(
 			ctx,
 			queue.IteratorWaitPop(ctx),
-			fnx.MakeHandler(queue.Add),
+			fnx.MakeHandler(queue.Push),
 			queue.Len,
 			BrokerOptions{
 				WorkerPoolSize: 1,
@@ -626,7 +626,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		broker := makeInternalBrokerImpl(
 			ctx,
 			queue.IteratorWaitPop(ctx),
-			fnx.MakeHandler(queue.Add),
+			fnx.MakeHandler(queue.Push),
 			queue.Len,
 			BrokerOptions{},
 		)

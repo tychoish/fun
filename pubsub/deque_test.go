@@ -75,7 +75,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 
 			return fixture[T]{
 				name:   "QueueUnlimited",
-				add:    cue.Add,
+				add:    cue.Push,
 				remove: cue.Remove,
 				stream: cue.IteratorWait,
 				elems:  makeElems(50),
@@ -88,7 +88,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 
 			return fixture[T]{
 				name:   "QueueLimited",
-				add:    cue.Add,
+				add:    cue.Push,
 				remove: cue.Remove,
 				stream: cue.IteratorWait,
 				close:  cue.Close,
@@ -1045,5 +1045,488 @@ func TestDequeFIFO(t *testing.T) {
 
 		// Should consume "first" first (it's at the front)
 		assert.Equal(t, firstVal, "first")
+	})
+}
+
+func TestDequeDrain(t *testing.T) {
+	t.Run("EmptyDequeDrainsImmediately", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		err := deque.Drain(ctx)
+		assert.NotError(t, err)
+		assert.Equal(t, 0, deque.Len())
+	})
+
+	t.Run("DrainsQueuedItems", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		// Add items
+		for i := 0; i < 5; i++ {
+			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
+		}
+
+		assert.Equal(t, 5, deque.Len())
+
+		// Start draining in background
+		drainComplete := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainComplete <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Drain should be waiting
+		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-drainComplete:
+			t.Fatal("drain should not have completed yet")
+		default:
+		}
+
+		// Consume items
+		for i := 0; i < 5; i++ {
+			val, ok := deque.PopFront()
+			check.True(t, ok)
+			check.Equal(t, fmt.Sprintf("item-%d", i), val)
+		}
+
+		// Drain should complete
+		err := <-drainComplete
+		assert.NotError(t, err)
+		assert.Equal(t, 0, deque.Len())
+	})
+
+	t.Run("PreventsNewAddsWhileDraining", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		// Add some items
+		for i := 0; i < 3; i++ {
+			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
+		}
+
+		// Start draining
+		drainErr := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give drain time to start
+		time.Sleep(50 * time.Millisecond)
+
+		// Try to add - should fail with ErrQueueDraining
+		err := deque.PushFront("blocked-front")
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		err = deque.PushBack("blocked-back")
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		// Consume all items
+		for deque.Len() > 0 {
+			_, ok := deque.PopFront()
+			check.True(t, ok)
+		}
+
+		// Drain should complete
+		err = <-drainErr
+		assert.NotError(t, err)
+
+		// After drain completes, should be able to add again
+		check.NotError(t, deque.PushBack("new-item"))
+	})
+
+	t.Run("DequeNotClosedAfterDrain", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		// Add items
+		for i := 0; i < 3; i++ {
+			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
+		}
+
+		// Start draining in background
+		drainComplete := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainComplete <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Consume items
+		for deque.Len() > 0 {
+			time.Sleep(10 * time.Millisecond)
+			_, ok := deque.PopFront()
+			check.True(t, ok)
+		}
+
+		// Wait for drain to complete
+		err := <-drainComplete
+		assert.NotError(t, err)
+
+		// Deque should not be closed - can still add items
+		check.NotError(t, deque.PushBack("after-drain"))
+		val, ok := deque.PopFront()
+		check.True(t, ok)
+		check.Equal(t, "after-drain", val)
+	})
+
+	t.Run("ContextCancellationDuringDrain", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		// Add items that won't be consumed
+		for i := 0; i < 5; i++ {
+			check.NotError(t, deque.PushBack(i))
+		}
+
+		drainCtx, drainCancel := context.WithCancel(ctx)
+
+		drainErr := make(chan error, 1)
+		go func() {
+			err := deque.Drain(drainCtx)
+			select {
+			case drainErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give drain time to start waiting
+		time.Sleep(50 * time.Millisecond)
+
+		// Cancel the drain context
+		drainCancel()
+
+		// Drain should return with error
+		err := <-drainErr
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled))
+
+		// Items should still be in deque
+		assert.Equal(t, 5, deque.Len())
+	})
+
+	t.Run("ConcurrentDrainAndConsume", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 100}))
+
+		// Add many items
+		for i := 0; i < 50; i++ {
+			check.NotError(t, deque.PushBack(i))
+		}
+
+		drainErr := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Consume items concurrently
+		go func() {
+			for deque.Len() > 0 {
+				time.Sleep(5 * time.Millisecond)
+				_, _ = deque.PopFront()
+			}
+		}()
+
+		// Drain should complete once all items consumed
+		err := <-drainErr
+		assert.NotError(t, err)
+		assert.Equal(t, 0, deque.Len())
+	})
+
+	t.Run("MultipleDrainCalls", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		// First drain on empty deque
+		err := deque.Drain(ctx)
+		assert.NotError(t, err)
+
+		// Add items
+		for i := 0; i < 3; i++ {
+			check.NotError(t, deque.PushBack(i))
+		}
+
+		// Second drain
+		drainErr := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Consume items
+		for deque.Len() > 0 {
+			time.Sleep(10 * time.Millisecond)
+			_, _ = deque.PopFront()
+		}
+
+		err = <-drainErr
+		assert.NotError(t, err)
+
+		// Third drain on empty deque
+		err = deque.Drain(ctx)
+		assert.NotError(t, err)
+	})
+
+	t.Run("DrainWithPopBack", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		// Add items
+		for i := 0; i < 3; i++ {
+			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
+		}
+
+		drainErr := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Use PopBack to consume
+		for deque.Len() > 0 {
+			val, ok := deque.PopBack()
+			check.True(t, ok)
+			check.True(t, val != "")
+		}
+
+		// Drain should complete
+		err := <-drainErr
+		assert.NotError(t, err)
+		assert.Equal(t, 0, deque.Len())
+	})
+
+	t.Run("WaitPushReceivesDrainingErrorWhileWaiting", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		// Create deque with capacity of 2
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 2}))
+
+		// Fill the deque to capacity
+		check.NotError(t, deque.PushBack(1))
+		check.NotError(t, deque.PushBack(2))
+		assert.Equal(t, 2, deque.Len())
+
+		// Start a goroutine that tries to WaitPushBack (will block because deque is full)
+		waitPushErr := make(chan error, 1)
+		go func() {
+			err := deque.WaitPushBack(ctx, 100)
+			select {
+			case waitPushErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give WaitPushBack time to block
+		time.Sleep(100 * time.Millisecond)
+
+		// Verify WaitPushBack hasn't completed yet
+		select {
+		case <-waitPushErr:
+			t.Fatal("WaitPushBack should still be waiting")
+		default:
+		}
+
+		// Now start draining the deque
+		drainErr := make(chan error, 1)
+		go func() {
+			err := deque.Drain(ctx)
+			select {
+			case drainErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give drain time to start
+		time.Sleep(50 * time.Millisecond)
+
+		// The blocked WaitPushBack should now receive ErrQueueDraining
+		err := <-waitPushErr
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		// Verify item was NOT added to the deque
+		assert.Equal(t, 2, deque.Len())
+
+		// Consume all items to allow drain to complete
+		for deque.Len() > 0 {
+			_, ok := deque.PopFront()
+			check.True(t, ok)
+		}
+
+		// Drain should complete successfully
+		err = <-drainErr
+		assert.NotError(t, err)
+		assert.Equal(t, 0, deque.Len())
+	})
+}
+
+func TestDequeShutdown(t *testing.T) {
+	t.Run("ShutdownDrainsAndCloses", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		// Add items
+		for i := 0; i < 3; i++ {
+			check.NotError(t, deque.PushBack(i))
+		}
+
+		// Shutdown in background
+		shutdownDone := make(chan error, 1)
+		go func() {
+			err := deque.Shutdown(ctx)
+			select {
+			case shutdownDone <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give shutdown time to start draining
+		time.Sleep(50 * time.Millisecond)
+
+		// Try to add - should fail with ErrQueueDraining
+		err := deque.PushBack(100)
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		// Consume items
+		for deque.Len() > 0 {
+			_, ok := deque.PopFront()
+			check.True(t, ok)
+		}
+
+		// Wait for shutdown to complete
+		err = <-shutdownDone
+		assert.NotError(t, err)
+
+		// Deque should be closed now
+		err = deque.PushBack(200)
+		assert.ErrorIs(t, err, ErrQueueClosed)
+	})
+
+	t.Run("ShutdownEmptyDeque", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+
+		// Shutdown empty deque
+		err := deque.Shutdown(ctx)
+		assert.NotError(t, err)
+
+		// Should be closed
+		err = deque.PushFront("item")
+		assert.ErrorIs(t, err, ErrQueueClosed)
+	})
+
+	t.Run("ShutdownWithContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		// Add items that won't be consumed
+		for i := 0; i < 5; i++ {
+			check.NotError(t, deque.PushBack(i))
+		}
+
+		shutdownCtx, shutdownCancel := context.WithCancel(ctx)
+
+		shutdownErr := make(chan error, 1)
+		go func() {
+			err := deque.Shutdown(shutdownCtx)
+			select {
+			case shutdownErr <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give shutdown time to start
+		time.Sleep(50 * time.Millisecond)
+
+		// Cancel shutdown context
+		shutdownCancel()
+
+		// Shutdown should fail
+		err := <-shutdownErr
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled))
+
+		// Items should still be in deque
+		assert.Equal(t, 5, deque.Len())
+	})
+
+	t.Run("ShutdownBlocksWaitPush", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+
+		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+
+		// Add items to deque
+		check.NotError(t, deque.PushBack(1))
+		check.NotError(t, deque.PushBack(2))
+		check.NotError(t, deque.PushBack(3))
+
+		// Start shutdown
+		shutdownDone := make(chan error, 1)
+		go func() {
+			err := deque.Shutdown(ctx)
+			select {
+			case shutdownDone <- err:
+			case <-ctx.Done():
+			}
+		}()
+
+		// Give shutdown time to start draining
+		time.Sleep(50 * time.Millisecond)
+
+		// Try WaitPushBack - should fail immediately with ErrQueueDraining
+		err := deque.WaitPushBack(ctx, 100)
+		assert.ErrorIs(t, err, ErrQueueDraining)
+
+		// Consume remaining items
+		for deque.Len() > 0 {
+			_, _ = deque.PopFront()
+		}
+
+		// Wait for shutdown
+		err = <-shutdownDone
+		assert.NotError(t, err)
 	})
 }
