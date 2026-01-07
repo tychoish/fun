@@ -162,7 +162,7 @@ func TestSort(t *testing.T) {
 				heap.Push("hi")
 			})
 		})
-		t.Run("Stream", func(t *testing.T) {
+		t.Run("Iterator", func(t *testing.T) {
 			heap := &Heap[int]{CF: cmp.Compare[int]}
 			if heap.Len() != 0 {
 				t.Fatal("heap should be empty to start")

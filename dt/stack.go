@@ -71,7 +71,7 @@ func (s *Stack[T]) Iterator() iter.Seq[T] {
 	}
 }
 
-// IteratorPop returns a destructive stream over the Items in a
+// IteratorPop returns a destructive iterator over the Items in a
 // stack. IteratorPop will not observe new items added to the
 // stack during iteration.
 func (s *Stack[T]) IteratorPop() iter.Seq[T] {

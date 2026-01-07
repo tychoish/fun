@@ -22,48 +22,27 @@ import (
 // paradigm, and entire tool kit for consumer functions, converters,
 // and generation options.
 //
-// As the basis and heart of a programming model, streams make it
-// possible to think about groups or sequences of objects or work,
-// that can be constructed and populated lazily, and provide a
-// collection of interfaces for processing and manipulating data.
+// The implementation of Stream predated Go's native iterators, and
+// Stream (originally named Iterator,) was an attempt to provide lazy,
+// incremental execution and iteration-focused flows, with a decidedly
+// functional and event-driven bent.
 //
-// Beyond the stream interactive tools provided in this package, the
-// itertool package provdes some additional helpers and tools, while
-// the adt and dt packages provide simple types and tooling built
-// around these streams
+// This gave rise to the `fnx` package, and in many ways everything in
+// the `tychoish/fun` package, all of which _do_ succeed at the aim of
+// providing ergonomic, batteries-included programming models to
+// address fundamental (and shared concerns.)
 //
-// The canonical way to use a stream is with the core Next()
-// Value() and Close() methods: Next takes a context and advances the
-// stream. Next, which is typically called in single-clause for loop
-// (e.g. as in while loop) returns false when the stream has no
-// items, after which the stream should be closed and cannot be
-// re-started. When Next() returns true, the stream is advanced, and
-// the output of Value() will provide the value at the current
-// position in the stream. Next() will block if the stream has not
-// been closed, and the operation with Produces or Generates new items
-// for the stream blocks, (or continues iterating) until the
-// stream is exhausted, or closed.
+// Fundamentally, this type has been superceded by iterators which
+// provide a much more reasonable and safe interface for common
+// operations. However, being able to use simple context-aware
+// functions as the basis for iteration/event-driven program has some
+// potential utility, particularly for pub-sub use cases, and so it
+// remains.
 //
-// However, additional methods, such as ReadOne, the Future()
-// function (which is a wrapper around ReadOne) provide a different
-// iteraction paradigm: they combine the Next() and value operations
-// into a single function call. When the stream is exhausted these
-// methods return the `io.EOF` error.
-//
-// In all cases, checking the Close() value of the stream makes it
-// possible to see any errors encountered during the operation of the
-// stream.
-//
-// Using Next/Value cannot be used concurrently, as there is no way to
-// synchronize the Next/Value calls with respect to eachother: it's
-// possible in this mode to both miss and/or get duplicate values from
-// the stream in this case. If the future function in
-// the stream is safe for concurrent use, then ReadOne can be used
-// safely. As a rule, all tooling in the fun package uses ReadOne
-// except in a few cases where a caller has exclusive access to the
-// stream.
-//
-// Stream is weakly deprecated in favor of iter.Seq, and the irt package.
+// Consider it deprecated: it will be removed in the future, but
+// without a deadline. New code should use the iter.Seq[T] model, and the
+// `fun/irt` package provides a lot of second-order tools for using
+// iterators to ease the transition.
 type Stream[T any] struct {
 	operation func(context.Context) (T, error)
 	value     T
@@ -95,7 +74,7 @@ func VariadicStream[T any](in ...T) *Stream[T] { return SliceStream(in) }
 // ChannelStream exposes access to an existing "receive" channel as
 // a stream.
 func ChannelStream[T any](ch <-chan T) *Stream[T] {
-	return InterfaceStream(stw.ChanBlockingReceive(ch))
+	return MakeStream(stw.ChanBlockingReceive(ch).Read)
 }
 
 // SliceStream provides Stream access to the elements in a slice.
@@ -116,15 +95,6 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
-// InterfaceStream creates a Stream from any object that implements a Read method with the following signature:
-//
-//	Read(context.Context) (T, error)
-func InterfaceStream[T any](obj interface {
-	Read(context.Context) (T, error)
-},
-) *Stream[T] {
-	return MakeStream(obj.Read)
-}
 
 // MergeStreams takes a collection of streams of the same type of
 // objects and provides a single stream over these items.
@@ -142,6 +112,8 @@ func InterfaceStream[T any](obj interface {
 // Use MergeStreams when producing an item takes a non-trivial
 // amount of time. Use ChainStreams or FlattenStreams if order is
 // important. Use FlattenStream for larger numbers of streams.
+//
+// Deprecated: use irt.Chain() and iter.Seq[T] iterators instead.
 func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	pipe := stw.ChanBlocking(make(chan T))
 	ec := &erc.Collector{}

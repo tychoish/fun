@@ -17,7 +17,7 @@ const maxRingSize int64 = 4294967296
 const defaultRingSize int = 1024
 
 // Ring is a simple generic ring-buffer implemented on top of a slice/array
-// with a few conveniences: there are forward and backward streams;
+// with a few conveniences: there are forward and backward iterators;
 // you can pop items from the "end" (oldest) in the buffer. The
 // Total() method maintains a count of the total number of items added
 // to the buffer.
@@ -136,8 +136,8 @@ func (r *Ring[T]) Pop() *T {
 	return nil
 }
 
-// FIFO returns a stream that begins at the first (oldest; Head) element
-// and streams forward to the current or most recently added element
+// FIFO returns an iterator that begins at the first (oldest; Head) element
+// and iterates forward to the current or most recently added element
 // in the buffer.
 func (r *Ring[T]) FIFO() iter.Seq[T] { r.init(); return r.iterate(r.oldest(), r.after) }
 
@@ -145,9 +145,9 @@ func (r *Ring[T]) FIFO() iter.Seq[T] { r.init(); return r.iterate(r.oldest(), r.
 // iterates backwords to the oldest element in the buffer.
 func (r *Ring[T]) LIFO() iter.Seq[T] { r.init(); return r.iterate(r.before(r.pos), r.before) }
 
-// PopFIFO returns a FIFO stream that consumes elements in the
+// PopFIFO returns a FIFO iterator that consumes elements in the
 // buffer, starting with the oldest element in the buffer and moving
-// through all elements. The stream is exhusted when the buffer is empty.
+// through all elements. The iterator is exhusted when the buffer is empty.
 func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Generate(r.Pop)) }
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) iter.Seq[T] {

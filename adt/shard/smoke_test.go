@@ -45,7 +45,7 @@ func TestShardedMap(t *testing.T) {
 				check.Equal(t, erc.MustOk(m.Load("b")), 42)
 				assert.Equal(t, sumUint64(m.Clocks())/2, m.Version())
 			})
-			t.Run("Stream", func(t *testing.T) {
+			t.Run("Iterators", func(t *testing.T) {
 				m := &shard.Map[string, int]{}
 				m.Setup(32, impl)
 

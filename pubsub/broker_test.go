@@ -357,10 +357,6 @@ func TestBroker(t *testing.T) {
 
 	t.Run("Populate", func(t *testing.T) {
 		t.Parallel()
-		input := randomIntSlice(100)
-
-		iter := SliceStream(input)
-
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
@@ -386,8 +382,8 @@ func TestBroker(t *testing.T) {
 		popsig := make(chan struct{})
 		go func() {
 			defer close(popsig)
-			for it := range iter.Iterator(ctx) {
-				broker.Send(ctx, it)
+			for _, it := range randomIntSlice(100) {
+				check.NotError(t, broker.Send(ctx, it))
 			}
 		}()
 

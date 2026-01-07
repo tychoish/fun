@@ -12,9 +12,7 @@ import (
 )
 
 // Handler are generic functions that take an argument (and a context)
-// and return an error. They're the type of function used in various
-// stream methods to implement worker pools, service management, and
-// stream processing.
+// and return an error.
 type Handler[T any] func(context.Context, T) error
 
 // MakeHandler converts a function with the Handler signature

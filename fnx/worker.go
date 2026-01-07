@@ -377,8 +377,8 @@ func (wf Worker) WithoutErrors(errs ...error) Worker {
 // terminating errors are not. All errors are discarded if the retry
 // operation succeeds in the provided number of retries.
 //
-// Except for ErrStreamContinue, which is ignored, all other errors are
-// aggregated and returned to the caller only if the retry fails.
+// Except for ers.ErrCurrentOpSkip, which is ignored, all other errors
+// are aggregated and returned to the caller only if the retry fails.
 func (wf Worker) Retry(n int) Worker {
 	return func(ctx context.Context) (err error) {
 		for range n {

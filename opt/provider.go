@@ -5,10 +5,9 @@ import (
 	"github.com/tychoish/fun/irt"
 )
 
-// Provider is a function type for building functional
-// arguments, and is used for the parallel stream processing (map,
-// transform, for-each, etc.) in the fun and itertool packages, and
-// available with tooling for use in other contexts.
+// Provider is a function type for building functional arguments, and
+// is used for the parallel processing tools in the wpa, srv, and
+// pubsub packages.
 //
 // The type T should always be mutable (e.g. a map, or a pointer).
 type Provider[T any] func(T) error

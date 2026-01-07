@@ -235,7 +235,7 @@ func TestList(t *testing.T) {
 			}
 		})
 	})
-	t.Run("Streams", func(t *testing.T) {
+	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			list := &List[int]{}
 			ct := 0
@@ -899,7 +899,7 @@ func BenchmarkList(b *testing.B) {
 					}
 				}
 			})
-			b.Run("Stream", func(b *testing.B) {
+			b.Run("Iterator", func(b *testing.B) {
 				list := &List[int]{}
 				for i := 0; i < size; i++ {
 					list.PushFront(i)

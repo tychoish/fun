@@ -2088,7 +2088,7 @@ func TestFlushTo(t *testing.T) {
 		}
 	})
 
-	t.Run("ContextCanceledMidStream", func(t *testing.T) {
+	t.Run("ContextCanceledMidIteration", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// Create a sequence that will trigger cancellation after first element

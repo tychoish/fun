@@ -48,7 +48,7 @@ func (s *Set[T]) Delete(in T) (ok bool) { _, ok = s.mp().mp.LoadAndDelete(in); r
 // returns, the item is a member of the set.
 func (s *Set[T]) Add(in T) (ok bool) { _, ok = s.mp().mp.LoadOrStore(in, struct{}{}); return }
 
-// Extend adds all items encountered in the stream to the set.
+// Extend adds all items from the iterator to the set.
 func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.add) }
 func (s *Set[T]) add(in T)                { s.Add(in) }
 

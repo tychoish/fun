@@ -64,7 +64,7 @@ func (s *Set[T]) Add(in T) (existed bool) {
 	return
 }
 
-// Extend adds all items encountered in the stream to the set.
+// Extend adds all items from the iterator to the set.
 func (s *Set[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.add) }
 func (s *Set[T]) add(in T)                { s.Add(in) }
 

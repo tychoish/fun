@@ -144,7 +144,7 @@ func PullWithPool[T any, HF Handler[T]](
 	opts = append(opts,
 		WorkerGroupConfDisableErrorCollector(),
 		WorkerGroupConfCustomValidatorAppend(func(conf *WorkerGroupConf) error {
-			return ers.When(conf.ErrorCollector != nil, "cannot define a custom error collector for streaming operations")
+			return ers.When(conf.ErrorCollector != nil, "cannot define a custom error collector for wpa pooled operations")
 		}),
 	)
 	conf := &WorkerGroupConf{}

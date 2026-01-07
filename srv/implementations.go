@@ -24,7 +24,7 @@ import (
 )
 
 // Group makes it possible to have a collection of services, provided
-// via a stream, that behave as a single service. All services are
+// by an iterator, that behave as a single service. All services are
 // started concurrently (and without order) and shutdown concurrently
 // (and without order). The Service produced by group, has the same
 // semantics as any other Service.
@@ -54,7 +54,7 @@ func Group(services iter.Seq[*Service]) *Service {
 		Cleanup: func() error {
 			defer ec.Recover()
 			// because we know that the implementation of the
-			// waiters stream won't block in this context, it's
+			// waiters iterator won't block in this context, it's
 			// safe to call it with a background context, though
 			// it's worth being careful here
 			ctx := context.Background()
@@ -111,7 +111,7 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 }
 
 // Wait creates a service that runs until *both* all wait functions
-// have returned *and* the stream is exhausted. The Service's wait
+// have returned *and* the iterator is exhausted. The Service's wait
 // function returns an error that aggregates all errors (e.g. panics)
 // encountered by the constituent wait functions.
 //
@@ -120,7 +120,7 @@ func HTTP(name string, shutdownTimeout time.Duration, hs *http.Server) *Service 
 // existing orchestration tools.
 //
 // When the service returns all worker Goroutines as well as the input
-// worker will have returned. Use a blocking pubsub stream to
+// worker will have returned. Use a blocking pubsub iterator to
 // dispatch wait functions throughout the lifecycle of your program.
 func Wait(seq iter.Seq[fnx.Operation]) *Service {
 	wg := &sync.WaitGroup{}

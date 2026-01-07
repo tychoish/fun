@@ -10,7 +10,7 @@ import (
 )
 
 // RateLimit wraps a iterator with a rate-limiter to ensure that the
-// output stream will produce no more than <num> items in any given
+// output iterator will produce no more than <num> items in any given
 // <window>.
 func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time.Duration) iter.Seq[T] {
 	erc.InvariantOk(num > 0, "rate must be greater than zero")

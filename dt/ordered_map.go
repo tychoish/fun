@@ -117,7 +117,7 @@ func (m *OrderedMap[K, V]) Iterator() iter.Seq2[K, V] {
 	)
 }
 
-// Keys provides a stream over just the keys in the map in insertion order.
+// Keys provides an iterator over just the keys in the map in insertion order.
 func (m *OrderedMap[K, V]) Keys() iter.Seq[K] { m.init(); return irt.First(irt.KVsplit(m.elems())) }
 
 func (m *OrderedMap[K, V]) checkForElem(e irt.KV[K, V]) bool { return m.hash.Check(e.Key) }
@@ -125,5 +125,5 @@ func (m *OrderedMap[K, V]) elems() iter.Seq[irt.KV[K, V]] {
 	return irt.WithMutex(m.list.IteratorFront(), &m.mtx)
 }
 
-// Values provides a stream over just the values in the map in insertion order.
+// Values provides an iterator over just the values in the map in insertion order.
 func (m *OrderedMap[K, V]) Values() iter.Seq[V] { return irt.Second(m.Iterator()) }

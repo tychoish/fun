@@ -12,9 +12,12 @@ import (
 ////////////////////////////////////////////////////////////////////////
 
 // Element is the underlying component of a list, provided by
-// streams, the Pop operations, and the Front/Back accesses in the
+// iterators, the Pop operations, and the Front/Back accesses in the
 // list. You can use the methods on this objects to iterate through
 // the list, and the Ok() method for validating zero-valued items.
+//
+// While Elements and Lists are not safe for concurrent access, it's
+// safe to combine use of List and Element driven-mutations.
 type Element[T any] struct {
 	next *Element[T]
 	prev *Element[T]

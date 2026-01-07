@@ -166,7 +166,7 @@ func TestMap(t *testing.T) {
 		}
 		assert.Equal(t, count, 200)
 	})
-	t.Run("Stream", func(t *testing.T) {
+	t.Run("Iterators", func(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
 		for i := 0; i < 200; i++ {
@@ -247,7 +247,7 @@ func TestMap(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
-	t.Run("Streams", func(t *testing.T) {
+	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
 			mp := &Map[string, int]{}
 			mp.Default.SetConstructor(func() int { return 38 })

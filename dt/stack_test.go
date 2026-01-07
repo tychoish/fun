@@ -264,7 +264,7 @@ func TestStack(t *testing.T) {
 			})
 		})
 	})
-	t.Run("Streams", func(t *testing.T) {
+	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			list := &Stack[int]{}
 			ct := 0

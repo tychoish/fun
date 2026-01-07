@@ -109,7 +109,7 @@ func (m *Map[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, m.Store) }
 //
 // Standard (global) Iterators
 
-// Items provides a stream over all items in the map. The MapItem type
+// Items provides an iterator over all items in the map. The MapItem type
 // captures the version information and information about the sharded
 // configuration.
 func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] { return irt.Keep(m.itemItr(), m.filter) }
@@ -118,18 +118,18 @@ func (m *Map[K, V]) Items() iter.Seq[MapItem[K, V]] { return irt.Keep(m.itemItr(
 // the sharded map..
 func (m *Map[K, V]) Iterator() iter.Seq2[K, V] { return m.itrsplit(m.Items()) }
 
-// Keys returns a stream for all the keys in the map. Items are
+// Keys returns an iterator for all the keys in the map. Items are
 // provdied from shards sequentially, and in the same sequence, but
 // are randomized within the shard. The keys are NOT captured in a
 // snapshot, so keys reflecting different logical moments will appear
-// in the stream. No key will appear more than once.
+// in the iterator. No key will appear more than once.
 func (m *Map[K, V]) Keys() iter.Seq[K] { return irt.Chain(m.KeysSharded()) }
 
-// Values returns a stream for all of the keys in the map. Values are
+// Values returns an iterator for all of the keys in the map. Values are
 // provided from shards sequentially, and always in the same
 // sequences, but randomized within each shard. The values are NOT
 // captured in a snapshot, so values reflecting different logical
-// moments will appear in the stream.
+// moments will appear in the iterator.
 func (m *Map[K, V]) Values() iter.Seq[V] { return irt.Chain(m.ValuesSharded()) }
 
 ////////////////////////////////////

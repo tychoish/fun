@@ -16,20 +16,18 @@ import (
 // operation.
 type WorkerGroupConf struct {
 	// NumWorkers describes the number of parallel workers
-	// processing the incoming stream items and running the map
+	// processing the incoming items and running the map
 	// function. All values less than 1 are converted to 1. Any
 	// value greater than 1 will result in out-of-sequence results
-	// in the output stream.
+	// in the output.
 	NumWorkers int
 	// ContinueOnPanic prevents the operations from halting when a
 	// single processing function panics. In all modes mode panics
-	// are converted to errors and propagated to the output
-	// stream's Close() method,.
+	// are converted to errors and propagated to the caller.
 	ContinueOnPanic bool
 	// ContinueOnError allows a processing function to return an
 	// error and allow the work of the broader operation to
-	// continue. Errors are aggregated propagated to the output
-	// stream's Close() method.
+	// continue. Errors are aggregated propagated to the caller.
 	ContinueOnError bool
 	// IncludeContextExpirationErrors changes the default handling
 	// of context cancellation errors. By default all errors
@@ -129,8 +127,8 @@ func WorkerGroupConfSet(opt *WorkerGroupConf) opt.Provider[*WorkerGroupConf] {
 }
 
 // WorkerGroupConfAddExcludeErrors appends the provided errors to the
-// ExcludedErrors value. The provider will return an error if any of
-// the input streams is ErrRecoveredPanic.
+// ExcludedErrors value. The provider will never exclude an error that
+// is rooted in ers.ErrRecoveredPanic..
 func WorkerGroupConfAddExcludeErrors(errs ...error) opt.Provider[*WorkerGroupConf] {
 	return func(opts *WorkerGroupConf) error {
 		if ers.Is(ers.ErrRecoveredPanic, errs...) {

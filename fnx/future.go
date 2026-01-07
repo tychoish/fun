@@ -14,9 +14,9 @@ import (
 	"github.com/tychoish/fun/internal"
 )
 
-// Future is a function type that is a failrly common
-// constructor. It's signature is used to create iterators/streams, as
-// a future, and functions like a Future.
+// Future is a function type that describes a fairly common function
+// signature, and provides a collection of methods for improved
+// ergonomics.
 type Future[T any] func(context.Context) (T, error)
 
 // MakeFuture constructs a future that wraps a similar
@@ -440,7 +440,7 @@ func (pf Future[T]) WithErrorFilter(ef erc.Filter) Future[T] {
 // Filter creates a function that passes the output of the future to
 // the filter function, which, if it returns true. is returned to the
 // caller, otherwise the Future returns the zero value of type T and
-// ers.ErrCurrentOpSkip error (e.g. continue), which streams and
+// ers.ErrCurrentOpSkip error (e.g. continue), which iterators and
 // other future-consuming functions can respect.
 func (pf Future[T]) Filter(fl func(T) bool) Future[T] {
 	var zero T

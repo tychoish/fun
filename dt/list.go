@@ -69,7 +69,7 @@ func (l *List[T]) PushBack(it T) { l.Back().Push(it) }
 
 // PopFront removes the first element from the list. If the list is
 // empty, this returns a nil value, that will report an Ok() false
-// You can use this element to produce a C-style stream over
+// You can use this element to produce a C-style iterator over
 // the list, that removes items during the iteration:
 //
 //	for e := list.PopFront(); e.Ok(); e = input.PopFront() {
@@ -79,7 +79,7 @@ func (l *List[T]) PopFront() *Element[T] { return l.pop(l.Front()) }
 
 // PopBack removes the last element from the list. If the list is
 // empty, this returns a detached non-nil value, that will report an
-// Ok() false value. You can use this element to produce a C-style stream
+// Ok() false value. You can use this element to produce a C-style iterator
 // over the list, that removes items during the iteration:
 //
 //	for e := list.PopBack(); e.Ok(); e = input.PopBack() {
@@ -107,38 +107,40 @@ func (l *List[T]) Front() *Element[T] { return l.root().next }
 //	}
 func (l *List[T]) Back() *Element[T] { return l.root().prev }
 
-// IteratorFront returns an iterator to the items in the list starting at the front and moving toward the
-// back of the list.
+// IteratorFront returns an iterator to the items in the list starting
+// at the front and moving toward the back of the list.
 //
-// If you add values to the list during iteration *behind* where the stream is, these values will
-// not be present in the stream; however, values added ahead of the stream, will be visible.
+// If you add values to the list during iteration *behind* the current
+// position of the iterator, these values will not be present in the
+// iterator; however, values added ahead of the current position, will
+// be visible.
 func (l *List[T]) IteratorFront() iter.Seq[T] { return l.iterator(l.Front, l.elemNext) }
 
-// IteratorBack returns an iterator to the items in the list starting at the back and moving toward the
-// front of the list.
+// IteratorBack returns an iterator to the items in the list starting
+// at the back and moving toward the front of the list.
 //
-// If you add values to the list during iteration *behind* where the stream is, these values will
-// not be present in the stream; however, values added ahead of the stream, will be visible.
+// If you add values to the list during iteration *behind* the current
+// position of the iterator, these values will not be present in the
+// iterator; however, values added ahead of the current position, will
+// be visible.
 func (l *List[T]) IteratorBack() iter.Seq[T] { return l.iterator(l.Back, l.elemPrevious) }
 
-// IteratorPopFront returns a destructive iterator that consumes elements from the list as it iterates,
-// moving front-to-back.
+// IteratorPopFront returns a destructive iterator that consumes
+// elements from the list as it iterates, moving front-to-back.
 //
-// If you add values to the list during iteration *behind* where the stream is, these values will
-// not be present in the stream; however, values added ahead of the stream, will be visible.
-//
-// In most cases, for destructive iteration, use the pubsub.Queue, pubsub.Deque, or one of the
-// pubsub.Distributor implementations, because those implementations are thread safe.
+// If you add values to the list during iteration *behind* the current
+// position of the iterator, these values will not be present in the
+// iterator; however, values added ahead of the current position, will
+// be visible.
 func (l *List[T]) IteratorPopFront() iter.Seq[T] { return l.iterator(l.PopFront, l.wrap(l.PopFront)) }
 
-// IteratorPopBack returns a destructive iterator that consumes elements from the list as it
-// iterates, moving back-to-fron.
+// IteratorPopBack returns a destructive iterator that consumes
+// elements from the list as it iterates, moving back-to-front.
 //
-// If you add values to the list during iteration *behind* where the stream is, these values will
-// not be present in the stream; however, values added ahead of the stream, will be visible.
-//
-// In most cases, for destructive iteration, use the pubsub.Queue, pubsub.Deque, or one of the
-// pubsub.Distributor implementations, because those implementations are thread safe.
+// If you add values to the list during iteration *behind* the current
+// position of the iterator, these values will not be present in the
+// iterator; however, values added ahead of the current position, will
+// be visible.
 func (l *List[T]) IteratorPopBack() iter.Seq[T] { return l.iterator(l.PopBack, l.wrap(l.PopBack)) }
 
 func (*List[T]) elemNext(e *Element[T]) *Element[T]     { return e.Next() }

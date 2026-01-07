@@ -14,10 +14,10 @@ import (
 
 // Deque proves a basic double ended queue backed by a doubly linked
 // list, with features to support a maximum capacity, burstable limits
-// and soft quotas, as well as streams, that safe for access from
+// and soft quotas, as well as iterators, that safe for access from
 // multiple concurrent go-routines. Furthermore, the implementation
 // safely handles multiple concurrent blocking operations (e.g. Wait,
-// streams).
+// WaitPop IteratorWait, IteratorWaitPop).
 //
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
@@ -67,18 +67,15 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 		return nil, err
 	}
 
-	var tracker queueLimitTracker
+	q := makeDeque[T]()
 
 	if opts.QueueOptions != nil {
-		tracker = newQueueLimitTracker(*opts.QueueOptions)
+		q.tracker = newQueueLimitTracker(*opts.QueueOptions)
 	} else if opts.Capacity > 0 {
-		tracker = &queueHardLimitTracker{capacity: opts.Capacity}
+		q.tracker = &queueHardLimitTracker{capacity: opts.Capacity}
 	} else if opts.Unlimited {
-		tracker = &queueNoLimitTrackerImpl{}
+		q.tracker = &queueNoLimitTrackerImpl{}
 	}
-
-	q := makeDeque[T]()
-	q.tracker = tracker
 
 	return q, nil
 }
@@ -104,9 +101,9 @@ func makeDeque[T any]() *Deque[T] {
 // this implementation.
 func (dq *Deque[T]) Len() int { defer adt.With(adt.Lock(dq.mtx)); return dq.tracker.len() }
 
-// Close marks the deque as closed, after which point all streams
-// will stop and no more operations will succeed. The error value is
-// not used in the current operation.
+// Close marks the deque as closed, after which point all blocking
+// consumers will stop and no more operations will succeed. The error
+// value is not used in the current operation.
 func (dq *Deque[T]) Close() error {
 	defer adt.With(adt.Lock(dq.mtx))
 	dq.doClose()
@@ -298,13 +295,13 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 }
 
 // IteratorFront starts at the front of the Deque and iterates towards
-// the back. When the stream reaches the beginning of the queue it
-// ends.
+// the back. When the iterator reaches the end (back) of the deque
+// iteration halts.
 func (dq *Deque[T]) IteratorFront(ctx context.Context) iter.Seq[T] { return dq.iterFrontEnd(ctx) }
 
-// IteratorBack starts at the back of the Deque  and iterates
-// towards the front. When the stream reaches the end of the queue
-// it ends.
+// IteratorBack starts at the back of the Deque and iterates towards
+// the front. When the iterator reaches the end (front) of the queue
+// iteration halts.
 func (dq *Deque[T]) IteratorBack(ctx context.Context) iter.Seq[T] { return dq.iterBackEnd(ctx) }
 
 // IteratorWaitFront yields items from the front of the Deque to the
@@ -429,7 +426,8 @@ func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 	it.next.prev = it.prev
 
 	// don't reset poointers in the item in case we're using this
-	// item in a stream
+	// item in an iterator
+	//
 	// it.next = nil
 	// it.prev = nil
 

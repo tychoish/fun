@@ -88,7 +88,7 @@ func (s *OrderedSet[T]) Add(in T) (ok bool) {
 	return
 }
 
-// Extend adds all items encountered in the stream to the set.
+// Extend adds all items encountered in the iterator to the set.
 func (s *OrderedSet[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.add) }
 func (s *OrderedSet[T]) add(in T)                { s.Add(in) }
 

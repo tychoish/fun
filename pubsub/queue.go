@@ -130,7 +130,7 @@ func (q *Queue[T]) doAdd(item T) error {
 		q.nempty.Signal()
 	}
 
-	// for the stream, signal for any updates
+	// for the iterator, signal for any updates
 	q.nupdates.Signal()
 
 	return nil
@@ -388,13 +388,13 @@ type entry[T any] struct {
 }
 
 // IteratorWait produces an iteratorthat wraps the
-// underlying queue linked list. The stream respects the Queue's
+// underlying queue linked list. The iterator respects the Queue's
 // mutex and is safe for concurrent access and current queue
-// operations, without additional locking. The stream does not
+// operations, without additional locking. The iterator does not
 // modify or remove items from the queue, and will only terminate when
 // the queue has been closed via the Close() method.
 //
-// To create a "consuming" stream, use a Distributor.
+// For a consuming stream, use IteratorWaitPop.
 func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
 	op := func() (o T, ok bool) {

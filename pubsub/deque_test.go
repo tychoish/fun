@@ -53,7 +53,7 @@ type fixture[T any] struct {
 	name   string
 	add    func(T) error
 	remove func() (T, bool)
-	stream func(context.Context) iter.Seq[T]
+	seq    func(context.Context) iter.Seq[T]
 	close  func() error
 	len    func() int
 	elems  []T
@@ -77,7 +77,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "QueueUnlimited",
 				add:    cue.Push,
 				remove: cue.Pop,
-				stream: cue.IteratorWait,
+				seq:    cue.IteratorWait,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.tracker.len,
@@ -90,7 +90,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "QueueLimited",
 				add:    cue.Push,
 				remove: cue.Pop,
-				stream: cue.IteratorWait,
+				seq:    cue.IteratorWait,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.tracker.len,
@@ -103,7 +103,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushBackPopFrontForward",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.IteratorFront,
+				seq:    cue.IteratorFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -116,7 +116,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushFrontPopBackForward",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.IteratorFront,
+				seq:    cue.IteratorFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -129,7 +129,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushBackPopFrontReverse",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.IteratorBack,
+				seq:    cue.IteratorBack,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.Len,
@@ -142,7 +142,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushFrontPopBackReverse",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.IteratorBack,
+				seq:    cue.IteratorBack,
 				elems:  makeElems(50),
 				len:    cue.Len,
 				close:  cue.Close,
@@ -155,7 +155,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequePushBackPopFrontForward",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.IteratorFront,
+				seq:    cue.IteratorFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -169,7 +169,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushFrontPopBackForward",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.IteratorFront,
+				seq:    cue.IteratorFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -182,7 +182,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushBackPopFrontReverse",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.IteratorBack,
+				seq:    cue.IteratorBack,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.Len,
@@ -195,7 +195,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushFrontPopBackReverse",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.IteratorBack,
+				seq:    cue.IteratorBack,
 				elems:  makeElems(50),
 				len:    cue.Len,
 				close:  cue.Close,
@@ -209,7 +209,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeCapacityPushBackPopFrontForward",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.IteratorFront,
+				seq:    cue.IteratorFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -224,7 +224,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeBurstPushFrontPopBackForward",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.IteratorFront,
+				seq:    cue.IteratorFront,
 				close:  cue.Close,
 				elems:  makeElems(50),
 				len:    cue.Len,
@@ -237,7 +237,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeBurstPushBackPopFrontReverse",
 				add:    cue.PushBack,
 				remove: cue.PopFront,
-				stream: cue.IteratorBack,
+				seq:    cue.IteratorBack,
 				elems:  makeElems(50),
 				close:  cue.Close,
 				len:    cue.Len,
@@ -250,7 +250,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 				name:   "DequeBurstPushFrontPopBackReverse",
 				add:    cue.PushFront,
 				remove: cue.PopBack,
-				stream: cue.IteratorBack,
+				seq:    cue.IteratorBack,
 				elems:  makeElems(50),
 				len:    cue.Len,
 				close:  cue.Close,
@@ -306,7 +306,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 
 			assert.Equal(t, fix.len(), len(fix.elems))
 			seen := 0
-			iter := fix.stream(ctx)
+			iter := fix.seq(ctx)
 
 			if err := fix.close(); err != nil {
 				t.Fatal(err)
@@ -583,7 +583,7 @@ func TestDeque(t *testing.T) {
 		if _, ok := dq.PopFront(); ok {
 			t.Error("should not pop empty list")
 		}
-		t.Run("Stream", func(t *testing.T) {
+		t.Run("Iterator", func(t *testing.T) {
 			for idx, iter := range []iter.Seq[int]{
 				dq.IteratorFront(t.Context()),
 				dq.IteratorBack(t.Context()),
@@ -703,7 +703,7 @@ func TestDeque(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		t.Run("Stream", func(t *testing.T) {
+		t.Run("Iterators", func(t *testing.T) {
 			for idx, iter := range []iter.Seq[int]{
 				dq.IteratorFront(t.Context()),
 				dq.IteratorBack(t.Context()),
@@ -714,7 +714,7 @@ func TestDeque(t *testing.T) {
 						seen++
 					}
 					if seen != 2 {
-						t.Fatalf("stream had %d and saw %d", dq.Len(), seen)
+						t.Fatalf("iterator had %d and saw %d", dq.Len(), seen)
 					}
 				})
 			}
@@ -725,7 +725,7 @@ func TestDeque(t *testing.T) {
 			}
 		})
 	})
-	t.Run("StreamHandlesEmpty", func(t *testing.T) {
+	t.Run("IteratorHandlesEmpty", func(t *testing.T) {
 		t.Parallel()
 		queue := NewUnlimitedDeque[int]()
 

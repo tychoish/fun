@@ -766,9 +766,10 @@ func TestChannel(t *testing.T) {
 
 // ReadAll returns a Worker function that processes the output of data
 // from the channel with the Handler function. If the processor
-// function returns ers.ErrCurrentOpSkip, the processing will continue. All
-// other Handler errors (and problems reading from the channel,)
-// abort stream. io.EOF errors are not propagated to the caller.
+// function returns ers.ErrCurrentOpSkip, the processing will
+// continue. All other Handler errors (and problems reading from the
+// channel,) abort iteration. io.EOF errors are not propagated to the
+// caller.
 func (ro ChanReceive[T]) ReadAll(op fnx.Handler[T]) fnx.Worker {
 	return func(ctx context.Context) (err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()

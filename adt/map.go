@@ -16,8 +16,9 @@ type OrderedMap[K comparable, V any] = dt.OrderedMap[K, V]
 
 // Map provides a wrapper around the standard library's sync.Map type
 // with key/value types enforced by generics. Additional helpers
-// support adding multiple items to the map, while Stream and
-// StoreFrom provide compatibility with streams.
+// support adding multiple items to the map, while the iteration
+// methods, and Extend provide compatibility with iter.Seq2[]
+// sequences.
 type Map[K comparable, V any] struct {
 	// Default handles construction and pools objects in
 	// the map for the Ensure and Get operations which must
@@ -130,19 +131,19 @@ func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) { mp.mp.Range(func(ak, av any) bool { return yield(ak.(K), av.(V)) }) }
 }
 
-// Keys returns a stream that renders all of the keys in the map.
+// Keys returns an iterator that yields all of the keys in the map.
 //
-// This operation relies on a the underlying Range stream, and
+// This operation relies on a the underlying Map's Range method, and
 // advances lazily through the Range operation as callers advance the
-// stream. Be aware that this produces a stream that does not reflect
-// any particular atomic of the underlying map.
+// iterator. Be aware that this produces a iterator that does not
+// reflect any particular point-in-time view of the underlying map.
 func (mp *Map[K, V]) Keys() iter.Seq[K] { return irt.First(mp.Iterator()) }
 
-// Values returns a stream that renders all of the values in the
+// Values returns an iterator that yields all of the values in the
 // map.
 //
-// This operation relies on a the underlying Range iterator, and
+// This operation relies on a the underlying Map's Range iterator, and
 // advances lazily through the Range operation as callers advance the
-// stream. Be aware that this produces a stream that does not
-// reflect any particular atomic of the underlying map.
+// iterator. Be aware that this produces an iterator that does not
+// reflect any particular point-in-time view of the underlying map.
 func (mp *Map[K, V]) Values() iter.Seq[V] { return irt.Second(mp.Iterator()) }

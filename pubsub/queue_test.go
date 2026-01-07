@@ -208,7 +208,7 @@ func TestQueueWait(t *testing.T) {
 	})
 }
 
-func TestQueueStream(t *testing.T) {
+func TestQueueIterators(t *testing.T) {
 	t.Parallel()
 
 	t.Run("EndToEnd", func(t *testing.T) {
@@ -361,7 +361,7 @@ func TestQueueStream(t *testing.T) {
 			t.Error("count should be 100: ", count)
 		}
 	})
-	t.Run("ClosedStreamDoesNotBlock", func(t *testing.T) {
+	t.Run("ClosedQueueDoesNotBlockIterators", func(t *testing.T) {
 		ctx := testt.Context(t)
 		queue := NewUnlimitedQueue[string]()
 
@@ -468,7 +468,7 @@ func TestQueueStream(t *testing.T) {
 			t.Error(dur)
 		}
 	})
-	t.Run("StreamRetrySpecialCase", func(t *testing.T) {
+	t.Run("IteratorRetrySpecialCase", func(t *testing.T) {
 		ctx := testt.Context(t)
 		queue := NewUnlimitedQueue[int]()
 		toctx, toccancel := context.WithTimeout(ctx, 10*time.Millisecond)

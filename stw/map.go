@@ -8,8 +8,8 @@ import (
 )
 
 // Map is just a generic type wrapper around a map, mostly for the
-// purpose of being able to interact with Pair[K,V] objects and
-// Streams.
+// purpose of being able to interact with other related types and
+// provide a improved/alterate ergonomics.
 //
 // All normal map operations are still accessible, these methods
 // exist to provide accessible function objects for use in contexts
@@ -74,11 +74,11 @@ func (m Map[K, V]) Extend(seq iter.Seq2[K, V]) { maps.Insert(m, seq) }
 // provided for consistency.
 func (m Map[K, V]) Len() int { return len(m) }
 
-// Iterator returns a standard Go iterator interface to the key-value pairs of the map.
+// Iterator returns an iterator to the key-value pairs of the map.
 func (m Map[K, V]) Iterator() iter.Seq2[K, V] { return maps.All(m) }
 
-// Keys provides a stream over just the keys in the map.
+// Keys provides an iterator over just the keys in the map.
 func (m Map[K, V]) Keys() iter.Seq[K] { return maps.Keys(m) }
 
-// Values provides a stream over just the values in the map.
+// Values provides an iterator over just the values in the map.
 func (m Map[K, V]) Values() iter.Seq[V] { return maps.Values(m) }

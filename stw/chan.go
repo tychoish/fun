@@ -114,7 +114,7 @@ func ChanNonBlockingReceive[T any](ch <-chan T) ChanReceive[T] {
 }
 
 // Iterator provides access to the contents of the channel as a
-// new-style standard library stream. For ChanRecieve objects in
+// new-style standard library iterator. For ChanRecieve objects in
 // non-blocking mode, iteration ends when there are no items in the
 // channel. In blocking mode, iteration ends when the context is
 // canceled or the channel is closed.
