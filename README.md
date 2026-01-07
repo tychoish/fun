@@ -3,7 +3,10 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/tychoish/fun.svg)](https://pkg.go.dev/github.com/tychoish/fun)
 
 `fun` is a simple, well-tested, zero-dependency "Core Library" for
-Go. Think of it as a collection of the best parts of the `utils` package or `shared` or `common` packages in any given Go application, but with solid design, highly ergonomic interfaces, and thorough testing.
+Go. Think of it as a collection of the best parts of the `utils`
+package or `shared` or `common` packages in any given Go application,
+but with solid design, highly ergonomic interfaces, and thorough
+testing.
 
 `fun` aims to be easy to adopt: the interfaces (and implementations!)
 are simple and (hopefully!) easy to use. There are no external
@@ -61,12 +64,14 @@ your project.
   - an ordered map `dt.OrderedMap[K,V]` (also thread safe, and
     accessible via `adt`.)
   - histograms (in `dt/hdrhist`)
+  - wrappers of standard library (**stw**)things (maps, slices,
+    pointers,) for ergonomic takes on Go constructs.
   - an "optional" wrapper (`dt.Optional[T]`) so you can avoid
     overloading pointer values in your type definitions.
 
-- A collection of **function object tools**, wrappers for common
-  function type in `fn` (without contexts) and `fnx` (with contexts),
-  and operations in `ft`.
+- A collection of **function object tools**, wrappers and tools for
+  common function type in `fn` (without contexts) and `fnx` (with
+  contexts).
 
 - Higher order **pubsub** tools, notably threadsafe queue and deque
   implementations--`pubsub.Queue[T]` and `pubsub.Deque[T]` which avoid
