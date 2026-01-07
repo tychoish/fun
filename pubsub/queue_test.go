@@ -147,7 +147,7 @@ func TestQueueWait(t *testing.T) {
 	// A wait on an empty queue should time out.
 	t.Run("WaitTimeout", func(t *testing.T) {
 		ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
-		got, err := q.Wait(ctx)
+		got, err := q.WaitPop(ctx)
 		if err == nil {
 			t.Errorf("Wait: got %v, want error", got)
 		} else if !errors.Is(err, context.DeadlineExceeded) {
@@ -162,7 +162,7 @@ func TestQueueWait(t *testing.T) {
 		const input = "figgy pudding"
 		q.mustAdd(input)
 
-		got, err := q.Wait(ctx)
+		got, err := q.WaitPop(ctx)
 		if err != nil {
 			t.Errorf("Wait: unexpected error: %v", err)
 		} else if got != input {
@@ -178,7 +178,7 @@ func TestQueueWait(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			got, err := q.Wait(ctx)
+			got, err := q.WaitPop(ctx)
 			if err != nil {
 				t.Errorf("Wait: unexpected error: %v", err)
 			} else if got != input {
@@ -197,7 +197,7 @@ func TestQueueWait(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			got, err := q.Wait(ctx)
+			got, err := q.WaitPop(ctx)
 			if err != ErrQueueClosed {
 				t.Errorf("Wait: got (%v, %v), want %v", got, err, ErrQueueClosed)
 			}
@@ -413,7 +413,7 @@ func TestQueueStream(t *testing.T) {
 			t.Fatal("should not iterate", count)
 		}
 
-		val, err := queue.Wait(t.Context())
+		val, err := queue.WaitPop(t.Context())
 		assert.NotError(t, err)
 		check.Equal(t, val, "one")
 		for range queue.IteratorWait(ctx) {
@@ -1170,11 +1170,11 @@ func TestQueueDrain(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Use Wait() to consume items
-		val, err := queue.Wait(ctx)
+		val, err := queue.WaitPop(ctx)
 		assert.NotError(t, err)
 		assert.Equal(t, 10, val)
 
-		val, err = queue.Wait(ctx)
+		val, err = queue.WaitPop(ctx)
 		assert.NotError(t, err)
 		assert.Equal(t, 20, val)
 

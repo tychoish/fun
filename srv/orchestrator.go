@@ -108,7 +108,7 @@ func (or *Orchestrator) Service() *Service {
 				if !ok {
 					var err error
 
-					s, err = or.input.Wait(ctx)
+					s, err = or.input.WaitPop(ctx)
 					if err != nil {
 						// we only want to collect non-context
 						// cancelation and non queue-closed errors

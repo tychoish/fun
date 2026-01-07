@@ -50,7 +50,7 @@ func (l *List[T]) Reset() {
 	}
 }
 
-// Len returns the length of the list. As the Append/Remove operations
+// Len returns the length of the list. Because the Push/Pop operations
 // track the length of the list, this is an O(1) operation.
 func (l *List[T]) Len() int {
 	if l == nil || l.meta == nil {
