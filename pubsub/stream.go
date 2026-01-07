@@ -189,7 +189,10 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 
 	return MakeStream(fnx.NewFuture(pipe.Receive().Read).
 		PreHook(init)).
-		WithHook(func(st *Stream[T]) { wg.Worker().Ignore(); st.AddError(ec.Resolve()) })
+		WithHook(func(st *Stream[T]) {
+			ft.WithContextCall(wg.Wait)
+			st.AddError(ec.Resolve())
+		})
 }
 
 // JoinStreams takes a sequence of streams and produces a combined
@@ -207,7 +210,7 @@ func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
 		st.closer.state.Store(true)
 		fn.JoinHandlers(irt.Slice(st.closer.hooks)).Read(st)
-		ft.Call(ft.Join(st.closer.ops...))
+		irt.Apply(irt.Remove(irt.Slice(st.closer.ops), func(op func()) bool { return op == nil }), func(op func()) { op() })
 	})
 }
 

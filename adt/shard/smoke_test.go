@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 )
 
 func sumUint64(in []uint64) (out uint64) {
@@ -100,8 +99,8 @@ func TestShardedMap(t *testing.T) {
 
 				t.Run("BeforePopulated", func(t *testing.T) {
 					item = m.Fetch("one")
-					assert.True(t, ft.Not(m.Check("one")))
-					assert.True(t, ft.Not(item.Exists))
+					assert.True(t, !m.Check("one"))
+					assert.True(t, !item.Exists)
 					assert.Equal(t, item.NumShards, 42)
 					assert.Equal(t, 42+1, len(m.Clocks()))
 				})
@@ -117,10 +116,10 @@ func TestShardedMap(t *testing.T) {
 				t.Run("PostDelete", func(t *testing.T) {
 					assert.True(t, m.Check("one"))
 					m.Delete("one")
-					assert.True(t, ft.Not(m.Check("one")))
+					assert.True(t, !m.Check("one"))
 
 					item = m.Fetch("one")
-					assert.True(t, ft.Not(item.Exists))
+					assert.True(t, !item.Exists)
 					assert.Equal(t, item.NumShards, 42)
 				})
 			})
@@ -168,8 +167,8 @@ func TestShardedMap(t *testing.T) {
 		m := &shard.Map[string, int]{}
 		t.Run("BeforePopulated", func(t *testing.T) {
 			item = m.Fetch("one")
-			assert.True(t, ft.Not(m.Check("one")))
-			assert.True(t, ft.Not(item.Exists))
+			assert.True(t, !m.Check("one"))
+			assert.True(t, !item.Exists)
 			assert.Equal(t, item.NumShards, 32)
 		})
 		t.Run("AfterPopulated", func(t *testing.T) {
@@ -184,16 +183,16 @@ func TestShardedMap(t *testing.T) {
 		t.Run("PostDelete", func(t *testing.T) {
 			assert.True(t, m.Check("one"))
 			m.Delete("one")
-			assert.True(t, ft.Not(m.Check("one")))
+			assert.True(t, !m.Check("one"))
 			item = m.Fetch("one")
-			assert.True(t, ft.Not(item.Exists))
+			assert.True(t, !item.Exists)
 			assert.Equal(t, item.NumShards, 32)
 		})
 	})
 	t.Run("VersionedObject", func(t *testing.T) {
 		var item *shard.Versioned[int]
 		t.Run("NilSafe", func(t *testing.T) {
-			assert.True(t, ft.Not(item.Ok()))
+			assert.True(t, !item.Ok())
 			assert.Zero(t, item.Load())
 			assert.Zero(t, item.Version())
 		})

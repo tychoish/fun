@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/ft"
 )
 
 type mockTB struct {
@@ -151,7 +150,7 @@ func TestTools(t *testing.T) {
 		t.Run("PreviouslyUnset", func(t *testing.T) {
 			assert.Zero(t, os.Getenv(t.Name()))
 			_, isSet := os.LookupEnv(t.Name())
-			assert.True(t, ft.Not(isSet))
+			assert.True(t, !isSet)
 			WithEnv(t, t.Name(), "beep!!beep", func() {
 				assert.Equal(t, os.Getenv(t.Name()), "beep!!beep")
 				_, isSetNow := os.LookupEnv(t.Name())
@@ -159,12 +158,12 @@ func TestTools(t *testing.T) {
 			})
 
 			_, isSet = os.LookupEnv(t.Name())
-			assert.True(t, ft.Not(isSet))
+			assert.True(t, !isSet)
 		})
 		t.Run("PreviouslySet", func(t *testing.T) {
 			assert.Zero(t, os.Getenv(t.Name()))
 			_, isSet := os.LookupEnv(t.Name())
-			assert.True(t, ft.Not(isSet))
+			assert.True(t, !isSet)
 
 			WithEnv(t, t.Name(), "boop!!boop", func() {
 				assert.Equal(t, os.Getenv(t.Name()), "boop!!boop")
@@ -183,7 +182,7 @@ func TestTools(t *testing.T) {
 			})
 
 			_, isSet = os.LookupEnv(t.Name())
-			assert.True(t, ft.Not(isSet))
+			assert.True(t, !isSet)
 		})
 	})
 }

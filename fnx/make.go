@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 )
 
 // MAKE provides namespaced access to the constructors provided by the Constructors type.
@@ -46,8 +45,17 @@ func (Constructors) ConvertWorkerToOperation(eh fn.Handler[error]) Converter[Wor
 // until the context is done, returning the context's cancellation error. Unless provided with a
 // custom context that can be canceled but does not return an error (which would break many common
 // assumptions regarding contexts,) this worker will always return an error.
-func (Constructors) ContextChannelWorker(ctx context.Context) Worker {
-	return MAKE.ErrorChannelWorker(ft.ContextErrorChannel(ctx))
+func (Constructors) ContextChannelWorker() Worker {
+	return func(ctx context.Context) error {
+		out := make(chan error)
+		go func() {
+			defer close(out)
+			defer func() { out <- ctx.Err() }()
+			<-ctx.Done()
+		}()
+
+		return <-out
+	}
 }
 
 // ErrorChannelWorker constructs a worker from an error channel. The resulting worker blocks until

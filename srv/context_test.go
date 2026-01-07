@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/wpa"
 )
@@ -205,15 +204,15 @@ func TestContext(t *testing.T) {
 		if orca := GetOrchestrator(ctx); orca == nil {
 			t.Error("should have orchestrator")
 		} else {
-			assert.True(t, ft.IsType[*Orchestrator](orca))
+			assert.Type[*Orchestrator](t, orca)
 		}
 		if bctx := GetBaseContext(ctx); bctx == nil {
 			t.Error("should have base context")
 		} else {
-			assert.True(t, ft.IsType[context.Context](bctx))
+			assert.Type[context.Context](t, bctx)
 		}
 		if shutdown := GetShutdownSignal(ctx); shutdown != nil {
-			assert.True(t, ft.IsType[context.CancelFunc](shutdown))
+			assert.Type[context.CancelFunc](t, shutdown)
 		}
 	})
 	t.Run("ContextsAreAStack", func(t *testing.T) {

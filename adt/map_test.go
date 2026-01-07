@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/ft"
 )
 
 // When implementing the Map[K,V] type, I wrote a number of
@@ -224,7 +223,9 @@ func TestMap(t *testing.T) {
 
 			assert.Equal(t, 2, mp2.Len())
 			assert.Equal(t, 3, mp.Len())
-			assert.Equal(t, ft.IgnoreSecond(mp.Load("foo")), 500)
+			val, ok := mp.Load("foo")
+			assert.True(t, ok)
+			assert.Equal(t, val, 500)
 		})
 	})
 	t.Run("JSON", func(t *testing.T) {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -152,7 +151,7 @@ func TestFilter(t *testing.T) {
 func TestConverter(t *testing.T) {
 	t.Run("Iterator", func(t *testing.T) {
 		conv := MakeConverter(strconv.Itoa)
-		input := ft.Slice(1, 2, 3, 4)
+		input := []int{1, 2, 3, 4}
 		out := irt.Collect(conv.Iterator(irt.Slice(input)))
 		assert.Equal(t, len(input), len(out))
 		for idx := range out {

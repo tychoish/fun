@@ -9,7 +9,7 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
+	"github.com/tychoish/fun/stw"
 )
 
 // AtomicValue describes the public interface of the Atomic type. Use
@@ -45,7 +45,8 @@ func (a *Atomic[T]) Get() T { return a.Load() }
 
 // Load returns the value stored in the atomic. It mirrors the
 // standard library's interface for atomics.
-func (a *Atomic[T]) Load() T { return ft.SafeCast[T](a.val.Load()) }
+func (a *Atomic[T]) Load() T           { return a.cast(a.val.Load()) }
+func (*Atomic[T]) cast(in any) (out T) { out, _ = in.(T); return }
 
 // Swap does an in place exchange of the contents of a value
 // exchanging the new value for the old. Unlike sync.Atomic.Swap() if
@@ -85,7 +86,7 @@ func CompareAndSwap[T comparable, A AtomicValue[T]](a A, oldVal, newVal T) bool 
 
 // Reset sets the atomic, for an atomic value that holds a number, to
 // 0, and returns the previously stored value.
-func Reset[T intish.Numbers, A AtomicValue[T]](a A) T {
+func Reset[T stw.Integers, A AtomicValue[T]](a A) T {
 	var delta T
 	for {
 		delta = a.Load()

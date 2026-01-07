@@ -11,7 +11,6 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 )
 
 const (
@@ -155,7 +154,7 @@ func (s *Service) Start(ctx context.Context) error {
 		ctx, s.cancel = context.WithCancel(ctx)
 		sig := s.Signal
 		if sig == nil {
-			sig = fnx.MAKE.ContextChannelWorker(ctx)
+			sig = fnx.MAKE.ContextChannelWorker()
 		}
 
 		shutdownSignal := make(chan struct{})
@@ -206,8 +205,8 @@ func (s *Service) Start(ctx context.Context) error {
 // started or isn't running this has no effect. Close is safe to call
 // multiple times.
 func (s *Service) Close() {
-	if s.isRunning.Load() {
-		ft.CallSafe(s.cancel)
+	if s.isRunning.Load() && s.cancel != nil {
+		s.cancel()
 	}
 }
 

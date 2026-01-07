@@ -1,4 +1,4 @@
-package intish
+package stw
 
 import (
 	"fmt"

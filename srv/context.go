@@ -15,7 +15,6 @@ import (
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/pubsub"
-	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/wpa"
 )
 
@@ -275,7 +274,7 @@ func getQueueForOpts(optp ...opt.Provider[*wpa.WorkerGroupConf]) *pubsub.Queue[f
 	opts := &wpa.WorkerGroupConf{}
 	erc.Invariant(opt.Join(optp...).Apply(opts))
 
-	return risky.Force(pubsub.NewQueue[fnx.Worker](
+	return erc.Must(pubsub.NewQueue[fnx.Worker](
 		pubsub.QueueOptions{
 			SoftQuota:   2 * opts.NumWorkers,
 			HardLimit:   4 * opts.NumWorkers,

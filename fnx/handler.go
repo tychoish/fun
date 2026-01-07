@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -58,14 +57,14 @@ func JoinHandlers[T any](pfs ...Handler[T]) Handler[T] {
 func (pf Handler[T]) Wait(in T) error { return pf(context.Background(), in) }
 
 // Ignore runs the process function and discards the error.
-func (pf Handler[T]) Ignore(ctx context.Context, in T) { ft.Ignore(pf(ctx, in)) }
+func (pf Handler[T]) Ignore(ctx context.Context, in T) { _ = pf(ctx, in) }
 
 // Check processes the input and returns true when the error is nil,
 // and false when there was an error.
 func (pf Handler[T]) Check(ctx context.Context, in T) bool { return ers.IsOk(pf(ctx, in)) }
 
 // Force processes the input, but discards the error and uses a background context.
-func (pf Handler[T]) Force(in T) { ft.Ignore(pf.Wait(in)) }
+func (pf Handler[T]) Force(in T) { _ = pf.Wait(in) }
 
 // Must calls the underlying handler, but converts all errors returned by the handler into panics.
 func (pf Handler[T]) Must(ctx context.Context, in T) { must(pf.Read(ctx, in)) }
@@ -93,7 +92,9 @@ func (pf Handler[T]) After(ts time.Time) Handler[T] { return pf.Delay(time.Until
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Handler[T]) Delay(dur time.Duration) Handler[T] { return pf.Jitter(ft.Wrap(dur)) }
+func (pf Handler[T]) Delay(dur time.Duration) Handler[T] {
+	return func(ctx context.Context, in T) error { return pf.doDelay(ctx, dur, in) }
+}
 
 // Jitter wraps a Handler that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
@@ -101,15 +102,17 @@ func (pf Handler[T]) Delay(dur time.Duration) Handler[T] { return pf.Jitter(ft.W
 //
 // If the function produces a negative duration, there is no delay.
 func (pf Handler[T]) Jitter(jf func() time.Duration) Handler[T] {
-	return func(ctx context.Context, in T) error {
-		timer := time.NewTimer(max(0, jf()))
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-			return pf(ctx, in)
-		}
+	return func(ctx context.Context, in T) error { return pf.doDelay(ctx, jf(), in) }
+}
+
+func (pf Handler[T]) doDelay(ctx context.Context, d time.Duration, in T) error {
+	timer := time.NewTimer(max(0, d))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return pf(ctx, in)
 	}
 }
 
@@ -118,7 +121,14 @@ func (pf Handler[T]) Jitter(jf func() time.Duration) Handler[T] {
 // nil.
 //
 // The resulting Handler can be used more than once.
-func (pf Handler[T]) If(c bool) Handler[T] { return pf.When(ft.Wrap(c)) }
+func (pf Handler[T]) If(c bool) Handler[T] {
+	return func(ctx context.Context, in T) error {
+		if c {
+			return pf(ctx, in)
+		}
+		return nil
+	}
+}
 
 // When returns a Handler function that runs if the conditional function
 // returns true, and does not run otherwise. The conditional function
@@ -239,10 +249,15 @@ func (pf Handler[T]) WithCancel() (Handler[T], context.CancelFunc) {
 	once := &sync.Once{}
 
 	return func(ctx context.Context, in T) error {
-		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		invariant(wctx != nil, "must start the operation before calling cancel")
-		return pf(wctx, in)
-	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
+			once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+			invariant(wctx != nil, "must start the operation before calling cancel")
+			return pf(wctx, in)
+		}, func() {
+			once.Do(func() {})
+			if cancel != nil {
+				cancel()
+			}
+		}
 }
 
 // PreHook creates an amalgamated Handler that runs the operation

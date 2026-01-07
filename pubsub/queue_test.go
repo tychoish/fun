@@ -11,8 +11,8 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/irt"
-	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -499,7 +499,7 @@ func TestQueueStream(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
+			tt := erc.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
@@ -519,7 +519,7 @@ func TestQueueStream(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
+			tt := erc.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 
@@ -540,7 +540,7 @@ func TestQueueStream(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			tt := risky.Force(NewQueue[int](QueueOptions{HardLimit: 2}))
+			tt := erc.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
 			start := time.Now()

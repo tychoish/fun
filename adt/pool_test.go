@@ -11,7 +11,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/stw"
 	"github.com/tychoish/fun/testt"
 )
@@ -165,18 +164,29 @@ func TestPool(t *testing.T) {
 	t.Run("Finalize", func(t *testing.T) {
 		p := &Pool[int]{}
 
-		ft.CallTimes(100, func() { p.SetConstructor(rand.Int) })
+		for range 100 {
+			p.SetConstructor(rand.Int)
+		}
 		p.SetConstructor(nil)
 		assert.NotNil(t, p.constructor.Load())
 		p.SetCleanupHook(nil)
 		assert.NotNil(t, p.hook.Load())
 
-		ft.CallTimes(100, p.FinalizeSetup)
+		for range 100 {
+			p.FinalizeSetup()
+		}
+
 		check.Panic(t, func() { p.SetConstructor(rand.Int) })
 		check.Panic(t, func() { p.SetCleanupHook(func(int) int { return 0 }) })
 		check.Panic(t, func() { p.SetConstructor(nil) })
 		check.Panic(t, func() { p.SetCleanupHook(nil) })
 	})
+	t.Run("Default", func(t *testing.T) {
+		strpool := &Pool[string]{}
+		check.Zero(t, strpool.Get())
+		check.Equal(t, "", strpool.Get())
+	})
+
 	t.Run("MakeBytesBufferPool", func(t *testing.T) {
 		bp := MakeBytesBufferPool(1024)
 		buf := bp.Get()
@@ -186,7 +196,9 @@ func TestPool(t *testing.T) {
 		var count int64
 		for start := time.Now(); time.Since(start) < 2*time.Second; {
 			count++
-			ft.CallTimes(2048, func() { buf.WriteByte('!') })
+			for range 2048 {
+				buf.WriteByte('!')
+			}
 			bp.Put(buf)
 			buf = bp.Get()
 			check.Equal(t, buf.Len(), 0)

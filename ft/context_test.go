@@ -12,6 +12,45 @@ import (
 	"github.com/tychoish/fun/ft"
 )
 
+func TestContexts(t *testing.T) {
+	t.Run("Timeout", func(t *testing.T) {
+		var cc context.Context
+		ft.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+			assert.NotError(t, ctx.Err())
+			cc = ctx
+			time.Sleep(100 * time.Millisecond)
+			assert.Error(t, ctx.Err())
+			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+		})
+		assert.ErrorIs(t, cc.Err(), context.DeadlineExceeded)
+	})
+	t.Run("ScopeTimeout", func(t *testing.T) {
+		var cc context.Context
+		ft.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+			cc = ctx
+			assert.NotError(t, ctx.Err())
+		})
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+	t.Run("Scope", func(t *testing.T) {
+		var cc context.Context
+		ft.WithContextCall(func(ctx context.Context) {
+			cc = ctx
+			assert.NotError(t, ctx.Err())
+		})
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+	t.Run("Do", func(t *testing.T) {
+		var cc context.Context
+		assert.Equal(t, 42, ft.WithContextDo(func(ctx context.Context) int {
+			cc = ctx
+			check.NotError(t, ctx.Err())
+			return 42
+		}))
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+}
+
 func TestWithContext(t *testing.T) {
 	t.Run("TimeoutCall", func(t *testing.T) {
 		t.Run("TimeoutOccurs", func(t *testing.T) {

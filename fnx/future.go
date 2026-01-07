@@ -11,7 +11,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 )
 
@@ -161,7 +160,7 @@ func (pf Future[T]) Future(ctx context.Context, ob fn.Handler[error]) fn.Future[
 // Ignore creates a future that runs the future and returns
 // the value, ignoring the error.
 func (pf Future[T]) Ignore(ctx context.Context) fn.Future[T] {
-	return func() T { return ft.IgnoreSecond(pf(ctx)) }
+	return func() (out T) { out, _ = pf(ctx); return }
 }
 
 // Must returns a future that resolves the future returning the
@@ -173,11 +172,11 @@ func (pf Future[T]) Must(ctx context.Context) fn.Future[T] {
 // Force combines the semantics of Must and Wait as a future: when the
 // future is resolved, the future executes with a context that never
 // expires and panics in the case of an error.
-func (pf Future[T]) Force() fn.Future[T] { return func() T { return ft.IgnoreSecond(pf.Wait()) } }
+func (pf Future[T]) Force() fn.Future[T] { return func() (out T) { out, _ = pf.Wait(); return } }
 
 // Resolve calls the function returned by Force resolving the future. This ignores all errors and provides a the underlying
 // future with a context that will never be canceled.
-func (pf Future[T]) Resolve() T { return ft.Do(pf.Force()) }
+func (pf Future[T]) Resolve() T { return pf.Force().Resolve() }
 
 // Wait runs the future with a context that will ever expire.
 func (pf Future[T]) Wait() (T, error) { return pf(context.Background()) }
@@ -227,7 +226,14 @@ func (pf Future[T]) Once() Future[T] {
 // If returns a future that will execute the root future only if
 // the cond value is true. Otherwise, If will return the zero value
 // for T and a nil error.
-func (pf Future[T]) If(cond bool) Future[T] { return pf.When(ft.Wrap(cond)) }
+func (pf Future[T]) If(cond bool) Future[T] {
+	return func(ctx context.Context) (zero T, err error) {
+		if cond {
+			return pf(ctx)
+		}
+		return zero, nil
+	}
+}
 
 // After will return a Future that will block until the provided
 // time is in the past, and then execute normally.
@@ -237,7 +243,9 @@ func (pf Future[T]) After(ts time.Time) Future[T] { return pf.Delay(time.Until(t
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (pf Future[T]) Delay(d time.Duration) Future[T] { return pf.Jitter(ft.Wrap(d)) }
+func (pf Future[T]) Delay(d time.Duration) Future[T] {
+	return func(ctx context.Context) (T, error) { return pf.doDelay(ctx, d) }
+}
 
 // Jitter wraps a Future that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
@@ -246,14 +254,18 @@ func (pf Future[T]) Delay(d time.Duration) Future[T] { return pf.Jitter(ft.Wrap(
 // If the function produces a negative duration, there is no delay.
 func (pf Future[T]) Jitter(jf func() time.Duration) Future[T] {
 	return func(ctx context.Context) (out T, _ error) {
-		timer := time.NewTimer(max(0, jf()))
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return out, ctx.Err()
-		case <-timer.C:
-			return pf(ctx)
-		}
+		return pf.doDelay(ctx, jf())
+	}
+}
+
+func (pf Future[T]) doDelay(ctx context.Context, d time.Duration) (out T, _ error) {
+	timer := time.NewTimer(max(0, d))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return out, ctx.Err()
+	case <-timer.C:
+		return pf(ctx)
 	}
 }
 
@@ -262,11 +274,11 @@ func (pf Future[T]) Jitter(jf func() time.Duration) Future[T] {
 // root future. Otherwise When will return the zero value of T and a
 // nil error.
 func (pf Future[T]) When(cond func() bool) Future[T] {
-	return func(ctx context.Context) (out T, _ error) {
+	return func(ctx context.Context) (zero T, _ error) {
 		if cond() {
 			return pf(ctx)
 		}
-		return out, nil
+		return zero, nil
 	}
 }
 
@@ -295,10 +307,15 @@ func (pf Future[T]) WithCancel() (Future[T], context.CancelFunc) {
 	once := &sync.Once{}
 
 	return func(ctx context.Context) (out T, _ error) {
-		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		invariant(wctx != nil, "must start the operation before calling cancel")
-		return pf(wctx)
-	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
+			once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+			invariant(wctx != nil, "must start the operation before calling cancel")
+			return pf(wctx)
+		}, func() {
+			once.Do(func() {})
+			if cancel != nil {
+				cancel()
+			}
+		}
 }
 
 // Limit runs the future a specified number of times, and caches the

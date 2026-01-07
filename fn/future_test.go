@@ -8,7 +8,6 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestFuture(t *testing.T) {
@@ -108,26 +107,36 @@ func TestFuture(t *testing.T) {
 	t.Run("Limit", func(t *testing.T) {
 		count := 0
 		thunk := MakeFuture(func() int { count++; return 42 }).Limit(100)
-		ft.CallTimes(500, func() { check.Equal(t, 42, thunk()) })
+		for range 500 {
+			check.Equal(t, 42, thunk())
+		}
 		check.Equal(t, count, 100)
 	})
 	t.Run("TTL", func(t *testing.T) {
 		t.Run("Under", func(t *testing.T) {
 			count := 0
 			thunk := MakeFuture(func() int { count++; return 42 }).TTL(time.Minute)
-			ft.CallTimes(500, func() { check.Equal(t, 42, thunk()) })
+			for range 500 {
+				check.Equal(t, 42, thunk())
+			}
 			check.Equal(t, count, 1)
 		})
 		t.Run("Par", func(t *testing.T) {
 			count := 0
 			thunk := MakeFuture(func() int { count++; return 42 }).TTL(time.Nanosecond)
-			ft.CallTimes(500, func() { time.Sleep(10 * time.Nanosecond); check.Equal(t, 42, thunk()) })
+			for range 500 {
+				time.Sleep(10 * time.Nanosecond)
+				check.Equal(t, 42, thunk())
+			}
 			check.Equal(t, count, 500)
 		})
 		t.Run("Over", func(t *testing.T) {
 			count := 0
 			thunk := MakeFuture(func() int { count++; return 42 }).TTL(50 * time.Millisecond)
-			ft.CallTimes(100, func() { time.Sleep(25 * time.Millisecond); check.Equal(t, 42, thunk()) })
+			for range 100 {
+				time.Sleep(25 * time.Millisecond)
+				check.Equal(t, 42, thunk())
+			}
 
 			check.Equal(t, count, 50)
 		})

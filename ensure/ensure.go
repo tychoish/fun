@@ -9,7 +9,6 @@ import (
 	"github.com/tychoish/fun/ensure/is"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
@@ -117,7 +116,7 @@ func (a *Assertion) WithMetadata(key string, value any) *Assertion {
 
 // Run rus the test and produces the output.
 func (a *Assertion) Run(t testing.TB) {
-	erc.InvariantOk(ft.Not(a.constructing), "cannot execute assertion during construction")
+	erc.InvariantOk(!a.constructing, "cannot execute assertion during construction")
 	t.Helper()
 	strlogger := func(in string) {
 		t.Helper()
@@ -129,18 +128,18 @@ func (a *Assertion) Run(t testing.TB) {
 		t.Helper()
 		if a.alwaysLog || t.Failed() {
 			for it := a.messages.Front(); it.Ok(); it = it.Next() {
-				strlogger(ft.DoSafe(it.Value()))
+				if op := it.Value(); op != nil {
+					strlogger(op())
+				}
 			}
 		}
 	})
 
 	result := stw.Slice[string]{}
 
-	ft.ApplyWhen(
-		!a.check.Defined() && a.subtests.Len() == 0,
-		result.Push,
-		"no tests defined",
-	)
+	if !a.check.Defined() && a.subtests.Len() == 0 {
+		result.Push("no tests defined")
+	}
 
 	result.Append(a.check.Resolve()...)
 

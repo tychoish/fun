@@ -5,7 +5,6 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
@@ -64,7 +63,10 @@ func (s *OrderedSet[T]) Delete(in T) bool {
 		return false
 	}
 
-	ft.DoWhen(e != nil, e.Remove)
+	if e != nil {
+		e.Remove()
+	}
+
 	return true
 }
 

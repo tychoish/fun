@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -28,7 +27,10 @@ func (s *Stack[T]) uncheckedSetup() { s.length = 0; s.head = &Item[T]{value: s.z
 func (*Stack[T]) zero() (o T)       { return }
 func (s *Stack[T]) root() *Item[T] {
 	erc.Invariant(ers.If(s == nil, ErrUninitializedContainer))
-	ft.CallWhen(s.head == nil, s.uncheckedSetup)
+
+	if s.head == nil {
+		s.uncheckedSetup()
+	}
 
 	return s.head
 }

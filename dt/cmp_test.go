@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
@@ -16,7 +15,7 @@ import (
 func randomIntSlice(size int) stw.Slice[int] {
 	out := make([]int, size)
 	for idx := range out {
-		out[idx] = intish.Abs(rand.Intn(size) + 1)
+		out[idx] = stw.Abs(rand.Intn(size) + 1)
 	}
 	return stw.NewSlice(out)
 }

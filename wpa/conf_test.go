@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/opt"
 )
 
@@ -70,7 +69,7 @@ func TestOptionProvider(t *testing.T) {
 		})
 		t.Run("Termintaing", func(t *testing.T) {
 			opt.ErrorCollector = &erc.Collector{}
-			check.True(t, ft.Not(opt.CanContinueOnError(io.EOF)))
+			check.True(t, !opt.CanContinueOnError(io.EOF))
 		})
 
 		t.Run("Continue", func(t *testing.T) {
@@ -232,9 +231,9 @@ func TestWorkerGroupConfJoinOptions(t *testing.T) {
 		assert.NotError(t, err)
 		assert.Equal(t, conf.NumWorkers, 1)      // because it's overridden by the validate method
 		assert.NotNilPtr(t, conf.ErrorCollector) // set by validate method
-		assert.True(t, ft.Not(conf.ContinueOnError))
-		assert.True(t, ft.Not(conf.ContinueOnPanic))
-		assert.True(t, ft.Not(conf.IncludeContextExpirationErrors))
+		assert.True(t, !conf.ContinueOnError)
+		assert.True(t, !conf.ContinueOnPanic)
+		assert.True(t, !conf.IncludeContextExpirationErrors)
 		assert.Equal(t, len(conf.ExcludedErrors), 0)
 	})
 
@@ -366,7 +365,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 				conf := &WorkerGroupConf{}
 				conf.Validate()
 
-				assert.True(t, ft.Not(conf.CanContinueOnError(tt.err)))
+				assert.True(t, !conf.CanContinueOnError(tt.err))
 				assert.Equal(t, conf.ErrorCollector.Len(), 0)
 			})
 		}
@@ -377,7 +376,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 			conf := &WorkerGroupConf{ContinueOnPanic: false}
 			conf.Validate()
 
-			assert.True(t, ft.Not(conf.CanContinueOnError(ers.ErrRecoveredPanic)))
+			assert.True(t, !conf.CanContinueOnError(ers.ErrRecoveredPanic))
 			assert.Equal(t, conf.ErrorCollector.Len(), 1)
 		})
 
@@ -395,7 +394,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 			conf := &WorkerGroupConf{IncludeContextExpirationErrors: false}
 			conf.Validate()
 
-			assert.True(t, ft.Not(conf.CanContinueOnError(errors.New("context canceled"))))
+			assert.True(t, !conf.CanContinueOnError(errors.New("context canceled")))
 			assert.Equal(t, conf.ErrorCollector.Len(), 1)
 		})
 
@@ -405,7 +404,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 
 			// Context errors should still return false for continuation
 			// but the error should not be collected
-			assert.True(t, ft.Not(conf.CanContinueOnError(errors.New("context deadline exceeded"))))
+			assert.True(t, !conf.CanContinueOnError(errors.New("context deadline exceeded")))
 		})
 	})
 
@@ -430,7 +429,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 					conf.Validate()
 
 					result := conf.CanContinueOnError(tt.err)
-					assert.True(t, ft.Not(result))
+					assert.True(t, !result)
 				})
 			}
 		})
@@ -444,7 +443,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 
 				result := conf.CanContinueOnError(context.Canceled)
 
-				assert.True(t, ft.Not(result))
+				assert.True(t, !result)
 				// Error should NOT be collected when include is false
 				assert.Equal(t, conf.ErrorCollector.Len(), 0)
 			})
@@ -457,7 +456,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 
 				result := conf.CanContinueOnError(context.DeadlineExceeded)
 
-				assert.True(t, ft.Not(result))
+				assert.True(t, !result)
 				// Error should be collected when include is true
 				assert.Equal(t, conf.ErrorCollector.Len(), 1)
 			})
@@ -500,7 +499,7 @@ func TestWorkerGroupConfCanContinueOnError(t *testing.T) {
 			conf.Validate()
 
 			testErr := errors.New("test error")
-			assert.True(t, ft.Not(conf.CanContinueOnError(testErr)))
+			assert.True(t, !conf.CanContinueOnError(testErr))
 			assert.Equal(t, conf.ErrorCollector.Len(), 1)
 		})
 
@@ -714,7 +713,7 @@ func TestCustomValidators(t *testing.T) {
 		assert.Equal(t, len(conf.CustomValidators), 1)
 		// Should only get err2, not err1
 		assert.Substring(t, err.Error(), err2.Error())
-		assert.True(t, ft.Not(errors.Is(err, err1)))
+		assert.True(t, !errors.Is(err, err1))
 	})
 
 	t.Run("ValidatorWithConfModification", func(t *testing.T) {

@@ -2,18 +2,14 @@ package fnx
 
 import (
 	"context"
-	"io"
 	"math/rand"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestWaitGroup(t *testing.T) {
@@ -180,31 +176,5 @@ func TestWaitGroup(t *testing.T) {
 
 		wg.Wait(ctx)
 		check.Equal(t, count, 128)
-	})
-	t.Run("WorkerHandler", func(t *testing.T) {
-		wg := &WaitGroup{}
-		ctx := t.Context()
-		count := &atomic.Int64{}
-		op := MakeWorker(func() error { count.Add(1); return nil })
-		check.Equal(t, 0, count.Load())
-		ec := &erc.Collector{}
-		wh := wg.WorkerHandler(ctx, ec.Push)
-		check.Equal(t, 0, count.Load())
-		wh(op)
-		wg.Wait(ctx)
-		check.Equal(t, 1, count.Load())
-		for range 9 {
-			wh(op)
-		}
-		wg.Wait(ctx)
-		check.Equal(t, 10, count.Load())
-		op = MakeWorker(func() error { count.Add(1); return io.EOF })
-		for range 10 {
-			wh(op)
-		}
-		wg.Wait(ctx)
-		check.True(t, ft.Not(ec.Ok()))
-		check.Equal(t, ec.Len(), 10)
-		check.ErrorIs(t, ec.Err(), io.EOF)
 	})
 }

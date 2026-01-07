@@ -4,13 +4,13 @@ import (
 	"context"
 	"iter"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/testt"
 	"github.com/tychoish/fun/wpa"
@@ -29,7 +29,7 @@ func TestRateLimit(t *testing.T) {
 
 	t.Run("Serial", func(t *testing.T) {
 		ctx := t.Context()
-		count := &intish.Atomic[int]{}
+		count := &atomic.Int64{}
 
 		check.MinRuntime(t, 100*time.Millisecond, func() {
 			assert.NotError(t, IteratorStream(RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond)).
@@ -37,14 +37,14 @@ func TestRateLimit(t *testing.T) {
 					check.True(t, in >= 0)
 					check.True(t, in <= 100)
 					count.Add(1)
-					testt.Log(t, in, count.Get(), "-->", time.Now())
+					testt.Log(t, in, count.Load(), "-->", time.Now())
 				})).Run(testt.Context(t)))
 		})
 
-		assert.Equal(t, 100, count.Get())
+		assert.Equal(t, 100, count.Load())
 	})
 	t.Run("Parallel", func(t *testing.T) {
-		count := &intish.Atomic[int]{}
+		count := &atomic.Int64{}
 		ctx := t.Context()
 
 		check.MinRuntime(t, 100*time.Millisecond, func() {
@@ -53,7 +53,7 @@ func TestRateLimit(t *testing.T) {
 					check.True(t, in >= 0)
 					check.True(t, in <= 100)
 					count.Add(1)
-					testt.Log(t, in, count.Get(), "-->", time.Now())
+					testt.Log(t, in, count.Load(), "-->", time.Now())
 					return nil
 				}
 			})
@@ -69,7 +69,7 @@ func TestRateLimit(t *testing.T) {
 			wg.Wait()
 		})
 
-		assert.Equal(t, 101, count.Get())
+		assert.Equal(t, 101, count.Load())
 	})
 	t.Run("Cancelation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -77,19 +77,19 @@ func TestRateLimit(t *testing.T) {
 
 		start := time.Now()
 		go func() { time.Sleep(time.Second); cancel() }()
-		count := &intish.Atomic[int]{}
+		count := &atomic.Int64{}
 		for in := range RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Second) {
 			check.True(t, in >= 0)
 			check.True(t, in <= 100)
 			count.Add(1)
-			testt.Log(t, count.Get(), "-->", time.Now())
+			testt.Log(t, count.Load(), "-->", time.Now())
 		}
 		end := time.Now()
 		dur := end.Sub(start)
 
 		testt.Logf(t, "start at %s, end at %s; duration=%s ", start, end, dur)
 
-		assert.Equal(t, 10, count.Get())
+		assert.Equal(t, 10, count.Load())
 		assert.True(t, dur >= time.Second)
 	})
 }

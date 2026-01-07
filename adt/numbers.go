@@ -1,39 +1,41 @@
-package intish
+package adt
 
 import (
 	"math"
 	"sync/atomic"
+
+	"github.com/tychoish/fun/stw"
 )
 
-// Atomic is a wrapper around sync/atomic.Int64 that provides
+// AtomicInteger is a wrapper around sync/atomic.Int64 that provides
 // type-preserving atomic storage for all numeric types.
 //
-// Atomic shares an interface with the adt.Atomic wrapper types.
-type Atomic[T Numbers] struct{ n atomic.Int64 }
+// AtomicInteger shares an interface with the adt.AtomicInteger wrapper types.
+type AtomicInteger[T stw.Integers] struct{ n atomic.Int64 }
 
 // Get retrieves the current value stored in the atomic variable.
 // This is an alias for Load() for consistency with other atomic interfaces.
-func (a *Atomic[T]) Get() T { return a.Load() }
+func (a *AtomicInteger[T]) Get() T { return a.Load() }
 
 // Set writes a new value to the atomic variable.
 // This is an alias for Store() for consistency with other atomic interfaces.
-func (a *Atomic[T]) Set(in T) { a.Store(in) }
+func (a *AtomicInteger[T]) Set(in T) { a.Store(in) }
 
 // Load atomically retrieves and returns the current value.
-func (a *Atomic[T]) Load() T { return T(a.n.Load()) }
+func (a *AtomicInteger[T]) Load() T { return T(a.n.Load()) }
 
 // Store atomically writes the given value.
-func (a *Atomic[T]) Store(in T) { a.n.Store(int64(in)) }
+func (a *AtomicInteger[T]) Store(in T) { a.n.Store(int64(in)) }
 
 // Swap atomically replaces the current value with newVal and returns the previous value.
-func (a *Atomic[T]) Swap(newVal T) T { return T(a.n.Swap(int64(newVal))) }
+func (a *AtomicInteger[T]) Swap(newVal T) T { return T(a.n.Swap(int64(newVal))) }
 
 // Add atomically increments the current value by delta and returns the new value.
-func (a *Atomic[T]) Add(delta T) T { return T(a.n.Add(int64(delta))) }
+func (a *AtomicInteger[T]) Add(delta T) T { return T(a.n.Add(int64(delta))) }
 
 // CompareAndSwap atomically examines the current value against oldVal and,
 // if they are equal, replaces it with newValue. It returns true if the replacement was performed.
-func (a *Atomic[T]) CompareAndSwap(oldVal, newValue T) bool {
+func (a *AtomicInteger[T]) CompareAndSwap(oldVal, newValue T) bool {
 	return a.n.CompareAndSwap(int64(oldVal), int64(newValue))
 }
 

@@ -94,8 +94,12 @@ func (m *Map[K, V]) Set(key K, value V) bool { return m.inc().shard(key).set(key
 
 // Get returns the value stored in the map, or the zero value for that
 // type if it isn't present.
-func (m *Map[K, V]) Get(key K) V {
-	return ft.IgnoreSecond(m.shard(key).read().Load(key)).Load()
+func (m *Map[K, V]) Get(key K) (out V) {
+	wv, ok := m.shard(key).read().Load(key)
+	if ok {
+		out = wv.Load()
+	}
+	return
 }
 
 // Extend adds items from the sequence to the sharded map

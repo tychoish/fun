@@ -5,7 +5,6 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -29,7 +28,12 @@ func (cf Converter[I, O]) Lock() Converter[I, O] { return cf.WithLock(&sync.Mute
 
 // If returns a converter that executes only when the condition is true, otherwise is a noop and
 // returns zero value of the output type..
-func (cf Converter[I, O]) If(cond bool) Converter[I, O] { return ft.IfElse(cond, cf, cf.noop) }
+func (cf Converter[I, O]) If(cond bool) Converter[I, O] {
+	if cond {
+		return cf
+	}
+	return cf.noop
+}
 
 // When returns a converter that executes only when the provided condition function returns true.
 func (cf Converter[I, O]) When(c func() bool) Converter[I, O] {
@@ -38,13 +42,25 @@ func (cf Converter[I, O]) When(c func() bool) Converter[I, O] {
 
 // PreHook returns a converter that executes the provided hook function before the conversion.
 func (cf Converter[I, O]) PreHook(h func()) Converter[I, O] {
-	return func(i I) O { ft.CallSafe(h); return cf(i) }
+	return func(i I) O {
+		if h != nil {
+			h()
+		}
+		return cf(i)
+	}
 }
 
 // PostHook returns a converter that executes the provided hook function after the conversion using
 // defer, ensuring that the hook always runs. Nil hook functions are ignored.
 func (cf Converter[I, O]) PostHook(h func()) Converter[I, O] {
-	return func(i I) O { defer ft.CallSafe(h); return cf(i) }
+	return func(i I) O {
+		defer func() {
+			if h != nil {
+				h()
+			}
+		}()
+		return cf(i)
+	}
 }
 
 // PreFilter returns a converter that applies the provided filter to the input before executing the

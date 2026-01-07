@@ -14,8 +14,8 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -36,12 +36,12 @@ func (tt *waitPushCase) check(t *testing.T) {
 func makeWaitPushCases() []*waitPushCase {
 	var cases []*waitPushCase
 
-	front := &waitPushCase{Name: "Front", dq: risky.Force(NewDeque[int](DequeOptions{Capacity: 2}))}
+	front := &waitPushCase{Name: "Front", dq: erc.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
 	front.Push = front.dq.WaitPushFront
 	front.Pop = front.dq.PopBack
 	cases = append(cases, front)
 
-	back := &waitPushCase{Name: "Back", dq: risky.Force(NewDeque[int](DequeOptions{Capacity: 2}))}
+	back := &waitPushCase{Name: "Back", dq: erc.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
 	back.Push = back.dq.WaitPushBack
 	back.Pop = back.dq.PopFront
 	cases = append(cases, back)
@@ -84,7 +84,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := risky.Force(NewQueue[T](QueueOptions{HardLimit: 100, SoftQuota: 60}))
+			cue := erc.Must(NewQueue[T](QueueOptions{HardLimit: 100, SoftQuota: 60}))
 
 			return fixture[T]{
 				name:   "QueueLimited",
@@ -163,7 +163,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 		},
 		// simple capacity
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := erc.Must(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:   "DequeCapacityPushFrontPopBackForward",
@@ -176,7 +176,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := erc.Must(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:   "DequeCapacityPushBackPopFrontReverse",
@@ -189,7 +189,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := erc.Must(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:   "DequeCapacityPushFrontPopBackReverse",
@@ -203,7 +203,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 		},
 
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{Capacity: 50}))
+			cue := erc.Must(NewDeque[T](DequeOptions{Capacity: 50}))
 
 			return fixture[T]{
 				name:   "DequeCapacityPushBackPopFrontForward",
@@ -218,7 +218,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 
 		// bursty limited size
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
+			cue := erc.Must(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
 
 			return fixture[T]{
 				name:   "DequeBurstPushFrontPopBackForward",
@@ -231,7 +231,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
+			cue := erc.Must(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
 
 			return fixture[T]{
 				name:   "DequeBurstPushBackPopFrontReverse",
@@ -244,7 +244,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			}
 		},
 		func() fixture[T] {
-			cue := risky.Force(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
+			cue := erc.Must(NewDeque[T](DequeOptions{QueueOptions: &QueueOptions{HardLimit: 100, SoftQuota: 60}}))
 
 			return fixture[T]{
 				name:   "DequeBurstPushFrontPopBackReverse",
@@ -807,7 +807,7 @@ func TestDequeIntegration(t *testing.T) {
 
 		t.Parallel()
 
-		queue := risky.Force(NewDeque[int64](DequeOptions{Unlimited: true}))
+		queue := erc.Must(NewDeque[int64](DequeOptions{Unlimited: true}))
 		ctx := testt.Context(t)
 		counter := &atomic.Int64{}
 		input := &atomic.Int64{}
@@ -875,7 +875,7 @@ func TestDequeIntegration(t *testing.T) {
 	t.Run("FutureConsumer", func(t *testing.T) {
 		t.Parallel()
 		ctx := testt.ContextWithTimeout(t, time.Second)
-		queue := risky.Force(NewDeque[func()](DequeOptions{Unlimited: true}))
+		queue := erc.Must(NewDeque[func()](DequeOptions{Unlimited: true}))
 		sent := &atomic.Int64{}
 		recv := &atomic.Int64{}
 
@@ -924,7 +924,7 @@ func TestDequeLIFO(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		dq := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		count := 0
 		for range dq.IteratorWaitPopBack(ctx) {
@@ -935,7 +935,7 @@ func TestDequeLIFO(t *testing.T) {
 	})
 
 	t.Run("ConsumesItems", func(t *testing.T) {
-		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		dq := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -958,7 +958,7 @@ func TestDequeLIFO(t *testing.T) {
 	})
 
 	t.Run("RemovesFromBack", func(t *testing.T) {
-		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		dq := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
@@ -989,7 +989,7 @@ func TestDequeFIFO(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		dq := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		count := 0
 		for range dq.IteratorWaitPopFront(ctx) {
@@ -1000,7 +1000,7 @@ func TestDequeFIFO(t *testing.T) {
 	})
 
 	t.Run("ConsumesItems", func(t *testing.T) {
-		dq := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		dq := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -1023,7 +1023,7 @@ func TestDequeFIFO(t *testing.T) {
 	})
 
 	t.Run("RemovesFromFront", func(t *testing.T) {
-		dq := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		dq := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
@@ -1053,7 +1053,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		err := deque.Drain(ctx)
 		assert.NotError(t, err)
@@ -1064,7 +1064,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add items
 		for i := 0; i < 5; i++ {
@@ -1108,7 +1108,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add some items
 		for i := 0; i < 3; i++ {
@@ -1153,7 +1153,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add items
 		for i := 0; i < 3; i++ {
@@ -1192,7 +1192,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items that won't be consumed
 		for i := 0; i < 5; i++ {
@@ -1229,7 +1229,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 100}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 100}))
 
 		// Add many items
 		for i := 0; i < 50; i++ {
@@ -1263,7 +1263,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// First drain on empty deque
 		err := deque.Drain(ctx)
@@ -1302,7 +1302,7 @@ func TestDequeDrain(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add items
 		for i := 0; i < 3; i++ {
@@ -1336,7 +1336,7 @@ func TestDequeDrain(t *testing.T) {
 		defer cancel()
 
 		// Create deque with capacity of 2
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 2}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 2}))
 
 		// Fill the deque to capacity
 		check.NotError(t, deque.PushBack(1))
@@ -1401,7 +1401,7 @@ func TestDequeShutdown(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items
 		for i := 0; i < 3; i++ {
@@ -1444,7 +1444,7 @@ func TestDequeShutdown(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[string](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Shutdown empty deque
 		err := deque.Shutdown(ctx)
@@ -1459,7 +1459,7 @@ func TestDequeShutdown(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items that won't be consumed
 		for i := 0; i < 5; i++ {
@@ -1496,7 +1496,7 @@ func TestDequeShutdown(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 
-		deque := risky.Force(NewDeque[int](DequeOptions{Capacity: 10}))
+		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items to deque
 		check.NotError(t, deque.PushBack(1))

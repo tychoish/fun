@@ -8,14 +8,13 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
 func TestShardedMap(t *testing.T) {
 	t.Run("LazyInitialization", func(t *testing.T) {
 		m := &Map[string, int]{}
-		assert.True(t, ft.Not(m.sh.Called()))
+		assert.True(t, !m.sh.Called())
 		m.Store("key", 42)
 		assert.True(t, m.sh.Called())
 
@@ -26,26 +25,34 @@ func TestShardedMap(t *testing.T) {
 		m := &Map[string, int]{}
 		check.Equal(t, m.Version(), 0)
 
-		check.True(t, ft.Not(m.Set("a", 12)))
+		check.True(t, !m.Set("a", 12))
 		check.Equal(t, m.Version(), 1)
 		check.True(t, m.Set("a", 42))
 		check.Equal(t, m.Version(), 2)
 		check.Equal(t, erc.MustOk(m.Load("a")), 42)
 		_, ok := m.Load("b")
 		check.True(t, !ok)
-		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 2)
+		vv, ok := m.Versioned("a")
+		assert.True(t, ok)
+		check.Equal(t, vv.Version(), 2)
 
 		check.Zero(t, m.Get("c"))
 		m.Store("a", 84)
 		check.Equal(t, m.Version(), 3)
 		check.Equal(t, m.Get("a"), 84)
-		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 3)
+		vv, ok = m.Versioned("a")
+		assert.True(t, ok)
+		check.Equal(t, vv.Version(), 3)
 
 		m.Store("b", 42)
 		check.Equal(t, m.Version(), 4)
 		check.Equal(t, m.Get("b"), 42)
-		check.Equal(t, ft.IgnoreSecond(m.Versioned("a")).Version(), 3)
-		check.Equal(t, ft.IgnoreSecond(m.Versioned("b")).Version(), 1)
+		vv, ok = m.Versioned("a")
+		assert.True(t, ok)
+		check.Equal(t, vv.Version(), 3)
+		vv, ok = m.Versioned("b")
+		assert.True(t, ok)
+		check.Equal(t, vv.Version(), 1)
 
 		assert.Equal(t, m.Version(), m.Clocks()[0])
 	})

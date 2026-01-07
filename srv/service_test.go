@@ -14,8 +14,8 @@ import (
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/dt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/risky"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -355,7 +355,7 @@ func TestService(t *testing.T) {
 				defer close(sig)
 				//nolint:bodyclose
 				resp, err := http.DefaultClient.Do(
-					risky.Force(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
+					erc.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
 				)
 				if err != nil {
 					t.Error(err)
@@ -387,10 +387,7 @@ func TestService(t *testing.T) {
 		}
 		s.ErrorHandler.Set(func(err error) { oberr.Set(err) })
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		assert.NotError(t, s.Start(ctx))
+		assert.NotError(t, s.Start(t.Context()))
 		err := s.Wait()
 		errs := ers.Unwind(err)
 		assert.Error(t, err)

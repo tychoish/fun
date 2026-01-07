@@ -10,7 +10,6 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
@@ -106,11 +105,13 @@ func NilPtr[T any](val *T) That { return EqualTo(val, nil) }
 // NotNilPtr asserts that the pointer is not nil.
 func NotNilPtr[T any](val *T) That { return NotEqualTo(val, nil) }
 
+func checkTypeFor[T any](in any) bool { _, ok := in.(T); return ok }
+
 // Nil asserts that the value is nil. Uses reflection unlike the other
 // assertions.
 func Nil(val any) That {
 	return All(
-		assertf(!ft.IsType[error](val), "use is.Error() rather than is.Nil() for errors"),
+		assertf(!checkTypeFor[error](val), "use is.Error() rather than is.Nil() for errors"),
 		assertf(internal.IsNil(val), "value (type=%T), was nil", val),
 	)
 }
@@ -118,7 +119,7 @@ func Nil(val any) That {
 // NotNil asserts that the value is not nil.
 func NotNil(val any) That {
 	return All(
-		assertf(!ft.IsType[error](val), "use is.Error() rather than is.Nil() for errors"),
+		assertf(!checkTypeFor[error](val), "use is.Error() rather than is.Nil() for errors"),
 		assertf(!internal.IsNil(val), "value (type=%T), was nil", val),
 	)
 }
@@ -136,12 +137,12 @@ func typestr[T any]() string { var zero T; return fmt.Sprintf("%T", zero) }
 
 // Type asserts that value v is of type T.
 func Type[T any](v any) That {
-	return assertf(ft.IsType[T](v), "%v [%T] is not %s", v, v, typestr[T]())
+	return assertf(checkTypeFor[T](v), "%v [%T] is not %s", v, v, typestr[T]())
 }
 
 // NotType asserts that the value v is not of type T.
 func NotType[T any](v any) That {
-	return assertf(!ft.IsType[T](v), "%v [%T] is  %s", v, v, typestr[T]())
+	return assertf(!checkTypeFor[T](v), "%v [%T] is  %s", v, v, typestr[T]())
 }
 
 // Substring asserts that the string (s) contains the substring (substr).

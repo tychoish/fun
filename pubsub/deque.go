@@ -7,9 +7,9 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/irt"
-	"github.com/tychoish/fun/risky"
 )
 
 // Deque proves a basic double ended queue backed by a doubly linked
@@ -85,7 +85,7 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 
 // NewUnlimitedDeque constructs an unbounded Deque.
 func NewUnlimitedDeque[T any]() *Deque[T] {
-	return risky.Force(NewDeque[T](DequeOptions{Unlimited: true}))
+	return erc.Must(NewDeque[T](DequeOptions{Unlimited: true}))
 }
 
 func makeDeque[T any]() *Deque[T] {

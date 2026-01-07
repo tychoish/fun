@@ -97,7 +97,7 @@ func TestConstructors(t *testing.T) {
 		t.Run("ContextChannelWorker", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
-			err := MAKE.ContextChannelWorker(ctx).Run(t.Context())
+			err := MAKE.ContextChannelWorker().Run(ctx)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.Canceled)
 			assert.True(t, t.Context().Err() == nil)

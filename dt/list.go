@@ -6,7 +6,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -174,7 +173,9 @@ func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != 
 func (l *List[T]) root() *Element[T] {
 	erc.Invariant(ers.If(l == nil, ErrUninitializedContainer))
 
-	ft.CallWhen(l.head == nil, l.uncheckedSetup)
+	if l.head == nil {
+		l.uncheckedSetup()
+	}
 
 	return l.head
 }

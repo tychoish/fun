@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestProcess(t *testing.T) {
@@ -174,7 +173,9 @@ func TestProcess(t *testing.T) {
 			oe := FromHandler(func(err error) { must(err) })
 			op = op.Lock()
 
-			ft.CallTimes(128, func() { oe(ctx, op(ctx, 42)) })
+			for range 128 {
+				check.NotError(t, oe(ctx, op(ctx, 42)))
+			}
 			wg.Wait(ctx)
 			assert.Equal(t, count, 128)
 		})

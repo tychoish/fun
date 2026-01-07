@@ -6,8 +6,8 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/stw"
 )
 
 // the maximum size for the ring: given that we divide to find the
@@ -38,9 +38,20 @@ type Ring[T any] struct {
 
 // Setup sets the size of the ring buffer and initializes the buffer,
 // if the buffer hasn't been used. Using the buffer initializes it with a size of 1024.
-func (r *Ring[T]) Setup(size int) { r.size = ft.IfElse(r.size == 0, size, r.size); r.init() }
+func (r *Ring[T]) Setup(size int) {
+	if r.size == 0 {
+		r.size = size
+	}
+	r.init()
+}
 
-func (r *Ring[T]) init() { ft.CallWhen(r.buf.ring == nil, r.innerInit) }
+func (r *Ring[T]) init() {
+	if r.buf.ring == nil {
+		r.innerInit()
+		return
+	}
+}
+
 func (r *Ring[T]) innerInit() {
 	r.size = ft.Default(r.size, defaultRingSize)
 
@@ -53,10 +64,16 @@ func (r *Ring[T]) innerInit() {
 
 func (*Ring[T]) zero() (out T)            { return out }
 func (r *Ring[T]) hasWrapped() bool       { return int(r.total) > r.size }
-func (r *Ring[T]) offset(idx, by int) int { return (r.size * max(1, intish.Abs(idx))) + (idx + by) }
-func (r *Ring[T]) oldest() int            { return ft.IfElse(r.hasWrapped(), r.pos, 0) }
+func (r *Ring[T]) offset(idx, by int) int { return (r.size * max(1, stw.Abs(idx))) + (idx + by) }
 func (r *Ring[T]) after(idx int) int      { return r.offset(idx, 1) % r.size }
 func (r *Ring[T]) before(idx int) int     { return r.offset(idx, -1) % r.size }
+
+func (r *Ring[T]) oldest() int {
+	if r.hasWrapped() {
+		return r.pos
+	}
+	return 0
+}
 
 // Cap returns the capacity of the ring buffer. This is either the size passed to Setup() or the default 1024.
 func (r *Ring[T]) Cap() int { return r.size }

@@ -1,4 +1,4 @@
-package intish
+package adt
 
 import (
 	"sync"
@@ -17,7 +17,7 @@ func doTimes(num int, op func()) {
 func TestAtomic(t *testing.T) {
 	t.Run("Integers", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
-			atom := &Atomic[int32]{}
+			atom := &AtomicInteger[int32]{}
 			doTimes(256, func() {
 				atom.Set(100)
 				if v := atom.Get(); v != 100 {
@@ -26,7 +26,7 @@ func TestAtomic(t *testing.T) {
 			})
 		})
 		t.Run("Add", func(t *testing.T) {
-			atom := &Atomic[uint]{}
+			atom := &AtomicInteger[uint]{}
 			doTimes(256, func() {
 				val := atom.Add(100)
 				if val < 100 {
@@ -38,7 +38,7 @@ func TestAtomic(t *testing.T) {
 			})
 		})
 		t.Run("Swap", func(t *testing.T) {
-			atom := &Atomic[uint]{}
+			atom := &AtomicInteger[uint]{}
 			doTimes(256, func() {
 				val := atom.Swap(100)
 				if val == 0 || val == 100 {
@@ -55,7 +55,7 @@ func TestAtomic(t *testing.T) {
 			}
 		})
 		t.Run("CompareAndSwap", func(_ *testing.T) {
-			atom := &Atomic[uint32]{}
+			atom := &AtomicInteger[uint32]{}
 			doTimes(256, func() {
 				for i := uint32(0); i < 100; i++ {
 					for {

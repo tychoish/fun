@@ -9,16 +9,15 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestOptional(t *testing.T) {
 	t.Run("Zero", func(t *testing.T) {
 		var opt Optional[string]
-		check.True(t, ft.Not(opt.Ok()))
+		check.True(t, !opt.Ok())
 		check.Equal(t, opt.Resolve(), "")
 		out, ok := opt.Get()
-		check.True(t, ft.Not(ok))
+		check.True(t, !ok)
 		check.Equal(t, out, "")
 	})
 	t.Run("SetAndGet", func(t *testing.T) {
@@ -43,7 +42,7 @@ func TestOptional(t *testing.T) {
 		check.Equal(t, opt.Resolve(), "hello")
 
 		opt.Reset()
-		assert.True(t, ft.Not(opt.Ok()))
+		assert.True(t, !opt.Ok())
 
 		opt.Default("world")
 		check.Equal(t, opt.Resolve(), "world")

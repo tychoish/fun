@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -79,28 +78,6 @@ func (wg *WaitGroup) Worker() Worker {
 	return func(ctx context.Context) error { wg.Wait(ctx); return ctx.Err() }
 }
 
-// Launch increments the WaitGroup and starts the operation in a go
-// routine.
-func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
-	wg.Inc()
-	op.PostHook(wg.Done).Background(ctx)
-}
-
-// OperationHandler returns a handelr function that accepts new Operation
-// functions, starts them in their own Go routine, with the provided
-// context. These handler functions are reusable.
-func (wg *WaitGroup) OperationHandler(ctx context.Context) fn.Handler[Operation] {
-	return func(op Operation) { wg.Launch(ctx, op) }
-}
-
-// WorkerHandler returns a handelr function that accepts new Worker
-// functions, starts them in their own Go routine, with the provided
-// context. Errors are collected by the error handler,
-// eventually. These handler functions are reusable.
-func (wg *WaitGroup) WorkerHandler(ctx context.Context, eh fn.Handler[error]) fn.Handler[Worker] {
-	return func(op Worker) { wg.Launch(ctx, op.Operation(eh)) }
-}
-
 // Group returns an operation that, when executed, starts <n> copies
 // of the operation and blocks until all have finished.
 func (wg *WaitGroup) Group(n int, op Operation) Operation {
@@ -110,14 +87,24 @@ func (wg *WaitGroup) Group(n int, op Operation) Operation {
 // StartGroup starts <n> copies of the operation in separate threads
 // and returns an operation that waits on the wait group.
 func (wg *WaitGroup) StartGroup(ctx context.Context, n int, op Operation) Operation {
-	_ = irt.Count(irt.GenerateN(n, func() bool { wg.OperationHandler(ctx).Read(op); return true }))
-	return wg.Operation()
+	_ = irt.Count(irt.GenerateN(n, func() bool { wg.Launch(ctx, op); return true }))
+	return wg.Wait
+}
+
+// Launch increments the WaitGroup and starts the operation in a go
+// routine.
+func (wg *WaitGroup) Launch(ctx context.Context, op Operation) {
+	wg.Inc()
+	go func(ctx context.Context) {
+		defer wg.Done()
+		op(ctx)
+	}(ctx)
 }
 
 // Wait blocks until either the context is canceled or all items have
 // completed.
 //
-// Wait is pasable or usable as a fnx.Operation.
+// Wait is passable or usable as a fnx.Operation.
 //
 // In many cases, callers should not rely on the Wait operation
 // returning after the context expires: If Done() calls are used in

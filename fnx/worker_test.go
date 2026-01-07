@@ -15,8 +15,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 func TestWorker(t *testing.T) {
@@ -567,8 +565,18 @@ func TestWorker(t *testing.T) {
 			etwo := errors.New("do errors")
 
 			whichErr := 2
-			one := func(context.Context) error { return ft.DoWhen(whichErr == 1, func() error { return eone }) }
-			two := func(context.Context) error { return ft.DoWhen(whichErr == 2, func() error { return etwo }) }
+			one := func(context.Context) error {
+				if whichErr == 1 {
+					return eone
+				}
+				return nil
+			}
+			two := func(context.Context) error {
+				if whichErr == 2 {
+					return etwo
+				}
+				return nil
+			}
 
 			if e, f := one(ctx), two(ctx); e == nil && f == nil {
 				t.Error("can't both be nil")
@@ -607,7 +615,10 @@ func TestWorker(t *testing.T) {
 			start := time.Now()
 			var wf Worker = func(_ context.Context) error {
 				time.Sleep(5 * time.Millisecond)
-				return ft.DoWhen(time.Since(start) > 50*time.Millisecond, func() error { return io.EOF })
+				if time.Since(start) > 50*time.Millisecond {
+					return io.EOF
+				}
+				return nil
 			}
 			t.Run("Min", func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -678,6 +689,23 @@ func TestWorker(t *testing.T) {
 			})
 		})
 	})
+	t.Run("SignalContextCancel", func(t *testing.T) {
+		var wf Worker = func(ctx context.Context) error {
+			tt := time.NewTimer(5 * time.Second)
+			defer tt.Stop()
+			select {
+			case <-ctx.Done():
+			case <-tt.C:
+			}
+			return io.EOF
+		}
+		ctx := t.Context()
+		cc, cancel := context.WithCancel(ctx)
+		cancel()
+		err := wf.Launch(ctx).Run(cc)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("Chain", func(t *testing.T) {
 			count := 0
@@ -769,46 +797,46 @@ func TestWorker(t *testing.T) {
 		defer cancel()
 
 		t.Run("Skip", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			err := MakeWorker(func() error {
 				defer count.Add(1)
-				if count.Get() == 0 {
+				if count.Load() == 0 {
 					return ers.ErrCurrentOpSkip
 				}
 				return nil
 			}).Retry(5).Run(ctx)
-			assert.Equal(t, count.Get(), 2)
+			assert.Equal(t, count.Load(), 2)
 			assert.NotError(t, err)
 		})
 		t.Run("FirstTry", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			err := MakeWorker(func() error {
 				defer count.Add(1)
 				return nil
 			}).Retry(10).Run(ctx)
-			assert.Equal(t, count.Get(), 1)
+			assert.Equal(t, count.Load(), 1)
 			assert.NotError(t, err)
 		})
 		t.Run("ArbitraryError", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			err := MakeWorker(func() error {
 				defer count.Add(1)
-				if count.Get() < 3 {
+				if count.Load() < 3 {
 					return errors.New("why not")
 				}
 				return nil
 			}).Retry(10).Run(ctx)
-			assert.Equal(t, count.Get(), 4)
+			assert.Equal(t, count.Load(), 4)
 			assert.NotError(t, err)
 		})
 		t.Run("DoesFail", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			exp := errors.New("why not")
 			err := MakeWorker(func() error {
 				defer count.Add(1)
 				return exp
 			}).Retry(16).Run(ctx)
-			assert.Equal(t, count.Get(), 16)
+			assert.Equal(t, count.Load(), 16)
 			assert.Error(t, err)
 			errs := ers.Unwind(err)
 			assert.Equal(t, len(errs), 16)
@@ -818,7 +846,7 @@ func TestWorker(t *testing.T) {
 			}
 		})
 		t.Run("Terminating", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			exp := errors.New("why not")
 			err := MakeWorker(func() error {
 				defer count.Add(1)
@@ -827,11 +855,11 @@ func TestWorker(t *testing.T) {
 				}
 				return exp
 			}).Retry(16).Run(ctx)
-			assert.Equal(t, count.Get(), 12)
+			assert.Equal(t, count.Load(), 12)
 			assert.NotError(t, err)
 		})
 		t.Run("Canceled", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			exp := errors.New("why not")
 			err := MakeWorker(func() error {
 				defer count.Add(1)
@@ -840,7 +868,7 @@ func TestWorker(t *testing.T) {
 				}
 				return exp
 			}).Retry(16).Run(ctx)
-			assert.Equal(t, count.Get(), 12)
+			assert.Equal(t, count.Load(), 12)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, context.Canceled)
 			assert.ErrorIs(t, err, exp)

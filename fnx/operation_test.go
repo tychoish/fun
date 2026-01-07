@@ -13,7 +13,6 @@ import (
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 )
 
 func TestOperation(t *testing.T) {
@@ -407,7 +406,7 @@ func TestOperation(t *testing.T) {
 			assert.Equal(t, count, 10)
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ft.CallTimes(32, func() {
+			for range 32 {
 				t.Run("Iteration", func(t *testing.T) {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
@@ -423,7 +422,7 @@ func TestOperation(t *testing.T) {
 					wg.Wait()
 					assert.Equal(t, count.Load(), 10)
 				})
-			})
+			}
 		})
 	})
 	t.Run("Jitter", func(t *testing.T) {

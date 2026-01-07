@@ -1218,6 +1218,31 @@ func TestApply(t *testing.T) {
 			}
 		})
 	}
+	t.Run("RunAll", func(t *testing.T) {
+		t.Run("Nil", func(t *testing.T) {
+			defer func() {
+				if p := recover(); p == nil {
+					t.Error("expectedPanic")
+				}
+			}()
+			if ct := RunAll(Args[func()](nil, nil)); ct != 0 {
+				t.Errorf("saw %d", ct)
+			}
+		})
+
+		t.Run("Empty", func(t *testing.T) {
+			if ct := RunAll(Args(func() {}, func() {})); ct != 2 {
+				t.Errorf("saw %d", ct)
+			}
+		})
+
+		t.Run("Observe", func(t *testing.T) {
+			called := 0
+			if ct := RunAll(Args(func() { called++ }, func() { called++ })); ct != 2 || called != 2 {
+				t.Errorf("saw %d, with effect of %d", ct, called)
+			}
+		})
+	})
 }
 
 func TestChannel(t *testing.T) {

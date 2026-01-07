@@ -3,7 +3,6 @@ package fnx
 import (
 	"context"
 	"errors"
-	"io"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // Worker represents a basic function used in worker pools and
@@ -60,14 +60,18 @@ func (wf Worker) Signal(ctx context.Context) <-chan error {
 //
 // The underlying worker begins executing before future returns.
 func (wf Worker) Launch(ctx context.Context) Worker {
-	out := wf.Signal(ctx)
+	ictx, cancel := context.WithCancel(ctx)
+	out := wf.Signal(ictx)
+	filter := erc.NewFilter().WithoutTerminating()
 	return func(ctx context.Context) (err error) {
-		ctxCh := ft.ContextErrorChannel(ctx)
+		defer cancel()
 		select {
+		case <-ctx.Done():
+			err = ctx.Err()
 		case err = <-out:
-		case err = <-ctxCh:
 		}
-		return ft.IfElse(errors.Is(err, io.EOF), nil, err)
+
+		return filter.Apply(err)
 	}
 }
 
@@ -107,13 +111,20 @@ func (wf Worker) Must() Operation { return func(ctx context.Context) { must(wf(c
 
 // Ignore converts the worker into a Operation that discards the error
 // produced by the worker.
-func (wf Worker) Ignore() Operation { return func(ctx context.Context) { ft.Ignore(wf(ctx)) } }
+func (wf Worker) Ignore() Operation { return func(ctx context.Context) { _ = wf(ctx) } }
 
 // If returns a Worker function that runs only if the condition is
 // true. The error is always nil if the condition is false. If-ed
 // functions may be called more than once, and will run multiple
 // times potentiall.y.
-func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrap(cond)) }
+func (wf Worker) If(cond bool) Worker {
+	return func(ctx context.Context) error {
+		if cond {
+			return wf(ctx)
+		}
+		return nil
+	}
+}
 
 // When wraps a Worker function that will only run if the condition
 // function returns true. If the condition is false the worker does
@@ -122,9 +133,13 @@ func (wf Worker) If(cond bool) Worker { return wf.When(ft.Wrap(cond)) }
 // When worker functions may be called more than once, and will run
 // multiple times potentially.
 func (wf Worker) When(cond func() bool) Worker {
-	return func(ctx context.Context) error { return ft.DoWhen(cond(), wf.futureOp(ctx)) }
+	return func(ctx context.Context) error {
+		if cond() {
+			return wf(ctx)
+		}
+		return nil
+	}
 }
-func (wf Worker) futureOp(ctx context.Context) func() error { return func() error { return wf(ctx) } }
 
 // After returns a Worker that blocks until the timestamp provided is
 // in the past. Additional calls to this worker will run
@@ -138,7 +153,9 @@ func (wf Worker) After(ts time.Time) Worker {
 // specified duration before running.
 //
 // If the value is negative, then there is always zero delay.
-func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrap(dur)) }
+func (wf Worker) Delay(dur time.Duration) Worker {
+	return func(ctx context.Context) error { return wf.doDelay(ctx, dur) }
+}
 
 // Jitter wraps a Worker that runs the jitter function (jf) once
 // before every execution of the resulting function, and waits for the
@@ -146,15 +163,17 @@ func (wf Worker) Delay(dur time.Duration) Worker { return wf.Jitter(ft.Wrap(dur)
 //
 // If the function produces a negative duration, there is no delay.
 func (wf Worker) Jitter(jf func() time.Duration) Worker {
-	return func(ctx context.Context) error {
-		timer := time.NewTimer(max(0, jf()))
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-			return wf(ctx)
-		}
+	return func(ctx context.Context) error { return wf.doDelay(ctx, jf()) }
+}
+
+func (wf Worker) doDelay(ctx context.Context, dur time.Duration) error {
+	timer := time.NewTimer(max(0, dur))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return wf(ctx)
 	}
 }
 
@@ -261,10 +280,16 @@ func (wf Worker) WithCancel() (Worker, context.CancelFunc) {
 	once := &sync.Once{}
 
 	return func(ctx context.Context) error {
-		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		invariant(wctx != nil, "must start the operation before calling cancel")
-		return wf(wctx)
-	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
+			once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+			invariant(wctx != nil, "must start the operation before calling cancel")
+			return wf(wctx)
+		}, func() {
+			once.Do(func() {})
+
+			if cancel != nil {
+				cancel()
+			}
+		}
 }
 
 // PreHook returns a Worker that runs an operatio unconditionally
@@ -313,7 +338,8 @@ func (wf Worker) StartGroup(ctx context.Context, n int) Worker {
 	wg := &WaitGroup{}
 	ec := &erc.Collector{}
 
-	wg.StartGroup(ctx, n, wf.Operation(ec.Push))
+	op := wf.Operation(ec.Push)
+	_ = irt.Count(irt.GenerateN(n, func() bool { wg.Launch(ctx, op); return true }))
 
 	return MakeWorker(ec.Resolve).PreHook(wg.Operation())
 }

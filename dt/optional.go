@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/internal"
 )
 
 // Optional is a wrapper type for optional value, where using a
@@ -35,7 +35,11 @@ func NewOptional[T any](in T) Optional[T] { return Optional[T]{v: in, defined: t
 
 // Default sets value of the optional to the provided value if it is
 // not already been defined.
-func (o *Optional[T]) Default(in T) { ft.ApplyWhen(!o.Ok(), o.Set, in) }
+func (o *Optional[T]) Default(in T) {
+	if !o.Ok() {
+		o.Set(in)
+	}
+}
 
 // Set marks the optional value as defined, and sets the optional
 // value. You can set an optional to the zero value for type T. To
@@ -61,6 +65,8 @@ func (o *Optional[T]) Get() (T, bool) { return o.v, o.defined }
 // Ok returns true when the optional.
 func (o Optional[T]) Ok() bool { return o.defined }
 
+func isType[T any](in any) bool { _, ok := in.(T); return ok }
+
 // Scan implements the sql.Scanner interface. This is invalid if the
 // type of the optional value is not a primitive value type.
 func (o *Optional[T]) Scan(src any) (err error) {
@@ -72,17 +78,17 @@ func (o *Optional[T]) Scan(src any) (err error) {
 	}
 	o.init()
 
-	defer func() { o.defined = (err == nil && ft.Not(ft.IsNil(o.v))) }()
+	defer func() { o.defined = (err == nil && !internal.IsNil(o.v)) }()
 
-	if ft.IsType[int](src) && ft.IsType[int64](o.v) {
+	if isType[int](src) && isType[int64](o.v) {
 		o.v = any(int64(src.(int))).(T)
 		return nil
 	}
-	if val, ok := ft.Cast[T](src); ok {
+	if val, ok := src.(T); ok {
 		o.v = val
 		return nil
 	}
-	if ft.IsType[sql.Scanner](o.v) {
+	if isType[sql.Scanner](o.v) {
 		o.init()
 		return any(o.v).(sql.Scanner).Scan(src)
 	}
@@ -102,7 +108,7 @@ func (o *Optional[T]) Scan(src any) (err error) {
 }
 
 func (o *Optional[T]) init() {
-	if ft.IsNil(o.v) && ft.IsPtr(o.v) {
+	if internal.IsNil(o.v) && internal.IsPtr(o.v) {
 		o.v = reflect.New(reflect.ValueOf(any(o.v)).Type().Elem()).Interface().(T)
 	}
 }
@@ -111,7 +117,7 @@ func (o *Optional[T]) init() {
 // the sql Scanner interface. This is invalid if the type of the
 // optional value is not a primitive value type.
 func (o Optional[T]) Value() (driver.Value, error) {
-	if !o.defined || ft.IsNil(o.v) {
+	if !o.defined || internal.IsNil(o.v) {
 		return nil, nil
 	}
 
@@ -166,7 +172,7 @@ func (o Optional[T]) MarshalText() ([]byte, error) {
 // interface. Strings and bytes slices pass through directly, and
 // json.Unmarshal() is used in all other situations.
 func (o *Optional[T]) UnmarshalText(in []byte) (err error) {
-	defer func() { o.defined = (err == nil && ft.Not(ft.IsNil(o.v))) }()
+	defer func() { o.defined = (err == nil && !internal.IsNil(o.v)) }()
 	o.init()
 
 	switch vt := any(o.v).(type) {
@@ -213,7 +219,7 @@ func (o Optional[T]) MarshalBinary() ([]byte, error) {
 // as a passthrough for encoding.BinaryUnmarshaler, bson.Unmarshaler
 // and the generic Unmarshal interface.
 func (o *Optional[T]) UnmarshalBinary(in []byte) (err error) {
-	defer func() { o.defined = (err == nil && ft.Not(ft.IsNil(o.v))) }()
+	defer func() { o.defined = (err == nil && !internal.IsNil(o.v)) }()
 
 	o.init()
 	switch vt := any(o.v).(type) {

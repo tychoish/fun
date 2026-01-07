@@ -14,8 +14,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
-	"github.com/tychoish/fun/intish"
 )
 
 func TestFuture(t *testing.T) {
@@ -126,7 +124,7 @@ func TestFuture(t *testing.T) {
 				}
 			})
 			t.Run("Always", func(t *testing.T) {
-				pf := PtrFuture(func() *int { return ft.Ptr(42) })
+				pf := PtrFuture(func() *int { v := 42; return &v })
 				ctx := t.Context()
 
 				for i := 0; i < 1024; i++ {
@@ -140,7 +138,8 @@ func TestFuture(t *testing.T) {
 				pf := PtrFuture(func() *int {
 					if count < 512 {
 						count++
-						return ft.Ptr(42)
+						v := 42
+						return &v
 					}
 					return nil
 				})
@@ -847,52 +846,52 @@ func TestFuture(t *testing.T) {
 		defer cancel()
 
 		t.Run("Skip", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
-				if count.Get() == 0 {
+				if count.Load() == 0 {
 					return 100, ers.ErrCurrentOpSkip
 				}
 				return 42, nil
 			}).Retry(5).Read(ctx)
-			assert.Equal(t, count.Get(), 2)
+			assert.Equal(t, count.Load(), 2)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
 			assert.NotEqual(t, val, 100)
 		})
 		t.Run("FirstTry", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				return 42, nil
 			}).Retry(10).Read(ctx)
-			assert.Equal(t, count.Get(), 1)
+			assert.Equal(t, count.Load(), 1)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
 			assert.NotEqual(t, val, 100)
 		})
 		t.Run("ArbitraryError", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
-				if count.Get() < 3 {
+				if count.Load() < 3 {
 					return 100, errors.New("why not")
 				}
 				return 42, nil
 			}).Retry(10).Read(ctx)
-			assert.Equal(t, count.Get(), 4)
+			assert.Equal(t, count.Load(), 4)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
 			assert.NotEqual(t, val, 100)
 		})
 		t.Run("DoesFail", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			exp := errors.New("why not")
 			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
 				return 100, exp
 			}).Retry(16).Read(ctx)
-			assert.Equal(t, count.Get(), 16)
+			assert.Equal(t, count.Load(), 16)
 			assert.Error(t, err)
 			assert.Equal(t, val, 0)
 			errs := ers.Unwind(err)
@@ -904,7 +903,7 @@ func TestFuture(t *testing.T) {
 			assert.NotEqual(t, val, 100)
 		})
 		t.Run("Terminating", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			exp := errors.New("why not")
 			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
@@ -913,7 +912,7 @@ func TestFuture(t *testing.T) {
 				}
 				return 100, exp
 			}).Retry(16).Read(ctx)
-			assert.Equal(t, count.Get(), 12)
+			assert.Equal(t, count.Load(), 12)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, exp)
 			assert.ErrorIs(t, err, ers.ErrCurrentOpAbort)
@@ -921,7 +920,7 @@ func TestFuture(t *testing.T) {
 			assert.NotEqual(t, val, 100)
 		})
 		t.Run("Canceled", func(t *testing.T) {
-			count := &intish.Atomic[int]{}
+			count := &atomic.Int64{}
 			exp := errors.New("why not")
 			val, err := MakeFuture(func() (int, error) {
 				defer count.Add(1)
@@ -930,7 +929,7 @@ func TestFuture(t *testing.T) {
 				}
 				return 100, exp
 			}).Retry(16).Read(ctx)
-			assert.Equal(t, count.Get(), 12)
+			assert.Equal(t, count.Load(), 12)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, exp)
 			assert.ErrorIs(t, err, context.Canceled)
@@ -939,9 +938,9 @@ func TestFuture(t *testing.T) {
 		})
 	})
 	t.Run("Filter", func(t *testing.T) {
-		rc := &intish.Atomic[int]{}
+		rc := &atomic.Int64{}
 		rv := 22
-		fc := &intish.Atomic[int]{}
+		fc := &atomic.Int64{}
 
 		var re error
 

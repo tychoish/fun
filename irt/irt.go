@@ -464,6 +464,17 @@ func Apply[T any](seq iter.Seq[T], op func(T)) (count int) {
 	return count
 }
 
+// RunAll takes a sequences of nilary functions and runs them all,
+// returning a count. If any functions are Nil. For other function
+// types, and for nil/panic safety, use the operations in the wpa package.
+func RunAll(seq iter.Seq[func()]) (count int) {
+	for op := range seq {
+		count++
+		op()
+	}
+	return count
+}
+
 // ApplyWhile consumes the sequence and calls op for each
 // element. Iteration stops if op returns false.  Returns the number
 // of elements processed.

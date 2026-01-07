@@ -8,8 +8,8 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
+	"github.com/tychoish/fun/irt"
 )
 
 // Operation is a type of function object that will block until an
@@ -62,9 +62,14 @@ func (wf Operation) WithCancel() (Operation, context.CancelFunc) {
 	var cancel context.CancelFunc
 	once := &sync.Once{}
 	return func(ctx context.Context) {
-		once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
-		wf(wctx)
-	}, func() { once.Do(func() {}); ft.CallSafe(cancel) }
+			once.Do(func() { wctx, cancel = context.WithCancel(ctx) })
+			wf(wctx)
+		}, func() {
+			once.Do(func() {})
+			if cancel != nil {
+				cancel()
+			}
+		}
 }
 
 // WithContextHook returns an wrapped operation where the provided
@@ -114,7 +119,8 @@ func (wf Operation) Add(ctx context.Context, wg *WaitGroup) { wg.Launch(ctx, wf)
 // for the job. Callers must wait on the WaitGroup independently.
 func (wf Operation) StartGroup(ctx context.Context, n int) Operation {
 	wg := &WaitGroup{}
-	return wg.StartGroup(ctx, n, wf)
+	_ = irt.Count(irt.GenerateN(n, func() bool { wg.Launch(ctx, wf); return true }))
+	return wg.Operation()
 }
 
 // Group makes an operation that runs n copies of the underlying

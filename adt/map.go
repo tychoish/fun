@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/tychoish/fun/dt"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -45,7 +44,7 @@ func (mp *Map[K, V]) Len() (count int) {
 }
 
 // Check returns true if the key exists in the map or false otherwise.
-func (mp *Map[K, V]) Check(key K) bool { return ft.IsOk(mp.mp.Load(key)) }
+func (mp *Map[K, V]) Check(key K) (ok bool) { _, ok = mp.mp.Load(key); return }
 
 // Delete removes a key--and its corresponding value--from the map, if
 // it exists.
@@ -63,11 +62,11 @@ func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key))
 
 // Get returns the value from the map. If the key is not present in the map,
 // this returns the zero value for V.
-func (mp *Map[K, V]) Get(key K) V { return ft.IgnoreSecond(mp.Load(key)) }
+func (mp *Map[K, V]) Get(key K) (out V) { out, _ = mp.Load(key); return }
 
 // Set adds the value to the map, overriding any existing value. The return reports if the key
 // existed in the map before the operation.
-func (mp *Map[K, V]) Set(key K, value V) bool { return ft.IgnoreFirst(mp.mp.Swap(key, value)) }
+func (mp *Map[K, V]) Set(key K, value V) (ok bool) { _, ok = mp.mp.Swap(key, value); return }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {

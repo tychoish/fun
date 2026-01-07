@@ -3,8 +3,6 @@ package adt
 import (
 	"sync"
 	"sync/atomic"
-
-	"github.com/tychoish/fun/ft"
 )
 
 // Once provides a mnemonic form of sync.Once, caching and returning a
@@ -55,7 +53,12 @@ func (o *Once[T]) Call(ctor func() T) T { o.Do(ctor); return o.comp }
 func (o *Once[T]) Resolve() T { o.once.Do(o.populate); return o.comp }
 
 func (o *Once[T]) populate() {
-	ft.CallWhen(o.called.CompareAndSwap(false, true), func() { o.comp = ft.DoSafe(o.ctor.Get()); o.ctor.Set(nil) })
+	if o.called.CompareAndSwap(false, true) {
+		if op := o.ctor.Get(); op != nil {
+			o.comp = op()
+		}
+		o.ctor.Set(nil)
+	}
 }
 
 // Set sets the constrctor/operation for the Once object, but does not
@@ -63,7 +66,10 @@ func (o *Once[T]) populate() {
 // operation has completed, will not reset the operation or the cached
 // value.
 func (o *Once[T]) Set(constr func() T) {
-	ft.CallWhen(!o.Called(), func() { o.defined.Store(true); o.ctor.Set(constr) })
+	if !o.Called() {
+		o.defined.Store(true)
+		o.ctor.Set(constr)
+	}
 }
 
 // Called returns true if the Once object has been called or is

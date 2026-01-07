@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/adt"
-	"github.com/tychoish/fun/ft"
 )
 
 // Versioned is a wrapper type that tracks the modification count for
@@ -26,11 +25,21 @@ func (vv *Versioned[T]) Ok() bool { return vv != nil }
 
 // Version returns the current version number of this object.
 // Returns 0 if the object is nil. The version increments each time Set() is called.
-func (vv *Versioned[T]) Version() uint64 { return ft.DoWhen(vv != nil, vv.innerVersion) }
+func (vv *Versioned[T]) Version() (v uint64) {
+	if vv != nil {
+		v = vv.innerVersion()
+	}
+	return
+}
 
 // Load returns the current value stored in this versioned object.
 // Returns the zero value if the object is nil. This operation is safe for concurrent access.
-func (vv *Versioned[T]) Load() T { return ft.DoWhen(vv != nil, vv.innerLoad) }
+func (vv *Versioned[T]) Load() (out T) {
+	if vv != nil {
+		out = vv.innerLoad()
+	}
+	return
+}
 
 // Set stores a new value and increments the version number.
 // This operation is safe for concurrent access and will atomically update both the value and version.

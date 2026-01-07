@@ -7,7 +7,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -93,7 +92,7 @@ func TestStack(t *testing.T) {
 
 			// head is non-nil and we can't remove it
 			assert.NotNil(t, stack.Head())
-			assert.True(t, ft.Not(stack.Head().Remove()))
+			assert.True(t, !stack.Head().Remove())
 
 			// add an element
 			stack.Push(100)

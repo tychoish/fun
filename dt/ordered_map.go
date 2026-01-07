@@ -4,7 +4,6 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
@@ -37,7 +36,7 @@ func (m *OrderedMap[K, V]) Check(key K) bool { defer m.with(m.lock()); return m.
 
 // Get returns the value from the map. If the key is not present in the map,
 // this returns the zero value for V.
-func (m *OrderedMap[K, V]) Get(key K) V { return ft.IgnoreSecond(m.Load(key)) }
+func (m *OrderedMap[K, V]) Get(key K) (out V) { out, _ = m.Load(key); return }
 
 // Load returns the value in the map for the key, and an "ok" value
 // which is true if that item is present in the map.
@@ -60,7 +59,9 @@ func (m *OrderedMap[K, V]) Delete(k K) {
 
 	defer m.hash.Delete(k)
 
-	ft.DoWhen(entry != nil, entry.Remove) // Remove from list
+	if entry != nil {
+		entry.Remove()
+	}
 }
 
 // Set adds a key-value pair directly to the map. If the key already
