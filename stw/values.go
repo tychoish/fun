@@ -1,5 +1,4 @@
-// Package ft provides high-level function tools for manipulating common function objects and types.
-package ft
+package stw
 
 // IsZero returns true if the input value compares "true" to the zero
 // value for the type of the argument. If the type implements an

@@ -8,7 +8,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/stw"
 )
 
 func TestAtomics(t *testing.T) {
@@ -80,17 +80,17 @@ func TestAtomics(t *testing.T) {
 		assert.True(t, atom.Get() != 0)
 	})
 	t.Run("IsZero", func(t *testing.T) {
-		assert.True(t, ft.IsZero[*Atomic[int]](nil))
+		assert.True(t, stw.IsZero[*Atomic[int]](nil))
 		var f *Atomic[int]
-		assert.True(t, ft.IsZero(f))
+		assert.True(t, stw.IsZero(f))
 		f = &Atomic[int]{}
 		// ideally this should be
 		// true, but...
-		assert.True(t, !ft.IsZero(f))
+		assert.True(t, !stw.IsZero(f))
 		// clearly true
-		assert.True(t, ft.IsZero(f.Get()))
+		assert.True(t, stw.IsZero(f.Get()))
 		f = NewAtomic(100)
-		assert.True(t, !ft.IsZero(f))
+		assert.True(t, !stw.IsZero(f))
 	})
 	t.Run("CompareAndSwap", func(t *testing.T) {
 		t.Run("Atomic", func(t *testing.T) {

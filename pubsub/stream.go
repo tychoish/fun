@@ -12,7 +12,6 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/stw"
@@ -190,7 +189,7 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 	return MakeStream(fnx.NewFuture(pipe.Receive().Read).
 		PreHook(init)).
 		WithHook(func(st *Stream[T]) {
-			ft.WithContextCall(wg.Wait)
+			fnx.WithContextCall(wg.Wait)
 			st.AddError(ec.Resolve())
 		})
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
@@ -53,7 +52,7 @@ func (r *Ring[T]) init() {
 }
 
 func (r *Ring[T]) innerInit() {
-	r.size = ft.Default(r.size, defaultRingSize)
+	r.size = stw.Default(r.size, defaultRingSize)
 
 	erc.Invariant(ers.Whenf(int64(r.size) > maxRingSize, "invalid size (%d) max: %d", r.size, maxRingSize))
 	erc.Invariant(ers.Whenf(r.size < 2, "invalid size %d (must be > 1)", r.size))

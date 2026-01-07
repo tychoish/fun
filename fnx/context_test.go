@@ -1,4 +1,4 @@
-package ft_test
+package fnx_test
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/ft"
+	"github.com/tychoish/fun/fnx"
 )
 
 func TestContexts(t *testing.T) {
 	t.Run("Timeout", func(t *testing.T) {
 		var cc context.Context
-		ft.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+		fnx.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
 			assert.NotError(t, ctx.Err())
 			cc = ctx
 			time.Sleep(100 * time.Millisecond)
@@ -26,7 +26,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("ScopeTimeout", func(t *testing.T) {
 		var cc context.Context
-		ft.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+		fnx.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
 			cc = ctx
 			assert.NotError(t, ctx.Err())
 		})
@@ -34,7 +34,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("Scope", func(t *testing.T) {
 		var cc context.Context
-		ft.WithContextCall(func(ctx context.Context) {
+		fnx.WithContextCall(func(ctx context.Context) {
 			cc = ctx
 			assert.NotError(t, ctx.Err())
 		})
@@ -42,7 +42,7 @@ func TestContexts(t *testing.T) {
 	})
 	t.Run("Do", func(t *testing.T) {
 		var cc context.Context
-		assert.Equal(t, 42, ft.WithContextDo(func(ctx context.Context) int {
+		assert.Equal(t, 42, fnx.WithContextDo(func(ctx context.Context) int {
 			cc = ctx
 			check.NotError(t, ctx.Err())
 			return 42
@@ -55,7 +55,7 @@ func TestWithContext(t *testing.T) {
 	t.Run("TimeoutCall", func(t *testing.T) {
 		t.Run("TimeoutOccurs", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+			fnx.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
 				capturedCtx = ctx
 				assert.NotError(t, ctx.Err())
 				time.Sleep(50 * time.Millisecond)
@@ -67,16 +67,16 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("NoTimeoutBeforeDeadline", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextTimeoutCall(100*time.Millisecond, func(ctx context.Context) {
+			fnx.WithContextTimeoutCall(100*time.Millisecond, func(ctx context.Context) {
 				capturedCtx = ctx
 				assert.NotError(t, ctx.Err())
 			})
-			// Context should be canceled after function returns
+			// Context should be canceled afnxer function returns
 			assert.ErrorIs(t, capturedCtx.Err(), context.Canceled)
 		})
 
 		t.Run("ContextHasDeadline", func(t *testing.T) {
-			ft.WithContextTimeoutCall(50*time.Millisecond, func(ctx context.Context) {
+			fnx.WithContextTimeoutCall(50*time.Millisecond, func(ctx context.Context) {
 				deadline, ok := ctx.Deadline()
 				check.True(t, ok)
 				check.True(t, time.Until(deadline) <= 50*time.Millisecond)
@@ -85,9 +85,9 @@ func TestWithContext(t *testing.T) {
 	})
 
 	t.Run("Call", func(t *testing.T) {
-		t.Run("ContextCanceledAfterReturn", func(t *testing.T) {
+		t.Run("ContextCanceledAfnxerReturn", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextCall(func(ctx context.Context) {
+			fnx.WithContextCall(func(ctx context.Context) {
 				capturedCtx = ctx
 				assert.NotError(t, ctx.Err())
 			})
@@ -95,7 +95,7 @@ func TestWithContext(t *testing.T) {
 		})
 
 		t.Run("ContextActiveInsideCall", func(t *testing.T) {
-			ft.WithContextCall(func(ctx context.Context) {
+			fnx.WithContextCall(func(ctx context.Context) {
 				check.NotError(t, ctx.Err())
 				select {
 				case <-ctx.Done():
@@ -109,7 +109,7 @@ func TestWithContext(t *testing.T) {
 
 	t.Run("CallOk", func(t *testing.T) {
 		t.Run("ReturnsTrue", func(t *testing.T) {
-			result := ft.WithContextCallOk(func(ctx context.Context) bool {
+			result := fnx.WithContextCallOk(func(ctx context.Context) bool {
 				check.NotError(t, ctx.Err())
 				return true
 			})
@@ -117,16 +117,16 @@ func TestWithContext(t *testing.T) {
 		})
 
 		t.Run("ReturnsFalse", func(t *testing.T) {
-			result := ft.WithContextCallOk(func(ctx context.Context) bool {
+			result := fnx.WithContextCallOk(func(ctx context.Context) bool {
 				check.NotError(t, ctx.Err())
 				return false
 			})
 			check.True(t, !result)
 		})
 
-		t.Run("ContextCanceledAfterReturn", func(t *testing.T) {
+		t.Run("ContextCanceledAfnxerReturn", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextCallOk(func(ctx context.Context) bool {
+			fnx.WithContextCallOk(func(ctx context.Context) bool {
 				capturedCtx = ctx
 				return true
 			})
@@ -136,7 +136,7 @@ func TestWithContext(t *testing.T) {
 
 	t.Run("CallErr", func(t *testing.T) {
 		t.Run("ReturnsNil", func(t *testing.T) {
-			err := ft.WithContextCallErr(func(ctx context.Context) error {
+			err := fnx.WithContextCallErr(func(ctx context.Context) error {
 				check.NotError(t, ctx.Err())
 				return nil
 			})
@@ -145,7 +145,7 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("ReturnsError", func(t *testing.T) {
 			expectedErr := errors.New("test error")
-			err := ft.WithContextCallErr(func(ctx context.Context) error {
+			err := fnx.WithContextCallErr(func(ctx context.Context) error {
 				check.NotError(t, ctx.Err())
 				return expectedErr
 			})
@@ -154,7 +154,7 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("ContextCanceledAfterReturn", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextCallErr(func(ctx context.Context) error {
+			fnx.WithContextCallErr(func(ctx context.Context) error {
 				capturedCtx = ctx
 				return nil
 			})
@@ -164,7 +164,7 @@ func TestWithContext(t *testing.T) {
 
 	t.Run("Do", func(t *testing.T) {
 		t.Run("ReturnsValue", func(t *testing.T) {
-			result := ft.WithContextDo(func(ctx context.Context) int {
+			result := fnx.WithContextDo(func(ctx context.Context) int {
 				check.NotError(t, ctx.Err())
 				return 42
 			})
@@ -172,7 +172,7 @@ func TestWithContext(t *testing.T) {
 		})
 
 		t.Run("ReturnsString", func(t *testing.T) {
-			result := ft.WithContextDo(func(ctx context.Context) string {
+			result := fnx.WithContextDo(func(ctx context.Context) string {
 				check.NotError(t, ctx.Err())
 				return "hello"
 			})
@@ -181,7 +181,7 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("ContextCanceledAfterReturn", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextDo(func(ctx context.Context) int {
+			fnx.WithContextDo(func(ctx context.Context) int {
 				capturedCtx = ctx
 				return 100
 			})
@@ -191,7 +191,7 @@ func TestWithContext(t *testing.T) {
 
 	t.Run("DoOk", func(t *testing.T) {
 		t.Run("ReturnsValueAndTrue", func(t *testing.T) {
-			val, ok := ft.WithContextDoOk(func(ctx context.Context) (int, bool) {
+			val, ok := fnx.WithContextDoOk(func(ctx context.Context) (int, bool) {
 				check.NotError(t, ctx.Err())
 				return 42, true
 			})
@@ -200,7 +200,7 @@ func TestWithContext(t *testing.T) {
 		})
 
 		t.Run("ReturnsValueAndFalse", func(t *testing.T) {
-			val, ok := ft.WithContextDoOk(func(ctx context.Context) (string, bool) {
+			val, ok := fnx.WithContextDoOk(func(ctx context.Context) (string, bool) {
 				check.NotError(t, ctx.Err())
 				return "test", false
 			})
@@ -210,7 +210,7 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("ContextCanceledAfterReturn", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextDoOk(func(ctx context.Context) (int, bool) {
+			fnx.WithContextDoOk(func(ctx context.Context) (int, bool) {
 				capturedCtx = ctx
 				return 10, true
 			})
@@ -220,7 +220,7 @@ func TestWithContext(t *testing.T) {
 
 	t.Run("DoErr", func(t *testing.T) {
 		t.Run("ReturnsValueNoError", func(t *testing.T) {
-			val, err := ft.WithContextDoErr(func(ctx context.Context) (int, error) {
+			val, err := fnx.WithContextDoErr(func(ctx context.Context) (int, error) {
 				check.NotError(t, ctx.Err())
 				return 42, nil
 			})
@@ -230,7 +230,7 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("ReturnsValueAndError", func(t *testing.T) {
 			expectedErr := errors.New("test error")
-			val, err := ft.WithContextDoErr(func(ctx context.Context) (string, error) {
+			val, err := fnx.WithContextDoErr(func(ctx context.Context) (string, error) {
 				check.NotError(t, ctx.Err())
 				return "result", expectedErr
 			})
@@ -240,7 +240,7 @@ func TestWithContext(t *testing.T) {
 
 		t.Run("ContextCanceledAfterReturn", func(t *testing.T) {
 			var capturedCtx context.Context
-			ft.WithContextDoErr(func(ctx context.Context) (int, error) {
+			fnx.WithContextDoErr(func(ctx context.Context) (int, error) {
 				capturedCtx = ctx
 				return 10, nil
 			})
@@ -256,7 +256,7 @@ func TestWrapWithContext(t *testing.T) {
 			var receivedCtx context.Context
 
 			ctx := context.Background()
-			wrapped := ft.WrapWithContextCall(ctx, func(c context.Context) {
+			wrapped := fnx.WrapWithContextCall(ctx, func(c context.Context) {
 				called.Store(true)
 				receivedCtx = c
 			})
@@ -277,7 +277,7 @@ func TestWrapWithContext(t *testing.T) {
 			defer cancel()
 
 			var capturedCtx context.Context
-			wrapped := ft.WrapWithContextCall(ctx, func(c context.Context) {
+			wrapped := fnx.WrapWithContextCall(ctx, func(c context.Context) {
 				capturedCtx = c
 			})
 
@@ -291,7 +291,7 @@ func TestWrapWithContext(t *testing.T) {
 			var count atomic.Int32
 			ctx := context.Background()
 
-			wrapped := ft.WrapWithContextCall(ctx, func(c context.Context) {
+			wrapped := fnx.WrapWithContextCall(ctx, func(c context.Context) {
 				count.Add(1)
 			})
 
@@ -306,7 +306,7 @@ func TestWrapWithContext(t *testing.T) {
 	t.Run("Do", func(t *testing.T) {
 		t.Run("WrapsAndReturnsValue", func(t *testing.T) {
 			ctx := context.Background()
-			wrapped := ft.WrapWithContextDo(ctx, func(c context.Context) int {
+			wrapped := fnx.WrapWithContextDo(ctx, func(c context.Context) int {
 				return 42
 			})
 
@@ -319,7 +319,7 @@ func TestWrapWithContext(t *testing.T) {
 			defer cancel()
 
 			var capturedCtx context.Context
-			wrapped := ft.WrapWithContextDo(ctx, func(c context.Context) string {
+			wrapped := fnx.WrapWithContextDo(ctx, func(c context.Context) string {
 				capturedCtx = c
 				return "hello"
 			})
@@ -334,7 +334,7 @@ func TestWrapWithContext(t *testing.T) {
 			ctx := context.Background()
 			expected := &struct{ Value int }{Value: 100}
 
-			wrapped := ft.WrapWithContextDo(ctx, func(c context.Context) *struct{ Value int } {
+			wrapped := fnx.WrapWithContextDo(ctx, func(c context.Context) *struct{ Value int } {
 				return expected
 			})
 
@@ -347,7 +347,7 @@ func TestWrapWithContext(t *testing.T) {
 	t.Run("DoOk", func(t *testing.T) {
 		t.Run("WrapsAndReturnsValueAndTrue", func(t *testing.T) {
 			ctx := context.Background()
-			wrapped := ft.WrapWithContextDoOk(ctx, func(c context.Context) (int, bool) {
+			wrapped := fnx.WrapWithContextDoOk(ctx, func(c context.Context) (int, bool) {
 				return 42, true
 			})
 
@@ -358,7 +358,7 @@ func TestWrapWithContext(t *testing.T) {
 
 		t.Run("WrapsAndReturnsValueAndFalse", func(t *testing.T) {
 			ctx := context.Background()
-			wrapped := ft.WrapWithContextDoOk(ctx, func(c context.Context) (string, bool) {
+			wrapped := fnx.WrapWithContextDoOk(ctx, func(c context.Context) (string, bool) {
 				return "test", false
 			})
 
@@ -372,7 +372,7 @@ func TestWrapWithContext(t *testing.T) {
 			defer cancel()
 
 			var capturedCtx context.Context
-			wrapped := ft.WrapWithContextDoOk(ctx, func(c context.Context) (int, bool) {
+			wrapped := fnx.WrapWithContextDoOk(ctx, func(c context.Context) (int, bool) {
 				capturedCtx = c
 				return 10, true
 			})
@@ -388,7 +388,7 @@ func TestWrapWithContext(t *testing.T) {
 	t.Run("DoErr", func(t *testing.T) {
 		t.Run("WrapsAndReturnsValueNoError", func(t *testing.T) {
 			ctx := context.Background()
-			wrapped := ft.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {
+			wrapped := fnx.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {
 				return 42, nil
 			})
 
@@ -401,7 +401,7 @@ func TestWrapWithContext(t *testing.T) {
 			ctx := context.Background()
 			expectedErr := errors.New("test error")
 
-			wrapped := ft.WrapWithContextDoErr(ctx, func(c context.Context) (string, error) {
+			wrapped := fnx.WrapWithContextDoErr(ctx, func(c context.Context) (string, error) {
 				return "result", expectedErr
 			})
 
@@ -415,7 +415,7 @@ func TestWrapWithContext(t *testing.T) {
 			defer cancel()
 
 			var capturedCtx context.Context
-			wrapped := ft.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {
+			wrapped := fnx.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {
 				capturedCtx = c
 				return 10, nil
 			})
@@ -431,12 +431,48 @@ func TestWrapWithContext(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel immediately
 
-			wrapped := ft.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {
+			wrapped := fnx.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {
 				return 0, c.Err()
 			})
 
 			_, err := wrapped()
 			check.ErrorIs(t, err, context.Canceled)
 		})
+	})
+	t.Run("Timeout", func(t *testing.T) {
+		var cc context.Context
+		fnx.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+			assert.NotError(t, ctx.Err())
+			cc = ctx
+			time.Sleep(100 * time.Millisecond)
+			assert.Error(t, ctx.Err())
+			assert.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+		})
+		assert.ErrorIs(t, cc.Err(), context.DeadlineExceeded)
+	})
+	t.Run("ScopeTimeout", func(t *testing.T) {
+		var cc context.Context
+		fnx.WithContextTimeoutCall(10*time.Millisecond, func(ctx context.Context) {
+			cc = ctx
+			assert.NotError(t, ctx.Err())
+		})
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+	t.Run("Scope", func(t *testing.T) {
+		var cc context.Context
+		fnx.WithContextCall(func(ctx context.Context) {
+			cc = ctx
+			assert.NotError(t, ctx.Err())
+		})
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
+	})
+	t.Run("Do", func(t *testing.T) {
+		var cc context.Context
+		assert.Equal(t, 42, fnx.WithContextDo(func(ctx context.Context) int {
+			cc = ctx
+			check.NotError(t, ctx.Err())
+			return 42
+		}))
+		assert.ErrorIs(t, cc.Err(), context.Canceled)
 	})
 }

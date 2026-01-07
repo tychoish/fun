@@ -9,7 +9,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 )
@@ -217,7 +216,7 @@ func (wf Worker) While() Worker {
 	return func(ctx context.Context) error {
 		for {
 			if err, cerr := wf(ctx), ctx.Err(); err != nil || cerr != nil {
-				return ft.Default(err, cerr)
+				return erc.Join(err, cerr)
 			}
 		}
 	}

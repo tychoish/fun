@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/stw"
 )
 
@@ -111,7 +110,7 @@ func isAtomicValueNil[T comparable, A AtomicValue[T]](in A) bool {
 // SafeSet sets the atomic to the given value only if the value is not
 // the Zero value for that type.
 func SafeSet[T comparable, A AtomicValue[T]](atom A, value T) {
-	if ft.IsZero(value) || isAtomicValueNil[T, A](atom) {
+	if stw.IsZero(value) || isAtomicValueNil[T, A](atom) {
 		return
 	}
 

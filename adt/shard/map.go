@@ -8,7 +8,6 @@ import (
 
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fn"
-	"github.com/tychoish/fun/ft"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
@@ -220,8 +219,8 @@ func (m *Map[K, V]) Setup(n int, mi MapType) { m.sh.Do(func() []sh[K, V] { retur
 func (m *Map[K, V]) init(n int, mi MapType) []sh[K, V] {
 	// ONLY called within the sync.Once scope.
 
-	m.num = ft.Default(uint64(max(0, n)), defaultSize)
-	m.imp = ft.Default(mi, MapTypeDefault)
+	m.num = stw.Default(uint64(max(0, n)), defaultSize)
+	m.imp = stw.Default(mi, MapTypeDefault)
 	return m.makeShards()
 }
 
