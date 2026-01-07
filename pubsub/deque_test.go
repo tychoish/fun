@@ -76,7 +76,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			return fixture[T]{
 				name:   "QueueUnlimited",
 				add:    cue.Push,
-				remove: cue.Remove,
+				remove: cue.Pop,
 				stream: cue.IteratorWait,
 				elems:  makeElems(50),
 				close:  cue.Close,
@@ -89,7 +89,7 @@ func generateDequeFixtures[T any](makeElems func(int) []T) []func() fixture[T] {
 			return fixture[T]{
 				name:   "QueueLimited",
 				add:    cue.Push,
-				remove: cue.Remove,
+				remove: cue.Pop,
 				stream: cue.IteratorWait,
 				close:  cue.Close,
 				elems:  makeElems(50),

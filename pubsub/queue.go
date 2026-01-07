@@ -173,10 +173,10 @@ func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	return q.doAdd(item)
 }
 
-// Remove removes and returns the frontmost (oldest) item in the queue and
-// reports whether an item was available.  If the queue is empty, Remove
+// Pop removes and returns the frontmost (oldest) item in the queue and
+// reports whether an item was available.  If the queue is empty, Pop
 // returns nil, false.
-func (q *Queue[T]) Remove() (out T, ok bool) {
+func (q *Queue[T]) Pop() (out T, ok bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -205,13 +205,13 @@ func (q *Queue[T]) Remove() (out T, ok bool) {
 	return
 }
 
-// Wait blocks until q is non-empty or closed, and then returns the frontmost
-// (oldest) item from the queue. If ctx ends before an item is available, Wait
+// WaitPop blocks until q is non-empty or closed, and then returns the frontmost
+// (oldest) item from the queue. If ctx ends before an item is available, WaitPop
 // returns a nil value and a context error. If the queue is closed while it is
-// still, Wait returns nil, ErrQueueClosed.
+// still, WaitPop returns nil, ErrQueueClosed.
 //
-// Wait is destructive: every item returned is removed from the queue.
-func (q *Queue[T]) Wait(ctx context.Context) (out T, _ error) {
+// WaitPop is destructive: every item returned is removed from the queue.
+func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -424,11 +424,11 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 // removed from the queue (destructive read). Safe for concurrent access.
 func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(func() (z T, _ bool) {
-		msg, ok := q.Remove() // holds lock
+		msg, ok := q.Pop() // holds lock
 		if ok {
 			return msg, true
 		}
-		if out, err := q.Wait(ctx); err == nil {
+		if out, err := q.WaitPop(ctx); err == nil {
 			return out, true
 		}
 		return z, false

@@ -104,7 +104,7 @@ func (or *Orchestrator) Service() *Service {
 			wg := &sync.WaitGroup{}
 
 			for {
-				s, ok := or.input.Remove()
+				s, ok := or.input.Pop()
 				if !ok {
 					var err error
 

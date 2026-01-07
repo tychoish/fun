@@ -58,7 +58,7 @@ func (q testQueue) mustAdd(item string) {
 
 func (q testQueue) mustRemove(want string) {
 	q.t.Helper()
-	got, ok := q.Remove()
+	got, ok := q.Pop()
 	if !ok {
 		q.t.Error("Remove: queue is empty")
 	} else if got != want {
@@ -557,14 +557,14 @@ func TestQueueStream(t *testing.T) {
 			sig2 := make(chan struct{})
 			go func() {
 				defer close(sig2)
-				one, ok := tt.Remove()
+				one, ok := tt.Pop()
 				if !ok {
 					t.Error("should have popped")
 				}
 				if one != 1 {
 					t.Error(one)
 				}
-				one, ok = tt.Remove()
+				one, ok = tt.Pop()
 				if !ok {
 					t.Error("should have popped")
 				}
@@ -583,7 +583,7 @@ func TestQueueStream(t *testing.T) {
 			case <-time.After(10 * time.Millisecond):
 				t.Error("should not have timed out")
 			case <-sig:
-				out, ok := tt.Remove()
+				out, ok := tt.Pop()
 				if !ok {
 					t.Error("should have popped")
 				}
@@ -934,20 +934,20 @@ func TestQueueDrain(t *testing.T) {
 		assert.Equal(t, 3, queue.Len())
 
 		// Remove items one by one
-		val, ok := queue.Remove()
+		val, ok := queue.Pop()
 		assert.True(t, ok)
 		assert.Equal(t, "item1", val)
 		time.Sleep(5 * time.Millisecond)
 		assert.True(t, !drainComplete.Load())
 
-		val, ok = queue.Remove()
+		val, ok = queue.Pop()
 		assert.True(t, ok)
 		assert.Equal(t, "item2", val)
 		time.Sleep(5 * time.Millisecond)
 		assert.True(t, !drainComplete.Load())
 
 		// Remove last item - drain should complete
-		val, ok = queue.Remove()
+		val, ok = queue.Pop()
 		assert.True(t, ok)
 		assert.Equal(t, "item3", val)
 
@@ -992,8 +992,8 @@ func TestQueueDrain(t *testing.T) {
 		assert.ErrorIs(t, err, ErrQueueDraining)
 
 		// Empty the queue to complete drain
-		queue.Remove()
-		queue.Remove()
+		queue.Pop()
+		queue.Pop()
 
 		// Wait for drain to complete
 		select {
@@ -1019,8 +1019,8 @@ func TestQueueDrain(t *testing.T) {
 
 		// Remove items to complete drain
 		time.Sleep(10 * time.Millisecond)
-		queue.Remove()
-		queue.Remove()
+		queue.Pop()
+		queue.Pop()
 
 		// Wait for drain
 		err := <-drainComplete
@@ -1036,11 +1036,11 @@ func TestQueueDrain(t *testing.T) {
 		assert.Equal(t, 2, queue.Len())
 
 		// Can remove items
-		val, ok := queue.Remove()
+		val, ok := queue.Pop()
 		assert.True(t, ok)
 		assert.Equal(t, "after-drain-1", val)
 
-		val, ok = queue.Remove()
+		val, ok = queue.Pop()
 		assert.True(t, ok)
 		assert.Equal(t, "after-drain-2", val)
 	})
@@ -1102,7 +1102,7 @@ func TestQueueDrain(t *testing.T) {
 		// Concurrently consume items
 		go func() {
 			for queue.Len() > 0 || consumed.Load() < 100 {
-				if val, ok := queue.Remove(); ok {
+				if val, ok := queue.Pop(); ok {
 					consumed.Add(1)
 					_ = val
 					time.Sleep(time.Millisecond)
@@ -1143,8 +1143,8 @@ func TestQueueDrain(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Empty queue
-		queue.Remove()
-		queue.Remove()
+		queue.Pop()
+		queue.Pop()
 
 		err = <-drainErr
 		assert.NotError(t, err)
