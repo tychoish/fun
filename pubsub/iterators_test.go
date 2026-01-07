@@ -32,13 +32,12 @@ func TestRateLimit(t *testing.T) {
 		count := &atomic.Int64{}
 
 		check.MinRuntime(t, 100*time.Millisecond, func() {
-			assert.NotError(t, IteratorStream(RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond)).
-				ReadAll(fnx.FromHandler(func(in int) {
-					check.True(t, in >= 0)
-					check.True(t, in <= 100)
-					count.Add(1)
-					testt.Log(t, in, count.Load(), "-->", time.Now())
-				})).Run(testt.Context(t)))
+			for num := range RateLimit(ctx, irt.Slice(makeIntSlice(100)), 10, 100*time.Millisecond) {
+				check.True(t, num >= 0)
+				check.True(t, num <= 100)
+				count.Add(1)
+				testt.Log(t, num, count.Load(), "-->", time.Now())
+			}
 		})
 
 		assert.Equal(t, 100, count.Load())

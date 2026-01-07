@@ -635,7 +635,7 @@ func TestQueueStream(t *testing.T) {
 		t.Run("Shutdown", func(t *testing.T) {
 			ctx := t.Context()
 			queue := NewUnlimitedQueue[string]()
-			listener := IteratorStream(queue.IteratorWaitPop(ctx))
+			listener := queue.IteratorWaitPop(ctx)
 			assert.NotError(t, queue.Push("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -650,11 +650,10 @@ func TestQueueStream(t *testing.T) {
 			time.Sleep(time.Millisecond)
 			assert.ErrorIs(t, queue.Push("bar"), ErrQueueDraining)
 			assert.Equal(t, flag.Load(), 1)
-			val, err := listener.Read(t.Context())
-			assert.NotError(t, err)
-			assert.Equal(t, "foo", val)
-
-			_, _ = listener.Read(t.Context())
+			for val := range listener {
+				assert.Equal(t, "foo", val)
+				break
+			}
 			<-sig
 
 			assert.Equal(t, flag.Load(), 2)
@@ -662,7 +661,7 @@ func TestQueueStream(t *testing.T) {
 		t.Run("Drain", func(t *testing.T) {
 			ctx := t.Context()
 			queue := NewUnlimitedQueue[string]()
-			listener := IteratorStream(queue.IteratorWaitPop(ctx))
+			listener := queue.IteratorWaitPop(ctx)
 			assert.NotError(t, queue.Push("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -677,20 +676,26 @@ func TestQueueStream(t *testing.T) {
 			time.Sleep(time.Millisecond)
 			assert.ErrorIs(t, queue.WaitPush(ctx, "bar"), ErrQueueDraining)
 			assert.Equal(t, flag.Load(), 1)
-			val, err := listener.Read(t.Context())
-			assert.NotError(t, err)
-			assert.Equal(t, "foo", val)
+			for val := range listener {
+				assert.Equal(t, "foo", val)
+				break
+			}
 
 			<-sig
 
 			assert.Equal(t, flag.Load(), 2)
 		})
 		t.Run("ContextCancelation", func(t *testing.T) {
+			// this is a legacy test from an era when the
+			// queue API was more context dependent;
+			// presently iterators yield results after
+			// contexts have canceled _but_ they won't
+			// wait for new items if they reach "the end".
+
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			cancel()
 
 			queue := NewUnlimitedQueue[string]()
-			listener := IteratorStream(queue.IteratorWaitPop(ctx))
 			assert.NotError(t, queue.Push("foo"))
 			flag := &atomic.Int64{}
 			sig := make(chan struct{})
@@ -704,16 +709,15 @@ func TestQueueStream(t *testing.T) {
 			}()
 			time.Sleep(10 * time.Millisecond)
 			check.Equal(t, flag.Load(), 2)
-			val, err := listener.Read(ctx)
-			check.Error(t, err)
-			check.Zero(t, val)
 
-			val, err = listener.Read(ctx)
-			check.ErrorIs(t, err, context.Canceled)
-			check.Zero(t, val)
-			ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
-			defer cancel()
-			check.Error(t, queue.Shutdown(ctx))
+			count := 0
+			for range queue.IteratorWaitPop(ctx) {
+				count++
+			}
+			assert.Equal(t, count, 1)
+
+			check.NotError(t, queue.Close())
+			check.NotError(t, queue.Close())
 		})
 	})
 }

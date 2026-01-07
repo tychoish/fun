@@ -17,6 +17,7 @@ import (
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/fnx"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
 	"github.com/tychoish/fun/pubsub"
 	"github.com/tychoish/fun/wpa"
@@ -142,18 +143,16 @@ func Wait(seq iter.Seq[fnx.Operation]) *Service {
 	}
 }
 
-// ProcessStream runs an itertool.ParallelForEach operation as a
-// *Service. For a long running service, use a stream that is
-// blocking (e.g. based on a pubsub queue/deque or a channel.)
-func ProcessStream[T any](
+// Handler runs an wpa worker pool operation as a *Service. For a long
+// running service, use a iteration sequence that's blocking (e.g. one
+// that wraps a pubsub queue/deque or a channel,) for the best results.
+func Handler[T any](
 	seq iter.Seq[T],
 	processor fnx.Handler[T],
 	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
-	st := pubsub.IteratorStream(seq)
 	return &Service{
-		Run:      st.Parallel(processor, optp...),
-		Shutdown: st.Close,
+		Run: wpa.WithHandler(processor).RunWithPool(optp...).For(seq),
 	}
 }
 
@@ -167,7 +166,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 
 	return &Service{
 		Run:      waitForSignal.WithErrorFilter(erc.NewFilter().WithoutContext()),
-		Shutdown: func() error { closer(); ; return pipe.Close() },
+		Shutdown: func() error { closer(); return pipe.Close() },
 		Cleanup: func() error {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -175,9 +174,8 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 				ctx, cancel = context.WithTimeout(ctx, timeout)
 				defer cancel()
 			}
-
-			if err := pubsub.IteratorStream(pipe.IteratorWaitPop(ctx)).Parallel(
-				func(ctx context.Context, wf fnx.Worker) error { return wf.Run(ctx) },
+			if err := wpa.RunWithPool(
+				pipe.IteratorWaitPop(ctx),
 				wpa.WorkerGroupConfContinueOnError(),
 				wpa.WorkerGroupConfContinueOnPanic(),
 				wpa.WorkerGroupConfWorkerPerCPU(),
@@ -197,12 +195,7 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.WorkerGroupConf]) *Service {
 	return &Service{
 		Run: func(ctx context.Context) error {
-			return pubsub.IteratorStream(workQueue.IteratorWaitPop(ctx)).Parallel(
-				func(ctx context.Context, fn fnx.Worker) error {
-					return fn.Run(ctx)
-				},
-				optp...,
-			).Run(ctx)
+			return wpa.RunWithPool(workQueue.IteratorWaitPop(ctx), optp...).Run(ctx)
 		},
 		Shutdown: func() error {
 			// Create a context with timeout for shutdown
@@ -215,7 +208,7 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.W
 	}
 }
 
-// HandlerWorkerPool has similar semantics and use to the WorkerPool,
+// WorkerPoolWithErrorHandler has similar semantics and use to the WorkerPool,
 // but rather than aggregating errors, all errors are passed to the
 // observer function, which is responsible for ignoring or processing
 // the errors. The worker pool will respect continue/abort on error or
@@ -229,18 +222,17 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.W
 // service execution which will be propagated to the return value of
 // the service's Wait method; but all errors that occur during the
 // execution of the workload will be observed (including panics) as well.
-func HandlerWorkerPool(
+func WorkerPoolWithErrorHandler(
 	workQueue *pubsub.Queue[fnx.Worker],
 	observer fn.Handler[error],
 	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) *Service {
 	s := &Service{
 		Run: func(ctx context.Context) error {
-			return pubsub.IteratorStream(workQueue.IteratorWaitPop(ctx)).Parallel(
-				func(ctx context.Context, fn fnx.Worker) error {
-					observer(fn.Run(ctx))
-					return nil
-				},
+			return wpa.RunWithPool(
+				irt.Convert(workQueue.IteratorWaitPop(ctx),
+					func(wf fnx.Worker) fnx.Operation { return wf.Operation(observer) },
+				),
 				optp...,
 			).Run(ctx)
 		},

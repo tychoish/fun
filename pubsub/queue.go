@@ -234,9 +234,11 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 	return q.popFront(), nil
 }
 
-// Drain marks the queue as draining so that new items cannot be added, and then blocks until the queue is empty (or it's
-// context is canceled.) This does not close the queue: when Drain returns the queue is empty, but new work can then be
-// added. To Drain and shutdown, use the Shutdown method.
+// Drain marks the queue as draining so that new items cannot be
+// added, and then blocks until the queue is empty (or it's context is
+// canceled.) This does not close the queue: when Drain returns the
+// queue is empty, but new work can then be added. To Drain and
+// shutdown, use the Shutdown method.
 func (q *Queue[T]) Drain(ctx context.Context) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -284,10 +286,11 @@ func (q *Queue[T]) waitForNew(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the queue. After closing, any further Add calls will report an
-// error, but items that were added to the queue prior to closing will still be
-// available for Remove and Wait. Wait will report an error without blocking if
-// it is called on a closed, empty queue.
+// Close closes the queue. After closing, any further Add calls will
+// report an error, but items that were added to the queue prior to
+// closing will still be available for Pop and WaitPop. WaitPop will
+// report an error without blocking if it is called on a closed, empty
+// queue.
 func (q *Queue[T]) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -297,8 +300,9 @@ func (q *Queue[T]) Close() error {
 	return nil
 }
 
-// Shutdown drains the queue, waiting for all items to be removed from the queue and then clsoes it so no additional work can be
-// added to the queue.
+// Shutdown drains the queue, waiting for all items to be removed from
+// the queue and then clsoes it so no additional work can be added to
+// the queue.
 func (q *Queue[T]) Shutdown(ctx context.Context) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()

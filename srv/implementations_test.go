@@ -46,7 +46,7 @@ func TestHelpers(t *testing.T) {
 		t.Parallel()
 		t.Run("Large", func(t *testing.T) {
 			count := atomic.Int64{}
-			srv := ProcessStream(
+			srv := Handler(
 				makeSeq(100),
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
 				wpa.WorkerGroupConfNumWorkers(2),
@@ -66,7 +66,7 @@ func TestHelpers(t *testing.T) {
 		})
 		t.Run("Medium", func(t *testing.T) {
 			count := atomic.Int64{}
-			srv := ProcessStream(
+			srv := Handler(
 				makeSeq(50),
 				func(_ context.Context, _ int) error {
 					time.Sleep(10 * time.Millisecond)
@@ -203,7 +203,7 @@ func TestHelpers(t *testing.T) {
 		t.Run("Small", func(t *testing.T) {
 			count := &atomic.Int64{}
 			errCount := &atomic.Int64{}
-			srv := HandlerWorkerPool(
+			srv := WorkerPoolWithErrorHandler(
 				makeErroringQueue(t, 100, count),
 				func(err error) {
 					t.Log(err)
@@ -232,7 +232,7 @@ func TestHelpers(t *testing.T) {
 		t.Run("Large", func(t *testing.T) {
 			count := &atomic.Int64{}
 			errCount := &atomic.Int64{}
-			srv := HandlerWorkerPool(
+			srv := WorkerPoolWithErrorHandler(
 				makeErroringQueue(t, 100, count),
 				func(err error) {
 					check.Error(t, err)

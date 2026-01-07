@@ -62,6 +62,8 @@ import (
 // safely. As a rule, all tooling in the fun package uses ReadOne
 // except in a few cases where a caller has exclusive access to the
 // stream.
+//
+// Stream is weakly deprecated in favor of iter.Seq, and the irt package.
 type Stream[T any] struct {
 	operation func(context.Context) (T, error)
 	value     T
@@ -122,30 +124,6 @@ func InterfaceStream[T any](obj interface {
 },
 ) *Stream[T] {
 	return MakeStream(obj.Read)
-}
-
-// IteratorStream wraps a native go iterator to a Stream[T].
-func IteratorStream[T any](it iter.Seq[T]) *Stream[T] {
-	next, stop := iter.Pull(it)
-	ctx, cancel := context.WithCancel(context.Background())
-	mtx := &sync.Mutex{}
-
-	return MakeStream(fnx.CheckedFuture(func() (zero T, _ bool) {
-		if val, ok := next(); ok {
-			return val, true
-		}
-		cancel()
-		return zero, false
-	}).WithLock(mtx).PreHook(fnx.Operation(func(cc context.Context) {
-		select {
-		case <-ctx.Done():
-		case <-cc.Done():
-		}
-
-		mtx.Lock()
-		defer mtx.Unlock()
-		stop()
-	}).PostHook(cancel).Go().Once()))
 }
 
 // MergeStreams takes a collection of streams of the same type of

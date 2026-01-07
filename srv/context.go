@@ -335,7 +335,7 @@ func SetHandlerWorkerPool(
 	optp ...opt.Provider[*wpa.WorkerGroupConf],
 ) context.Context {
 	return setupWorkerPool(ctx, key, queue, func(orca *Orchestrator) {
-		erc.Invariant(orca.Add(HandlerWorkerPool(queue, observer, optp...)))
+		erc.Invariant(orca.Add(WorkerPoolWithErrorHandler(queue, observer, optp...)))
 	})
 }
 
