@@ -17,20 +17,29 @@ import (
 // elements. This combines the operations slices.Collect and
 // make([]T).
 //
-// Like make([]T), the optional args are args[0] sets initial length,
-// args[1] sets initial capacity.
+// Unlike you can only set the capacity, not the initial length. For
+// compatibility, you can specify more than one integer arguments,
+// though ONLY one can be non-zero. If you specify a capacity argument
+// that is less than zero, it becomes zero.
 func Collect[T any](seq iter.Seq[T], args ...int) (s []T) {
 	switch len(args) {
 	case 0:
 	// pass, use the nil slice
 	case 1:
-		s = make([]T, idxorz(args, 0))
+		s = make([]T, 0, idxorz(args, 0))
 	case 2:
-		fallthrough
+		a, b := idxorz(args, 0), idxorz(args, 1)
+		if a != 0 && b != 0 {
+			panic("collect can have at most one non-zero argument")
+		}
+		s = make([]T, 0, max(0, a, b))
 	default:
-		size := max(0, idxorz(args, 0))
-		capacity := min(size, idxorz(args, 1))
-		s = make([]T, size, capacity)
+		caps := slices.Collect(RemoveZeros(Slice(args)))
+		if len(caps) > 1 {
+			panic("can only specify ONE non-zero capaciy argument to Collect.")
+		}
+
+		s = make([]T, 0, max(0, idxorz(args, 0)))
 	}
 	return slices.AppendSeq(s, seq)
 }
@@ -78,6 +87,9 @@ func Two[A, B any](a A, b B) iter.Seq2[A, B] { return func(yield func(A, B) bool
 
 // Map returns a iterator containing all key-value pairs from the map.
 func Map[K comparable, V any, M ~map[K]V](mp M) iter.Seq2[K, V] { return maps.All(mp) }
+
+// MapKV transforms a map into an iterator of KV pairs.
+func MapKV[A comparable, B any, M ~map[A]B](mp M) iter.Seq[KV[A, B]] { return KVmap(mp) }
 
 // Slice returns a sequence containing all elements from the slice.
 func Slice[T any, S ~[]T](sl S) iter.Seq[T] { return slices.Values(sl) }

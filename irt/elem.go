@@ -20,6 +20,9 @@ func MakeKV[A, B any](a A, b B) KV[A, B] { return KV[A, B]{Key: a, Value: b} }
 // KVargs takes a variadic sequence of KV args and returns a pair iterator.
 func KVargs[A, B any](elems ...KV[A, B]) iter.Seq2[A, B] { return KVsplit(Slice(elems)) }
 
+// KVmap converts a map into a sequence of KV pairs, and returns them as an iterator.
+func KVmap[A comparable, B any, M ~map[A]B](in M) iter.Seq[KV[A, B]] { return KVjoin(Map(in)) }
+
 ////////////////////////////////////////////////////////////////////////
 //
 // Split/Apply

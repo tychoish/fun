@@ -33,15 +33,18 @@ func PullWithMutex[T any](seq iter.Seq[T], mu *sync.Mutex) (next func() (T, bool
 
 func TestCollect(t *testing.T) {
 	tests := []struct {
-		name     string
-		seq      iter.Seq[int]
-		args     []int
-		expected []int
+		name             string
+		seq              iter.Seq[int]
+		args             []int
+		expected         []int
+		expectedCapacity int
+		panics           bool
 	}{
 		{
-			name:     "EmptySequence",
-			seq:      func(yield func(int) bool) {},
-			expected: []int{},
+			name:             "EmptySequence",
+			seq:              func(yield func(int) bool) {},
+			expected:         []int{},
+			expectedCapacity: 0,
 		},
 		{
 			name: "SimpleSequence",
@@ -54,29 +57,65 @@ func TestCollect(t *testing.T) {
 				}
 				yield(3)
 			},
-			expected: []int{1, 2, 3},
+			expected:         []int{1, 2, 3},
+			expectedCapacity: 4,
 		},
 		{
-			name: "WithInitialSize",
+			name: "WithInitialCapacity/First",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
 				}
 				yield(2)
 			},
-			args:     []int{5},
-			expected: []int{0, 0, 0, 0, 0, 1, 2},
+			args:             []int{5, 0},
+			expected:         []int{1, 2},
+			expectedCapacity: 5,
 		},
 		{
-			name: "WithInitialCapacity",
+			name: "WithInitialCapacity/Second",
 			seq: func(yield func(int) bool) {
 				if !yield(1) {
 					return
 				}
 				yield(2)
 			},
-			args:     []int{0, 5},
-			expected: []int{1, 2},
+			args:             []int{0, 5},
+			expected:         []int{1, 2},
+			expectedCapacity: 5,
+		},
+		{
+			name: "WithInitialCapacity/many",
+			seq: func(yield func(int) bool) {
+				if !yield(1) {
+					return
+				}
+				yield(2)
+			},
+			args:             []int{0, 5, 0, 0, 0},
+			expected:         []int{1, 2},
+			expectedCapacity: 2,
+		},
+		{
+			name: "WithInitialCapacity/Negative",
+			seq: func(yield func(int) bool) {
+				if !yield(1) {
+					return
+				}
+				yield(2)
+			},
+			args:             []int{0, -55, 0, 0, 0},
+			expected:         []int{1, 2},
+			expectedCapacity: 2,
+		},
+		{
+			name: "WithInitialCapacityAndNoData/Negative",
+			seq: func(yield func(int) bool) {
+				return
+			},
+			args:             []int{0, -55, 0, 0, 0},
+			expected:         []int{},
+			expectedCapacity: 0,
 		},
 		{
 			name: "WithInitialCapacityAndLength",
@@ -86,16 +125,58 @@ func TestCollect(t *testing.T) {
 				}
 				yield(2)
 			},
-			args:     []int{0, 5},
-			expected: []int{1, 2},
+			args:             []int{0, 5},
+			expected:         []int{1, 2},
+			expectedCapacity: 5,
+		},
+		{
+			name:   "Panics/NilSeq",
+			seq:    nil,
+			args:   []int{0, 5},
+			panics: true,
+		},
+		{
+			name:   "Panics/Two",
+			seq:    func(func(int) bool) {},
+			args:   []int{1, 1},
+			panics: true,
+		},
+		{
+			name:   "Panics/Three",
+			seq:    func(func(int) bool) {},
+			args:   []int{1, 1, 0},
+			panics: true,
+		},
+		{
+			name:             "NotPanics",
+			seq:              func(func(int) bool) {},
+			args:             []int{1},
+			expectedCapacity: 1,
+			panics:           false,
 		},
 	}
 
 	for _, tt := range tests {
+		if tt.panics {
+			t.Run(tt.name, func(t *testing.T) {
+				defer func() {
+					p := recover()
+					if p == nil {
+						t.Error("expected panic")
+					}
+				}()
+				_ = Collect(tt.seq, tt.args...)
+			})
+
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			result := Collect(tt.seq, tt.args...)
 			if !slices.Equal(result, tt.expected) {
 				t.Errorf("Collect() = %v, want %v", result, tt.expected)
+			}
+			if cap(result) != tt.expectedCapacity {
+				t.Errorf("saw capcity of %d not %d", cap(result), tt.expectedCapacity)
 			}
 		})
 	}
@@ -6060,5 +6141,420 @@ func TestWith3(t *testing.T) {
 		}
 
 		check.Equal(t, count, 1000)
+	})
+}
+
+func TestKVmap(t *testing.T) {
+	t.Run("EmptyMap", func(t *testing.T) {
+		input := map[int]string{}
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 0)
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		input := map[string]int{"a": 1}
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 1)
+		check.Equal(t, result[0].Key, "a")
+		check.Equal(t, result[0].Value, 1)
+	})
+
+	t.Run("MultipleElements", func(t *testing.T) {
+		input := map[string]int{
+			"a": 1,
+			"b": 2,
+			"c": 3,
+		}
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 3)
+
+		// Convert to map to verify all elements are present (map iteration order is not guaranteed)
+		resultMap := make(map[string]int)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("IntToString", func(t *testing.T) {
+		input := map[int]string{
+			1: "one",
+			2: "two",
+			3: "three",
+		}
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 3)
+
+		resultMap := make(map[int]string)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("StringToString", func(t *testing.T) {
+		input := map[string]string{
+			"hello":   "world",
+			"foo":     "bar",
+			"testing": "123",
+		}
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 3)
+
+		resultMap := make(map[string]string)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("LargeMap", func(t *testing.T) {
+		input := make(map[int]int)
+		for i := 0; i < 100; i++ {
+			input[i] = i * 2
+		}
+
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 100)
+
+		resultMap := make(map[int]int)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := map[int]string{
+			1: "a",
+			2: "b",
+			3: "c",
+			4: "d",
+			5: "e",
+		}
+
+		count := 0
+		for range KVmap(input) {
+			count++
+			if count == 3 {
+				break
+			}
+		}
+
+		check.Equal(t, count, 3)
+	})
+
+	t.Run("IteratorReuse", func(t *testing.T) {
+		input := map[string]int{
+			"x": 10,
+			"y": 20,
+			"z": 30,
+		}
+
+		seq := KVmap(input)
+
+		// First iteration
+		result1 := Collect(seq)
+		check.Equal(t, len(result1), 3)
+
+		// Second iteration (iterator should be reusable)
+		result2 := Collect(seq)
+		check.Equal(t, len(result2), 3)
+
+		// Both iterations should produce the same elements
+		map1 := make(map[string]int)
+		for _, kv := range result1 {
+			map1[kv.Key] = kv.Value
+		}
+
+		map2 := make(map[string]int)
+		for _, kv := range result2 {
+			map2[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(map1, map2))
+		check.True(t, maps.Equal(input, map1))
+	})
+
+	t.Run("KVStructureCorrectness", func(t *testing.T) {
+		input := map[int]string{42: "answer"}
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 1)
+		kv := result[0]
+		check.Equal(t, kv.Key, 42)
+		check.Equal(t, kv.Value, "answer")
+
+		// Test that Split() works correctly
+		key, value := kv.Split()
+		check.Equal(t, key, 42)
+		check.Equal(t, value, "answer")
+	})
+
+	t.Run("WithPointerValues", func(t *testing.T) {
+		val1 := 100
+		val2 := 200
+		input := map[string]*int{
+			"a": &val1,
+			"b": &val2,
+		}
+
+		result := Collect(KVmap(input))
+
+		check.Equal(t, len(result), 2)
+
+		resultMap := make(map[string]*int)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.Equal(t, len(resultMap), 2)
+		check.Equal(t, *resultMap["a"], 100)
+		check.Equal(t, *resultMap["b"], 200)
+	})
+
+	t.Run("ConvertBackToMap", func(t *testing.T) {
+		input := map[int]string{
+			1: "one",
+			2: "two",
+			3: "three",
+		}
+
+		// KVmap -> Collect -> KVsplit -> Collect2
+		result := Collect2(KVsplit(Slice(Collect(KVmap(input)))))
+
+		check.True(t, maps.Equal(input, result))
+	})
+}
+
+func TestMapKV(t *testing.T) {
+	t.Run("EmptyMap", func(t *testing.T) {
+		input := map[int]string{}
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 0)
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		input := map[string]int{"a": 1}
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 1)
+		check.Equal(t, result[0].Key, "a")
+		check.Equal(t, result[0].Value, 1)
+	})
+
+	t.Run("MultipleElements", func(t *testing.T) {
+		input := map[string]int{
+			"a": 1,
+			"b": 2,
+			"c": 3,
+		}
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 3)
+
+		// Convert to map to verify all elements are present
+		resultMap := make(map[string]int)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("IntToString", func(t *testing.T) {
+		input := map[int]string{
+			1: "one",
+			2: "two",
+			3: "three",
+		}
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 3)
+
+		resultMap := make(map[int]string)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("StringToString", func(t *testing.T) {
+		input := map[string]string{
+			"hello":   "world",
+			"foo":     "bar",
+			"testing": "123",
+		}
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 3)
+
+		resultMap := make(map[string]string)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("LargeMap", func(t *testing.T) {
+		input := make(map[int]int)
+		for i := 0; i < 100; i++ {
+			input[i] = i * 2
+		}
+
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 100)
+
+		resultMap := make(map[int]int)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(input, resultMap))
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := map[int]string{
+			1: "a",
+			2: "b",
+			3: "c",
+			4: "d",
+			5: "e",
+		}
+
+		count := 0
+		for range MapKV(input) {
+			count++
+			if count == 3 {
+				break
+			}
+		}
+
+		check.Equal(t, count, 3)
+	})
+
+	t.Run("IteratorReuse", func(t *testing.T) {
+		input := map[string]int{
+			"x": 10,
+			"y": 20,
+			"z": 30,
+		}
+
+		seq := MapKV(input)
+
+		// First iteration
+		result1 := Collect(seq)
+		check.Equal(t, len(result1), 3)
+
+		// Second iteration (iterator should be reusable)
+		result2 := Collect(seq)
+		check.Equal(t, len(result2), 3)
+
+		// Both iterations should produce the same elements
+		map1 := make(map[string]int)
+		for _, kv := range result1 {
+			map1[kv.Key] = kv.Value
+		}
+
+		map2 := make(map[string]int)
+		for _, kv := range result2 {
+			map2[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(map1, map2))
+		check.True(t, maps.Equal(input, map1))
+	})
+
+	t.Run("KVStructureCorrectness", func(t *testing.T) {
+		input := map[int]string{42: "answer"}
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 1)
+		kv := result[0]
+		check.Equal(t, kv.Key, 42)
+		check.Equal(t, kv.Value, "answer")
+
+		// Test that Split() works correctly
+		key, value := kv.Split()
+		check.Equal(t, key, 42)
+		check.Equal(t, value, "answer")
+	})
+
+	t.Run("WithPointerValues", func(t *testing.T) {
+		val1 := 100
+		val2 := 200
+		input := map[string]*int{
+			"a": &val1,
+			"b": &val2,
+		}
+
+		result := Collect(MapKV(input))
+
+		check.Equal(t, len(result), 2)
+
+		resultMap := make(map[string]*int)
+		for _, kv := range result {
+			resultMap[kv.Key] = kv.Value
+		}
+
+		check.Equal(t, len(resultMap), 2)
+		check.Equal(t, *resultMap["a"], 100)
+		check.Equal(t, *resultMap["b"], 200)
+	})
+
+	t.Run("ConvertBackToMap", func(t *testing.T) {
+		input := map[int]string{
+			1: "one",
+			2: "two",
+			3: "three",
+		}
+
+		// MapKV -> Collect -> KVsplit -> Collect2
+		result := Collect2(KVsplit(Slice(Collect(MapKV(input)))))
+
+		check.True(t, maps.Equal(input, result))
+	})
+
+	t.Run("KVmapAndMapKVEquivalence", func(t *testing.T) {
+		input := map[string]int{
+			"alpha": 1,
+			"beta":  2,
+			"gamma": 3,
+		}
+
+		// Both should produce the same results
+		kvmapResult := Collect(KVmap(input))
+		mapkvResult := Collect(MapKV(input))
+
+		check.Equal(t, len(kvmapResult), len(mapkvResult))
+
+		// Convert both to maps for comparison
+		kvmapMap := make(map[string]int)
+		for _, kv := range kvmapResult {
+			kvmapMap[kv.Key] = kv.Value
+		}
+
+		mapkvMap := make(map[string]int)
+		for _, kv := range mapkvResult {
+			mapkvMap[kv.Key] = kv.Value
+		}
+
+		check.True(t, maps.Equal(kvmapMap, mapkvMap))
+		check.True(t, maps.Equal(input, kvmapMap))
+		check.True(t, maps.Equal(input, mapkvMap))
 	})
 }
