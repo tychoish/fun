@@ -681,6 +681,397 @@ func (e *customError) Error() string {
 	return e.msg
 }
 
+func TestFromIterator(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {}
+		values, err := FromIterator(seq)
+		assert.NotError(t, err)
+		assert.Equal(t, 0, len(values))
+	})
+
+	t.Run("AllSuccessfulValues", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(2, nil)
+			yield(3, nil)
+		}
+		values, err := FromIterator(seq)
+		assert.NotError(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 2, values[1])
+		assert.Equal(t, 3, values[2])
+	})
+
+	t.Run("SomeErrors", func(t *testing.T) {
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+		seq := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(0, err1)      // value with error is skipped
+			yield(2, nil)
+			yield(0, err2)      // value with error is skipped
+			yield(3, nil)
+		}
+		values, err := FromIterator(seq)
+		// Should return non-nil slice with non-nil error
+		assert.Error(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 2, values[1])
+		assert.Equal(t, 3, values[2])
+
+		// Verify both errors are aggregated
+		assert.ErrorIs(t, err, err1)
+		assert.ErrorIs(t, err, err2)
+	})
+
+	t.Run("AllErrors", func(t *testing.T) {
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+		err3 := errors.New("error3")
+		seq := func(yield func(int, error) bool) {
+			yield(0, err1)
+			yield(0, err2)
+			yield(0, err3)
+		}
+		values, err := FromIterator(seq)
+		// Should return non-nil error with empty slice
+		assert.Error(t, err)
+		assert.Equal(t, 0, len(values))
+
+		// Verify all errors are aggregated
+		assert.ErrorIs(t, err, err1)
+		assert.ErrorIs(t, err, err2)
+		assert.ErrorIs(t, err, err3)
+
+		// Verify it's a Collector with 3 errors
+		collector, ok := err.(*Collector)
+		assert.True(t, ok)
+		assert.Equal(t, 3, collector.Len())
+	})
+
+	t.Run("SingleError", func(t *testing.T) {
+		expectedErr := io.EOF
+		seq := func(yield func(string, error) bool) {
+			yield("first", nil)
+			yield("", expectedErr)
+			yield("second", nil)
+		}
+		values, err := FromIterator(seq)
+		assert.Error(t, err)
+		assert.Equal(t, 2, len(values))
+		assert.Equal(t, "first", values[0])
+		assert.Equal(t, "second", values[1])
+		assert.ErrorIs(t, err, expectedErr)
+	})
+
+	t.Run("NonNilSliceWithError", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {
+			yield(42, nil)
+			yield(0, errors.New("error"))
+		}
+		values, err := FromIterator(seq)
+		// Both slice and error should be non-nil
+		assert.Error(t, err)
+		assert.True(t, values != nil)
+		assert.Equal(t, 1, len(values))
+		assert.Equal(t, 42, values[0])
+	})
+}
+
+func TestFromIteratorAll(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {}
+		values, err := FromIteratorAll(seq)
+		assert.NotError(t, err)
+		assert.Equal(t, 0, len(values))
+	})
+
+	t.Run("AllSuccessfulValues", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(2, nil)
+			yield(3, nil)
+		}
+		values, err := FromIteratorAll(seq)
+		assert.NotError(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 2, values[1])
+		assert.Equal(t, 3, values[2])
+	})
+
+	t.Run("SomeErrors", func(t *testing.T) {
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+		seq := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(10, err1)     // value included even with error
+			yield(2, nil)
+			yield(20, err2)     // value included even with error
+			yield(3, nil)
+		}
+		values, err := FromIteratorAll(seq)
+		// Should return non-nil slice with ALL values and non-nil error
+		assert.Error(t, err)
+		assert.Equal(t, 5, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 10, values[1])
+		assert.Equal(t, 2, values[2])
+		assert.Equal(t, 20, values[3])
+		assert.Equal(t, 3, values[4])
+
+		// Verify both errors are aggregated
+		assert.ErrorIs(t, err, err1)
+		assert.ErrorIs(t, err, err2)
+	})
+
+	t.Run("AllErrors", func(t *testing.T) {
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+		err3 := errors.New("error3")
+		seq := func(yield func(int, error) bool) {
+			yield(100, err1)
+			yield(200, err2)
+			yield(300, err3)
+		}
+		values, err := FromIteratorAll(seq)
+		// Should return non-nil slice with ALL values and aggregated errors
+		assert.Error(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, 100, values[0])
+		assert.Equal(t, 200, values[1])
+		assert.Equal(t, 300, values[2])
+
+		// Verify all errors are aggregated
+		assert.ErrorIs(t, err, err1)
+		assert.ErrorIs(t, err, err2)
+		assert.ErrorIs(t, err, err3)
+
+		// Verify it's a Collector with 3 errors
+		collector, ok := err.(*Collector)
+		assert.True(t, ok)
+		assert.Equal(t, 3, collector.Len())
+	})
+
+	t.Run("SingleError", func(t *testing.T) {
+		expectedErr := context.Canceled
+		seq := func(yield func(string, error) bool) {
+			yield("first", nil)
+			yield("with-error", expectedErr)
+			yield("second", nil)
+		}
+		values, err := FromIteratorAll(seq)
+		assert.Error(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, "first", values[0])
+		assert.Equal(t, "with-error", values[1])
+		assert.Equal(t, "second", values[2])
+		assert.ErrorIs(t, err, expectedErr)
+	})
+
+	t.Run("NonNilSliceWithError", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {
+			yield(42, nil)
+			yield(99, errors.New("error"))
+		}
+		values, err := FromIteratorAll(seq)
+		// Both slice and error should be non-nil
+		assert.Error(t, err)
+		assert.True(t, values != nil)
+		assert.Equal(t, 2, len(values))
+		assert.Equal(t, 42, values[0])
+		assert.Equal(t, 99, values[1])
+	})
+
+	t.Run("DifferenceFromFromIterator", func(t *testing.T) {
+		// Demonstrate the key difference: FromIteratorAll includes ALL values
+		err1 := errors.New("skip-me")
+
+		seq1 := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(999, err1)  // This value is skipped in FromIterator
+			yield(2, nil)
+		}
+		values1, _ := FromIterator(seq1)
+		assert.Equal(t, 2, len(values1))
+		assert.Equal(t, 1, values1[0])
+		assert.Equal(t, 2, values1[1])
+
+		seq2 := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(999, err1)  // This value is included in FromIteratorAll
+			yield(2, nil)
+		}
+		values2, _ := FromIteratorAll(seq2)
+		assert.Equal(t, 3, len(values2))
+		assert.Equal(t, 1, values2[0])
+		assert.Equal(t, 999, values2[1])
+		assert.Equal(t, 2, values2[2])
+	})
+}
+
+func TestFromIteratorUntil(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {}
+		values, err := FromIteratorUntil(seq)
+		assert.NotError(t, err)
+		assert.Equal(t, 0, len(values))
+	})
+
+	t.Run("AllSuccessfulValues", func(t *testing.T) {
+		seq := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(2, nil)
+			yield(3, nil)
+		}
+		values, err := FromIteratorUntil(seq)
+		assert.NotError(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 2, values[1])
+		assert.Equal(t, 3, values[2])
+	})
+
+	t.Run("ErrorInMiddle", func(t *testing.T) {
+		err1 := errors.New("first-error")
+		err2 := errors.New("second-error")
+		seq := func(yield func(int, error) bool) {
+			if !yield(1, nil) {
+				return
+			}
+			if !yield(2, nil) {
+				return
+			}
+			if !yield(0, err1) { // stops here
+				return
+			}
+			if !yield(3, nil) { // never reached
+				return
+			}
+			yield(0, err2) // never reached
+		}
+		values, err := FromIteratorUntil(seq)
+		// Should return first error directly (not aggregated)
+		assert.Error(t, err)
+		assert.Equal(t, 2, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 2, values[1])
+
+		// Verify it returns the FIRST error directly (not a Collector)
+		assert.ErrorIs(t, err, err1)
+		_, isCollector := err.(*Collector)
+		assert.True(t, !isCollector) // NOT a collector
+
+		// Second error should NOT be present
+		check.True(t, !errors.Is(err, err2))
+	})
+
+	t.Run("ErrorAtStart", func(t *testing.T) {
+		expectedErr := io.EOF
+		seq := func(yield func(string, error) bool) {
+			if !yield("", expectedErr) { // immediate error
+				return
+			}
+			yield("never", nil) // never reached
+		}
+		values, err := FromIteratorUntil(seq)
+		assert.Error(t, err)
+		assert.Equal(t, 0, len(values))
+		assert.ErrorIs(t, err, expectedErr)
+
+		// Verify it's the original error, not wrapped
+		assert.Equal(t, expectedErr, err)
+	})
+
+	t.Run("ErrorAtEnd", func(t *testing.T) {
+		expectedErr := context.DeadlineExceeded
+		seq := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(2, nil)
+			yield(3, nil)
+			yield(0, expectedErr)
+		}
+		values, err := FromIteratorUntil(seq)
+		assert.Error(t, err)
+		assert.Equal(t, 3, len(values))
+		assert.Equal(t, 1, values[0])
+		assert.Equal(t, 2, values[1])
+		assert.Equal(t, 3, values[2])
+		assert.ErrorIs(t, err, expectedErr)
+	})
+
+	t.Run("NoAggregation", func(t *testing.T) {
+		// Verify that errors are NOT aggregated (fail-fast behavior)
+		err1 := errors.New("error1")
+		err2 := errors.New("error2")
+		seq := func(yield func(int, error) bool) {
+			if !yield(1, nil) {
+				return
+			}
+			if !yield(0, err1) {
+				return
+			}
+			yield(0, err2)
+		}
+		values, err := FromIteratorUntil(seq)
+		assert.Error(t, err)
+		assert.Equal(t, 1, len(values))
+
+		// Only first error should be present
+		assert.ErrorIs(t, err, err1)
+		check.True(t, !errors.Is(err, err2))
+
+		// Should be the raw error, not a Collector
+		assert.Equal(t, err1, err)
+	})
+
+	t.Run("DifferenceFromOtherFunctions", func(t *testing.T) {
+		// Demonstrate fail-fast vs continue-on-error behavior
+		err1 := errors.New("stop")
+
+		// FromIteratorUntil stops immediately
+		seq1 := func(yield func(int, error) bool) {
+			if !yield(1, nil) {
+				return
+			}
+			if !yield(0, err1) {
+				return
+			}
+			if !yield(2, nil) {
+				return
+			}
+			yield(3, nil)
+		}
+		valuesUntil, errUntil := FromIteratorUntil(seq1)
+		assert.Equal(t, 1, len(valuesUntil))
+		assert.Equal(t, err1, errUntil)
+
+		// FromIterator continues and skips error values
+		seq2 := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(0, err1)
+			yield(2, nil)
+			yield(3, nil)
+		}
+		valuesSkip, errSkip := FromIterator(seq2)
+		assert.Equal(t, 3, len(valuesSkip))
+		assert.ErrorIs(t, errSkip, err1)
+
+		// FromIteratorAll continues and includes all values
+		seq3 := func(yield func(int, error) bool) {
+			yield(1, nil)
+			yield(0, err1)
+			yield(2, nil)
+			yield(3, nil)
+		}
+		valuesAll, errAll := FromIteratorAll(seq3)
+		assert.Equal(t, 4, len(valuesAll))
+		assert.ErrorIs(t, errAll, err1)
+	})
+}
+
 func BenchmarkErrorList(b *testing.B) {
 	const count int = 8
 
