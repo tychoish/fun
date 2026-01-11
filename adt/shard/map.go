@@ -235,7 +235,7 @@ func (m *Map[K, V]) makeShards() []sh[K, V] {
 }
 
 func (m *Map[K, V]) defaultShards() []sh[K, V]                          { return m.init(defaultSize, MapTypeDefault) }
-func (m *Map[K, V]) shards() stw.Slice[sh[K, V]]                        { return m.sh.Call(m.defaultShards) }
+func (m *Map[K, V]) shards() stw.Slice[sh[K, V]]                        { return m.sh.Do(m.defaultShards) }
 func (m *Map[K, V]) shard(key K) *sh[K, V]                              { return m.shards().Ptr(int(m.shardID(key))) }
 func (m *Map[K, V]) inc() *Map[K, V]                                    { m.clock.Add(1); return m }
 func (*Map[K, V]) shKeys(sh *sh[K, V]) iter.Seq[K]                      { return sh.keys() }

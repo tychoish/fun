@@ -33,6 +33,12 @@ type Optional[T any] struct {
 // Optional value.
 func NewOptional[T any](in T) Optional[T] { return Optional[T]{v: in, defined: true} }
 
+func (o *Optional[T]) init() {
+	if internal.IsNil(o.v) && internal.IsPtr(o.v) {
+		o.v = reflect.New(reflect.ValueOf(any(o.v)).Type().Elem()).Interface().(T)
+	}
+}
+
 // Default sets value of the optional to the provided value if it is
 // not already been defined.
 func (o *Optional[T]) Default(in T) {
@@ -104,12 +110,6 @@ func (o *Optional[T]) Scan(src any) (err error) {
 			ers.ErrInvalidInput,
 			fmt.Errorf("%T can not be the value for Optional[%T]", src, o.v),
 		)
-	}
-}
-
-func (o *Optional[T]) init() {
-	if internal.IsNil(o.v) && internal.IsPtr(o.v) {
-		o.v = reflect.New(reflect.ValueOf(any(o.v)).Type().Elem()).Interface().(T)
 	}
 }
 

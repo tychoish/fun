@@ -40,10 +40,10 @@ func NewOnce[T any](fn func() T) *Once[T] {
 // concurrent access: while the Do/Resolve operations are synchronized,
 // the return value from Do is responsible for its own
 // synchronization.
-func (o *Once[T]) Do(ctor func() T) { o.once.Do(func() { o.ctor.Set(ctor); o.populate() }) }
-
-// Call has the same semantics Do but returns the value produced by the constructor function.
-func (o *Once[T]) Call(ctor func() T) T { o.Do(ctor); return o.comp }
+func (o *Once[T]) Do(ctor func() T) T {
+	o.once.Do(func() { o.ctor.Set(ctor); o.populate() })
+	return o.comp
+}
 
 // Resolve runs the stored, if and only if it hasn't been run function
 // and returns its output. If the constructor hasn't been populated,
