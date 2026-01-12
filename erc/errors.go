@@ -323,7 +323,6 @@ func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 		if err != nil {
 			ec.Push(err)
 			continue
-
 		}
 		out = append(out, value)
 	}

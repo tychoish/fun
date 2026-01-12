@@ -708,9 +708,9 @@ func TestFromIterator(t *testing.T) {
 		err2 := errors.New("error2")
 		seq := func(yield func(int, error) bool) {
 			yield(1, nil)
-			yield(0, err1)      // value with error is skipped
+			yield(0, err1) // value with error is skipped
 			yield(2, nil)
-			yield(0, err2)      // value with error is skipped
+			yield(0, err2) // value with error is skipped
 			yield(3, nil)
 		}
 		values, err := FromIterator(seq)
@@ -807,9 +807,9 @@ func TestFromIteratorAll(t *testing.T) {
 		err2 := errors.New("error2")
 		seq := func(yield func(int, error) bool) {
 			yield(1, nil)
-			yield(10, err1)     // value included even with error
+			yield(10, err1) // value included even with error
 			yield(2, nil)
-			yield(20, err2)     // value included even with error
+			yield(20, err2) // value included even with error
 			yield(3, nil)
 		}
 		values, err := FromIteratorAll(seq)
@@ -891,7 +891,7 @@ func TestFromIteratorAll(t *testing.T) {
 
 		seq1 := func(yield func(int, error) bool) {
 			yield(1, nil)
-			yield(999, err1)  // This value is skipped in FromIterator
+			yield(999, err1) // This value is skipped in FromIterator
 			yield(2, nil)
 		}
 		values1, _ := FromIterator(seq1)
@@ -901,7 +901,7 @@ func TestFromIteratorAll(t *testing.T) {
 
 		seq2 := func(yield func(int, error) bool) {
 			yield(1, nil)
-			yield(999, err1)  // This value is included in FromIteratorAll
+			yield(999, err1) // This value is included in FromIteratorAll
 			yield(2, nil)
 		}
 		values2, _ := FromIteratorAll(seq2)

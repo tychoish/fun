@@ -46,7 +46,7 @@ func DerefOk[T any](in *T) (value T, ok bool) {
 
 // DerefZ de-references a pointer value, and if the pointer is nil, returns the zero value for that
 // type. This cannot panic, but does not distinguish between "nil pointer" and "pointer to the zero
-// value for the type."
+// value for the type" input.
 func DerefZ[T any](in *T) (value T) { value, _ = DerefOk(in); return }
 
 // Deref de-references a pointer, panicing if the pointer is nil.

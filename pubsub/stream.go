@@ -95,7 +95,6 @@ func SliceStream[T any](in []T) *Stream[T] {
 	})
 }
 
-
 // MergeStreams takes a collection of streams of the same type of
 // objects and provides a single stream over these items.
 //
