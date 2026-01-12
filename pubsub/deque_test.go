@@ -284,7 +284,7 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 				set[out] = true
 			}
 			if len(set) != len(fix.elems) {
-				t.Fatal("did not see all expected results", set.Len(), len(fix.elems))
+				t.Fatal("did not see all expected results", len(set), len(fix.elems))
 			}
 
 			if fix.len() != 0 {

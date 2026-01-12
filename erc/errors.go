@@ -318,7 +318,7 @@ func (ec *Collector) extractErrors(in []any) {
 // processing and collect all errors for later inspection.
 func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	var ec Collector
-	out := make([]T)
+	out := make([]T, 0)
 	for value, err := range seq {
 		if err != nil {
 			ec.Push(err)
@@ -341,7 +341,7 @@ func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // errors that occurred.
 func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	var ec Collector
-	out := make([]T)
+	out := make([]T, 0)
 	for value, err := range seq {
 		if err != nil {
 			ec.Push(err)
@@ -361,7 +361,7 @@ func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // Use FromIteratorUntil when you want fail-fast behavior and don't need
 // to continue processing after the first error.
 func FromIteratorUntil[T any](seq iter.Seq2[T, error]) ([]T, error) {
-	out := make([]T)
+	out := make([]T, 0)
 	for value, err := range seq {
 		if err != nil {
 			return out, err
