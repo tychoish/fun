@@ -126,7 +126,7 @@ func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-// Iterator returns a native go iterator for a fun/dt.Map object.
+// Iterator returns a native go iterator for a Map object.
 func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) { mp.mp.Range(func(ak, av any) bool { return yield(ak.(K), av.(V)) }) }
 }

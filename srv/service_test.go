@@ -13,9 +13,9 @@ import (
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -180,9 +180,9 @@ func TestService(t *testing.T) {
 	})
 	t.Run("Group", func(t *testing.T) {
 		counter := &atomic.Int64{}
-		list := dt.List[*Service]{}
+		list := make([]*Service, 0, 100)
 		for i := 0; i < 100; i++ {
-			list.PushBack(&Service{
+			list = append(list, &Service{
 				Name: fmt.Sprint(i),
 				Run: func(_ context.Context) error {
 					counter.Add(1)
@@ -190,7 +190,7 @@ func TestService(t *testing.T) {
 				},
 			})
 		}
-		s := Group(list.IteratorPopFront())
+		s := Group(irt.Slice(list))
 		if err := s.Start(context.Background()); err != nil {
 			t.Fatal(err)
 		}

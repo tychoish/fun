@@ -13,7 +13,6 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/testt"
@@ -276,15 +275,15 @@ func RunDequeTests[T comparable](ctx context.Context, t *testing.T, f func() fix
 				t.Fatal("add did not work")
 			}
 
-			set := &dt.Set[T]{}
+			set := map[T]bool{}
 			for i := len(fix.elems); i > 0; i-- {
 				out, ok := fix.remove()
 				if !ok {
 					t.Error("remove should not fail", i)
 				}
-				set.Add(out)
+				set[out] = true
 			}
-			if set.Len() != len(fix.elems) {
+			if len(set) != len(fix.elems) {
 				t.Fatal("did not see all expected results", set.Len(), len(fix.elems))
 			}
 
