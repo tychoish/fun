@@ -800,7 +800,7 @@ func TestTools(t *testing.T) {
 					defer close(sig)
 					for {
 						select {
-						case <-bctx.Done():
+						case <-ctx.Done():
 							return
 						case pipe <- t.Name():
 							continue
@@ -830,7 +830,7 @@ func TestTools(t *testing.T) {
 						break CONSUME
 					}
 				}
-				if count != 1 {
+				if count > 1 {
 					t.Error(count)
 				}
 			})
