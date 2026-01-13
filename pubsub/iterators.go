@@ -43,7 +43,7 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 
 		prune := func(now time.Time) state {
 			ok := true
-			for ok && queue.Len() > 0 && now.Sub(queue.front.link.item) > window {
+			for ok && queue.Len() >= 0 && now.Sub(queue.getFront()) > window {
 				_, ok = queue.Pop()
 			}
 			if queue.Len() >= num {
@@ -54,23 +54,26 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 
 		for ctx.Err() == nil {
 			now := time.Now()
-			s := send(now)
 
-			switch s {
+			switch send(now) {
 			case stateComplete:
 				return
 			case stateRetrySend, stateSendSuccessful:
 				continue
 			case stateOverCapacity:
-				s = prune(now)
-				sleepUntil := max(time.Millisecond, time.Until(queue.front.link.item.Add(window)))
-				timer.Reset(sleepUntil)
-				select {
-				case <-timer.C:
+				switch prune(now) {
+				case stateRetrySend:
 					continue
-				case <-ctx.Done():
-					return
+				case stateOverCapacity:
+					timer.Reset(max(time.Millisecond, time.Until(queue.getFront().Add(window))))
+					select {
+					case <-timer.C:
+						continue
+					case <-ctx.Done():
+						return
+					}
 				}
+
 			}
 		}
 	}

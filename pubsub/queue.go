@@ -315,6 +315,13 @@ func (q *Queue[T]) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (q *Queue[T]) getFront() (out T) {
+	if q.front.link != nil {
+		out = q.front.link.item
+	}
+	return
+}
+
 func (q *Queue[T]) doClose() {
 	q.closed = true
 	q.nupdates.Broadcast()
