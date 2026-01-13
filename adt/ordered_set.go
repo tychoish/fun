@@ -9,6 +9,11 @@ import (
 	"github.com/tychoish/fun/irt"
 )
 
+// OrderedMap is an alias of the `dt` package's ordered map
+// implementation, which is (incidentally as an implementation detail)
+// safe for concurrent use.
+type OrderedMap[K comparable, V any] = dt.OrderedMap[K, V]
+
 // OrderedSet provides a thread-safe generic set implementation that
 // always maintains insertion order. All operations are synchronized.
 type OrderedSet[T comparable] struct {

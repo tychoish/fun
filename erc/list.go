@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"iter"
-
-	"github.com/tychoish/fun/irt"
 )
 
 type list struct {
@@ -96,7 +94,11 @@ func (eel *list) As(target any) (ok bool) {
 	return
 }
 
-func (eel *list) From(seq iter.Seq[error]) { irt.Apply(irt.KeepErrors(seq), eel.Push) }
+func (eel *list) From(seq iter.Seq[error]) {
+	for err := range seq {
+		eel.Push(err)
+	}
+}
 
 func (eel *list) Push(err error) {
 	switch werr := eel.filter.Apply(err).(type) {
@@ -119,9 +121,13 @@ func (eel *list) Push(err error) {
 			}
 		}
 	case interface{ Unwind() []error }:
-		irt.Apply(irt.KeepErrors(irt.Slice(werr.Unwind())), eel.Push)
+		for _, err := range werr.Unwind() {
+			eel.Push(err)
+		}
 	case interface{ Unwrap() []error }:
-		irt.Apply(irt.KeepErrors(irt.Slice(werr.Unwrap())), eel.Push)
+		for _, err := range werr.Unwrap() {
+			eel.Push(err)
+		}
 	default:
 		eel.PushBack(err)
 	}

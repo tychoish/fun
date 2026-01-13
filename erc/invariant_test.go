@@ -2,15 +2,12 @@ package erc_test
 
 import (
 	"errors"
-	"io"
 	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
-	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/fn"
 )
 
 func withPanicAsError(op func()) (err error) {
@@ -170,26 +167,10 @@ func TestPanics(t *testing.T) {
 		})
 	})
 	t.Run("Handler", func(t *testing.T) {
-		var of fn.Handler[string]
-		t.Run("Worker", func(t *testing.T) {
-			var called bool
-			of = func(string) {
-				called = true
-				panic(io.EOF)
-			}
-
-			assert.NotPanic(t, func() {
-				err := of.RecoverPanic("hi")
-
-				assert.ErrorIs(t, err, io.EOF)
-				assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
-			})
-			assert.True(t, called)
-		})
 		t.Run("Handler", func(t *testing.T) {
 			var called bool
 			var seen string
-			of = func(in string) {
+			of := func(in string) {
 				called = true
 				seen = in
 			}
@@ -204,22 +185,12 @@ func TestPanics(t *testing.T) {
 		})
 		t.Run("Panic", func(t *testing.T) {
 			var called bool
-			of = func(string) {
+			of := func(string) {
 				called = true
 				panic("hi")
 			}
 
 			assert.Panic(t, func() { of("hi") })
-			assert.True(t, called)
-		})
-		t.Run("Wait", func(t *testing.T) {
-			var called bool
-			of = func(string) {
-				called = true
-				panic("hi")
-			}
-
-			assert.NotPanic(t, func() { ts := of.RecoverPanic; check.Error(t, ts("hi")) })
 			assert.True(t, called)
 		})
 	})
