@@ -175,7 +175,7 @@ func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 
 // Pop removes and returns the frontmost (oldest) item in the queue and
 // reports whether an item was available.  If the queue is empty, Pop
-// returns nil, false.
+// returns T<zero>, false.
 func (q *Queue[T]) Pop() (out T, ok bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -194,7 +194,6 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 	default:
 		out = q.popFront()
 		ok = true
-
 		if q.draining || q.closed {
 			q.nupdates.Broadcast()
 			break
