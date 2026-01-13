@@ -5,7 +5,6 @@ import (
 	"iter"
 	"time"
 
-	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/erc"
 )
 
@@ -16,7 +15,7 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 	erc.InvariantOk(num > 0, "rate must be greater than zero")
 
 	timer := time.NewTimer(0)
-	queue := &dt.List[time.Time]{}
+	queue := NewUnlimitedQueue[time.Time]()
 
 	type state int
 
@@ -33,19 +32,19 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 		defer stop()
 
 		send := func(now time.Time) state {
-			if queue.Len() < num {
-				queue.PushBack(now)
+			if queue.Len() < num && queue.Push(now) == nil {
 				if val, ok := next(); !ok || !yield(val) {
 					return stateComplete
 				}
 				return stateSendSuccessful
 			}
-			return stateRateExceded
+			return stateOverCapacity
 		}
 
 		prune := func(now time.Time) state {
-			for queue.Len() > 0 && num >= queue.Len() && now.Sub(queue.Front().Value()) > window {
-				queue.PopFront()
+			ok := true
+			for ok && queue.Len() > 0 && now.Sub(queue.front.link.item) > window {
+				_, ok = queue.Pop()
 			}
 			if queue.Len() >= num {
 				return stateOverCapacity
@@ -57,20 +56,14 @@ func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time
 			now := time.Now()
 			s := send(now)
 
-		RETRY:
 			switch s {
 			case stateComplete:
 				return
-			case stateSendSuccessful:
+			case stateRetrySend, stateSendSuccessful:
 				continue
-			case stateRateExceded:
-				s = prune(now)
-				goto RETRY
-			case stateRetrySend:
-				s = send(now)
-				goto RETRY
 			case stateOverCapacity:
-				sleepUntil := max(time.Nanosecond, time.Until(queue.Front().Value().Add(window)))
+				s = prune(now)
+				sleepUntil := max(time.Millisecond, time.Until(queue.front.link.item.Add(window)))
 				timer.Reset(sleepUntil)
 				select {
 				case <-timer.C:
