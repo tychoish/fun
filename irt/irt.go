@@ -386,7 +386,7 @@ func GenerateOk[T any, OP ~func() (T, bool)](gen OP) iter.Seq[T] {
 
 // GenerateWhile returns a sequence that yields values produced by op
 // as long as they satisfy the while predicate.
-func GenerateWhile[T any, OP ~func(T) bool](op func() T, while OP) iter.Seq[T] {
+func GenerateWhile[T any, OP ~func() T, CHECK ~func(T) bool](op OP, while CHECK) iter.Seq[T] {
 	return While(Generate(op), while)
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fn"
 	"github.com/tychoish/fun/irt"
-	"github.com/tychoish/fun/stw"
 )
 
 // Assertion values are produced by the ensure.That() constructor, and
@@ -135,10 +134,10 @@ func (a *Assertion) Run(t testing.TB) {
 		}
 	})
 
-	result := stw.Slice[string]{}
+	result := &dt.List[string]{}
 
 	if !a.check.Defined() && a.subtests.Len() == 0 {
-		result.Push("no tests defined")
+		result.PushBack("no tests defined")
 	}
 
 	result.Append(a.check.Resolve()...)
@@ -157,7 +156,7 @@ func (a *Assertion) Run(t testing.TB) {
 	}
 
 	if result.Len() > 0 {
-		irt.Apply(irt.Slice(result), strlogger)
+		irt.Apply(result.IteratorBack(), strlogger)
 
 		if a.continueOnError {
 			t.Fail()

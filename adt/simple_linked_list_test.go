@@ -1179,6 +1179,23 @@ func TestLinkedListSort(t *testing.T) {
 		check.True(t, slices.Equal([]int{5, 4, 3, 2, 1}, result))
 	})
 
+	t.Run("PopElemIterEarlyReturn", func(t *testing.T) {
+		l := &list[int]{}
+		l.PushBack(1)
+		l.PushBack(2)
+		l.PushBack(3)
+		check.Equal(t, 3, l.Len())
+		for value := range l.IteratorPopBackE() {
+			check.Equal(t, value.Value(), 3)
+			break
+		}
+		check.Equal(t, 2, l.Len())
+		for value := range l.IteratorPopFrontE() {
+			check.Equal(t, value.Value(), 1)
+			break
+		}
+		check.Equal(t, 1, l.Len())
+	})
 	t.Run("PopIterEarlyReturn", func(t *testing.T) {
 		l := &list[int]{}
 		l.PushBack(1)
@@ -1186,12 +1203,12 @@ func TestLinkedListSort(t *testing.T) {
 		l.PushBack(3)
 		check.Equal(t, 3, l.Len())
 		for value := range l.IteratorPopBack() {
-			check.Equal(t, value.Value(), 3)
+			check.Equal(t, value, 3)
 			break
 		}
 		check.Equal(t, 2, l.Len())
 		for value := range l.IteratorPopFront() {
-			check.Equal(t, value.Value(), 1)
+			check.Equal(t, value, 1)
 			break
 		}
 		check.Equal(t, 1, l.Len())
@@ -1201,7 +1218,7 @@ func TestLinkedListSort(t *testing.T) {
 		l.Extend(irt.Args(0, 1, 2, 3, 4, 5, 6))
 		check.Equal(t, 7, l.Len())
 		for expected := range 7 {
-			for value := range l.IteratorPopFront() {
+			for value := range l.IteratorPopFrontE() {
 				check.Equal(t, value.Value(), expected)
 				break
 			}
