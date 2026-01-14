@@ -7,6 +7,7 @@ import (
 
 	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
+	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/testt"
 )
 
@@ -1176,6 +1177,36 @@ func TestLinkedListSort(t *testing.T) {
 		}
 		testt.Log(t, result)
 		check.True(t, slices.Equal([]int{5, 4, 3, 2, 1}, result))
+	})
+
+	t.Run("PopIterEarlyReturn", func(t *testing.T) {
+		l := &list[int]{}
+		l.PushBack(1)
+		l.PushBack(2)
+		l.PushBack(3)
+		check.Equal(t, 3, l.Len())
+		for value := range l.IteratorPopBack() {
+			check.Equal(t, value.Value(), 3)
+			break
+		}
+		check.Equal(t, 2, l.Len())
+		for value := range l.IteratorPopFront() {
+			check.Equal(t, value.Value(), 1)
+			break
+		}
+		check.Equal(t, 1, l.Len())
+	})
+	t.Run("Extend", func(t *testing.T) {
+		l := &list[int]{}
+		l.Extend(irt.Args(0, 1, 2, 3, 4, 5, 6))
+		check.Equal(t, 7, l.Len())
+		for expected := range 7 {
+			for value := range l.IteratorPopFront() {
+				check.Equal(t, value.Value(), expected)
+				break
+			}
+		}
+		check.Equal(t, 0, l.Len())
 	})
 }
 

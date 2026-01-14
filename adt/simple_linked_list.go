@@ -52,20 +52,11 @@ func (l *list[T]) PopFront() T                   { return l.Front().Pop().Value(
 func (l *list[T]) IteratorFront() iter.Seq[T]    { return l.unwrapIter(l.nextFrom(l.Front())) }
 func (l *list[T]) IteratorBack() iter.Seq[T]     { return l.unwrapIter(l.prevFrom(l.Back())) }
 
-// func (l *list[T]) IteratorPopFront() iter.Seq[*elem[T]] { return l.popIter(l.nextFrom(l.Front())) }
-// func (l *list[T]) IteratorPopBack() iter.Seq[*elem[T]]  { return l.popIter(l.prevFrom(l.Back())) }
-
 func (l *list[T]) Extend(seq iter.Seq[T]) {
 	for v := range seq {
 		l.PushBack(v)
 	}
 }
-
-// func (l *list[T]) ExtendElements(seq iter.Seq[*elem[T]]) {
-// 	for v := range seq {
-// 		l.root().PushBack(v)
-// 	}
-// }
 
 func (l *list[T]) nextFrom(e *elem[T]) iter.Seq[*elem[T]] {
 	return func(yield func(*elem[T]) bool) {
@@ -92,26 +83,6 @@ func (l *list[T]) unwrapIter(seq iter.Seq[*elem[T]]) iter.Seq[T] {
 		}
 	}
 }
-
-// func (l *list[T]) popIter(seq iter.Seq[*elem[T]]) iter.Seq[*elem[T]] {
-// 	return func(yield func(*elem[T]) bool) {
-// 		var last *elem[T]
-// 		for value := range seq {
-// 			if last == nil {
-// 				last = value
-// 				continue
-// 			}
-// 			last = last.Pop()
-// 			if !yield(last) {
-// 				return
-// 			}
-// 			last = value
-// 		}
-// 		if last != nil {
-// 			yield(last)
-// 		}
-// 	}
-// }
 
 // SortQuick sorts the list by extracting elements to a slice, sorting
 // with slices.SortFunc, and re-adding them to the list.
@@ -141,9 +112,6 @@ func (*list[T]) cmp(cmpfn func(l, r T) int) func(*elem[T], *elem[T]) int {
 
 // SortMerge sorts the list in-place using merge sort.
 func (l *list[T]) SortMerge(cmp func(T, T) int) {
-	// TODO: actually use ExtendElements and IteratorPop variants to
-	// avoid overallocating new elements for every partition.
-
 	if l.size <= 1 {
 		return
 	}
@@ -153,10 +121,10 @@ func (l *list[T]) SortMerge(cmp func(T, T) int) {
 	right := &list[T]{}
 
 	for range l.Len() / 2 {
-		left.PushBack(l.PopFront())
+		left.root().PushBack(l.Front().Pop())
 	}
 	for l.Len() > 0 {
-		right.PushBack(l.PopFront())
+		right.root().PushBack(l.Front().Pop())
 	}
 
 	// Recursively sort each half
@@ -166,13 +134,37 @@ func (l *list[T]) SortMerge(cmp func(T, T) int) {
 	// Merge the sorted halves back into l
 	for left.Len() > 0 && right.Len() > 0 {
 		if cmp(left.Front().Value(), right.Front().Value()) <= 0 {
-			l.PushBack(left.PopFront())
+			l.Back().PushBack(left.Front().Pop())
 		} else {
-			l.PushBack(right.PopFront())
+			l.Back().PushBack(right.Front().Pop())
 		}
 	}
 
 	// Append remaining elements
-	l.Extend(left.IteratorFront())
-	l.Extend(right.IteratorFront())
+	l.ExtendElements(left.IteratorPopFront())
+	l.ExtendElements(right.IteratorPopFront())
+}
+
+func (l *list[T]) IteratorPopFront() iter.Seq[*elem[T]] { return l.popIter(l.nextFrom(l.Front())) }
+func (l *list[T]) IteratorPopBack() iter.Seq[*elem[T]]  { return l.popIter(l.prevFrom(l.Back())) }
+
+func (l *list[T]) ExtendElements(seq iter.Seq[*elem[T]]) {
+	for v := range seq {
+		l.Back().PushBack(v)
+	}
+}
+
+func (l *list[T]) popIter(seq iter.Seq[*elem[T]]) iter.Seq[*elem[T]] {
+	return func(yield func(*elem[T]) bool) {
+		var last *elem[T]
+		for value := range seq {
+			if last != nil && !yield(last.Pop()) {
+				return
+			}
+			last = value
+		}
+		if last != nil {
+			yield(last.Pop())
+		}
+	}
 }
