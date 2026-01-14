@@ -19,8 +19,8 @@ type OrderedMap[K comparable, V any] = dt.OrderedMap[K, V]
 type OrderedSet[T comparable] struct {
 	mtx  sync.Mutex
 	once sync.Once
-	hash *Map[T, *dt.Element[T]]
-	list *dt.List[T]
+	hash *Map[T, *elem[T]]
+	list list[T]
 }
 
 // MakeOrderedSet constructs an ordered set and adds all items from the
@@ -40,11 +40,9 @@ func (s *OrderedSet[T]) SortQuick(cf func(T, T) int) { defer s.with(s.lock()); s
 // algorithm.
 func (s *OrderedSet[T]) SortMerge(cf func(T, T) int) { defer s.with(s.lock()); s.list.SortMerge(cf) }
 
-func (s *OrderedSet[T]) init() { s.once.Do(s.doInit) }
-func (s *OrderedSet[T]) doInit() {
-	s.hash = &Map[T, *dt.Element[T]]{}
-	s.list = &dt.List[T]{}
-}
+func (s *OrderedSet[T]) init()   { s.once.Do(s.doInit) }
+func (s *OrderedSet[T]) doInit() { s.hash = &Map[T, *elem[T]]{} }
+
 func (*OrderedSet[T]) with(mtx *sync.Mutex) { mtx.Unlock() }
 func (s *OrderedSet[T]) lock() *sync.Mutex  { s.mtx.Lock(); s.init(); return &s.mtx }
 
@@ -73,7 +71,7 @@ func (s *OrderedSet[T]) Delete(in T) bool {
 	}
 
 	if e != nil {
-		e.Remove()
+		e.Pop()
 	}
 
 	return true
@@ -89,8 +87,8 @@ func (s *OrderedSet[T]) Add(in T) (ok bool) {
 		return
 	}
 
-	elem := dt.NewElement(in)
-	s.list.Back().Append(elem)
+	elem := s.list.newElem().Set(in)
+	s.list.Back().PushBack(elem)
 	s.hash.Store(in, elem)
 
 	return
