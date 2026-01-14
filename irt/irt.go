@@ -206,7 +206,7 @@ func Limit2[A, B any](seq iter.Seq2[A, B], n int) iter.Seq2[A, B] {
 
 // Convert returns a sequence where each element is the result of
 // applying op to the elements of the input sequence.
-func Convert[A, B any](seq iter.Seq[A], op func(A) B) iter.Seq[B] {
+func Convert[A, B any, OP ~func(A) B](seq iter.Seq[A], op OP) iter.Seq[B] {
 	return func(yield func(B) bool) {
 		for value := range seq {
 			if !yield(op(value)) {
@@ -218,7 +218,7 @@ func Convert[A, B any](seq iter.Seq[A], op func(A) B) iter.Seq[B] {
 
 // Convert2 returns a iterator where each pair is the result of
 // applying op to the pairs of the input iterator.
-func Convert2[A, B, C, D any](seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Seq2[C, D] {
+func Convert2[A, B, C, D any, OP ~func(A, B) (C, D)](seq iter.Seq2[A, B], op OP) iter.Seq2[C, D] {
 	return func(yield func(C, D) bool) {
 		for key, value := range seq {
 			if !yield(op(key, value)) {
@@ -231,7 +231,7 @@ func Convert2[A, B, C, D any](seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Se
 // Modify2 applies a transformation function to each pair in the
 // sequence.  If the operation is nil, the sequence is returned
 // unchanged.
-func Modify2[A, B any](seq iter.Seq2[A, B], op func(A, B) (A, B)) iter.Seq2[A, B] {
+func Modify2[A, B any, OP ~func(A, B) (A, B)](seq iter.Seq2[A, B], op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		if op != nil {
 			seq = Convert2(seq, op)
@@ -264,7 +264,7 @@ func ModifyAll2[A, B any](seq iter.Seq2[A, B], ops ...func(A, B) (A, B)) iter.Se
 // Modify applies a transformation function to each element in the
 // sequence.  If the operation is nil, the sequence is returned
 // unchanged.
-func Modify[T any](seq iter.Seq[T], op func(T) T) iter.Seq[T] {
+func Modify[T any, OP ~func(T) T](seq iter.Seq[T], op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		if op != nil {
 			seq = Convert(seq, op)
@@ -278,9 +278,9 @@ func Modify[T any](seq iter.Seq[T], op func(T) T) iter.Seq[T] {
 // element in the sequence.  Nil modification functions are
 // skipped. Each transformation is applied in order, with the result
 // of one transformation passed to the next.
-func ModifyAll[T any](seq iter.Seq[T], ops ...func(T) T) iter.Seq[T] {
+func ModifyAll[T any, OP ~func(T) T](seq iter.Seq[T], ops ...OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		operations := Collect(Remove(Slice(ops), func(op func(T) T) bool { return op == nil }), 0, len(ops))
+		operations := Collect(Remove(Slice(ops), func(op OP) bool { return op == nil }), 0, len(ops))
 		if len(operations) > 0 {
 			seq = Convert(seq, func(in T) T {
 				for op := range Slice(operations) {
@@ -296,7 +296,7 @@ func ModifyAll[T any](seq iter.Seq[T], ops ...func(T) T) iter.Seq[T] {
 
 // Merge returns a sequence where each element is the result of
 // applying op to the pairs of the input iterator.
-func Merge[A, B, C any](seq iter.Seq2[A, B], op func(A, B) C) iter.Seq[C] {
+func Merge[A, B, C any, OP ~func(A, B) C](seq iter.Seq2[A, B], op OP) iter.Seq[C] {
 	return func(yield func(C) bool) {
 		for key, value := range seq {
 			if !yield(op(key, value)) {
@@ -308,7 +308,7 @@ func Merge[A, B, C any](seq iter.Seq2[A, B], op func(A, B) C) iter.Seq[C] {
 
 // Generate returns an infinite sequence where each element is
 // produced by calling op.
-func Generate[T any](op func() T) iter.Seq[T] {
+func Generate[T any, OP ~func() T](op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for yield(op()) {
 			continue
@@ -317,7 +317,7 @@ func Generate[T any](op func() T) iter.Seq[T] {
 }
 
 // Generate2 returns an infinite iterator where each pair is produced by calling op.
-func Generate2[A, B any](op func() (A, B)) iter.Seq2[A, B] {
+func Generate2[A, B any, OP ~func() (A, B)](op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for yield(op()) {
 			continue
@@ -327,7 +327,7 @@ func Generate2[A, B any](op func() (A, B)) iter.Seq2[A, B] {
 
 // With returns a iterator where each element from the input sequence
 // is paired with the result of applying op to it.
-func With[A, B any](seq iter.Seq[A], op func(A) B) iter.Seq2[A, B] {
+func With[A, B any, OP ~func(A) B](seq iter.Seq[A], op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for value := range seq {
 			if !yield(value, op(value)) {
@@ -339,7 +339,7 @@ func With[A, B any](seq iter.Seq[A], op func(A) B) iter.Seq2[A, B] {
 
 // With2 returns a iterator where each pair is produced by applying op
 // to each element of the input sequence.
-func With2[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[B, C] {
+func With2[A, B, C any, OP ~func(A) (B, C)](seq iter.Seq[A], op OP) iter.Seq2[B, C] {
 	return func(yield func(B, C) bool) {
 		for value := range seq {
 			if !yield(op(value)) {
@@ -351,7 +351,7 @@ func With2[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[B, C] {
 
 // With3 returns a iterator where each pair is produced by applying op
 // to each element of the input sequence.
-func With3[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[KV[A, B], C] {
+func With3[A, B, C any, OP ~func(A) (B, C)](seq iter.Seq[A], op OP) iter.Seq2[KV[A, B], C] {
 	return func(yield func(KV[A, B], C) bool) {
 		for key := range seq {
 			value, check := op(key)
@@ -364,7 +364,7 @@ func With3[A, B, C any](seq iter.Seq[A], op func(A) (B, C)) iter.Seq2[KV[A, B], 
 
 // WithEach returns a iterator where each element from the input
 // sequence is paired with a value produced by calling op.
-func WithEach[A, B any](seq iter.Seq[A], op func() B) iter.Seq2[A, B] {
+func WithEach[A, B any, OP ~func() B](seq iter.Seq[A], op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for value := range seq {
 			if !yield(value, op()) {
@@ -376,7 +376,7 @@ func WithEach[A, B any](seq iter.Seq[A], op func() B) iter.Seq2[A, B] {
 
 // GenerateOk returns a sequence that yields values produced by gen as
 // long as gen returns true.
-func GenerateOk[T any](gen func() (T, bool)) iter.Seq[T] {
+func GenerateOk[T any, OP ~func() (T, bool)](gen OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for val, ok := gen(); ok && yield(val); val, ok = gen() {
 			continue
@@ -386,13 +386,13 @@ func GenerateOk[T any](gen func() (T, bool)) iter.Seq[T] {
 
 // GenerateWhile returns a sequence that yields values produced by op
 // as long as they satisfy the while predicate.
-func GenerateWhile[T any](op func() T, while func(T) bool) iter.Seq[T] {
+func GenerateWhile[T any, OP ~func(T) bool](op func() T, while OP) iter.Seq[T] {
 	return While(Generate(op), while)
 }
 
 // GenerateOk2 returns a iterator that yields pairs produced by gen as
 // long as gen returns true.
-func GenerateOk2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
+func GenerateOk2[A, B any, OP ~func() (A, B, bool)](gen OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for first, second, ok := gen(); ok && yield(first, second); first, second, ok = gen() {
 			continue
@@ -402,13 +402,13 @@ func GenerateOk2[A, B any](gen func() (A, B, bool)) iter.Seq2[A, B] {
 
 // GenerateWhile2 returns a iterator that yields pairs produced by op
 // as long as they satisfy the while predicate.
-func GenerateWhile2[A, B any](op func() (A, B), while func(A, B) bool) iter.Seq2[A, B] {
+func GenerateWhile2[A, B any, OP ~func() (A, B), WHILE ~func(A, B) bool](op OP, while WHILE) iter.Seq2[A, B] {
 	return While2(Generate2(op), while)
 }
 
 // GenerateN returns a sequence that yields exactly num elements
 // produced by calling op.  If num <= 0, the sequence is empty.
-func GenerateN[T any](num int, op func() T) iter.Seq[T] {
+func GenerateN[T any, OP ~func() T](num int, op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for i := 0; i < num && yield(op()); i++ {
 			continue
@@ -418,7 +418,7 @@ func GenerateN[T any](num int, op func() T) iter.Seq[T] {
 
 // ForEach returns a sequence that calls op for each element of the
 // input sequence during iteration.
-func ForEach[T any](seq iter.Seq[T], op func(T)) iter.Seq[T] {
+func ForEach[T any, OP ~func(T)](seq iter.Seq[T], op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for value := range seq {
 			op(value)
@@ -431,7 +431,7 @@ func ForEach[T any](seq iter.Seq[T], op func(T)) iter.Seq[T] {
 
 // ForEachWhile returns a sequence that calls op for each element of
 // the input sequence.  Iteration stops if op returns false.
-func ForEachWhile[T any](seq iter.Seq[T], op func(T) bool) iter.Seq[T] {
+func ForEachWhile[T any, OP func(T) bool](seq iter.Seq[T], op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for value := range seq {
 			if !op(value) || !yield(value) {
@@ -443,7 +443,7 @@ func ForEachWhile[T any](seq iter.Seq[T], op func(T) bool) iter.Seq[T] {
 
 // ForEach2 returns a iterator that calls op for each pair of the
 // input iterator during iteration.
-func ForEach2[A, B any](seq iter.Seq2[A, B], op func(A, B)) iter.Seq2[A, B] {
+func ForEach2[A, B any, OP ~func(A, B)](seq iter.Seq2[A, B], op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for key, value := range seq {
 			op(key, value)
@@ -456,7 +456,7 @@ func ForEach2[A, B any](seq iter.Seq2[A, B], op func(A, B)) iter.Seq2[A, B] {
 
 // ForEachWhile2 returns a iterator that calls op for each pair of the
 // input iterator.  Iteration stops if op returns false.
-func ForEachWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) iter.Seq2[A, B] {
+func ForEachWhile2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for key, value := range seq {
 			if !op(key, value) || !yield(key, value) {
@@ -468,7 +468,7 @@ func ForEachWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) iter.Seq2[
 
 // Apply consumes the sequence and calls op for each element. Returns
 // the number of elements processed.
-func Apply[T any](seq iter.Seq[T], op func(T)) (count int) {
+func Apply[T any, OP ~func(T)](seq iter.Seq[T], op OP) (count int) {
 	for value := range seq {
 		count++
 		op(value)
@@ -479,7 +479,7 @@ func Apply[T any](seq iter.Seq[T], op func(T)) (count int) {
 // RunAll takes a sequences of nilary functions and runs them all,
 // returning a count. If any functions are Nil. For other function
 // types, and for nil/panic safety, use the operations in the wpa package.
-func RunAll(seq iter.Seq[func()]) (count int) {
+func RunAll[OP ~func()](seq iter.Seq[OP]) (count int) {
 	for op := range seq {
 		count++
 		op()
@@ -490,7 +490,7 @@ func RunAll(seq iter.Seq[func()]) (count int) {
 // ApplyWhile consumes the sequence and calls op for each
 // element. Iteration stops if op returns false.  Returns the number
 // of elements processed.
-func ApplyWhile[T any](seq iter.Seq[T], op func(T) bool) (count int) {
+func ApplyWhile[T any, OP ~func(T) bool](seq iter.Seq[T], op OP) (count int) {
 	for value := range seq {
 		count++
 		if !op(value) {
@@ -503,7 +503,7 @@ func ApplyWhile[T any](seq iter.Seq[T], op func(T) bool) (count int) {
 // ApplyUntil consumes the sequence and calls op for each
 // element. Iteration stops if op returns an error.  Returns the error
 // from op, or nil if the sequence was fully consumed.
-func ApplyUntil[T any](seq iter.Seq[T], op func(T) error) error {
+func ApplyUntil[T any, OP ~func(T) error](seq iter.Seq[T], op OP) error {
 	for value := range seq {
 		if err := op(value); err != nil {
 			return err
@@ -515,21 +515,25 @@ func ApplyUntil[T any](seq iter.Seq[T], op func(T) error) error {
 // ApplyUnless consumes the sequence and calls op for each
 // element. Iteration stops if op returns true.  Returns the number of
 // elements processed.
-func ApplyUnless[T any](seq iter.Seq[T], op func(T) bool) int { return ApplyWhile(seq, notf(op)) }
+func ApplyUnless[T any, OP ~func(T) bool](seq iter.Seq[T], op OP) int {
+	return ApplyWhile(seq, notf(op))
+}
 
 // ApplyAll consumes the sequence and calls op for each element. It
 // collects all errors returned by op and returns them joined.
-func ApplyAll[T any](seq iter.Seq[T], op func(T) error) error { return JoinErrors(Convert(seq, op)) }
+func ApplyAll[T any, OP ~func(T) error](seq iter.Seq[T], op OP) error {
+	return JoinErrors(Convert(seq, op))
+}
 
 // ApplyAll2 consumes the iterator and calls op for each pair. It
 // collects all errors returned by op and returns them joined.
-func ApplyAll2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
+func ApplyAll2[A, B any, OP ~func(A, B) error](seq iter.Seq2[A, B], op OP) error {
 	return JoinErrors(Merge(seq, op))
 }
 
 // Apply2 consumes the iterator and calls op for each pair. Returns
 // the number of pairs processed.
-func Apply2[A, B any](seq iter.Seq2[A, B], op func(A, B)) (count int) {
+func Apply2[A, B any, OP ~func(A, B)](seq iter.Seq2[A, B], op OP) (count int) {
 	for key, value := range seq {
 		count++
 		op(key, value)
@@ -540,7 +544,7 @@ func Apply2[A, B any](seq iter.Seq2[A, B], op func(A, B)) (count int) {
 // ApplyWhile2 consumes the iterator and calls op for each
 // pair. Iteration stops if op returns false.  Returns the number of
 // pairs processed.
-func ApplyWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) (count int) {
+func ApplyWhile2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], op OP) (count int) {
 	for key, value := range seq {
 		count++
 		if !op(key, value) {
@@ -553,14 +557,14 @@ func ApplyWhile2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) (count int) 
 // ApplyUnless2 consumes the iterator and calls op for each
 // pair. Iteration stops if op returns true.  Returns the number of
 // pairs processed.
-func ApplyUnless2[A, B any](seq iter.Seq2[A, B], op func(A, B) bool) int {
+func ApplyUnless2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], op OP) int {
 	return ApplyWhile2(seq, notf2(op))
 }
 
 // ApplyUntil2 consumes the iterator and calls op for each
 // pair. Iteration stops if op returns an error.  Returns the error
 // from op, or nil if the sequence was fully consumed.
-func ApplyUntil2[A, B any](seq iter.Seq2[A, B], op func(A, B) error) error {
+func ApplyUntil2[A, B any, OP ~func(A, B) error](seq iter.Seq2[A, B], op OP) error {
 	for key, value := range seq {
 		if err := op(key, value); err != nil {
 			return err
@@ -979,5 +983,57 @@ func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 		out, ok = recieveFrom(ctx, ch)
 		whencall(!ok, cancel)
 		return
+	}
+}
+
+// Call returns a sequence that lazily executes each function in the
+// input sequence and yields the results. Functions are only called
+// during iteration.
+func Call[T any, F ~func() T](seq iter.Seq[F]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for operation := range seq {
+			if !yield(operation()) {
+				return
+			}
+		}
+	}
+}
+
+// Call2 returns a pair sequence that lazily executes each function in
+// the input sequence and yields the result pairs. Functions are only
+// called during iteration.
+func Call2[A, B any, F ~func() (A, B)](seq iter.Seq[F]) iter.Seq2[A, B] {
+	return func(yield func(A, B) bool) {
+		for operation := range seq {
+			if !yield(operation()) {
+				return
+			}
+		}
+	}
+}
+
+// CallWrap returns a sequence that lazily executes each function in
+// the input sequence with the provided argument and yields the
+// results. Functions are only called during iteration.
+func CallWrap[A, B any, F ~func(A) B](seq iter.Seq[F], wrapping A) iter.Seq[B] {
+	return func(yield func(B) bool) {
+		for operation := range seq {
+			if !yield(operation(wrapping)) {
+				return
+			}
+		}
+	}
+}
+
+// CallWrap2 returns a pair sequence that lazily executes each
+// function in the input sequence with the provided argument and yields
+// the result pairs. Functions are only called during iteration.
+func CallWrap2[A, B, C any, F ~func(A) (B, C)](seq iter.Seq[F], wrapping A) iter.Seq2[B, C] {
+	return func(yield func(B, C) bool) {
+		for operation := range seq {
+			if !yield(operation(wrapping)) {
+				return
+			}
+		}
 	}
 }

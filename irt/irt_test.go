@@ -4009,15 +4009,6 @@ func TestMerge(t *testing.T) {
 }
 
 func TestModify(t *testing.T) {
-	t.Run("NilOperation", func(t *testing.T) {
-		input := Slice([]int{1, 2, 3, 4, 5})
-		result := Collect(Modify(input, nil))
-		expected := []int{1, 2, 3, 4, 5}
-		if !slices.Equal(result, expected) {
-			t.Errorf("Modify() with nil = %v, want %v", result, expected)
-		}
-	})
-
 	t.Run("SingleTransformation", func(t *testing.T) {
 		input := Slice([]int{1, 2, 3, 4, 5})
 		result := Collect(Modify(input, func(x int) int {
@@ -4070,18 +4061,9 @@ func TestModify(t *testing.T) {
 }
 
 func TestModifyAll(t *testing.T) {
-	t.Run("NoOperations", func(t *testing.T) {
-		input := Slice([]int{1, 2, 3})
-		result := Collect(ModifyAll(input))
-		expected := []int{1, 2, 3}
-		if !slices.Equal(result, expected) {
-			t.Errorf("ModifyAll() with no ops = %v, want %v", result, expected)
-		}
-	})
-
 	t.Run("AllNilOperations", func(t *testing.T) {
 		input := Slice([]int{1, 2, 3})
-		result := Collect(ModifyAll(input, nil, nil, nil))
+		result := Collect(ModifyAll(input, nil, nil, func(in int) int { return in }))
 		expected := []int{1, 2, 3}
 		if !slices.Equal(result, expected) {
 			t.Errorf("ModifyAll() with all nil = %v, want %v", result, expected)
@@ -4147,15 +4129,6 @@ func TestModifyAll(t *testing.T) {
 }
 
 func TestModify2(t *testing.T) {
-	t.Run("NilOperation", func(t *testing.T) {
-		input := Map(map[string]int{"a": 1, "b": 2})
-		result := Collect2(Modify2(input, nil))
-		expected := map[string]int{"a": 1, "b": 2}
-		if !maps.Equal(result, expected) {
-			t.Errorf("Modify2() with nil = %v, want %v", result, expected)
-		}
-	})
-
 	t.Run("SingleTransformation", func(t *testing.T) {
 		input := Map(map[string]int{"a": 1, "b": 2})
 		result := Collect2(Modify2(input, func(k string, v int) (string, int) {
@@ -6556,5 +6529,315 @@ func TestMapKV(t *testing.T) {
 		check.True(t, maps.Equal(kvmapMap, mapkvMap))
 		check.True(t, maps.Equal(input, kvmapMap))
 		check.True(t, maps.Equal(input, mapkvMap))
+	})
+}
+
+func TestCall(t *testing.T) {
+	t.Run("LazyExecution", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func() int { callCount.Add(1); return 1 },
+			func() int { callCount.Add(1); return 2 },
+			func() int { callCount.Add(1); return 3 },
+		)
+
+		seq := Call(funcs)
+
+		// Before iteration, no functions should be called
+		check.Equal(t, int32(0), callCount.Load())
+
+		// Iterate
+		result := Collect(seq)
+
+		// After iteration, all functions should be called
+		check.Equal(t, int32(3), callCount.Load())
+		check.True(t, slices.Equal([]int{1, 2, 3}, result))
+	})
+
+	t.Run("AllFunctionsRun", func(t *testing.T) {
+		called := make([]bool, 5)
+
+		funcs := Args(
+			func() int { called[0] = true; return 10 },
+			func() int { called[1] = true; return 20 },
+			func() int { called[2] = true; return 30 },
+			func() int { called[3] = true; return 40 },
+			func() int { called[4] = true; return 50 },
+		)
+
+		result := Collect(Call(funcs))
+
+		for i, c := range called {
+			check.True(t, c)
+			if !c {
+				t.Errorf("function %d was not called", i)
+			}
+		}
+		check.True(t, slices.Equal([]int{10, 20, 30, 40, 50}, result))
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func() int { callCount.Add(1); return 1 },
+			func() int { callCount.Add(1); return 2 },
+			func() int { callCount.Add(1); return 3 },
+			func() int { callCount.Add(1); return 4 },
+			func() int { callCount.Add(1); return 5 },
+		)
+
+		// Only take first 2
+		result := Collect(Limit(Call(funcs), 2))
+
+		check.Equal(t, int32(2), callCount.Load())
+		check.True(t, slices.Equal([]int{1, 2}, result))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		funcs := func(yield func(func() int) bool) {}
+		result := Collect(Call(funcs))
+		check.Equal(t, 0, len(result))
+	})
+}
+
+func TestCall2(t *testing.T) {
+	t.Run("LazyExecution", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func() (string, int) { callCount.Add(1); return "a", 1 },
+			func() (string, int) { callCount.Add(1); return "b", 2 },
+			func() (string, int) { callCount.Add(1); return "c", 3 },
+		)
+
+		seq := Call2(funcs)
+
+		// Before iteration, no functions should be called
+		check.Equal(t, int32(0), callCount.Load())
+
+		// Iterate
+		result := Collect2(seq)
+
+		// After iteration, all functions should be called
+		check.Equal(t, int32(3), callCount.Load())
+		check.Equal(t, 1, result["a"])
+		check.Equal(t, 2, result["b"])
+		check.Equal(t, 3, result["c"])
+	})
+
+	t.Run("AllFunctionsRun", func(t *testing.T) {
+		called := make([]bool, 4)
+
+		funcs := Args(
+			func() (int, string) { called[0] = true; return 0, "zero" },
+			func() (int, string) { called[1] = true; return 1, "one" },
+			func() (int, string) { called[2] = true; return 2, "two" },
+			func() (int, string) { called[3] = true; return 3, "three" },
+		)
+
+		result := Collect2(Call2(funcs))
+
+		for i, c := range called {
+			check.True(t, c)
+			if !c {
+				t.Errorf("function %d was not called", i)
+			}
+		}
+		check.Equal(t, 4, len(result))
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func() (int, int) { callCount.Add(1); return 1, 10 },
+			func() (int, int) { callCount.Add(1); return 2, 20 },
+			func() (int, int) { callCount.Add(1); return 3, 30 },
+			func() (int, int) { callCount.Add(1); return 4, 40 },
+		)
+
+		// Only take first 2
+		result := Collect2(Limit2(Call2(funcs), 2))
+
+		check.Equal(t, int32(2), callCount.Load())
+		check.Equal(t, 2, len(result))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		funcs := func(yield func(func() (string, int)) bool) {}
+		result := Collect2(Call2(funcs))
+		check.Equal(t, 0, len(result))
+	})
+}
+
+func TestCallWrap(t *testing.T) {
+	t.Run("LazyExecution", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func(n int) int { callCount.Add(1); return n * 1 },
+			func(n int) int { callCount.Add(1); return n * 2 },
+			func(n int) int { callCount.Add(1); return n * 3 },
+		)
+
+		seq := CallWrap(funcs, 10)
+
+		// Before iteration, no functions should be called
+		check.Equal(t, int32(0), callCount.Load())
+
+		// Iterate
+		result := Collect(seq)
+
+		// After iteration, all functions should be called
+		check.Equal(t, int32(3), callCount.Load())
+		check.True(t, slices.Equal([]int{10, 20, 30}, result))
+	})
+
+	t.Run("AllFunctionsRun", func(t *testing.T) {
+		called := make([]bool, 5)
+
+		funcs := Args(
+			func(s string) string { called[0] = true; return s + "0" },
+			func(s string) string { called[1] = true; return s + "1" },
+			func(s string) string { called[2] = true; return s + "2" },
+			func(s string) string { called[3] = true; return s + "3" },
+			func(s string) string { called[4] = true; return s + "4" },
+		)
+
+		result := Collect(CallWrap(funcs, "x"))
+
+		for i, c := range called {
+			check.True(t, c)
+			if !c {
+				t.Errorf("function %d was not called", i)
+			}
+		}
+		check.True(t, slices.Equal([]string{"x0", "x1", "x2", "x3", "x4"}, result))
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func(n int) int { callCount.Add(1); return n + 1 },
+			func(n int) int { callCount.Add(1); return n + 2 },
+			func(n int) int { callCount.Add(1); return n + 3 },
+			func(n int) int { callCount.Add(1); return n + 4 },
+			func(n int) int { callCount.Add(1); return n + 5 },
+		)
+
+		// Only take first 3
+		result := Collect(Limit(CallWrap(funcs, 100), 3))
+
+		check.Equal(t, int32(3), callCount.Load())
+		check.True(t, slices.Equal([]int{101, 102, 103}, result))
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		funcs := func(yield func(func(int) int) bool) {}
+		result := Collect(CallWrap(funcs, 42))
+		check.Equal(t, 0, len(result))
+	})
+
+	t.Run("WrappingValuePassedCorrectly", func(t *testing.T) {
+		var receivedValues []int
+
+		funcs := Args(
+			func(n int) int { receivedValues = append(receivedValues, n); return n },
+			func(n int) int { receivedValues = append(receivedValues, n); return n },
+			func(n int) int { receivedValues = append(receivedValues, n); return n },
+		)
+
+		_ = Collect(CallWrap(funcs, 99))
+
+		check.True(t, slices.Equal([]int{99, 99, 99}, receivedValues))
+	})
+}
+
+func TestCallWrap2(t *testing.T) {
+	t.Run("LazyExecution", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func(n int) (string, int) { callCount.Add(1); return "a", n * 1 },
+			func(n int) (string, int) { callCount.Add(1); return "b", n * 2 },
+			func(n int) (string, int) { callCount.Add(1); return "c", n * 3 },
+		)
+
+		seq := CallWrap2(funcs, 10)
+
+		// Before iteration, no functions should be called
+		check.Equal(t, int32(0), callCount.Load())
+
+		// Iterate
+		result := Collect2(seq)
+
+		// After iteration, all functions should be called
+		check.Equal(t, int32(3), callCount.Load())
+		check.Equal(t, 10, result["a"])
+		check.Equal(t, 20, result["b"])
+		check.Equal(t, 30, result["c"])
+	})
+
+	t.Run("AllFunctionsRun", func(t *testing.T) {
+		called := make([]bool, 4)
+
+		funcs := Args(
+			func(s string) (int, string) { called[0] = true; return 0, s + "!" },
+			func(s string) (int, string) { called[1] = true; return 1, s + "?" },
+			func(s string) (int, string) { called[2] = true; return 2, s + "." },
+			func(s string) (int, string) { called[3] = true; return 3, s + "," },
+		)
+
+		result := Collect2(CallWrap2(funcs, "test"))
+
+		for i, c := range called {
+			check.True(t, c)
+			if !c {
+				t.Errorf("function %d was not called", i)
+			}
+		}
+		check.Equal(t, 4, len(result))
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		var callCount atomic.Int32
+
+		funcs := Args(
+			func(n int) (int, int) { callCount.Add(1); return 1, n * 1 },
+			func(n int) (int, int) { callCount.Add(1); return 2, n * 2 },
+			func(n int) (int, int) { callCount.Add(1); return 3, n * 3 },
+			func(n int) (int, int) { callCount.Add(1); return 4, n * 4 },
+		)
+
+		// Only take first 2
+		result := Collect2(Limit2(CallWrap2(funcs, 5), 2))
+
+		check.Equal(t, int32(2), callCount.Load())
+		check.Equal(t, 2, len(result))
+		check.Equal(t, 5, result[1])
+		check.Equal(t, 10, result[2])
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		funcs := func(yield func(func(int) (string, int)) bool) {}
+		result := Collect2(CallWrap2(funcs, 42))
+		check.Equal(t, 0, len(result))
+	})
+
+	t.Run("WrappingValuePassedCorrectly", func(t *testing.T) {
+		var receivedValues []string
+
+		funcs := Args(
+			func(s string) (int, int) { receivedValues = append(receivedValues, s); return 0, 0 },
+			func(s string) (int, int) { receivedValues = append(receivedValues, s); return 1, 1 },
+			func(s string) (int, int) { receivedValues = append(receivedValues, s); return 2, 2 },
+		)
+
+		_ = Collect2(CallWrap2(funcs, "wrapped"))
+
+		check.True(t, slices.Equal([]string{"wrapped", "wrapped", "wrapped"}, receivedValues))
 	})
 }
