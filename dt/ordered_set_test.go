@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"slices"
 	"testing"
 
@@ -241,36 +240,6 @@ func TestOrderedSet(t *testing.T) {
 		check.Equal(t, 3, sl[2])
 	})
 
-	t.Run("Constructors", func(t *testing.T) {
-		t.Run("Slice", func(t *testing.T) {
-			var passed bool
-			for attempt := 0; attempt < 10; attempt++ {
-				func() {
-					ls := make([]uint64, 0, 100)
-					for i := 0; i < 100; i++ {
-						ls = append(ls, rand.Uint64())
-					}
-					set := MakeOrderedSet(irt.Slice(ls))
-					if set.Len() != 100 {
-						return
-					}
-					set2 := MakeOrderedSet(irt.Slice(ls))
-					if set2.Len() != 100 {
-						return
-					}
-					if !set.Equal(set2) {
-						return
-					}
-					passed = true
-				}()
-				if passed {
-					return
-				}
-			}
-			t.Fatal("test could not pass")
-		})
-	})
-
 	t.Run("List", func(t *testing.T) {
 		t.Run("Ordered", func(t *testing.T) {
 			ls := &List[int]{}
@@ -285,7 +254,8 @@ func TestOrderedSet(t *testing.T) {
 			assert.Equal(t, ls.Len(), 42)
 			assert.Equal(t, st.Len(), ls.Len())
 
-			setls := IteratorList(st.Iterator())
+			setls := &List[int]{}
+			setls.Extend(st.Iterator())
 
 			count := 0
 			for elemL, elemS := ls.Front(), setls.Front(); elemL.Ok() && elemS.Ok(); elemL, elemS = elemL.Next(), elemS.Next() {

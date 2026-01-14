@@ -29,18 +29,6 @@ type List[T any] struct {
 	meta *struct{ length int }
 }
 
-// VariadicList constructs a doubly-linked list from a sequence of arguments passed to the constructor.
-func VariadicList[T any](elems ...T) *List[T] { return SliceList(elems) }
-
-// SliceList constructs a doubly-linked list from the elements of a slice.
-func SliceList[T any](elems []T) *List[T] { l := new(List[T]); l.Append(elems...); return l }
-
-// IteratorList constructs a doubly-linked list from the elements of a Go standard library iterator.
-func IteratorList[T any](in iter.Seq[T]) *List[T] { l := new(List[T]); l.Extend(in); return l }
-
-// Append adds a variadic sequence of items to the end of the list.
-func (l *List[T]) Append(items ...T) *List[T] { return l.Extend(irt.Slice(items)) }
-
 // Extend adds all of the items in a slice to the end of the list.
 func (l *List[T]) Extend(seq iter.Seq[T]) *List[T] { irt.Apply(seq, l.PushBack); return l }
 
@@ -275,7 +263,7 @@ type Element[T any] struct {
 }
 
 // NewElement produces an unattached Element that you can use with
-// Append. Element.Append(NewElement()) is essentially the same as
+// Push. Element.Append(NewElement()) is essentially the same as
 // List.PushBack().
 func NewElement[T any](val T) *Element[T] { return &Element[T]{item: val, ok: true} }
 

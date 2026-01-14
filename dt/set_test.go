@@ -239,7 +239,8 @@ func TestSet(t *testing.T) {
 				st.Add(v)
 			}
 
-			setls := IteratorList(st.Iterator())
+			setls := &List[int]{}
+			setls.Extend(st.Iterator())
 
 			assert.Equal(t, ls.Len(), 42)
 			assert.Equal(t, st.Len(), ls.Len())

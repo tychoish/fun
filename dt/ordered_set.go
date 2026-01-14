@@ -18,14 +18,6 @@ type OrderedSet[T comparable] struct {
 	list *List[T]
 }
 
-// MakeOrderedSet constructs an ordered set and adds all items from the
-// input sequence to the set in order.
-func MakeOrderedSet[T comparable](in iter.Seq[T]) *OrderedSet[T] {
-	out := &OrderedSet[T]{}
-	out.Extend(in)
-	return out
-}
-
 // SortQuick sorts the elements in the set using
 // sort.StableSort. Typically faster than SortMerge, but potentially
 // more memory intensive for some types.

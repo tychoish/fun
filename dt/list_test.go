@@ -37,7 +37,9 @@ func TestList(t *testing.T) {
 		assert.Zero(t, l.Len())
 	})
 	t.Run("IteratorList", func(t *testing.T) {
-		list := IteratorList(irt.Slice([]int{1, 2, 3, 4, 5}))
+		list := &List[int]{}
+		list.Extend(irt.Slice([]int{1, 2, 3, 4, 5}))
+
 		assert.Equal(t, list.Len(), 5)
 		assert.Equal(t, list.Front().Value(), 1)
 		assert.Equal(t, list.Back().Value(), 5)
@@ -679,7 +681,8 @@ func TestList(t *testing.T) {
 			assert.True(t, nl.Front().Next().Next().Value() == list.Front().Next().Next().Value())
 		})
 		t.Run("TypeMismatch", func(t *testing.T) {
-			list := VariadicList(400, 300, 42)
+			list := &List[int]{}
+			list.Extend(irt.Args(400, 300, 42))
 
 			out, err := list.MarshalJSON()
 			if err != nil {

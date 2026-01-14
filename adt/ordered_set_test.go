@@ -3,7 +3,6 @@ package adt
 import (
 	"cmp"
 	"encoding/json"
-	"math/rand"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -35,6 +34,17 @@ func TestOrderedSet(t *testing.T) {
 		set.Add("xyz")
 		set.Add("lmn")
 		set.Add("abc")
+
+		sl := irt.Collect(set.Iterator())
+
+		check.Equal(t, "xyz", sl[0])
+		check.Equal(t, "lmn", sl[1])
+		check.Equal(t, "abc", sl[2])
+	})
+
+	t.Run("Extend", func(t *testing.T) {
+		set := &OrderedSet[string]{}
+		set.Extend(irt.Args("xyz", "lmn", "abc"))
 
 		sl := irt.Collect(set.Iterator())
 
@@ -190,37 +200,6 @@ func TestOrderedSet(t *testing.T) {
 		err := json.Unmarshal([]byte("[1,2,3]"), &set)
 		check.NotError(t, err)
 		check.Equal(t, 3, set.Len())
-	})
-
-	t.Run("Constructors", func(t *testing.T) {
-		t.Run("Slice", func(t *testing.T) {
-			var passed bool
-			for attempt := 0; attempt < 10; attempt++ {
-				func() {
-					ls := make([]uint64, 0, 100)
-					for i := 0; i < 100; i++ {
-						ls = append(ls, rand.Uint64())
-					}
-					set := MakeOrderedSet(irt.Slice(ls))
-					if set.Len() != 100 {
-						return
-					}
-					set2 := MakeOrderedSet(irt.Slice(ls))
-					if set2.Len() != 100 {
-						return
-					}
-					if !irt.Equal(set.Iterator(), set2.Iterator()) {
-						return
-					}
-
-					passed = true
-				}()
-				if passed {
-					return
-				}
-			}
-			t.Fatal("test could not pass")
-		})
 	})
 }
 
