@@ -986,10 +986,10 @@ func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	}
 }
 
-// Call returns a sequence that lazily executes each function in the
+// Resolve returns a sequence that lazily executes each function in the
 // input sequence and yields the results. Functions are only called
 // during iteration.
-func Call[T any, F ~func() T](seq iter.Seq[F]) iter.Seq[T] {
+func Resolve[T any, F ~func() T](seq iter.Seq[F]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for operation := range seq {
 			if !yield(operation()) {
@@ -999,10 +999,10 @@ func Call[T any, F ~func() T](seq iter.Seq[F]) iter.Seq[T] {
 	}
 }
 
-// Call2 returns a pair sequence that lazily executes each function in
+// Resolve2 returns a pair sequence that lazily executes each function in
 // the input sequence and yields the result pairs. Functions are only
 // called during iteration.
-func Call2[A, B any, F ~func() (A, B)](seq iter.Seq[F]) iter.Seq2[A, B] {
+func Resolve2[A, B any, F ~func() (A, B)](seq iter.Seq[F]) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for operation := range seq {
 			if !yield(operation()) {
@@ -1012,10 +1012,10 @@ func Call2[A, B any, F ~func() (A, B)](seq iter.Seq[F]) iter.Seq2[A, B] {
 	}
 }
 
-// CallWrap returns a sequence that lazily executes each function in
+// ResolveWrap returns a sequence that lazily executes each function in
 // the input sequence with the provided argument and yields the
 // results. Functions are only called during iteration.
-func CallWrap[A, B any, F ~func(A) B](seq iter.Seq[F], wrapping A) iter.Seq[B] {
+func ResolveWrap[A, B any, F ~func(A) B](seq iter.Seq[F], wrapping A) iter.Seq[B] {
 	return func(yield func(B) bool) {
 		for operation := range seq {
 			if !yield(operation(wrapping)) {
@@ -1025,10 +1025,10 @@ func CallWrap[A, B any, F ~func(A) B](seq iter.Seq[F], wrapping A) iter.Seq[B] {
 	}
 }
 
-// CallWrap2 returns a pair sequence that lazily executes each
+// ResolveWrap2 returns a pair sequence that lazily executes each
 // function in the input sequence with the provided argument and yields
 // the result pairs. Functions are only called during iteration.
-func CallWrap2[A, B, C any, F ~func(A) (B, C)](seq iter.Seq[F], wrapping A) iter.Seq2[B, C] {
+func ResolveWrap2[A, B, C any, F ~func(A) (B, C)](seq iter.Seq[F], wrapping A) iter.Seq2[B, C] {
 	return func(yield func(B, C) bool) {
 		for operation := range seq {
 			if !yield(operation(wrapping)) {

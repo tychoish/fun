@@ -6542,7 +6542,7 @@ func TestCall(t *testing.T) {
 			func() int { callCount.Add(1); return 3 },
 		)
 
-		seq := Call(funcs)
+		seq := Resolve(funcs)
 
 		// Before iteration, no functions should be called
 		check.Equal(t, int32(0), callCount.Load())
@@ -6566,7 +6566,7 @@ func TestCall(t *testing.T) {
 			func() int { called[4] = true; return 50 },
 		)
 
-		result := Collect(Call(funcs))
+		result := Collect(Resolve(funcs))
 
 		for i, c := range called {
 			check.True(t, c)
@@ -6589,7 +6589,7 @@ func TestCall(t *testing.T) {
 		)
 
 		// Only take first 2
-		result := Collect(Limit(Call(funcs), 2))
+		result := Collect(Limit(Resolve(funcs), 2))
 
 		check.Equal(t, int32(2), callCount.Load())
 		check.True(t, slices.Equal([]int{1, 2}, result))
@@ -6597,7 +6597,7 @@ func TestCall(t *testing.T) {
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func() int) bool) {}
-		result := Collect(Call(funcs))
+		result := Collect(Resolve(funcs))
 		check.Equal(t, 0, len(result))
 	})
 }
@@ -6612,7 +6612,7 @@ func TestCall2(t *testing.T) {
 			func() (string, int) { callCount.Add(1); return "c", 3 },
 		)
 
-		seq := Call2(funcs)
+		seq := Resolve2(funcs)
 
 		// Before iteration, no functions should be called
 		check.Equal(t, int32(0), callCount.Load())
@@ -6637,7 +6637,7 @@ func TestCall2(t *testing.T) {
 			func() (int, string) { called[3] = true; return 3, "three" },
 		)
 
-		result := Collect2(Call2(funcs))
+		result := Collect2(Resolve2(funcs))
 
 		for i, c := range called {
 			check.True(t, c)
@@ -6659,7 +6659,7 @@ func TestCall2(t *testing.T) {
 		)
 
 		// Only take first 2
-		result := Collect2(Limit2(Call2(funcs), 2))
+		result := Collect2(Limit2(Resolve2(funcs), 2))
 
 		check.Equal(t, int32(2), callCount.Load())
 		check.Equal(t, 2, len(result))
@@ -6667,7 +6667,7 @@ func TestCall2(t *testing.T) {
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func() (string, int)) bool) {}
-		result := Collect2(Call2(funcs))
+		result := Collect2(Resolve2(funcs))
 		check.Equal(t, 0, len(result))
 	})
 }
@@ -6682,7 +6682,7 @@ func TestCallWrap(t *testing.T) {
 			func(n int) int { callCount.Add(1); return n * 3 },
 		)
 
-		seq := CallWrap(funcs, 10)
+		seq := ResolveWrap(funcs, 10)
 
 		// Before iteration, no functions should be called
 		check.Equal(t, int32(0), callCount.Load())
@@ -6706,7 +6706,7 @@ func TestCallWrap(t *testing.T) {
 			func(s string) string { called[4] = true; return s + "4" },
 		)
 
-		result := Collect(CallWrap(funcs, "x"))
+		result := Collect(ResolveWrap(funcs, "x"))
 
 		for i, c := range called {
 			check.True(t, c)
@@ -6729,7 +6729,7 @@ func TestCallWrap(t *testing.T) {
 		)
 
 		// Only take first 3
-		result := Collect(Limit(CallWrap(funcs, 100), 3))
+		result := Collect(Limit(ResolveWrap(funcs, 100), 3))
 
 		check.Equal(t, int32(3), callCount.Load())
 		check.True(t, slices.Equal([]int{101, 102, 103}, result))
@@ -6737,7 +6737,7 @@ func TestCallWrap(t *testing.T) {
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func(int) int) bool) {}
-		result := Collect(CallWrap(funcs, 42))
+		result := Collect(ResolveWrap(funcs, 42))
 		check.Equal(t, 0, len(result))
 	})
 
@@ -6750,7 +6750,7 @@ func TestCallWrap(t *testing.T) {
 			func(n int) int { receivedValues = append(receivedValues, n); return n },
 		)
 
-		_ = Collect(CallWrap(funcs, 99))
+		_ = Collect(ResolveWrap(funcs, 99))
 
 		check.True(t, slices.Equal([]int{99, 99, 99}, receivedValues))
 	})
@@ -6766,7 +6766,7 @@ func TestCallWrap2(t *testing.T) {
 			func(n int) (string, int) { callCount.Add(1); return "c", n * 3 },
 		)
 
-		seq := CallWrap2(funcs, 10)
+		seq := ResolveWrap2(funcs, 10)
 
 		// Before iteration, no functions should be called
 		check.Equal(t, int32(0), callCount.Load())
@@ -6791,7 +6791,7 @@ func TestCallWrap2(t *testing.T) {
 			func(s string) (int, string) { called[3] = true; return 3, s + "," },
 		)
 
-		result := Collect2(CallWrap2(funcs, "test"))
+		result := Collect2(ResolveWrap2(funcs, "test"))
 
 		for i, c := range called {
 			check.True(t, c)
@@ -6813,7 +6813,7 @@ func TestCallWrap2(t *testing.T) {
 		)
 
 		// Only take first 2
-		result := Collect2(Limit2(CallWrap2(funcs, 5), 2))
+		result := Collect2(Limit2(ResolveWrap2(funcs, 5), 2))
 
 		check.Equal(t, int32(2), callCount.Load())
 		check.Equal(t, 2, len(result))
@@ -6823,7 +6823,7 @@ func TestCallWrap2(t *testing.T) {
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func(int) (string, int)) bool) {}
-		result := Collect2(CallWrap2(funcs, 42))
+		result := Collect2(ResolveWrap2(funcs, 42))
 		check.Equal(t, 0, len(result))
 	})
 
@@ -6836,7 +6836,7 @@ func TestCallWrap2(t *testing.T) {
 			func(s string) (int, int) { receivedValues = append(receivedValues, s); return 2, 2 },
 		)
 
-		_ = Collect2(CallWrap2(funcs, "wrapped"))
+		_ = Collect2(ResolveWrap2(funcs, "wrapped"))
 
 		check.True(t, slices.Equal([]string{"wrapped", "wrapped", "wrapped"}, receivedValues))
 	})
