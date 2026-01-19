@@ -16,8 +16,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/tychoish/fun/assert/check"
 )
 
 // PullWithMutex wraps iter.Pull and returns thread-safe next and stop functions.
@@ -5925,8 +5923,12 @@ func TestWith3(t *testing.T) {
 			count++
 		}
 
-		check.Equal(t, count, 0)
-		check.Equal(t, callCount.Load(), int32(0))
+		if count != 0 {
+			t.Errorf("expected 0, got %v", count)
+		}
+		if callCount.Load() != int32(0) {
+			t.Errorf("expected int32(0), got %v", callCount.Load())
+		}
 	})
 
 	t.Run("SingleElement", func(t *testing.T) {
@@ -5948,10 +5950,18 @@ func TestWith3(t *testing.T) {
 			}{elem, third})
 		}
 
-		check.Equal(t, len(results), 1)
-		check.Equal(t, results[0].elem.Key, 5)    // original input
-		check.Equal(t, results[0].elem.Value, 25) // 5^2
-		check.Equal(t, results[0].third, 125)     // 5^3
+		if len(results) != 1 {
+			t.Errorf("expected 1, got %v", len(results))
+		}
+		if results[0].elem.Key != 5 {
+			t.Errorf("expected 5, got %v", results[0].elem.Key)
+		} // original input
+		if results[0].elem.Value != 25 {
+			t.Errorf("expected 25, got %v", results[0].elem.Value)
+		} // 5^2
+		if results[0].third != 125 {
+			t.Errorf("expected 125, got %v", results[0].third)
+		} // 5^3
 	})
 
 	t.Run("EarlyReturn", func(t *testing.T) {
@@ -5971,8 +5981,12 @@ func TestWith3(t *testing.T) {
 			}
 		}
 
-		check.Equal(t, count, 3) // Should process 1, 2, 3 and stop at 3
-		check.Equal(t, callCount.Load(), int32(3))
+		if count != 3 {
+			t.Errorf("expected 3, got %v", count)
+		} // Should process 1, 2, 3 and stop at 3
+		if callCount.Load() != int32(3) {
+			t.Errorf("expected int32(3, got %v", callCount.Load())
+		}
 	})
 
 	t.Run("MultipleTypes", func(t *testing.T) {
@@ -5987,27 +6001,53 @@ func TestWith3(t *testing.T) {
 
 		results := Collect(KVjoin(seq))
 
-		check.Equal(t, len(results), 4)
+		if len(results) != 4 {
+			t.Errorf("expected 4, got %v", len(results))
+		}
 
 		// First result
-		check.Equal(t, results[0].Key.Key, "Alice")
-		check.Equal(t, results[0].Key.Value, 5)
-		check.Equal(t, results[0].Value, false)
+		if results[0].Key.Key != "Alice" {
+			t.Errorf("expected %v, got %v", "Alice", results[0].Key.Key)
+		}
+		if results[0].Key.Value != 5 {
+			t.Errorf("expected 5, got %v", results[0].Key.Value)
+		}
+		if results[0].Value != false {
+			t.Errorf("expected false, got %v", results[0].Value)
+		}
 
 		// Second result
-		check.Equal(t, results[1].Key.Key, "Bob")
-		check.Equal(t, results[1].Key.Value, 3)
-		check.Equal(t, results[1].Value, false)
+		if results[1].Key.Key != "Bob" {
+			t.Errorf("expected %v, got %v", "Bob", results[1].Key.Key)
+		}
+		if results[1].Key.Value != 3 {
+			t.Errorf("expected 3, got %v", results[1].Key.Value)
+		}
+		if results[1].Value != false {
+			t.Errorf("expected false, got %v", results[1].Value)
+		}
 
 		// Third result
-		check.Equal(t, results[2].Key.Key, "Charlotte")
-		check.Equal(t, results[2].Key.Value, 9)
-		check.Equal(t, results[2].Value, true)
+		if results[2].Key.Key != "Charlotte" {
+			t.Errorf("expected %v, got %v", "Charlotte", results[2].Key.Key)
+		}
+		if results[2].Key.Value != 9 {
+			t.Errorf("expected 9, got %v", results[2].Key.Value)
+		}
+		if results[2].Value != true {
+			t.Errorf("expected true, got %v", results[2].Value)
+		}
 
 		// Fourth result
-		check.Equal(t, results[3].Key.Key, "Dan")
-		check.Equal(t, results[3].Key.Value, 3)
-		check.Equal(t, results[3].Value, false)
+		if results[3].Key.Key != "Dan" {
+			t.Errorf("expected %v, got %v", "Dan", results[3].Key.Key)
+		}
+		if results[3].Key.Value != 3 {
+			t.Errorf("expected 3, got %v", results[3].Key.Value)
+		}
+		if results[3].Value != false {
+			t.Errorf("expected false, got %v", results[3].Value)
+		}
 	})
 
 	t.Run("OperationCalledForEachElement", func(t *testing.T) {
@@ -6024,11 +6064,21 @@ func TestWith3(t *testing.T) {
 			count++
 		}
 
-		check.Equal(t, count, 3)
-		check.Equal(t, len(callOrder), 3)
-		check.Equal(t, callOrder[0], 10)
-		check.Equal(t, callOrder[1], 20)
-		check.Equal(t, callOrder[2], 30)
+		if count != 3 {
+			t.Errorf("expected 3, got %v", count)
+		}
+		if len(callOrder) != 3 {
+			t.Errorf("expected 3, got %v", len(callOrder))
+		}
+		if callOrder[0] != 10 {
+			t.Errorf("expected 10, got %v", callOrder[0])
+		}
+		if callOrder[1] != 20 {
+			t.Errorf("expected 20, got %v", callOrder[1])
+		}
+		if callOrder[2] != 30 {
+			t.Errorf("expected 30, got %v", callOrder[2])
+		}
 	})
 
 	t.Run("PreservesOrder", func(t *testing.T) {
@@ -6042,9 +6092,15 @@ func TestWith3(t *testing.T) {
 
 		for i := 0; i < 5; i++ {
 			expectedInput := i + 1
-			check.Equal(t, results[i].Key.Key, expectedInput)
-			check.Equal(t, results[i].Key.Value, expectedInput*2)
-			check.Equal(t, results[i].Value, expectedInput*3)
+			if results[i].Key.Key != expectedInput {
+				t.Errorf("expected expectedInput, got %v", results[i].Key.Key)
+			}
+			if results[i].Key.Value != expectedInput*2 {
+				t.Errorf("expected expectedInput*2, got %v", results[i].Key.Value)
+			}
+			if results[i].Value != expectedInput*3 {
+				t.Errorf("expected expectedInput*3, got %v", results[i].Value)
+			}
 		}
 	})
 
@@ -6059,14 +6115,28 @@ func TestWith3(t *testing.T) {
 
 		results := Collect(KVjoin(seq))
 
-		check.Equal(t, len(results), 2)
-		check.Equal(t, results[0].Key.Key, 1)
-		check.Equal(t, *results[0].Key.Value, 2)
-		check.Equal(t, *results[0].Value, "test")
+		if len(results) != 2 {
+			t.Errorf("expected 2, got %v", len(results))
+		}
+		if results[0].Key.Key != 1 {
+			t.Errorf("expected 1, got %v", results[0].Key.Key)
+		}
+		if *results[0].Key.Value != 2 {
+			t.Errorf("expected 2, got %v", *results[0].Key.Value)
+		}
+		if *results[0].Value != "test" {
+			t.Errorf("expected %v, got %v", "test", *results[0].Value)
+		}
 
-		check.Equal(t, results[1].Key.Key, 2)
-		check.Equal(t, *results[1].Key.Value, 4)
-		check.Equal(t, *results[1].Value, "test")
+		if results[1].Key.Key != 2 {
+			t.Errorf("expected 2, got %v", results[1].Key.Key)
+		}
+		if *results[1].Key.Value != 4 {
+			t.Errorf("expected 4, got %v", *results[1].Key.Value)
+		}
+		if *results[1].Value != "test" {
+			t.Errorf("expected %v, got %v", "test", *results[1].Value)
+		}
 	})
 
 	t.Run("WithNilReturns", func(t *testing.T) {
@@ -6083,17 +6153,31 @@ func TestWith3(t *testing.T) {
 
 		results := Collect(KVjoin(seq))
 
-		check.Equal(t, len(results), 4)
+		if len(results) != 4 {
+			t.Errorf("expected 4, got %v", len(results))
+		}
 
 		// Odd numbers
-		check.Equal(t, results[0].Key.Key, 1)
-		check.True(t, results[0].Key.Value != nil)
-		check.True(t, results[0].Value != nil)
+		if results[0].Key.Key != 1 {
+			t.Errorf("expected 1, got %v", results[0].Key.Key)
+		}
+		if !(results[0].Key.Value != nil) {
+			t.Error("expected condition to be true")
+		}
+		if !(results[0].Value != nil) {
+			t.Error("expected condition to be true")
+		}
 
 		// Even numbers
-		check.Equal(t, results[1].Key.Key, 2)
-		check.True(t, results[1].Key.Value == nil)
-		check.True(t, results[1].Value == nil)
+		if results[1].Key.Key != 2 {
+			t.Errorf("expected 2, got %v", results[1].Key.Key)
+		}
+		if !(results[1].Key.Value == nil) {
+			t.Error("expected condition to be true")
+		}
+		if !(results[1].Value == nil) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("LargeSequence", func(t *testing.T) {
@@ -6107,13 +6191,19 @@ func TestWith3(t *testing.T) {
 		for elem, isLarge := range seq {
 			count++
 			if elem.Key <= 500 {
-				check.True(t, !isLarge)
+				if !(!isLarge) {
+					t.Error("expected condition to be true")
+				}
 			} else {
-				check.True(t, isLarge)
+				if !(isLarge) {
+					t.Error("expected condition to be true")
+				}
 			}
 		}
 
-		check.Equal(t, count, 1000)
+		if count != 1000 {
+			t.Errorf("expected 1000, got %v", count)
+		}
 	})
 }
 
@@ -6122,16 +6212,24 @@ func TestKVmap(t *testing.T) {
 		input := map[int]string{}
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 0)
+		if len(result) != 0 {
+			t.Errorf("expected 0, got %v", len(result))
+		}
 	})
 
 	t.Run("SingleElement", func(t *testing.T) {
 		input := map[string]int{"a": 1}
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 1)
-		check.Equal(t, result[0].Key, "a")
-		check.Equal(t, result[0].Value, 1)
+		if len(result) != 1 {
+			t.Errorf("expected 1, got %v", len(result))
+		}
+		if result[0].Key != "a" {
+			t.Errorf("expected %v, got %v", "a", result[0].Key)
+		}
+		if result[0].Value != 1 {
+			t.Errorf("expected 1, got %v", result[0].Value)
+		}
 	})
 
 	t.Run("MultipleElements", func(t *testing.T) {
@@ -6142,7 +6240,9 @@ func TestKVmap(t *testing.T) {
 		}
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 3)
+		if len(result) != 3 {
+			t.Errorf("expected 3, got %v", len(result))
+		}
 
 		// Convert to map to verify all elements are present (map iteration order is not guaranteed)
 		resultMap := make(map[string]int)
@@ -6150,7 +6250,9 @@ func TestKVmap(t *testing.T) {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("IntToString", func(t *testing.T) {
@@ -6161,14 +6263,18 @@ func TestKVmap(t *testing.T) {
 		}
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 3)
+		if len(result) != 3 {
+			t.Errorf("expected 3, got %v", len(result))
+		}
 
 		resultMap := make(map[int]string)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("StringToString", func(t *testing.T) {
@@ -6179,14 +6285,18 @@ func TestKVmap(t *testing.T) {
 		}
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 3)
+		if len(result) != 3 {
+			t.Errorf("expected 3, got %v", len(result))
+		}
 
 		resultMap := make(map[string]string)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("LargeMap", func(t *testing.T) {
@@ -6197,14 +6307,18 @@ func TestKVmap(t *testing.T) {
 
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 100)
+		if len(result) != 100 {
+			t.Errorf("expected 100, got %v", len(result))
+		}
 
 		resultMap := make(map[int]int)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("EarlyTermination", func(t *testing.T) {
@@ -6224,7 +6338,9 @@ func TestKVmap(t *testing.T) {
 			}
 		}
 
-		check.Equal(t, count, 3)
+		if count != 3 {
+			t.Errorf("expected 3, got %v", count)
+		}
 	})
 
 	t.Run("IteratorReuse", func(t *testing.T) {
@@ -6238,11 +6354,15 @@ func TestKVmap(t *testing.T) {
 
 		// First iteration
 		result1 := Collect(seq)
-		check.Equal(t, len(result1), 3)
+		if len(result1) != 3 {
+			t.Errorf("expected 3, got %v", len(result1))
+		}
 
 		// Second iteration (iterator should be reusable)
 		result2 := Collect(seq)
-		check.Equal(t, len(result2), 3)
+		if len(result2) != 3 {
+			t.Errorf("expected 3, got %v", len(result2))
+		}
 
 		// Both iterations should produce the same elements
 		map1 := make(map[string]int)
@@ -6255,23 +6375,37 @@ func TestKVmap(t *testing.T) {
 			map2[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(map1, map2))
-		check.True(t, maps.Equal(input, map1))
+		if !(maps.Equal(map1, map2)) {
+			t.Error("expected condition to be true")
+		}
+		if !(maps.Equal(input, map1)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("KVStructureCorrectness", func(t *testing.T) {
 		input := map[int]string{42: "answer"}
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 1)
+		if len(result) != 1 {
+			t.Errorf("expected 1, got %v", len(result))
+		}
 		kv := result[0]
-		check.Equal(t, kv.Key, 42)
-		check.Equal(t, kv.Value, "answer")
+		if kv.Key != 42 {
+			t.Errorf("expected 42, got %v", kv.Key)
+		}
+		if kv.Value != "answer" {
+			t.Errorf("expected %v, got %v", "answer", kv.Value)
+		}
 
 		// Test that Split() works correctly
 		key, value := kv.Split()
-		check.Equal(t, key, 42)
-		check.Equal(t, value, "answer")
+		if key != 42 {
+			t.Errorf("expected 42, got %v", key)
+		}
+		if value != "answer" {
+			t.Errorf("expected %v, got %v", "answer", value)
+		}
 	})
 
 	t.Run("WithPointerValues", func(t *testing.T) {
@@ -6284,16 +6418,24 @@ func TestKVmap(t *testing.T) {
 
 		result := Collect(KVmap(input))
 
-		check.Equal(t, len(result), 2)
+		if len(result) != 2 {
+			t.Errorf("expected 2, got %v", len(result))
+		}
 
 		resultMap := make(map[string]*int)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.Equal(t, len(resultMap), 2)
-		check.Equal(t, *resultMap["a"], 100)
-		check.Equal(t, *resultMap["b"], 200)
+		if len(resultMap) != 2 {
+			t.Errorf("expected 2, got %v", len(resultMap))
+		}
+		if *resultMap["a"] != 100 {
+			t.Errorf("expected 100, got %v", *resultMap["a"])
+		}
+		if *resultMap["b"] != 200 {
+			t.Errorf("expected 200, got %v", *resultMap["b"])
+		}
 	})
 
 	t.Run("ConvertBackToMap", func(t *testing.T) {
@@ -6306,7 +6448,9 @@ func TestKVmap(t *testing.T) {
 		// KVmap -> Collect -> KVsplit -> Collect2
 		result := Collect2(KVsplit(Slice(Collect(KVmap(input)))))
 
-		check.True(t, maps.Equal(input, result))
+		if !(maps.Equal(input, result)) {
+			t.Error("expected condition to be true")
+		}
 	})
 }
 
@@ -6315,16 +6459,24 @@ func TestMapKV(t *testing.T) {
 		input := map[int]string{}
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 0)
+		if len(result) != 0 {
+			t.Errorf("expected 0, got %v", len(result))
+		}
 	})
 
 	t.Run("SingleElement", func(t *testing.T) {
 		input := map[string]int{"a": 1}
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 1)
-		check.Equal(t, result[0].Key, "a")
-		check.Equal(t, result[0].Value, 1)
+		if len(result) != 1 {
+			t.Errorf("expected 1, got %v", len(result))
+		}
+		if result[0].Key != "a" {
+			t.Errorf("expected %v, got %v", "a", result[0].Key)
+		}
+		if result[0].Value != 1 {
+			t.Errorf("expected 1, got %v", result[0].Value)
+		}
 	})
 
 	t.Run("MultipleElements", func(t *testing.T) {
@@ -6335,7 +6487,9 @@ func TestMapKV(t *testing.T) {
 		}
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 3)
+		if len(result) != 3 {
+			t.Errorf("expected 3, got %v", len(result))
+		}
 
 		// Convert to map to verify all elements are present
 		resultMap := make(map[string]int)
@@ -6343,7 +6497,9 @@ func TestMapKV(t *testing.T) {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("IntToString", func(t *testing.T) {
@@ -6354,14 +6510,18 @@ func TestMapKV(t *testing.T) {
 		}
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 3)
+		if len(result) != 3 {
+			t.Errorf("expected 3, got %v", len(result))
+		}
 
 		resultMap := make(map[int]string)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("StringToString", func(t *testing.T) {
@@ -6372,14 +6532,18 @@ func TestMapKV(t *testing.T) {
 		}
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 3)
+		if len(result) != 3 {
+			t.Errorf("expected 3, got %v", len(result))
+		}
 
 		resultMap := make(map[string]string)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("LargeMap", func(t *testing.T) {
@@ -6390,14 +6554,18 @@ func TestMapKV(t *testing.T) {
 
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 100)
+		if len(result) != 100 {
+			t.Errorf("expected 100, got %v", len(result))
+		}
 
 		resultMap := make(map[int]int)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(input, resultMap))
+		if !(maps.Equal(input, resultMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("EarlyTermination", func(t *testing.T) {
@@ -6417,7 +6585,9 @@ func TestMapKV(t *testing.T) {
 			}
 		}
 
-		check.Equal(t, count, 3)
+		if count != 3 {
+			t.Errorf("expected 3, got %v", count)
+		}
 	})
 
 	t.Run("IteratorReuse", func(t *testing.T) {
@@ -6431,11 +6601,15 @@ func TestMapKV(t *testing.T) {
 
 		// First iteration
 		result1 := Collect(seq)
-		check.Equal(t, len(result1), 3)
+		if len(result1) != 3 {
+			t.Errorf("expected 3, got %v", len(result1))
+		}
 
 		// Second iteration (iterator should be reusable)
 		result2 := Collect(seq)
-		check.Equal(t, len(result2), 3)
+		if len(result2) != 3 {
+			t.Errorf("expected 3, got %v", len(result2))
+		}
 
 		// Both iterations should produce the same elements
 		map1 := make(map[string]int)
@@ -6448,23 +6622,37 @@ func TestMapKV(t *testing.T) {
 			map2[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(map1, map2))
-		check.True(t, maps.Equal(input, map1))
+		if !(maps.Equal(map1, map2)) {
+			t.Error("expected condition to be true")
+		}
+		if !(maps.Equal(input, map1)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("KVStructureCorrectness", func(t *testing.T) {
 		input := map[int]string{42: "answer"}
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 1)
+		if len(result) != 1 {
+			t.Errorf("expected 1, got %v", len(result))
+		}
 		kv := result[0]
-		check.Equal(t, kv.Key, 42)
-		check.Equal(t, kv.Value, "answer")
+		if kv.Key != 42 {
+			t.Errorf("expected 42, got %v", kv.Key)
+		}
+		if kv.Value != "answer" {
+			t.Errorf("expected %v, got %v", "answer", kv.Value)
+		}
 
 		// Test that Split() works correctly
 		key, value := kv.Split()
-		check.Equal(t, key, 42)
-		check.Equal(t, value, "answer")
+		if key != 42 {
+			t.Errorf("expected 42, got %v", key)
+		}
+		if value != "answer" {
+			t.Errorf("expected %v, got %v", "answer", value)
+		}
 	})
 
 	t.Run("WithPointerValues", func(t *testing.T) {
@@ -6477,16 +6665,24 @@ func TestMapKV(t *testing.T) {
 
 		result := Collect(MapKV(input))
 
-		check.Equal(t, len(result), 2)
+		if len(result) != 2 {
+			t.Errorf("expected 2, got %v", len(result))
+		}
 
 		resultMap := make(map[string]*int)
 		for _, kv := range result {
 			resultMap[kv.Key] = kv.Value
 		}
 
-		check.Equal(t, len(resultMap), 2)
-		check.Equal(t, *resultMap["a"], 100)
-		check.Equal(t, *resultMap["b"], 200)
+		if len(resultMap) != 2 {
+			t.Errorf("expected 2, got %v", len(resultMap))
+		}
+		if *resultMap["a"] != 100 {
+			t.Errorf("expected 100, got %v", *resultMap["a"])
+		}
+		if *resultMap["b"] != 200 {
+			t.Errorf("expected 200, got %v", *resultMap["b"])
+		}
 	})
 
 	t.Run("ConvertBackToMap", func(t *testing.T) {
@@ -6499,7 +6695,9 @@ func TestMapKV(t *testing.T) {
 		// MapKV -> Collect -> KVsplit -> Collect2
 		result := Collect2(KVsplit(Slice(Collect(MapKV(input)))))
 
-		check.True(t, maps.Equal(input, result))
+		if !(maps.Equal(input, result)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("KVmapAndMapKVEquivalence", func(t *testing.T) {
@@ -6513,7 +6711,9 @@ func TestMapKV(t *testing.T) {
 		kvmapResult := Collect(KVmap(input))
 		mapkvResult := Collect(MapKV(input))
 
-		check.Equal(t, len(kvmapResult), len(mapkvResult))
+		if len(kvmapResult) != len(mapkvResult) {
+			t.Errorf("expected len(mapkvResult, got %v", len(kvmapResult))
+		}
 
 		// Convert both to maps for comparison
 		kvmapMap := make(map[string]int)
@@ -6526,9 +6726,15 @@ func TestMapKV(t *testing.T) {
 			mapkvMap[kv.Key] = kv.Value
 		}
 
-		check.True(t, maps.Equal(kvmapMap, mapkvMap))
-		check.True(t, maps.Equal(input, kvmapMap))
-		check.True(t, maps.Equal(input, mapkvMap))
+		if !(maps.Equal(kvmapMap, mapkvMap)) {
+			t.Error("expected condition to be true")
+		}
+		if !(maps.Equal(input, kvmapMap)) {
+			t.Error("expected condition to be true")
+		}
+		if !(maps.Equal(input, mapkvMap)) {
+			t.Error("expected condition to be true")
+		}
 	})
 }
 
@@ -6545,14 +6751,20 @@ func TestCall(t *testing.T) {
 		seq := Resolve(funcs)
 
 		// Before iteration, no functions should be called
-		check.Equal(t, int32(0), callCount.Load())
+		if int32(0) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", 0)
+		}
 
 		// Iterate
 		result := Collect(seq)
 
 		// After iteration, all functions should be called
-		check.Equal(t, int32(3), callCount.Load())
-		check.True(t, slices.Equal([]int{1, 2, 3}, result))
+		if int32(3) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(3))
+		}
+		if !(slices.Equal([]int{1, 2, 3}, result)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("AllFunctionsRun", func(t *testing.T) {
@@ -6569,12 +6781,16 @@ func TestCall(t *testing.T) {
 		result := Collect(Resolve(funcs))
 
 		for i, c := range called {
-			check.True(t, c)
+			if !(c) {
+				t.Error("expected condition to be true")
+			}
 			if !c {
 				t.Errorf("function %d was not called", i)
 			}
 		}
-		check.True(t, slices.Equal([]int{10, 20, 30, 40, 50}, result))
+		if !(slices.Equal([]int{10, 20, 30, 40, 50}, result)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("EarlyTermination", func(t *testing.T) {
@@ -6591,14 +6807,20 @@ func TestCall(t *testing.T) {
 		// Only take first 2
 		result := Collect(Limit(Resolve(funcs), 2))
 
-		check.Equal(t, int32(2), callCount.Load())
-		check.True(t, slices.Equal([]int{1, 2}, result))
+		if int32(2) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(2))
+		}
+		if !(slices.Equal([]int{1, 2}, result)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func() int) bool) {}
 		result := Collect(Resolve(funcs))
-		check.Equal(t, 0, len(result))
+		if 0 != len(result) {
+			t.Errorf("expected len(result, got %v", 0)
+		}
 	})
 }
 
@@ -6615,16 +6837,26 @@ func TestCall2(t *testing.T) {
 		seq := Resolve2(funcs)
 
 		// Before iteration, no functions should be called
-		check.Equal(t, int32(0), callCount.Load())
+		if int32(0) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(0))
+		}
 
 		// Iterate
 		result := Collect2(seq)
 
 		// After iteration, all functions should be called
-		check.Equal(t, int32(3), callCount.Load())
-		check.Equal(t, 1, result["a"])
-		check.Equal(t, 2, result["b"])
-		check.Equal(t, 3, result["c"])
+		if int32(3) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(3))
+		}
+		if 1 != result["a"] {
+			t.Errorf("expected %v, got %v", result["a"], 1)
+		}
+		if 2 != result["b"] {
+			t.Errorf("expected %v, got %v", result["b"], 2)
+		}
+		if 3 != result["c"] {
+			t.Errorf("expected %v, got %v", result["c"], 3)
+		}
 	})
 
 	t.Run("AllFunctionsRun", func(t *testing.T) {
@@ -6640,12 +6872,16 @@ func TestCall2(t *testing.T) {
 		result := Collect2(Resolve2(funcs))
 
 		for i, c := range called {
-			check.True(t, c)
+			if !(c) {
+				t.Error("expected condition to be true")
+			}
 			if !c {
 				t.Errorf("function %d was not called", i)
 			}
 		}
-		check.Equal(t, 4, len(result))
+		if 4 != len(result) {
+			t.Errorf("expected len(result, got %v", 4)
+		}
 	})
 
 	t.Run("EarlyTermination", func(t *testing.T) {
@@ -6661,14 +6897,20 @@ func TestCall2(t *testing.T) {
 		// Only take first 2
 		result := Collect2(Limit2(Resolve2(funcs), 2))
 
-		check.Equal(t, int32(2), callCount.Load())
-		check.Equal(t, 2, len(result))
+		if int32(2) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(2))
+		}
+		if 2 != len(result) {
+			t.Errorf("expected len(result, got %v", 2)
+		}
 	})
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func() (string, int)) bool) {}
 		result := Collect2(Resolve2(funcs))
-		check.Equal(t, 0, len(result))
+		if 0 != len(result) {
+			t.Errorf("expected len(result, got %v", 0)
+		}
 	})
 }
 
@@ -6685,14 +6927,20 @@ func TestCallWrap(t *testing.T) {
 		seq := ResolveWrap(funcs, 10)
 
 		// Before iteration, no functions should be called
-		check.Equal(t, int32(0), callCount.Load())
+		if int32(0) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(0))
+		}
 
 		// Iterate
 		result := Collect(seq)
 
 		// After iteration, all functions should be called
-		check.Equal(t, int32(3), callCount.Load())
-		check.True(t, slices.Equal([]int{10, 20, 30}, result))
+		if int32(3) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(3))
+		}
+		if !slices.Equal([]int{10, 20, 30}, result) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("AllFunctionsRun", func(t *testing.T) {
@@ -6709,12 +6957,16 @@ func TestCallWrap(t *testing.T) {
 		result := Collect(ResolveWrap(funcs, "x"))
 
 		for i, c := range called {
-			check.True(t, c)
+			if !(c) {
+				t.Error("expected condition to be true")
+			}
 			if !c {
 				t.Errorf("function %d was not called", i)
 			}
 		}
-		check.True(t, slices.Equal([]string{"x0", "x1", "x2", "x3", "x4"}, result))
+		if !slices.Equal([]string{"x0", "x1", "x2", "x3", "x4"}, result) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("EarlyTermination", func(t *testing.T) {
@@ -6731,14 +6983,20 @@ func TestCallWrap(t *testing.T) {
 		// Only take first 3
 		result := Collect(Limit(ResolveWrap(funcs, 100), 3))
 
-		check.Equal(t, int32(3), callCount.Load())
-		check.True(t, slices.Equal([]int{101, 102, 103}, result))
+		if int32(3) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(3))
+		}
+		if !(slices.Equal([]int{101, 102, 103}, result)) {
+			t.Error("expected condition to be true")
+		}
 	})
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func(int) int) bool) {}
 		result := Collect(ResolveWrap(funcs, 42))
-		check.Equal(t, 0, len(result))
+		if 0 != len(result) {
+			t.Errorf("expected len(result, got %v", 0)
+		}
 	})
 
 	t.Run("WrappingValuePassedCorrectly", func(t *testing.T) {
@@ -6752,7 +7010,9 @@ func TestCallWrap(t *testing.T) {
 
 		_ = Collect(ResolveWrap(funcs, 99))
 
-		check.True(t, slices.Equal([]int{99, 99, 99}, receivedValues))
+		if !slices.Equal([]int{99, 99, 99}, receivedValues) {
+			t.Error("expected condition to be true")
+		}
 	})
 }
 
@@ -6769,16 +7029,26 @@ func TestCallWrap2(t *testing.T) {
 		seq := ResolveWrap2(funcs, 10)
 
 		// Before iteration, no functions should be called
-		check.Equal(t, int32(0), callCount.Load())
+		if int32(0) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(0))
+		}
 
 		// Iterate
 		result := Collect2(seq)
 
 		// After iteration, all functions should be called
-		check.Equal(t, int32(3), callCount.Load())
-		check.Equal(t, 10, result["a"])
-		check.Equal(t, 20, result["b"])
-		check.Equal(t, 30, result["c"])
+		if int32(3) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(3))
+		}
+		if 10 != result["a"] {
+			t.Errorf("expected %v, got %v", result["a"], 10)
+		}
+		if 20 != result["b"] {
+			t.Errorf("expected %v, got %v", result["b"], 20)
+		}
+		if 30 != result["c"] {
+			t.Errorf("expected %v, got %v", result["c"], 30)
+		}
 	})
 
 	t.Run("AllFunctionsRun", func(t *testing.T) {
@@ -6794,12 +7064,16 @@ func TestCallWrap2(t *testing.T) {
 		result := Collect2(ResolveWrap2(funcs, "test"))
 
 		for i, c := range called {
-			check.True(t, c)
+			if !(c) {
+				t.Error("expected condition to be true")
+			}
 			if !c {
 				t.Errorf("function %d was not called", i)
 			}
 		}
-		check.Equal(t, 4, len(result))
+		if 4 != len(result) {
+			t.Errorf("expected len(result, got %v", 4)
+		}
 	})
 
 	t.Run("EarlyTermination", func(t *testing.T) {
@@ -6815,16 +7089,26 @@ func TestCallWrap2(t *testing.T) {
 		// Only take first 2
 		result := Collect2(Limit2(ResolveWrap2(funcs, 5), 2))
 
-		check.Equal(t, int32(2), callCount.Load())
-		check.Equal(t, 2, len(result))
-		check.Equal(t, 5, result[1])
-		check.Equal(t, 10, result[2])
+		if int32(2) != callCount.Load() {
+			t.Errorf("expected callCount.Load(, got %v", int32(2))
+		}
+		if 2 != len(result) {
+			t.Errorf("expected len(result, got %v", 2)
+		}
+		if 5 != result[1] {
+			t.Errorf("expected result[1], got %v", 5)
+		}
+		if 10 != result[2] {
+			t.Errorf("expected result[2], got %v", 10)
+		}
 	})
 
 	t.Run("EmptySequence", func(t *testing.T) {
 		funcs := func(yield func(func(int) (string, int)) bool) {}
 		result := Collect2(ResolveWrap2(funcs, 42))
-		check.Equal(t, 0, len(result))
+		if 0 != len(result) {
+			t.Errorf("expected len(result, got %v", 0)
+		}
 	})
 
 	t.Run("WrappingValuePassedCorrectly", func(t *testing.T) {
@@ -6838,6 +7122,8 @@ func TestCallWrap2(t *testing.T) {
 
 		_ = Collect2(ResolveWrap2(funcs, "wrapped"))
 
-		check.True(t, slices.Equal([]string{"wrapped", "wrapped", "wrapped"}, receivedValues))
+		if !slices.Equal([]string{"wrapped", "wrapped", "wrapped"}, receivedValues) {
+			t.Error("expected condition to be true")
+		}
 	})
 }
