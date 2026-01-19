@@ -22,6 +22,8 @@ func goop(op func()) func()                                    { return func() {
 func with(mtx *sync.Mutex)                                     { mtx.Unlock() }
 func lock(mtx *sync.Mutex) *sync.Mutex                         { mtx.Lock(); return mtx }
 func mtxcall(mtx *sync.Mutex, op func()) func()                { return func() { defer with(lock(mtx)); op() } }
+func toany[T any](in T) any                                    { return in }
+func toany2[A, B any](first A, second B) (A, any)              { return first, any(second) }
 
 func mtxdo[T any](mtx *sync.Mutex, op func() T) func() T {
 	return func() T { defer with(lock(mtx)); return op() }

@@ -97,6 +97,13 @@ func Slice[T any, S ~[]T](sl S) iter.Seq[T] { return slices.Values(sl) }
 // Args returns a sequence containing all provided arguments.
 func Args[T any](items ...T) iter.Seq[T] { return Slice(items) }
 
+// Any converts an arbitrary sequence to a sequence of `any` values.
+func Any[T any](seq iter.Seq[T]) iter.Seq[any] { return Convert(seq, toany) }
+
+// Any2 converts the second value of a sequence of pairs to be `any` typed, leaving the first value
+// unchanged.
+func Any2[A, B any](seq iter.Seq2[A, B]) iter.Seq2[A, any] { return Convert2(seq, toany2) }
+
 // Append returns a sequence containing all elements from the input
 // sequence followed by additional values provided.
 func Append[T any](seq iter.Seq[T], with ...T) iter.Seq[T] { return Chain(Args(seq, Slice(with))) }
