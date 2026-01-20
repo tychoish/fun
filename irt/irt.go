@@ -10,6 +10,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -78,6 +79,37 @@ func CollectFirstN[T any](seq iter.Seq[T], n int) []T {
 // JoinErrors consumes a sequence of errors and returns a single error
 // produced by errors.Join. Returns nil if the sequence is empty.
 func JoinErrors(seq iter.Seq[error]) error { return errors.Join(Collect(seq)...) }
+
+// JoinStrings takes a sequence of strings and concatenates them. Uses
+// a strings.Buffer to minimize allocation overhead.
+func JoinStrings[S ~string](seq iter.Seq[S]) S {
+	var buf strings.Builder
+
+	for str := range seq {
+		buf.WriteString(string(str))
+	}
+
+	return S(buf.String())
+}
+
+// JoinStringsWith concatenates a sequence of strings and returns one
+// string, inserting `with` between elements. If an element in the
+// iterator is is the empty string, then an extra separator is not
+// inserted.
+func JoinStringsWith[S, T ~string](seq iter.Seq[S], with T) S {
+	var buf strings.Builder
+	var lastSize int
+
+	for str := range seq {
+		if buf.Len() > lastSize {
+			buf.WriteString(string(with))
+		}
+		lastSize = buf.Len()
+		buf.WriteString(string(str))
+	}
+
+	return S(buf.String())
+}
 
 // One returns a sequence containing exactly one element.
 func One[T any](v T) iter.Seq[T] { return func(yield func(T) bool) { yield(v) } }
