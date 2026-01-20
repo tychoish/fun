@@ -21,7 +21,8 @@ import (
 //
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
-	mtx     *sync.Mutex
+	once    sync.Once
+	mutex   sync.Mutex
 	nfront  *sync.Cond
 	nback   *sync.Cond
 	updates *sync.Cond
@@ -31,6 +32,19 @@ type Deque[T any] struct {
 	draining bool
 	closed   bool
 }
+
+func (dq *Deque[T]) mtx() *sync.Mutex { dq.init(); return &dq.mutex }
+func (dq *Deque[T]) doInit() {
+	dq.updates = sync.NewCond(&dq.mutex)
+	dq.nfront = sync.NewCond(&dq.mutex)
+	dq.nback = sync.NewCond(&dq.mutex)
+	dq.root = &element[T]{root: true, list: dq}
+	dq.root.next = dq.root
+	dq.root.prev = dq.root
+	dq.tracker = &queueNoLimitTrackerImpl{}
+}
+
+func (dq *Deque[T]) init() { dq.once.Do(dq.doInit) }
 
 // DequeOptions configure the semantics of the deque. The Validate()
 // method ensures that you do not produce a configuration that is
@@ -67,45 +81,37 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 		return nil, err
 	}
 
-	q := makeDeque[T]()
+	dq := &Deque[T]{}
+
+	dq.init()
 
 	if opts.QueueOptions != nil {
-		q.tracker = newQueueLimitTracker(*opts.QueueOptions)
+		dq.tracker = newQueueLimitTracker(*opts.QueueOptions)
 	} else if opts.Capacity > 0 {
-		q.tracker = &queueHardLimitTracker{capacity: opts.Capacity}
+		dq.tracker = &queueHardLimitTracker{capacity: opts.Capacity}
 	} else if opts.Unlimited {
-		q.tracker = &queueNoLimitTrackerImpl{}
+		dq.tracker = &queueNoLimitTrackerImpl{}
 	}
-
-	return q, nil
+	return dq, nil
 }
 
 // NewUnlimitedDeque constructs an unbounded Deque.
+//
+// Deprecated: you can use a literal constructor,
+// &Deque[T]{}, to get an unlimited dequeue.
 func NewUnlimitedDeque[T any]() *Deque[T] {
 	return erc.Must(NewDeque[T](DequeOptions{Unlimited: true}))
 }
 
-func makeDeque[T any]() *Deque[T] {
-	q := &Deque[T]{mtx: &sync.Mutex{}}
-	q.updates = sync.NewCond(q.mtx)
-	q.nfront = sync.NewCond(q.mtx)
-	q.nback = sync.NewCond(q.mtx)
-	q.root = &element[T]{root: true, list: q}
-	q.root.next = q.root
-	q.root.prev = q.root
-
-	return q
-}
-
 // Len returns the length of the queue. This is an O(1) operation in
 // this implementation.
-func (dq *Deque[T]) Len() int { defer adt.With(adt.Lock(dq.mtx)); return dq.tracker.len() }
+func (dq *Deque[T]) Len() int { defer adt.With(adt.Lock(dq.mtx())); return dq.tracker.len() }
 
 // Close marks the deque as closed, after which point all blocking
 // consumers will stop and no more operations will succeed. The error
 // value is not used in the current operation.
 func (dq *Deque[T]) Close() error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	dq.doClose()
 	return nil
 }
@@ -114,16 +120,14 @@ func (dq *Deque[T]) Close() error {
 // context is canceled.) This does not close the deque: when Drain returns the deque is empty, but new work can then be
 // added. To Drain and shutdown, use the Shutdown method.
 func (dq *Deque[T]) Drain(ctx context.Context) error {
-	dq.mtx.Lock()
-	defer dq.mtx.Unlock()
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.waitForDrain(ctx)
 }
 
 // Shutdown drains the deque, waiting for all items to be removed from the deque and then closes it so no additional work can be
 // added to the deque.
 func (dq *Deque[T]) Shutdown(ctx context.Context) error {
-	dq.mtx.Lock()
-	defer dq.mtx.Unlock()
+	defer adt.With(adt.Lock(dq.mtx()))
 
 	if err := dq.waitForDrain(ctx); err != nil {
 		return err
@@ -166,7 +170,7 @@ func (dq *Deque[T]) doClose() {
 // erroring if the queue is closed, at capacity, or has reached its
 // limit.
 func (dq *Deque[T]) PushFront(it T) error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.addAfter(it, dq.root)
 }
 
@@ -174,21 +178,21 @@ func (dq *Deque[T]) PushFront(it T) error {
 // erroring if the queue is closed, at capacity, or has reached its
 // limit.
 func (dq *Deque[T]) PushBack(it T) error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.addAfter(it, dq.root.prev)
 }
 
 // PopFront removes the first (head) item of the queue, with the
 // second value being false if the queue is empty or closed.
 func (dq *Deque[T]) PopFront() (T, bool) {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.pop(dq.root.next)
 }
 
 // PopBack removes the last (tail) item of the queue, with the
 // second value being false if the queue is empty or closed.
 func (dq *Deque[T]) PopBack() (T, bool) {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.pop(dq.root.prev)
 }
 
@@ -196,7 +200,7 @@ func (dq *Deque[T]) PopBack() (T, bool) {
 // empty, will block until an item is added, returning an error if the
 // context canceled or the queue is closed.
 func (dq *Deque[T]) WaitPopFront(ctx context.Context) (v T, err error) {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.waitPop(ctx, dqNext)
 }
 
@@ -204,7 +208,7 @@ func (dq *Deque[T]) WaitPopFront(ctx context.Context) (v T, err error) {
 // is empty, will block until an item is added, returning an error if
 // the context canceled or the queue is closed.
 func (dq *Deque[T]) WaitPopBack(ctx context.Context) (T, error) {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.waitPop(ctx, dqPrev)
 }
 
@@ -213,7 +217,7 @@ func (dq *Deque[T]) WaitPopBack(ctx context.Context) (T, error) {
 // having made room appends the item. Returns an error if the deque is
 // closed.
 func (dq *Deque[T]) ForcePushFront(it T) error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 
 	if dq.tracker.cap() == dq.tracker.len() {
 		_, _ = dq.pop(dq.root.prev)
@@ -227,7 +231,7 @@ func (dq *Deque[T]) ForcePushFront(it T) error {
 // having made room prepends the item. Returns an error if the deque
 // is closed.
 func (dq *Deque[T]) ForcePushBack(it T) error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 
 	if dq.tracker.cap() == dq.tracker.len() {
 		_, _ = dq.pop(dq.root.next)
@@ -241,7 +245,7 @@ func (dq *Deque[T]) ForcePushBack(it T) error {
 // there is capacity to add an item. The new item is added to the
 // front of the deque.
 func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 
 	return dq.waitPushAfter(ctx, it, func() *element[T] { return dq.root })
 }
@@ -251,7 +255,7 @@ func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
 // there is capacity to add an item. The new item is added to the
 // back of the deque.
 func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
-	defer adt.With(adt.Lock(dq.mtx))
+	defer adt.With(adt.Lock(dq.mtx()))
 
 	return dq.waitPushAfter(ctx, it, func() *element[T] { return dq.root.prev })
 }
@@ -347,7 +351,7 @@ func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bo
 	var current *element[T]
 
 	op := func() (T, bool) {
-		defer adt.With(adt.Lock(dq.mtx))
+		defer adt.With(adt.Lock(dq.mtx()))
 		if current == nil {
 			current = dq.root
 		}
