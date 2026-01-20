@@ -725,7 +725,7 @@ func TestQueueIterators(t *testing.T) {
 func TestQueueIteratorPop(t *testing.T) {
 	t.Run("PopExistingItems", func(t *testing.T) {
 		ctx := context.Background()
-		queue := NewUnlimitedQueue[string]()
+		queue := &Queue[string]{}
 
 		check.NotError(t, queue.Push("one"))
 		check.NotError(t, queue.Push("two"))

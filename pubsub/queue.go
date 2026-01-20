@@ -53,6 +53,7 @@ var (
 // A Queue is safe for concurrent use by multiple goroutines.
 type Queue[T any] struct {
 	mu       sync.Mutex // protects the fields below
+	once     sync.Once
 	tracker  queueLimitTracker
 	draining bool
 	closed   bool
@@ -81,23 +82,31 @@ func NewUnlimitedQueue[T any]() *Queue[T] {
 }
 
 func makeQueue[T any](tracker queueLimitTracker) *Queue[T] {
+	q := &Queue[T]{tracker: tracker}
+	q.init()
+	return q
+}
+
+func (q *Queue[T]) mtx() *sync.Mutex   { return &q.mu }
+func (*Queue[T]) with(mtx *sync.Mutex) { mtx.Unlock() }
+func (q *Queue[T]) lock() *sync.Mutex  { mtx := q.mtx(); mtx.Lock(); q.init(); return mtx }
+func (q *Queue[T]) init()              { q.once.Do(q.doInit) }
+func (q *Queue[T]) doInit() {
 	sentinel := new(entry[T])
-	q := &Queue[T]{
-		back:    sentinel,
-		front:   sentinel,
-		tracker: tracker,
-	}
+	q.back = sentinel
+	q.front = sentinel
 	q.nempty = sync.NewCond(&q.mu)
 	q.nupdates = sync.NewCond(&q.mu)
-	return q
+	if q.tracker == nil {
+		q.tracker = &queueNoLimitTrackerImpl{}
+	}
 }
 
 // Push adds item to the back of the queue. It reports an error and does not
 // enqueue the item if the queue is full or closed, or if it exceeds its soft
 // quota and there is not enough burst credit.
 func (q *Queue[T]) Push(item T) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 
 	return q.doAdd(item)
 }
@@ -105,8 +114,7 @@ func (q *Queue[T]) Push(item T) error {
 // Len returns the number of items in the queue. Because the queue
 // tracks its size this is a constant time operation.
 func (q *Queue[T]) Len() int {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 	return q.tracker.len()
 }
 
@@ -141,8 +149,7 @@ func (q *Queue[T]) doAdd(item T) error {
 // closed, or the context is canceled. Returns an error if the context
 // is canceled or the queue is closed.
 func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 	if q.draining {
 		return ErrQueueDraining
 	}
@@ -177,8 +184,7 @@ func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 // reports whether an item was available.  If the queue is empty, Pop
 // returns T<zero>, false.
 func (q *Queue[T]) Pop() (out T, ok bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 
 	switch q.tracker.len() {
 	case 0:
@@ -211,8 +217,7 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 //
 // WaitPop is destructive: every item returned is removed from the queue.
 func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 
 	// If the context terminates, wake the waiter.
 	ctx, cancel := context.WithCancel(ctx)
@@ -239,8 +244,7 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 // queue is empty, but new work can then be added. To Drain and
 // shutdown, use the Shutdown method.
 func (q *Queue[T]) Drain(ctx context.Context) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 
 	return q.waitForDrain(ctx)
 }
@@ -291,8 +295,7 @@ func (q *Queue[T]) waitForNew(ctx context.Context) error {
 // report an error without blocking if it is called on a closed, empty
 // queue.
 func (q *Queue[T]) Close() error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.with(q.lock())
 
 	q.doClose()
 
@@ -303,9 +306,7 @@ func (q *Queue[T]) Close() error {
 // the queue and then clsoes it so no additional work can be added to
 // the queue.
 func (q *Queue[T]) Shutdown(ctx context.Context) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
+	defer q.with(q.lock())
 	if err := q.waitForDrain(ctx); err != nil {
 		return err
 	}
@@ -404,8 +405,7 @@ type entry[T any] struct {
 func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 	var next *entry[T]
 	op := func() (o T, ok bool) {
-		q.mu.Lock()
-		defer q.mu.Unlock()
+		defer q.with(q.lock())
 
 		if next == nil {
 			next = q.front
@@ -451,7 +451,7 @@ func (q *Queue[T]) Iterator() iter.Seq[T] {
 		for next := q.front.link; !q.closed && next != nil && q.front != q.back && q.front != next && yield(next.item); next = next.link {
 			continue
 		}
-	}, &q.mu)
+	}, q.mtx())
 }
 
 func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {
