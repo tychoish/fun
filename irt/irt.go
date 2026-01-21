@@ -650,9 +650,11 @@ func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 func Chain[T any](seq iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for inner := range seq {
-			for value := range inner {
-				if !yield(value) {
-					return
+			if inner != nil {
+				for value := range inner {
+					if !yield(value) {
+						return
+					}
 				}
 			}
 		}
