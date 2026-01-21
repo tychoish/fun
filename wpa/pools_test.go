@@ -1890,7 +1890,7 @@ func TestWithHandlerForEachPullWithPool(t *testing.T) {
 		seq := irt.Slice([]int{1, 2, 3, 4, 5, 6})
 		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
 
-		var errors []error
+		errors := make([]error, 0, 3)
 		for err := range errorSeq {
 			errors = append(errors, err)
 		}
@@ -1974,7 +1974,7 @@ func TestWithHandlerForEachPullWithPool(t *testing.T) {
 		seq := irt.Slice([]int{1, 2, 3, 4, 5})
 		errorSeq := WithHandler(reader).ForEach(seq).PullWithPool(t.Context(), WorkerGroupConfDefaults())
 
-		var errors []error
+		errors := make([]error, 0, 1)
 		for err := range errorSeq {
 			errors = append(errors, err)
 		}
@@ -2033,7 +2033,7 @@ func TestWithHandlerForEachPullWithPool(t *testing.T) {
 			WorkerGroupConfWithErrorCollector(nil),
 		)
 
-		var errors []error
+		errors := make([]error, 0, 1)
 		for err := range errorSeq {
 			errors = append(errors, err)
 		}

@@ -1412,7 +1412,7 @@ func TestPipe(t *testing.T) {
 			seq := Slice(tt.values)
 			ch := Pipe(ctx, seq)
 
-			var result []int
+			result := make([]int, 0, 3)
 			for v := range ch {
 				result = append(result, v)
 			}
@@ -1887,8 +1887,8 @@ func TestJoin2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var keys []string
-			var vals []int
+			keys := make([]string, 0, 0)
+			vals := make([]int, 0, 0)
 			for k, v := range Join2(tt.seqs...) {
 				keys = append(keys, k)
 				vals = append(vals, v)
@@ -1976,8 +1976,8 @@ func TestChain2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var keys []string
-			var vals []int
+			keys := make([]string, 0, len(tt.expectedKeys))
+			vals := make([]int, 0, len(tt.expectedVals))
 			for k, v := range Chain2(tt.seq) {
 				keys = append(keys, k)
 				vals = append(vals, v)
@@ -4142,8 +4142,8 @@ func TestModify2(t *testing.T) {
 		input := func(yield func(string, int) bool) {
 			_ = yield("a", 1) && yield("b", 2) && yield("c", 3)
 		}
-		var keys []string
-		var vals []int
+		keys := make([]string, 0, 3)
+		vals := make([]int, 0, 3)
 		for k, v := range Modify2(input, func(k string, v int) (string, int) {
 			return fmt.Sprint(v), len(k)
 		}) {
@@ -4223,8 +4223,8 @@ func TestModifyAll2(t *testing.T) {
 		input := func(yield func(string, int) bool) {
 			_ = yield("x", 1) && yield("y", 2)
 		}
-		var keys []string
-		var vals []int
+		keys := make([]string, 0, 2)
+		vals := make([]int, 0, 2)
 		for k, v := range ModifyAll2(input,
 			func(k string, v int) (string, int) { return k + "1", v * 2 },
 			func(k string, v int) (string, int) { return k + "2", v + 10 },
@@ -4249,8 +4249,8 @@ func TestModifyAll2(t *testing.T) {
 		input := func(yield func(string, int) bool) {
 			_ = yield("a", 5) && yield("b", 10)
 		}
-		var keys []string
-		var vals []int
+		keys := make([]string, 0, 2)
+		vals := make([]int, 0, 2)
 		for k, v := range ModifyAll2(input,
 			nil,
 			func(k string, v int) (string, int) { return k + "x", v * 2 },
@@ -5368,7 +5368,7 @@ func TestWithBuffer(t *testing.T) {
 		buffered := WithBuffer(ctx, seq, 2)
 
 		t.Log("Starting consumption")
-		var result []int
+		result := make([]int, 0, 0)
 		for val := range buffered {
 			t.Logf("Consumer got %d", val)
 			result = append(result, val)
@@ -5471,7 +5471,7 @@ func TestWithBuffer(t *testing.T) {
 		buffered := WithBuffer(ctx, seq, 10)
 
 		// Slow consumer
-		var consumed []int
+		consumed := make([]int, 0, 4)
 		for val := range buffered {
 			consumed = append(consumed, val)
 			time.Sleep(20 * time.Millisecond) // Slow consumption
@@ -5661,7 +5661,7 @@ func TestWithBuffer(t *testing.T) {
 		// Wait a bit before consuming to let buffer fill
 		time.Sleep(50 * time.Millisecond)
 
-		var consumed []int
+		consumed := make([]int, 0, 4)
 		for val := range buffered {
 			if !firstItemConsumed.Load() {
 				firstItemConsumed.Store(true)
@@ -5938,10 +5938,10 @@ func TestWith3(t *testing.T) {
 
 		seq := With3(Slice([]int{5}), op)
 
-		var results []struct {
+		results := make([]struct {
 			elem  KV[int, int]
 			third int
-		}
+		}, 0, 1)
 
 		for elem, third := range seq {
 			results = append(results, struct {
@@ -7731,8 +7731,8 @@ func TestAny2(t *testing.T) {
 		}
 		result := Any2(seq)
 
-		keys := make([]string, 0)
-		values := make([]any, 0)
+		keys := make([]string, 0, 3)
+		values := make([]any, 0, 3)
 
 		for k, v := range result {
 			keys = append(keys, k)
@@ -7836,8 +7836,8 @@ func TestAny2(t *testing.T) {
 		}
 		result := Any2(seq)
 
-		keys := make([]Key, 0)
-		values := make([]any, 0)
+		keys := make([]Key, 0, 2)
+		values := make([]any, 0, 2)
 
 		for k, v := range result {
 			keys = append(keys, k)
@@ -7941,8 +7941,8 @@ func TestAny2(t *testing.T) {
 		}
 		result := Any2(seq)
 
-		keys := make([]string, 0)
-		values := make([]any, 0)
+		keys := make([]string, 0, 2)
+		values := make([]any, 0, 2)
 
 		for k, v := range result {
 			keys = append(keys, k)

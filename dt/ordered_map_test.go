@@ -151,8 +151,8 @@ func TestOrderedMap(t *testing.T) {
 		m.Set("b", 20)
 		m.Set("c", 30)
 
-		var keys []string
-		var values []int
+		keys := make([]string, 0, 3)
+		values := make([]int, 0, 3)
 
 		for k, v := range m.Iterator() {
 			keys = append(keys, k)
@@ -324,7 +324,7 @@ func TestOrderedMap(t *testing.T) {
 
 		keys := irt.Collect(m.Keys(), 0, 3)
 
-		var valuesFromIterator []int
+		valuesFromIterator := make([]int, 0, 3)
 		for _, v := range m.Iterator() {
 			valuesFromIterator = append(valuesFromIterator, v)
 		}

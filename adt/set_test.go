@@ -235,7 +235,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 10; i++ {
-				var items []string
+				items := make([]string, 0, 50)
 				for item := range s.Iterator() {
 					items = append(items, item)
 					time.Sleep(500 * time.Microsecond)

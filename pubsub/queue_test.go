@@ -779,7 +779,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		check.NotError(t, queue.Push("item"))
 
 		iter := queue.IteratorWaitPop(ctx)
-		values := make([]string, 0)
+		values := make([]string, 0, 1)
 
 		for val := range iter {
 			values = append(values, val)
@@ -815,7 +815,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		check.NotError(t, queue.Push("two"))
 
 		iter := queue.IteratorWaitPop(ctx)
-		values := make([]string, 0)
+		values := make([]string, 0, 2)
 
 		go func() {
 			time.Sleep(20 * time.Millisecond)

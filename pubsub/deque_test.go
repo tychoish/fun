@@ -33,7 +33,7 @@ func (tt *waitPushCase) check(t *testing.T) {
 }
 
 func makeWaitPushCases() []*waitPushCase {
-	var cases []*waitPushCase
+	cases := make([]*waitPushCase, 0, 2)
 
 	front := &waitPushCase{Name: "Front", dq: erc.Must(NewDeque[int](DequeOptions{Capacity: 2}))}
 	front.Push = front.dq.WaitPushFront

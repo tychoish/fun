@@ -750,7 +750,7 @@ func TestChannel(t *testing.T) {
 			close(ch)
 
 			// Collect all values
-			var collected []int
+			collected := make([]int, 0, 4)
 			for val := range ChanBlockingReceive(ch).Iterator(ctx) {
 				collected = append(collected, val)
 			}

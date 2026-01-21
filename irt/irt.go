@@ -94,7 +94,7 @@ func JoinStrings[S ~string](seq iter.Seq[S]) S {
 
 // JoinStringsWith concatenates a sequence of strings and returns one
 // string, inserting `with` between elements. If an element in the
-// iterator is is the empty string, then an extra separator is not
+// iterator is the empty string, then an extra separator is not
 // inserted.
 func JoinStringsWith[S, T ~string](seq iter.Seq[S], with T) S {
 	var buf strings.Builder

@@ -154,7 +154,7 @@ func TestLinkedList(t *testing.T) {
 	t.Run("Iterate", func(t *testing.T) {
 		t.Run("IteratorFrontEmpty", func(t *testing.T) {
 			l := &list[int]{}
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -163,7 +163,7 @@ func TestLinkedList(t *testing.T) {
 
 		t.Run("IteratorBackEmpty", func(t *testing.T) {
 			l := &list[int]{}
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorBack() {
 				result = append(result, v)
 			}
@@ -174,7 +174,7 @@ func TestLinkedList(t *testing.T) {
 			l := &list[int]{}
 			l.PushBack(42)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -187,7 +187,7 @@ func TestLinkedList(t *testing.T) {
 			l := &list[int]{}
 			l.PushBack(42)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorBack() {
 				result = append(result, v)
 			}
@@ -202,7 +202,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack(2)
 			l.PushBack(3)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -217,7 +217,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack(2)
 			l.PushBack(3)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorBack() {
 				result = append(result, v)
 			}
@@ -233,7 +233,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack("c")
 			l.PushBack("d")
 
-			var result []string
+			result := make([]string, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -248,7 +248,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack("c")
 			l.PushBack("d")
 
-			var result []string
+			result := make([]string, 0, 0)
 			for v := range l.IteratorBack() {
 				result = append(result, v)
 			}
@@ -278,7 +278,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack(4)
 			l.PushBack(5)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 				if len(result) == 3 {
@@ -301,7 +301,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushFront(5)
 
 			// Should be [5, 4, 3, 2, 1] front to back
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -325,7 +325,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushFront(1) // [1, 2, 3]
 			l.PushBack(4)  // [1, 2, 3, 4]
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -452,7 +452,7 @@ func TestLinkedList(t *testing.T) {
 
 			check.Equal(t, 3, l.Len())
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -481,7 +481,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack(4)
 			l.PushBack(5)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 				if v == 2 {
@@ -542,7 +542,7 @@ func TestLinkedList(t *testing.T) {
 			l.PushBack(2)
 			l.PushBack(3)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 				// Clear remaining elements
@@ -718,7 +718,7 @@ func TestLinkedList(t *testing.T) {
 			l.inc()
 
 			// List should now be [1, 2, 3]
-			var result []int
+			result := make([]int, 0, 0)
 			for e := l.Front(); l.In(e); e = e.Next() {
 				result = append(result, e.Value())
 			}
@@ -739,7 +739,7 @@ func TestLinkedList(t *testing.T) {
 			// List should now be [1, 2, 3]
 			check.Equal(t, 1, l.Front().Value())
 
-			var result []int
+			result := make([]int, 0, 0)
 			for e := l.Front(); l.In(e); e = e.Next() {
 				result = append(result, e.Value())
 			}
@@ -757,7 +757,7 @@ func TestLinkedList(t *testing.T) {
 				target.PushFront(newElem)
 			}
 
-			var result []int
+			result := make([]int, 0, 0)
 			for e := l.Front(); l.In(e); e = e.Next() {
 				result = append(result, e.Value())
 			}
@@ -873,7 +873,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortQuick(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -890,7 +890,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortQuick(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -910,7 +910,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortQuick(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -928,7 +928,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortQuick(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -944,7 +944,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortQuick(stringCmp)
 
-			var result []string
+			result := make([]string, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -972,7 +972,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortQuick(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1008,7 +1008,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1026,7 +1026,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1047,7 +1047,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1065,7 +1065,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1081,7 +1081,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(stringCmp)
 
-			var result []string
+			result := make([]string, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1109,7 +1109,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1124,7 +1124,7 @@ func TestLinkedListSort(t *testing.T) {
 
 			l.SortMerge(intCmp)
 
-			var result []int
+			result := make([]int, 0, 0)
 			for v := range l.IteratorFront() {
 				result = append(result, v)
 			}
@@ -1145,7 +1145,8 @@ func TestLinkedListSort(t *testing.T) {
 		l1.SortQuick(intCmp)
 		l2.SortMerge(intCmp)
 
-		var r1, r2 []int
+		r1 := make([]int, 0, 10)
+		r2 := make([]int, 0, 10)
 		for v := range l1.IteratorFront() {
 			r1 = append(r1, v)
 		}
@@ -1171,7 +1172,7 @@ func TestLinkedListSort(t *testing.T) {
 
 		l.SortQuick(reverseCmp)
 
-		var result []int
+		result := make([]int, 0, 0)
 		for v := range l.IteratorFront() {
 			result = append(result, v)
 		}
