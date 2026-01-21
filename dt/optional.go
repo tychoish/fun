@@ -82,7 +82,6 @@ func (o *Optional[T]) Scan(src any) (err error) {
 		o.v = zero
 		return nil
 	}
-	o.init()
 
 	defer func() { o.defined = (err == nil && !internal.IsNil(o.v)) }()
 
