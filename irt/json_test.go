@@ -555,7 +555,7 @@ func TestUnmarshalJSONStrings(t *testing.T) {
 	seq := UnmarshalJSON[string](reader)
 
 	expected := []string{"apple", "banana", "cherry"}
-	var results []string
+	results := make([]string, 0, 3)
 
 	for value, err := range seq {
 		if err != nil {
@@ -589,7 +589,7 @@ func TestUnmarshalJSONStructs(t *testing.T) {
 		{Name: "Alice", Age: 30},
 		{Name: "Bob", Age: 25},
 	}
-	var results []Person
+	results := make([]Person, 0, 2)
 
 	for value, err := range seq {
 		if err != nil {
@@ -818,7 +818,7 @@ func TestUnmarshalJSONRoundTrip(t *testing.T) {
 	reader := bytes.NewReader(data)
 	unmarshalSeq := UnmarshalJSON[int](reader)
 
-	var results []int
+	results := make([]int, 0, 4)
 	for value, err := range unmarshalSeq {
 		if err != nil {
 			t.Fatalf("UnmarshalJSON() error = %v", err)

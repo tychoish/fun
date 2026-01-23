@@ -64,8 +64,12 @@ func (h *Heap[T]) Len() int { return h.list().Len() }
 func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), e.Ok() }
 
 // Iterator provides an iterator to the items in the heap.
-func (h *Heap[T]) Iterator() iter.Seq[T]        { ; return h.list().IteratorFront() }
+func (h *Heap[T]) Iterator() iter.Seq[T] { ; return h.list().IteratorFront() }
+
+// MarshalJSON encodes the heap as a JSON array in heap order.
 func (h *Heap[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(h.Iterator()) }
+
+// UnmarshalJSON decodes a JSON array and pushes each element onto the heap.
 func (h *Heap[T]) UnmarshalJSON(in []byte) error {
 	for kv, err := range irt.UnmarshalJSON[T](bytes.NewBuffer(in)) {
 		if err != nil {

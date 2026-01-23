@@ -151,7 +151,10 @@ func (r *Ring[T]) LIFO() iter.Seq[T] { r.init(); return r.iterate(r.before(r.pos
 // through all elements. The iterator is exhusted when the buffer is empty.
 func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Generate(r.Pop)) }
 
+// MarshalJSON encodes the ring as a JSON array in FIFO order.
 func (r *Ring[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(r.FIFO()) }
+
+// UnmarshalJSON decodes a JSON array and pushes each element into the ring.
 func (r *Ring[T]) UnmarshalJSON(in []byte) error {
 	for kv, err := range irt.UnmarshalJSON[T](bytes.NewBuffer(in)) {
 		if err != nil {

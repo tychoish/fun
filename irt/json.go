@@ -159,6 +159,8 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 	}
 }
 
+// MarshalText marshals a sequence to bytes by trying TextMarshaler, JSONMarshaler,
+// MarshalYAML, Marshal, string/[]byte conversions, or falling back to JSON encoding.
 func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
 	var buf bytes.Buffer
 	var (
@@ -191,6 +193,8 @@ func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// MarshalBinary marshals a sequence to bytes by trying BinaryMarshaler, Marshal,
+// MarshalBSON, or []byte conversions. Returns an error for unsupported types.
 func MarshalBinary[T any](seq iter.Seq[T]) ([]byte, error) {
 	var buf bytes.Buffer
 	var (

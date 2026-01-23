@@ -316,7 +316,7 @@ func TestRingMarshalUnmarshal(t *testing.T) {
 
 		// Verify elements in FIFO order
 		expected := []int{1, 2, 3}
-		var results []int
+		results := make([]int, 0, 3)
 		for v := range r2.FIFO() {
 			results = append(results, v)
 		}
@@ -378,7 +378,7 @@ func TestRingMarshalUnmarshal(t *testing.T) {
 
 		// Should have the last 3 elements: 3, 4, 5
 		expected := []int{3, 4, 5}
-		var results []int
+		results := make([]int, 0, 3)
 		for v := range r2.FIFO() {
 			results = append(results, v)
 		}
@@ -438,7 +438,7 @@ func TestRingMarshalUnmarshal(t *testing.T) {
 
 		// Should have the last 2 elements: 4, 5
 		expected := []int{4, 5}
-		var results []int
+		results := make([]int, 0, 3)
 		for v := range r.FIFO() {
 			results = append(results, v)
 		}
