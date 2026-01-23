@@ -1,6 +1,7 @@
 package dt
 
 import (
+	"bytes"
 	"iter"
 
 	"github.com/tychoish/fun/erc"
@@ -149,6 +150,18 @@ func (r *Ring[T]) LIFO() iter.Seq[T] { r.init(); return r.iterate(r.before(r.pos
 // buffer, starting with the oldest element in the buffer and moving
 // through all elements. The iterator is exhusted when the buffer is empty.
 func (r *Ring[T]) PopFIFO() iter.Seq[T] { return irt.UntilNil(irt.Generate(r.Pop)) }
+
+func (r *Ring[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(r.FIFO()) }
+func (r *Ring[T]) UnmarshalJSON(in []byte) error {
+	for kv, err := range irt.UnmarshalJSON[T](bytes.NewBuffer(in)) {
+		if err != nil {
+			return err
+		}
+		r.Push(kv)
+	}
+	return nil
+}
+
 
 func (r *Ring[T]) iterate(from int, advance func(int) int) iter.Seq[T] {
 	var current int
