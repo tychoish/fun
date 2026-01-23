@@ -1,6 +1,7 @@
 package dt
 
 import (
+	"bytes"
 	"iter"
 	"sync"
 
@@ -127,3 +128,14 @@ func (m *OrderedMap[K, V]) elems() iter.Seq[irt.KV[K, V]] {
 
 // Values provides an iterator over just the values in the map in insertion order.
 func (m *OrderedMap[K, V]) Values() iter.Seq[V] { return irt.Second(m.Iterator()) }
+
+func (m *OrderedMap[K, V]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON2(m.Iterator()) }
+func (m *OrderedMap[K, V]) UnmarshalJSON(in []byte) error {
+	for kv, err := range irt.UnmarshalJSON2[K, V](bytes.NewBuffer(in)) {
+		if err != nil {
+			return err
+		}
+		m.Store(kv.Key, kv.Value)
+	}
+	return nil
+}

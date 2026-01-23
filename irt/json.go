@@ -39,7 +39,7 @@ func MarshalJSON[T any](seq iter.Seq[T]) ([]byte, error) {
 // MarshalJSON2 consumes a pair sequence with string keys and
 // returns its JSON encoding as an object. Returns an error if any
 // element fails to marshal.
-func MarshalJSON2[A ~string, B any](seq iter.Seq2[A, B]) ([]byte, error) {
+func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 	var buf bytes.Buffer
 
 	for k, v := range seq {
@@ -111,7 +111,7 @@ func cast[T any](in any) T                  { return first(castOk[T](in)) }
 // UnmarshalJSON2 decodes a JSON object from the reader and yields each
 // key-value pair as KV with a potential error. The reader is wrapped
 // with bufio for efficient reading.
-func UnmarshalJSON2[A ~string, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
+func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 	return func(yield func(KV[A, B], error) bool) {
 		var zero KV[A, B]
 
@@ -139,7 +139,7 @@ func UnmarshalJSON2[A ~string, B any](data io.Reader) iter.Seq2[KV[A, B], error]
 				return
 			}
 
-			key := cast[string](t)
+			key := cast[A](t)
 
 			// Decode the value
 			var value B
@@ -148,7 +148,7 @@ func UnmarshalJSON2[A ~string, B any](data io.Reader) iter.Seq2[KV[A, B], error]
 				return
 			}
 
-			if !yield(MakeKV(A(key), value), nil) {
+			if !yield(MakeKV(key, value), nil) {
 				return
 			}
 		}
