@@ -2,6 +2,7 @@ package irt
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strconv"
@@ -2435,6 +2436,63 @@ func TestMtxHelpers(t *testing.T) {
 
 		if len(seen) != 100 {
 			t.Errorf("ConcurrentSafety: got %d unique values, want 100", len(seen))
+		}
+	})
+}
+
+func TestMust(t *testing.T) {
+	t.Run("NilError", func(t *testing.T) {
+		// Should not panic with nil error
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("must() panicked with nil error: %v", r)
+			}
+		}()
+		must(nil)
+	})
+
+	t.Run("NonNilError", func(t *testing.T) {
+		// Should panic with non-nil error
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("must() did not panic with non-nil error")
+			}
+		}()
+		must(&json.SyntaxError{})
+	})
+}
+
+func TestMust2(t *testing.T) {
+	t.Run("NilError", func(t *testing.T) {
+		// Should not panic and return the value
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("must2() panicked with nil error: %v", r)
+			}
+		}()
+		result := must2(42, nil)
+		if result != 42 {
+			t.Errorf("must2() = %d, want 42", result)
+		}
+	})
+
+	t.Run("NonNilError", func(t *testing.T) {
+		// Should panic with non-nil error
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("must2() did not panic with non-nil error")
+			}
+		}()
+		must2(0, &json.SyntaxError{})
+	})
+
+	t.Run("ReturnsValue", func(t *testing.T) {
+		// Verify it returns the first parameter
+		result := must2("hello", nil)
+		if result != "hello" {
+			t.Errorf("must2() = %q, want %q", result, "hello")
 		}
 	})
 }

@@ -57,6 +57,13 @@ func mapPop[K comparable, V any](mp map[K]V, k K) (V, bool) {
 	return v, ok
 }
 
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+func must2[T any](v T, err error) T { must(err); return v }
+
 // statefull function utilities
 
 func counter() func() int                             { return counterFrom(0) }
