@@ -162,7 +162,6 @@ func (r *Ring[T]) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-
 func (r *Ring[T]) iterate(from int, advance func(int) int) iter.Seq[T] {
 	var current int
 	var count int

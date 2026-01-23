@@ -3,7 +3,9 @@ package irt
 import (
 	"bufio"
 	"bytes"
+	"encoding"
 	"encoding/json"
+	"fmt"
 	"io"
 	"iter"
 )
@@ -155,4 +157,64 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 		// we don't have to read the closing brace: more only returns false when the next
 		// character is a closing brace, so this can't error, unless Peek is broken
 	}
+}
+
+func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
+	var buf bytes.Buffer
+	var (
+		payload []byte
+		err     error
+	)
+	for value := range seq {
+		switch vt := any(value).(type) {
+		case encoding.TextMarshaler:
+			payload, err = vt.MarshalText()
+		case json.Marshaler:
+			payload, err = vt.MarshalJSON()
+		case interface{ MarshalYAML() ([]byte, error) }:
+			payload, err = vt.MarshalYAML()
+		case interface{ Marshal() ([]byte, error) }:
+			payload, err = vt.Marshal()
+		case string:
+			payload, err = []byte(vt), nil
+		case []byte:
+			payload, err = vt, nil
+		default:
+			payload, err = json.Marshal(vt)
+		}
+		if err != nil {
+			return nil, err
+		}
+		must2(buf.Write(payload))
+		payload = payload[:0]
+	}
+	return buf.Bytes(), nil
+}
+
+func MarshalBinary[T any](seq iter.Seq[T]) ([]byte, error) {
+	var buf bytes.Buffer
+	var (
+		payload []byte
+		err     error
+	)
+	for value := range seq {
+		switch vt := any(value).(type) {
+		case encoding.BinaryMarshaler:
+			payload, err = vt.MarshalBinary()
+		case interface{ Marshal() ([]byte, error) }:
+			payload, err = vt.Marshal()
+		case interface{ MarshalBSON() ([]byte, error) }:
+			payload, err = vt.MarshalBSON()
+		case []byte:
+			payload, err = vt, nil
+		default:
+			payload, err = nil, fmt.Errorf("could not marshal %T, implement econding.BinaryMarshaler", value)
+		}
+		if err != nil {
+			return nil, err
+		}
+		must2(buf.Write(payload))
+		payload = payload[:0]
+	}
+	return buf.Bytes(), nil
 }

@@ -173,7 +173,6 @@ func (o Optional[T]) MarshalText() ([]byte, error) {
 func (o *Optional[T]) UnmarshalText(in []byte) (err error) {
 	defer func() { o.defined = (err == nil && !internal.IsNil(o.v)) }()
 	o.init()
-
 	switch vt := any(o.v).(type) {
 	case encoding.TextUnmarshaler:
 		return vt.UnmarshalText(in)
