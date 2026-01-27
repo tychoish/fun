@@ -5150,6 +5150,139 @@ func TestLegacyUtils(t *testing.T) {
 			t.Errorf("got errors %v, want [%v]", errs, expectedErr)
 		}
 	})
+	t.Run("ReadWords/Basic", func(t *testing.T) {
+		buf := bytes.NewBufferString("hello world foo bar")
+		words := Collect(ReadWords(buf))
+		expected := []string{"hello", "world", "foo", "bar"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWords() = %v, want %v", words, expected)
+		}
+	})
+	t.Run("ReadWords/Empty", func(t *testing.T) {
+		buf := bytes.NewBufferString("")
+		words := Collect(ReadWords(buf))
+		if len(words) != 0 {
+			t.Errorf("ReadWords(empty) = %v, want []", words)
+		}
+	})
+	t.Run("ReadWords/SingleWord", func(t *testing.T) {
+		buf := bytes.NewBufferString("hello")
+		words := Collect(ReadWords(buf))
+		expected := []string{"hello"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWords(single) = %v, want %v", words, expected)
+		}
+	})
+	t.Run("ReadWords/MultipleSpaces", func(t *testing.T) {
+		buf := bytes.NewBufferString("hello    world")
+		words := Collect(ReadWords(buf))
+		expected := []string{"hello", "world"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWords(spaces) = %v, want %v", words, expected)
+		}
+	})
+	t.Run("ReadWords/Newlines", func(t *testing.T) {
+		buf := bytes.NewBufferString("hello\nworld\nfoo")
+		words := Collect(ReadWords(buf))
+		expected := []string{"hello", "world", "foo"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWords(newlines) = %v, want %v", words, expected)
+		}
+	})
+	t.Run("ReadWords/MixedWhitespace", func(t *testing.T) {
+		buf := bytes.NewBufferString("hello \t world\n\nfoo  bar")
+		words := Collect(ReadWords(buf))
+		expected := []string{"hello", "world", "foo", "bar"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWords(mixed) = %v, want %v", words, expected)
+		}
+	})
+	t.Run("ReadWords/LeadingTrailingWhitespace", func(t *testing.T) {
+		buf := bytes.NewBufferString("  hello world  ")
+		words := Collect(ReadWords(buf))
+		expected := []string{"hello", "world"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWords(trim) = %v, want %v", words, expected)
+		}
+	})
+	t.Run("ReadWords/EarlyTermination", func(t *testing.T) {
+		buf := bytes.NewBufferString("one two three four five")
+		count := 0
+		for word := range ReadWords(buf) {
+			count++
+			if word == "three" {
+				break
+			}
+		}
+		if count != 3 {
+			t.Errorf("ReadWords early termination count = %d, want 3", count)
+		}
+	})
+	t.Run("ReadWordsErr/Basic", func(t *testing.T) {
+		buf := bytes.NewBufferString("hello world")
+		var words []string
+		var errs []error
+		for word, err := range ReadWordsErr(buf) {
+			if word != "" {
+				words = append(words, word)
+			}
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+		expected := []string{"hello", "world"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWordsErr() words = %v, want %v", words, expected)
+		}
+		if len(errs) != 0 {
+			t.Errorf("ReadWordsErr() errs = %v, want none", errs)
+		}
+	})
+	t.Run("ReadWordsErr/WithError", func(t *testing.T) {
+		expectedErr := errors.New("read error")
+		reader := &testReader{
+			data: []byte("hello world foo"),
+			err:  expectedErr,
+		}
+
+		var words []string
+		var errs []error
+		for word, err := range ReadWordsErr(reader) {
+			if word != "" {
+				words = append(words, word)
+			}
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		expected := []string{"hello", "world", "foo"}
+		if !slices.Equal(words, expected) {
+			t.Errorf("ReadWordsErr() words = %v, want %v", words, expected)
+		}
+		if len(errs) != 1 || !errors.Is(errs[0], expectedErr) {
+			t.Errorf("ReadWordsErr() errs = %v, want [%v]", errs, expectedErr)
+		}
+	})
+	t.Run("ReadWordsErr/Empty", func(t *testing.T) {
+		buf := bytes.NewBufferString("")
+		var words []string
+		var errs []error
+		for word, err := range ReadWordsErr(buf) {
+			if word != "" {
+				words = append(words, word)
+			}
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if len(words) != 0 {
+			t.Errorf("ReadWordsErr(empty) words = %v, want []", words)
+		}
+		if len(errs) != 0 {
+			t.Errorf("ReadWordsErr(empty) errs = %v, want []", errs)
+		}
+	})
 }
 
 func TestAsGenerator(t *testing.T) {

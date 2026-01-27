@@ -991,15 +991,32 @@ func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter
 	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), toCmp2(cf))))
 }
 
-// ReadLines returns a sequence of strings from the reader, stopping
-// at the first error.
+// ReadLines returns a sequence of strings from the reader, with one
+// item for every line, stopping when the reader is exhausted at the
+// first error.
 func ReadLines(reader io.Reader) iter.Seq[string] { return UntilError(ReadLinesErr(reader)) }
+
+// ReadWord returns a sequence of strings from the reader, with one
+// item for every word, stopping at the first error.
+func ReadWords(reader io.Reader) iter.Seq[string] { return UntilError(ReadWordsErr(reader)) }
 
 // ReadLinesErr returns a iterator of strings and errors from the
 // reader. It yields each line with a nil error, and finally yields an
 // empty string and the scanner's error.
 func ReadLinesErr(reader io.Reader) iter.Seq2[string, error] {
+	return fromReader(reader, bufio.ScanLines)
+}
+
+// ReadWordsErr returns a iterator of strings and errors from the
+// reader. It yields each line with a nil error, and finally yields an
+// empty string and the scanner's error.
+func ReadWordsErr(reader io.Reader) iter.Seq2[string, error] {
+	return fromReader(reader, bufio.ScanWords)
+}
+
+func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, error] {
 	scanner := bufio.NewScanner(reader)
+	scanner.Split(splitter)
 	return func(yield func(string, error) bool) {
 		for scanner.Scan() {
 			if !yield(scanner.Text(), nil) {
