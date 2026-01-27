@@ -1,10 +1,11 @@
 package adt
 
 import (
-	"encoding/json"
+	"bytes"
 	"iter"
 	"sync"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -85,18 +86,11 @@ func (s *OrderedSet[T]) Extend(iter iter.Seq[T]) { irt.Apply(iter, s.add) }
 func (s *OrderedSet[T]) add(in T)                { s.Add(in) }
 
 // MarshalJSON generates a JSON array of the items in the set in insertion order.
-func (s *OrderedSet[T]) MarshalJSON() ([]byte, error) {
-	return json.Marshal(irt.Collect(s.Iterator(), 0, s.Len()))
-}
+func (s *OrderedSet[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(s.Iterator()) }
 
 // UnmarshalJSON reads input JSON data, constructs an array in memory
 // and then adds items from the array to existing set. Items that are
 // in the set when UnmarshalJSON begins are not modified.
 func (s *OrderedSet[T]) UnmarshalJSON(in []byte) error {
-	var items []T
-	err := json.Unmarshal(in, &items)
-	if err == nil {
-		irt.Apply(irt.Slice(items), s.add)
-	}
-	return err
+	return erc.ForIteraratorAll(irt.UnmarshalJSON[T](bytes.NewReader(in)), s.add)
 }

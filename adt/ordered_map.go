@@ -104,6 +104,7 @@ func (m *OrderedMap[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, m.Store
 // Iterator returns a standard Go iterator interface to the key-value
 // pairs of the map in insertion order.
 func (m *OrderedMap[K, V]) Iterator() iter.Seq2[K, V] {
+	m.init()
 	return irt.KVsplit(
 		irt.WithMutex(
 			irt.Keep(
