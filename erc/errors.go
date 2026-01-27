@@ -192,6 +192,16 @@ func (ec *Collector) Push(err error) {
 	}
 }
 
+// PushOk adds the error to the collector and then returns true if the
+// error is nil, and false otherwise.
+func (ec *Collector) PushOk(err error) bool {
+	if ers.IsError(err) {
+		ec.pushWithLock(err)
+		return false
+	}
+	return true
+}
+
 // From adds all non-nil error values from the iterator sequence to the
 // error collector. Nil errors in the sequence are automatically filtered
 // out and ignored. This method is thread-safe and can be called
@@ -306,67 +316,4 @@ func (ec *Collector) extractErrors(in []any) {
 	if len(args) > 0 {
 		ec.Push(errors.New(strings.TrimSpace(fmt.Sprintln(args...))))
 	}
-}
-
-// FromIterator consumes an iterator sequence and returns only the values
-// that were successfully produced (without errors). All errors encountered
-// during iteration are aggregated using an error Collector. If any errors
-// occur, both a non-nil slice of successful values AND a non-nil aggregated
-// error are returned, allowing partial results to be recovered.
-//
-// Use FromIterator when you want to skip failed values but continue
-// processing and collect all errors for later inspection.
-func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
-	var ec Collector
-	out := make([]T, 0)
-	for value, err := range seq {
-		if err != nil {
-			ec.Push(err)
-			continue
-		}
-		out = append(out, value)
-	}
-	return out, ec.Resolve()
-}
-
-// FromIteratorAll consumes an iterator sequence and returns ALL values
-// produced, regardless of whether they had associated errors. Unlike
-// FromIterator, this function includes values even when an error occurred
-// for that iteration. All errors are aggregated using an error Collector.
-// If any errors occur, both a non-nil slice (containing all values) AND
-// a non-nil aggregated error are returned.
-//
-// Use FromIteratorAll when you need to collect every value from the
-// sequence, even those that produced errors, while still tracking all
-// errors that occurred.
-func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
-	var ec Collector
-	out := make([]T, 0)
-	for value, err := range seq {
-		if err != nil {
-			ec.Push(err)
-		}
-		out = append(out, value)
-	}
-	return out, ec.Resolve()
-}
-
-// FromIteratorUntil consumes an iterator sequence and stops immediately
-// upon encountering the first error. Unlike FromIterator and FromIteratorAll,
-// this function does NOT aggregate errors - it returns the first error
-// encountered directly and stops iteration. All successfully processed
-// values before the error are returned in the slice. If no errors occur,
-// returns the complete slice with a nil error.
-//
-// Use FromIteratorUntil when you want fail-fast behavior and don't need
-// to continue processing after the first error.
-func FromIteratorUntil[T any](seq iter.Seq2[T, error]) ([]T, error) {
-	out := make([]T, 0)
-	for value, err := range seq {
-		if err != nil {
-			return out, err
-		}
-		out = append(out, value)
-	}
-	return out, nil
 }
