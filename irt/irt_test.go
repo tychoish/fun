@@ -8312,3 +8312,349 @@ func TestToAny2(t *testing.T) {
 		}
 	})
 }
+
+func TestSort(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{})))
+		if len(result) != 0 {
+			t.Errorf("Sort(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{42})))
+		expected := []int{42}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(single) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("AlreadySorted", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{1, 2, 3, 4, 5})))
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(sorted) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("ReverseSorted", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{5, 4, 3, 2, 1})))
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(reverse) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Duplicates", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5})))
+		expected := []int{1, 1, 2, 3, 3, 4, 5, 5, 5, 6, 9}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(duplicates) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("AllSameValue", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{7, 7, 7, 7})))
+		expected := []int{7, 7, 7, 7}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(same) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("NegativeNumbers", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{-3, 1, -5, 0, 4, -1})))
+		expected := []int{-5, -3, -1, 0, 1, 4}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(negative) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Strings", func(t *testing.T) {
+		result := Collect(Sort(Slice([]string{"banana", "apple", "cherry", "apricot"})))
+		expected := []string{"apple", "apricot", "banana", "cherry"}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(strings) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Floats", func(t *testing.T) {
+		result := Collect(Sort(Slice([]float64{3.14, 2.71, 1.41, 1.73})))
+		expected := []float64{1.41, 1.73, 2.71, 3.14}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(floats) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		// Verify iteration can be stopped early
+		count := 0
+		for v := range Sort(Slice([]int{5, 3, 1, 4, 2})) {
+			count++
+			if v != 1 {
+				t.Errorf("first element should be 1, got %d", v)
+			}
+			break
+		}
+		if count != 1 {
+			t.Errorf("should have iterated exactly once, got %d", count)
+		}
+	})
+
+	t.Run("LargeInput", func(t *testing.T) {
+		// Test with a larger input to verify correctness at scale
+		input := make([]int, 1000)
+		for i := range input {
+			input[i] = 1000 - i
+		}
+		result := Collect(Sort(Slice(input)))
+		for i := 0; i < len(result)-1; i++ {
+			if result[i] > result[i+1] {
+				t.Errorf("Sort(large) not sorted at index %d: %d > %d", i, result[i], result[i+1])
+				break
+			}
+		}
+	})
+
+	t.Run("TwoElements", func(t *testing.T) {
+		result := Collect(Sort(Slice([]int{2, 1})))
+		expected := []int{1, 2}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort(two) = %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestSort2(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		result := Collect(KVjoin(Sort2(KVsplit(Slice([]KV[int, int]{})))))
+		if len(result) != 0 {
+			t.Errorf("Sort2(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		input := []KV[int, int]{{1, 2}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		if !slices.Equal(result, input) {
+			t.Errorf("Sort2(single) = %v, want %v", result, input)
+		}
+	})
+
+	t.Run("SortsByFirstThenSecond", func(t *testing.T) {
+		// Same first values, different second values - should sort by second
+		input := []KV[int, int]{{1, 3}, {1, 1}, {1, 2}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[int, int]{{1, 1}, {1, 2}, {1, 3}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(same first) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("DifferentFirstValues", func(t *testing.T) {
+		input := []KV[int, int]{{3, 1}, {1, 1}, {2, 1}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[int, int]{{1, 1}, {2, 1}, {3, 1}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(different first) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("MixedOrdering", func(t *testing.T) {
+		// First value takes priority, then second
+		input := []KV[int, int]{{2, 2}, {1, 3}, {2, 1}, {1, 1}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[int, int]{{1, 1}, {1, 3}, {2, 1}, {2, 2}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(mixed) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Duplicates", func(t *testing.T) {
+		input := []KV[int, int]{{1, 2}, {1, 2}, {1, 1}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[int, int]{{1, 1}, {1, 2}, {1, 2}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(duplicates) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StringPairs", func(t *testing.T) {
+		input := []KV[string, string]{{"b", "a"}, {"a", "b"}, {"a", "a"}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[string, string]{{"a", "a"}, {"a", "b"}, {"b", "a"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(strings) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("NegativeNumbers", func(t *testing.T) {
+		input := []KV[int, int]{{0, -1}, {-1, 0}, {-1, -1}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[int, int]{{-1, -1}, {-1, 0}, {0, -1}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(negative) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := []KV[int, int]{{3, 3}, {1, 1}, {2, 2}}
+		count := 0
+		for k, v := range Sort2(KVsplit(Slice(input))) {
+			count++
+			if k != 1 || v != 1 {
+				t.Errorf("first element should be (1,1), got (%d,%d)", k, v)
+			}
+			break
+		}
+		if count != 1 {
+			t.Errorf("should have iterated exactly once, got %d", count)
+		}
+	})
+
+	t.Run("ReverseSorted", func(t *testing.T) {
+		input := []KV[int, int]{{3, 3}, {2, 2}, {1, 1}}
+		result := Collect(KVjoin(Sort2(KVsplit(Slice(input)))))
+		expected := []KV[int, int]{{1, 1}, {2, 2}, {3, 3}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort2(reverse) = %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestSort1(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		result := Collect(KVjoin(Sort1(KVsplit(Slice([]KV[int, string]{})))))
+		if len(result) != 0 {
+			t.Errorf("Sort1(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		input := []KV[int, string]{{1, "a"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		if !slices.Equal(result, input) {
+			t.Errorf("Sort1(single) = %v, want %v", result, input)
+		}
+	})
+
+	t.Run("SortsByFirstOnly", func(t *testing.T) {
+		// Second value should NOT affect sort order
+		input := []KV[int, string]{{3, "first"}, {1, "second"}, {2, "third"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		expected := []KV[int, string]{{1, "second"}, {2, "third"}, {3, "first"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort1(by first) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SecondValueIgnored", func(t *testing.T) {
+		// Even with different second values, only first value matters
+		// This test verifies that "z" < "a" in second position doesn't affect ordering
+		input := []KV[int, string]{{1, "z"}, {1, "a"}, {1, "m"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		// All have same first value, so order depends on sort stability
+		// The important thing is that they all appear (not filtered/lost)
+		if len(result) != 3 {
+			t.Errorf("Sort1(same first) should have 3 elements, got %d", len(result))
+		}
+		// All should have key=1
+		for _, kv := range result {
+			if kv.Key != 1 {
+				t.Errorf("expected key=1, got %d", kv.Key)
+			}
+		}
+	})
+
+	t.Run("DifferentFirstValues", func(t *testing.T) {
+		input := []KV[int, string]{{3, "c"}, {1, "a"}, {2, "b"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		expected := []KV[int, string]{{1, "a"}, {2, "b"}, {3, "c"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort1(different first) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("NegativeKeys", func(t *testing.T) {
+		input := []KV[int, string]{{0, "zero"}, {-1, "neg"}, {1, "pos"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		expected := []KV[int, string]{{-1, "neg"}, {0, "zero"}, {1, "pos"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort1(negative) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StringKeys", func(t *testing.T) {
+		input := []KV[string, int]{{"cherry", 3}, {"apple", 1}, {"banana", 2}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		expected := []KV[string, int]{{"apple", 1}, {"banana", 2}, {"cherry", 3}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort1(string keys) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("FloatKeys", func(t *testing.T) {
+		input := []KV[float64, string]{{3.14, "pi"}, {2.71, "e"}, {1.41, "sqrt2"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		expected := []KV[float64, string]{{1.41, "sqrt2"}, {2.71, "e"}, {3.14, "pi"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort1(float keys) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := []KV[int, string]{{3, "c"}, {1, "a"}, {2, "b"}}
+		count := 0
+		for k, v := range Sort1(KVsplit(Slice(input))) {
+			count++
+			if k != 1 || v != "a" {
+				t.Errorf("first element should be (1,'a'), got (%d,%q)", k, v)
+			}
+			break
+		}
+		if count != 1 {
+			t.Errorf("should have iterated exactly once, got %d", count)
+		}
+	})
+
+	t.Run("ReverseSorted", func(t *testing.T) {
+		input := []KV[int, string]{{3, "c"}, {2, "b"}, {1, "a"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		expected := []KV[int, string]{{1, "a"}, {2, "b"}, {3, "c"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Sort1(reverse) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("DuplicateKeys", func(t *testing.T) {
+		input := []KV[int, string]{{2, "b1"}, {1, "a"}, {2, "b2"}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		// With duplicate keys, the order among duplicates is stable based on input order
+		if len(result) != 3 {
+			t.Errorf("Sort1(dup keys) should have 3 elements, got %d", len(result))
+		}
+		// First element must have key=1
+		if result[0].Key != 1 {
+			t.Errorf("first element key should be 1, got %d", result[0].Key)
+		}
+		// Last two elements must have key=2
+		if result[1].Key != 2 || result[2].Key != 2 {
+			t.Errorf("elements 2 and 3 should have key=2, got %d and %d", result[1].Key, result[2].Key)
+		}
+	})
+
+	t.Run("NonOrderedSecondValue", func(t *testing.T) {
+		// Use a type for second value that is NOT cmp.Ordered
+		// to verify Sort1 truly doesn't care about second value ordering
+		type notOrdered struct {
+			data []int
+		}
+		input := []KV[int, notOrdered]{{3, notOrdered{[]int{1, 2}}}, {1, notOrdered{[]int{3}}}}
+		result := Collect(KVjoin(Sort1(KVsplit(Slice(input)))))
+		if len(result) != 2 {
+			t.Errorf("Sort1(non-ordered second) should have 2 elements, got %d", len(result))
+		}
+		if result[0].Key != 1 || result[1].Key != 3 {
+			t.Errorf("Sort1(non-ordered second) = keys %d,%d, want 1,3", result[0].Key, result[1].Key)
+		}
+	})
+}

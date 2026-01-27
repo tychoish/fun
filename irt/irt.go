@@ -960,8 +960,27 @@ func Zip[A, B any](rh iter.Seq[A], lh iter.Seq[B]) iter.Seq2[A, B] {
 	}
 }
 
+// Sort collects the elements in an iterator, sorts them, and then
+// returns an iterator in ascending order.
+func Sort[T cmp.Ordered](seq iter.Seq[T]) iter.Seq[T] { return slices.Values(slices.Sorted(seq)) }
+
+// Sort2 collects the KV pairs from the iterator, sorts them by
+// comparing the first value then the second value as a tiebreaker,
+// and returns an iterator in ascending order.
+func Sort2[A, B cmp.Ordered](seq iter.Seq2[A, B]) iter.Seq2[A, B] {
+	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), KVcmp)))
+}
+
+// Sort1 collects the KV pairs from the iterator, sorts them by
+// comparing only the first value, and returns an iterator in
+// ascending order.
+func Sort1[A cmp.Ordered, B any](seq iter.Seq2[A, B]) iter.Seq2[A, B] {
+	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), KVcmpFirst)))
+}
+
 // SortBy consumes the sequence, sorts it based on the keys produced
-// by cf, and returns a new sequence of the sorted elements.
+// by the comparison function, cf, and returns a new sequence of the
+// sorted elements.
 func SortBy[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
 	return slices.Values(slices.SortedFunc(seq, toCmp(cf)))
 }
