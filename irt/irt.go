@@ -996,7 +996,7 @@ func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter
 // first error.
 func ReadLines(reader io.Reader) iter.Seq[string] { return UntilError(ReadLinesErr(reader)) }
 
-// ReadWord returns a sequence of strings from the reader, with one
+// ReadWords returns a sequence of strings from the reader, with one
 // item for every word, stopping at the first error.
 func ReadWords(reader io.Reader) iter.Seq[string] { return UntilError(ReadWordsErr(reader)) }
 

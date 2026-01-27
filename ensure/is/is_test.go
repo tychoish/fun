@@ -20,7 +20,7 @@ func TestFundamentals(t *testing.T) {
 	})
 	t.Run("NilSemantics", func(t *testing.T) {
 		t.Run("Append", func(t *testing.T) {
-			var ex []string //nolint:prealloc
+			var ex []string
 			check.True(t, ex == nil)
 
 			ex = append(ex, ex...)

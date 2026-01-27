@@ -61,5 +61,5 @@ func (s *Set[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(s.Iterat
 // and then adds items from the array to existing set. Items that are
 // in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
-	return erc.ForIteraratorAll(irt.UnmarshalJSON[T](bytes.NewReader(in)), s.add)
+	return erc.ForIteratorAll(irt.UnmarshalJSON[T](bytes.NewReader(in)), s.add)
 }

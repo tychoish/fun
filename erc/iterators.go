@@ -12,7 +12,7 @@ import "iter"
 // processing and collect all errors for later inspection.
 func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	out := slice[T]{}
-	err := ForIterarator(seq, out.appender())
+	err := ForIterator(seq, out.appender())
 	return out, err
 }
 
@@ -28,7 +28,7 @@ func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // errors that occurred.
 func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	out := slice[T]{}
-	err := ForIteraratorAll(seq, out.appender())
+	err := ForIteratorAll(seq, out.appender())
 	return out, err
 }
 
@@ -43,14 +43,14 @@ func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // to continue processing after the first error.
 func FromIteratorUntil[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	out := slice[T]{}
-	err := ForIteraratorUntil(seq, out.appender())
+	err := ForIteratorUntil(seq, out.appender())
 	return out, err
 }
 
 // ForIterator iterates through value-error pairs, passing the value
 // to the function and aggregating the error. The function is ONLY
 // called for the values where the error is nil.
-func ForIterarator[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
+func ForIterator[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 	var ec Collector
 	for value, err := range seq {
 		if ec.PushOk(err) {
@@ -63,7 +63,7 @@ func ForIterarator[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 // ForIteratorAll iterates through value-error pairs, passing the value
 // to the function and aggregating the error. The function is ALWAYS
 // called, even if the error is nil.
-func ForIteraratorAll[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
+func ForIteratorAll[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 	var ec Collector
 	for value, err := range seq {
 		ec.Push(err)
@@ -75,7 +75,7 @@ func ForIteraratorAll[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error 
 // ForIteratorUntil iterates through value-error pairs, passing the
 // value to the function UNTIL the error value is non nil. The first
 // error encountered is always returned.
-func ForIteraratorUntil[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
+func ForIteratorUntil[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 	for value, err := range seq {
 		if err != nil {
 			return err
