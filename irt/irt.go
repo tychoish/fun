@@ -148,6 +148,20 @@ func Join[T any](seqs ...iter.Seq[T]) iter.Seq[T] { return Chain(Slice(seqs)) }
 // sequence, yielding all key-value pairs from each sequence in order.
 func Join2[A, B any](seqs ...iter.Seq2[A, B]) iter.Seq2[A, B] { return Chain2(Slice(seqs)) }
 
+// Reverse collects the elements from an iterator and returns an
+// iterator in reverse order. The contents of the iterator must be
+// materialized first.
+func Reverse[T any](seq iter.Seq[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		s := Collect(seq)
+		for i := len(s) - 1; i >= 0; i-- {
+			if !yield(s[i]) {
+				return
+			}
+		}
+	}
+}
+
 // Monotonic returns an infinite sequence of integers starting from 1.
 func Monotonic() iter.Seq[int] { return Generate(counter()) }
 
@@ -161,6 +175,12 @@ func Range(start int, end int) iter.Seq[int] { return While(MonotonicFrom(start)
 // Index returns a iterator where each element from the input sequence
 // is paired with its 0-based index.
 func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] { return Flip(WithEach(seq, counterFrom(-1))) }
+
+// Index2 returns a pair iterator where each element from the input
+// sequence is paired with its 0-based index.
+func Index2[A, B any](seq iter.Seq2[A, B]) iter.Seq2[int, KV[A, B]] {
+	return Index(KVjoin(seq))
+}
 
 // Flip returns a iterator where the keys and values of the input
 // sequence are swapped.

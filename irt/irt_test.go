@@ -8791,3 +8791,150 @@ func TestSort1(t *testing.T) {
 		}
 	})
 }
+
+func TestReverse(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		input := Slice([]int{})
+		output := Collect(Reverse(input))
+		if len(output) != 0 {
+			t.Errorf("Reverse(empty) = %v, want []", output)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		input := Slice([]int{42})
+		output := Collect(Reverse(input))
+		expected := []int{42}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse(single) = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("TwoElements", func(t *testing.T) {
+		input := Slice([]int{1, 2})
+		output := Collect(Reverse(input))
+		expected := []int{2, 1}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse(two) = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("MultipleElements", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		output := Collect(Reverse(input))
+		expected := []int{5, 4, 3, 2, 1}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse(multiple) = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("WithStrings", func(t *testing.T) {
+		input := Slice([]string{"a", "b", "c", "d"})
+		output := Collect(Reverse(input))
+		expected := []string{"d", "c", "b", "a"}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse(strings) = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		var output []int
+		var callCount int
+
+		for v := range Reverse(input) {
+			callCount++
+			output = append(output, v)
+			if callCount == 3 {
+				break
+			}
+		}
+
+		expected := []int{5, 4, 3}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse with early return = %v, want %v", output, expected)
+		}
+		if callCount != 3 {
+			t.Errorf("Reverse with early return called yield %d times, want 3", callCount)
+		}
+	})
+
+	t.Run("ConsumerStopsEarly", func(t *testing.T) {
+		input := Slice([]int{10, 20, 30, 40, 50})
+		reversed := Reverse(input)
+
+		var collected []int
+		for v := range reversed {
+			collected = append(collected, v)
+			if v == 30 {
+				break
+			}
+		}
+
+		expected := []int{50, 40, 30}
+		if !slices.Equal(collected, expected) {
+			t.Errorf("Reverse with consumer stopping = %v, want %v", collected, expected)
+		}
+	})
+
+	t.Run("NilSequencePanics", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Reverse(nil) should panic, but did not")
+			}
+		}()
+
+		var nilSeq iter.Seq[int]
+		// This should panic when Collect tries to range over nil
+		_ = Collect(Reverse(nilSeq))
+	})
+
+	t.Run("LargeSequence", func(t *testing.T) {
+		size := 1000
+		input := make([]int, size)
+		for i := range input {
+			input[i] = i
+		}
+
+		output := Collect(Reverse(Slice(input)))
+
+		if len(output) != size {
+			t.Errorf("Reverse(large) length = %d, want %d", len(output), size)
+		}
+
+		// Check first and last elements
+		if output[0] != size-1 {
+			t.Errorf("Reverse(large) first element = %d, want %d", output[0], size-1)
+		}
+		if output[size-1] != 0 {
+			t.Errorf("Reverse(large) last element = %d, want 0", output[size-1])
+		}
+
+		// Check all elements are properly reversed
+		for i, v := range output {
+			expected := size - 1 - i
+			if v != expected {
+				t.Errorf("Reverse(large) at index %d = %d, want %d", i, v, expected)
+				break
+			}
+		}
+	})
+
+	t.Run("DoubleReverse", func(t *testing.T) {
+		input := Slice([]int{1, 2, 3, 4, 5})
+		output := Collect(Reverse(Reverse(input)))
+		expected := []int{1, 2, 3, 4, 5}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse(Reverse()) = %v, want %v", output, expected)
+		}
+	})
+
+	t.Run("WithDuplicates", func(t *testing.T) {
+		input := Slice([]int{1, 2, 2, 3, 3, 3})
+		output := Collect(Reverse(input))
+		expected := []int{3, 3, 3, 2, 2, 1}
+		if !slices.Equal(output, expected) {
+			t.Errorf("Reverse(duplicates) = %v, want %v", output, expected)
+		}
+	})
+}
