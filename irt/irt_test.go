@@ -515,6 +515,137 @@ func TestIndex(t *testing.T) {
 	}
 }
 
+func TestIndex2(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(string, int) bool) {}
+		indexed := Index2(seq)
+
+		count := 0
+		for range indexed {
+			count++
+		}
+		if count != 0 {
+			t.Errorf("Index2(empty) should produce 0 items, got %d", count)
+		}
+	})
+
+	t.Run("SinglePair", func(t *testing.T) {
+		seq := func(yield func(string, int) bool) {
+			yield("a", 100)
+		}
+		indexed := Index2(seq)
+
+		count := 0
+		for idx, kv := range indexed {
+			if idx != 0 {
+				t.Errorf("Index2() index = %d, want 0", idx)
+			}
+			if kv.Key != "a" || kv.Value != 100 {
+				t.Errorf("Index2() KV = {%v, %v}, want {a, 100}", kv.Key, kv.Value)
+			}
+			count++
+		}
+		if count != 1 {
+			t.Errorf("Index2(single) should produce 1 item, got %d", count)
+		}
+	})
+
+	t.Run("MultiplePairs", func(t *testing.T) {
+		seq := func(yield func(string, int) bool) {
+			if !yield("a", 1) {
+				return
+			}
+			if !yield("b", 2) {
+				return
+			}
+			yield("c", 3)
+		}
+		indexed := Index2(seq)
+
+		expected := []struct {
+			idx int
+			key string
+			val int
+		}{
+			{0, "a", 1},
+			{1, "b", 2},
+			{2, "c", 3},
+		}
+
+		i := 0
+		for idx, kv := range indexed {
+			if i >= len(expected) {
+				t.Errorf("Index2() yielded more items than expected")
+				break
+			}
+			if idx != expected[i].idx {
+				t.Errorf("Index2() index = %d, want %d", idx, expected[i].idx)
+			}
+			if kv.Key != expected[i].key || kv.Value != expected[i].val {
+				t.Errorf("Index2() KV = {%v, %v}, want {%v, %v}",
+					kv.Key, kv.Value, expected[i].key, expected[i].val)
+			}
+			i++
+		}
+		if i != len(expected) {
+			t.Errorf("Index2() yielded %d items, want %d", i, len(expected))
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		seq := func(yield func(int, string) bool) {
+			if !yield(10, "x") {
+				return
+			}
+			if !yield(20, "y") {
+				return
+			}
+			yield(30, "z")
+		}
+		indexed := Index2(seq)
+
+		count := 0
+		for idx, kv := range indexed {
+			if idx == 1 {
+				break
+			}
+			if idx != 0 || kv.Key != 10 || kv.Value != "x" {
+				t.Errorf("Index2() at idx 0: got (%d, {%v, %v}), want (0, {10, x})",
+					idx, kv.Key, kv.Value)
+			}
+			count++
+		}
+		if count != 1 {
+			t.Errorf("early termination should have seen 1 item, got %d", count)
+		}
+	})
+
+	t.Run("WithMap", func(t *testing.T) {
+		m := map[string]int{"apple": 1, "banana": 2, "cherry": 3}
+		indexed := Index2(Map(m))
+
+		seen := make(map[string]bool)
+		count := 0
+		for idx, kv := range indexed {
+			if idx < 0 || idx >= 3 {
+				t.Errorf("Index2() index out of range: %d", idx)
+			}
+			// Check that the key-value pair is from the original map
+			if m[kv.Key] != kv.Value {
+				t.Errorf("Index2() KV {%v, %v} not in original map", kv.Key, kv.Value)
+			}
+			seen[kv.Key] = true
+			count++
+		}
+		if count != 3 {
+			t.Errorf("Index2(map) should produce 3 items, got %d", count)
+		}
+		if len(seen) != 3 {
+			t.Errorf("Index2(map) should see 3 unique keys, got %d", len(seen))
+		}
+	})
+}
+
 func TestJoinErrors(t *testing.T) {
 	tests := []struct {
 		name     string
