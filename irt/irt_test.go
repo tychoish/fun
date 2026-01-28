@@ -646,6 +646,257 @@ func TestIndex2(t *testing.T) {
 	})
 }
 
+func TestInitial(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int) bool) {}
+		val, ok := Initial(seq)
+		if ok {
+			t.Error("Initial(empty) should return false")
+		}
+		if val != 0 {
+			t.Errorf("Initial(empty) value = %v, want 0", val)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		seq := func(yield func(int) bool) { yield(42) }
+		val, ok := Initial(seq)
+		if !ok {
+			t.Error("Initial(single) should return true")
+		}
+		if val != 42 {
+			t.Errorf("Initial(single) = %v, want 42", val)
+		}
+	})
+
+	t.Run("MultipleElements", func(t *testing.T) {
+		seq := func(yield func(string) bool) {
+			if !yield("first") {
+				return
+			}
+			if !yield("second") {
+				return
+			}
+			yield("third")
+		}
+		val, ok := Initial(seq)
+		if !ok {
+			t.Error("Initial() should return true")
+		}
+		if val != "first" {
+			t.Errorf("Initial() = %v, want 'first'", val)
+		}
+	})
+
+	t.Run("OnlyIteratesOnce", func(t *testing.T) {
+		count := 0
+		seq := func(yield func(int) bool) {
+			for i := 0; i < 10; i++ {
+				count++
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		_, _ = Initial(seq)
+		if count != 1 {
+			t.Errorf("Initial() iterated %d times, want 1", count)
+		}
+	})
+}
+
+func TestInitial2(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int, string) bool) {}
+		a, b, ok := Initial2(seq)
+		if ok {
+			t.Error("Initial2(empty) should return false")
+		}
+		if a != 0 || b != "" {
+			t.Errorf("Initial2(empty) = (%v, %v), want (0, '')", a, b)
+		}
+	})
+
+	t.Run("SinglePair", func(t *testing.T) {
+		seq := func(yield func(int, string) bool) { yield(42, "hello") }
+		a, b, ok := Initial2(seq)
+		if !ok {
+			t.Error("Initial2(single) should return true")
+		}
+		if a != 42 || b != "hello" {
+			t.Errorf("Initial2(single) = (%v, %v), want (42, hello)", a, b)
+		}
+	})
+
+	t.Run("MultiplePairs", func(t *testing.T) {
+		seq := func(yield func(string, int) bool) {
+			if !yield("first", 1) {
+				return
+			}
+			if !yield("second", 2) {
+				return
+			}
+			yield("third", 3)
+		}
+		a, b, ok := Initial2(seq)
+		if !ok {
+			t.Error("Initial2() should return true")
+		}
+		if a != "first" || b != 1 {
+			t.Errorf("Initial2() = (%v, %v), want ('first', 1)", a, b)
+		}
+	})
+}
+
+func TestFinal(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int) bool) {}
+		val, ok := Final(seq)
+		if ok {
+			t.Error("Final(empty) should return false")
+		}
+		if val != 0 {
+			t.Errorf("Final(empty) value = %v, want 0", val)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		seq := func(yield func(int) bool) { yield(42) }
+		val, ok := Final(seq)
+		if !ok {
+			t.Error("Final(single) should return true")
+		}
+		if val != 42 {
+			t.Errorf("Final(single) = %v, want 42", val)
+		}
+	})
+
+	t.Run("MultipleElements", func(t *testing.T) {
+		seq := func(yield func(string) bool) {
+			if !yield("first") {
+				return
+			}
+			if !yield("second") {
+				return
+			}
+			yield("third")
+		}
+		val, ok := Final(seq)
+		if !ok {
+			t.Error("Final() should return true")
+		}
+		if val != "third" {
+			t.Errorf("Final() = %v, want 'third'", val)
+		}
+	})
+
+	t.Run("LargeSequence", func(t *testing.T) {
+		seq := func(yield func(int) bool) {
+			for i := 0; i < 1000; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		val, ok := Final(seq)
+		if !ok {
+			t.Error("Final() should return true")
+		}
+		if val != 999 {
+			t.Errorf("Final() = %v, want 999", val)
+		}
+	})
+
+	t.Run("WithSlice", func(t *testing.T) {
+		slice := []int{10, 20, 30, 40, 50}
+		val, ok := Final(Slice(slice))
+		if !ok {
+			t.Error("Final() should return true")
+		}
+		if val != 50 {
+			t.Errorf("Final() = %v, want 50", val)
+		}
+	})
+}
+
+func TestFinal2(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		seq := func(yield func(int, string) bool) {}
+		a, b, ok := Final2(seq)
+		if ok {
+			t.Error("Final2(empty) should return false")
+		}
+		if a != 0 || b != "" {
+			t.Errorf("Final2(empty) = (%v, %v), want (0, '')", a, b)
+		}
+	})
+
+	t.Run("SinglePair", func(t *testing.T) {
+		seq := func(yield func(int, string) bool) { yield(42, "hello") }
+		a, b, ok := Final2(seq)
+		if !ok {
+			t.Error("Final2(single) should return true")
+		}
+		if a != 42 || b != "hello" {
+			t.Errorf("Final2(single) = (%v, %v), want (42, hello)", a, b)
+		}
+	})
+
+	t.Run("MultiplePairs", func(t *testing.T) {
+		seq := func(yield func(string, int) bool) {
+			if !yield("first", 1) {
+				return
+			}
+			if !yield("second", 2) {
+				return
+			}
+			yield("third", 3)
+		}
+		a, b, ok := Final2(seq)
+		if !ok {
+			t.Error("Final2() should return true")
+		}
+		if a != "third" || b != 3 {
+			t.Errorf("Final2() = (%v, %v), want ('third', 3)", a, b)
+		}
+	})
+
+	t.Run("WithMap", func(t *testing.T) {
+		// Use a single element map to have predictable output
+		m := map[string]int{"only": 42}
+		a, b, ok := Final2(Map(m))
+		if !ok {
+			t.Error("Final2() should return true")
+		}
+		if a != "only" || b != 42 {
+			t.Errorf("Final2() = (%v, %v), want ('only', 42)", a, b)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		// Test that Final2 still consumes entire sequence even if we could stop early
+		consumed := 0
+		seq := func(yield func(int, int) bool) {
+			for i := 0; i < 5; i++ {
+				consumed++
+				if !yield(i, i*10) {
+					return
+				}
+			}
+		}
+		a, b, ok := Final2(seq)
+		if !ok {
+			t.Error("Final2() should return true")
+		}
+		if a != 4 || b != 40 {
+			t.Errorf("Final2() = (%v, %v), want (4, 40)", a, b)
+		}
+		if consumed != 5 {
+			t.Errorf("Final2() consumed %d items, want 5", consumed)
+		}
+	})
+}
+
 func TestJoinErrors(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -3517,7 +3768,7 @@ func TestFirstValue(t *testing.T) {
 		}
 
 		// Call FirstValue
-		first, ok := FirstValue(input)
+		first, ok := Initial(input)
 
 		// Assertions
 		if !ok {
@@ -3531,7 +3782,7 @@ func TestFirstValue(t *testing.T) {
 		}
 	})
 	t.Run("Empty", func(t *testing.T) {
-		val, ok := FirstValue(func(yield func(int) bool) {})
+		val, ok := Initial(func(yield func(int) bool) {})
 		if ok {
 			t.Error("unexpected true ok")
 		}
@@ -3558,7 +3809,7 @@ func TestFirstValue2(t *testing.T) {
 			}
 		}
 
-		k, v, ok := FirstValue2(input)
+		k, v, ok := Initial2(input)
 
 		if !ok {
 			t.Fatalf("FirstValue2() returned ok = false, want true")
@@ -3571,7 +3822,7 @@ func TestFirstValue2(t *testing.T) {
 		}
 	})
 	t.Run("Empty", func(t *testing.T) {
-		k, v, ok := FirstValue2(func(yield func(string, float64) bool) {})
+		k, v, ok := Initial2(func(yield func(string, float64) bool) {})
 		if ok {
 			t.Error("unexpected true ok for empty sequence")
 		}
@@ -3580,7 +3831,7 @@ func TestFirstValue2(t *testing.T) {
 		}
 	})
 	t.Run("Single", func(t *testing.T) {
-		k, v, ok := FirstValue2(Two("hello", 42))
+		k, v, ok := Initial2(Two("hello", 42))
 		if !ok {
 			t.Fatal("expected ok")
 		}
@@ -3591,7 +3842,7 @@ func TestFirstValue2(t *testing.T) {
 	t.Run("Types", func(t *testing.T) {
 		type testStruct struct{ val int }
 		s := testStruct{val: 100}
-		k, v, ok := FirstValue2(Two(s, true))
+		k, v, ok := Initial2(Two(s, true))
 		if !ok || k.val != 100 || v != true {
 			t.Errorf("got (%v, %v, %v), want ({100}, true, true)", k, v, ok)
 		}

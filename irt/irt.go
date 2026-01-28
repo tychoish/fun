@@ -215,18 +215,39 @@ func DerefWithZeros[T any](seq iter.Seq[*T]) iter.Seq[T] { return Convert(seq, d
 
 // FirstValue returns the first value from the sequence and true.  If
 // the sequence is empty, it returns the zero value and false.
-func FirstValue[T any](seq iter.Seq[T]) (zero T, ok bool) {
+func Initial[T any](seq iter.Seq[T]) (zero T, ok bool) {
 	for value := range seq {
 		return value, true
 	}
 	return
 }
 
-// FirstValue2 returns the first pair of values from the iterator and
+// Initial2 returns the first pair of values from the iterator and
 // true.  If the sequence is empty, it returns zero values and false.
-func FirstValue2[A, B any](seq iter.Seq2[A, B]) (azero A, bzero B, ok bool) {
+func Initial2[A, B any](seq iter.Seq2[A, B]) (azero A, bzero B, ok bool) {
 	for k, v := range seq {
 		return k, v, true
+	}
+	return
+}
+
+// Final returns the last value from the sequence and true.  If the
+// sequence is empty, it returns the zero value and false.
+func Final[T any](seq iter.Seq[T]) (out T, ok bool) {
+	for value := range seq {
+		out = value
+		ok = true
+	}
+	return
+}
+
+// Final2 returns the last pair of values from the iterator and true.
+// If the sequence is empty, it returns zero values and false.
+func Final2[A, B any](seq iter.Seq2[A, B]) (aout A, bout B, ok bool) {
+	for a, b := range seq {
+		aout = a
+		bout = b
+		ok = true
 	}
 	return
 }
