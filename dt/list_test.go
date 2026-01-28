@@ -731,6 +731,239 @@ func TestList(t *testing.T) {
 			check.NotError(t, err)
 			check.Equal(t, string(out), "42")
 		})
+		t.Run("EmptyListMarshal", func(t *testing.T) {
+			list := &List[int]{}
+			out, err := list.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "[]")
+		})
+		t.Run("EmptyListUnmarshal", func(t *testing.T) {
+			list := &List[int]{}
+			err := list.UnmarshalJSON([]byte("[]"))
+			check.NotError(t, err)
+			check.Equal(t, list.Len(), 0)
+		})
+		t.Run("LargeList", func(t *testing.T) {
+			list := &List[int]{}
+			for i := 0; i < 100; i++ {
+				list.PushBack(i)
+			}
+
+			out, err := list.MarshalJSON()
+			check.NotError(t, err)
+
+			nl := &List[int]{}
+			err = nl.UnmarshalJSON(out)
+			check.NotError(t, err)
+			check.Equal(t, nl.Len(), 100)
+
+			// Verify all elements match
+			e1 := list.Front()
+			e2 := nl.Front()
+			for i := 0; i < 100; i++ {
+				if e1.Value() != e2.Value() {
+					t.Errorf("element %d mismatch: %d vs %d", i, e1.Value(), e2.Value())
+				}
+				e1 = e1.Next()
+				e2 = e2.Next()
+			}
+		})
+		t.Run("AppendDuringUnmarshal", func(t *testing.T) {
+			list := &List[int]{}
+			list.PushBack(1)
+			list.PushBack(2)
+
+			// Unmarshal should append, not replace
+			err := list.UnmarshalJSON([]byte("[3,4,5]"))
+			check.NotError(t, err)
+			check.Equal(t, list.Len(), 5)
+
+			// Should have [1, 2, 3, 4, 5]
+			expected := []int{1, 2, 3, 4, 5}
+			i := 0
+			for e := list.Front(); e.Ok(); e = e.Next() {
+				if e.Value() != expected[i] {
+					t.Errorf("element %d = %d, want %d", i, e.Value(), expected[i])
+				}
+				i++
+			}
+		})
+		t.Run("MultipleRoundTrips", func(t *testing.T) {
+			list := &List[string]{}
+			list.Extend(irt.Args("a", "b", "c"))
+
+			// First round trip
+			out1, err := list.MarshalJSON()
+			check.NotError(t, err)
+
+			list2 := &List[string]{}
+			err = list2.UnmarshalJSON(out1)
+			check.NotError(t, err)
+
+			// Second round trip
+			out2, err := list2.MarshalJSON()
+			check.NotError(t, err)
+
+			// JSON should be identical
+			check.Equal(t, string(out1), string(out2))
+
+			// Third round trip
+			list3 := &List[string]{}
+			err = list3.UnmarshalJSON(out2)
+			check.NotError(t, err)
+
+			// All lists should have same content
+			check.Equal(t, list.Len(), list3.Len())
+		})
+		t.Run("InvalidJSON", func(t *testing.T) {
+			list := &List[int]{}
+			err := list.UnmarshalJSON([]byte("{not valid}"))
+			check.Error(t, err)
+		})
+		t.Run("NonArrayJSON", func(t *testing.T) {
+			list := &List[int]{}
+			err := list.UnmarshalJSON([]byte("42"))
+			check.Error(t, err)
+		})
+	})
+	t.Run("ElementJSON", func(t *testing.T) {
+		t.Run("NilElement", func(t *testing.T) {
+			var e *Element[int]
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "null")
+		})
+
+		t.Run("UninitializedElement", func(t *testing.T) {
+			e := &Element[int]{}
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "null")
+		})
+
+		t.Run("ElementWithZeroValue", func(t *testing.T) {
+			e := &Element[int]{}
+			e.Set(0)
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "0")
+		})
+
+		t.Run("ElementWithValue", func(t *testing.T) {
+			e := NewElement(42)
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "42")
+		})
+
+		t.Run("ElementWithString", func(t *testing.T) {
+			e := NewElement("hello")
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), `"hello"`)
+		})
+
+		t.Run("ElementWithStruct", func(t *testing.T) {
+			type testStruct struct {
+				Name  string `json:"name"`
+				Value int    `json:"value"`
+			}
+			e := NewElement(testStruct{Name: "test", Value: 123})
+			out, err := e.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), `{"name":"test","value":123}`)
+		})
+
+		t.Run("UnmarshalIntoElement", func(t *testing.T) {
+			e := &Element[int]{}
+			err := e.UnmarshalJSON([]byte("42"))
+			check.NotError(t, err)
+			check.True(t, e.Ok())
+			check.Equal(t, e.Value(), 42)
+		})
+
+		t.Run("UnmarshalOverwritesValue", func(t *testing.T) {
+			e := NewElement(10)
+			check.Equal(t, e.Value(), 10)
+
+			err := e.UnmarshalJSON([]byte("20"))
+			check.NotError(t, err)
+			check.Equal(t, e.Value(), 20)
+		})
+
+		t.Run("UnmarshalString", func(t *testing.T) {
+			e := &Element[string]{}
+			err := e.UnmarshalJSON([]byte(`"world"`))
+			check.NotError(t, err)
+			check.Equal(t, e.Value(), "world")
+		})
+
+		t.Run("UnmarshalStruct", func(t *testing.T) {
+			type testStruct struct {
+				Name  string `json:"name"`
+				Value int    `json:"value"`
+			}
+			e := &Element[testStruct]{}
+			err := e.UnmarshalJSON([]byte(`{"name":"foo","value":456}`))
+			check.NotError(t, err)
+			check.Equal(t, e.Value().Name, "foo")
+			check.Equal(t, e.Value().Value, 456)
+		})
+
+		t.Run("UnmarshalInvalidJSON", func(t *testing.T) {
+			e := &Element[int]{}
+			err := e.UnmarshalJSON([]byte("not valid json"))
+			check.Error(t, err)
+		})
+
+		t.Run("UnmarshalTypeMismatch", func(t *testing.T) {
+			e := &Element[int]{}
+			err := e.UnmarshalJSON([]byte(`"string instead of int"`))
+			check.Error(t, err)
+		})
+
+		t.Run("UnmarshalNull", func(t *testing.T) {
+			e := NewElement(42)
+			err := e.UnmarshalJSON([]byte("null"))
+			check.NotError(t, err)
+			// Value should be zero value after unmarshaling null
+			check.Equal(t, e.Value(), 0)
+		})
+
+		t.Run("RoundTripElement", func(t *testing.T) {
+			original := NewElement(999)
+
+			// Marshal
+			data, err := original.MarshalJSON()
+			check.NotError(t, err)
+
+			// Unmarshal into new element
+			restored := &Element[int]{}
+			err = restored.UnmarshalJSON(data)
+			check.NotError(t, err)
+
+			check.Equal(t, original.Value(), restored.Value())
+		})
+
+		t.Run("ElementInList", func(t *testing.T) {
+			list := &List[int]{}
+			list.PushBack(1)
+			list.PushBack(2)
+			list.PushBack(3)
+
+			elem := list.Front().Next() // Should be element with value 2
+
+			// Marshal the element
+			data, err := elem.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(data), "2")
+
+			// Unmarshal into a different element
+			newElem := &Element[int]{}
+			err = newElem.UnmarshalJSON(data)
+			check.NotError(t, err)
+			check.Equal(t, newElem.Value(), 2)
+		})
 	})
 	t.Run("Rest", func(t *testing.T) {
 		list := &List[int]{}

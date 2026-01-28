@@ -1,14 +1,13 @@
 package dt
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"iter"
 	"slices"
 
 	"github.com/tychoish/fun/erc"
-	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/irt"
 )
 
@@ -164,7 +163,7 @@ func (l *List[T]) Copy() *List[T] {
 func (l *List[T]) nonNil() bool { return l != nil && l.head != nil && l.meta != nil }
 
 func (l *List[T]) root() *Element[T] {
-	erc.Invariant(ers.If(l == nil, ErrUninitializedContainer))
+	erc.InvariantOk(l != nil, ErrUninitializedContainer)
 
 	if l.head == nil {
 		l.uncheckedSetup()
@@ -196,27 +195,7 @@ func (l *List[T]) pop(it *Element[T]) *Element[T] {
 // list. By supporting json.Marshaler and json.Unmarshaler, Elements
 // and lists can behave as arrays in larger json objects, and
 // can be as the output/input of json.Marshal and json.Unmarshal.
-func (l *List[T]) MarshalJSON() ([]byte, error) {
-	buf := &internal.IgnoreNewLinesBuffer{}
-	enc := json.NewEncoder(buf)
-
-	_ = buf.WriteByte('[')
-
-	if l.Len() > 0 {
-		for i := l.Front(); i.Ok(); i = i.Next() {
-			if i != l.Front() {
-				_ = buf.WriteByte(',')
-			}
-			if err := enc.Encode(i.Value()); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	_ = buf.WriteByte(']')
-
-	return buf.Bytes(), nil
-}
+func (l *List[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(l.IteratorFront()) }
 
 // UnmarshalJSON reads json input and adds that to values in the
 // list. If there are elements in the list, they are not removed. By
@@ -224,20 +203,13 @@ func (l *List[T]) MarshalJSON() ([]byte, error) {
 // can behave as arrays in larger json objects, and can be as the
 // output/input of json.Marshal and json.Unmarshal.
 func (l *List[T]) UnmarshalJSON(in []byte) error {
-	rv := []json.RawMessage{}
-
-	if err := json.Unmarshal(in, &rv); err != nil {
-		return err
-	}
-	var zero T
-	tail := l.Back()
-	for idx := range rv {
-		elem := NewElement(zero)
-		if err := elem.UnmarshalJSON(rv[idx]); err != nil {
+	for value, err := range irt.UnmarshalJSON[T](bytes.NewBuffer(in)) {
+		if err != nil {
 			return err
 		}
-		tail = tail.Append(elem)
+		l.PushBack(value)
 	}
+
 	return nil
 }
 

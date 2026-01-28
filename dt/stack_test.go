@@ -391,6 +391,258 @@ func TestStack(t *testing.T) {
 				t.Fatal("expected error", string(out))
 			}
 		})
+		t.Run("EmptyStack", func(t *testing.T) {
+			stack := &Stack[int]{}
+			out, err := stack.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "[]")
+
+			nstack := &Stack[int]{}
+			err = nstack.UnmarshalJSON(out)
+			check.NotError(t, err)
+			check.Equal(t, nstack.Len(), 0)
+		})
+		t.Run("LargeStack", func(t *testing.T) {
+			stack := &Stack[int]{}
+			for i := 0; i < 100; i++ {
+				stack.Push(i)
+			}
+
+			out, err := stack.MarshalJSON()
+			check.NotError(t, err)
+
+			nstack := &Stack[int]{}
+			err = nstack.UnmarshalJSON(out)
+			check.NotError(t, err)
+			check.Equal(t, nstack.Len(), 100)
+
+			// Verify all elements match
+			it1 := stack.Head()
+			it2 := nstack.Head()
+			for i := 0; i < 100; i++ {
+				if it1.Value() != it2.Value() {
+					t.Errorf("element %d mismatch: %d vs %d", i, it1.Value(), it2.Value())
+				}
+				it1 = it1.Next()
+				it2 = it2.Next()
+			}
+		})
+		t.Run("AppendDuringUnmarshal", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Push(1)
+			stack.Push(2)
+			origLen := stack.Len()
+
+			err := stack.UnmarshalJSON([]byte("[3,4,5]"))
+			check.NotError(t, err)
+			check.Equal(t, stack.Len(), origLen+3)
+		})
+		t.Run("MultipleRoundTrips", func(t *testing.T) {
+			stack := &Stack[string]{}
+			stack.Append("a", "b", "c")
+
+			out1, err := stack.MarshalJSON()
+			check.NotError(t, err)
+
+			stack2 := &Stack[string]{}
+			err = stack2.UnmarshalJSON(out1)
+			check.NotError(t, err)
+
+			out2, err := stack2.MarshalJSON()
+			check.NotError(t, err)
+
+			check.Equal(t, string(out1), string(out2))
+		})
+		t.Run("InvalidJSON", func(t *testing.T) {
+			stack := &Stack[int]{}
+			err := stack.UnmarshalJSON([]byte("{invalid}"))
+			check.Error(t, err)
+		})
+	})
+	t.Run("ItemJSON", func(t *testing.T) {
+		t.Run("MarshalItem", func(t *testing.T) {
+			item := NewItem(42)
+			out, err := item.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "42")
+		})
+
+		t.Run("MarshalItemString", func(t *testing.T) {
+			item := NewItem("hello")
+			out, err := item.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), `"hello"`)
+		})
+
+		t.Run("MarshalItemZeroValue", func(t *testing.T) {
+			item := NewItem(0)
+			out, err := item.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), "0")
+		})
+
+		t.Run("MarshalItemStruct", func(t *testing.T) {
+			type testStruct struct {
+				Name  string `json:"name"`
+				Value int    `json:"value"`
+			}
+			item := NewItem(testStruct{Name: "test", Value: 123})
+			out, err := item.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(out), `{"name":"test","value":123}`)
+		})
+
+		t.Run("MarshalUninitializedItem", func(t *testing.T) {
+			item := &Item[int]{}
+			out, err := item.MarshalJSON()
+			check.NotError(t, err)
+			// Uninitialized item should marshal its zero value
+			check.Equal(t, string(out), "0")
+		})
+
+		t.Run("UnmarshalIntoItem", func(t *testing.T) {
+			item := &Item[int]{}
+			err := item.UnmarshalJSON([]byte("42"))
+			check.NotError(t, err)
+			check.Equal(t, item.Value(), 42)
+		})
+
+		t.Run("UnmarshalOverwritesValue", func(t *testing.T) {
+			item := NewItem(10)
+			check.Equal(t, item.Value(), 10)
+
+			err := item.UnmarshalJSON([]byte("20"))
+			check.NotError(t, err)
+			check.Equal(t, item.Value(), 20)
+		})
+
+		t.Run("UnmarshalString", func(t *testing.T) {
+			item := &Item[string]{}
+			err := item.UnmarshalJSON([]byte(`"world"`))
+			check.NotError(t, err)
+			check.Equal(t, item.Value(), "world")
+		})
+
+		t.Run("UnmarshalStruct", func(t *testing.T) {
+			type testStruct struct {
+				Name  string `json:"name"`
+				Value int    `json:"value"`
+			}
+			item := &Item[testStruct]{}
+			err := item.UnmarshalJSON([]byte(`{"name":"foo","value":456}`))
+			check.NotError(t, err)
+			check.Equal(t, item.Value().Name, "foo")
+			check.Equal(t, item.Value().Value, 456)
+		})
+
+		t.Run("UnmarshalInvalidJSON", func(t *testing.T) {
+			item := &Item[int]{}
+			err := item.UnmarshalJSON([]byte("not valid json"))
+			check.Error(t, err)
+		})
+
+		t.Run("UnmarshalTypeMismatch", func(t *testing.T) {
+			item := &Item[int]{}
+			err := item.UnmarshalJSON([]byte(`"string instead of int"`))
+			check.Error(t, err)
+		})
+
+		t.Run("UnmarshalNull", func(t *testing.T) {
+			item := NewItem(42)
+			err := item.UnmarshalJSON([]byte("null"))
+			check.NotError(t, err)
+			// Value should be zero value after unmarshaling null
+			check.Equal(t, item.Value(), 0)
+		})
+
+		t.Run("UnmarshalNilInput", func(t *testing.T) {
+			item := NewItem(0)
+			err := item.UnmarshalJSON(nil)
+			check.Error(t, err)
+		})
+
+		t.Run("RoundTripItem", func(t *testing.T) {
+			original := NewItem(999)
+
+			// Marshal
+			data, err := original.MarshalJSON()
+			check.NotError(t, err)
+
+			// Unmarshal into new item
+			restored := &Item[int]{}
+			err = restored.UnmarshalJSON(data)
+			check.NotError(t, err)
+
+			check.Equal(t, original.Value(), restored.Value())
+		})
+
+		t.Run("ItemInStack", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Push(1)
+			stack.Push(2)
+			stack.Push(3)
+
+			item := stack.Head() // Should be item with value 3
+
+			// Marshal the item
+			data, err := item.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(data), "3")
+
+			// Unmarshal into a different item
+			newItem := &Item[int]{}
+			err = newItem.UnmarshalJSON(data)
+			check.NotError(t, err)
+			check.Equal(t, newItem.Value(), 3)
+		})
+
+		t.Run("ItemSetFails", func(t *testing.T) {
+			// Test that Set returns false for root/head items
+			stack := &Stack[int]{}
+			stack.Push(100)
+
+			root := stack.Head()
+			// Unmarshal should call Set which might fail
+			// but UnmarshalJSON itself doesn't fail
+			err := root.UnmarshalJSON([]byte("200"))
+			check.NotError(t, err)
+		})
+
+		t.Run("MultipleUnmarshals", func(t *testing.T) {
+			item := NewItem(1)
+
+			for i := 2; i <= 5; i++ {
+				data := []byte(fmt.Sprintf("%d", i*10))
+				err := item.UnmarshalJSON(data)
+				check.NotError(t, err)
+				check.Equal(t, item.Value(), i*10)
+			}
+		})
+
+		t.Run("ArrayUnmarshal", func(t *testing.T) {
+			item := &Item[[]int]{}
+			err := item.UnmarshalJSON([]byte("[1,2,3,4,5]"))
+			check.NotError(t, err)
+			check.Equal(t, len(item.Value()), 5)
+			check.Equal(t, item.Value()[0], 1)
+			check.Equal(t, item.Value()[4], 5)
+		})
+
+		t.Run("NestedStructUnmarshal", func(t *testing.T) {
+			type inner struct {
+				X int `json:"x"`
+			}
+			type outer struct {
+				Name  string `json:"name"`
+				Inner inner  `json:"inner"`
+			}
+
+			item := &Item[outer]{}
+			err := item.UnmarshalJSON([]byte(`{"name":"test","inner":{"x":42}}`))
+			check.NotError(t, err)
+			check.Equal(t, item.Value().Name, "test")
+			check.Equal(t, item.Value().Inner.X, 42)
+		})
 	})
 	t.Run("Seq", func(t *testing.T) {
 		stack := &Stack[int]{}
@@ -405,6 +657,135 @@ func TestStack(t *testing.T) {
 			}
 			last = item
 		}
+	})
+	t.Run("Reverse", func(t *testing.T) {
+		t.Run("EmptyStack", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Reverse()
+			if stack.Len() != 0 {
+				t.Error("reversing empty stack should remain empty")
+			}
+		})
+
+		t.Run("SingleElement", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Push(42)
+			stack.Reverse()
+			if stack.Head().Value() != 42 {
+				t.Error("single element should remain unchanged")
+			}
+			if stack.Len() != 1 {
+				t.Error("length should be 1")
+			}
+		})
+
+		t.Run("TwoElements", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Push(1)
+			stack.Push(2)
+			// Stack is [2, 1]
+
+			stack.Reverse()
+			// After reverse should be [1, 2]
+
+			if stack.Head().Value() != 1 {
+				t.Errorf("head should be 1, got %d", stack.Head().Value())
+			}
+			if stack.Head().Next().Value() != 2 {
+				t.Errorf("second should be 2, got %d", stack.Head().Next().Value())
+			}
+			if stack.Len() != 2 {
+				t.Error("length should be 2")
+			}
+		})
+
+		t.Run("MultipleElements", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Append(400, 300, 42)
+			// Stack is [42, 300, 400]
+
+			original := irt.Collect(stack.Iterator())
+			if len(original) != 3 || original[0] != 42 || original[1] != 300 || original[2] != 400 {
+				t.Errorf("expected [42, 300, 400], got %v", original)
+			}
+
+			stack.Reverse()
+			// After reverse should be [400, 300, 42]
+
+			reversed := irt.Collect(stack.Iterator())
+			if len(reversed) != 3 || reversed[0] != 400 || reversed[1] != 300 || reversed[2] != 42 {
+				t.Errorf("expected [400, 300, 42], got %v", reversed)
+			}
+			if stack.Len() != 3 {
+				t.Errorf("length should be 3, got %d", stack.Len())
+			}
+		})
+
+		t.Run("DoubleReverse", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Append(5, 4, 3, 2, 1)
+
+			original := irt.Collect(stack.Iterator())
+
+			stack.Reverse()
+			stack.Reverse()
+
+			afterDouble := irt.Collect(stack.Iterator())
+			if len(original) != len(afterDouble) {
+				t.Fatalf("length mismatch: %d vs %d", len(original), len(afterDouble))
+			}
+			for i := range original {
+				if original[i] != afterDouble[i] {
+					t.Errorf("mismatch at index %d: %d vs %d", i, original[i], afterDouble[i])
+				}
+			}
+		})
+
+		t.Run("LargeStack", func(t *testing.T) {
+			stack := &Stack[int]{}
+			size := 100
+			for i := 0; i < size; i++ {
+				stack.Push(i)
+			}
+
+			original := irt.Collect(stack.Iterator())
+			stack.Reverse()
+			reversed := irt.Collect(stack.Iterator())
+
+			// Check that reversed is actually reversed
+			for i := 0; i < size; i++ {
+				if original[i] != reversed[size-1-i] {
+					t.Errorf("reversal failed at index %d", i)
+					break
+				}
+			}
+
+			assert.Equal(t, stack.Len(), size)
+		})
+
+		t.Run("PreservesStackReferences", func(t *testing.T) {
+			stack := &Stack[int]{}
+			stack.Append(3, 2, 1)
+
+			// Get reference to items before reversal
+			oldHead := stack.Head()
+
+			stack.Reverse()
+
+			// After reversal, old head should still be in the stack
+			// but at a different position
+			found := false
+			for item := stack.Head(); item.Ok(); item = item.Next() {
+				if item == oldHead {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.Error("item references should be preserved")
+			}
+		})
 	})
 }
 

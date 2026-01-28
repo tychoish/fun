@@ -83,6 +83,40 @@ func (s *Stack[T]) IteratorPop() iter.Seq[T] {
 	}
 }
 
+// Reverse inverts the order of elements in the stack in-place.
+// Returns the stack to allow method chaining.
+func (s *Stack[T]) Reverse() {
+	if s.length <= 1 {
+		return
+	}
+
+	// Ensure initialized
+	s.root()
+
+	// Find the root sentinel (first item where ok=false)
+	var rootSentinel *Item[T]
+	for item := s.head; item != nil; item = item.next {
+		if !item.Ok() {
+			rootSentinel = item
+			break
+		}
+	}
+
+	// Standard linked list reversal, stopping at root sentinel
+	var prev *Item[T] = rootSentinel
+	current := s.head
+
+	for current != nil && current.Ok() {
+		next := current.next
+		current.next = prev
+		prev = current
+		current = next
+	}
+
+	// Update head to the new first item (old last)
+	s.head = prev
+}
+
 ////////////////////////////////////////////////////////////////////////
 //
 // JSON marshaling support
@@ -94,24 +128,7 @@ func (s *Stack[T]) IteratorPop() iter.Seq[T] {
 // and stacks can behave as arrays in larger json objects, and
 // can be as the output/input of json.Marshal and json.Unmarshal.
 func (s *Stack[T]) MarshalJSON() ([]byte, error) {
-	buf := &bytes.Buffer{}
-	_, _ = buf.Write([]byte("["))
-
-	for i := s.Head(); i.Ok(); i = i.Next() {
-		if i != s.Head() {
-			_, _ = buf.Write([]byte(","))
-		}
-
-		e, err := i.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-
-		_, _ = buf.Write(e)
-	}
-	_, _ = buf.Write([]byte("]"))
-
-	return buf.Bytes(), nil
+	return irt.MarshalJSON(s.Iterator())
 }
 
 // UnmarshalJSON reads json input and adds that to values in the
@@ -120,24 +137,14 @@ func (s *Stack[T]) MarshalJSON() ([]byte, error) {
 // can behave as arrays in larger json objects, and can be as the
 // output/input of json.Marshal and json.Unmarshal.
 func (s *Stack[T]) UnmarshalJSON(in []byte) error {
-	rv := []json.RawMessage{}
-
-	if err := json.Unmarshal(in, &rv); err != nil {
-		return err
-	}
-	ns := &Stack[T]{}
-	head := ns.Head()
-	for idx := range rv {
-		elem := NewItem(s.zero())
-		if err := elem.UnmarshalJSON(rv[idx]); err != nil {
+	for value, err := range irt.UnmarshalJSON[T](bytes.NewBuffer(in)) {
+		if err != nil {
 			return err
 		}
-		head = head.Append(elem)
+		s.Push(value)
 	}
-	head = s.Head()
-	for it := ns.Pop(); it.Ok(); it = ns.Pop() {
-		head.Append(it)
-	}
+
+	s.Reverse()
 	return nil
 }
 

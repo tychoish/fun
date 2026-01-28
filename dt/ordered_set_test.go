@@ -45,23 +45,117 @@ func TestOrderedSet(t *testing.T) {
 	})
 
 	t.Run("JSON", func(t *testing.T) {
-		set := &OrderedSet[string]{}
-		set.Add("hello")
-		set.Add("buddy")
-		set.Add("hello") // duplicate
-		set.Add("kip")
-		check.Equal(t, set.Len(), 3) // hello is a dupe
+		t.Run("RoundTrip", func(t *testing.T) {
+			set := &OrderedSet[string]{}
+			set.Add("hello")
+			set.Add("buddy")
+			set.Add("hello") // duplicate
+			set.Add("kip")
+			check.Equal(t, set.Len(), 3) // hello is a dupe
 
-		data, err := json.Marshal(set)
-		check.NotError(t, err)
+			data, err := json.Marshal(set)
+			check.NotError(t, err)
 
-		// Should preserve insertion order
-		expected := `["hello","buddy","kip"]`
-		check.Equal(t, expected, string(data))
+			// Should preserve insertion order
+			expected := `["hello","buddy","kip"]`
+			check.Equal(t, expected, string(data))
 
-		nset := &OrderedSet[string]{}
-		assert.NotError(t, nset.UnmarshalJSON(data))
-		check.True(t, set.Equal(nset))
+			nset := &OrderedSet[string]{}
+			assert.NotError(t, nset.UnmarshalJSON(data))
+			check.True(t, set.Equal(nset))
+		})
+		t.Run("EmptySet", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			data, err := set.MarshalJSON()
+			check.NotError(t, err)
+			check.Equal(t, string(data), "[]")
+
+			nset := &OrderedSet[int]{}
+			err = nset.UnmarshalJSON(data)
+			check.NotError(t, err)
+			check.Equal(t, nset.Len(), 0)
+		})
+		t.Run("DuplicatesInJSON", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			err := set.UnmarshalJSON([]byte("[1,2,3,2,1]"))
+			check.NotError(t, err)
+			// Should only have unique values
+			check.Equal(t, set.Len(), 3)
+			check.True(t, set.Check(1))
+			check.True(t, set.Check(2))
+			check.True(t, set.Check(3))
+		})
+		t.Run("LargeSet", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			for i := 0; i < 100; i++ {
+				set.Add(i)
+			}
+
+			data, err := set.MarshalJSON()
+			check.NotError(t, err)
+
+			nset := &OrderedSet[int]{}
+			err = nset.UnmarshalJSON(data)
+			check.NotError(t, err)
+			check.Equal(t, nset.Len(), 100)
+			check.True(t, set.Equal(nset))
+		})
+		t.Run("AppendDuringUnmarshal", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			set.Add(1)
+			set.Add(2)
+
+			err := set.UnmarshalJSON([]byte("[3,4,5]"))
+			check.NotError(t, err)
+			check.Equal(t, set.Len(), 5)
+
+			// Verify all values present
+			for i := 1; i <= 5; i++ {
+				if !set.Check(i) {
+					t.Errorf("set missing value %d", i)
+				}
+			}
+		})
+		t.Run("MultipleRoundTrips", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			set.Add(10)
+			set.Add(20)
+			set.Add(30)
+
+			data1, err := set.MarshalJSON()
+			check.NotError(t, err)
+
+			set2 := &OrderedSet[int]{}
+			err = set2.UnmarshalJSON(data1)
+			check.NotError(t, err)
+
+			data2, err := set2.MarshalJSON()
+			check.NotError(t, err)
+
+			check.Equal(t, string(data1), string(data2))
+		})
+		t.Run("TypeMismatch", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			set.Add(1)
+			set.Add(2)
+
+			data, err := set.MarshalJSON()
+			check.NotError(t, err)
+
+			sset := &OrderedSet[string]{}
+			err = sset.UnmarshalJSON(data)
+			check.Error(t, err)
+		})
+		t.Run("InvalidJSON", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			err := set.UnmarshalJSON([]byte("{invalid}"))
+			check.Error(t, err)
+		})
+		t.Run("NilInput", func(t *testing.T) {
+			set := &OrderedSet[int]{}
+			err := set.UnmarshalJSON(nil)
+			check.Error(t, err)
+		})
 	})
 
 	t.Run("Recall", func(t *testing.T) {

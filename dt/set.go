@@ -1,7 +1,7 @@
 package dt
 
 import (
-	"encoding/json"
+	"bytes"
 	"iter"
 	"maps"
 	"sync"
@@ -80,17 +80,18 @@ func (s *Set[T]) Equal(other *Set[T]) bool {
 // MarshalJSON generates a JSON array of the items in the set.
 // The order of items in the array is undefined.
 func (s *Set[T]) MarshalJSON() ([]byte, error) {
-	return json.Marshal(irt.Collect(s.Iterator(), 0, s.Len()))
+	return irt.MarshalJSON(s.Iterator())
 }
 
 // UnmarshalJSON reads input JSON data, constructs an array in memory
 // and then adds items from the array to existing set. Items that are
 // in the set when UnmarshalJSON begins are not modified.
 func (s *Set[T]) UnmarshalJSON(in []byte) error {
-	var items []T
-	err := json.Unmarshal(in, &items)
-	if err == nil {
-		irt.Apply(irt.Slice(items), s.add)
+	for value, err := range irt.UnmarshalJSON[T](bytes.NewBuffer(in)) {
+		if err != nil {
+			return err
+		}
+		s.add(value)
 	}
-	return err
+	return nil
 }

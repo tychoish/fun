@@ -1,7 +1,7 @@
 package adt
 
 import (
-	"encoding/json"
+	"bytes"
 	"iter"
 	"sync"
 
@@ -102,21 +102,20 @@ func (mp *Map[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, mp.Store) }
 // reflect a specific snapshot of the map if the map is being modified
 // while being marshaled: keys will only appear at most once but order
 // or which version of a value is not defined.
-func (mp *Map[K, V]) MarshalJSON() ([]byte, error) { return json.Marshal(irt.Collect2(mp.Iterator())) }
+func (mp *Map[K, V]) MarshalJSON() ([]byte, error) {
+	return irt.MarshalJSON2(mp.Iterator())
+}
 
 // UnmarshalJSON takes a json sequence and adds the values to the
 // map. This does not remove or reset the values in the map, and other
 // operations may interleave during this operation.
 func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
-	out := map[K]V{}
-	if err := json.Unmarshal(in, &out); err != nil {
-		return err
+	for kv, err := range irt.UnmarshalJSON2[K, V](bytes.NewBuffer(in)) {
+		if err != nil {
+			return err
+		}
+		mp.Store(kv.Key, kv.Value)
 	}
-
-	for k := range out {
-		mp.Store(k, out[k])
-	}
-
 	return nil
 }
 
