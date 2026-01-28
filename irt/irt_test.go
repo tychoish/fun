@@ -9320,3 +9320,85 @@ func TestReverse(t *testing.T) {
 		}
 	})
 }
+
+func TestPtrExpectations(t *testing.T) {
+	type inner struct {
+		Concrete    int
+		Referential *int
+	}
+
+	t.Run("PtrSlice", func(t *testing.T) {
+		items := []inner{
+			{3, ptr(-1)},
+			{33, ptr(-11)},
+			{333, ptr(-111)},
+		}
+
+		t.Log("initial:", items)
+
+		for mval := range Ptrs(Slice(items)) {
+			mval.Concrete += 1
+			mval.Referential = ptr(deref(mval.Referential) * -1)
+		}
+		for _, val := range items {
+			if derefz(val.Referential)*-3 != val.Concrete {
+				t.Error("Ptr(Slice()) provides and unexpectedly mutable iterator:", val, derefz(val.Referential))
+			}
+		}
+		t.Log("no mutation:", items)
+	})
+
+	t.Run("SlicePtr", func(t *testing.T) {
+		items := []inner{
+			{3, ptr(-1)},
+			{33, ptr(-11)},
+			{333, ptr(-111)},
+		}
+
+		t.Log("initial:", items)
+
+		for mval := range Mutable(items) {
+			mval.Concrete += 1
+			mval.Referential = ptr(deref(mval.Referential) * -1)
+		}
+		for _, val := range items {
+			if derefz(val.Referential)*-3 == val.Concrete {
+				t.Error("Ptr(Slice()) provides and unexpectedly mutable iterator:", val, derefz(val.Referential))
+			}
+		}
+		t.Log("mutated:", items)
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		items := []inner{
+			{}, {}, {},
+		}
+		for mval := range Mutable(items) {
+			mval.Concrete = 33
+			mval.Referential = ptr(42)
+			break
+		}
+		var zero inner
+		for idx := range items {
+			switch idx {
+			case 0:
+				if items[idx] == zero {
+					t.Error("first element should not be zero")
+					continue
+				}
+			case 1:
+				if items[idx] != zero {
+					t.Error("second should be zero", items[idx])
+				}
+			case 2:
+				if items[idx] != zero {
+					t.Error("third should be zero", items[idx])
+				}
+			case 3:
+				fallthrough
+			default:
+				t.Fatal("too many objects at index", idx)
+			}
+		}
+	})
+}

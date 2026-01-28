@@ -129,6 +129,20 @@ func Slice[T any, S ~[]T](sl S) iter.Seq[T] { return slices.Values(sl) }
 // Args returns a sequence containing all provided arguments.
 func Args[T any](items ...T) iter.Seq[T] { return Slice(items) }
 
+// Mutable takes a slice, and returns an iterator over pointers to the
+// elements in the slice. Mutations to elements during iteration
+// impact the underlying slice, and may be observable outside of the
+// scope of this iterator.
+func Mutable[T any, S ~[]T](sl S) iter.Seq[*T] {
+	return func(yield func(*T) bool) {
+		for idx := range sl {
+			if !yield(&sl[idx]) {
+				return
+			}
+		}
+	}
+}
+
 // Any converts an arbitrary sequence to a sequence of `any` values.
 func Any[T any](seq iter.Seq[T]) iter.Seq[any] { return Convert(seq, toany) }
 
