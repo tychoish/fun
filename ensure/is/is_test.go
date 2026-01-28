@@ -21,16 +21,24 @@ func TestFundamentals(t *testing.T) {
 	t.Run("NilSemantics", func(t *testing.T) {
 		t.Run("Append", func(t *testing.T) {
 			var ex []string
+			check.Equal(t, cap(ex), 0)
+			check.Equal(t, len(ex), 0)
 			check.True(t, ex == nil)
+			ex = make([]string, 0, 1)
+			check.Equal(t, cap(ex), 1)
+			check.Equal(t, len(ex), 0)
+			check.True(t, ex != nil)
 
 			ex = append(ex, ex...)
-			check.True(t, ex == nil)
+			check.True(t, ex != nil)
+			check.Equal(t, len(ex), 0)
 
 			exx := []string{}
 			check.True(t, exx != nil)
 
 			ex = append(ex, exx...)
-			check.True(t, ex == nil)
+			check.Equal(t, cap(ex), 1)
+			check.Equal(t, len(ex), 0)
 		})
 		t.Run("NewSlice", func(t *testing.T) {
 			var base []string

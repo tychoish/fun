@@ -213,7 +213,7 @@ func Deref[T any](seq iter.Seq[*T]) iter.Seq[T] { return Convert(RemoveNils(seq)
 // result in the zero value for the type.
 func DerefWithZeros[T any](seq iter.Seq[*T]) iter.Seq[T] { return Convert(seq, derefz) }
 
-// FirstValue returns the first value from the sequence and true.  If
+// Initial returns the first value from the sequence and true.  If
 // the sequence is empty, it returns the zero value and false.
 func Initial[T any](seq iter.Seq[T]) (zero T, ok bool) {
 	for value := range seq {
