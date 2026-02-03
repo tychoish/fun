@@ -333,13 +333,6 @@ func TestSlice(t *testing.T) {
 			check.Equal(t, sl[2], three)
 		})
 	})
-	t.Run("Prepend", func(t *testing.T) {
-		powers := Variadic(100, 1000, 10000)
-		powers.Prepend(10)
-		check.Equal(t, powers.Len(), 4)
-		check.Equal(t, powers.Index(0), 10)
-		check.Equal(t, powers.Index(1), 100)
-	})
 	t.Run("Zero", func(t *testing.T) {
 		s := NewSlice([]int{100, 100, 100, 100, 100, 100})
 		s.Zero()
@@ -363,5 +356,14 @@ func TestSlice(t *testing.T) {
 		check.Equal(t, sl.Index(0), 100)
 		check.Equal(t, sl.Index(3), 400)
 		check.Equal(t, sl.Index(6), 800)
+	})
+	t.Run("Iterator", func(t *testing.T) {
+		s := NewSlice([]int{100, 100, 100, 100, 100, 100})
+		var total int
+		for value := range s.Iterator() {
+			check.Equal(t, value, 100)
+			total += value
+		}
+		check.Equal(t, total, 600)
 	})
 }

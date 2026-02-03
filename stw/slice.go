@@ -93,7 +93,7 @@ func DefaultSlice[T any](input []T, args ...int) Slice[T] {
 	}
 }
 
-// Sort reorders the slice using the provided com parator function,
+// Sort reorders the slice using the provided comparator function,
 // which should return true if a is less than b and, false
 // otherwise. The slice is sorted in "lowest" to "highest" order.
 func (s Slice[T]) Sort(cp func(a, b T) bool) {
@@ -106,14 +106,18 @@ func (s *Slice[T]) Push(in T) { *s = append(*s, in) }
 // PushMany adds all of the items to the end of the slice.
 func (s *Slice[T]) PushMany(in ...T) { s.Extend(slices.Values(in)) }
 
-// Prepend adds the items to beginning of the slice.
-func (s *Slice[T]) Prepend(in ...T) *Slice[T] { *s = append(in, *s...); return s }
+// Append adds the items from the input  to the slice.
+func (s *Slice[T]) Append(in ...T) *Slice[T] { s.Extend(slices.Values(in)); return s }
 
-// Append adds the items from the input slice to the root slice.
-func (s *Slice[T]) Append(in ...T) *Slice[T] { *s = append(*s, in...); return s }
+// Extend adds the items from the input slice to the root slice. Modifies the underlying slice
+// (e.g. unlike the builtin append() you do not need to capture the return value.)
+func (s *Slice[T]) Extend(seq iter.Seq[T]) { *s = slices.AppendSeq(s.Slice(), seq) }
 
-// Extend adds the items from the input slice to the root slice.
-func (s *Slice[T]) Extend(seq iter.Seq[T]) *Slice[T] { *s = slices.AppendSeq(*s, seq); return s }
+// Slice "unwraps" the Slice[T] as a standard slice value.
+func (s Slice[T]) Slice() []T { return s }
+
+// Iterator returns an iterator over the values in the slice.
+func (s *Slice[T]) Iterator() iter.Seq[T] { return slices.Values(s.Slice()) }
 
 // Copy performs a shallow copy of the Slice.
 func (s Slice[T]) Copy() Slice[T] { out := make([]T, len(s)); copy(out, s); return out }
