@@ -129,6 +129,22 @@ func Slice[T any, S ~[]T](sl S) iter.Seq[T] { return slices.Values(sl) }
 // Args returns a sequence containing all provided arguments.
 func Args[T any](items ...T) iter.Seq[T] { return Slice(items) }
 
+// Zero returns a sequence that never yeilds any elements.
+func Zero[T any]() iter.Seq[T] { return func(_ func(T) bool) {} }
+
+// Zero2 returns a two element sequence that never yields any elements.
+func Zero2[A, B any]() iter.Seq2[A, B] { return func(_ func(A, B) bool) {} }
+
+// OrEmpty returns a noop (empty) sequence if the input sequence is
+// nil, and returns the sequence otherwise.
+func OrEmpty[T any](seq iter.Seq[T]) iter.Seq[T] { return ifelsedo(seq != nil, seq, Zero[T]) }
+
+// OrEmpty2 returns a noop (empty) sequence if the input sequence is
+// nil, and returns the sequence otherwise.
+func OrEmpty2[A, B any](seq iter.Seq2[A, B]) iter.Seq2[A, B] {
+	return ifelsedo(seq != nil, seq, Zero2[A, B])
+}
+
 // Mutable takes a slice, and returns an iterator over pointers to the
 // elements in the slice. Mutations to elements during iteration
 // impact the underlying slice, and may be observable outside of the

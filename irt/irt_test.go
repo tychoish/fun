@@ -9402,3 +9402,171 @@ func TestPtrExpectations(t *testing.T) {
 		}
 	})
 }
+
+func TestZero(t *testing.T) {
+	tests := []struct {
+		name          string
+		seq           iter.Seq[int]
+		expectedCount int
+	}{
+		{
+			name:          "Zero sequence yields no elements",
+			seq:           Zero[int](),
+			expectedCount: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			count := 0
+			tc.seq(func(_ int) bool {
+				count++
+				return true
+			})
+			if count != tc.expectedCount {
+				t.Errorf("expected count %d, got %d", tc.expectedCount, count)
+			}
+		})
+	}
+}
+
+func TestZero2(t *testing.T) {
+	tests := []struct {
+		name          string
+		seq           iter.Seq2[int, string]
+		expectedCount int
+	}{
+		{
+			name:          "Zero2 sequence yields no elements",
+			seq:           Zero2[int, string](),
+			expectedCount: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			count := 0
+			tc.seq(func(_ int, _ string) bool {
+				count++
+				return true
+			})
+			if count != tc.expectedCount {
+				t.Errorf("expected count %d, got %d", tc.expectedCount, count)
+			}
+		})
+	}
+}
+
+func TestOrEmpty(t *testing.T) {
+	tests := []struct {
+		name          string
+		seq           iter.Seq[int]
+		expectedCount int
+		expectedVals  []int
+	}{
+		{
+			name:          "OrEmpty with nil sequence returns empty sequence",
+			seq:           OrEmpty[int](nil),
+			expectedCount: 0,
+			expectedVals:  []int{},
+		},
+		{
+			name: "OrEmpty with non-nil sequence returns original sequence",
+			seq: func(yield func(int) bool) {
+				yield(1)
+				yield(2)
+			},
+			expectedCount: 2,
+			expectedVals:  []int{1, 2},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			count := 0
+			values := []int{}
+			tc.seq(func(val int) bool {
+				count++
+				values = append(values, val)
+				return true
+			})
+			if count != tc.expectedCount {
+				t.Errorf("expected count %d, got %d", tc.expectedCount, count)
+			}
+			if len(values) != len(tc.expectedVals) {
+				t.Fatalf("expected values %v, got %v", tc.expectedVals, values)
+			}
+			for i, v := range values {
+				if v != tc.expectedVals[i] {
+					t.Errorf("at index %d, expected value %d, got %d", i, tc.expectedVals[i], v)
+				}
+			}
+		})
+	}
+}
+
+func TestOrEmpty2(t *testing.T) {
+	tests := []struct {
+		name          string
+		seq           iter.Seq2[int, string]
+		expectedCount int
+		expectedVals  []struct {
+			key   int
+			value string
+		}
+	}{
+		{
+			name:          "OrEmpty2 with nil sequence returns empty sequence",
+			seq:           OrEmpty2[int, string](nil),
+			expectedCount: 0,
+			expectedVals: []struct {
+				key   int
+				value string
+			}{},
+		},
+		{
+			name: "OrEmpty2 with non-nil sequence returns original sequence",
+			seq: func(yield func(int, string) bool) {
+				yield(1, "one")
+				yield(2, "two")
+			},
+			expectedCount: 2,
+			expectedVals: []struct {
+				key   int
+				value string
+			}{
+				{key: 1, value: "one"},
+				{key: 2, value: "two"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			count := 0
+			values := []struct {
+				key   int
+				value string
+			}{}
+			tc.seq(func(key int, value string) bool {
+				count++
+				values = append(values, struct {
+					key   int
+					value string
+				}{key: key, value: value})
+				return true
+			})
+			if count != tc.expectedCount {
+				t.Errorf("expected count %d, got %d", tc.expectedCount, count)
+			}
+			if len(values) != len(tc.expectedVals) {
+				t.Fatalf("expected values %v, got %v", tc.expectedVals, values)
+			}
+			for i, v := range values {
+				if v.key != tc.expectedVals[i].key || v.value != tc.expectedVals[i].value {
+					t.Errorf("at index %d, expected key-value pair %v, got %v", i, tc.expectedVals[i], v)
+				}
+			}
+		})
+	}
+}
