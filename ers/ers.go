@@ -99,7 +99,7 @@ func Whenf(cond bool, tmpl string, args ...any) error {
 // advantage of newer standard library error wrapping tools.
 func Wrap(err error, annotation string) error {
 	if IsError(err) {
-		return fmt.Errorf("%w: %s", err, annotation)
+		return fmt.Errorf("%s: %w", annotation, err)
 	}
 	return nil
 }
@@ -111,7 +111,7 @@ func Wrap(err error, annotation string) error {
 // advantage of newer standard library error wrapping tools.
 func Wrapf(err error, tmpl string, args ...any) error {
 	if IsError(err) {
-		return fmt.Errorf(fmt.Sprint("%w: ", tmpl),
+		return fmt.Errorf(fmt.Sprint(tmpl, ": %w"),
 			append([]any{err}, args...)...,
 		)
 	}
