@@ -6,6 +6,7 @@
 package erc
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"iter"
@@ -44,6 +45,10 @@ func AsCollector(err error) *Collector {
 		return et
 	case *list:
 		return &Collector{list: *et}
+	// case interface{ Iterator() iter.Seq[error] }:
+	// 	st := &Collector{}
+	// 	st.list.From(et.Iterator())
+	// 	return st
 	case interface{ Unwind() []error }:
 		if errs := et.Unwind(); len(errs) > 0 {
 			st := &Collector{}
@@ -143,17 +148,35 @@ func (ec *Collector) Ok() bool { return ec.Len() == 0 }
 
 // Error implements the error interface, and renders an error message
 // that includes all of the constituent errors.
-func (ec *Collector) Error() string { defer ec.with(ec.lock()); return ec.list.Error() }
+func (ec *Collector) Error() string {
+	defer ec.with(ec.lock())
+	switch ec.list.Len() {
+	case 0:
+		return "<nil>"
+	case 1:
+		return ec.list.Front().Error()
+	default:
+		buf := new(bytes.Buffer)
+		for elem := range ec.list.FIFO() {
+			if buf.Len() != 0 {
+				buf.WriteByte('\n')
+			}
+			buf.WriteString(elem.Error())
+		}
 
-// Unwrap returns all of the constituent errors held by the
+		return buf.String()
+	}
+}
+
+// Unwind returns all of the constituent errors held by the
 // collector. The implementation of errors.Is and errors.As mean that
 // this method is not called for either of those functions, you can
 // use this director or with ers.Unwind() to get all errors in a
 // slice.
 //
-// Internally collectors use a linked list implementation, so Unwrap()
+// Internally collectors use a linked list implementation, so Unwind()
 // requires building the slice.
-func (ec *Collector) Unwrap() []error { defer ec.with(ec.lock()); return ec.list.Unwind() }
+func (ec *Collector) Unwind() []error { defer ec.with(ec.lock()); return ec.list.Unwind() }
 
 // Is supports the errors.Is() function and returns true if any of the
 // errors in the collector OR their ancestors are the target error.

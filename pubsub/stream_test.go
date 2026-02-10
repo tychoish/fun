@@ -1029,7 +1029,7 @@ func TestParallelForEach(t *testing.T) {
 			t.Error(count.Load())
 		}
 		// panic recovery errors plus panics themselves
-		check.Equal(t, 200, len(ers.Unwind(err)))
+		check.Equal(t, 100, len(ers.Unwind(err)))
 	})
 	t.Run("AbortOnPanic", func(t *testing.T) {
 		seenCount := &atomic.Int64{}

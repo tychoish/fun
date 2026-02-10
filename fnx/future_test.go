@@ -895,9 +895,8 @@ func TestFuture(t *testing.T) {
 			assert.Error(t, err)
 			assert.Equal(t, val, 0)
 			errs := ers.Unwind(err)
-			assert.Equal(t, len(errs), 16)
+			assert.Equal(t, len(errs), 2)
 			for _, err := range errs {
-				assert.Equal(t, err, exp)
 				assert.ErrorIs(t, err, exp)
 			}
 			assert.NotEqual(t, val, 100)

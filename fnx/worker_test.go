@@ -839,9 +839,8 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, count.Load(), 16)
 			assert.Error(t, err)
 			errs := ers.Unwind(err)
-			assert.Equal(t, len(errs), 16)
+			assert.Equal(t, len(errs), 2)
 			for _, err := range errs {
-				assert.Equal(t, err, exp)
 				assert.ErrorIs(t, err, exp)
 			}
 		})
@@ -864,7 +863,7 @@ func TestWorker(t *testing.T) {
 			err := MakeWorker(func() error {
 				defer count.Add(1)
 				if count.Load() == 11 {
-					return erc.Join(exp, context.Canceled)
+					return erc.Join(context.Canceled, exp)
 				}
 				return exp
 			}).Retry(16).Run(ctx)
@@ -873,8 +872,7 @@ func TestWorker(t *testing.T) {
 			assert.ErrorIs(t, err, context.Canceled)
 			assert.ErrorIs(t, err, exp)
 			errs := ers.Unwind(err)
-			t.Log(errs, len(errs))
-			assert.Equal(t, len(errs), 13)
+			assert.Equal(t, len(errs), 2) // grouping...
 		})
 	})
 	t.Run("WithContextHook", func(t *testing.T) {

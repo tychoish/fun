@@ -205,7 +205,8 @@ func TestErrors(t *testing.T) {
 			}
 
 			assert.ErrorIs(t, err, base)
-			assert.True(t, strings.HasPrefix(err.Error(), "base: annotation: annotation"))
+			t.Log("err>", err.Error())
+			assert.True(t, strings.HasSuffix(err.Error(), base.Error()))
 
 			errs := internal.Unwind(err)
 			if len(errs) != 101 {

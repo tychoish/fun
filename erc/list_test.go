@@ -159,7 +159,7 @@ func TestList(t *testing.T) {
 		}
 
 		es1.Push(es2)
-		if l := es1.Len(); l != 4 {
+		if l := es1.Len(); l != 3 {
 			t.Fatal("merged unexpected length", l)
 		}
 	})
@@ -189,7 +189,7 @@ func TestList(t *testing.T) {
 		es.Push(errors.New("three"))
 
 		output := es.Error()
-		const expected = "one: two: three"
+		const expected = "one; two; three"
 		if output != expected {
 			t.Error(output, "!=", expected)
 		}
@@ -343,7 +343,7 @@ func TestMergeLegacy(t *testing.T) {
 			errs := ers.Unwind(jerr)
 			t.Log(errs)
 			check.Equal(t, len(errs), 8)
-			check.Equal(t, jerr.Error(), "one: two: three: four: five: six: seven: eight")
+			check.Equal(t, jerr.Error(), "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight")
 		})
 		t.Run("ChainUnwrapping", func(t *testing.T) {
 			jerr := fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w", fmt.Errorf("next: %w",

@@ -258,7 +258,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal("should error")
 			}
 			errs := ers.Unwind(err)
-			if len(errs) != 200 {
+			if len(errs) != 100 {
 				t.Log(errs)
 				t.Error(len(errs))
 			}
@@ -412,7 +412,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Fatal("should error")
 			}
 			errs := ers.Unwind(err)
-			check.Equal(t, len(errs), 200)
+			check.Equal(t, len(errs), 100)
 			testt.Log(t, errs)
 		})
 		t.Run("LogRunningServices", func(t *testing.T) {

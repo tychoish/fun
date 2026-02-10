@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"iter"
+
+	"github.com/tychoish/fun/ers"
 )
 
 type list struct {
@@ -32,16 +34,18 @@ func (eel *list) Error() string {
 		return "<nil>"
 	}
 
-	buf := &bytes.Buffer{}
+	buf := new(bytes.Buffer)
+	eel.writeTo(buf)
+	return buf.String()
+}
 
+func (eel *list) writeTo(buf *bytes.Buffer) {
 	for elem := range eel.FIFO() {
 		if buf.Len() > 0 {
-			buf.WriteString(": ")
+			buf.WriteString("; ")
 		}
 		buf.WriteString(elem.Error())
 	}
-
-	return buf.String()
 }
 
 func (eel *list) In(elm *element) bool { return elm.list == eel }
@@ -67,10 +71,10 @@ func (eel *list) Unwrap() error {
 }
 
 func (eel *list) Unwind() []error {
-	out := make([]error, eel.num)
+	out := make([]error, 0, eel.num)
 
-	for elem, idx := eel.Front(), 0; elem.Ok(); elem, idx = elem.Next(), idx+1 {
-		out[idx] = elem.err
+	for elem := range eel.FIFO() {
+		out = append(out, ers.Unwind(elem)...)
 	}
 
 	return out
@@ -105,11 +109,12 @@ func (eel *list) Push(err error) {
 	case nil:
 		return
 	case *Collector:
-		defer werr.with(werr.lock())
-		eel.Push(&werr.list)
+		if eel != &werr.list {
+			eel.PushBack(&werr.list)
+		}
 	case *list:
-		for elem := werr.Front(); elem.Ok(); elem = elem.Next() {
-			eel.PushBack(elem.Err())
+		if eel != werr {
+			eel.PushBack(werr)
 		}
 	case *element:
 		switch {

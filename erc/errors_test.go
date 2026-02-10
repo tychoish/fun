@@ -73,7 +73,12 @@ func TestError(t *testing.T) {
 			ec2 := &Collector{}
 			ec1.Join(io.EOF, context.Canceled)
 			ec2.Push(ec1)
-			assert.Equal(t, 2, ec2.Len())
+			assert.Equal(t, 1, ec2.Len())
+			assert.Equal(t, 2, ec1.Len())
+			check.ErrorIs(t, ec1, io.EOF)
+			check.ErrorIs(t, ec2, io.EOF)
+			check.ErrorIs(t, ec1, context.Canceled)
+			check.ErrorIs(t, ec2, context.Canceled)
 		})
 		t.Run("Future", func(t *testing.T) {
 			ec := &Collector{}
@@ -272,9 +277,11 @@ func TestError(t *testing.T) {
 			ec.Wrap(exp, "bar")
 			assert.True(t, !ec.Ok())
 			assert.Equal(t, ec.Len(), 1)
-			assert.Equal(t, "foo: bar", ec.Error())
+			assert.Equal(t, "bar: foo", ec.Error())
 			assert.NotEqual(t, ec.Err().Error(), exp.Error())
-			assert.True(t, strings.HasPrefix(ec.Error(), exp.Error()))
+			t.Log("exp", exp.Error())
+			t.Log("ec", ec.Error())
+			assert.True(t, strings.HasSuffix(ec.Error(), exp.Error()))
 			assert.ErrorIs(t, ec.Err(), exp)
 		})
 		t.Run("Wrapf", func(t *testing.T) {
@@ -287,9 +294,9 @@ func TestError(t *testing.T) {
 			ec.Wrapf(exp, "bar %d", 2)
 			assert.True(t, !ec.Ok())
 			assert.Equal(t, ec.Len(), 1)
-			assert.Equal(t, "foo: bar 2", ec.Error())
+			assert.Equal(t, "bar 2: foo", ec.Error())
 			assert.NotEqual(t, ec.Err().Error(), exp.Error())
-			assert.True(t, strings.HasPrefix(ec.Error(), exp.Error()))
+			assert.True(t, strings.HasSuffix(ec.Error(), exp.Error()))
 			assert.ErrorIs(t, ec.Err(), exp)
 		})
 	})
@@ -409,6 +416,27 @@ func TestError(t *testing.T) {
 		ec.Push(io.EOF)
 
 		check.Equal(t, 6, ec.Len())
+	})
+	t.Run("Empty", func(t *testing.T) {
+		var ec Collector
+		check.Equal(t, ec.Error(), "<nil>")
+	})
+	t.Run("Grouping", func(t *testing.T) {
+		t.Run("JoinMethod", func(t *testing.T) {
+			var ec Collector
+			ec.Join(ers.New("one"), ers.New("two"))
+			check.Equal(t, ec.Error(), "one\ntwo")
+		})
+		t.Run("JoinFunction", func(t *testing.T) {
+			err := Join(ers.New("one"), ers.New("two"))
+			check.Equal(t, err.Error(), "one\ntwo")
+		})
+		t.Run("Collect", func(t *testing.T) {
+			var ec Collector
+			ec.Push(Join(ers.New("one"), ers.New("two")))
+			ec.Push(ers.New("three"))
+			check.Equal(t, ec.Error(), "one; two\nthree")
+		})
 	})
 }
 
