@@ -2,6 +2,7 @@ package erc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tychoish/fun/ers"
 )
@@ -33,16 +34,33 @@ func NewInvariantError(args ...any) error {
 	case 0:
 		return ers.ErrInvariantViolation
 	case 1:
+		ec := &Collector{}
+		ec.Push(ers.ErrInvariantViolation)
+
 		switch ei := args[0].(type) {
+		case nil:
+			break
 		case error:
-			return Join(ei, ers.ErrInvariantViolation)
+			ec.Push(ei)
 		case string:
-			return Join(ers.New(ei), ers.ErrInvariantViolation)
+			if ei := strings.TrimSpace(ei); ei != "" {
+				ec.New(ei)
+			}
 		case func() error:
-			return Join(ei(), ers.ErrInvariantViolation)
+			ec.Push(ei())
+		case fmt.Stringer:
+			if str := strings.TrimSpace(ei.String()); str != "" {
+				ec.New(str)
+			}
+		case func() string:
+			if str := strings.TrimSpace(ei()); str != "" {
+				ec.New(str)
+			}
 		default:
-			return fmt.Errorf("%v: %w", args[0], ers.ErrInvariantViolation)
+			ec.Errorf("%v", args[0])
 		}
+
+		return ec.Resolve()
 	default:
 		ec := &Collector{}
 		ec.Push(ers.ErrInvariantViolation)

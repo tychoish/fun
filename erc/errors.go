@@ -7,7 +7,6 @@ package erc
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"iter"
 	"strings"
@@ -285,6 +284,26 @@ func (ec *Collector) Wrapf(err error, tmpl string, args ...any) {
 	ec.Push(ers.Wrapf(err, tmpl, args...))
 }
 
+// Annotate, like Wrap, attaches context to an error, and adds it to
+// the collector when the error is non-nil, otherwise Annotate is a
+// noop.
+//
+// Unlike Wrap, Annotate places the annotation after the error, and
+// encloses it in square brackets.
+func (ec *Collector) Annotate(err error, annotation string) {
+	ec.Push(ers.Annotate(err, annotation))
+}
+
+// Annotatef, like Wrap, attaches context to an error, and adds it to
+// the collector when the error is non-nil, otherwise Annotatef is a
+// noop.
+//
+// Unlike Wrap, Annotate places the annotation after the error, and
+// encloses it in square brackets.
+func (ec *Collector) Annotatef(err error, tmpl string, args ...any) {
+	ec.Push(ers.Annotatef(err, tmpl, args...))
+}
+
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
 func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
@@ -322,14 +341,20 @@ func (ec *Collector) extractErrors(in []any) {
 		case nil:
 			continue
 		case error:
-			// this handles nested collectors well.
 			ec.Push(val)
+		case string:
+			if val = strings.TrimSpace(val); val != "" {
+				args = append(args, val)
+			}
 		case func() error:
 			ec.Push(val())
-		case string:
-			val = strings.TrimSpace(val)
-			if val != "" {
-				args = append(args, val)
+		case fmt.Stringer:
+			if str := strings.TrimSpace(val.String()); str != "" {
+				args = append(args, str)
+			}
+		case func() string:
+			if str := strings.TrimSpace(val()); str != "" {
+				args = append(args, str)
 			}
 		default:
 			args = append(args, val)
@@ -337,6 +362,6 @@ func (ec *Collector) extractErrors(in []any) {
 	}
 
 	if len(args) > 0 {
-		ec.Push(errors.New(strings.TrimSpace(fmt.Sprintln(args...))))
+		ec.Push(ers.New(strings.TrimSpace(fmt.Sprintln(args...))))
 	}
 }
