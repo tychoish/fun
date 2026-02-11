@@ -6,7 +6,12 @@ import (
 
 // New constructs an error object that uses the Error as the
 // underlying type.
-func New(str string) error { return Error(str) }
+func New(str string) error {
+	if str == "" {
+		return nil
+	}
+	return Error(str)
+}
 
 // As is a wrapper around errors.As to allow ers to be a drop in
 // replacement for errors.

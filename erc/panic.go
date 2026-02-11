@@ -43,19 +43,13 @@ func NewInvariantError(args ...any) error {
 		case error:
 			ec.Push(ei)
 		case string:
-			if ei := strings.TrimSpace(ei); ei != "" {
-				ec.New(ei)
-			}
+			ec.New(strings.TrimSpace(ei))
 		case func() error:
 			ec.Push(ei())
 		case fmt.Stringer:
-			if str := strings.TrimSpace(ei.String()); str != "" {
-				ec.New(str)
-			}
+			ec.New(strings.TrimSpace(ei.String()))
 		case func() string:
-			if str := strings.TrimSpace(ei()); str != "" {
-				ec.New(str)
-			}
+			ec.New(strings.TrimSpace(ei()))
 		default:
 			ec.Errorf("%v", args[0])
 		}

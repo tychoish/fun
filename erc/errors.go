@@ -343,25 +343,19 @@ func (ec *Collector) extractErrors(in []any) {
 		case error:
 			ec.Push(val)
 		case string:
-			if val = strings.TrimSpace(val); val != "" {
-				args = append(args, val)
-			}
+			args = append(args, strings.TrimSpace(val))
 		case func() error:
 			ec.Push(val())
 		case fmt.Stringer:
-			if str := strings.TrimSpace(val.String()); str != "" {
-				args = append(args, str)
-			}
+			args = append(args, strings.TrimSpace(val.String()))
 		case func() string:
-			if str := strings.TrimSpace(val()); str != "" {
-				args = append(args, str)
-			}
+			args = append(args, strings.TrimSpace(val()))
 		default:
 			args = append(args, val)
 		}
 	}
 
 	if len(args) > 0 {
-		ec.Push(ers.New(strings.TrimSpace(fmt.Sprintln(args...))))
+		ec.Push(ers.New(strings.TrimSpace(fmt.Sprint(args...))))
 	}
 }
