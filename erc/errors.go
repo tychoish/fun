@@ -334,7 +334,7 @@ func (ec *Collector) WithRecoverHook(hook func()) {
 }
 
 func (ec *Collector) extractErrors(in []any) {
-	args := make([]any, 0, len(in))
+	args := make([]string, 0, len(in))
 
 	for idx := range in {
 		switch val := in[idx].(type) {
@@ -351,11 +351,11 @@ func (ec *Collector) extractErrors(in []any) {
 		case func() string:
 			args = append(args, strings.TrimSpace(val()))
 		default:
-			args = append(args, val)
+			args = append(args, fmt.Sprint(val))
 		}
 	}
 
 	if len(args) > 0 {
-		ec.Push(ers.New(strings.TrimSpace(fmt.Sprint(args...))))
+		ec.Push(ers.New(irt.JoinStringsWith(irt.RemoveZeros(irt.Slice(args)), " ")))
 	}
 }

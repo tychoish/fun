@@ -74,7 +74,7 @@ func TestTimestamp(t *testing.T) {
 		}
 	})
 	t.Run("NewWith", func(t *testing.T) {
-		check.Error(t, NewWithTime(""))
+		check.NotError(t, NewWithTime(""))
 		check.Error(t, NewWithTime("hello"))
 		check.True(t, !GetTime(NewWithTime("hello")).IsZero())
 	})

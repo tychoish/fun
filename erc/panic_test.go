@@ -79,7 +79,7 @@ func TestPanics(t *testing.T) {
 	})
 	t.Run("ExtractErrors", func(t *testing.T) {
 		ec := &Collector{}
-		input := []any{nil, ers.Error("hi"), 1, true, "   ", "hi"}
+		input := []any{nil, ers.Error("hi"), 1, true, "   ", "hi", func() string { return "boop" }, func() string { return "" }}
 		ec.extractErrors(input)
 		check.Equal(t, ec.Len(), 2)
 
@@ -90,9 +90,9 @@ func TestPanics(t *testing.T) {
 		check.Equal(t, ec.Len(), 2)
 
 		ec = &Collector{}
-		input = []any{ers.Error("hi"), ers.Error("hi"), ers.Error("hi"), ers.Error("hi")}
+		input = []any{ers.Error("hi"), ers.Error("hi"), ers.Error("hi"), ers.Error("hi"), time.Now()}
 		ec.extractErrors(input)
-		check.Equal(t, ec.Len(), 4)
+		check.Equal(t, ec.Len(), 5)
 	})
 	t.Run("InvariantError", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
@@ -159,7 +159,6 @@ func TestPanics(t *testing.T) {
 			check.Error(t, err)
 			check.ErrorIs(t, err, ers.ErrInvariantViolation)
 			es := ers.Unwind(err)
-			t.Log(es)
 			check.Equal(t, len(es), 1)
 		})
 		t.Run("Future", func(t *testing.T) {
