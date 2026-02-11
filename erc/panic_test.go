@@ -99,6 +99,20 @@ func TestPanics(t *testing.T) {
 			assert.Equal[error](t, ers.ErrInvariantViolation, NewInvariantError())
 			assert.ErrorIs(t, NewInvariantError(), ers.ErrInvariantViolation)
 		})
+		t.Run("SingleNil", func(t *testing.T) {
+			assert.Equal[error](t, ers.ErrInvariantViolation, NewInvariantError(nil))
+			assert.ErrorIs(t, NewInvariantError(nil), ers.ErrInvariantViolation)
+		})
+		t.Run("StringFunc", func(t *testing.T) {
+			ts := time.Now()
+			assert.ErrorIs(t, NewInvariantError(ts.String), ers.ErrInvariantViolation)
+			assert.True(t, strings.Contains(NewInvariantError(ts.String).Error(), ts.String()))
+		})
+		t.Run("Stringer", func(t *testing.T) {
+			ts := time.Now()
+			assert.ErrorIs(t, NewInvariantError(ts), ers.ErrInvariantViolation)
+			assert.True(t, strings.Contains(NewInvariantError(ts).Error(), ts.String()))
+		})
 		t.Run("One", func(t *testing.T) {
 			vals := []any{"hello", time.Now(), ers.New("hello"), func() error { return errors.New("hello") }}
 			for val := range slices.Values(vals) {
