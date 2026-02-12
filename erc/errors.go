@@ -153,7 +153,7 @@ func (ec *Collector) Error() string {
 	}
 }
 
-// Unwind returns all of the constituent errors held by the
+// Unwrap returns all of the constituent errors held by the
 // collector. The implementation of errors.Is and errors.As mean that
 // this method is not called for either of those functions, you can
 // use this director or with ers.Unwind() to get all errors in a
@@ -241,7 +241,7 @@ func (ec *Collector) Wrapf(err error, tmpl string, args ...any) {
 	ec.Push(ers.Wrapf(err, tmpl, args...))
 }
 
-// Annotate, like Wrap, attaches context to an error, and adds it to
+// Annotate attaches context to an error, like Wrap, and adds it to
 // the collector when the error is non-nil, otherwise Annotate is a
 // noop.
 //
@@ -251,7 +251,7 @@ func (ec *Collector) Annotate(err error, annotation string) {
 	ec.Push(ers.Annotate(err, annotation))
 }
 
-// Annotatef, like Wrap, attaches context to an error, and adds it to
+// Annotatef attaches context to an error, like Wrap, and adds it to
 // the collector when the error is non-nil, otherwise Annotatef is a
 // noop.
 //

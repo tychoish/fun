@@ -122,7 +122,7 @@ func Wrapf(err error, tmpl string, args ...any) error {
 	return nil
 }
 
-// Annotate, like Wrap, attaches context to an error, when the error
+// Annotate attaches context to an error, like Wrap, when the error
 // is non-nil and returns nil otherwise.
 //
 // Unlike Wrap, Annotate places the annotation after the error, and
@@ -134,7 +134,7 @@ func Annotate(err error, annotation string) error {
 	return nil
 }
 
-// Annotatef, like Wrap, attaches context to an error, when the error
+// Annotatef attaches context to an error, like Wrap, when the error
 // is non-nil and returns nil otherwise.
 //
 // Unlike Wrap, Annotate places the annotation after the error, and
