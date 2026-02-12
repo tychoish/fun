@@ -62,21 +62,15 @@ func (eel *list) Len() int {
 // otherwise.
 func (eel *list) Ok() bool { return eel == nil || eel.elm.Ok() }
 
-func (eel *list) Unwrap() error {
-	if eel.Ok() {
+func (eel *list) Unwrap() []error {
+	if eel == nil || eel.num == 0 {
 		return nil
 	}
-
-	return eel.root().Err()
-}
-
-func (eel *list) Unwind() []error {
 	out := make([]error, 0, eel.num)
 
 	for elem := range eel.FIFO() {
 		out = append(out, ers.Unwind(elem)...)
 	}
-
 	return out
 }
 

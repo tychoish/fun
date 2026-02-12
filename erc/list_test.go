@@ -32,7 +32,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("UnwrapList", func(t *testing.T) {
 		es := &list{}
-		if err := es.Unwrap(); err != nil {
+		if err := es.Unwrap(); len(err) != 0 {
 			t.Fatal("unexpected unwrap empty", err)
 		}
 	})

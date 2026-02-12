@@ -29,6 +29,33 @@ type Collector struct {
 	list list
 }
 
+func (ec *Collector) mtx() *sync.Mutex  { return &ec.mu }
+func (*Collector) with(m *sync.Mutex)   { m.Unlock() }
+func (ec *Collector) lock() *sync.Mutex { m := ec.mtx(); m.Lock(); return m }
+
+///////////////////////////////////////////////////////////////////////
+//
+// Collector constructors and setup methods
+//
+///////////////////////////////////////////////////////////////////////
+
+// Join takes a slice of errors and converts it into an *erc.List
+// typed error. This operation has several advantages relative to
+// using errors.Join(): if you call erc.Join repeatedly on the same
+// error set of errors the resulting error is convertable.
+func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
+
+// JoinSeq takes an iterator sequence of errors and aggregates them into
+// a single error. This operation is similar to Join but accepts an
+// iter.Seq[error] instead of a variadic slice. Nil errors are filtered
+// out, and if all errors are nil, JoinSeq returns nil. If only one
+// non-nil error exists, it is returned directly. Otherwise, a
+// *Collector is returned containing all non-nil errors.
+//
+// The resulting error is compatible with errors.Is and errors.As for
+// introspecting the constituent errors.
+func JoinSeq(errs iter.Seq[error]) error { st := &Collector{}; st.From(errs); return st.Err() }
+
 // AsCollector takes an error and converts it to a list if possible, if
 // the error is an erc.List then this is a passthrough, and errors
 // that implement {Unwind() []error} or {Unwrap() []error}, though
@@ -63,43 +90,6 @@ func AsCollector(err error) *Collector {
 		st.Push(err)
 		return st
 	}
-}
-
-///////////////////////////////////////////////////////////////////////
-//
-// Collector constructors and setup methods
-//
-///////////////////////////////////////////////////////////////////////
-
-// Join takes a slice of errors and converts it into an *erc.List
-// typed error. This operation has several advantages relative to
-// using errors.Join(): if you call erc.Join repeatedly on the same
-// error set of errors the resulting error is convertable.
-func Join(errs ...error) error { st := &Collector{}; st.Join(errs...); return st.Err() }
-
-// JoinSeq takes an iterator sequence of errors and aggregates them into
-// a single error. This operation is similar to Join but accepts an
-// iter.Seq[error] instead of a variadic slice. Nil errors are filtered
-// out, and if all errors are nil, JoinSeq returns nil. If only one
-// non-nil error exists, it is returned directly. Otherwise, a
-// *Collector is returned containing all non-nil errors.
-//
-// The resulting error is compatible with errors.Is and errors.As for
-// introspecting the constituent errors.
-func JoinSeq(errs iter.Seq[error]) error { st := &Collector{}; st.From(errs); return st.Err() }
-
-// with/lock are internal helpers to avoid twiddling the pointer to
-// the mutex.
-func (*Collector) with(m *sync.Mutex)   { m.Unlock() }
-func (ec *Collector) mtx() *sync.Mutex  { return &ec.mu }
-func (ec *Collector) lock() *sync.Mutex { m := ec.mtx(); m.Lock(); return m }
-
-// SetFilter sets (or overrides) the current filter on the
-// collector. Errors errors collected by the filter are passed to the
-// filter function. Filters will not receive nil errors.
-func (ec *Collector) SetFilter(erf Filter) {
-	defer ec.with(ec.lock())
-	ec.list.filter = erf
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -171,7 +161,7 @@ func (ec *Collector) Error() string {
 //
 // Internally collectors use a linked list implementation, so Unwind()
 // requires building the slice.
-func (ec *Collector) Unwind() []error { defer ec.with(ec.lock()); return ec.list.Unwind() }
+func (ec *Collector) Unwrap() []error { defer ec.with(ec.lock()); return ec.list.Unwrap() }
 
 // Is supports the errors.Is() function and returns true if any of the
 // errors in the collector OR their ancestors are the target error.
@@ -199,58 +189,9 @@ func (ec *Collector) Iterator() iter.Seq[error] {
 
 ///////////////////////////////////////////////////////////////////////
 //
-// Collection methods
+// Error (in Collector) Constructors
 //
 ///////////////////////////////////////////////////////////////////////
-
-// Push collects an error if that error is non-nil.
-func (ec *Collector) Push(err error) {
-	if ers.IsError(err) {
-		ec.pushWithLock(err)
-	}
-}
-
-// PushOk adds the error to the collector and then returns true if the
-// error is nil, and false otherwise.
-func (ec *Collector) PushOk(err error) bool {
-	if ers.IsError(err) {
-		ec.pushWithLock(err)
-		return false
-	}
-	return true
-}
-
-// From adds all non-nil error values from the iterator sequence to the
-// error collector. Nil errors in the sequence are automatically filtered
-// out and ignored. This method is thread-safe and can be called
-// concurrently with other Collector methods.
-//
-// The method uses irt.KeepErrors to filter the sequence, ensuring only
-// non-nil errors are added to the collector.
-func (ec *Collector) From(seq iter.Seq[error])        { irt.Apply(irt.KeepErrors(seq), ec.pushWithLock) }
-func (ec *Collector) pushWithLock(err error)          { defer ec.with(ec.lock()); ec.list.Push(err) }
-func (ec *Collector) addWithLock(seq iter.Seq[error]) { defer ec.with(ec.lock()); ec.list.From(seq) }
-
-// Join appends one or more errors to the collectors. Nil errors are
-// always omitted from the collector.
-func (ec *Collector) Join(errs ...error) {
-	switch len(errs) {
-	case 0:
-		return
-	case 1:
-		ec.Push(errs[0])
-	default:
-		ec.addWithLock(irt.Slice(errs))
-	}
-}
-
-// When is a helper function, typically useful for improving the
-// readability of validation code. If the condition is true, then When
-// creates an error with the string value and adds it to the Collector.
-func (ec *Collector) When(cond bool, val string) { ec.Push(ers.When(cond, val)) }
-
-// If adds the error to the collector when the condition is true, and ignores it otherwise.
-func (ec *Collector) If(cond bool, val error) { ec.Push(ers.If(cond, val)) }
 
 // Errorf constructs an error, using fmt.Errorf, and adds it to the collector.
 func (ec *Collector) Errorf(tmpl string, args ...any) { ec.Push(fmt.Errorf(tmpl, args...)) }
@@ -258,12 +199,32 @@ func (ec *Collector) Errorf(tmpl string, args ...any) { ec.Push(fmt.Errorf(tmpl,
 // New adds an error to the collector using the provided string as its value. The error is an ers.Error object.
 func (ec *Collector) New(val string) { ec.Push(ers.New(val)) }
 
+///////////////////////////////////////////////////////////////////////
+//
+// Conditional Errors
+//
+///////////////////////////////////////////////////////////////////////
+
+// If adds the error to the collector when the condition is true, and ignores it otherwise.
+func (ec *Collector) If(cond bool, val error) { ec.Push(ers.If(cond, val)) }
+
+// When is a helper function, typically useful for improving the
+// readability of validation code. If the condition is true, then When
+// creates an error with the string value and adds it to the Collector.
+func (ec *Collector) When(cond bool, val string) { ec.Push(ers.When(cond, val)) }
+
 // Whenf conditionally creates and adds an error to the collector, as
 // When, and with a similar use case, but permits Sprintf/Errorf
 // formating.
 func (ec *Collector) Whenf(cond bool, val string, args ...any) {
 	ec.Push(ers.Whenf(cond, val, args...))
 }
+
+///////////////////////////////////////////////////////////////////////
+//
+// Error Annotation Methods
+//
+///////////////////////////////////////////////////////////////////////
 
 // Wrap adds an annotated error to the Collector, IF the wrapped
 // error is non-nil: nil errors are always a noop. If there is no
@@ -300,19 +261,74 @@ func (ec *Collector) Annotatef(err error, tmpl string, args ...any) {
 	ec.Push(ers.Annotatef(err, tmpl, args...))
 }
 
+///////////////////////////////////////////////////////////////////////
+//
+// Collection methods
+//
+///////////////////////////////////////////////////////////////////////
+
+// Push collects an error if that error is non-nil.
+func (ec *Collector) Push(err error) {
+	if ers.IsError(err) {
+		ec.pushWithLock(err)
+	}
+}
+
+// PushOk adds the error to the collector and then returns true if the
+// error is nil, and false otherwise.
+func (ec *Collector) PushOk(err error) bool {
+	if ers.IsError(err) {
+		ec.pushWithLock(err)
+		return false
+	}
+	return true
+}
+
+// Join appends one or more errors to the collectors. Nil errors are
+// always omitted from the collector.
+func (ec *Collector) Join(errs ...error) {
+	switch len(errs) {
+	case 0:
+		return
+	case 1:
+		ec.Push(errs[0])
+	default:
+		ec.addWithLock(irt.Slice(errs))
+	}
+}
+
 // Check executes a simple function and if it returns an error, adds
 // it to the collector, primarily for use in defer statements.
 func (ec *Collector) Check(fut func() error) { ec.Push(fut()) }
+
+// SetFilter sets (or overrides) the current filter on the
+// collector. Errors errors collected by the filter are passed to the
+// filter function. Filters will not receive nil errors.
+func (ec *Collector) SetFilter(erf Filter) { defer ec.with(ec.lock()); ec.list.filter = erf }
+
+// From adds all non-nil error values from the iterator sequence to the
+// error collector. Nil errors in the sequence are automatically filtered
+// out and ignored. This method is thread-safe and can be called
+// concurrently with other Collector methods.
+//
+// The method uses irt.KeepErrors to filter the sequence, ensuring only
+// non-nil errors are added to the collector.
+func (ec *Collector) From(seq iter.Seq[error])        { irt.Apply(irt.KeepErrors(seq), ec.pushWithLock) }
+func (ec *Collector) pushWithLock(err error)          { defer ec.with(ec.lock()); ec.list.Push(err) }
+func (ec *Collector) addWithLock(seq iter.Seq[error]) { defer ec.with(ec.lock()); ec.list.From(seq) }
+
+///////////////////////////////////////////////////////////////////////
+//
+// Panic Management
+//
+///////////////////////////////////////////////////////////////////////
 
 // Recover can be used in a defer to collect a panic and add it to the collector.
 func (ec *Collector) Recover() { ec.Push(ParsePanic(recover())) }
 
 // WithRecover calls the provided function, collecting any panic and
 // converting it to an error// that is added to the collector.
-func (ec *Collector) WithRecover(fn func()) {
-	defer func() { ec.Push(ParsePanic(recover())) }()
-	fn()
-}
+func (ec *Collector) WithRecover(fn func()) { defer func() { ec.Push(ParsePanic(recover())) }(); fn() }
 
 // WithRecoverHook catches a panic and adds it to the error collector
 // and THEN runs the specified hook if. If there was no panic, this
