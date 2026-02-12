@@ -44,10 +44,6 @@ func AsCollector(err error) *Collector {
 		return et
 	case *list:
 		return &Collector{list: *et}
-	// case interface{ Iterator() iter.Seq[error] }:
-	// 	st := &Collector{}
-	// 	st.list.From(et.Iterator())
-	// 	return st
 	case interface{ Unwind() []error }:
 		if errs := et.Unwind(); len(errs) > 0 {
 			st := &Collector{}
