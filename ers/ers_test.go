@@ -223,5 +223,48 @@ func TestErrors(t *testing.T) {
 		t.Run("WrapNil", func(t *testing.T) {
 			assert.NotError(t, Wrap(nil, "foo"))
 		})
+
+		t.Run("Annotatef", func(t *testing.T) {
+			base := errors.New("base")
+			err := base
+			for i := 0; i < 100; i++ {
+				err = Annotatef(err, "iter=%d", i)
+			}
+
+			errs := internal.Unwind(err)
+			if len(errs) != 101 {
+				t.Fatal(len(errs), err)
+			}
+			if errs[100].Error() != "base" {
+				t.Error(errs[100])
+			}
+			check.Equal(t, 101, len(internal.Unwind(err)))
+		})
+		t.Run("Annotate", func(t *testing.T) {
+			base := errors.New("base")
+			err := base
+			for i := 0; i < 100; i++ {
+				err = Annotate(err, "annotation")
+			}
+
+			assert.ErrorIs(t, err, base)
+			t.Log("err>", err.Error())
+			assert.True(t, strings.HasPrefix(err.Error(), base.Error()))
+
+			errs := internal.Unwind(err)
+			if len(errs) != 101 {
+				t.Error(len(errs))
+			}
+			if errs[100].Error() != "base" {
+				t.Error(errs[100])
+			}
+			check.Equal(t, 101, len(internal.Unwind(err)))
+		})
+		t.Run("AnnotatefNil", func(t *testing.T) {
+			assert.NotError(t, Annotatef(nil, "foo %s", "bar"))
+		})
+		t.Run("AnnotateNil", func(t *testing.T) {
+			assert.NotError(t, Annotate(nil, "foo"))
+		})
 	})
 }

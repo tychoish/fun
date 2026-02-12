@@ -299,6 +299,38 @@ func TestError(t *testing.T) {
 			assert.True(t, strings.HasSuffix(ec.Error(), exp.Error()))
 			assert.ErrorIs(t, ec.Err(), exp)
 		})
+		t.Run("Annotate", func(t *testing.T) {
+			ec := &Collector{}
+
+			ec.Annotate(nil, "bar")
+			assert.Equal(t, ec.Len(), 0)
+			assert.True(t, ec.Ok())
+			exp := errors.New("foo")
+			ec.Annotate(exp, "bar")
+			assert.True(t, !ec.Ok())
+			assert.Equal(t, ec.Len(), 1)
+			assert.Equal(t, "foo [bar]", ec.Error())
+			assert.NotEqual(t, ec.Err().Error(), exp.Error())
+			t.Log("exp", exp.Error())
+			t.Log("ec", ec.Error())
+			assert.True(t, strings.HasPrefix(ec.Error(), exp.Error()))
+			assert.ErrorIs(t, ec.Err(), exp)
+		})
+		t.Run("Annotatef", func(t *testing.T) {
+			ec := &Collector{}
+
+			ec.Annotatef(nil, "bar %d", 1)
+			assert.Equal(t, ec.Len(), 0)
+			assert.True(t, ec.Ok())
+			exp := errors.New("foo")
+			ec.Annotatef(exp, "bar %d", 2)
+			assert.True(t, !ec.Ok())
+			assert.Equal(t, ec.Len(), 1)
+			assert.Equal(t, "foo [bar 2]", ec.Error())
+			assert.NotEqual(t, ec.Err().Error(), exp.Error())
+			assert.True(t, strings.HasPrefix(ec.Error(), exp.Error()))
+			assert.ErrorIs(t, ec.Err(), exp)
+		})
 	})
 	t.Run("ChaosEndToEnd", func(t *testing.T) {
 		t.Parallel()
