@@ -12,7 +12,7 @@ import "iter"
 // processing and collect all errors for later inspection.
 func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	out := slice[T]{}
-	err := ForIterator(seq, out.appender())
+	err := ForIterator(seq, out.push)
 	return out, err
 }
 
@@ -28,7 +28,7 @@ func FromIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // errors that occurred.
 func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	out := slice[T]{}
-	err := ForIteratorAll(seq, out.appender())
+	err := ForIteratorAll(seq, out.push)
 	return out, err
 }
 
@@ -43,7 +43,7 @@ func FromIteratorAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // to continue processing after the first error.
 func FromIteratorUntil[T any](seq iter.Seq2[T, error]) ([]T, error) {
 	out := slice[T]{}
-	err := ForIteratorUntil(seq, out.appender())
+	err := ForIteratorUntil(seq, out.push)
 	return out, err
 }
 
@@ -87,5 +87,4 @@ func ForIteratorUntil[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error 
 
 type slice[T any] []T
 
-func (sl *slice[T]) push(value T)      { *sl = append(*sl, value) }
-func (sl *slice[T]) appender() func(T) { return func(in T) { sl.push(in) } }
+func (sl *slice[T]) push(value T) { *sl = append(*sl, value) }

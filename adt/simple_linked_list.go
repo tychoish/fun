@@ -88,7 +88,7 @@ func (l *list[T]) prevFrom(e *elem[T]) iter.Seq[*elem[T]] {
 	}
 }
 
-func (l *list[T]) popIter(seq iter.Seq[*elem[T]]) iter.Seq[*elem[T]] {
+func (*list[T]) popIter(seq iter.Seq[*elem[T]]) iter.Seq[*elem[T]] {
 	return func(yield func(*elem[T]) bool) {
 		var last *elem[T]
 		for value := range seq {
