@@ -15,8 +15,8 @@ import (
 // sequences.
 type Map[K comparable, V any] struct {
 	// Default handles construction and pools objects in
-	// the map for the Ensure and Get operations which must
-	// construct zero-value items. No configuration or
+	// the map for the Ensure operation that
+	// constructs zero-value items. No configuration or
 	// construction is necessary; however, callers can modify the
 	// default value constructed as needed.
 	Default Pool[V]
