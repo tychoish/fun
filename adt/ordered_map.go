@@ -26,15 +26,16 @@ func (*OrderedMap[K, V]) zerov() (out V)       { return }
 func (*OrderedMap[K, V]) with(mtx *sync.Mutex) { mtx.Unlock() }
 func (m *OrderedMap[K, V]) lock() *sync.Mutex  { m.mtx.Lock(); m.init(); return &m.mtx }
 
-// Len returns the length of the map.
-func (m *OrderedMap[K, V]) Len() int { defer m.with(m.lock()); return m.hash.Len() }
+// Len returns the length of the map. Unlike adt.Map, which as an O(n)
+// Len method, this Len method is done in constant time.
+func (m *OrderedMap[K, V]) Len() int { defer m.with(m.lock()); return m.list.Len() }
 
 // Check returns true if the value K is in the map.
 func (m *OrderedMap[K, V]) Check(key K) bool { defer m.with(m.lock()); return m.hash.Check(key) }
 
 // Get returns the value from the map. If the key is not present in the map,
 // this returns the zero value for V.
-func (m *OrderedMap[K, V]) Get(key K) (out V) { out, _ = m.Load(key); return }
+func (m *OrderedMap[K, V]) Get(key K) V { out, _ := m.Load(key); return out }
 
 // Load returns the value in the map for the key, and an "ok" value
 // which is true if that item is present in the map.

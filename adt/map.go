@@ -57,11 +57,11 @@ func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key))
 
 // Get returns the value from the map. If the key is not present in the map,
 // this returns the zero value for V.
-func (mp *Map[K, V]) Get(key K) (out V) { out, _ = mp.Load(key); return }
+func (mp *Map[K, V]) Get(key K) V { out, _ := mp.Load(key); return out }
 
 // Set adds the value to the map, overriding any existing value. The return reports if the key
 // existed in the map before the operation.
-func (mp *Map[K, V]) Set(key K, value V) (ok bool) { _, ok = mp.mp.Swap(key, value); return }
+func (mp *Map[K, V]) Set(key K, value V) bool { _, ok := mp.mp.Swap(key, value); return ok }
 
 func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {

@@ -37,7 +37,7 @@ func (m *OrderedMap[K, V]) Check(key K) bool { defer m.with(m.lock()); return m.
 
 // Get returns the value from the map. If the key is not present in the map,
 // this returns the zero value for V.
-func (m *OrderedMap[K, V]) Get(key K) (out V) { out, _ = m.Load(key); return }
+func (m *OrderedMap[K, V]) Get(key K) V { out, _ := m.Load(key); return out }
 
 // Load returns the value in the map for the key, and an "ok" value
 // which is true if that item is present in the map.
