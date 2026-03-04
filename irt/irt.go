@@ -99,10 +99,12 @@ func JoinStrings[S ~string](seq iter.Seq[S]) S {
 func JoinStringsWith[S, T ~string](seq iter.Seq[S], with T) S {
 	var buf strings.Builder
 	var lastSize int
+	var withStr string
+	withStr = string(with)
 
 	for str := range seq {
 		if buf.Len() > lastSize {
-			buf.WriteString(string(with))
+			buf.WriteString(withStr)
 		}
 		lastSize = buf.Len()
 		buf.WriteString(string(str))
