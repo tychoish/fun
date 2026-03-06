@@ -2681,6 +2681,12 @@ func TestRemove(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("RemoveValue", func(t *testing.T) {
+		if !slices.Equal(Collect(RemoveValue(Args(1, 2, 8, 3, 4), 8)), []int{1, 2, 3, 4}) {
+			t.Error("value not remove:", RemoveValue(Args(1, 2, 8, 3, 4), 8))
+		}
+	})
 }
 
 func TestUnique(t *testing.T) {

@@ -909,6 +909,9 @@ func WithMutex2[A, B any](seq iter.Seq2[A, B], mtx *sync.Mutex) iter.Seq2[A, B] 
 // input sequence that do NOT satisfy the predicate prd.
 func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, notf(prd)) }
 
+// RemoveValue returns a sequence with all values equal to the provided values removed.
+func RemoveValue[T comparable](seq iter.Seq[T], to T) iter.Seq[T] { return Remove(seq, equalf(to)) }
+
 // Remove2 returns a iterator containing only the pairs from the input
 // iterator that do NOT satisfy the predicate prd.
 func Remove2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {

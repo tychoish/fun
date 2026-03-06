@@ -179,6 +179,7 @@ func equal[T comparable](lh, rh T) bool                  { return lh == rh }
 func notf2[A, B any](op func(A, B) bool) func(A, B) bool { return threadzip2(op, not) }
 func not(is bool) bool                                   { return !is }
 func notf[T any](op func(T) bool) func(T) bool           { return thread(op, not) }
+func equalf[T comparable](rhv T) func(T) bool            { return func(lhv T) bool { return equal(lhv, rhv) } }
 
 func isNil[T any](in *T) bool               { return in == nil }
 func isNilChan[T any](in chan T) bool       { return in == nil }
