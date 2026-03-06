@@ -168,7 +168,7 @@ func TestErrors(t *testing.T) {
 	t.Run("Wrapped", func(t *testing.T) {
 		t.Run("Errorf", func(t *testing.T) {
 			err := errors.New("base")
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				err = fmt.Errorf("wrap %d: %w", i, err)
 			}
 
@@ -184,7 +184,7 @@ func TestErrors(t *testing.T) {
 		t.Run("Wrapf", func(t *testing.T) {
 			base := errors.New("base")
 			err := base
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				err = Wrapf(err, "iter=%d", i)
 			}
 
@@ -200,7 +200,7 @@ func TestErrors(t *testing.T) {
 		t.Run("Wrap", func(t *testing.T) {
 			base := errors.New("base")
 			err := base
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				err = Wrap(err, "annotation")
 			}
 
@@ -227,7 +227,7 @@ func TestErrors(t *testing.T) {
 		t.Run("Annotatef", func(t *testing.T) {
 			base := errors.New("base")
 			err := base
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				err = Annotatef(err, "iter=%d", i)
 			}
 
@@ -243,7 +243,7 @@ func TestErrors(t *testing.T) {
 		t.Run("Annotate", func(t *testing.T) {
 			base := errors.New("base")
 			err := base
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				err = Annotate(err, "annotation")
 			}
 

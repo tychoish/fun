@@ -94,8 +94,7 @@ func GenerateRandomStringSlice(size int) []string {
 func TestFunStream(t *testing.T) {
 	t.Run("ReadAll", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{})
 			assert.NotError(t, iter.ReadAll(fnx.FromHandler(func(_ int) { t.Fatal("should not be called") })).Run(ctx))
 
@@ -103,8 +102,7 @@ func TestFunStream(t *testing.T) {
 			assert.ErrorIs(t, err, io.EOF)
 		})
 		t.Run("PanicSafety", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			called := 0
 			err := SliceStream([]int{1, 2, 34, 56}).ReadAll(fnx.FromHandler(func(in int) {
 				called++
@@ -140,8 +138,7 @@ func TestFunStream(t *testing.T) {
 		})
 	})
 	t.Run("Continue", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		count := 0
 		iter := MakeStream(func(context.Context) (int, error) {
 			count++
@@ -192,8 +189,7 @@ func TestFunStream(t *testing.T) {
 	})
 	t.Run("Process", func(t *testing.T) {
 		t.Run("Process", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
@@ -203,8 +199,7 @@ func TestFunStream(t *testing.T) {
 			check.Equal(t, 9, count)
 		})
 		t.Run("ProcessWorker", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			op := iter.ReadAll(fnx.FromHandler(func(int) { count++ }))
@@ -213,8 +208,7 @@ func TestFunStream(t *testing.T) {
 			check.Equal(t, 9, count)
 		})
 		t.Run("Abort", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; return io.EOF }).Run(ctx)
@@ -222,8 +216,7 @@ func TestFunStream(t *testing.T) {
 			assert.Equal(t, 1, count)
 		})
 		t.Run("OperationError", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; return ers.ErrLimitExceeded }).Run(ctx)
@@ -232,8 +225,7 @@ func TestFunStream(t *testing.T) {
 			assert.Equal(t, 1, count)
 		})
 		t.Run("Panic", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := 0
 			err := iter.ReadAll(func(_ context.Context, _ int) error { count++; panic(ers.ErrLimitExceeded) }).Run(ctx)
@@ -254,8 +246,7 @@ func TestFunStream(t *testing.T) {
 		})
 
 		t.Run("Parallel", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{1, 2, 3, 4, 5, 6, 7, 8, 9})
 			count := &atomic.Int64{}
 			err := iter.Parallel(
@@ -270,8 +261,7 @@ func TestFunStream(t *testing.T) {
 	})
 	t.Run("Transform", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			input := SliceStream([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
@@ -293,8 +283,7 @@ func TestFunStream(t *testing.T) {
 			assert.Equal(t, calls, 4)
 		})
 		t.Run("Skips", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			input := SliceStream([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
@@ -319,8 +308,7 @@ func TestFunStream(t *testing.T) {
 			assert.Equal(t, calls, 3)
 		})
 		t.Run("ErrorPropogation", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			input := SliceStream([]string{
 				fmt.Sprint(10),
 				fmt.Sprint(10),
@@ -348,8 +336,7 @@ func TestFunStream(t *testing.T) {
 		})
 	})
 	t.Run("Future", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		t.Run("BasicOperation", func(t *testing.T) {
 			iter := MakeStream(func(context.Context) (int, error) {
 				return 1, nil
@@ -423,8 +410,7 @@ func TestFunStream(t *testing.T) {
 		})
 	})
 	t.Run("Filter", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		evens := testIntIter(t, 100).Filter(func(in int) bool { return in%2 == 0 })
 		assert.Equal(t, evens.Count(ctx), 50)
 		for evens.Next(ctx) {
@@ -433,8 +419,7 @@ func TestFunStream(t *testing.T) {
 		assert.NotError(t, evens.Close())
 	})
 	t.Run("Split", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		input := SliceStream(GenerateRandomStringSlice(100))
 
 		splits := input.Split(0)
@@ -468,8 +453,7 @@ func TestFunStream(t *testing.T) {
 		}
 	})
 	t.Run("Buffer", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		input := SliceStream(GenerateRandomStringSlice(128))
 		buf := input.Buffer(256)
 		check.Equal(t, buf.Count(ctx), 128)
@@ -477,8 +461,7 @@ func TestFunStream(t *testing.T) {
 		check.True(t, input.closer.state.Load())
 	})
 	t.Run("ParallelBuffer", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		input := SliceStream(GenerateRandomStringSlice(128))
 		buf := input.BufferParallel(256)
 		out, err := buf.Slice(ctx)
@@ -489,8 +472,7 @@ func TestFunStream(t *testing.T) {
 	})
 	t.Run("Slice", func(t *testing.T) {
 		t.Run("End2End", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			iter := SliceStream([]int{1, 2, 3, 4})
 			seen := 0
 			for iter.Next(ctx) {
@@ -544,7 +526,7 @@ func TestFunStream(t *testing.T) {
 		ch <- "buddy"
 		cancel()
 		seenCondition := false
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			t.Log(i)
 			_, err = stw.ChanBlocking(ch).Receive().Read(ctx)
 			if errors.Is(err, context.Canceled) {
@@ -591,7 +573,7 @@ func TestFunStream(t *testing.T) {
 			ch <- "buddy"
 			cancel()
 			seenCondition := false
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				_, err = stw.ChanNonBlocking(ch).Receive().Read(ctx)
 				if errors.Is(err, context.Canceled) {
 					seenCondition = true
@@ -608,8 +590,7 @@ func TestFunStream(t *testing.T) {
 			}
 		})
 		t.Run("NonBlocking", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			ch := make(chan string)
 			out, err := stw.ChanNonBlocking(ch).Receive().Read(ctx)
@@ -618,8 +599,7 @@ func TestFunStream(t *testing.T) {
 			assert.ErrorIs(t, err, ers.ErrCurrentOpSkip)
 		})
 		t.Run("Closed", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			ch := make(chan string)
 			close(ch)
@@ -630,8 +610,7 @@ func TestFunStream(t *testing.T) {
 		})
 	})
 	t.Run("Merged", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		elems := GenerateRandomStringSlice(100)
 
 		iter := MergeStreams(
@@ -751,8 +730,7 @@ func TestFunStream(t *testing.T) {
 }
 
 func TestEmptyIteration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ch := make(chan int)
 	close(ch)
@@ -783,12 +761,11 @@ func TestChain(t *testing.T) {
 
 func TestTools(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		t.Run(fmt.Sprint("Iteration", i), func(t *testing.T) {
 			t.Parallel()
 			t.Run("CancelCollectChannel", func(t *testing.T) {
-				bctx, bcancel := context.WithCancel(context.Background())
-				defer bcancel()
+				bctx := t.Context()
 
 				ctx, cancel := context.WithCancel(bctx)
 				defer cancel()
@@ -964,8 +941,7 @@ func TestStreamAlgoInts(t *testing.T) {
 }
 
 func TestParallelForEach(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	t.Run("Basic", func(t *testing.T) {
 		for i := int64(-1); i <= 12; i++ {
@@ -1067,8 +1043,7 @@ func TestParallelForEach(t *testing.T) {
 		}
 	})
 	t.Run("CancelAndPanic", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		err := SliceStream(makeIntSlice(10)).
 			Parallel(
@@ -1085,8 +1060,7 @@ func TestParallelForEach(t *testing.T) {
 		}
 	})
 	t.Run("CollectAllContinuedErrors", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		count := &atomic.Int64{}
 
 		err := SliceStream(makeIntSlice(10)).
@@ -1111,8 +1085,7 @@ func TestParallelForEach(t *testing.T) {
 		}
 	})
 	t.Run("CollectAllErrors/Double", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		err := SliceStream(makeIntSlice(100)).
 			Parallel(
@@ -1134,8 +1107,7 @@ func TestParallelForEach(t *testing.T) {
 		}
 	})
 	t.Run("CollectAllErrors/Cores", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		err := SliceStream(makeIntSlice(100)).Parallel(
 			func(_ context.Context, in int) error {
@@ -1157,8 +1129,7 @@ func TestParallelForEach(t *testing.T) {
 	})
 	t.Run("IncludeContextErrors", func(t *testing.T) {
 		t.Run("SuppressErrorsByDefault", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			err := SliceStream(makeIntSlice(2)).Parallel(
 				func(_ context.Context, _ int) error {
@@ -1171,8 +1142,7 @@ func TestParallelForEach(t *testing.T) {
 			}
 		})
 		t.Run("WithErrors", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			err := SliceStream(makeIntSlice(2)).Parallel(
 				func(_ context.Context, _ int) error {
@@ -1203,8 +1173,7 @@ func RunStreamImplementationTests[T comparable](
 					builder := func() *Stream[T] { return baseBuilder(elems) }
 
 					t.Run("Single", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						seen := make(map[T]struct{}, len(elems))
 						iter := builder()
@@ -1236,8 +1205,7 @@ func RunStreamImplementationTests[T comparable](
 					})
 					t.Run("PanicSafety", func(t *testing.T) {
 						t.Run("Map", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 
 							out, err := Map[T](
 								baseBuilder(elems),
@@ -1254,8 +1222,7 @@ func RunStreamImplementationTests[T comparable](
 							}
 						})
 						t.Run("ParallelMeap", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 
 							out, err := Map(
 								baseBuilder(elems),
@@ -1301,8 +1268,7 @@ func RunStreamIntegerAlgoTests(
 
 					t.Run("Map", func(t *testing.T) {
 						t.Run("ErrorDoesNotAbort", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 							expected := errors.New("root error")
 
 							out, err := Map(
@@ -1329,8 +1295,7 @@ func RunStreamIntegerAlgoTests(
 						})
 
 						t.Run("PanicDoesNotAbort", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 
 							out, err := Map(
 								baseBuilder(elems),
@@ -1353,8 +1318,7 @@ func RunStreamIntegerAlgoTests(
 							}
 						})
 						t.Run("ErrorAborts", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 							expectedErr := errors.New("whoop")
 							out, err := Map(
 								baseBuilder(elems),
@@ -1378,8 +1342,7 @@ func RunStreamIntegerAlgoTests(
 							}
 						})
 						t.Run("ParallelErrorDoesNotAbort", func(t *testing.T) {
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 
 							expectedErr := errors.New("whoop")
 							out, err := Map(
@@ -1426,8 +1389,7 @@ func RunStreamStringAlgoTests(
 
 					builder := func() *Stream[string] { return (baseBuilder(elems)) }
 					t.Run("Channel", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						seen := make(map[string]struct{}, len(elems))
 						iter := builder()
@@ -1441,8 +1403,7 @@ func RunStreamStringAlgoTests(
 						}
 					})
 					t.Run("Collect", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						iter := builder()
 						vals, err := iter.Slice(ctx)
@@ -1455,8 +1416,7 @@ func RunStreamStringAlgoTests(
 						}
 					})
 					t.Run("Map", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						iter := builder()
 						out := Map[string, string](
@@ -1503,8 +1463,7 @@ func RunStreamStringAlgoTests(
 					})
 
 					t.Run("Reduce", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						iter := builder()
 						seen := make(map[string]struct{}, len(elems))
@@ -1525,8 +1484,7 @@ func RunStreamStringAlgoTests(
 						}
 					})
 					t.Run("ReduceError", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						iter := builder()
 
@@ -1563,8 +1521,7 @@ func RunStreamStringAlgoTests(
 						}
 					})
 					t.Run("ReduceSkip", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						elems := makeIntSlice(32)
 						iter := SliceStream(elems)
@@ -1581,8 +1538,7 @@ func RunStreamStringAlgoTests(
 						assert.Equal(t, count, 32)
 					})
 					t.Run("ReduceEarlyExit", func(t *testing.T) {
-						ctx, cancel := context.WithCancel(context.Background())
-						defer cancel()
+						ctx := t.Context()
 
 						elems := makeIntSlice(32)
 						iter := SliceStream(elems)

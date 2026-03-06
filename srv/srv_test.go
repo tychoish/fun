@@ -110,7 +110,7 @@ func testCheckOrderingEffects(t *testing.T, s *Service) {
 
 func makeSeq(size int) iter.Seq[int] {
 	slice := make([]int, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		slice[i] = rand.Intn(size)
 	}
 	return irt.Slice(slice)
@@ -120,7 +120,7 @@ func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fnx.Wo
 	t.Helper()
 	queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
-	for i := 0; i < size; i++ {
+	for range size {
 		assert.NotError(t, queue.Push(func(_ context.Context) error {
 			time.Sleep(2 * time.Millisecond)
 			count.Add(1)
@@ -135,7 +135,7 @@ func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queu
 	t.Helper()
 	queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
-	for i := 0; i < size; i++ {
+	for i := range size {
 		idx := i
 		assert.NotError(t, queue.Push(func(_ context.Context) error {
 			time.Sleep(2 * time.Millisecond)

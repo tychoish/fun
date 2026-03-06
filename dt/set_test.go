@@ -87,7 +87,7 @@ func TestSet(t *testing.T) {
 		})
 		t.Run("LargeSet", func(t *testing.T) {
 			set := &Set[int]{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				set.Add(i)
 			}
 
@@ -101,7 +101,7 @@ func TestSet(t *testing.T) {
 			check.True(t, set.Equal(nset))
 
 			// Verify all elements present
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				if !nset.Check(i) {
 					t.Errorf("missing value %d", i)
 				}
@@ -227,7 +227,7 @@ func TestSet(t *testing.T) {
 			set.Add("c")
 		},
 		"Numbers": func(set *Set[string]) {
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				set.Add(fmt.Sprint(i))
 			}
 		},
@@ -303,10 +303,10 @@ func TestSet(t *testing.T) {
 	t.Run("Constructors", func(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			var passed bool
-			for attempt := 0; attempt < 10; attempt++ {
+			for range 10 {
 				func() {
 					ls := make([]uint64, 0, 100)
-					for i := 0; i < 100; i++ {
+					for range 100 {
 						ls = append(ls, rand.Uint64())
 					}
 					set := MakeSet(irt.Slice(ls))
@@ -471,7 +471,7 @@ func TestSet(t *testing.T) {
 			set2 := &Set[int]{}
 
 			// Add 1000 items in different orders
-			for i := 0; i < 1000; i++ {
+			for i := range 1000 {
 				set1.Add(i)
 			}
 			for i := 999; i >= 0; i-- {
@@ -548,7 +548,7 @@ func BenchmarkSet(b *testing.B) {
 	const size = 10000
 	b.Run("Append", func(b *testing.B) {
 		operation := func(set *Set[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i * i)
 			}
 		}
@@ -561,7 +561,7 @@ func BenchmarkSet(b *testing.B) {
 	b.Run("Mixed", func(b *testing.B) {
 		operation := func(set *Set[int]) {
 			var last int
-			for i := 0; i < size; i++ {
+			for i := range size {
 				val := i * i * size
 				set.Add(val)
 				if i%3 == 0 {
@@ -578,11 +578,11 @@ func BenchmarkSet(b *testing.B) {
 
 	b.Run("Deletion", func(b *testing.B) {
 		operation := func(set *Set[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i)
 				set.Add(i * size)
 			}
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Delete(i)
 				set.Delete(i + 1)
 				if i%3 == 0 {
@@ -598,7 +598,7 @@ func BenchmarkSet(b *testing.B) {
 
 	b.Run("Iteration", func(b *testing.B) {
 		operation := func(set *Set[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i * size)
 			}
 			count := 0

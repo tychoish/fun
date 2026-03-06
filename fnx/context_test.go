@@ -273,8 +273,7 @@ func TestWrapWithContext(t *testing.T) {
 		})
 
 		t.Run("CapturesContext", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			var capturedCtx context.Context
 			wrapped := fnx.WrapWithContextCall(ctx, func(c context.Context) {
@@ -315,8 +314,7 @@ func TestWrapWithContext(t *testing.T) {
 		})
 
 		t.Run("CapturesContext", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			var capturedCtx context.Context
 			wrapped := fnx.WrapWithContextDo(ctx, func(c context.Context) string {
@@ -368,8 +366,7 @@ func TestWrapWithContext(t *testing.T) {
 		})
 
 		t.Run("CapturesContext", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			var capturedCtx context.Context
 			wrapped := fnx.WrapWithContextDoOk(ctx, func(c context.Context) (int, bool) {
@@ -411,8 +408,7 @@ func TestWrapWithContext(t *testing.T) {
 		})
 
 		t.Run("CapturesContext", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			var capturedCtx context.Context
 			wrapped := fnx.WrapWithContextDoErr(ctx, func(c context.Context) (int, error) {

@@ -691,7 +691,7 @@ func TestInitial(t *testing.T) {
 	t.Run("OnlyIteratesOnce", func(t *testing.T) {
 		count := 0
 		seq := func(yield func(int) bool) {
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				count++
 				if !yield(i) {
 					return
@@ -792,7 +792,7 @@ func TestFinal(t *testing.T) {
 
 	t.Run("LargeSequence", func(t *testing.T) {
 		seq := func(yield func(int) bool) {
-			for i := 0; i < 1000; i++ {
+			for i := range 1000 {
 				if !yield(i) {
 					return
 				}
@@ -877,7 +877,7 @@ func TestFinal2(t *testing.T) {
 		// Test that Final2 still consumes entire sequence even if we could stop early
 		consumed := 0
 		seq := func(yield func(int, int) bool) {
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				consumed++
 				if !yield(i, i*10) {
 					return
@@ -3627,7 +3627,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 	t.Run("RemoveZerosEarlyReturn", func(t *testing.T) {
 		var callCount atomic.Int32
 		seq := func(yield func(int) bool) {
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				callCount.Add(1)
 				if !yield(i) {
 					return
@@ -3714,8 +3714,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 // Additional tests for Shard and ShardByHash
 
 func TestShard(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	workload := Slice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 	numShards := 3
@@ -4829,7 +4828,7 @@ func TestKeepOk(t *testing.T) {
 	t.Run("EarlyReturn", func(t *testing.T) {
 		var count atomic.Int32
 		input := func(yield func(int, bool) bool) {
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				count.Add(1)
 				if !yield(i, true) {
 					return
@@ -5469,7 +5468,7 @@ func TestForEachWhile2(t *testing.T) {
 func TestLegacyUtils(t *testing.T) {
 	t.Run("Lines", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		last := sha256.Sum256([]byte(fmt.Sprint(time.Now().UTC().UnixMilli())))
+		last := sha256.Sum256(fmt.Append(nil, time.Now().UTC().UnixMilli()))
 		_, _ = fmt.Fprintf(buf, "%x", last)
 		for i := 1; i < 128; i++ {
 			next := sha256.Sum256(last[:])
@@ -5734,7 +5733,7 @@ func TestAsGenerator(t *testing.T) {
 		}
 
 		// After exhaustion, should return zero value and false
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			val, ok := gen(t.Context())
 			if ok {
 				t.Errorf("after exhaustion call %d: expected ok to be false", i)
@@ -6299,7 +6298,7 @@ func TestWithMutex2(t *testing.T) {
 			t.Errorf("expected 5 pairs, got %d", len(result))
 		}
 
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			if result[i] != i+1 {
 				t.Errorf("expected result[%d] to be %d, got %d", i, i+1, result[i])
 			}
@@ -6319,7 +6318,7 @@ func TestWithMutex2(t *testing.T) {
 			t.Errorf("first iteration: expected 10 pairs, got %d", len(result1))
 		}
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			if result1[i] != i+1 {
 				t.Errorf("first iteration: expected result1[%d] to be %d, got %d", i, i+1, result1[i])
 			}
@@ -6368,7 +6367,7 @@ func TestWithMutex2(t *testing.T) {
 			t.Errorf("expected 5 pairs, got %d", len(result))
 		}
 
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			if result[i] != i+1 {
 				t.Errorf("expected result[%d] to be %d, got %d", i, i+1, result[i])
 			}
@@ -6611,7 +6610,7 @@ func TestWith3(t *testing.T) {
 
 		results := Collect(KVjoin(seq))
 
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			expectedInput := i + 1
 			if results[i].Key.Key != expectedInput {
 				t.Errorf("expected expectedInput, got %v", results[i].Key.Key)
@@ -6822,7 +6821,7 @@ func TestKVmap(t *testing.T) {
 
 	t.Run("LargeMap", func(t *testing.T) {
 		input := make(map[int]int)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			input[i] = i * 2
 		}
 
@@ -7069,7 +7068,7 @@ func TestMapKV(t *testing.T) {
 
 	t.Run("LargeMap", func(t *testing.T) {
 		input := make(map[int]int)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			input[i] = i * 2
 		}
 
@@ -7722,18 +7721,18 @@ func TestJoinStrings(t *testing.T) {
 		{
 			name: "LongSequence",
 			seq: func(yield func(string) bool) {
-				for i := 0; i < 100; i++ {
+				for range 100 {
 					if !yield("x") {
 						return
 					}
 				}
 			},
 			expected: func() string {
-				s := ""
-				for i := 0; i < 100; i++ {
-					s += "x"
+				var s strings.Builder
+				for range 100 {
+					s.WriteString("x")
 				}
-				return s
+				return s.String()
 			}(),
 		},
 		{

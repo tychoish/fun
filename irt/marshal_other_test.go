@@ -532,7 +532,7 @@ func TestMarshalBinary(t *testing.T) {
 func TestMarshalTextEdgeCases(t *testing.T) {
 	t.Run("VeryLongSequence", func(t *testing.T) {
 		seq := func(yield func(string) bool) {
-			for i := 0; i < 10000; i++ {
+			for i := range 10000 {
 				if !yield(fmt.Sprintf("%d", i)) {
 					return
 				}
@@ -579,7 +579,7 @@ func TestMarshalTextEdgeCases(t *testing.T) {
 func TestMarshalBinaryEdgeCases(t *testing.T) {
 	t.Run("VeryLongSequence", func(t *testing.T) {
 		seq := func(yield func([]byte) bool) {
-			for i := 0; i < 10000; i++ {
+			for i := range 10000 {
 				if !yield([]byte{byte(i % 256)}) {
 					return
 				}

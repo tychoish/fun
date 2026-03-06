@@ -21,6 +21,7 @@ linters:
     - inamedparam
     - mnd
   enable:
+    - modernize
     - revive
   settings:
     dupl:

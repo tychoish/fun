@@ -38,7 +38,7 @@ func TestUnwind(t *testing.T) {
 	})
 	t.Run("Wrapped", func(t *testing.T) {
 		err := errors.New("base")
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			err = fmt.Errorf("wrap %d: %w", i, err)
 		}
 

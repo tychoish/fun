@@ -99,8 +99,7 @@ func TestContext(t *testing.T) {
 			}
 		})
 		t.Run("Tree", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			ctx = SetBaseContext(ctx)
 
 			ctxleft, cancelleft := context.WithCancel(ctx)
@@ -120,8 +119,7 @@ func TestContext(t *testing.T) {
 	})
 	t.Run("Shutdown", func(t *testing.T) {
 		t.Run("NormalCase", func(t *testing.T) {
-			rctx, cancel0 := context.WithCancel(context.Background())
-			defer cancel0()
+			rctx := t.Context()
 
 			ctx, cancel1 := context.WithCancel(rctx)
 			defer cancel1()
@@ -145,8 +143,7 @@ func TestContext(t *testing.T) {
 			}
 		})
 		t.Run("Tree", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			ctxleft, cancelleft := context.WithCancel(ctx)
 			defer cancelleft()
@@ -181,8 +178,7 @@ func TestContext(t *testing.T) {
 		})
 	})
 	t.Run("WithOrchestrator", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		ctx = WithOrchestrator(ctx)
 		orca := GetOrchestrator(ctx)
@@ -194,8 +190,7 @@ func TestContext(t *testing.T) {
 		}
 	})
 	t.Run("MultipleAttchments", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		ctx = SetShutdownSignal(ctx)
 		ctx = SetBaseContext(ctx)
@@ -216,8 +211,7 @@ func TestContext(t *testing.T) {
 		}
 	})
 	t.Run("ContextsAreAStack", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		ctx = SetBaseContext(ctx)
 		bctx := SetShutdownSignal(ctx)
 		ctx = WithOrchestrator(bctx)
@@ -264,8 +258,7 @@ func TestWorkerPool(t *testing.T) {
 		})
 	})
 	t.Run("NegativeWorkersWork", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		ctx = WithWorkerPool(ctx, "kip", wpa.WorkerGroupConfNumWorkers(4))
 		assert.True(t, HasOrchestrator(ctx))
 		called := &atomic.Bool{}
@@ -282,8 +275,7 @@ func TestWorkerPool(t *testing.T) {
 		assert.True(t, called.Load())
 	})
 	t.Run("UnsetAddToWorkerErrors", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		err := AddToWorkerPool(ctx, "kip", func(context.Context) error {
 			return errors.New("should not be called")
 		})
@@ -293,8 +285,7 @@ func TestWorkerPool(t *testing.T) {
 		check.Substring(t, err.Error(), "kip")
 	})
 	t.Run("ClosedQueueError", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 		ctx = WithWorkerPool(ctx, "buddy")
 		ctx = SetWorkerPool(ctx, "kip", queue)
@@ -322,8 +313,7 @@ func TestWorkerPool(t *testing.T) {
 	})
 	t.Run("MultiplePools", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		wpCt := &atomic.Int64{}
 		ctx = SetShutdownSignal(ctx)
 		ctx = WithWorkerPool(ctx, "buddy", wpa.WorkerGroupConfNumWorkers(50))
@@ -333,7 +323,7 @@ func TestWorkerPool(t *testing.T) {
 			check.ErrorIs(t, err, expected)
 			obCt.Add(1)
 		}, wpa.WorkerGroupConfNumWorkers(50))
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			err := AddToWorkerPool(ctx, "buddy", func(context.Context) error { wpCt.Add(1); return nil })
 			assert.NotError(t, err)
 			err = AddToWorkerPool(ctx, "kip", func(context.Context) error { return expected })

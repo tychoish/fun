@@ -38,7 +38,7 @@ func TestValueAtQuantile(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +78,7 @@ func TestMean(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +94,7 @@ func TestStdDev(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +110,7 @@ func TestTotalCount(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +125,7 @@ func TestMax(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +141,7 @@ func TestReset(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -160,7 +160,7 @@ func TestMerge(t *testing.T) {
 	h1 := hdrhist.New(1, 1000, 3)
 	h2 := hdrhist.New(1, 1000, 3)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if err := h1.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +184,7 @@ func TestMin(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +238,7 @@ func TestCumulativeDistribution(t *testing.T) {
 
 	h := hdrhist.New(1, num, 3)
 
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -278,7 +278,7 @@ func TestDistribution(t *testing.T) {
 
 	h := hdrhist.New(8, 1024, 3)
 
-	for i := 0; i < 1024; i++ {
+	for i := range 1024 {
 		if err := h.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -347,15 +347,15 @@ func TestHighestTrackableValue(t *testing.T) {
 
 func BenchmarkHistRecordValue(b *testing.B) {
 	h := hdrhist.New(1, num, 3)
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			b.Fatal(err)
 		}
 	}
-	b.ResetTimer()
+
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = h.RecordValue(100)
 	}
 }
@@ -363,7 +363,7 @@ func BenchmarkHistRecordValue(b *testing.B) {
 func BenchmarkNew(b *testing.B) {
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		hdrhist.New(1, 120000, 3) // this could track 1ms-2min
 	}
 }
@@ -406,7 +406,7 @@ func TestExportImport(t *testing.T) {
 	maxVal := num
 	sigfigs := 3
 	h := hdrhist.New(minVal, maxVal, sigfigs)
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
@@ -435,14 +435,14 @@ func TestEquals(t *testing.T) {
 	defer without(raceDetector())
 
 	h1 := hdrhist.New(1, num, 3)
-	for i := int64(0); i < num/10; i++ {
+	for i := range num / 10 {
 		if err := h1.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	h2 := hdrhist.New(1, num, 3)
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		if err := h1.RecordValue(int64(i)); err != nil {
 			t.Fatal(err)
 		}
@@ -465,7 +465,7 @@ func TestEqualsEdgeCase(t *testing.T) {
 
 	first := hdrhist.New(1, num, 3)
 	second := hdrhist.New(1, num, 3)
-	for i := int64(0); i < 10000; i++ {
+	for i := range int64(10000) {
 		if err := errors.Join(
 			first.RecordValue(i),
 			second.RecordValue(i),
@@ -578,12 +578,12 @@ func TestRand(t *testing.T) {
 	defer without(raceDetector())
 
 	hist := hdrhist.New(0, 100, 3)
-	for i := int64(0); i < 10000; i++ {
+	for range int64(10000) {
 		if err := hist.RecordValue(rand.Int63n(101)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for i := int64(0); i < 101; i++ {
+	for i := range int64(101) {
 		if err := hist.RecordValue(i); err != nil {
 			t.Fatal(err)
 		}

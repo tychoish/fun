@@ -64,7 +64,7 @@ func TestWaitGroup(t *testing.T) {
 		const num = 100
 		wg.Add(100)
 		waits := make([]chan struct{}, 100)
-		for i := 0; i < num; i++ {
+		for i := range num {
 			ch := make(chan struct{})
 			waits[i] = ch
 			go func(ch chan struct{}) {
@@ -73,7 +73,7 @@ func TestWaitGroup(t *testing.T) {
 			}(ch)
 		}
 
-		for i := 0; i < num; i++ {
+		for i := range num {
 			go func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Int63n(100)+1) * time.Millisecond)
@@ -99,7 +99,7 @@ func TestWaitGroup(t *testing.T) {
 		const num = 100
 		wg.Add(100)
 		waits := make([]chan struct{}, 100)
-		for i := 0; i < num; i++ {
+		for i := range num {
 			ch := make(chan struct{})
 			waits[i] = ch
 			if i%4 == 0 {
@@ -125,7 +125,7 @@ func TestWaitGroup(t *testing.T) {
 			}
 		}
 
-		for i := 0; i < num; i++ {
+		for i := range num {
 			go func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Int63n(100)+1) * time.Millisecond)
@@ -149,8 +149,7 @@ func TestWaitGroup(t *testing.T) {
 		count := 0
 		thunk := fn.MakeFuture(func() int { count++; return 42 }).Lock()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		// tempt the race detector.
 		wg := &WaitGroup{}
@@ -165,8 +164,7 @@ func TestWaitGroup(t *testing.T) {
 		count := 0
 		thunk := fn.MakeFuture(func() int { count++; return 42 }).WithLock(&sync.Mutex{})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		// tempt the race detector.
 		wg := &WaitGroup{}

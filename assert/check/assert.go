@@ -2,6 +2,7 @@ package check
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -211,10 +212,8 @@ func Contains[T comparable](t testing.TB, slice []T, item T) {
 		t.Error("slice was empty")
 	}
 
-	for _, it := range slice {
-		if it == item {
-			return
-		}
+	if slices.Contains(slice, item) {
+		return
 	}
 
 	t.Errorf("item <%v> is not in %v", item, slice)

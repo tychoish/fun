@@ -28,7 +28,7 @@ func TestLocked(t *testing.T) {
 		}
 
 		wg := &sync.WaitGroup{}
-		for i := 0; i < 30; i++ {
+		for i := range 30 {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()

@@ -207,7 +207,7 @@ func BenchmarkOrderedSet(b *testing.B) {
 	const size = 10000
 	b.Run("Append", func(b *testing.B) {
 		operation := func(set *OrderedSet[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i * i)
 			}
 		}
@@ -220,7 +220,7 @@ func BenchmarkOrderedSet(b *testing.B) {
 	b.Run("Mixed", func(b *testing.B) {
 		operation := func(set *OrderedSet[int]) {
 			var last int
-			for i := 0; i < size; i++ {
+			for i := range size {
 				val := i * i * size
 				set.Add(val)
 				if i%3 == 0 {
@@ -237,11 +237,11 @@ func BenchmarkOrderedSet(b *testing.B) {
 
 	b.Run("Deletion", func(b *testing.B) {
 		operation := func(set *OrderedSet[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i)
 				set.Add(i * size)
 			}
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Delete(i)
 				set.Delete(i + 1)
 				if i%3 == 0 {
@@ -257,7 +257,7 @@ func BenchmarkOrderedSet(b *testing.B) {
 
 	b.Run("Iteration", func(b *testing.B) {
 		operation := func(set *OrderedSet[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i * size)
 			}
 			count := 0

@@ -214,8 +214,7 @@ func TestQueueIterators(t *testing.T) {
 	t.Run("EndToEnd", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
 		if err != nil {
@@ -293,8 +292,7 @@ func TestQueueIterators(t *testing.T) {
 		}
 	})
 	t.Run("EndToEndStartEmpty", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		queue, err := NewQueue[string](QueueOptions{HardLimit: 5, SoftQuota: 3})
 		if err != nil {
@@ -339,12 +337,11 @@ func TestQueueIterators(t *testing.T) {
 		}
 	})
 	t.Run("ClosedQueueIteratesAndDoesNotBlock", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		queue := NewUnlimitedQueue[string]()
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			if err := queue.Push(fmt.Sprint("item ", i)); err != nil {
 				t.Fatal(err)
 			}
@@ -365,7 +362,7 @@ func TestQueueIterators(t *testing.T) {
 		ctx := testt.Context(t)
 		queue := NewUnlimitedQueue[string]()
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			if err := queue.Push(fmt.Sprint("item ", i)); err != nil {
 				t.Fatal(err)
 			}
@@ -496,8 +493,7 @@ func TestQueueIterators(t *testing.T) {
 	t.Run("WaitAdd", func(t *testing.T) {
 		t.Parallel()
 		t.Run("ContextCanceled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			tt := erc.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 
@@ -516,8 +512,7 @@ func TestQueueIterators(t *testing.T) {
 			}
 		})
 		t.Run("Closed", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			tt := erc.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
@@ -537,8 +532,7 @@ func TestQueueIterators(t *testing.T) {
 		})
 		t.Run("RealWait", func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			tt := erc.Must(NewQueue[int](QueueOptions{HardLimit: 2}))
 			assert.True(t, tt.WaitPush(ctx, 1) == nil)
@@ -851,7 +845,7 @@ func TestQueueIteratorPop(t *testing.T) {
 		ctx := context.Background()
 		queue := NewUnlimitedQueue[int]()
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			check.NotError(t, queue.Push(i))
 		}
 		assert.Equal(t, queue.Len(), 10)
@@ -885,7 +879,7 @@ func TestQueueIteratorPop(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond)
 
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			check.NotError(t, queue.Push(i))
 			time.Sleep(5 * time.Millisecond)
 		}
@@ -1091,7 +1085,7 @@ func TestQueueDrain(t *testing.T) {
 		queue := NewUnlimitedQueue[int]()
 
 		// Add many items
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			assert.NotError(t, queue.Push(i))
 		}
 

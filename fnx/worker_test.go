@@ -57,8 +57,7 @@ func TestWorker(t *testing.T) {
 			assert.NotError(t, err)
 		})
 		t.Run("Background", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			called := &atomic.Int64{}
 			expected := errors.New("foo")
 			Worker(func(_ context.Context) error { called.Add(1); panic(expected) }).WithRecover().
@@ -77,8 +76,7 @@ func TestWorker(t *testing.T) {
 			}
 		})
 		t.Run("Add", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			wg := &WaitGroup{}
 			count := &atomic.Int64{}
 			func() {
@@ -100,8 +98,7 @@ func TestWorker(t *testing.T) {
 			assert.Equal(t, count.Load(), 2)
 		})
 		t.Run("Operation/Run", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			t.Run("ObserveNilErrors", func(t *testing.T) {
 				called := &atomic.Bool{}
 				observed := &atomic.Bool{}
@@ -173,8 +170,7 @@ func TestWorker(t *testing.T) {
 			})
 		})
 		t.Run("Signal", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			expected := errors.New("hello")
 			wf := MakeWorker(func() error { return expected })
 			out := wf.Signal(ctx)
@@ -184,8 +180,7 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("Background", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		ch := make(chan struct{}, 1)
 
 		expected := errors.New("kip")
@@ -215,8 +210,7 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("Once ", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		var count int
 		var wf Worker = func(context.Context) error { count++; return nil }
@@ -225,14 +219,13 @@ func TestWorker(t *testing.T) {
 		check.NotError(t, wf(ctx))
 		assert.Equal(t, 1, count)
 
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			check.NotError(t, wf(ctx))
 			assert.Equal(t, 1, count)
 		}
 	})
 	t.Run("Ignore", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		expected := errors.New("cat")
 		count := 0
@@ -250,26 +243,24 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("Limit", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := 0
 			var wf Worker = func(context.Context) error { count++; return nil }
 			wf = wf.Limit(10)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				assert.NotError(t, wf(ctx))
 			}
 			assert.Equal(t, count, 10)
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := &atomic.Int64{}
 
 			var wf Worker = func(context.Context) error { count.Add(1); return nil }
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				wg.Add(1)
 				go func() { defer wg.Done(); check.NotError(t, wf(ctx)) }()
 			}
@@ -297,8 +288,7 @@ func TestWorker(t *testing.T) {
 			}
 		})
 		t.Run("Half", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := &atomic.Int64{}
 			var wf Worker = func(context.Context) error {
 				if count.Add(1) > 3 {
@@ -336,8 +326,7 @@ func TestWorker(t *testing.T) {
 				assert.Equal(t, count, 3)
 			})
 			t.Run("Error", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 				expected := errors.New("cat")
 
 				count := 0
@@ -366,8 +355,7 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("Check", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		expected := errors.New("cat")
 
@@ -388,10 +376,9 @@ func TestWorker(t *testing.T) {
 		}
 
 		wf = wf.Lock()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
-		for i := 0; i < 64; i++ {
+		for range 64 {
 			wg.Add(1)
 			go func() { check.NotError(t, wf(ctx)) }()
 		}
@@ -401,41 +388,38 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("TTL", func(t *testing.T) {
 		t.Run("Zero", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := errors.New("cat")
 
 			count := 0
 			var wf Worker = func(context.Context) error { count++; return expected }
 			wf = wf.TTL(0)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				check.ErrorIs(t, wf(ctx), expected)
 			}
 			check.Equal(t, 100, count)
 		})
 		t.Run("Serial", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := errors.New("cat")
 
 			count := 0
 			var wf Worker = func(context.Context) error { count++; return expected }
 			wf = wf.TTL(100 * time.Millisecond)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				check.ErrorIs(t, wf(ctx), expected)
 			}
 			check.Equal(t, 1, count)
 			time.Sleep(100 * time.Millisecond)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				check.ErrorIs(t, wf(ctx), expected)
 			}
 			check.Equal(t, 2, count)
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := errors.New("cat")
 			wg := &sync.WaitGroup{}
@@ -444,14 +428,14 @@ func TestWorker(t *testing.T) {
 			var wf Worker = func(context.Context) error { count++; return expected }
 			wf = wf.TTL(100 * time.Millisecond)
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() { defer wg.Done(); check.ErrorIs(t, wf(ctx), expected) }()
 			}
 			wg.Wait()
 			check.Equal(t, 1, count)
 			time.Sleep(100 * time.Millisecond)
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() { defer wg.Done(); check.ErrorIs(t, wf(ctx), expected) }()
 			}
 			wg.Wait()
@@ -460,15 +444,14 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("Delay", func(t *testing.T) {
 		t.Run("Basic", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := &atomic.Int64{}
 			var wf Worker = func(context.Context) error { count.Add(1); return nil }
 			wf = wf.Delay(100 * time.Millisecond)
 			wg := &WaitGroup{}
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					start := time.Now()
@@ -491,7 +474,7 @@ func TestWorker(t *testing.T) {
 			wg := &WaitGroup{}
 			wg.Add(100)
 			cancel()
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					check.ErrorIs(t, wf(ctx), context.Canceled)
@@ -503,8 +486,7 @@ func TestWorker(t *testing.T) {
 			check.Equal(t, count.Load(), 0)
 		})
 		t.Run("After", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := &atomic.Int64{}
 			var wf Worker = func(context.Context) error { count.Add(1); return nil }
@@ -512,7 +494,7 @@ func TestWorker(t *testing.T) {
 			wf = wf.After(ts)
 			wg := &WaitGroup{}
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					start := time.Now()
@@ -528,8 +510,7 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("Jitter", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		delay := (100 * time.Millisecond)
 		timing := func(in *time.Duration) time.Duration {
@@ -559,8 +540,7 @@ func TestWorker(t *testing.T) {
 	t.Run("While", func(t *testing.T) {
 		t.Parallel()
 		t.Run("PRoof", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			eone := errors.New("while errors")
 			etwo := errors.New("do errors")
 
@@ -589,8 +569,7 @@ func TestWorker(t *testing.T) {
 			}
 		})
 		t.Run("Ordering", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			var (
 				ts1 time.Time
@@ -640,8 +619,7 @@ func TestWorker(t *testing.T) {
 		})
 	})
 	t.Run("FilterError", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		var wf Worker = func(context.Context) error {
 			return io.EOF
 		}
@@ -653,8 +631,7 @@ func TestWorker(t *testing.T) {
 		assert.ErrorIs(t, fwf(ctx), context.Canceled)
 	})
 	t.Run("WithoutError", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		var wf Worker = func(context.Context) error {
 			return io.EOF
 		}
@@ -709,8 +686,7 @@ func TestWorker(t *testing.T) {
 	t.Run("PreHook", func(t *testing.T) {
 		t.Run("Chain", func(t *testing.T) {
 			count := 0
-			rctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			rctx := t.Context()
 			var wf Worker = func(ctx context.Context) error {
 				check.True(t, count == 1 || count == 4)
 				check.Equal(t, rctx, ctx)
@@ -742,8 +718,7 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++; panic(root) })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := pf(ctx)
 			check.Error(t, err)
 			check.ErrorIs(t, err, root)
@@ -756,8 +731,7 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++ })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, 2, count)
@@ -772,8 +746,7 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := pf(ctx)
 			check.Error(t, err)
 			check.Equal(t, 2, count)
@@ -785,16 +758,14 @@ func TestWorker(t *testing.T) {
 				count++
 				return nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, 2, count)
 		})
 	})
 	t.Run("Retry", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		t.Run("Skip", func(t *testing.T) {
 			count := &atomic.Int64{}

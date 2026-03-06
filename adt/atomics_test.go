@@ -121,7 +121,7 @@ func TestAtomics(t *testing.T) {
 			count := &atomic.Int64{}
 			actor := &Once[int]{}
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 64; i++ {
+			for range 64 {
 				wg.Add(1)
 				// this function panics rather than
 				// asserts because it's very likely to
@@ -129,7 +129,7 @@ func TestAtomics(t *testing.T) {
 				// mutexes.
 				go func() {
 					defer wg.Done()
-					for i := 0; i < 64; i++ {
+					for range 64 {
 						actor.Do(func() int {
 							count.Add(1)
 							return 42
@@ -155,7 +155,7 @@ func TestAtomics(t *testing.T) {
 			check.True(t, actor.Defined())
 			check.True(t, !actor.Called())
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 64; i++ {
+			for range 64 {
 				wg.Add(1)
 				// this function panics rather than
 				// asserts because it's very likely to
@@ -163,7 +163,7 @@ func TestAtomics(t *testing.T) {
 				// mutexes.
 				go func() {
 					defer wg.Done()
-					for i := 0; i < 64; i++ {
+					for range 64 {
 						val := actor.Resolve()
 						check.True(t, actor.Called())
 						if val != 42 {

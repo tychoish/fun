@@ -126,7 +126,7 @@ func TestPool(t *testing.T) {
 			t.Run("Basic", func(t *testing.T) {
 				counter := &atomic.Int64{}
 				wfs := make([]fnx.Worker, wpJobCount)
-				for i := 0; i < wpJobCount; i++ {
+				for i := range wpJobCount {
 					wfs[i] = func(context.Context) error {
 						counter.Add(1)
 						time.Sleep(minDuration)
@@ -150,7 +150,7 @@ func TestPool(t *testing.T) {
 
 				counter := &atomic.Int64{}
 				wfs := make([]fnx.Worker, wpJobCount)
-				for i := 0; i < wpJobCount; i++ {
+				for i := range wpJobCount {
 					wfs[i] = func(context.Context) error { counter.Add(1); time.Sleep(minDuration); return experr }
 				}
 
@@ -178,7 +178,7 @@ func TestPool(t *testing.T) {
 	t.Run("Merge", func(t *testing.T) {
 		wfs := make([]fnx.Operation, 100)
 		count := &atomic.Int64{}
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			wfs[i] = func(context.Context) {
 				startAt := time.Now()
 				defer count.Add(1)
@@ -187,8 +187,7 @@ func TestPool(t *testing.T) {
 				t.Log(time.Since(startAt))
 			}
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		start := time.Now()
 		t.Log("before exec:", count.Load())
 		err := RunWithPool(irt.Slice(wfs), WorkerGroupConfDefaults()).Run(ctx)

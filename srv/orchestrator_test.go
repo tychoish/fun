@@ -32,7 +32,7 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("BeforeStart", func(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
 					Run: func(_ context.Context) error {
@@ -55,7 +55,7 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("NilServices", func(t *testing.T) {
 			orc := &Orchestrator{}
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				if err := orc.Add(nil); err != nil {
 					t.Error(err)
 				}
@@ -71,8 +71,7 @@ func TestOrchestrator(t *testing.T) {
 	t.Run("Service", func(t *testing.T) {
 		t.Parallel()
 		t.Run("MultipleCalls", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			orc := &Orchestrator{}
 			if orc.srv != nil {
@@ -87,7 +86,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error("service is created lazily, by now")
 			}
 			wg := &fnx.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				wg.Add(1)
 				go func(id int) {
 					defer wg.Done()
@@ -104,7 +103,7 @@ func TestOrchestrator(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
 			wg := &fnx.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
@@ -118,8 +117,7 @@ func TestOrchestrator(t *testing.T) {
 				}
 			}
 			s := orc.Service()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -138,7 +136,7 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("FinishedErrorsPropogate", func(t *testing.T) {
 			orc := &Orchestrator{}
 			wg := &fnx.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
@@ -151,8 +149,7 @@ func TestOrchestrator(t *testing.T) {
 				}
 			}
 			s := orc.Service()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -170,11 +167,10 @@ func TestOrchestrator(t *testing.T) {
 			}
 		})
 		t.Run("PropogateErrors", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			orc := &Orchestrator{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				s := &Service{
 					Name: fmt.Sprint(i),
 					Run: func(_ context.Context) error {
@@ -212,7 +208,7 @@ func TestOrchestrator(t *testing.T) {
 			orc := &Orchestrator{}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 			defer cancel()
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				s := makeBlockingService(t)
 				if err := s.Start(ctx); err != nil {
 					t.Fatal(err)
@@ -236,15 +232,14 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			orc := &Orchestrator{}
 			osrv := orc.Service()
 			if err := osrv.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				if err := orc.Add(&Service{Name: fmt.Sprint(i)}); err != nil {
 					t.Fatal(err)
 				}
@@ -268,7 +263,7 @@ func TestOrchestrator(t *testing.T) {
 
 			orc := &Orchestrator{}
 			wg := &fnx.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				wg.Add(1)
 				if err := orc.Add(makeBlockingService(t)); err != nil {
 					t.Error(err)
@@ -297,7 +292,7 @@ func TestOrchestrator(t *testing.T) {
 			counter := &atomic.Int64{}
 			orc := &Orchestrator{}
 			wg := &fnx.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
@@ -310,8 +305,7 @@ func TestOrchestrator(t *testing.T) {
 					t.Error(err)
 				}
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := orc.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -331,7 +325,7 @@ func TestOrchestrator(t *testing.T) {
 			t.Parallel()
 			orc := &Orchestrator{}
 			wg := &fnx.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				wg.Add(1)
 				if err := orc.Add(&Service{
 					Name: fmt.Sprint(i),
@@ -343,8 +337,7 @@ func TestOrchestrator(t *testing.T) {
 					t.Error(err)
 				}
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := orc.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -366,7 +359,7 @@ func TestOrchestrator(t *testing.T) {
 			orc := &Orchestrator{}
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			defer cancel()
-			for i := 0; i < 50; i++ {
+			for range 50 {
 				s := makeBlockingService(t)
 				if err := s.Start(ctx); err != nil {
 					t.Fatal(err)
@@ -391,14 +384,13 @@ func TestOrchestrator(t *testing.T) {
 		})
 		t.Run("PanicSafely", func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			orc := &Orchestrator{}
 			if err := orc.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				if err := orc.Add(&Service{Name: fmt.Sprint(i)}); err != nil {
 					t.Fatal(err)
 				}
@@ -418,7 +410,7 @@ func TestOrchestrator(t *testing.T) {
 		t.Run("LogRunningServices", func(t *testing.T) {
 			t.Parallel()
 			orc := &Orchestrator{}
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				if err := orc.Add(makeBlockingService(t)); err != nil {
 					t.Error(err)
 				}

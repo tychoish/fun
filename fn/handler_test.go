@@ -84,7 +84,7 @@ func TestHandler(t *testing.T) {
 			count++
 		}
 		oob := ob.Once()
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			oob(100)
 		}
 		assert.Equal(t, 1, count)
@@ -151,7 +151,7 @@ func TestHandler(t *testing.T) {
 
 		lob := ob.Lock()
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go lob(100)
 		}
@@ -172,7 +172,7 @@ func TestHandler(t *testing.T) {
 		mtx := &sync.Mutex{}
 		lob := ob.WithLocker(mtx)
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go lob(100)
 		}

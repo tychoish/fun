@@ -24,8 +24,7 @@ func TestHelpers(t *testing.T) {
 	t.Parallel()
 	t.Run("Wait", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		svc := Wait(irt.One(fnx.Operation(func(context.Context) { time.Sleep(50 * time.Millisecond) })))
 		start := time.Now()
@@ -51,8 +50,7 @@ func TestHelpers(t *testing.T) {
 				func(_ context.Context, _ int) error { count.Add(1); return nil },
 				wpa.WorkerGroupConfNumWorkers(2),
 			)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -75,8 +73,7 @@ func TestHelpers(t *testing.T) {
 				},
 				wpa.WorkerGroupConfNumWorkers(50),
 			)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			start := time.Now()
 			if err := srv.Start(ctx); err != nil {
@@ -102,8 +99,7 @@ func TestHelpers(t *testing.T) {
 				makeQueue(t, 100, count),
 				wpa.WorkerGroupConfWorkerPerCPU(),
 			)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -140,7 +136,7 @@ func TestHelpers(t *testing.T) {
 			queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
 			// Add jobs to the queue without closing it
-			for i := 0; i < 50; i++ {
+			for range 50 {
 				assert.NotError(t, queue.Push(func(_ context.Context) error {
 					time.Sleep(10 * time.Millisecond)
 					count.Add(1)
@@ -150,8 +146,7 @@ func TestHelpers(t *testing.T) {
 
 			srv := WorkerPool(queue, wpa.WorkerGroupConfNumWorkers(5))
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			// Start the service
 			if err := srv.Start(ctx); err != nil {
@@ -162,7 +157,7 @@ func TestHelpers(t *testing.T) {
 			time.Sleep(50 * time.Millisecond)
 
 			// Add more jobs after service started
-			for i := 0; i < 30; i++ {
+			for range 30 {
 				assert.NotError(t, queue.Push(func(_ context.Context) error {
 					time.Sleep(5 * time.Millisecond)
 					count.Add(1)
@@ -212,8 +207,7 @@ func TestHelpers(t *testing.T) {
 				},
 				wpa.WorkerGroupConfNumWorkers(50),
 			)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -259,8 +253,7 @@ func TestHelpers(t *testing.T) {
 	})
 
 	t.Run("Broker", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		broker := pubsub.NewBroker[int](ctx, pubsub.BrokerOptions{})
 		srv := Broker(broker)
@@ -521,7 +514,7 @@ func TestCleanup(t *testing.T) {
 		assert.NotError(t, s.Start(ctx))
 
 		check.Equal(t, 0, count.Load())
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			check.NotError(t, pipe.Push(func(context.Context) error {
 				count.Add(1)
 				return nil
@@ -545,8 +538,7 @@ func TestCleanup(t *testing.T) {
 		check.Equal(t, 100, count.Load())
 	})
 	t.Run("Context", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		ctx = WithCleanup(ctx)
 		count := &atomic.Int64{}
@@ -561,7 +553,7 @@ func TestCleanup(t *testing.T) {
 		}()
 
 		called := 0
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			check.NotPanic(t, func() {
 				called++
 				AddCleanup(ctx, func(context.Context) error {
@@ -581,8 +573,7 @@ func TestCleanup(t *testing.T) {
 		check.Equal(t, 100, count.Load())
 	})
 	t.Run("ContextCleanupError", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		ctx = WithCleanup(ctx)
 		err := errors.New("kip")
 

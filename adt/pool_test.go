@@ -42,7 +42,7 @@ func TestPool(t *testing.T) {
 
 		seen := false
 
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			pgt := p.Get()
 			if pgt.value == 100 {
 				seen = true
@@ -52,7 +52,7 @@ func TestPool(t *testing.T) {
 			p.Put(pgt)
 		}
 
-		for i := 0; i < 100000; i++ {
+		for range 100000 {
 			ppg := p.Make()
 			if ppg.value == 100 || seen {
 				seen = true
@@ -79,7 +79,7 @@ func TestPool(t *testing.T) {
 		wg := &sync.WaitGroup{}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		for gr := 0; gr < 32; gr++ {
+		for range 32 {
 			wg.Add(2)
 
 			go func() {
@@ -120,7 +120,7 @@ func TestPool(t *testing.T) {
 		defer cancel()
 		wg := &sync.WaitGroup{}
 		seen := &atomic.Bool{}
-		for i := 0; i < 16; i++ {
+		for range 16 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

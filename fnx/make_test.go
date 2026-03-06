@@ -48,8 +48,7 @@ func TestConstructors(t *testing.T) {
 
 	t.Run("ImportedFromFNX", func(t *testing.T) {
 		t.Run("MAKE.ErrorChannelWorker", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			expected := errors.New("cat")
 			var ch chan error
 			t.Run("NilChannel", func(t *testing.T) {
@@ -81,8 +80,7 @@ func TestConstructors(t *testing.T) {
 			})
 		})
 		t.Run("MAKE.ErrorChannelWorker", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			ch := make(chan error, 1)
 			wf := MAKE.ErrorChannelWorker(ch)
 			root := ers.New("will-be-cached")
@@ -215,7 +213,7 @@ func TestConstructors(t *testing.T) {
 			handler := MAKE.OperationHandler()
 			count := 0
 
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				op := Operation(func(ctx context.Context) {
 					count++
 				})
@@ -257,7 +255,7 @@ func TestConstructors(t *testing.T) {
 			count := 0
 			wg := &sync.WaitGroup{}
 
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()

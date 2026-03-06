@@ -566,7 +566,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		defer broker.Unsubscribe(ctx, sub)
 
 		// Fill queue to soft quota
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			err := broker.Send(ctx, i)
 			check.NotError(t, err)
 		}
@@ -651,7 +651,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 
 		// Consume messages
 		received := []string{}
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			msg := <-sub
 			received = append(received, msg)
 		}

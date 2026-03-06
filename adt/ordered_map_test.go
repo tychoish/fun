@@ -228,7 +228,7 @@ func TestOrderedMap(t *testing.T) {
 		m := &OrderedMap[int, string]{}
 
 		// Add many items
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			m.Set(i, string(rune('a'+i%26)))
 		}
 
@@ -236,7 +236,7 @@ func TestOrderedMap(t *testing.T) {
 
 		// Verify order is maintained
 		keys := irt.Collect(m.Keys(), 0, 1000)
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			check.Equal(t, keys[i], i)
 		}
 	})
@@ -245,18 +245,18 @@ func TestOrderedMap(t *testing.T) {
 		m := &OrderedMap[int, int]{}
 
 		// Pre-populate
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			m.Set(i, i*10)
 		}
 
 		var wg sync.WaitGroup
 
 		// Concurrent readers
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for j := 0; j < 100; j++ {
+				for j := range 100 {
 					_ = m.Get(j)
 					_ = m.Check(j)
 					_, _ = m.Load(j)
@@ -265,11 +265,11 @@ func TestOrderedMap(t *testing.T) {
 		}
 
 		// Concurrent writers
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			wg.Add(1)
 			go func(offset int) {
 				defer wg.Done()
-				for j := 0; j < 50; j++ {
+				for j := range 50 {
 					key := 1000 + offset*100 + j
 					m.Set(key, key)
 				}
@@ -277,7 +277,7 @@ func TestOrderedMap(t *testing.T) {
 		}
 
 		// Concurrent iterators
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -296,7 +296,7 @@ func TestOrderedMap(t *testing.T) {
 	t.Run("IteratorDuringModification", func(t *testing.T) {
 		m := &OrderedMap[int, int]{}
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			m.Set(i, i)
 		}
 
@@ -452,7 +452,7 @@ func BenchmarkOrderedMap(b *testing.B) {
 
 	b.Run("Get", func(b *testing.B) {
 		m := &OrderedMap[int, int]{}
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			m.Set(i, i*2)
 		}
 		b.ResetTimer()
@@ -463,7 +463,7 @@ func BenchmarkOrderedMap(b *testing.B) {
 
 	b.Run("Iterator", func(b *testing.B) {
 		m := &OrderedMap[int, int]{}
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			m.Set(i, i*2)
 		}
 		b.ResetTimer()
@@ -477,12 +477,12 @@ func BenchmarkOrderedMap(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()
 			m := &OrderedMap[int, int]{}
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				m.Set(j, j*2)
 			}
 			b.StartTimer()
 
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				m.Delete(j)
 			}
 		}

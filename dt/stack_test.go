@@ -404,7 +404,7 @@ func TestStack(t *testing.T) {
 		})
 		t.Run("LargeStack", func(t *testing.T) {
 			stack := &Stack[int]{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				stack.Push(i)
 			}
 
@@ -419,7 +419,7 @@ func TestStack(t *testing.T) {
 			// Verify all elements match
 			it1 := stack.Head()
 			it2 := nstack.Head()
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				if it1.Value() != it2.Value() {
 					t.Errorf("element %d mismatch: %d vs %d", i, it1.Value(), it2.Value())
 				}
@@ -612,7 +612,7 @@ func TestStack(t *testing.T) {
 			item := NewItem(1)
 
 			for i := 2; i <= 5; i++ {
-				data := []byte(fmt.Sprintf("%d", i*10))
+				data := fmt.Appendf(nil, "%d", i*10)
 				err := item.UnmarshalJSON(data)
 				check.NotError(t, err)
 				check.Equal(t, item.Value(), i*10)
@@ -744,7 +744,7 @@ func TestStack(t *testing.T) {
 		t.Run("LargeStack", func(t *testing.T) {
 			stack := &Stack[int]{}
 			size := 100
-			for i := 0; i < size; i++ {
+			for i := range size {
 				stack.Push(i)
 			}
 
@@ -753,7 +753,7 @@ func TestStack(t *testing.T) {
 			reversed := irt.Collect(stack.Iterator())
 
 			// Check that reversed is actually reversed
-			for i := 0; i < size; i++ {
+			for i := range size {
 				if original[i] != reversed[size-1-i] {
 					t.Errorf("reversal failed at index %d", i)
 					break
@@ -807,7 +807,7 @@ func TestStackInternal(t *testing.T) {
 func GenerateStack(t *testing.T, size int) *Stack[int] {
 	t.Helper()
 	stack := &Stack[int]{}
-	for i := 0; i < size; i++ {
+	for i := range size {
 		stack.Push(1 + i + rand.Int())
 	}
 	if stack.Len() != size {

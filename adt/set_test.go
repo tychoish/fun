@@ -124,7 +124,7 @@ func TestSet(t *testing.T) {
 	t.Run("Constructors", func(t *testing.T) {
 		t.Run("Slice", func(t *testing.T) {
 			ls := make([]uint64, 0, 100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				ls = append(ls, rand.Uint64())
 			}
 			set := MakeSet(irt.Slice(ls))
@@ -152,7 +152,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		s := &Set[int]{}
 
 		// Pre-populate the set
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			s.Add(i)
 		}
 
@@ -171,7 +171,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 			iteratorRan.Store(true)
 
 			// Iterate multiple times to increase chance of catching races
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				var count int
 				for range s.Iterator() {
 					count++
@@ -192,7 +192,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 			defer wg.Done()
 			modifierRan.Store(true)
 
-			for i := 0; i < 50; i++ {
+			for i := range 50 {
 				select {
 				case <-ctx.Done():
 					return
@@ -222,7 +222,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		s := &Set[string]{}
 
 		// Pre-populate
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			s.Add(string(rune('a' + i)))
 		}
 
@@ -234,7 +234,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				items := make([]string, 0, 50)
 				for item := range s.Iterator() {
 					items = append(items, item)
@@ -244,11 +244,11 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		}()
 
 		// Multiple modifier goroutines
-		for g := 0; g < 3; g++ {
+		for g := range 3 {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
-				for i := 0; i < 20; i++ {
+				for i := range 20 {
 					select {
 					case <-ctx.Done():
 						return
@@ -282,7 +282,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 		m := &Map[int, string]{}
 
 		// Pre-populate
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			m.Store(i, string(rune('a'+(i%26))))
 		}
 
@@ -299,7 +299,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 			defer wg.Done()
 			iteratorRan.Store(true)
 
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				var count int
 				for k, v := range m.Iterator() {
 					count++
@@ -320,7 +320,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 			defer wg.Done()
 			modifierRan.Store(true)
 
-			for i := 0; i < 50; i++ {
+			for i := range 50 {
 				select {
 				case <-ctx.Done():
 					return
@@ -350,7 +350,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 		m := &Map[string, int]{}
 
 		// Pre-populate
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			m.Store(string(rune('a'+i)), i)
 		}
 
@@ -359,11 +359,11 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 		defer cancel()
 
 		// Multiple iterator goroutines
-		for r := 0; r < 5; r++ {
+		for r := range 5 {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
-				for i := 0; i < 3; i++ {
+				for range 3 {
 					for k, v := range m.Iterator() {
 						_ = k
 						_ = v
@@ -377,7 +377,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 30; i++ {
+			for i := range 30 {
 				select {
 				case <-ctx.Done():
 					return
@@ -398,7 +398,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 	s := &Set[int]{}
 
 	// Pre-populate
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		s.Add(i)
 	}
 
@@ -410,7 +410,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			result := irt.Collect(s.Iterator())
 			// Should have collected something
 			if len(result) == 0 {
@@ -424,7 +424,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			var sum int
 			irt.Apply(s.Iterator(), func(n int) { sum += n })
 			time.Sleep(5 * time.Millisecond)
@@ -435,7 +435,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			count := irt.Count(s.Iterator())
 			if count == 0 {
 				t.Error("irt.Count returned 0")
@@ -448,7 +448,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			select {
 			case <-ctx.Done():
 				return
@@ -469,7 +469,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 	m := &Map[string, int]{}
 
 	// Pre-populate
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		m.Store(string(rune('a'+(i%26))), i)
 	}
 
@@ -481,7 +481,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			result := irt.Collect2(m.Iterator())
 			if len(result) == 0 {
 				t.Error("irt.Collect2 returned empty result")
@@ -494,7 +494,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			keys := irt.Collect(irt.First(m.Iterator()))
 			if len(keys) == 0 {
 				t.Error("irt.First returned empty result")
@@ -507,7 +507,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			count := irt.Count2(m.Iterator())
 			if count == 0 {
 				t.Error("irt.Count2 returned 0")
@@ -520,7 +520,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			select {
 			case <-ctx.Done():
 				return
@@ -541,7 +541,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 	t.Run("Set", func(t *testing.T) {
 		s := &Set[int]{}
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			s.Add(i)
 		}
 
@@ -553,7 +553,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for round := 0; round < 20; round++ {
+			for range 20 {
 				count := 0
 				for range s.Iterator() {
 					count++
@@ -569,7 +569,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				select {
 				case <-ctx.Done():
 					return
@@ -587,7 +587,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 	t.Run("Map", func(t *testing.T) {
 		m := &Map[int, string]{}
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			m.Store(i, "value")
 		}
 
@@ -599,7 +599,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for round := 0; round < 20; round++ {
+			for range 20 {
 				count := 0
 				for range m.Iterator() {
 					count++
@@ -615,7 +615,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				select {
 				case <-ctx.Done():
 					return
@@ -635,7 +635,7 @@ func BenchmarkSet(b *testing.B) {
 	const size = 10000
 	b.Run("Append", func(b *testing.B) {
 		operation := func(set *Set[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i * i)
 			}
 		}
@@ -656,7 +656,7 @@ func BenchmarkSet(b *testing.B) {
 	b.Run("Mixed", func(b *testing.B) {
 		operation := func(set *Set[int]) {
 			var last int
-			for i := 0; i < size; i++ {
+			for i := range size {
 				val := i * i * size
 				set.Add(val)
 				if i%3 == 0 {
@@ -682,11 +682,11 @@ func BenchmarkSet(b *testing.B) {
 
 	b.Run("Deletion", func(b *testing.B) {
 		operation := func(set *Set[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i)
 				set.Add(i * size)
 			}
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Delete(i)
 				set.Delete(i + 1)
 				if i%3 == 0 {
@@ -711,7 +711,7 @@ func BenchmarkSet(b *testing.B) {
 
 	b.Run("Iteration", func(b *testing.B) {
 		operation := func(set *Set[int]) {
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i * size)
 			}
 			count := 0

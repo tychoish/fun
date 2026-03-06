@@ -452,7 +452,7 @@ func TestJoinCallOrderAndCount(t *testing.T) {
 
 		// Create 7 providers that log their calls
 		providers := make([]Provider[*testConfig], 7)
-		for i := 0; i < 7; i++ {
+		for i := range 7 {
 			idx := i
 			providers[i] = Provider[*testConfig](func(c *testConfig) error {
 				callCounter++
@@ -488,7 +488,7 @@ func TestJoinCallOrderAndCount(t *testing.T) {
 		}
 
 		// Verify the sequence: 0, 1, 2, 3, 4, 5, 6
-		for i := 0; i < 7; i++ {
+		for i := range 7 {
 			if callLog[i].providerID != i {
 				t.Errorf("call %d: expected provider %d, got %d",
 					i, i, callLog[i].providerID)

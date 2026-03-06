@@ -82,7 +82,7 @@ func TestError(t *testing.T) {
 		})
 		t.Run("Future", func(t *testing.T) {
 			ec := &Collector{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				ec.Errorf("%d", i)
 			}
 			count := 0
@@ -340,7 +340,7 @@ func TestError(t *testing.T) {
 		defer cancel()
 		wg := &sync.WaitGroup{}
 		catcher := &Collector{}
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -357,7 +357,7 @@ func TestError(t *testing.T) {
 			}()
 		}
 
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			wg.Add(1)
 			go func(_ int) {
 				defer wg.Done()
@@ -405,7 +405,7 @@ func TestError(t *testing.T) {
 		})
 		t.Run("Stack", func(t *testing.T) {
 			ec := &Collector{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				ec.Push(fmt.Errorf("%d", i))
 			}
 			errs := ers.Unwind(ec.Resolve())
@@ -415,7 +415,7 @@ func TestError(t *testing.T) {
 		})
 		t.Run("Wrapped", func(t *testing.T) {
 			err := errors.New("base")
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				err = fmt.Errorf("wrap %d: %w", i, err)
 			}
 
@@ -684,12 +684,12 @@ func TestCollectorFrom(t *testing.T) {
 		wg := &sync.WaitGroup{}
 
 		// Spawn multiple goroutines adding errors concurrently
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
 				seq := func(yield func(error) bool) {
-					for j := 0; j < 10; j++ {
+					for j := range 10 {
 						yield(fmt.Errorf("error %d-%d", id, j))
 					}
 				}
@@ -1138,7 +1138,7 @@ func BenchmarkErrorList(b *testing.B) {
 	b.Run("Reporting", func(b *testing.B) {
 		b.Run("ListError", func(b *testing.B) {
 			es := &list{}
-			for i := 0; i < count; i++ {
+			for range count {
 				es.Push(errors.New("foo"))
 			}
 			err := es.Error()
@@ -1156,7 +1156,7 @@ func BenchmarkErrorList(b *testing.B) {
 		})
 		b.Run("Collector", func(b *testing.B) {
 			ec := &Collector{}
-			for i := 0; i < count; i++ {
+			for range count {
 				ec.New("foo")
 			}
 			err := ec.Resolve().Error()

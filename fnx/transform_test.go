@@ -13,8 +13,7 @@ import (
 
 func TestConverter(t *testing.T) {
 	t.Run("ConverterOK", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		tfrm := MakeCovnerterOk(func(in string) (string, bool) { return in, true })
 		out, err := tfrm(ctx, "hello")
 		check.Equal(t, out, "hello")
@@ -26,8 +25,7 @@ func TestConverter(t *testing.T) {
 		check.Equal(t, out, "bye")
 	})
 	t.Run("ConverterErr", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		tfrm := MakeConverterErr(func(in string) (string, error) { return in, nil })
 		out, err := tfrm(ctx, "hello")
 		check.Equal(t, out, "hello")
@@ -80,8 +78,7 @@ func TestConverter(t *testing.T) {
 		mpf = mpf.Lock()
 		// tempt the race detector
 		wg := &WaitGroup{}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		wg.Group(128, func(ctx context.Context) {
 			out, err := mpf(ctx, 42)
 			check.Equal(t, out, "42")

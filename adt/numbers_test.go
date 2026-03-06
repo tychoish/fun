@@ -8,7 +8,7 @@ import (
 func doTimes(num int, op func()) {
 	wg := &sync.WaitGroup{}
 	wg.Add(num)
-	for i := 0; i < num; i++ {
+	for range num {
 		go func() { defer wg.Done(); op() }()
 	}
 	wg.Wait()
@@ -57,7 +57,7 @@ func TestAtomic(t *testing.T) {
 		t.Run("CompareAndSwap", func(_ *testing.T) {
 			atom := &AtomicInteger[uint32]{}
 			doTimes(256, func() {
-				for i := uint32(0); i < 100; i++ {
+				for i := range uint32(100) {
 					for {
 						prev := atom.Load()
 						if atom.CompareAndSwap(prev, i) {

@@ -13,7 +13,7 @@ func BenchmarkIdxorz(b *testing.B) {
 	for _, size := range []int{1, 10, 100, 1000, 10000} {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
 			data := make([]int, size)
-			for i := 0; i < size; i++ {
+			for i := range size {
 				data[i] = rand.Int()
 			}
 
@@ -95,7 +95,7 @@ func BenchmarkGenerateOk(b *testing.B) {
 	for _, size := range []int{1, 10, 100, 1000, 10000} {
 		b.Run(fmt.Sprintf("Ints-Size-%d", size), func(b *testing.B) {
 			data := make([]int, size)
-			for i := 0; i < size; i++ {
+			for i := range size {
 				data[i] = rand.Int()
 			}
 			getGen := newGeneratorFactory(data)
@@ -117,7 +117,7 @@ func BenchmarkGenerateOk(b *testing.B) {
 
 		b.Run(fmt.Sprintf("Strings-Size-%d", size), func(b *testing.B) {
 			data := make([]string, size)
-			for i := 0; i < size; i++ {
+			for i := range size {
 				data[i] = fmt.Sprintf("string-%d", rand.Int())
 			}
 			getGen := newGeneratorFactory(data)
@@ -145,7 +145,7 @@ func BenchmarkApply2(b *testing.B) {
 	for _, size := range []int{1, 10, 100, 1000, 10000} {
 		b.Run(fmt.Sprintf("Ints-Size-%d", size), func(b *testing.B) {
 			mdata := make(map[int]int, size)
-			for i := 0; i < size; i++ {
+			for i := range size {
 				mdata[i] = rand.Int()
 			}
 			for _, op := range []func() (string, iter.Seq2[int, int]){
@@ -175,7 +175,7 @@ func BenchmarkApply2(b *testing.B) {
 
 		b.Run(fmt.Sprintf("Strings-Size-%d", size), func(b *testing.B) {
 			mdata := make(map[string]string, size)
-			for i := 0; i < size; i++ {
+			for i := range size {
 				key := fmt.Sprintf("key-%d", i)
 				mdata[key] = fmt.Sprintf("string-%d", rand.Int())
 			}

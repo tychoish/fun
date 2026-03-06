@@ -258,7 +258,7 @@ func TestLinkedList(t *testing.T) {
 
 		t.Run("IteratorCountMatchesLen", func(t *testing.T) {
 			l := &list[int]{}
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				l.PushBack(i)
 			}
 
@@ -389,7 +389,7 @@ func TestLinkedList(t *testing.T) {
 			l := &list[int]{}
 
 			assert.NotPanic(t, func() {
-				for i := 0; i < 10; i++ {
+				for range 10 {
 					l.PopFront()
 					l.PopBack()
 				}
@@ -400,14 +400,14 @@ func TestLinkedList(t *testing.T) {
 		t.Run("AddRemoveAddRemove", func(t *testing.T) {
 			l := &list[int]{}
 
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				l.PushBack(i)
 				l.PushFront(i * 10)
 			}
 			// [40, 30, 20, 10, 0, 0, 1, 2, 3, 4]
 			check.Equal(t, 10, l.Len())
 
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				l.PopFront()
 				l.PopBack()
 			}
@@ -1232,7 +1232,7 @@ func makeTestList(size int) *list[int] {
 	l := &list[int]{}
 	// Use a simple pseudo-random sequence for reproducibility
 	val := 12345
-	for i := 0; i < size; i++ {
+	for range size {
 		val = (val*1103515245 + 12345) & 0x7fffffff
 		l.PushBack(val % 10000)
 	}
@@ -1271,7 +1271,7 @@ func BenchmarkListSortAlreadySorted(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
 				l := &list[int]{}
-				for j := 0; j < size; j++ {
+				for j := range size {
 					l.PushBack(j)
 				}
 				b.StartTimer()
@@ -1283,7 +1283,7 @@ func BenchmarkListSortAlreadySorted(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
 				l := &list[int]{}
-				for j := 0; j < size; j++ {
+				for j := range size {
 					l.PushBack(j)
 				}
 				b.StartTimer()

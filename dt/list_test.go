@@ -105,7 +105,7 @@ func TestList(t *testing.T) {
 	})
 	t.Run("WrapAroundEffects", func(t *testing.T) {
 		list := &List[int]{}
-		for i := 0; i < 21; i++ {
+		for i := range 21 {
 			if i%2 == 0 {
 				list.PushBack(i)
 			} else {
@@ -494,7 +494,7 @@ func TestList(t *testing.T) {
 				t.Fatal(list.Len())
 			}
 
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				list.Front().Drop()
 			}
 
@@ -745,7 +745,7 @@ func TestList(t *testing.T) {
 		})
 		t.Run("LargeList", func(t *testing.T) {
 			list := &List[int]{}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				list.PushBack(i)
 			}
 
@@ -760,7 +760,7 @@ func TestList(t *testing.T) {
 			// Verify all elements match
 			e1 := list.Front()
 			e2 := nl.Front()
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				if e1.Value() != e2.Value() {
 					t.Errorf("element %d mismatch: %d vs %d", i, e1.Value(), e2.Value())
 				}
@@ -998,7 +998,7 @@ func TestList(t *testing.T) {
 func BenchmarkList(b *testing.B) {
 	var e *Element[int]
 	b.Run("SeedElemPool", func(b *testing.B) {
-		for i := 0; i < 200; i++ {
+		for i := range 200 {
 			e = NewElement(i)
 		}
 		b.StopTimer()
@@ -1014,7 +1014,7 @@ func BenchmarkList(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				b.StartTimer()
 				slice := []int{}
-				for i := 0; i < size; i++ {
+				for i := range size {
 					slice = append(slice, i)
 				}
 				b.StopTimer()
@@ -1027,7 +1027,7 @@ func BenchmarkList(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				b.StartTimer()
 				slice := make([]int, 0, 100)
-				for i := 0; i < size; i++ {
+				for i := range size {
 					slice = append(slice, i)
 				}
 				b.StopTimer()
@@ -1043,7 +1043,7 @@ func BenchmarkList(b *testing.B) {
 				list.PushBack(0)
 				list.PopBack()
 				b.StartTimer()
-				for i := 0; i < size; i++ {
+				for i := range size {
 					list.PushBack(i)
 				}
 			}
@@ -1055,7 +1055,7 @@ func BenchmarkList(b *testing.B) {
 				list.PushBack(0)
 				list.PopBack()
 				b.StartTimer()
-				for i := 0; i < size; i++ {
+				for i := range size {
 					list.Back().Append(NewElement(i))
 				}
 			}
@@ -1065,7 +1065,7 @@ func BenchmarkList(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				slice := []int{}
-				for i := 0; i < size; i++ {
+				for i := range size {
 					slice = append([]int{i}, slice...)
 				}
 			}
@@ -1078,7 +1078,7 @@ func BenchmarkList(b *testing.B) {
 				list.PopBack()
 				b.StartTimer()
 
-				for i := 0; i < size; i++ {
+				for i := range size {
 					list.PushFront(i)
 				}
 			}
@@ -1087,7 +1087,7 @@ func BenchmarkList(b *testing.B) {
 	b.Run("Deletion", func(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
 			slice := []int{}
-			for i := 0; i < size; i++ {
+			for i := range size {
 				slice = append([]int{i}, slice...)
 			}
 
@@ -1103,7 +1103,7 @@ func BenchmarkList(b *testing.B) {
 		b.Run("List", func(b *testing.B) {
 			b.Run("Drop", func(b *testing.B) {
 				list := &List[int]{}
-				for i := 0; i < size; i++ {
+				for i := range size {
 					list.PushFront(i)
 				}
 
@@ -1120,7 +1120,7 @@ func BenchmarkList(b *testing.B) {
 			})
 			b.Run("Remove", func(b *testing.B) {
 				list := &List[int]{}
-				for i := 0; i < size; i++ {
+				for i := range size {
 					list.PushFront(i)
 				}
 
@@ -1137,7 +1137,7 @@ func BenchmarkList(b *testing.B) {
 			})
 			b.Run("Iterator", func(b *testing.B) {
 				list := &List[int]{}
-				for i := 0; i < size; i++ {
+				for i := range size {
 					list.PushFront(i)
 				}
 
@@ -1157,7 +1157,7 @@ func BenchmarkList(b *testing.B) {
 			b.Run("RoundTrip", func(b *testing.B) {
 				b.Run("PooledElements", func(b *testing.B) {
 					list := &List[int]{}
-					for i := 0; i < size; i++ {
+					for i := range size {
 						list.Front().Previous().Append(NewElement(i))
 					}
 
@@ -1173,7 +1173,7 @@ func BenchmarkList(b *testing.B) {
 				})
 				b.Run("Values", func(b *testing.B) {
 					list := &List[int]{}
-					for i := 0; i < size; i++ {
+					for i := range size {
 						list.PushFront(i)
 					}
 

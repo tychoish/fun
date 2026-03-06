@@ -45,15 +45,14 @@ func TestFuture(t *testing.T) {
 		})
 	})
 	t.Run("Once", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		called := 0
 		pf := Future[int](func(_ context.Context) (int, error) {
 			called++
 			return 42, nil
 		}).Once()
-		for i := 0; i < 1024; i++ {
+		for range 1024 {
 			val, err := pf(ctx)
 			assert.NotError(t, err)
 			assert.Equal(t, val, 42)
@@ -61,8 +60,7 @@ func TestFuture(t *testing.T) {
 		check.Equal(t, called, 1)
 	})
 	t.Run("If", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		called := 0
 		pf := Future[int](func(_ context.Context) (int, error) {
 			called++
@@ -81,8 +79,7 @@ func TestFuture(t *testing.T) {
 		check.Equal(t, 3, called)
 	})
 	t.Run("When", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		called := 0
 		pf := Future[int](func(_ context.Context) (int, error) {
 			called++
@@ -102,11 +99,10 @@ func TestFuture(t *testing.T) {
 	})
 	t.Run("Constructor", func(t *testing.T) {
 		t.Run("Value", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			pf := ValueFuture(42)
-			for i := 0; i < 1024; i++ {
+			for range 1024 {
 				v, err := pf(ctx)
 				assert.NotError(t, err)
 				assert.Equal(t, v, 42)
@@ -117,7 +113,7 @@ func TestFuture(t *testing.T) {
 				pf := PtrFuture(func() *int { return nil })
 				ctx := t.Context()
 
-				for i := 0; i < 1024; i++ {
+				for range 1024 {
 					v, err := pf(ctx)
 					assert.ErrorIs(t, err, io.EOF)
 					assert.Zero(t, v)
@@ -127,7 +123,7 @@ func TestFuture(t *testing.T) {
 				pf := PtrFuture(func() *int { v := 42; return &v })
 				ctx := t.Context()
 
-				for i := 0; i < 1024; i++ {
+				for range 1024 {
 					v, err := pf(ctx)
 					assert.NotError(t, err)
 					assert.Equal(t, v, 42)
@@ -147,7 +143,7 @@ func TestFuture(t *testing.T) {
 
 				fortyTwos := 0
 				errs := 0
-				for i := 0; i < 1024; i++ {
+				for range 1024 {
 					v, err := pf(ctx)
 					if err != nil {
 						errs++
@@ -163,24 +159,22 @@ func TestFuture(t *testing.T) {
 			})
 		})
 		t.Run("Static", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			root := ers.Error(t.Name())
 			pf := StaticFuture(42, root)
-			for i := 0; i < 1024; i++ {
+			for range 1024 {
 				v, err := pf(ctx)
 				assert.ErrorIs(t, err, root)
 				assert.Equal(t, v, 42)
 			}
 		})
 		t.Run("Blocking", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			root := ers.Error(t.Name())
 			pf := MakeFuture(func() (int, error) { return 42, root })
-			for i := 0; i < 1024; i++ {
+			for range 1024 {
 				v, err := pf(ctx)
 				assert.ErrorIs(t, err, root)
 				assert.Equal(t, v, 42)
@@ -191,12 +185,11 @@ func TestFuture(t *testing.T) {
 			errCount := 0
 			root := ers.Error(t.Name())
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			pf := MakeFuture(func() (int, error) { callCount++; return 42, root })
 			ff := pf.Future(ctx, func(err error) { errCount++; assert.ErrorIs(t, err, root) })
-			for i := 0; i < 1024; i++ {
+			for range 1024 {
 				v := ff()
 				assert.Equal(t, v, 42)
 			}
@@ -205,10 +198,9 @@ func TestFuture(t *testing.T) {
 		})
 
 		t.Run("Consistent", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			pf := WrapFuture(func() int { return 42 })
-			for i := 0; i < 1024; i++ {
+			for range 1024 {
 				v, err := pf(ctx)
 				assert.Equal(t, v, 42)
 				assert.NotError(t, err)
@@ -217,8 +209,7 @@ func TestFuture(t *testing.T) {
 	})
 	t.Run("Lock", func(t *testing.T) {
 		t.Run("NilLockPanics", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := 0
 			op := Future[int](func(context.Context) (int, error) {
 				count++
@@ -234,8 +225,7 @@ func TestFuture(t *testing.T) {
 		// the rest of the tests are really just "tempt the
 		// race detector"
 		t.Run("ManagedLock", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := 0
 			op := Future[int](func(context.Context) (int, error) {
 				count++
@@ -259,8 +249,7 @@ func TestFuture(t *testing.T) {
 			assert.Equal(t, count, 128)
 		})
 		t.Run("Locker", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := 0
 			op := Future[int](func(context.Context) (int, error) {
 				count++
@@ -284,8 +273,7 @@ func TestFuture(t *testing.T) {
 			assert.Equal(t, count, 128)
 		})
 		t.Run("CustomLock", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			mu := &sync.Mutex{}
 			opct := &atomic.Int64{}
 			wg := &WaitGroup{}
@@ -311,8 +299,7 @@ func TestFuture(t *testing.T) {
 		})
 	})
 	t.Run("WithoutErrors", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		count := 0
 		var err error
@@ -372,8 +359,7 @@ func TestFuture(t *testing.T) {
 		assert.True(t, ok)
 	})
 	t.Run("Ignore", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		count := 0
 		err := io.EOF
@@ -387,8 +373,7 @@ func TestFuture(t *testing.T) {
 		assert.Equal(t, 42, pf.Force().Resolve())
 	})
 	t.Run("Must", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		count := 0
 		err := io.EOF
@@ -411,8 +396,7 @@ func TestFuture(t *testing.T) {
 	})
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("Exhausted", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := 0
 			var pf Future[int] = func(_ context.Context) (int, error) { count++; return -1, io.EOF }
 			pf = pf.Join(pf)
@@ -429,8 +413,7 @@ func TestFuture(t *testing.T) {
 			assert.Equal(t, 0, out)
 		})
 		t.Run("FirstContinues", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			counter := &atomic.Int64{}
 
 			pf := producerContinuesOnce(42, counter)
@@ -448,8 +431,7 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, counter.Load(), 4)
 		})
 		t.Run("SecondContinues", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			counter := &atomic.Int64{}
 			pf := Future[int](func(_ context.Context) (int, error) {
 				return -1, io.EOF
@@ -460,8 +442,7 @@ func TestFuture(t *testing.T) {
 			assert.Equal(t, counter.Load(), 2)
 		})
 		t.Run("ErrorFirstCanceled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			count := 0
 			pf := Future[int](func(_ context.Context) (int, error) {
 				return -1, context.Canceled
@@ -480,8 +461,7 @@ func TestFuture(t *testing.T) {
 			assert.Zero(t, count)
 		})
 		t.Run("SecondCancled", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			counter := 0
 			pf := Future[int](func(_ context.Context) (int, error) {
 				return -1, io.EOF
@@ -509,8 +489,7 @@ func TestFuture(t *testing.T) {
 				count++
 				return 42, nil
 			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++; panic(root) })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			val, err := pf(ctx)
 			check.Error(t, err)
 			check.Equal(t, val, 42)
@@ -523,8 +502,7 @@ func TestFuture(t *testing.T) {
 				count++
 				return 42, nil
 			}).PreHook(func(_ context.Context) { assert.Zero(t, count); count++ })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			val, err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, 42)
@@ -540,8 +518,7 @@ func TestFuture(t *testing.T) {
 				count++
 				return 42, nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++; panic(root) })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			val, err := pf(ctx)
 			check.Error(t, err)
 			check.Equal(t, val, 42)
@@ -554,8 +531,7 @@ func TestFuture(t *testing.T) {
 				count++
 				return 42, nil
 			}).PostHook(func() { assert.Equal(t, count, 1); count++ })
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			val, err := pf(ctx)
 			check.NotError(t, err)
 			check.Equal(t, val, 42)
@@ -631,13 +607,12 @@ func TestFuture(t *testing.T) {
 	})
 	t.Run("Limit", func(t *testing.T) {
 		t.Run("Serial", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := 0
 			var wf Future[int] = func(_ context.Context) (int, error) { count++; return 42, nil }
 			wf = wf.Limit(10)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				out, err := wf(ctx)
 				check.Equal(t, 42, out)
 				check.NotError(t, err)
@@ -645,14 +620,13 @@ func TestFuture(t *testing.T) {
 			assert.Equal(t, count, 10)
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := &atomic.Int64{}
 			var wf Future[int] = func(_ context.Context) (int, error) { count.Add(1); return 42, nil }
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				wg.Add(1)
 				go func() { defer wg.Done(); out, err := wf(ctx); check.Equal(t, 42, out); check.NotError(t, err) }()
 			}
@@ -662,15 +636,14 @@ func TestFuture(t *testing.T) {
 	})
 	t.Run("TTL", func(t *testing.T) {
 		t.Run("Zero", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := errors.New("cat")
 
 			count := &atomic.Int64{}
 			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.TTL(0)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				out, err := wf(ctx)
 				check.ErrorIs(t, err, expected)
 				check.Equal(t, out, 42)
@@ -678,22 +651,21 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, 100, count.Load())
 		})
 		t.Run("Serial", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := errors.New("cat")
 
 			count := &atomic.Int64{}
 			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.TTL(100 * time.Millisecond)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				out, err := wf(ctx)
 				check.ErrorIs(t, err, expected)
 				check.Equal(t, out, 42)
 			}
 			check.Equal(t, 1, count.Load())
 			time.Sleep(100 * time.Millisecond)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				out, err := wf(ctx)
 				check.ErrorIs(t, err, expected)
 				check.Equal(t, out, 42)
@@ -701,8 +673,7 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, 2, count.Load())
 		})
 		t.Run("Parallel", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := errors.New("cat")
 			wg := &sync.WaitGroup{}
@@ -711,7 +682,7 @@ func TestFuture(t *testing.T) {
 			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.TTL(100 * time.Millisecond)
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					out, err := wf(ctx)
@@ -723,7 +694,7 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, 1, count.Load())
 			time.Sleep(100 * time.Millisecond)
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					out, err := wf(ctx)
@@ -738,15 +709,14 @@ func TestFuture(t *testing.T) {
 	t.Run("Delay", func(t *testing.T) {
 		expected := errors.New("cat")
 		t.Run("Basic", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := &atomic.Int64{}
 			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
 			wf = wf.Delay(100 * time.Millisecond)
 			wg := &WaitGroup{}
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					start := time.Now()
@@ -771,7 +741,7 @@ func TestFuture(t *testing.T) {
 			wg := &WaitGroup{}
 			wg.Add(100)
 			cancel()
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					out, err := wf(ctx)
@@ -785,8 +755,7 @@ func TestFuture(t *testing.T) {
 			check.Equal(t, count.Load(), 0)
 		})
 		t.Run("After", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			count := &atomic.Int64{}
 			var wf Future[int] = func(context.Context) (int, error) { count.Add(1); return 42, expected }
@@ -794,7 +763,7 @@ func TestFuture(t *testing.T) {
 			wf = wf.After(ts)
 			wg := &WaitGroup{}
 			wg.Add(100)
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				go func() {
 					defer wg.Done()
 					start := time.Now()
@@ -811,8 +780,7 @@ func TestFuture(t *testing.T) {
 		})
 	})
 	t.Run("Jitter", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		expected := errors.New("cat")
 
@@ -842,8 +810,7 @@ func TestFuture(t *testing.T) {
 		assert.True(t, dur < 20*time.Millisecond)
 	})
 	t.Run("Retry", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		t.Run("Skip", func(t *testing.T) {
 			count := &atomic.Int64{}

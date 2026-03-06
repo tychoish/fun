@@ -2,6 +2,7 @@ package shard
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"testing"
 
@@ -135,7 +136,7 @@ func TestShardedMap(t *testing.T) {
 			m := &Map[int, int]{}
 
 			// Populate the map with initial values
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				m.Store(i, i*10)
 			}
 
@@ -145,7 +146,7 @@ func TestShardedMap(t *testing.T) {
 			// Goroutine 1: Read items concurrently
 			go func() {
 				defer func() { done <- true }()
-				for i := 0; i < 10; i++ {
+				for range 10 {
 					count := 0
 					for shardItems := range m.ItemsSharded() {
 						for item := range shardItems {
@@ -171,7 +172,7 @@ func TestShardedMap(t *testing.T) {
 			// Goroutine 3: Update existing items concurrently
 			go func() {
 				defer func() { done <- true }()
-				for i := 0; i < 50; i++ {
+				for i := range 50 {
 					m.Store(i, i*20)
 				}
 			}()
@@ -246,9 +247,7 @@ func TestShardedMap(t *testing.T) {
 
 			for shardIter := range m.IteratorSharded() {
 				shardCount++
-				for k, v := range shardIter {
-					seen[k] = v
-				}
+				maps.Insert(seen, shardIter)
 			}
 
 			// Verify all items were seen
@@ -281,7 +280,7 @@ func TestShardedMap(t *testing.T) {
 			m := &Map[int, int]{}
 
 			// Populate with 1000 items
-			for i := 0; i < 1000; i++ {
+			for i := range 1000 {
 				m.Store(i, i*10)
 			}
 
@@ -305,7 +304,7 @@ func TestShardedMap(t *testing.T) {
 
 			// Verify all 1000 items were seen
 			assert.Equal(t, len(seen), 1000)
-			for i := 0; i < 1000; i++ {
+			for i := range 1000 {
 				val, ok := seen[i]
 				check.True(t, ok)
 				check.Equal(t, val, i*10)
@@ -325,7 +324,7 @@ func TestShardedMap(t *testing.T) {
 		t.Run("EarlyTermination", func(t *testing.T) {
 			m := &Map[int, int]{}
 
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				m.Store(i, i*10)
 			}
 
@@ -350,7 +349,7 @@ func TestShardedMap(t *testing.T) {
 			m := &Map[int, int]{}
 
 			// Populate the map with initial values
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				m.Store(i, i*10)
 			}
 
@@ -360,7 +359,7 @@ func TestShardedMap(t *testing.T) {
 			// Goroutine 1: Read items concurrently using IteratorSharded
 			go func() {
 				defer func() { done <- true }()
-				for i := 0; i < 10; i++ {
+				for range 10 {
 					count := 0
 					for shardIter := range m.IteratorSharded() {
 						for k, v := range shardIter {
@@ -385,7 +384,7 @@ func TestShardedMap(t *testing.T) {
 			// Goroutine 3: Update existing items concurrently
 			go func() {
 				defer func() { done <- true }()
-				for i := 0; i < 50; i++ {
+				for i := range 50 {
 					m.Store(i, i*20)
 				}
 			}()
@@ -417,17 +416,12 @@ func TestShardedMap(t *testing.T) {
 			m.Store("epsilon", 5)
 
 			// Collect results from regular Iterator
-			regularSeen := make(map[string]int)
-			for k, v := range m.Iterator() {
-				regularSeen[k] = v
-			}
+			regularSeen := maps.Collect(m.Iterator())
 
 			// Collect results from IteratorSharded
 			shardedSeen := make(map[string]int)
 			for shardIter := range m.IteratorSharded() {
-				for k, v := range shardIter {
-					shardedSeen[k] = v
-				}
+				maps.Insert(shardedSeen, shardIter)
 			}
 
 			// Both should see the same items
@@ -443,7 +437,7 @@ func TestShardedMap(t *testing.T) {
 			m := &Map[int, string]{}
 
 			// Store 500 items
-			for i := 0; i < 500; i++ {
+			for i := range 500 {
 				m.Store(i, fmt.Sprintf("value-%d", i))
 			}
 
@@ -471,7 +465,7 @@ func TestShardedMap(t *testing.T) {
 			m := &Map[int, int]{}
 			m.Setup(8, MapTypeDefault) // Use 8 shards instead of default 32
 
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				m.Store(i, i*2)
 			}
 

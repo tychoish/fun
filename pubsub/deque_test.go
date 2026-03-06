@@ -61,7 +61,7 @@ type fixture[T any] struct {
 func randomStringSlice(size int) []string {
 	elems := make([]string, size)
 
-	for i := 0; i < size; i++ {
+	for i := range size {
 		elems[i] = fmt.Sprintf("value=%d", i)
 	}
 	return elems
@@ -414,7 +414,7 @@ func TestDeque(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			if i <= 50 {
 				if err := dq.ForcePushBack(i); err != nil {
 					t.Fatal(err)
@@ -439,7 +439,7 @@ func TestDeque(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			if i < 10 {
 				if err := dq.PushBack(i); err != nil {
 					t.Fatal(err)
@@ -814,7 +814,7 @@ func TestDequeIntegration(t *testing.T) {
 		wg := &fnx.WaitGroup{}
 		signal := fnx.Operation(wg.Wait).Worker().Signal(ctx)
 
-		for i := 0; i < num; i++ {
+		for i := range num {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -885,17 +885,17 @@ func TestDequeIntegration(t *testing.T) {
 			num    = factor * worker
 		)
 		wwg := &fnx.WaitGroup{}
-		for i := 0; i < factor; i++ {
+		for range factor {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for i := 0; i < num; i++ {
+				for range num {
 					assert.NotError(t, queue.PushBack(func() { sent.Add(1) }))
 					time.Sleep(time.Millisecond)
 				}
 				time.Sleep(10 * time.Millisecond)
 			}()
-			for i := 0; i < worker; i++ {
+			for range worker {
 				wwg.Add(1)
 				go func(iter iter.Seq[func()]) {
 					defer wwg.Done()
@@ -1066,7 +1066,7 @@ func TestDequeDrain(t *testing.T) {
 		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add items
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
 		}
 
@@ -1091,7 +1091,7 @@ func TestDequeDrain(t *testing.T) {
 		}
 
 		// Consume items
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			val, ok := deque.PopFront()
 			check.True(t, ok)
 			check.Equal(t, fmt.Sprintf("item-%d", i), val)
@@ -1110,7 +1110,7 @@ func TestDequeDrain(t *testing.T) {
 		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add some items
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
 		}
 
@@ -1155,7 +1155,7 @@ func TestDequeDrain(t *testing.T) {
 		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add items
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
 		}
 
@@ -1194,7 +1194,7 @@ func TestDequeDrain(t *testing.T) {
 		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items that won't be consumed
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			check.NotError(t, deque.PushBack(i))
 		}
 
@@ -1231,7 +1231,7 @@ func TestDequeDrain(t *testing.T) {
 		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 100}))
 
 		// Add many items
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			check.NotError(t, deque.PushBack(i))
 		}
 
@@ -1269,7 +1269,7 @@ func TestDequeDrain(t *testing.T) {
 		assert.NotError(t, err)
 
 		// Add items
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			check.NotError(t, deque.PushBack(i))
 		}
 
@@ -1304,7 +1304,7 @@ func TestDequeDrain(t *testing.T) {
 		deque := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
 		// Add items
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			check.NotError(t, deque.PushBack(fmt.Sprintf("item-%d", i)))
 		}
 
@@ -1403,7 +1403,7 @@ func TestDequeShutdown(t *testing.T) {
 		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			check.NotError(t, deque.PushBack(i))
 		}
 
@@ -1461,7 +1461,7 @@ func TestDequeShutdown(t *testing.T) {
 		deque := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
 		// Add items that won't be consumed
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			check.NotError(t, deque.PushBack(i))
 		}
 

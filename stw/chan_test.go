@@ -18,8 +18,7 @@ func TestChannel(t *testing.T) {
 	t.Run("Chain", func(t *testing.T) {
 		t.Run("Send", func(t *testing.T) {
 			t.Run("Write", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan int, 2)
 				err := ChanBlocking(ch).Send().Write(ctx, 1)
@@ -31,8 +30,7 @@ func TestChannel(t *testing.T) {
 				assert.Equal(t, <-ch, 3)
 			})
 			t.Run("Handler", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan int, 2)
 				err := ChanBlocking(ch).Send().Write(ctx, 1)
@@ -44,8 +42,7 @@ func TestChannel(t *testing.T) {
 				assert.Equal(t, <-ch, 3)
 			})
 			t.Run("ClosedWrite", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan int)
 				close(ch)
@@ -54,13 +51,12 @@ func TestChannel(t *testing.T) {
 			})
 			t.Run("MultiClose", func(t *testing.T) {
 				ch := ChanNonBlocking(make(chan int))
-				for i := 0; i < 10; i++ {
+				for range 10 {
 					check.NotPanic(t, ch.Close)
 				}
 			})
 			t.Run("Ignore", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan int, 2)
 				assert.Equal(t, len(ch), 0)
@@ -78,8 +74,7 @@ func TestChannel(t *testing.T) {
 				assert.Equal(t, len(ch), 0)
 			})
 			t.Run("Zero", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan time.Time, 1)
 				assert.NotError(t, ChanBlocking(ch).Send().Zero(ctx))
@@ -89,8 +84,7 @@ func TestChannel(t *testing.T) {
 
 			t.Run("NonBlocking", func(t *testing.T) {
 				t.Run("Wrote", func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					ch := make(chan int)
 
@@ -102,8 +96,7 @@ func TestChannel(t *testing.T) {
 					assert.Zero(t, out)
 				})
 				t.Run("Check", func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					ch := make(chan int, 1)
 
@@ -114,8 +107,7 @@ func TestChannel(t *testing.T) {
 					assert.Equal(t, 3, out)
 				})
 				t.Run("Check", func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					ch := make(chan int, 1)
 
@@ -148,8 +140,7 @@ func TestChannel(t *testing.T) {
 			})
 		})
 		t.Run("Receive", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			t.Run("Blocking", func(t *testing.T) {
 				t.Run("Chain", func(t *testing.T) {
@@ -202,8 +193,7 @@ func TestChannel(t *testing.T) {
 	t.Run("Shortcut", func(t *testing.T) {
 		t.Run("Send", func(t *testing.T) {
 			t.Run("Write", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan int, 2)
 				err := ChanBlocking(ch).Send().Write(ctx, 1)
@@ -215,8 +205,7 @@ func TestChannel(t *testing.T) {
 				assert.Equal(t, <-ch, 3)
 			})
 			t.Run("ClosedWrite", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := make(chan int)
 				close(ch)
@@ -225,8 +214,7 @@ func TestChannel(t *testing.T) {
 			})
 			t.Run("NonBlocking", func(t *testing.T) {
 				t.Run("Wrote", func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					ch := make(chan int)
 
@@ -238,8 +226,7 @@ func TestChannel(t *testing.T) {
 					assert.Zero(t, out)
 				})
 				t.Run("Check", func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					ch := make(chan int, 1)
 
@@ -250,8 +237,7 @@ func TestChannel(t *testing.T) {
 					assert.Equal(t, 3, out)
 				})
 				t.Run("Check", func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					ch := make(chan int, 1)
 
@@ -284,8 +270,7 @@ func TestChannel(t *testing.T) {
 			})
 		})
 		t.Run("Receive", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			t.Run("Blocking", func(t *testing.T) {
 				ch := make(chan string, 1)
@@ -359,8 +344,7 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, <-sig)
 			})
 			t.Run("Error", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := ChanBlocking(make(chan string, 4))
 				var count int
@@ -388,8 +372,7 @@ func TestChannel(t *testing.T) {
 				assert.ErrorIs(t, err, experr)
 			})
 			t.Run("SuppressHandlerEOF", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := ChanBlocking(make(chan string, 1))
 				var count int
@@ -405,8 +388,7 @@ func TestChannel(t *testing.T) {
 				assert.NotError(t, err)
 			})
 			t.Run("ErrorPropogationEOF", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := ChanBlocking(make(chan string, 1))
 				var count int
@@ -422,8 +404,7 @@ func TestChannel(t *testing.T) {
 				check.NotError(t, err)
 			})
 			t.Run("Continue", func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 
 				ch := ChanBlocking(make(chan string, 2))
 				var count int
@@ -447,8 +428,7 @@ func TestChannel(t *testing.T) {
 			})
 		})
 		t.Run("Seq", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			ch := ChanBlocking(make(chan int, 2))
 			check.NotError(t, ch.Send().Write(ctx, 42))
@@ -504,8 +484,7 @@ func TestChannel(t *testing.T) {
 	})
 
 	t.Run("SizeReporters", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		ch := ChanBlocking(make(chan int, 100))
 		check.Equal(t, 100, ch.Cap())

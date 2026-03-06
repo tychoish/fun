@@ -134,8 +134,7 @@ func TestService(t *testing.T) {
 				Run:     func(context.Context) error { return nil },
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := s.Start(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -148,8 +147,7 @@ func TestService(t *testing.T) {
 		})
 		t.Run("NilRun", func(t *testing.T) {
 			s := &Service{}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := s.Start(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -165,8 +163,7 @@ func TestService(t *testing.T) {
 				Run: func(context.Context) error { panic("whoops") },
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			err := s.Start(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -181,7 +178,7 @@ func TestService(t *testing.T) {
 	t.Run("Group", func(t *testing.T) {
 		counter := &atomic.Int64{}
 		list := make([]*Service, 0, 100)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			list = append(list, &Service{
 				Name: fmt.Sprint(i),
 				Run: func(_ context.Context) error {
@@ -217,8 +214,7 @@ func TestService(t *testing.T) {
 				Shutdown: func() error { panic("whoops") },
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -240,8 +236,7 @@ func TestService(t *testing.T) {
 				Shutdown: func() error { return errors.New("expected") },
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -264,8 +259,7 @@ func TestService(t *testing.T) {
 			}
 			testCheckOrderingEffects(t, s)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -283,8 +277,7 @@ func TestService(t *testing.T) {
 			s := HTTP("test", time.Minute, hs)
 			testCheckOrderingEffects(t, s)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -296,8 +289,7 @@ func TestService(t *testing.T) {
 			}
 		})
 		t.Run("ErrorStartup", func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			hs1 := &http.Server{
 				Addr: "127.0.0.2:2340",

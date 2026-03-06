@@ -18,7 +18,7 @@ import (
 
 func makeIntSlice(size int) []int {
 	out := make([]int, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		out[i] = i
 	}
 	return out

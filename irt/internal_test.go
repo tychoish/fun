@@ -1825,7 +1825,7 @@ func TestGoOnce(t *testing.T) {
 		fn := oncego(op)
 
 		// Call multiple times rapidly
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			fn()
 		}
 
@@ -1970,7 +1970,7 @@ func TestFlushTo(t *testing.T) {
 
 		// Receive all values
 		var collected []int
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			v := <-ch
 			collected = append(collected, v)
 		}
@@ -2227,7 +2227,7 @@ func TestMtxHelpers(t *testing.T) {
 		var wg sync.WaitGroup
 		results := make([]int, 100)
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()

@@ -43,7 +43,7 @@ func ClearList(t testing.TB, list *List[int]) {
 
 func PopulateList(t testing.TB, size int, list *List[int]) {
 	t.Helper()
-	for i := 0; i < size; i++ {
+	for range size {
 		list.PushBack(rand.Intn(size))
 	}
 	if list.Len() != size {
@@ -140,7 +140,7 @@ func TestSort(t *testing.T) {
 			check.Equal(t, list.Len(), lcopy.Len())
 			check.Equal(t, list.Len(), len(copyVals))
 			check.Equal(t, list.Len(), 10)
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				if listVals[i] != copyVals[i] {
 					t.Error("sort missmatch", i, listVals[i], copyVals[i])
 				}
@@ -167,7 +167,7 @@ func TestSort(t *testing.T) {
 			if heap.Len() != 0 {
 				t.Fatal("heap should be empty to start")
 			}
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				val := i + rand.Intn(200)
 				if val == 0 {
 					val++
@@ -239,7 +239,7 @@ func BenchmarkSorts(b *testing.B) {
 
 	var e *Element[int]
 	b.Run("SeedElemPool", func(b *testing.B) {
-		for i := 0; i < 10*size; i++ {
+		for i := range 10 * size {
 			e = NewElement(i)
 		}
 		b.StopTimer()
@@ -251,7 +251,7 @@ func BenchmarkSorts(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()
 			slice := make([]int, 0, size)
-			for i := 0; i < size; i++ {
+			for range size {
 				slice = append(slice, rand.Intn(size))
 			}
 			b.StartTimer()

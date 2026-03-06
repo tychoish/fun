@@ -159,7 +159,7 @@ func TestFuture(t *testing.T) {
 
 		lob := ob.Lock()
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go func() {
 				t.Helper()
@@ -184,7 +184,7 @@ func TestFuture(t *testing.T) {
 		rmtx := &sync.RWMutex{}
 		lob := ob.WithLocker(rmtx)
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go func() {
 				t.Helper()

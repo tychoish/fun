@@ -9,7 +9,7 @@ import (
 func TestWindowedHistogram(t *testing.T) {
 	w := hdrhist.NewWindowed(2, 1, 1000, 3)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if err := w.Current.RecordValue(int64(i)); err != nil {
 			t.Error(err)
 		}
@@ -37,9 +37,8 @@ func TestWindowedHistogram(t *testing.T) {
 func BenchmarkWindowedHistogramRecordAndRotate(b *testing.B) {
 	w := hdrhist.NewWindowed(3, 1, 10000000, 3)
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		if err := w.Current.RecordValue(100); err != nil {
 			b.Fatal(err)
 		}
@@ -52,7 +51,7 @@ func BenchmarkWindowedHistogramRecordAndRotate(b *testing.B) {
 
 func BenchmarkWindowedHistogramMerge(b *testing.B) {
 	w := hdrhist.NewWindowed(3, 1, 10000000, 3)
-	for i := 0; i < 10000000; i++ {
+	for i := range 10000000 {
 		if err := w.Current.RecordValue(100); err != nil {
 			b.Fatal(err)
 		}
@@ -62,9 +61,8 @@ func BenchmarkWindowedHistogramMerge(b *testing.B) {
 		}
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		w.Merge()
 	}
 }

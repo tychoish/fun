@@ -46,12 +46,12 @@ func TestMap(t *testing.T) {
 		mp := &Map[string, int]{}
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
-		for i := 0; i < 32; i++ {
+		for range 32 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				for ctx.Err() == nil && !passed.Load() {
-					for i := 0; i < 100; i++ {
+					for i := range 100 {
 						mp.Set(fmt.Sprint(i), rand.Int())
 					}
 					runtime.Gosched()
@@ -83,7 +83,7 @@ func TestMap(t *testing.T) {
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
-		for i := 0; i < 32; i++ {
+		for range 32 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -92,7 +92,7 @@ func TestMap(t *testing.T) {
 						return
 					}
 
-					for i := 0; i < 300; i++ {
+					for i := range 300 {
 						mp.Store(fmt.Sprint(i), rand.Int())
 						count.Add(1)
 					}
@@ -109,7 +109,7 @@ func TestMap(t *testing.T) {
 					if mp.Len() == 0 {
 						continue
 					}
-					for i := 0; i < 300; i++ {
+					for i := range 300 {
 						mp.Delete(fmt.Sprint(i))
 						count.Add(1)
 					}
@@ -146,11 +146,11 @@ func TestMap(t *testing.T) {
 	t.Run("EnsureSemantics", func(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			mp.Store(i, rand.Int()+43)
 		}
 
-		for i := 0; i < 200; i++ {
+		for i := range 200 {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
@@ -169,7 +169,7 @@ func TestMap(t *testing.T) {
 	t.Run("Iterators", func(t *testing.T) {
 		mp := &Map[int, int]{}
 		mp.Default.SetConstructor(func() int { return 42 })
-		for i := 0; i < 200; i++ {
+		for i := range 200 {
 			mp.Ensure(i)
 		}
 		assert.Equal(t, 200, mp.Len())
@@ -251,7 +251,7 @@ func TestMap(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
 			mp := &Map[string, int]{}
 			mp.Default.SetConstructor(func() int { return 38 })
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				mp.Ensure(fmt.Sprint(i))
 			}
 
@@ -268,7 +268,7 @@ func TestMap(t *testing.T) {
 		t.Run("Values", func(t *testing.T) {
 			mp := &Map[string, int]{}
 			mp.Default.SetConstructor(func() int { return 38 })
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				mp.Ensure(fmt.Sprint(i))
 			}
 
