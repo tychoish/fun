@@ -650,7 +650,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 
 		// Consume messages
-		received := []string{}
+		received := make([]string, 0, 3)
 		for range 3 {
 			msg := <-sub
 			received = append(received, msg)

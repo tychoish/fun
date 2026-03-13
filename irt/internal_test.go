@@ -1969,7 +1969,7 @@ func TestFlushTo(t *testing.T) {
 		}()
 
 		// Receive all values
-		var collected []int
+		collected := make([]int, 0, 3)
 		for range 3 {
 			v := <-ch
 			collected = append(collected, v)

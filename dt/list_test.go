@@ -1013,7 +1013,7 @@ func BenchmarkList(b *testing.B) {
 		b.Run("Slice", func(b *testing.B) {
 			for j := 0; j < b.N; j++ {
 				b.StartTimer()
-				slice := []int{}
+				slice := make([]int, 0, size)
 				for i := range size {
 					slice = append(slice, i)
 				}
