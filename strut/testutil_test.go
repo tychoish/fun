@@ -9,7 +9,7 @@ import (
 )
 
 // StringWriter is a common interface for Builder and Buffer for testing purposes.
-type stringWriter interface {
+type stringWriter interface { //nolint:interfacebloat
 	WriteString(string) (int, error)
 	WriteByte(byte) error
 	WriteRune(rune) (int, error)
