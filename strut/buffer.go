@@ -59,19 +59,16 @@ func (b *Buffer) WriteLine(ln string) { b.WriteString(ln); b.Line() }
 // character to the buffer. Each string is written on its own line.
 func (b *Buffer) WriteLines(lns ...string) { apply(b.WriteLine, lns) }
 
-// WriteBytesLine writes the byte slice 'ln' followed by a newline character
-// to the buffer. The byte slice is copied during the write operation.
+// WriteBytesLine writes the string 'ln' followed by a newline character to
+// the buffer.
 func (b *Buffer) WriteBytesLine(ln []byte) { b.Write(ln); b.Line() }
 
-// WriteBytesLines writes each byte slice in 'lns' followed by a newline
-// character to the buffer. Each byte slice is written on its own line.
-// Each byte slice is copied during the write operation.
+// WriteBytesLines writes each string in 'lns' followed by a newline
+// character to the buffer. Each string is written on its own line.
 func (b *Buffer) WriteBytesLines(lns ...[]byte) { apply(b.WriteBytesLine, lns) }
 
-// Append writes the byte slice 'buf' to the buffer. The byte slice is
-// copied during the write operation; the caller retains ownership of 'buf'
-// and may modify it after this call returns. This is a convenience wrapper
-// around Write.
+// Append writes the byte slice 'buf' to the buffer.
+// This is a convenience wrapper around Write.
 func (b *Buffer) Append(buf []byte) { b.Write(buf) }
 
 // Join writes all strings from the slice 's', separated by 'sep', to the
@@ -189,75 +186,54 @@ func (b *Buffer) QuoteRuneASCII(r rune) { b.ws(strconv.QuoteRuneToASCII(r)) }
 func (b *Buffer) QuoteRuneGrapic(r rune) { b.ws(strconv.QuoteRuneToGraphic(r)) }
 
 // AppendQuote writes a double-quoted Go string literal representing 'str' to
-// the buffer. The output includes surrounding quotes and uses Go escape
-// sequences. This method uses strconv.AppendQuote which may be more efficient
-// than Quote for avoiding intermediate string allocations in some cases.
+// the buffer. The output includes surrounding quotes and uses Go
+// escape sequences.
 func (b *Buffer) AppendQuote(str string) { b.Write(strconv.AppendQuote(nil, str)) }
 
 // AppendQuoteASCII writes a double-quoted Go string literal representing
-// 'str' to the buffer. Non-ASCII characters are escaped using \u or \U
-// sequences. This method uses strconv.AppendQuoteToASCII which may be more
-// efficient than QuoteASCII for avoiding intermediate string allocations in
-// some cases.
+// 'str' to the buffer. Non-ASCII characters are escaped using \u or
+// \U sequences.
 func (b *Buffer) AppendQuoteASCII(str string) { b.Write(strconv.AppendQuoteToASCII(nil, str)) }
 
 // AppendQuoteGrapic writes a double-quoted Go string literal representing
 // 'str' to the buffer. Non-graphic characters as defined by
-// unicode.IsGraphic are escaped. This method uses strconv.AppendQuoteToGraphic
-// which may be more efficient than QuoteGrapic for avoiding intermediate
-// string allocations in some cases.
+// unicode.IsGraphic are escaped.
 func (b *Buffer) AppendQuoteGrapic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
 
 // AppendQuoteRune writes a single-quoted Go character literal representing
-// 'r' to the buffer. The output includes surrounding single quotes and uses
-// Go escape sequences. This method uses strconv.AppendQuoteRune which may be
-// more efficient than QuoteRune for avoiding intermediate string allocations
-// in some cases.
+// 'r' to the buffer. The output includes surrounding single quotes
+// and uses Go escape sequences.
 func (b *Buffer) AppendQuoteRune(r rune) { b.Write(strconv.AppendQuoteRune(nil, r)) }
 
 // AppendQuoteRuneASCII writes a single-quoted Go character literal
-// representing 'r' to the buffer. Non-ASCII characters are escaped using \u
-// or \U sequences. This method uses strconv.AppendQuoteRuneToASCII which may
-// be more efficient than QuoteRuneASCII for avoiding intermediate string
-// allocations in some cases.
+// representing 'r' to the buffer. Non-ASCII characters are escaped
+// using \u or \U sequences.
 func (b *Buffer) AppendQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneToASCII(nil, r)) }
 
 // AppendQuoteRuneGrapic writes a single-quoted Go character literal
-// representing 'r' to the buffer. Non-graphic characters as defined by
-// unicode.IsGraphic are escaped. This method uses strconv.AppendQuoteRuneToGraphic
-// which may be more efficient than QuoteRuneGrapic for avoiding intermediate
-// string allocations in some cases.
+// representing 'r' to the buffer. Non-graphic characters as defined
+// by unicode.IsGraphic are escaped.
 func (b *Buffer) AppendQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
 
 // Int writes the decimal string representation of 'num' to the buffer.
 func (b *Buffer) Int(num int) { b.Write(strconv.AppendInt(nil, int64(num), 10)) }
 
-// AppendBool writes "true" or "false" according to the value of 'v' to the
-// buffer. This method uses strconv.AppendBool which may be more efficient
-// than FormatBool for avoiding intermediate string allocations in some cases.
-// Functionally equivalent to FormatBool.
+// AppendBool writes "true" or "false" according to the value of 'v' to
+// the buffer.
 func (b *Buffer) AppendBool(v bool) { b.Write(strconv.AppendBool(nil, v)) }
 
-// AppendInt64 writes the string representation of 'n' in the given 'base' to
-// the buffer. The 'base' must be between 2 and 36 inclusive. This method
-// uses strconv.AppendInt which may be more efficient than FormatInt64 for
-// avoiding intermediate string allocations in some cases. Functionally
-// equivalent to FormatInt64.
+// AppendInt64 writes the string representation of 'n' in the given 'base'
+// to the buffer. The 'base' must be between 2 and 36 inclusive.
 func (b *Buffer) AppendInt64(n int64, base int) { b.Write(strconv.AppendInt(nil, n, base)) }
 
-// AppendUint64 writes the string representation of 'n' in the given 'base'
-// to the buffer. The 'base' must be between 2 and 36 inclusive. This method
-// uses strconv.AppendUint which may be more efficient than FormatUint64 for
-// avoiding intermediate string allocations in some cases. Functionally
-// equivalent to FormatUint64.
+// AppendUint64 writes the string representation of 'n' in the given
+// 'base' to the buffer. The 'base' must be between 2 and 36 inclusive.
 func (b *Buffer) AppendUint64(n uint64, base int) { b.Write(strconv.AppendUint(nil, n, base)) }
 
-// AppendFloat writes the string representation of the floating-point number
-// 'f' to the buffer. The 'tpl' parameter is the format ('b', 'e', 'E', 'f',
-// 'g', 'G', 'x', 'X'), 'prec' controls precision, and 'size' is the number of
-// bits (32 or 64). This method uses strconv.AppendFloat which may be more
-// efficient than FormatFloat for avoiding intermediate string allocations in
-// some cases. Functionally equivalent to FormatFloat.
+// AppendFloat writes the string representation of the floating-point
+// number 'f' to the buffer. The 'tpl' parameter is the format ('b',
+// 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
+// 'size' is the number of bits (32 or 64).
 func (b *Buffer) AppendFloat(f float64, tpl byte, prec, size int) {
 	b.Write(strconv.AppendFloat(nil, f, tpl, prec, size))
 }
@@ -320,46 +296,34 @@ func (b *Buffer) WithReplaceAll(s, old, new string) { b.ws(strings.ReplaceAll(s,
 // instances are replaced.
 func (b *Buffer) WithReplace(s, old, new string, n int) { b.ws(strings.Replace(s, old, new, n)) } //nolint:predeclared
 
-// AppendTrimSpace writes the byte slice 'str' with all leading and trailing
-// whitespace removed to the buffer. The input 'str' is not modified; a
-// transformed copy is written. This is the byte slice equivalent of
-// WithTrimSpace.
+// AppendTrimSpace writes 'str' with all leading and trailing whitespace
+// removed to the buffer.
 func (b *Buffer) AppendTrimSpace(str []byte) { b.Write(bytes.TrimSpace(str)) }
 
-// AppendTrimRight writes the byte slice 'str' with all trailing characters
-// contained in 'cut' removed to the buffer. The input 'str' is not modified;
-// a transformed copy is written. This is the byte slice equivalent of
-// WithTrimRight.
+// AppendTrimRight writes 'str' with all trailing characters contained in
+// 'cut' removed to the buffer.
 func (b *Buffer) AppendTrimRight(str []byte, cut string) { b.Write(bytes.TrimRight(str, cut)) }
 
-// AppendTrimLeft writes the byte slice 'str' with all leading characters
-// contained in 'cut' removed to the buffer. The input 'str' is not modified;
-// a transformed copy is written. This is the byte slice equivalent of
-// WithTrimLeft.
+// AppendTrimLeft writes 'str' with all leading characters contained in
+// 'cut' removed to the buffer.
 func (b *Buffer) AppendTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
 
-// AppendTrimPrefix writes the byte slice 's' with the leading 'prefix'
-// removed to the buffer. If 's' doesn't start with 'prefix', 's' is written
-// unchanged. The input 's' is not modified; a transformed copy is written.
-// This is the byte slice equivalent of WithTrimPrefix.
+// AppendTrimPrefix writes 's' with the leading 'prefix' string removed to
+// the buffer. If 's' doesn't start with 'prefix', 's' is written
+// unchanged.
 func (b *Buffer) AppendTrimPrefix(s []byte, prefix []byte) { b.Write(bytes.TrimPrefix(s, prefix)) }
 
-// AppendTrimSuffix writes the byte slice 's' with the trailing 'suffix'
-// removed to the buffer. If 's' doesn't end with 'suffix', 's' is written
-// unchanged. The input 's' is not modified; a transformed copy is written.
-// This is the byte slice equivalent of WithTrimSuffix.
+// AppendTrimSuffix writes 's' with the trailing 'suffix' string removed to
+// the buffer. If 's' doesn't end with 'suffix', 's' is written unchanged.
 func (b *Buffer) AppendTrimSuffix(s []byte, suffix []byte) { b.Write(bytes.TrimSuffix(s, suffix)) }
 
-// AppendReplaceAll writes the byte slice 's' with all non-overlapping
-// instances of 'old' replaced by 'new' to the buffer. The input 's' is not
-// modified; a transformed copy is written. This is the byte slice equivalent
-// of WithReplaceAll.
+// AppendReplaceAll writes 's' with all non-overlapping instances of 'old'
+// replaced by 'new' to the buffer.
 func (b *Buffer) AppendReplaceAll(s, old, new []byte) { b.Write(bytes.ReplaceAll(s, old, new)) } //nolint:predeclared
 
-// AppendReplace writes the byte slice 's' with the first 'n' non-overlapping
-// instances of 'old' replaced by 'new' to the buffer. If 'n' is negative,
-// all instances are replaced. The input 's' is not modified; a transformed
-// copy is written. This is the byte slice equivalent of WithReplace.
+// AppendReplace writes 's' with the first 'n' non-overlapping instances of
+// 'old' replaced by 'new' to the buffer. If 'n' is negative, all
+// instances are replaced.
 func (b *Buffer) AppendReplace(s, old, new []byte, n int) { b.Write(bytes.Replace(s, old, new, n)) } //nolint:predeclared
 
 // Extend writes all strings from the iterator 'seq' consecutively to
@@ -371,15 +335,12 @@ func (b *Buffer) Extend(seq iter.Seq[string]) { flush(seq, b.ws) }
 // character.
 func (b *Buffer) ExtendLines(seq iter.Seq[string]) { flush(seq, b.WriteLine) }
 
-// ExtendBytes writes all byte slices from the iterator 'seq' consecutively
-// to the buffer. Each byte slice is copied during the write operation. This
-// is the byte slice equivalent of Extend.
+// ExtendBytes writes all strings from the iterator 'seq' consecutively to
+// the buffer.
 func (b *Buffer) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.Append) }
 
-// ExtendBytesLines writes all byte slices from the iterator 'seq' to the
-// buffer, each followed by a newline character. Each byte slice is written
-// on its own line. Each byte slice is copied during the write operation.
-// This is the byte slice equivalent of ExtendLines.
+// ExtendBytesLines writes all strings from the iterator 'seq' consecutively to
+// the buffer, interspersing a newline character.
 func (b *Buffer) ExtendBytesLines(seq iter.Seq[[]byte]) { flush(seq, b.WriteBytesLine) }
 
 // ExtendJoin writes all strings from the iterator 'seq' to the buffer,
@@ -395,10 +356,8 @@ func (b *Buffer) ExtendJoin(seq iter.Seq[string], sep string) {
 	}
 }
 
-// ExtendBytesJoin writes all byte slices from the iterator 'seq' to the
-// buffer, separated by 'sep'. The first byte slice is not preceded by a
-// separator. Each byte slice is copied during the write operation. This is
-// the byte slice equivalent of ExtendJoin.
+// ExtendBytesJoin writes all strings from the iterator 'seq' to the buffer,
+// separated by 'sep'. The first string is not preceded by a separator.
 func (b *Buffer) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) {
 	var ct int
 	for elem := range seq {
