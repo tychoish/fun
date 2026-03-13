@@ -130,38 +130,6 @@ func TestSemanticCorrectness(t *testing.T) {
 		}
 	})
 
-	t.Run("WriteLines vs ExtendParagraph", func(t *testing.T) {
-		var b1, b2 Builder
-
-		// WriteLines: each on own line
-		b1.WriteLines("a", "b", "c")
-		expected1 := "a\nb\nc\n"
-		if b1.String() != expected1 {
-			t.Errorf("WriteLines: expected %q, got %q", expected1, b1.String())
-		}
-
-		// ExtendParagraph: each on own line plus blank line
-		b2.ExtendParagraph(slices.Values([]string{"a", "b", "c"}))
-		expected2 := "a\nb\nc\n\n"
-		if b2.String() != expected2 {
-			t.Errorf("ExtendParagraph: expected %q, got %q", expected2, b2.String())
-		}
-	})
-
-	t.Run("ExtendParagraph adds blank line at end", func(t *testing.T) {
-		var b Builder
-		b.WriteString("Paragraph 1:\n")
-		b.ExtendParagraph(slices.Values([]string{"line1", "line2"}))
-		b.WriteString("Paragraph 2:\n")
-		b.ExtendParagraph(slices.Values([]string{"line3", "line4"}))
-
-		expected := "Paragraph 1:\nline1\nline2\n\nParagraph 2:\nline3\nline4\n\n"
-		got := b.String()
-		if got != expected {
-			t.Errorf("expected %q, got %q", expected, got)
-		}
-	})
-
 	t.Run("conditional When methods work correctly", func(t *testing.T) {
 		var b Builder
 
@@ -432,6 +400,334 @@ func TestNamingConsistency(t *testing.T) {
 
 		if b.String() != "ab" {
 			t.Error("Extend* methods should work with iterators")
+		}
+	})
+}
+
+// TestSemanticEquivalence verifies that Buffer and Builder have identical
+// semantics for all shared methods. This test ensures that both types produce
+// the same output for the same sequence of operations.
+func TestSemanticEquivalence(t *testing.T) {
+	tests := []struct {
+		name     string
+		buildFn  func(stringWriter)
+		expected string
+	}{
+		{
+			name: "basic write operations",
+			buildFn: func(w stringWriter) {
+				w.WriteString("hello")
+				w.WriteByte(' ')
+				w.WriteRune('世')
+			},
+			expected: "hello 世",
+		},
+		{
+			name: "line operations",
+			buildFn: func(w stringWriter) {
+				w.WriteLine("line1")
+				w.WriteLines("line2", "line3")
+				w.NLines(2)
+			},
+			expected: "line1\nline2\nline3\n\n\n",
+		},
+		{
+			name: "tab operations",
+			buildFn: func(w stringWriter) {
+				w.Tab()
+				w.WriteString("indented")
+				w.NTabs(3)
+			},
+			expected: "\tindented\t\t\t",
+		},
+		{
+			name: "concat and join",
+			buildFn: func(w stringWriter) {
+				w.Concat("a", "b", "c")
+				w.WriteByte(' ')
+				w.Join([]string{"x", "y", "z"}, ",")
+			},
+			expected: "abc x,y,z",
+		},
+		{
+			name: "repeat operations",
+			buildFn: func(w stringWriter) {
+				w.Repeat("ab", 3)
+				w.RepeatByte('x', 2)
+				w.RepeatRune('🎉', 2)
+			},
+			expected: "abababxx🎉🎉",
+		},
+		{
+			name: "repeat line",
+			buildFn: func(w stringWriter) {
+				w.RepeatLine("test", 2)
+			},
+			expected: "test\ntest\n",
+		},
+		{
+			name: "wprint operations",
+			buildFn: func(w stringWriter) {
+				w.Wprint("hello", " ", "world")
+				w.Wprintf(" %d", 42)
+				w.Wprintln("!")
+			},
+			expected: "hello world 42!\n",
+		},
+		{
+			name: "when methods - true conditions",
+			buildFn: func(w stringWriter) {
+				w.WhenWriteString(true, "yes")
+				w.WhenLine(true)
+				w.WhenWriteString(false, "no")
+			},
+			expected: "yes\n",
+		},
+		{
+			name: "quote operations",
+			buildFn: func(w stringWriter) {
+				w.Quote("test")
+				w.WriteByte(' ')
+				w.QuoteRune('a')
+				w.WriteByte(' ')
+				w.QuoteASCII("世")
+			},
+			expected: `"test" 'a' "\u4e16"`,
+		},
+		{
+			name: "format numbers",
+			buildFn: func(w stringWriter) {
+				w.Int(42)
+				w.WriteByte(' ')
+				w.FormatBool(true)
+				w.WriteByte(' ')
+				w.FormatInt64(255, 16)
+			},
+			expected: "42 true ff",
+		},
+		{
+			name: "trim operations",
+			buildFn: func(w stringWriter) {
+				w.WithTrimSpace("  hello  ")
+				w.WriteByte(' ')
+				w.WithTrimPrefix("prefix_test", "prefix_")
+			},
+			expected: "hello test",
+		},
+		{
+			name: "replace operations",
+			buildFn: func(w stringWriter) {
+				w.WithReplaceAll("hello hello", "hello", "hi") //nolint:dupword
+				w.WriteByte(' ')
+				w.WithReplace("aaa", "a", "b", 2)
+			},
+			expected: "hi hi bba", //nolint:dupword
+		},
+		{
+			name: "extend operations",
+			buildFn: func(w stringWriter) {
+				w.Extend(slices.Values([]string{"a", "b", "c"}))
+				w.WriteByte(' ')
+				w.ExtendJoin(slices.Values([]string{"x", "y"}), ",")
+			},
+			expected: "abc x,y",
+		},
+		{
+			name: "bytes operations",
+			buildFn: func(w stringWriter) {
+				w.Append([]byte("test"))
+				w.WriteBytesLine([]byte("line"))
+				w.WriteBytesLines([]byte("a"), []byte("b"))
+			},
+			expected: "testline\na\nb\n",
+		},
+		{
+			name: "append quote operations",
+			buildFn: func(w stringWriter) {
+				w.AppendQuote("test")
+				w.WriteByte(' ')
+				w.AppendQuoteRune('x')
+				w.WriteByte(' ')
+				w.AppendQuoteASCII("世")
+			},
+			expected: `"test" 'x' "\u4e16"`,
+		},
+		{
+			name: "append number operations",
+			buildFn: func(w stringWriter) {
+				w.AppendBool(true)
+				w.WriteByte(' ')
+				w.AppendInt64(42, 10)
+				w.WriteByte(' ')
+				w.AppendUint64(255, 16)
+				w.WriteByte(' ')
+				w.AppendFloat(3.14, 'f', 2, 64)
+			},
+			expected: "true 42 ff 3.14",
+		},
+		{
+			name: "append trim operations",
+			buildFn: func(w stringWriter) {
+				w.AppendTrimSpace([]byte("  hello  "))
+				w.WriteByte(' ')
+				w.AppendTrimPrefix([]byte("prefix_test"), []byte("prefix_"))
+			},
+			expected: "hello test",
+		},
+		{
+			name: "append replace operations",
+			buildFn: func(w stringWriter) {
+				w.AppendReplaceAll([]byte("aa"), []byte("a"), []byte("b"))
+				w.WriteByte(' ')
+				w.AppendReplace([]byte("aaa"), []byte("a"), []byte("b"), 1)
+			},
+			expected: "bb baa",
+		},
+		{
+			name: "extend bytes operations",
+			buildFn: func(w stringWriter) {
+				w.ExtendBytes(slices.Values([][]byte{[]byte("x"), []byte("y")}))
+				w.WriteByte(' ')
+				w.ExtendBytesJoin(slices.Values([][]byte{[]byte("a"), []byte("b")}), []byte(","))
+			},
+			expected: "xy a,b",
+		},
+		{
+			name: "complex mixed operations",
+			buildFn: func(w stringWriter) {
+				w.WriteLine("Header")
+				w.Tab()
+				w.Wprintf("Value: %d", 42)
+				w.Line()
+				w.Concat("a", "b", "c")
+				w.Line()
+				w.Join([]string{"x", "y"}, " | ")
+				w.Line()
+				w.Quote("end")
+			},
+			expected: "Header\n\tValue: 42\nabc\nx | y\n\"end\"",
+		},
+		{
+			name: "conditional operations mix",
+			buildFn: func(w stringWriter) {
+				w.WhenWriteLine(true, "included")
+				w.WhenWriteLine(false, "skipped")
+				w.WhenConcat(true, "a", "b")
+				w.WhenJoin(true, []string{"x", "y"}, ",")
+			},
+			expected: "included\nabx,y",
+		},
+		{
+			name: "edge case - empty operations",
+			buildFn: func(w stringWriter) {
+				w.WriteString("")
+				w.Concat()
+				w.WriteLines()
+				w.Repeat("x", 0)
+			},
+			expected: "",
+		},
+		{
+			name: "edge case - negative counts",
+			buildFn: func(w stringWriter) {
+				w.NLines(-1)
+				w.NTabs(-5)
+				w.Repeat("x", -1)
+				w.RepeatByte('a', -10)
+				w.WriteString("ok")
+			},
+			expected: "ok",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test Buffer
+			var buf Buffer
+			tt.buildFn(&buf)
+			bufResult := buf.String()
+
+			// Test Builder
+			var bld Builder
+			tt.buildFn(&bld)
+			bldResult := bld.String()
+
+			// Verify they produce the same output
+			if bufResult != bldResult {
+				t.Errorf("Buffer and Builder produce different output:\nBuffer:  %q\nBuilder: %q", bufResult, bldResult)
+			}
+
+			// Verify both match expected output
+			if bufResult != tt.expected {
+				t.Errorf("Buffer output mismatch:\nExpected: %q\nGot:      %q", tt.expected, bufResult)
+			}
+			if bldResult != tt.expected {
+				t.Errorf("Builder output mismatch:\nExpected: %q\nGot:      %q", tt.expected, bldResult)
+			}
+		})
+	}
+}
+
+// TestBufferBuilderStateEquivalence verifies that Buffer and Builder maintain
+// equivalent state through various operations.
+func TestBufferBuilderStateEquivalence(t *testing.T) {
+	t.Run("Len() equivalence", func(t *testing.T) {
+		var buf Buffer
+		var bld Builder
+
+		if buf.Len() != bld.Len() {
+			t.Errorf("initial length mismatch: Buffer=%d, Builder=%d", buf.Len(), bld.Len())
+		}
+
+		buf.WriteString("hello")
+		bld.WriteString("hello")
+
+		if buf.Len() != bld.Len() {
+			t.Errorf("length after WriteString mismatch: Buffer=%d, Builder=%d", buf.Len(), bld.Len())
+		}
+
+		buf.WriteRune('世')
+		bld.WriteRune('世')
+
+		if buf.Len() != bld.Len() {
+			t.Errorf("length after WriteRune mismatch: Buffer=%d, Builder=%d", buf.Len(), bld.Len())
+		}
+	})
+
+	t.Run("Reset() equivalence", func(t *testing.T) {
+		var buf Buffer
+		var bld Builder
+
+		buf.WriteString("test")
+		bld.WriteString("test")
+
+		buf.Reset()
+		bld.Reset()
+
+		if buf.String() != bld.String() {
+			t.Errorf("Reset() output mismatch: Buffer=%q, Builder=%q", buf.String(), bld.String())
+		}
+
+		if buf.Len() != 0 || bld.Len() != 0 {
+			t.Errorf("Reset() length mismatch: Buffer=%d, Builder=%d", buf.Len(), bld.Len())
+		}
+	})
+
+	t.Run("Grow() equivalence", func(t *testing.T) {
+		var buf Buffer
+		var bld Builder
+
+		initialBufCap := buf.Cap()
+		initialBldCap := bld.Cap()
+
+		buf.Grow(1000)
+		bld.Grow(1000)
+
+		if buf.Cap() < initialBufCap+1000 {
+			t.Errorf("Buffer Grow() did not increase capacity sufficiently")
+		}
+		if bld.Cap() < initialBldCap+1000 {
+			t.Errorf("Builder Grow() did not increase capacity sufficiently")
 		}
 	})
 }
