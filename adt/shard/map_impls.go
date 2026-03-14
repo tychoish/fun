@@ -32,9 +32,9 @@ const (
 	// MapTypeRWMutex is a standard library map (map[K]V) with all
 	// access protected with a sync.RWMutex, ensuring exclusive
 	// access for write operations and concurrent access for read
-	// operations. Will perform better for read-heavy workloads,
-	// with write workloads that are skewed towards modifications
-	// rather than additions.
+	// operations. Will perform better for mixed but read-heavy
+	// workloads, with write workloads that are skewed towards
+	// modifications rather than additions.
 	MapTypeRWMutex MapType = 3
 	// MapTypeStdlib is a very minimal wrapper on top of a
 	// standard library map (map[K]V). This is not safe for
