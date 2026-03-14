@@ -3,7 +3,6 @@ package adt
 import (
 	"context"
 	"math/rand"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -30,7 +29,7 @@ func TestPool(t *testing.T) {
 	t.Run("Init", func(t *testing.T) {
 		p := &Pool[*poolTestType]{}
 		p.SetConstructor(func() *poolTestType { return &poolTestType{} })
-		ptt := p.Make()
+		ptt := p.Get()
 		assert.Equal(t, ptt.value, 0)
 		pgt := p.Get()
 		assert.Equal(t, *ptt, *pgt)
@@ -53,7 +52,7 @@ func TestPool(t *testing.T) {
 		}
 
 		for range 100000 {
-			ppg := p.Make()
+			ppg := p.Get()
 			if ppg.value == 100 || seen {
 				seen = true
 				break
@@ -112,82 +111,6 @@ func TestPool(t *testing.T) {
 		check.True(t, called.Load())
 		testt.Log(t, "seen =", seen.Load(), "called = ", called.Load())
 	})
-	t.Run("MakeMagic", func(t *testing.T) {
-		t.Parallel()
-		p := &Pool[*poolTestType]{}
-		p.SetConstructor(func() *poolTestType { return &poolTestType{} })
-		ctx, cancel := context.WithCancel(testt.ContextWithTimeout(t, 5*time.Second))
-		defer cancel()
-		wg := &sync.WaitGroup{}
-		seen := &atomic.Bool{}
-		for range 16 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for {
-					if seen.Load() || ctx.Err() != nil {
-						return
-					}
-
-					func() {
-						ppg := p.Make()
-						ppg.value = 420
-					}()
-					runtime.GC()
-				}
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
-				for {
-					for {
-						if seen.Load() || ctx.Err() != nil {
-							return
-						}
-
-						ppg := p.Get()
-						if ppg.value == 420 {
-							seen.Store(true)
-							cancel()
-							return
-						}
-
-						runtime.GC()
-					}
-				}
-			}()
-		}
-		<-ctx.Done()
-		assert.True(t, seen.Load())
-	})
-	// MakeNonPointerIsEquivalentToGet confirms that after the fix Make()
-	// for non-pointer value types behaves identically to Get(): no
-	// automatic cleanup is registered, so the hook is never called
-	// unless the caller explicitly calls Put().
-	t.Run("MakeNonPointerIsEquivalentToGet", func(t *testing.T) {
-		t.Parallel()
-		returned := &atomic.Int64{}
-		p := &Pool[int]{}
-		p.SetConstructor(func() int { return 0 })
-		p.SetCleanupHook(func(in int) int { returned.Add(1); return in })
-
-		vals := make([]int, 20)
-		for i := range vals {
-			vals[i] = p.Make()
-		}
-
-		runtime.GC()
-		runtime.GC()
-		time.Sleep(10 * time.Millisecond)
-		runtime.GC()
-
-		// No automatic cleanup was registered, so the hook must not have
-		// fired even though GC ran while vals is still in scope.
-		check.Equal(t, returned.Load(), int64(0))
-		_ = vals
-	})
-
 	t.Run("Finalize", func(t *testing.T) {
 		p := &Pool[int]{}
 

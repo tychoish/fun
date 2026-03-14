@@ -2,33 +2,23 @@ package adt
 
 import (
 	"bytes"
-	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
-	"github.com/tychoish/fun/internal"
 	"github.com/tychoish/fun/stw"
 )
 
-// Pool is an ergonomic wrapper around sync.Pool that provides some
-// additional functionality: generic type interface, a default clean
-// up hook to modify (optionally) the object before returning it to
-// the pool.
-//
-// Additionally, the Make() method attaches an object finalizer to the
-// object produced by the pool that returns the object to the pool
-// rather than garbage collect it. This is likely to be less efficient
-// than return the objects to the pool using defer functions, but may
-// be more ergonomic in some situations.
+// Pool is an ergonomic wrapper around sync.Pool that provides a
+// generic type interface and an optional cleanup hook to modify
+// objects before returning them to the pool.
 //
 // Pool can be used with default construction; however, you should set
-// the Constructor before calling Get() or Make() on the pool.
+// the Constructor before calling Get() on the pool.
 type Pool[T any] struct {
 	once        sync.Once
 	locked      atomic.Bool
-	typeIsPtr   bool
 	hook        *Atomic[func(T) T]
 	constructor *Atomic[func() T]
 	pool        *sync.Pool
@@ -42,8 +32,6 @@ func (p *Pool[T]) doInit() {
 	p.hook = NewAtomic(p.noop)
 	p.constructor = NewAtomic(p.zero)
 	p.pool = &sync.Pool{New: func() any { return p.constructor.Get()() }}
-	var zero T
-	p.typeIsPtr = internal.IsPtr(zero)
 }
 
 // FinalizeSetup prevents future calls from setting the constructor or
@@ -64,8 +52,8 @@ func (p *Pool[T]) SetCleanupHook(in func(T) T) {
 	}
 }
 
-// SetConstructor overrides the default constructor (which makes an
-// object with a Zero value by default) for Get/Make operations.
+// SetConstructor overrides the default constructor (which returns a
+// zero value by default) for Get operations.
 func (p *Pool[T]) SetConstructor(in func() T) {
 	p.init()
 	erc.InvariantOk(!p.locked.Load(), "SetConstructor", "after FinalizeSetup", ers.ErrImmutabilityViolation)
@@ -78,39 +66,13 @@ func (p *Pool[T]) SetConstructor(in func() T) {
 // according to the constructor.
 func (p *Pool[T]) Get() T { p.init(); return p.pool.Get().(T) }
 
-// Put returns an object in the pool, calling the cleanup hook if
-// set. Put does not clear any cleanup registered by Make; do not pass
-// Make-retrieved objects to Put.
+// Put returns an object in the pool, calling the cleanup hook if set.
 func (p *Pool[T]) Put(in T) {
 	p.init()
 
 	if any(in) != nil {
 		p.pool.Put(p.hook.Get()(in))
 	}
-}
-
-// Make gets an object out of the sync.Pool, and for pointer types
-// attaches a cleanup that returns the item to the pool when the
-// object would be garbage collected. For non-pointer types Make
-// behaves identically to Get because finalizers cannot track the
-// lifetime of a value-type copy.
-//
-// Note: runtime.AddCleanup would be preferable to runtime.SetFinalizer
-// but its first argument requires a concrete *T, not an any-constrained
-// generic value, so SetFinalizer (which accepts any) is used here.
-//
-// Do not pass Make-retrieved pointer objects to Put manually; the
-// cleanup is not cleared by Put and the object will be returned to
-// the pool twice.
-func (p *Pool[T]) Make() T {
-	p.init()
-	o := p.pool.Get().(T)
-
-	if p.typeIsPtr {
-		runtime.SetFinalizer(o, p.Put)
-	}
-
-	return o
 }
 
 // MakeBytesBufferPool configures a pool of *bytes.Buffers. Buffers
@@ -121,7 +83,7 @@ func MakeBytesBufferPool(capacity int) *Pool[*bytes.Buffer] {
 	_buf := MakeBufferPool(capacity, 64*1024)
 	bufpool := &Pool[*bytes.Buffer]{}
 	bufpool.SetCleanupHook(func(buf *bytes.Buffer) *bytes.Buffer { buf.Reset(); return buf })
-	bufpool.SetConstructor(func() *bytes.Buffer { return bytes.NewBuffer(_buf.Make()) })
+	bufpool.SetConstructor(func() *bytes.Buffer { return bytes.NewBuffer(_buf.Get()) })
 	bufpool.FinalizeSetup()
 	return bufpool
 }
