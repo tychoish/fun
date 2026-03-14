@@ -54,3 +54,14 @@ func flush[T any](seq iter.Seq[T], op func(T)) {
 		op(str)
 	}
 }
+
+// FromMutable provides a clear, legible operation to convert iterators of Mutable instances to iterators of strings.
+func FromMutable(seq iter.Seq[Mutable]) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for mut := range seq {
+			if !yield(string(mut)) {
+				return
+			}
+		}
+	}
+}

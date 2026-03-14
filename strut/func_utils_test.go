@@ -611,3 +611,176 @@ func TestFlushWithComplexIterator(t *testing.T) {
 		t.Errorf("expected %v, got %v", expected, result)
 	}
 }
+
+func TestFromMutable(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    [][]byte
+		expected []string
+	}{
+		{
+			name:     "converts multiple mutable values to strings",
+			input:    [][]byte{[]byte("hello"), []byte("world"), []byte("test")},
+			expected: []string{"hello", "world", "test"},
+		},
+		{
+			name:     "empty iterator",
+			input:    [][]byte{},
+			expected: []string{},
+		},
+		{
+			name:     "single element",
+			input:    [][]byte{[]byte("solo")},
+			expected: []string{"solo"},
+		},
+		{
+			name:     "unicode content",
+			input:    [][]byte{[]byte("hello"), []byte("世界"), []byte("🌍")},
+			expected: []string{"hello", "世界", "🌍"},
+		},
+		{
+			name:     "empty strings",
+			input:    [][]byte{[]byte(""), []byte(""), []byte("")},
+			expected: []string{"", "", ""},
+		},
+		{
+			name:     "mixed empty and non-empty",
+			input:    [][]byte{[]byte("first"), []byte(""), []byte("last")},
+			expected: []string{"first", "", "last"},
+		},
+		{
+			name:     "long strings",
+			input:    [][]byte{[]byte("this is a longer string"), []byte("with multiple words")},
+			expected: []string{"this is a longer string", "with multiple words"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create an iterator of *Mutable from the input
+			mutSeq := func(yield func(Mutable) bool) {
+				for _, b := range tt.input {
+					m := Mutable(b)
+					if !yield(m) {
+						return
+					}
+				}
+			}
+
+			// Convert to string iterator
+			strSeq := FromMutable(mutSeq)
+
+			// Collect results
+			var result []string
+			for s := range strSeq {
+				result = append(result, s)
+			}
+
+			// Verify
+			if len(result) != len(tt.expected) {
+				t.Errorf("expected len=%d, got %d", len(tt.expected), len(result))
+				return
+			}
+
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("at index %d: expected %q, got %q", i, tt.expected[i], result[i])
+				}
+			}
+		})
+	}
+}
+
+func TestFromMutableEarlyTermination(t *testing.T) {
+	// Test that FromMutable respects early termination
+	input := [][]byte{[]byte("one"), []byte("two"), []byte("three"), []byte("four"), []byte("five")}
+
+	mutSeq := func(yield func(Mutable) bool) {
+		for _, b := range input {
+			m := Mutable(b)
+			if !yield(m) {
+				return
+			}
+		}
+	}
+
+	strSeq := FromMutable(mutSeq)
+
+	var result []string
+	for s := range strSeq {
+		result = append(result, s)
+		if len(result) == 3 {
+			break // Early termination
+		}
+	}
+
+	expected := []string{"one", "two", "three"}
+	if !slices.Equal(result, expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
+func TestFromMutableWithSplit(t *testing.T) {
+	// Test FromMutable with actual Mutable Split method
+	mut := Mutable([]byte("hello,world,test"))
+
+	result := make([]string, 0, 3)
+	for s := range FromMutable(mut.Split([]byte(","))) {
+		result = append(result, s)
+	}
+
+	expected := []string{"hello", "world", "test"}
+	if !slices.Equal(result, expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
+func TestFromMutableWithFields(t *testing.T) {
+	// Test FromMutable with actual Mutable Fields method
+	mut := Mutable([]byte("hello   world\ttest\nfoo"))
+
+	result := make([]string, 0, 4)
+	for s := range FromMutable(mut.Fields()) {
+		result = append(result, s)
+	}
+
+	expected := []string{"hello", "world", "test", "foo"}
+	if !slices.Equal(result, expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
+func TestFromMutableLazyEvaluation(t *testing.T) {
+	// Test that FromMutable is lazy - it shouldn't consume the iterator until needed
+	callCount := 0
+	mutSeq := func(yield func(Mutable) bool) {
+		for range 5 {
+			callCount++
+			m := Mutable([]byte("item"))
+			if !yield(m) {
+				return
+			}
+		}
+	}
+
+	strSeq := FromMutable(mutSeq)
+
+	// Just creating the iterator shouldn't call the underlying sequence
+	if callCount != 0 {
+		t.Errorf("expected callCount=0 before iteration, got %d", callCount)
+	}
+
+	// Consume only first 2 items
+	consumed := 0
+	for range strSeq {
+		consumed++
+		if consumed == 2 {
+			break
+		}
+	}
+
+	// Should have called exactly 2 times
+	if callCount != 2 {
+		t.Errorf("expected callCount=2 after consuming 2 items, got %d", callCount)
+	}
+}

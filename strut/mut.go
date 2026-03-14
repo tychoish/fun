@@ -16,7 +16,7 @@ const (
 	asciiCaseDiff = 'a' - 'A' // 32
 )
 
-var bufpool sync.Pool{
+var bufpool = sync.Pool{
 	New: func() any { return new(Mutable) },
 }
 
@@ -319,15 +319,15 @@ func (mut Mutable) CutSuffixString(suffix string) (before []byte, found bool) {
 // more consecutive white space characters, as defined by unicode.IsSpace,
 // returning an iterator that yields each field. Zero allocation for the
 // iterator itself.
-func (mut Mutable) Fields() iter.Seq[[]byte] {
+func (mut Mutable) Fields() iter.Seq[Mutable] {
 	return mut.FieldsFunc(unicode.IsSpace)
 }
 
 // FieldsFunc splits the mutable string at each run of code points
 // 'c' satisfying 'f(c)', returning an iterator. Zero allocation for
 // the iterator itself.
-func (mut Mutable) FieldsFunc(f func(rune) bool) iter.Seq[[]byte] {
-	return func(yield func([]byte) bool) {
+func (mut Mutable) FieldsFunc(f func(rune) bool) iter.Seq[Mutable] {
+	return func(yield func(Mutable) bool) {
 		s := []byte(mut)
 		start := -1
 
@@ -336,7 +336,8 @@ func (mut Mutable) FieldsFunc(f func(rune) bool) iter.Seq[[]byte] {
 			isField := f(r)
 			switch {
 			case isField && start >= 0:
-				if !yield(s[start:i]) {
+				m := Mutable(s[start:i])
+				if !yield(m) {
 					return
 				}
 				start = -1
@@ -346,7 +347,8 @@ func (mut Mutable) FieldsFunc(f func(rune) bool) iter.Seq[[]byte] {
 			i += size
 		}
 		if start >= 0 {
-			yield(s[start:])
+			m := Mutable(s[start:])
+			yield(m)
 		}
 	}
 }
@@ -354,12 +356,13 @@ func (mut Mutable) FieldsFunc(f func(rune) bool) iter.Seq[[]byte] {
 // splitHelper is a helper function that implements the common logic for
 // Split and SplitAfter. The includeSep parameter determines whether the
 // separator is included in the yielded slices.
-func splitHelper(mut Mutable, sep []byte, includeSep bool) iter.Seq[[]byte] {
-	return func(yield func([]byte) bool) {
+func splitHelper(mut Mutable, sep []byte, includeSep bool) iter.Seq[Mutable] {
+	return func(yield func(Mutable) bool) {
 		if len(sep) == 0 {
 			// Empty separator: split into individual bytes
 			for i := range mut {
-				if !yield(mut[i : i+1]) {
+				m := Mutable(mut[i : i+1])
+				if !yield(m) {
 					return
 				}
 			}
@@ -370,14 +373,16 @@ func splitHelper(mut Mutable, sep []byte, includeSep bool) iter.Seq[[]byte] {
 		for {
 			idx := bytes.Index(s, sep)
 			if idx < 0 {
-				yield(s)
+				m := Mutable(s)
+				yield(m)
 				return
 			}
 			endIdx := idx
 			if includeSep {
 				endIdx += len(sep)
 			}
-			if !yield(s[:endIdx]) {
+			m := Mutable(s[:endIdx])
+			if !yield(m) {
 				return
 			}
 			s = s[idx+len(sep):]
@@ -388,22 +393,22 @@ func splitHelper(mut Mutable, sep []byte, includeSep bool) iter.Seq[[]byte] {
 // Split returns an iterator that yields subslices separated by 'sep'.
 // Zero allocation for the iterator itself; each yielded slice is a
 // subslice of the original data (no copying).
-func (mut Mutable) Split(sep []byte) iter.Seq[[]byte] {
+func (mut Mutable) Split(sep Mutable) iter.Seq[Mutable] {
 	return splitHelper(mut, sep, false)
 }
 
 // SplitString returns an iterator that yields subslices separated by
 // 'sep'. Zero allocation for the iterator itself; each yielded slice
 // is a subslice of the original data (no copying).
-func (mut Mutable) SplitString(sep string) iter.Seq[[]byte] {
+func (mut Mutable) SplitString(sep string) iter.Seq[Mutable] {
 	return mut.Split([]byte(sep))
 }
 
 // splitNHelper is a helper function that implements the common logic for
 // SplitN and SplitAfterN. The includeSep parameter determines whether the
 // separator is included in the yielded slices.
-func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSplit func([]byte) iter.Seq[[]byte]) iter.Seq[[]byte] {
-	return func(yield func([]byte) bool) {
+func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSplit func(Mutable) iter.Seq[Mutable]) iter.Seq[Mutable] {
+	return func(yield func(Mutable) bool) {
 		if n == 0 || len(mut) == 0 {
 			return
 		}
@@ -420,15 +425,18 @@ func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSpli
 		if len(sep) == 0 {
 			// Empty separator: split into individual bytes
 			for i := 0; i < len(mut) && i < n-1; i++ {
-				if !yield(mut[i : i+1]) {
+				m := Mutable(mut[i : i+1])
+				if !yield(m) {
 					return
 				}
 			}
 
 			if n == 1 {
-				yield(mut)
+				m := Mutable(mut)
+				yield(m)
 			} else {
-				yield(mut[n-1:])
+				m := Mutable(mut[n-1:])
+				yield(m)
 			}
 
 			return
@@ -445,7 +453,8 @@ func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSpli
 			if includeSep {
 				endIdx += len(sep)
 			}
-			if !yield(s[:endIdx]) {
+			m := Mutable(s[:endIdx])
+			if !yield(m) {
 				return
 			}
 			s = s[idx+len(sep):]
@@ -453,7 +462,8 @@ func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSpli
 		}
 		// Yield remainder
 		if len(s) > 0 || count < n {
-			yield(s)
+			m := Mutable(s)
+			yield(m)
 		}
 	}
 }
@@ -461,42 +471,42 @@ func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSpli
 // SplitN returns an iterator that yields at most 'n' subslices
 // separated by 'sep'. If n <= 0, yields all subslices. Zero
 // allocation for the iterator itself.
-func (mut Mutable) SplitN(sep []byte, n int) iter.Seq[[]byte] {
+func (mut Mutable) SplitN(sep []byte, n int) iter.Seq[Mutable] {
 	return splitNHelper(mut, sep, n, false, mut.Split)
 }
 
 // SplitNString returns an iterator that yields at most 'n' subslices
 // separated by 'sep'. If n <= 0, yields all subslices. Zero
 // allocation for the iterator itself.
-func (mut Mutable) SplitNString(sep string, n int) iter.Seq[[]byte] {
+func (mut Mutable) SplitNString(sep string, n int) iter.Seq[Mutable] {
 	return mut.SplitN([]byte(sep), n)
 }
 
 // SplitAfter returns an iterator that yields subslices after each
 // instance of 'sep'. Each yielded slice includes the separator. Zero
 // allocation for the iterator itself.
-func (mut Mutable) SplitAfter(sep []byte) iter.Seq[[]byte] {
+func (mut Mutable) SplitAfter(sep Mutable) iter.Seq[Mutable] {
 	return splitHelper(mut, sep, true)
 }
 
 // SplitAfterString returns an iterator that yields subslices after
 // each instance of 'sep'. Each yielded slice includes the separator.
 // Zero allocation for the iterator itself.
-func (mut Mutable) SplitAfterString(sep string) iter.Seq[[]byte] {
+func (mut Mutable) SplitAfterString(sep string) iter.Seq[Mutable] {
 	return mut.SplitAfter([]byte(sep))
 }
 
 // SplitAfterN returns an iterator that yields at most 'n' subslices
 // after each instance of 'sep'. Each yielded slice includes the
 // separator. Zero allocation for the iterator itself.
-func (mut Mutable) SplitAfterN(sep []byte, n int) iter.Seq[[]byte] {
+func (mut Mutable) SplitAfterN(sep []byte, n int) iter.Seq[Mutable] {
 	return splitNHelper(mut, sep, n, true, mut.SplitAfter)
 }
 
 // SplitAfterNString returns an iterator that yields at most 'n'
 // subslices after each instance of 'sep'. Each yielded slice includes
 // the separator. Zero allocation for the iterator itself.
-func (mut Mutable) SplitAfterNString(sep string, n int) iter.Seq[[]byte] {
+func (mut Mutable) SplitAfterNString(sep string, n int) iter.Seq[Mutable] {
 	return mut.SplitAfterN([]byte(sep), n)
 }
 

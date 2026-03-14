@@ -645,7 +645,7 @@ func TestMutableSplit(t *testing.T) {
 				t.Errorf("Split() returned %d parts, want %d", len(got), len(tt.want))
 			}
 			for i, part := range got {
-				if string(part) != tt.want[i] {
+				if part.String() != tt.want[i] {
 					t.Errorf("Split()[%d] = %q, want %q", i, part, tt.want[i])
 				}
 			}
@@ -673,7 +673,7 @@ func TestMutableFields(t *testing.T) {
 				t.Errorf("Fields() returned %d parts, want %d", len(got), len(tt.want))
 			}
 			for i, part := range got {
-				if string(part) != tt.want[i] {
+				if part.String() != tt.want[i] {
 					t.Errorf("Fields()[%d] = %q, want %q", i, part, tt.want[i])
 				}
 			}
@@ -1317,21 +1317,21 @@ func TestMutableSplitVariants(t *testing.T) {
 	// Test SplitNString
 	mut := Mutable([]byte("a,b,c,d"))
 	parts := slices.Collect(mut.SplitNString(",", 2))
-	if len(parts) != 2 || string(parts[0]) != "a" || string(parts[1]) != "b,c,d" {
+	if len(parts) != 2 || parts[0].String() != "a" || parts[1].String() != "b,c,d" {
 		t.Errorf("SplitNString() failed, got %v", parts)
 	}
 
 	// Test SplitAfterString
 	mut = Mutable([]byte("a,b,c"))
 	parts = slices.Collect(mut.SplitAfterString(","))
-	if len(parts) != 3 || string(parts[0]) != "a," || string(parts[1]) != "b," || string(parts[2]) != "c" {
+	if len(parts) != 3 || parts[0].String() != "a," || parts[1].String() != "b," || parts[2].String() != "c" {
 		t.Errorf("SplitAfterString() failed, got %v", parts)
 	}
 
 	// Test SplitAfterNString
 	mut = Mutable([]byte("a,b,c,d"))
 	parts = slices.Collect(mut.SplitAfterNString(",", 2))
-	if len(parts) != 2 || string(parts[0]) != "a," || string(parts[1]) != "b,c,d" {
+	if len(parts) != 2 || parts[0].String() != "a," || parts[1].String() != "b,c,d" {
 		t.Errorf("SplitAfterNString() failed, got %v", parts)
 	}
 
@@ -1339,7 +1339,7 @@ func TestMutableSplitVariants(t *testing.T) {
 	isComma := func(r rune) bool { return r == ',' }
 	mut = Mutable([]byte("a,b,c"))
 	parts = slices.Collect(mut.FieldsFunc(isComma))
-	if len(parts) != 3 || string(parts[0]) != "a" || string(parts[1]) != "b" || string(parts[2]) != "c" {
+	if len(parts) != 3 || parts[0].String() != "a" || parts[1].String() != "b" || parts[2].String() != "c" {
 		t.Errorf("FieldsFunc() failed, got %v", parts)
 	}
 }
@@ -1922,7 +1922,7 @@ func TestIteratorConformance(t *testing.T) {
 					expected = bytes.Split(tc.data, tc.sep)
 				}
 
-				var got [][]byte
+				var got []Mutable
 				if tc.n >= 0 {
 					got = slices.Collect(mut.SplitN(tc.sep, tc.n))
 				} else {
@@ -1953,7 +1953,7 @@ func TestIteratorConformance(t *testing.T) {
 					expected = bytes.SplitAfter(tc.data, tc.sep)
 				}
 
-				var got [][]byte
+				var got []Mutable
 				if tc.n >= 0 {
 					got = slices.Collect(mut.SplitAfterN(tc.sep, tc.n))
 				} else {
