@@ -265,3 +265,101 @@ func TestBuffer_NewBuffer(t *testing.T) {
 		}
 	})
 }
+
+func TestMakeBuffer(t *testing.T) {
+	t.Run("returns non-nil with zero length", func(t *testing.T) {
+		b := MakeBuffer(100)
+		if b == nil {
+			t.Fatal("MakeBuffer() returned nil")
+		}
+		if b.Len() != 0 {
+			t.Errorf("initial length = %d, want 0", b.Len())
+		}
+		b.Release()
+	})
+
+	t.Run("preallocates at least the requested capacity", func(t *testing.T) {
+		b := MakeBuffer(100)
+		if b.Cap() < 100 {
+			t.Errorf("Cap() = %d, want >= 100", b.Cap())
+		}
+		b.Release()
+	})
+
+	t.Run("zero capacity", func(t *testing.T) {
+		b := MakeBuffer(0)
+		if b == nil {
+			t.Fatal("MakeBuffer(0) returned nil")
+		}
+		if b.Len() != 0 {
+			t.Errorf("length = %d, want 0", b.Len())
+		}
+		b.Release()
+	})
+
+	t.Run("usable after construction", func(t *testing.T) {
+		b := MakeBuffer(64)
+		b.WriteString("hello")
+		if b.String() != "hello" {
+			t.Errorf("got %q, want %q", b.String(), "hello")
+		}
+		b.Release()
+	})
+
+	t.Run("pool reuse resets content", func(t *testing.T) {
+		b := MakeBuffer(32)
+		b.WriteString("old data")
+		b.Release()
+
+		b2 := MakeBuffer(32)
+		if b2.Len() != 0 {
+			t.Errorf("pooled Buffer not reset: Len() = %d, want 0", b2.Len())
+		}
+		if b2.String() != "" {
+			t.Errorf("pooled Buffer not reset: String() = %q, want empty", b2.String())
+		}
+		b2.Release()
+	})
+
+	t.Run("grows pooled instance to requested capacity", func(t *testing.T) {
+		small := MakeBuffer(8)
+		small.WriteString("x")
+		small.Release()
+
+		large := MakeBuffer(1000)
+		if large.Cap() < 1000 {
+			t.Errorf("Cap() = %d, want >= 1000", large.Cap())
+		}
+		if large.Len() != 0 {
+			t.Errorf("Len() = %d, want 0", large.Len())
+		}
+		large.Release()
+	})
+}
+
+func TestBuffer_Release(t *testing.T) {
+	t.Run("resets content", func(t *testing.T) {
+		b := MakeBuffer(32)
+		b.WriteString("some content")
+		b.Release()
+
+		b2 := MakeBuffer(32)
+		if b2.Len() != 0 {
+			t.Errorf("after Release, Len() = %d, want 0", b2.Len())
+		}
+		b2.Release()
+	})
+
+	t.Run("large buffer not returned to pool", func(t *testing.T) {
+		b := MakeBuffer(0)
+		b.Write(make([]byte, 65*1024))
+		// Release should not panic and should discard the oversized buffer
+		b.Release()
+	})
+
+	t.Run("Release on stack-allocated Buffer does not panic", func(t *testing.T) {
+		var b Buffer
+		b.WriteString("data")
+		b.Release() // not from pool, but Release must not panic
+	})
+}

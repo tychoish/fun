@@ -7,15 +7,38 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Buffer provides the same interface as Builder but wraps
 // 'bytes.Buffer'.
 type Buffer struct{ bytes.Buffer }
 
+var bufferPool = sync.Pool{New: func() any { return new(Buffer) }}
+
 // NewBuffer constructs a new 'strut.Buffer' using the provided 'buf'
 // as the basis of the buffer.
 func NewBuffer(buf []byte) *Buffer { var b Buffer; b.Write(buf); return &b }
+
+// MakeBuffer retrieves a Buffer from the pool and ensures it has at
+// least the specified capacity. The returned Buffer has zero length.
+// Call Release() when done to return it to the pool for reuse.
+func MakeBuffer(capacity int) *Buffer {
+	b := bufferPool.Get().(*Buffer)
+	b.Grow(capacity)
+	return b
+}
+
+// Release resets the Buffer and returns it to the pool for reuse.
+// Buffers larger than 64KB are not pooled to prevent excessive memory
+// retention. After calling Release, the Buffer should not be used again.
+func (b *Buffer) Release() {
+	if b.Cap() > 64*1024 {
+		return
+	}
+	b.Reset()
+	bufferPool.Put(b)
+}
 
 func (b *Buffer) ws(s string)       { b.WriteString(s) }
 func (b *Buffer) wb(in byte)        { b.WriteByte(in) }
