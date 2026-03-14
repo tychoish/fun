@@ -16,13 +16,8 @@ const (
 	asciiCaseDiff = 'a' - 'A' // 32
 )
 
-var (
-	bufonce sync.Once
-	bufpool sync.Pool
-)
-
-func init() {
-	bufonce.Do(func() { bufpool.New = func() any { return new(Mutable) } })
+var bufpool sync.Pool{
+	New: func() any { return new(Mutable) },
 }
 
 // Mutable provides a pooled, mutable byte slice type for efficient
