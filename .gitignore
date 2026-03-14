@@ -3,3 +3,5 @@ coverage.html
 *.out
 *.test
 .aider*
+**.md
+!README.md
