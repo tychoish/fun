@@ -47,6 +47,22 @@ type Mutable []byte
 // reuse. The initial content is empty but may have non-zero capacity.
 func NewMutable() *Mutable { return bufpool.Get().(*Mutable) }
 
+// MakeMutable retrieves a Mutable from the pool and ensures it has
+// at least the specified capacity. The returned Mutable has zero length
+// and at least the specified capacity. Like NewMutable, the returned
+// Mutable should be released with Release() when no longer needed.
+func MakeMutable(capacity int) *Mutable {
+	mut := bufpool.Get().(*Mutable)
+	*mut = (*mut)[:0] // Reset length to 0
+	if mut.Cap() < capacity {
+		// Grow needs to account for current capacity being freed
+		// Since length is now 0, Grow(n) will create capacity of n
+		// We need total capacity, so grow by the full amount needed
+		mut.Grow(capacity)
+	}
+	return mut
+}
+
 // Format implements fmt.Formatter, allowing Mutable to be used directly
 // in formatted output. Writes the underlying bytes to the formatter's
 // state.
@@ -62,9 +78,10 @@ func (mut Mutable) ref() Mutable { return mut }
 func (mut *Mutable) Append(next *Mutable) *Mutable { *mut = append(*mut, *next...); return mut }
 
 // Release resets the Mutable and returns it to the pool for reuse.
-// Buffers larger than 64KB are not returned to the pool to prevent
-// excessive memory retention. After calling Release, the Mutable
-// should not be used again.
+// Any Mutable instance can be released, whether obtained from NewMutable(),
+// MakeMutable(), or created directly. Buffers larger than 64KB are not
+// returned to the pool to prevent excessive memory retention. After calling
+// Release, the Mutable should not be used again.
 func (mut *Mutable) Release() {
 	if cap(mut.ref()) > 64*1024 {
 		*mut = nil

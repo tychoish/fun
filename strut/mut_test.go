@@ -903,6 +903,107 @@ func TestMutableReleaseLargeBuffer(t *testing.T) {
 	// This is hard to test directly, but we can at least ensure Release doesn't panic
 }
 
+func TestMakeMutable(t *testing.T) {
+	t.Run("creates with specified capacity", func(t *testing.T) {
+		mut := MakeMutable(100)
+		if mut == nil {
+			t.Fatal("MakeMutable() returned nil")
+		}
+		if mut.Len() != 0 {
+			t.Errorf("MakeMutable() initial length = %d, want 0", mut.Len())
+		}
+		if mut.Cap() < 100 {
+			t.Errorf("MakeMutable(100) capacity = %d, want >= 100", mut.Cap())
+		}
+	})
+
+	t.Run("zero capacity", func(t *testing.T) {
+		mut := MakeMutable(0)
+		if mut == nil {
+			t.Fatal("MakeMutable(0) returned nil")
+		}
+		if mut.Len() != 0 {
+			t.Errorf("MakeMutable(0) length = %d, want 0", mut.Len())
+		}
+		if mut.Cap() != 0 {
+			t.Errorf("MakeMutable(0) capacity = %d, want 0", mut.Cap())
+		}
+	})
+
+	t.Run("can write up to capacity without realloc", func(t *testing.T) {
+		capacity := 50
+		mut := MakeMutable(capacity)
+		initialCap := mut.Cap()
+
+		// Write data up to capacity
+		data := make([]byte, capacity)
+		for i := range data {
+			data[i] = byte('a' + (i % 26))
+		}
+		mut.Write(data)
+
+		if mut.Len() != capacity {
+			t.Errorf("After writing %d bytes, length = %d", capacity, mut.Len())
+		}
+		if mut.Cap() != initialCap {
+			t.Errorf("Capacity changed from %d to %d (should not reallocate)", initialCap, mut.Cap())
+		}
+	})
+
+	t.Run("grows beyond capacity", func(t *testing.T) {
+		mut := MakeMutable(10)
+		initialCap := mut.Cap()
+
+		// Write more than capacity
+		data := make([]byte, 20)
+		mut.Write(data)
+
+		if mut.Len() != 20 {
+			t.Errorf("After writing 20 bytes, length = %d", mut.Len())
+		}
+		if mut.Cap() <= initialCap {
+			t.Errorf("Capacity should have grown beyond %d, got %d", initialCap, mut.Cap())
+		}
+	})
+
+	t.Run("uses pool and can be released", func(t *testing.T) {
+		// MakeMutable uses the pool
+		made := MakeMutable(10)
+		made.WriteString("made data")
+
+		if made.String() != "made data" {
+			t.Errorf("MakeMutable data = %q, want %q", made.String(), "made data")
+		}
+
+		// Should be able to release it
+		made.Release()
+
+		// Get another instance - verify pool is working
+		made2 := MakeMutable(10)
+		if made2.Len() != 0 {
+			t.Errorf("Released Mutable was not reset, Len() = %d, want 0", made2.Len())
+		}
+		made2.Release()
+	})
+
+	t.Run("grows pooled instance to requested capacity", func(t *testing.T) {
+		// First, put a small buffer in the pool
+		small := NewMutable()
+		small.WriteString("x") // Use it briefly
+		small.Release()
+
+		// Request larger capacity - should grow the pooled instance
+		large := MakeMutable(1000)
+		if large.Cap() < 1000 {
+			t.Errorf("MakeMutable(1000) capacity = %d, want >= 1000", large.Cap())
+		}
+		if large.Len() != 0 {
+			t.Errorf("MakeMutable(1000) length = %d, want 0", large.Len())
+		}
+		large.Release()
+	})
+}
+
 func TestMutableIsNullTerminated(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1223,10 +1324,10 @@ func TestCaseModificationComprehensive(t *testing.T) {
 	t.Run("ToLower preserves all non-letter bytes", func(t *testing.T) {
 		// Test that bytes 0-64 and 91-96 and 123-127 are preserved
 		// (all ASCII except a-z and A-Z)
-		var input []byte
+		input := make([]byte, 0, 128)
 		var expected []byte
 		// Add all ASCII characters 0-127
-		for b := byte(0); b < 128; b++ {
+		for b := range byte(128) {
 			input = append(input, b)
 			// Convert A-Z to a-z, leave everything else unchanged
 			if b >= 'A' && b <= 'Z' {
@@ -1252,10 +1353,10 @@ func TestCaseModificationComprehensive(t *testing.T) {
 	t.Run("ToUpper preserves all non-letter bytes", func(t *testing.T) {
 		// Test that bytes 0-64 and 91-96 and 123-127 are preserved
 		// (all ASCII except a-z and A-Z)
-		var input []byte
+		input := make([]byte, 0, 128)
 		var expected []byte
 		// Add all ASCII characters 0-127
-		for b := byte(0); b < 128; b++ {
+		for b := range byte(128) {
 			input = append(input, b)
 			// Convert a-z to A-Z, leave everything else unchanged
 			if b >= 'a' && b <= 'z' {
