@@ -30,8 +30,15 @@ func init() {
 // splitting. Pointer receiver methods mutate in place; value receiver
 // methods are read-only. The type implements io.Writer and fmt.Formatter.
 //
-// Use NewMutable() to obtain a pooled instance and Release() to return it
-// to the pool. Buffers larger than 64KB are not pooled. Split and Fields
+// While it is safe to create Mutable values using `var name Mutable`
+// and `name := Mutable{}`, the NewMutable() constructor takes advantage
+// of a buffer pool, and buffers can be returned to the pool using
+// Release(). Buffers larger than 64KB are not pooled, following the
+// example of the implementation of the buffers in the stdlib fmt
+// package.
+//
+// Mutake attempts, when possible to, to provide efficient in-place
+// operations and avoids allocation when possible. Split and Fields
 // methods return iter.Seq iterators for zero-allocation iteration.
 type Mutable []byte
 
