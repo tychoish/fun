@@ -133,6 +133,43 @@ func TestBuilder_Reset(t *testing.T) {
 	}
 }
 
+func TestMakeBuilder(t *testing.T) {
+	t.Run("returns non-nil with zero length", func(t *testing.T) {
+		b := MakeBuilder(100)
+		if b == nil {
+			t.Fatal("MakeBuilder() returned nil")
+		}
+		if b.Len() != 0 {
+			t.Errorf("initial length = %d, want 0", b.Len())
+		}
+	})
+
+	t.Run("preallocates at least the requested capacity", func(t *testing.T) {
+		b := MakeBuilder(100)
+		if b.Cap() < 100 {
+			t.Errorf("Cap() = %d, want >= 100", b.Cap())
+		}
+	})
+
+	t.Run("zero capacity", func(t *testing.T) {
+		b := MakeBuilder(0)
+		if b == nil {
+			t.Fatal("MakeBuilder(0) returned nil")
+		}
+		if b.Len() != 0 {
+			t.Errorf("length = %d, want 0", b.Len())
+		}
+	})
+
+	t.Run("usable after construction", func(t *testing.T) {
+		b := MakeBuilder(64)
+		b.WriteString("hello")
+		if b.String() != "hello" {
+			t.Errorf("got %q, want %q", b.String(), "hello")
+		}
+	})
+}
+
 func TestBuilder_Grow(t *testing.T) {
 	var b Builder
 	initialCap := b.Cap()

@@ -14,6 +14,10 @@ import (
 // higher-level methods for building strings.
 type Builder struct{ strings.Builder }
 
+// MakeBuilder constructs a new Builder with at least the specified capacity
+// preallocated, avoiding early reallocation for known-size outputs.
+func MakeBuilder(capacity int) *Builder { var b Builder; b.Grow(capacity); return &b }
+
 func (b *Builder) ws(s string)       { b.WriteString(s) }
 func (b *Builder) wb(in byte)        { b.WriteByte(in) }
 func (b *Builder) wrr(r rune)        { b.WriteRune(r) }
