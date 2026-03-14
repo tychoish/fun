@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"testing"
 	"unicode"
@@ -1025,6 +1026,229 @@ func TestMutableIsNullTerminated(t *testing.T) {
 				t.Errorf("IsNullTerminated() = %v, want %v for %q", got, tt.want, tt.data)
 			}
 		})
+	}
+}
+
+func TestMutablePrint(t *testing.T) {
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	t.Run("print basic string", func(t *testing.T) {
+		mut := Mutable([]byte("hello world"))
+		mut.Print()
+	})
+
+	// Restore stdout and read captured output
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "hello world"
+	if got := buf.String(); got != expected {
+		t.Errorf("Print() wrote %q, want %q", got, expected)
+	}
+}
+
+func TestMutablePrintMultiple(t *testing.T) {
+	// Test multiple Print calls
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	mut1 := Mutable([]byte("foo"))
+	mut2 := Mutable([]byte("bar"))
+	mut3 := Mutable([]byte("baz"))
+
+	mut1.Print()
+	mut2.Print()
+	mut3.Print()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "foobarbaz"
+	if got := buf.String(); got != expected {
+		t.Errorf("Print() multiple calls wrote %q, want %q", got, expected)
+	}
+}
+
+func TestMutablePrintln(t *testing.T) {
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	t.Run("println basic string", func(t *testing.T) {
+		mut := Mutable([]byte("hello world"))
+		mut.Println()
+	})
+
+	// Restore stdout and read captured output
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "hello world\n"
+	if got := buf.String(); got != expected {
+		t.Errorf("Println() wrote %q, want %q", got, expected)
+	}
+}
+
+func TestMutablePrintlnMultiple(t *testing.T) {
+	// Test multiple Println calls
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	mut1 := Mutable([]byte("line1"))
+	mut2 := Mutable([]byte("line2"))
+	mut3 := Mutable([]byte("line3"))
+
+	mut1.Println()
+	mut2.Println()
+	mut3.Println()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "line1\nline2\nline3\n"
+	if got := buf.String(); got != expected {
+		t.Errorf("Println() multiple calls wrote %q, want %q", got, expected)
+	}
+}
+
+func TestMutablePrintEmpty(t *testing.T) {
+	// Test printing empty Mutable
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	mut := Mutable([]byte{})
+	mut.Print()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := buf.String(); got != "" {
+		t.Errorf("Print() empty wrote %q, want empty string", got)
+	}
+}
+
+func TestMutablePrintlnEmpty(t *testing.T) {
+	// Test Println with empty Mutable
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	mut := Mutable([]byte{})
+	mut.Println()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "\n"
+	if got := buf.String(); got != expected {
+		t.Errorf("Println() empty wrote %q, want newline", got)
+	}
+}
+
+func TestMutablePrintSpecialCharacters(t *testing.T) {
+	// Test printing with special characters
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	mut := Mutable([]byte("hello\tworld\n123"))
+	mut.Print()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "hello\tworld\n123"
+	if got := buf.String(); got != expected {
+		t.Errorf("Print() with special chars wrote %q, want %q", got, expected)
+	}
+}
+
+func TestMutablePrintUnicode(t *testing.T) {
+	// Test printing with Unicode characters
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	mut := Mutable([]byte("Hello 世界 🌍"))
+	mut.Println()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "Hello 世界 🌍\n"
+	if got := buf.String(); got != expected {
+		t.Errorf("Println() with Unicode wrote %q, want %q", got, expected)
 	}
 }
 
@@ -2798,6 +3022,159 @@ func TestMutableTrimSuffixString(t *testing.T) {
 	if got := string(mut); got != "hello" {
 		t.Errorf("TrimSuffixString() = %q, want \"hello\"", got)
 	}
+}
+
+func TestSprint(t *testing.T) {
+	t.Run("basic usage", func(t *testing.T) {
+		mut := Mprint("hello", "world")
+		defer mut.Release()
+
+		if got := mut.String(); got != "helloworld" {
+			t.Errorf("Sprint() = %q, want %q", got, "helloworld")
+		}
+	})
+
+	t.Run("with non-strings adds spaces", func(t *testing.T) {
+		// Spaces are added between operands when neither is a string
+		mut := Mprint(42, 43, 44)
+		defer mut.Release()
+
+		if got := mut.String(); got != "42 43 44" {
+			t.Errorf("Sprint() = %q, want %q", got, "42 43 44")
+		}
+	})
+
+	t.Run("mixed types no spaces", func(t *testing.T) {
+		// No spaces when one operand is a string
+		mut := Mprint("hello", 42, "world")
+		defer mut.Release()
+
+		if got := mut.String(); got != "hello42world" {
+			t.Errorf("Sprint() = %q, want %q", got, "hello42world")
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		mut := Mprint()
+		defer mut.Release()
+
+		if got := mut.String(); got != "" {
+			t.Errorf("Sprint() = %q, want empty string", got)
+		}
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		mut := Mprint(123)
+		defer mut.Release()
+
+		if got := mut.String(); got != "123" {
+			t.Errorf("Sprint() = %q, want %q", got, "123")
+		}
+	})
+}
+
+func TestSprintf(t *testing.T) {
+	t.Run("basic format", func(t *testing.T) {
+		mut := Mprintf("hello %s", "world")
+		defer mut.Release()
+
+		if got := mut.String(); got != "hello world" {
+			t.Errorf("Sprintf() = %q, want %q", got, "hello world")
+		}
+	})
+
+	t.Run("multiple formats", func(t *testing.T) {
+		mut := Mprintf("%s: %d items at $%.2f each", "Order", 3, 12.50)
+		defer mut.Release()
+
+		expected := "Order: 3 items at $12.50 each"
+		if got := mut.String(); got != expected {
+			t.Errorf("Sprintf() = %q, want %q", got, expected)
+		}
+	})
+
+	t.Run("no arguments", func(t *testing.T) {
+		mut := Mprintf("no formatting")
+		defer mut.Release()
+
+		if got := mut.String(); got != "no formatting" {
+			t.Errorf("Sprintf() = %q, want %q", got, "no formatting")
+		}
+	})
+
+	t.Run("complex formatting", func(t *testing.T) {
+		mut := Mprintf("%04d-%02d-%02d", 2024, 3, 15)
+		defer mut.Release()
+
+		if got := mut.String(); got != "2024-03-15" {
+			t.Errorf("Sprintf() = %q, want %q", got, "2024-03-15")
+		}
+	})
+}
+
+func TestSprintln(t *testing.T) {
+	t.Run("basic usage", func(t *testing.T) {
+		mut := Mprintln("hello", "world")
+		defer mut.Release()
+
+		if got := mut.String(); got != "hello world\n" {
+			t.Errorf("Sprintln() = %q, want %q", got, "hello world\n")
+		}
+	})
+
+	t.Run("with numbers", func(t *testing.T) {
+		mut := Mprintln("count:", 42)
+		defer mut.Release()
+
+		if got := mut.String(); got != "count: 42\n" {
+			t.Errorf("Sprintln() = %q, want %q", got, "count: 42\n")
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		mut := Mprintln()
+		defer mut.Release()
+
+		if got := mut.String(); got != "\n" {
+			t.Errorf("Sprintln() = %q, want newline", got)
+		}
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		mut := Mprintln(123)
+		defer mut.Release()
+
+		if got := mut.String(); got != "123\n" {
+			t.Errorf("Sprintln() = %q, want %q", got, "123\n")
+		}
+	})
+}
+
+func TestSprintFunctionsUsePool(t *testing.T) {
+	// Verify that Sprint functions return pooled Mutables
+	// that can be properly released and reused
+
+	mut1 := Mprint("test1")
+	mut1.Release()
+
+	mut2 := Mprintf("test%d", 2)
+	if mut2.Len() == 0 {
+		t.Error("Sprintf should have written data")
+	}
+	mut2.Release()
+
+	mut3 := Mprintln("test3")
+	if mut3.Len() == 0 {
+		t.Error("Sprintln should have written data")
+	}
+	mut3.Release()
+
+	// Get another from pool - should be reset
+	mut4 := NewMutable()
+	if mut4.Len() != 0 {
+		t.Errorf("Pooled Mutable not reset, Len() = %d, want 0", mut4.Len())
+	}
+	mut4.Release()
 }
 
 // Benchmark tests.

@@ -4,4 +4,4 @@ coverage.html
 *.test
 .aider*
 **.md
-!README.md
+!README.md0
