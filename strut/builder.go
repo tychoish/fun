@@ -19,20 +19,23 @@ func (b *Builder) wb(in byte)        { b.WriteByte(in) }
 func (b *Builder) wrr(r rune)        { b.WriteRune(r) }
 func (b *Builder) cat(strs []string) { apply(b.ws, strs) }
 
-// Wprint formats its arguments using default formatting and writes to
+// AppendPrint formats its arguments using default formatting and writes to
 // the builder. Analogous to fmt.Print, fmt.Fprint, and fmt.Sprint.
-func (b *Builder) Wprint(args ...any) { fmt.Fprint(b, args...) }
+func (b *Builder) AppendPrint(args ...any) *Builder { fmt.Fprint(b, args...); return b }
 
-// Wprintf formats according to a format specifier and writes to the
+// AppendPrintf formats according to a format specifier and writes to the
 // builder. The 'tpl' parameter is the format string, and 'args' are the
 // values to format. Analgous to fmt.Printf, fmt.Sprintf, and
 // fmt.Fprintf.
-func (b *Builder) Wprintf(tpl string, args ...any) { fmt.Fprintf(b, tpl, args...) }
+func (b *Builder) AppendPrintf(tpl string, args ...any) *Builder {
+	fmt.Fprintf(b, tpl, args...)
+	return b
+}
 
-// Wprintln formats its arguments using default formatting, adds a
+// AppendPrintln formats its arguments using default formatting, adds a
 // newline, and writes to the builder. Analogous to fmt.Println,
 // fmt.Sprintln, fmt.Fprintln.
-func (b *Builder) Wprintln(args ...any) { fmt.Fprintln(b, args...) }
+func (b *Builder) AppendPrintln(args ...any) *Builder { fmt.Fprintln(b, args...); return b }
 
 // Line writes a single newline character to the builder.
 func (b *Builder) Line() { b.WriteByte('\n') }
@@ -97,17 +100,32 @@ func (b *Builder) RepeatRune(r rune, n int) { nwith(n, b.wrr, r) }
 // repetition is on its own line.
 func (b *Builder) RepeatLine(ln string, n int) { nwith(n, b.WriteLine, ln) }
 
-// WhenWprint calls Wprint with 'args' if 'cond' is true and is a no-op
+// WhenAppendPrint calls AppendPrint with 'args' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Builder) WhenWprint(cond bool, args ...any) { ifargs(cond, b.Wprint, args) }
+func (b *Builder) WhenAppendPrint(cond bool, args ...any) *Builder {
+	if cond {
+		b.AppendPrint(args...)
+	}
+	return b
+}
 
-// WhenWprintf calls Wprintf with 'tpl' and 'args' if 'cond' is true and is
+// WhenAppendPrintf calls AppendPrintf with 'tpl' and 'args' if 'cond' is true and is
 // a no-op otherwise.
-func (b *Builder) WhenWprintf(cond bool, tpl string, args ...any) { iffmt(cond, b.Wprintf, tpl, args) }
+func (b *Builder) WhenAppendPrintf(cond bool, tpl string, args ...any) *Builder {
+	if cond {
+		b.AppendPrintf(tpl, args...)
+	}
+	return b
+}
 
-// WhenWprintln calls Wprintln with 'args' if 'cond' is true and is a
+// WhenAppendPrintln calls AppendPrintln with 'args' if 'cond' is true and is a
 // no-op otherwise.
-func (b *Builder) WhenWprintln(cond bool, args ...any) { ifargs(cond, b.Wprintln, args) }
+func (b *Builder) WhenAppendPrintln(cond bool, args ...any) *Builder {
+	if cond {
+		b.AppendPrintln(args...)
+	}
+	return b
+}
 
 // WhenLine writes a newline if 'cond' is true and is a no-op otherwise.
 func (b *Builder) WhenLine(cond bool) { ifop(cond, b.Line) }

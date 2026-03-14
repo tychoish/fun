@@ -9,7 +9,7 @@ import (
 )
 
 // StringWriter is a common interface for Builder and Buffer for testing purposes.
-type stringWriter interface { //nolint:interfacebloat
+type stringWriter[T any] interface { //nolint:interfacebloat
 	WriteString(string) (int, error)
 	WriteByte(byte) error
 	WriteRune(rune) (int, error)
@@ -27,12 +27,12 @@ type stringWriter interface { //nolint:interfacebloat
 	RepeatByte(byte, int)
 	RepeatRune(rune, int)
 	RepeatLine(string, int)
-	Wprint(...any)
-	Wprintf(string, ...any)
-	Wprintln(...any)
-	WhenWprint(bool, ...any)
-	WhenWprintf(bool, string, ...any)
-	WhenWprintln(bool, ...any)
+	AppendPrint(...any) T
+	AppendPrintf(string, ...any) T
+	AppendPrintln(...any) T
+	WhenAppendPrint(bool, ...any) T
+	WhenAppendPrintf(bool, string, ...any) T
+	WhenAppendPrintln(bool, ...any) T
 	WhenLine(bool)
 	WhenTab(bool)
 	WhenNLines(bool, int)
@@ -96,14 +96,14 @@ type stringWriter interface { //nolint:interfacebloat
 }
 
 // testCase defines a generic test case with a build function and expected result.
-type testCase[T stringWriter] struct {
+type testCase[T stringWriter[T]] struct {
 	name     string
 	buildFn  func(T)
 	expected string
 }
 
 // runBuildTests runs a set of test cases against a string writer.
-func runBuildTests[T stringWriter](t *testing.T, newWriter func() T, tests []testCase[T]) {
+func runBuildTests[T stringWriter[T]](t *testing.T, newWriter func() T, tests []testCase[T]) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -118,14 +118,14 @@ func runBuildTests[T stringWriter](t *testing.T, newWriter func() T, tests []tes
 }
 
 // validationTestCase defines a test case with custom validation logic.
-type validationTestCase[T stringWriter] struct {
+type validationTestCase[T stringWriter[T]] struct {
 	name     string
 	buildFn  func(T)
 	validate func(*testing.T, string)
 }
 
 // runValidationTests runs test cases with custom validation.
-func runValidationTests[T stringWriter](t *testing.T, newWriter func() T, tests []validationTestCase[T]) {
+func runValidationTests[T stringWriter[T]](t *testing.T, newWriter func() T, tests []validationTestCase[T]) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -137,7 +137,7 @@ func runValidationTests[T stringWriter](t *testing.T, newWriter func() T, tests 
 }
 
 // basicWriteTests returns common test cases for basic write operations.
-func basicWriteTests[T stringWriter]() []testCase[T] {
+func basicWriteTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "WriteString simple",
@@ -206,7 +206,7 @@ func basicWriteTests[T stringWriter]() []testCase[T] {
 }
 
 // lineTests returns common test cases for line operations.
-func lineTests[T stringWriter]() []testCase[T] {
+func lineTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "single line",
@@ -425,7 +425,7 @@ func joinTests() []joinTestCase {
 }
 
 // repeatTests returns test cases for repeat operations.
-func repeatTests[T stringWriter]() []testCase[T] {
+func repeatTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "Repeat positive",
@@ -501,47 +501,47 @@ func repeatTests[T stringWriter]() []testCase[T] {
 }
 
 // wprintTests returns test cases for formatted print operations.
-func wprintTests[T stringWriter]() []testCase[T] {
+func wprintTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "Wprint simple",
+			name: "AppendPrint simple",
 			buildFn: func(w T) {
-				w.Wprint("hello", " ", "world")
+				w.AppendPrint("hello", " ", "world")
 			},
 			expected: "hello world",
 		},
 		{
-			name: "Wprint numbers",
+			name: "AppendPrint numbers",
 			buildFn: func(w T) {
-				w.Wprint(42, " ", 3.14)
+				w.AppendPrint(42, " ", 3.14)
 			},
 			expected: "42 3.14",
 		},
 		{
-			name: "Wprintf format",
+			name: "AppendPrintf format",
 			buildFn: func(w T) {
-				w.Wprintf("Hello %s, number %d", "world", 42)
+				w.AppendPrintf("Hello %s, number %d", "world", 42)
 			},
 			expected: "Hello world, number 42",
 		},
 		{
-			name: "Wprintf empty",
+			name: "AppendPrintf empty",
 			buildFn: func(w T) {
-				w.Wprintf("")
+				w.AppendPrintf("")
 			},
 			expected: "",
 		},
 		{
-			name: "Wprintln",
+			name: "AppendPrintln",
 			buildFn: func(w T) {
-				w.Wprintln("test")
+				w.AppendPrintln("test")
 			},
 			expected: "test\n",
 		},
 		{
-			name: "Wprintln multiple args",
+			name: "AppendPrintln multiple args",
 			buildFn: func(w T) {
-				w.Wprintln("a", "b", "c")
+				w.AppendPrintln("a", "b", "c")
 			},
 			expected: "a b c\n",
 		},
@@ -549,47 +549,47 @@ func wprintTests[T stringWriter]() []testCase[T] {
 }
 
 // whenMethodTests returns test cases for When* conditional methods.
-func whenMethodTests[T stringWriter]() []testCase[T] {
+func whenMethodTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "WhenWprint true",
+			name: "WhenAppendPrint true",
 			buildFn: func(w T) {
-				w.WhenWprint(true, "hello")
+				w.WhenAppendPrint(true, "hello")
 			},
 			expected: "hello",
 		},
 		{
-			name: "WhenWprint false",
+			name: "WhenAppendPrint false",
 			buildFn: func(w T) {
-				w.WhenWprint(false, "hello")
+				w.WhenAppendPrint(false, "hello")
 			},
 			expected: "",
 		},
 		{
-			name: "WhenWprintf true",
+			name: "WhenAppendPrintf true",
 			buildFn: func(w T) {
-				w.WhenWprintf(true, "num=%d", 42)
+				w.WhenAppendPrintf(true, "num=%d", 42)
 			},
 			expected: "num=42",
 		},
 		{
-			name: "WhenWprintf false",
+			name: "WhenAppendPrintf false",
 			buildFn: func(w T) {
-				w.WhenWprintf(false, "num=%d", 42)
+				w.WhenAppendPrintf(false, "num=%d", 42)
 			},
 			expected: "",
 		},
 		{
-			name: "WhenWprintln true",
+			name: "WhenAppendPrintln true",
 			buildFn: func(w T) {
-				w.WhenWprintln(true, "test")
+				w.WhenAppendPrintln(true, "test")
 			},
 			expected: "test\n",
 		},
 		{
-			name: "WhenWprintln false",
+			name: "WhenAppendPrintln false",
 			buildFn: func(w T) {
-				w.WhenWprintln(false, "test")
+				w.WhenAppendPrintln(false, "test")
 			},
 			expected: "",
 		},
@@ -765,7 +765,7 @@ func whenMethodTests[T stringWriter]() []testCase[T] {
 }
 
 // quoteTests returns test cases for quote operations.
-func quoteTests[T stringWriter]() []testCase[T] {
+func quoteTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "Quote simple",
@@ -834,7 +834,7 @@ func quoteTests[T stringWriter]() []testCase[T] {
 }
 
 // formatNumberTests returns test cases for number formatting.
-func formatNumberTests[T stringWriter]() []testCase[T] {
+func formatNumberTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "Int positive",
@@ -938,7 +938,7 @@ func formatNumberTests[T stringWriter]() []testCase[T] {
 }
 
 // trimTests returns test cases for trim operations.
-func trimTests[T stringWriter]() []testCase[T] {
+func trimTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "TrimSpace",
@@ -1000,7 +1000,7 @@ func trimTests[T stringWriter]() []testCase[T] {
 }
 
 // replaceTests returns test cases for replace operations.
-func replaceTests[T stringWriter]() []testCase[T] {
+func replaceTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "ReplaceAll",
@@ -1041,7 +1041,7 @@ func replaceTests[T stringWriter]() []testCase[T] {
 }
 
 // edgeCaseTests returns test cases for edge cases.
-func edgeCaseTests[T stringWriter]() []validationTestCase[T] {
+func edgeCaseTests[T stringWriter[T]]() []validationTestCase[T] {
 	return []validationTestCase[T]{
 		{
 			name: "mixed operations",
@@ -1155,7 +1155,7 @@ func edgeCaseTests[T stringWriter]() []validationTestCase[T] {
 
 // extendTestsBuilderOnly returns test cases specific to types with Extend methods.
 type extendTestBuilderOnly[T interface {
-	stringWriter
+	stringWriter[T]
 	Extend(iter.Seq[string])
 	ExtendLines(iter.Seq[string])
 	ExtendJoin(iter.Seq[string], string)
@@ -1166,7 +1166,7 @@ type extendTestBuilderOnly[T interface {
 }
 
 func extendTests[T interface {
-	stringWriter
+	stringWriter[T]
 	Extend(iter.Seq[string])
 	ExtendLines(iter.Seq[string])
 	ExtendJoin(iter.Seq[string], string)
@@ -1217,7 +1217,7 @@ func extendTests[T interface {
 	}
 }
 
-func writeBytesLineTests[T stringWriter]() []testCase[T] {
+func writeBytesLineTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "WriteBytesLine simple",
@@ -1264,7 +1264,7 @@ func writeBytesLineTests[T stringWriter]() []testCase[T] {
 	}
 }
 
-func appendQuoteTests[T stringWriter]() []testCase[T] {
+func appendQuoteTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "AppendQuote simple",
@@ -1346,7 +1346,7 @@ func appendQuoteTests[T stringWriter]() []testCase[T] {
 	}
 }
 
-func appendNumberTests[T stringWriter]() []testCase[T] {
+func appendNumberTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "AppendBool true",
@@ -1462,7 +1462,7 @@ func appendNumberTests[T stringWriter]() []testCase[T] {
 	}
 }
 
-func appendTrimTests[T stringWriter]() []testCase[T] {
+func appendTrimTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "AppendTrimSpace leading and trailing",
@@ -1544,7 +1544,7 @@ func appendTrimTests[T stringWriter]() []testCase[T] {
 	}
 }
 
-func appendReplaceTests[T stringWriter]() []testCase[T] {
+func appendReplaceTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "AppendReplaceAll",
@@ -1598,7 +1598,7 @@ func appendReplaceTests[T stringWriter]() []testCase[T] {
 	}
 }
 
-func extendBytesTests[T stringWriter]() []testCase[T] {
+func extendBytesTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
 			name: "ExtendBytes with values",

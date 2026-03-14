@@ -22,20 +22,23 @@ func (b *Buffer) wb(in byte)        { b.WriteByte(in) }
 func (b *Buffer) wrr(r rune)        { b.WriteRune(r) }
 func (b *Buffer) cat(strs []string) { apply(b.ws, strs) }
 
-// Wprint formats its arguments using default formatting and writes to
+// AppendPrint formats its arguments using default formatting and writes to
 // the buffer. Analogous to fmt.Print, fmt.Fprint, and fmt.Sprint.
-func (b *Buffer) Wprint(args ...any) { fmt.Fprint(b, args...) }
+func (b *Buffer) AppendPrint(args ...any) *Buffer { fmt.Fprint(b, args...); return b }
 
-// Wprintf formats according to a format specifier and writes to the
+// AppendPrintf formats according to a format specifier and writes to the
 // buffer. The 'tpl' parameter is the format string, and 'args' are the
 // values to format. Analgous to fmt.Printf, fmt.Sprintf, and
 // fmt.Fprintf.
-func (b *Buffer) Wprintf(tpl string, args ...any) { fmt.Fprintf(b, tpl, args...) }
+func (b *Buffer) AppendPrintf(tpl string, args ...any) *Buffer {
+	fmt.Fprintf(b, tpl, args...)
+	return b
+}
 
-// Wprintln formats its arguments using default formatting, adds a
+// AppendPrintln formats its arguments using default formatting, adds a
 // newline, and writes to the buffer. Analogous to fmt.Println,
 // fmt.Sprintln, fmt.Fprintln.
-func (b *Buffer) Wprintln(args ...any) { fmt.Fprintln(b, args...) }
+func (b *Buffer) AppendPrintln(args ...any) *Buffer { fmt.Fprintln(b, args...); return b }
 
 // Line writes a single newline character to the buffer.
 func (b *Buffer) Line() { b.WriteByte('\n') }
@@ -97,17 +100,32 @@ func (b *Buffer) RepeatRune(r rune, n int) { nwith(n, b.wrr, r) }
 // repetition is on its own line.
 func (b *Buffer) RepeatLine(ln string, n int) { nwith(n, b.WriteLine, ln) }
 
-// WhenWprint calls Wprint with 'args' if 'cond' is true and is a no-op
+// WhenAppendPrint calls AppendPrint with 'args' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Buffer) WhenWprint(cond bool, args ...any) { ifargs(cond, b.Wprint, args) }
+func (b *Buffer) WhenAppendPrint(cond bool, args ...any) *Buffer {
+	if cond {
+		b.AppendPrint(args...)
+	}
+	return b
+}
 
-// WhenWprintf calls Wprintf with 'tpl' and 'args' if 'cond' is true and is
+// WhenAppendPrintf calls AppendPrintf with 'tpl' and 'args' if 'cond' is true and is
 // a no-op otherwise.
-func (b *Buffer) WhenWprintf(cond bool, tpl string, args ...any) { iffmt(cond, b.Wprintf, tpl, args) }
+func (b *Buffer) WhenAppendPrintf(cond bool, tpl string, args ...any) *Buffer {
+	if cond {
+		b.AppendPrintf(tpl, args...)
+	}
+	return b
+}
 
-// WhenWprintln calls Wprintln with 'args' if 'cond' is true and is a
+// WhenAppendPrintln calls AppendPrintln with 'args' if 'cond' is true and is a
 // no-op otherwise.
-func (b *Buffer) WhenWprintln(cond bool, args ...any) { ifargs(cond, b.Wprintln, args) }
+func (b *Buffer) WhenAppendPrintln(cond bool, args ...any) *Buffer {
+	if cond {
+		b.AppendPrintln(args...)
+	}
+	return b
+}
 
 // WhenLine writes a newline if 'cond' is true and is a no-op otherwise.
 func (b *Buffer) WhenLine(cond bool) { ifop(cond, b.Line) }
