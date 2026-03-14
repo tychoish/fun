@@ -78,9 +78,9 @@ func (p *Pool[T]) SetConstructor(in func() T) {
 // according to the constructor.
 func (p *Pool[T]) Get() T { p.init(); return p.pool.Get().(T) }
 
-// Put returns an object in the pool, calling the cleanuphook if
-// set. Put *always* clears the object's finalizer before calling the
-// cleanuphook or returning it to the pool.
+// Put returns an object in the pool, calling the cleanup hook if
+// set. Put does not clear any cleanup registered by Make; do not pass
+// Make-retrieved objects to Put.
 func (p *Pool[T]) Put(in T) {
 	p.init()
 
@@ -89,21 +89,25 @@ func (p *Pool[T]) Put(in T) {
 	}
 }
 
-// Make gets an object out of the sync.Pool, and attaches a finalizer
-// that returns the item to the pool when the object would be garbage
-// collected.
+// Make gets an object out of the sync.Pool, and for pointer types
+// attaches a cleanup that returns the item to the pool when the
+// object would be garbage collected. For non-pointer types Make
+// behaves identically to Get because finalizers cannot track the
+// lifetime of a value-type copy.
 //
-// Finalizer hooks are not automatically cleared by the Put()
-// operation, so objects retrieved with Make should not be passed
-// manually to Put().
+// Note: runtime.AddCleanup would be preferable to runtime.SetFinalizer
+// but its first argument requires a concrete *T, not an any-constrained
+// generic value, so SetFinalizer (which accepts any) is used here.
+//
+// Do not pass Make-retrieved pointer objects to Put manually; the
+// cleanup is not cleared by Put and the object will be returned to
+// the pool twice.
 func (p *Pool[T]) Make() T {
 	p.init()
 	o := p.pool.Get().(T)
 
 	if p.typeIsPtr {
 		runtime.SetFinalizer(o, p.Put)
-	} else {
-		runtime.SetFinalizer(&o, func(in *T) { p.Put(*in) })
 	}
 
 	return o

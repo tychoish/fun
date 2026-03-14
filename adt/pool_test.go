@@ -161,6 +161,33 @@ func TestPool(t *testing.T) {
 		<-ctx.Done()
 		assert.True(t, seen.Load())
 	})
+	// MakeNonPointerIsEquivalentToGet confirms that after the fix Make()
+	// for non-pointer value types behaves identically to Get(): no
+	// automatic cleanup is registered, so the hook is never called
+	// unless the caller explicitly calls Put().
+	t.Run("MakeNonPointerIsEquivalentToGet", func(t *testing.T) {
+		t.Parallel()
+		returned := &atomic.Int64{}
+		p := &Pool[int]{}
+		p.SetConstructor(func() int { return 0 })
+		p.SetCleanupHook(func(in int) int { returned.Add(1); return in })
+
+		vals := make([]int, 20)
+		for i := range vals {
+			vals[i] = p.Make()
+		}
+
+		runtime.GC()
+		runtime.GC()
+		time.Sleep(10 * time.Millisecond)
+		runtime.GC()
+
+		// No automatic cleanup was registered, so the hook must not have
+		// fired even though GC ran while vals is still in scope.
+		check.Equal(t, returned.Load(), int64(0))
+		_ = vals
+	})
+
 	t.Run("Finalize", func(t *testing.T) {
 		p := &Pool[int]{}
 
