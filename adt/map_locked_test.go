@@ -17,7 +17,7 @@ import (
 )
 
 // siMap is the common interface for LockedMap[string,int] and LockedRWMap[string,int].
-type siMap interface {
+type siMap interface { //nolint:interfacebloat
 	Len() int
 	Check(string) bool
 	Get(string) int
