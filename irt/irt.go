@@ -897,12 +897,49 @@ func WithMutex[T any](seq iter.Seq[T], mtx *sync.Mutex) iter.Seq[T] {
 	return unpull(mtxdo2(mtx, next), mtxcall(mtx, stop))
 }
 
+// WithRMutex returns a sequence that synchronizes all calls to the
+// underlying iterator using the provided readers/writer mutex. Locks
+// the mutex for reading (shared) while advancing the iterator.
+func WithRMutex[T any](seq iter.Seq[T], mtx *sync.RWMutex) iter.Seq[T] {
+	next, stop := iter.Pull(seq)
+
+	return unpull(mtxdor(mtx, next), mtxcallr(mtx, stop))
+}
+
+// WithWMutex returns a sequence that synchronizes all calls to the
+// underlying iterator using the provided readers/writer mutex. Locks
+// the mutex for writing (exclusive) while advancing the iterator.
+func WithWMutex[T any](seq iter.Seq[T], mtx *sync.RWMutex) iter.Seq[T] {
+	next, stop := iter.Pull(seq)
+
+	return unpull(mtxdo2w(mtx, next), mtxcallw(mtx, stop))
+}
+
 // WithMutex2 returns a pair sequence that synchronizes all calls to
 // the underlying iterator using the provided mutex.
 func WithMutex2[A, B any](seq iter.Seq2[A, B], mtx *sync.Mutex) iter.Seq2[A, B] {
 	next, stop := iter.Pull2(seq)
 
 	return unpull2(mtxdo3(mtx, next), mtxcall(mtx, stop))
+}
+
+// WithRMutex2 returns a pair sequence that synchronizes all calls to
+// the underlying iterator using the provided readers/writer
+// mutex. Locks the mutex for reading (shared) while advancing the iterator.
+func WithRMutex2[A, B any](seq iter.Seq2[A, B], mtx *sync.RWMutex) iter.Seq2[A, B] {
+	next, stop := iter.Pull2(seq)
+
+	return unpull2(mtxdo3r(mtx, next), mtxcallr(mtx, stop))
+}
+
+// WithWMutex2 returns a pair sequence that synchronizes all calls to
+// the underlying iterator using the provided readers/writer
+// mutex. Locks the mutex for writing (exclusive) while advancing the
+// iterator.
+func WithWMutex2[A, B any](seq iter.Seq2[A, B], mtx *sync.RWMutex) iter.Seq2[A, B] {
+	next, stop := iter.Pull2(seq)
+
+	return unpull2(mtxdo3w(mtx, next), mtxcallw(mtx, stop))
 }
 
 // Remove returns a sequence containing only the elements from the

@@ -21,7 +21,13 @@ func oncego(op func()) func()                                  { return once(goo
 func goop(op func()) func()                                    { return func() { go op() } }
 func with(mtx *sync.Mutex)                                     { mtx.Unlock() }
 func lock(mtx *sync.Mutex) *sync.Mutex                         { mtx.Lock(); return mtx }
+func withr(mtx *sync.RWMutex)                                  { mtx.RUnlock() }
+func lockr(mtx *sync.RWMutex) *sync.RWMutex                    { mtx.RLock(); return mtx }
+func withw(mtx *sync.RWMutex)                                  { mtx.Unlock() }
+func lockw(mtx *sync.RWMutex) *sync.RWMutex                    { mtx.Lock(); return mtx }
 func mtxcall(mtx *sync.Mutex, op func()) func()                { return func() { defer with(lock(mtx)); op() } }
+func mtxcallr(mtx *sync.RWMutex, op func()) func()             { return func() { defer withr(lockr(mtx)); op() } }
+func mtxcallw(mtx *sync.RWMutex, op func()) func()             { return func() { defer withw(lockw(mtx)); op() } }
 func toany[T any](in T) any                                    { return in }
 func toany2[A, B any](first A, second B) (A, any)              { return first, any(second) }
 
@@ -33,8 +39,24 @@ func mtxdo2[A, B any](m *sync.Mutex, o func() (A, B)) func() (A, B) {
 	return func() (A, B) { defer with(lock(m)); return o() }
 }
 
+func mtxdor[A, B any](m *sync.RWMutex, o func() (A, B)) func() (A, B) {
+	return func() (A, B) { defer withr(lockr(m)); return o() }
+}
+
+func mtxdo2w[A, B any](m *sync.RWMutex, o func() (A, B)) func() (A, B) {
+	return func() (A, B) { defer withw(lockw(m)); return o() }
+}
+
 func mtxdo3[A, B, C any](m *sync.Mutex, o func() (A, B, C)) func() (A, B, C) {
 	return func() (A, B, C) { defer with(lock(m)); return o() }
+}
+
+func mtxdo3r[A, B, C any](m *sync.RWMutex, o func() (A, B, C)) func() (A, B, C) {
+	return func() (A, B, C) { defer withr(lockr(m)); return o() }
+}
+
+func mtxdo3w[A, B, C any](m *sync.RWMutex, o func() (A, B, C)) func() (A, B, C) {
+	return func() (A, B, C) { defer withw(lockw(m)); return o() }
 }
 
 func mtxcallwith[T any](mtx *sync.Mutex, op func(T)) func(T) {
