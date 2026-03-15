@@ -194,6 +194,9 @@ func (ec *Collector) Iterator() iter.Seq[error] {
 ///////////////////////////////////////////////////////////////////////
 
 // Errorf constructs an error, using fmt.Errorf, and adds it to the collector.
+//
+// Unlike 'erc.Errorf', which has special semantics for formatting 'args'
+// that are errors, this method simply wraps 'fmt.Errorf()'.
 func (ec *Collector) Errorf(tmpl string, args ...any) { ec.Push(fmt.Errorf(tmpl, args...)) }
 
 // New adds an error to the collector using the provided string as its value. The error is an ers.Error object.
