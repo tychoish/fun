@@ -14,7 +14,7 @@ import (
 type OrderedSet[T comparable] struct {
 	mtx  sync.Mutex
 	once sync.Once
-	hash *Map[T, *elem[T]]
+	hash *SyncMap[T, *elem[T]]
 	list list[T]
 }
 
@@ -28,7 +28,7 @@ func (s *OrderedSet[T]) SortQuick(cf func(T, T) int) { defer s.with(s.lock()); s
 func (s *OrderedSet[T]) SortMerge(cf func(T, T) int) { defer s.with(s.lock()); s.list.SortMerge(cf) }
 
 func (s *OrderedSet[T]) init()   { s.once.Do(s.doInit) }
-func (s *OrderedSet[T]) doInit() { s.hash = &Map[T, *elem[T]]{} }
+func (s *OrderedSet[T]) doInit() { s.hash = &SyncMap[T, *elem[T]]{} }
 
 func (*OrderedSet[T]) with(mtx *sync.Mutex) { mtx.Unlock() }
 func (s *OrderedSet[T]) lock() *sync.Mutex  { s.mtx.Lock(); s.init(); return &s.mtx }

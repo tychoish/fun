@@ -35,7 +35,7 @@ import (
 // results if the input map is mutated during the operation. Keys and
 // values from the input map will replace keys and values from the
 // output map.
-func (mp *Map[K, V]) Join(in *Map[K, V]) { mp.Extend(in.Iterator()) }
+func (mp *SyncMap[K, V]) Join(in *SyncMap[K, V]) { mp.Extend(in.Iterator()) }
 
 func TestMap(t *testing.T) {
 	t.Parallel()
@@ -43,7 +43,7 @@ func TestMap(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		mp := &Map[string, int]{}
+		mp := &SyncMap[string, int]{}
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
 		for range 32 {
@@ -79,7 +79,7 @@ func TestMap(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		mp := &Map[string, int]{}
+		mp := &SyncMap[string, int]{}
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
@@ -144,7 +144,7 @@ func TestMap(t *testing.T) {
 		assert.True(t, passed.Load())
 	})
 	t.Run("EnsureSemantics", func(t *testing.T) {
-		mp := &Map[int, int]{}
+		mp := &SyncMap[int, int]{}
 		for i := range 100 {
 			mp.Store(i, rand.Int()+43)
 		}
@@ -166,7 +166,7 @@ func TestMap(t *testing.T) {
 		assert.Equal(t, count, 200)
 	})
 	t.Run("Iterators", func(t *testing.T) {
-		mp := &Map[int, int]{}
+		mp := &SyncMap[int, int]{}
 		for i := range 200 {
 			mp.Ensure(i)
 		}
@@ -180,7 +180,7 @@ func TestMap(t *testing.T) {
 		assert.Equal(t, count, 200)
 	})
 	t.Run("Contains", func(t *testing.T) {
-		mp := &Map[string, int]{}
+		mp := &SyncMap[string, int]{}
 		mp.Store("foo", 100)
 		mp.Store("bar", 42)
 		assert.Equal(t, 2, mp.Len())
@@ -191,10 +191,10 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("Join", func(t *testing.T) {
 		t.Run("Disjoint", func(t *testing.T) {
-			mp := &Map[string, int]{}
+			mp := &SyncMap[string, int]{}
 			mp.Store("foo", 100)
 			mp.Store("bar", 100)
-			mp2 := &Map[string, int]{}
+			mp2 := &SyncMap[string, int]{}
 			mp2.Store("foofoo", 100)
 			mp2.Store("barfoo", 100)
 			assert.Equal(t, 2, mp.Len())
@@ -207,10 +207,10 @@ func TestMap(t *testing.T) {
 			assert.Equal(t, 4, mp.Len())
 		})
 		t.Run("Overlapping", func(t *testing.T) {
-			mp := &Map[string, int]{}
+			mp := &SyncMap[string, int]{}
 			mp.Store("foo", 100)
 			mp.Store("bar", 100)
-			mp2 := &Map[string, int]{}
+			mp2 := &SyncMap[string, int]{}
 			mp2.Store("foo", 500)
 			mp2.Store("baz", 100)
 			assert.Equal(t, 2, mp.Len())
@@ -228,26 +228,26 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("JSON", func(t *testing.T) {
 		t.Run("HappyPath", func(t *testing.T) {
-			mp := &Map[string, int]{}
+			mp := &SyncMap[string, int]{}
 			mp.Store("foo", 100)
 			js, err := json.Marshal(mp)
 			assert.NotError(t, err)
 			assert.Equal(t, string(js), `{"foo":100}`)
-			nmp := &Map[string, int]{}
+			nmp := &SyncMap[string, int]{}
 			err = json.Unmarshal(js, nmp)
 			assert.NotError(t, err)
 			assert.Equal(t, nmp.Len(), 1)
 			assert.Equal(t, nmp.Get("foo"), 100)
 		})
 		t.Run("Impossible", func(t *testing.T) {
-			mp := &Map[string, int]{}
+			mp := &SyncMap[string, int]{}
 			err := json.Unmarshal([]byte(`{"foo": []}`), mp)
 			assert.Error(t, err)
 		})
 	})
 	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
-			mp := &Map[string, int]{}
+			mp := &SyncMap[string, int]{}
 			for i := range 100 {
 				mp.Ensure(fmt.Sprint(i))
 			}
@@ -263,7 +263,7 @@ func TestMap(t *testing.T) {
 			assert.Equal(t, len(seen), 100)
 		})
 		t.Run("Values", func(t *testing.T) {
-			mp := &Map[string, int]{}
+			mp := &SyncMap[string, int]{}
 			for i := range 100 {
 				mp.Ensure(fmt.Sprint(i))
 			}

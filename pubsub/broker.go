@@ -164,7 +164,7 @@ func (b *Broker[T]) startQueueWorkers(
 	sink func(context.Context, T) error,
 	length func() int,
 ) {
-	subs := &adt.Map[chan T, struct{}]{}
+	subs := &adt.SyncMap[chan T, struct{}]{}
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()

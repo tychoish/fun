@@ -8,12 +8,12 @@ import (
 	"github.com/tychoish/fun/irt"
 )
 
-// Map provides a wrapper around the standard library's sync.Map type
+// SyncMap provides a wrapper around the standard library's sync.SyncMap type
 // with key/value types enforced by generics. Additional helpers
 // support adding multiple items to the map, while the iteration
 // methods, and Extend provide compatibility with iter.Seq2[]
 // sequences.
-type Map[K comparable, V any] struct {
+type SyncMap[K comparable, V any] struct {
 	mp sync.Map
 }
 
@@ -27,37 +27,37 @@ type Map[K comparable, V any] struct {
 // total number of items in the map while Len is running, but the
 // number of items in the map may be smaller at the beginning and/or
 // the end than reported.
-func (mp *Map[K, V]) Len() (count int) {
+func (mp *SyncMap[K, V]) Len() (count int) {
 	mp.mp.Range(func(any, any) bool { count++; return true })
 	return
 }
 
 // Check returns true if the key exists in the map or false otherwise.
-func (mp *Map[K, V]) Check(key K) (ok bool) { _, ok = mp.mp.Load(key); return }
+func (mp *SyncMap[K, V]) Check(key K) (ok bool) { _, ok = mp.mp.Load(key); return }
 
 // Delete removes a key--and its corresponding value--from the map, if
 // it exists.
-func (mp *Map[K, V]) Delete(key K) { mp.mp.Delete(key) }
+func (mp *SyncMap[K, V]) Delete(key K) { mp.mp.Delete(key) }
 
 // Store adds a key and value to the map, replacing any existing
 // values as needed.
-func (mp *Map[K, V]) Store(k K, v V) { mp.mp.Store(k, v) }
+func (mp *SyncMap[K, V]) Store(k K, v V) { mp.mp.Store(k, v) }
 
 // Load retrieves the value from the map. The semantics are the same
 // as for maps in go: if the value does not exist it always returns
 // the zero value for the type, while the second value indicates if
 // the key was present in the map.
-func (mp *Map[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key)) }
+func (mp *SyncMap[K, V]) Load(key K) (V, bool) { return mp.safeCast(mp.mp.Load(key)) }
 
 // Get returns the value from the map. If the key is not present in the map,
 // this returns the zero value for V.
-func (mp *Map[K, V]) Get(key K) V { out, _ := mp.Load(key); return out }
+func (mp *SyncMap[K, V]) Get(key K) V { out, _ := mp.Load(key); return out }
 
 // Set adds the value to the map, overriding any existing value. The return reports if the key
 // existed in the map before the operation.
-func (mp *Map[K, V]) Set(key K, value V) bool { _, ok := mp.mp.Swap(key, value); return ok }
+func (mp *SyncMap[K, V]) Set(key K, value V) bool { _, ok := mp.mp.Swap(key, value); return ok }
 
-func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
+func (mp *SyncMap[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	if v == nil {
 		return out, false
 	}
@@ -66,7 +66,7 @@ func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 
 // Ensure stores the zero value for V at key if the key is not already
 // present. Reports true if the key already existed.
-func (mp *Map[K, V]) Ensure(key K) bool {
+func (mp *SyncMap[K, V]) Ensure(key K) bool {
 	var zero V
 	_, loaded := mp.mp.LoadOrStore(key, zero)
 	return loaded
@@ -78,21 +78,21 @@ func (mp *Map[K, V]) Ensure(key K) bool {
 // thread safe (or at least as safe as the input iterator is), adding
 // individual key/value pairs to the map may interleave with other
 // operations.
-func (mp *Map[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, mp.Store) }
+func (mp *SyncMap[K, V]) Extend(seq iter.Seq2[K, V]) { irt.Apply2(seq, mp.Store) }
 
 // MarshalJSON produces a JSON form of the map, using a Range function
 // to iterate through the values in the map. Range functions do not
 // reflect a specific snapshot of the map if the map is being modified
 // while being marshaled: keys will only appear at most once but order
 // or which version of a value is not defined.
-func (mp *Map[K, V]) MarshalJSON() ([]byte, error) {
+func (mp *SyncMap[K, V]) MarshalJSON() ([]byte, error) {
 	return irt.MarshalJSON2(mp.Iterator())
 }
 
 // UnmarshalJSON takes a json sequence and adds the values to the
 // map. This does not remove or reset the values in the map, and other
 // operations may interleave during this operation.
-func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
+func (mp *SyncMap[K, V]) UnmarshalJSON(in []byte) error {
 	for kv, err := range irt.UnmarshalJSON2[K, V](bytes.NewBuffer(in)) {
 		if err != nil {
 			return err
@@ -103,7 +103,7 @@ func (mp *Map[K, V]) UnmarshalJSON(in []byte) error {
 }
 
 // Iterator returns a native go iterator for a Map object.
-func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
+func (mp *SyncMap[K, V]) Iterator() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) { mp.mp.Range(func(ak, av any) bool { return yield(ak.(K), av.(V)) }) }
 }
 
@@ -113,7 +113,7 @@ func (mp *Map[K, V]) Iterator() iter.Seq2[K, V] {
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces a iterator that does not
 // reflect any particular point-in-time view of the underlying map.
-func (mp *Map[K, V]) Keys() iter.Seq[K] { return irt.First(mp.Iterator()) }
+func (mp *SyncMap[K, V]) Keys() iter.Seq[K] { return irt.First(mp.Iterator()) }
 
 // Values returns an iterator that yields all of the values in the
 // map.
@@ -122,4 +122,4 @@ func (mp *Map[K, V]) Keys() iter.Seq[K] { return irt.First(mp.Iterator()) }
 // advances lazily through the Range operation as callers advance the
 // iterator. Be aware that this produces an iterator that does not
 // reflect any particular point-in-time view of the underlying map.
-func (mp *Map[K, V]) Values() iter.Seq[V] { return irt.Second(mp.Iterator()) }
+func (mp *SyncMap[K, V]) Values() iter.Seq[V] { return irt.Second(mp.Iterator()) }

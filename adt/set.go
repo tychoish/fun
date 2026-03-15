@@ -14,7 +14,7 @@ import (
 // order, use OrderedSet.
 type Set[T comparable] struct {
 	once sync.Once
-	hash *Map[T, struct{}]
+	hash *SyncMap[T, struct{}]
 }
 
 // MakeSet constructs an unordered set and adds all items from the input
@@ -25,8 +25,8 @@ func MakeSet[T comparable](seq iter.Seq[T]) *Set[T] {
 	return out
 }
 
-func (s *Set[T]) mp() *Map[T, struct{}] { s.once.Do(s.doInit); return s.hash }
-func (s *Set[T]) doInit()               { s.hash = &Map[T, struct{}]{} }
+func (s *Set[T]) mp() *SyncMap[T, struct{}] { s.once.Do(s.doInit); return s.hash }
+func (s *Set[T]) doInit()                   { s.hash = &SyncMap[T, struct{}]{} }
 
 // Len returns the number of items tracked in the set.
 func (s *Set[T]) Len() int { return s.mp().Len() }

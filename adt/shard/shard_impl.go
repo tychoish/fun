@@ -23,7 +23,7 @@ type sh[K comparable, V any] struct {
 func (*sh[K, V]) makeVmap(impl MapType) vmap[K, V] {
 	switch impl {
 	case MapTypeSync:
-		return &adt.Map[K, *Versioned[V]]{}
+		return &adt.SyncMap[K, *Versioned[V]]{}
 	case MapTypeStdlib:
 		return stw.Map[K, *Versioned[V]]{}
 	case MapTypeRWMutex:

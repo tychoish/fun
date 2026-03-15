@@ -15,12 +15,12 @@ import (
 type OrderedMap[K comparable, V any] struct {
 	mtx  sync.Mutex
 	once sync.Once
-	hash Map[K, *elem[irt.KV[K, V]]]
+	hash SyncMap[K, *elem[irt.KV[K, V]]]
 	list list[irt.KV[K, V]]
 }
 
 func (m *OrderedMap[K, V]) init()   { m.once.Do(m.doInit) }
-func (m *OrderedMap[K, V]) doInit() { m.hash = Map[K, *elem[irt.KV[K, V]]]{} }
+func (m *OrderedMap[K, V]) doInit() { m.hash = SyncMap[K, *elem[irt.KV[K, V]]]{} }
 
 func (*OrderedMap[K, V]) zerov() (out V)       { return }
 func (*OrderedMap[K, V]) with(mtx *sync.Mutex) { mtx.Unlock() }

@@ -279,7 +279,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 //	go test -race
 func TestMapConcurrentIterationAndModification(t *testing.T) {
 	t.Run("BasicConcurrentAccess", func(t *testing.T) {
-		m := &Map[int, string]{}
+		m := &SyncMap[int, string]{}
 
 		// Pre-populate
 		for i := range 100 {
@@ -347,7 +347,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 	})
 
 	t.Run("MultipleReaders", func(t *testing.T) {
-		m := &Map[string, int]{}
+		m := &SyncMap[string, int]{}
 
 		// Pre-populate
 		for i := range 50 {
@@ -466,7 +466,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 // TestMapIteratorWithIRTFunctions tests that using irt functions with
 // concurrent modifications doesn't cause races.
 func TestMapIteratorWithIRTFunctions(t *testing.T) {
-	m := &Map[string, int]{}
+	m := &SyncMap[string, int]{}
 
 	// Pre-populate
 	for i := range 100 {
@@ -585,7 +585,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 	})
 
 	t.Run("Map", func(t *testing.T) {
-		m := &Map[int, string]{}
+		m := &SyncMap[int, string]{}
 
 		for i := range 1000 {
 			m.Store(i, "value")
