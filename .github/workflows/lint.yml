@@ -5,15 +5,11 @@ on:
       - "**.go"
     branches:
       - main
-      - v0.11.x
-      - v0.12.x
   push:
     paths:
       - "**.go"
     branches:
       - main
-      - v0.11.x
-      - v0.12.x
 
 jobs:
   golangci:
@@ -37,6 +33,6 @@ jobs:
           # Required: the version of golangci-lint is required and
           # must be specified with patch version: we always use the
           # latest patch version.
-          version: v2.5.0
+          version: v2.9.0
           args: --timeout 8m
           github-token: ${{ secrets.github_token }}
