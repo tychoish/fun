@@ -1,6 +1,10 @@
 package strut
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -235,6 +239,18 @@ func TestBuffer_ExtendBytes(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, extendBytesTests[*Buffer]())
 }
 
+func TestBuffer_ExtendMutable(t *testing.T) {
+	runBuildTests(t, func() *Buffer { return &Buffer{} }, extendMutableTests[*Buffer]())
+}
+
+func TestBuffer_WriteMutableLines(t *testing.T) {
+	runBuildTests(t, func() *Buffer { return &Buffer{} }, writeMutableLinesTests[*Buffer]())
+}
+
+func TestBuffer_WhenWriteMutable(t *testing.T) {
+	runBuildTests(t, func() *Buffer { return &Buffer{} }, whenWriteMutableTests[*Buffer]())
+}
+
 func TestBuffer_NewBuffer(t *testing.T) {
 	t.Run("with initial content", func(t *testing.T) {
 		b := NewBuffer([]byte("hello"))
@@ -362,4 +378,82 @@ func TestBuffer_Release(t *testing.T) {
 		b.WriteString("data")
 		b.Release() // not from pool, but Release must not panic
 	})
+}
+
+func TestBuffer_Format(t *testing.T) {
+	var b Buffer
+	b.WriteString("hello")
+
+	result := fmt.Sprintf("%s", &b)
+	if result != "hello" {
+		t.Errorf("Format() with %%s = %q, want \"hello\"", result)
+	}
+
+	result = fmt.Sprintf("%v", &b)
+	if result != "hello" {
+		t.Errorf("Format() with %%v = %q, want \"hello\"", result)
+	}
+}
+
+func TestBuffer_Print(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	var b Buffer
+	b.WriteString("hello world")
+	b.Print()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := buf.String(); got != "hello world" {
+		t.Errorf("Print() wrote %q, want \"hello world\"", got)
+	}
+}
+
+func TestBuffer_Println(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	var b Buffer
+	b.WriteString("hello world")
+	b.Println()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := buf.String(); got != "hello world\n" {
+		t.Errorf("Println() wrote %q, want \"hello world\\n\"", got)
+	}
+}
+
+func TestBuffer_Mutable(t *testing.T) {
+	var b Buffer
+	b.WriteString("hello")
+
+	m := b.Mutable()
+	if m.String() != "hello" {
+		t.Errorf("Mutable() = %q, want \"hello\"", m.String())
+	}
+	if m.Len() != 5 {
+		t.Errorf("Mutable() len = %d, want 5", m.Len())
+	}
 }

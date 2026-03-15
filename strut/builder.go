@@ -4,7 +4,9 @@ package strut
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"iter"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -55,6 +57,17 @@ func (b *Builder) NLines(n int) { ntimes(n, b.Line) }
 // If 'n' is negative, the operaton is a no-op.
 func (b *Builder) NTabs(n int) { ntimes(n, b.Tab) }
 
+// WriteMutable writes the Mutable byte slice 'in' to the builder.
+func (b *Builder) WriteMutable(in Mutable) { b.Write(in) }
+
+// WriteMutableLine writes the Mutable byte slice 'in' followed by a newline
+// character to the builder.
+func (b *Builder) WriteMutableLine(in Mutable) { b.Write(in); b.Line() }
+
+// WriteMutableLines writes each Mutable byte slice in 'in' followed by a
+// newline character to the builder. Each element is written on its own line.
+func (b *Builder) WriteMutableLines(in ...Mutable) { apply(b.WriteMutableLine, in) }
+
 // WriteLine writes the string 'ln' followed by a newline character to
 // the builder.
 func (b *Builder) WriteLine(ln string) { b.WriteString(ln); b.Line() }
@@ -71,6 +84,20 @@ func (b *Builder) WriteBytesLine(ln []byte) { b.Append(ln); b.Line() }
 // character to the builder. Each byte slice is written on its own line.
 // Each byte slice is copied during the write operation.
 func (b *Builder) WriteBytesLines(lns ...[]byte) { apply(b.WriteBytesLine, lns) }
+
+// WhenWriteMutable writes the Mutable byte slice 'm' if 'cond' is true and is
+// a no-op otherwise.
+func (b *Builder) WhenWriteMutable(cond bool, m Mutable) { ifwith(cond, b.WriteMutable, m) }
+
+// WhenWriteMutableLine writes the Mutable byte slice 'm' followed by a newline
+// if 'cond' is true and is a no-op otherwise.
+func (b *Builder) WhenWriteMutableLine(cond bool, m Mutable) { ifwith(cond, b.WriteMutableLine, m) }
+
+// WhenWriteMutableLines writes each Mutable byte slice in 'ms' on its own line
+// if 'cond' is true and is a no-op otherwise.
+func (b *Builder) WhenWriteMutableLines(cond bool, ms ...Mutable) {
+	ifargs(cond, b.WriteMutableLines, ms)
+}
 
 // Append writes the byte slice 'buf' to the builder. The byte slice is
 // copied during the write operation; the caller retains ownership of 'buf'
@@ -385,14 +412,22 @@ func (b *Builder) AppendReplace(s, old, new []byte, n int) { b.Write(bytes.Repla
 // the builder.
 func (b *Builder) Extend(seq iter.Seq[string]) { flush(seq, b.ws) }
 
+// ExtendLines writes each string from the iterator 'seq' on its own line to
+// the builder. Each string is followed by a newline character.
+func (b *Builder) ExtendLines(seq iter.Seq[string]) { flush(seq, b.WriteLine) }
+
+// ExtendMutable writes all Mutable byte slices from the iterator 'seq'
+// consecutively to the builder.
+func (b *Builder) ExtendMutable(seq iter.Seq[Mutable]) { flush(seq, b.WriteMutable) }
+
+// ExtendMutableLines writes each Mutable byte slice from the iterator 'seq'
+// on its own line to the builder. Each element is followed by a newline character.
+func (b *Builder) ExtendMutableLines(seq iter.Seq[Mutable]) { flush(seq, b.WriteMutableLine) }
+
 // ExtendBytes writes all byte slices from the iterator 'seq' consecutively
 // to the builder. Each byte slice is copied during the write operation. This
 // is the byte slice equivalent of Extend.
 func (b *Builder) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.Append) }
-
-// ExtendLines writes each string from the iterator 'seq' on its own line to
-// the builder. Each string is followed by a newline character.
-func (b *Builder) ExtendLines(seq iter.Seq[string]) { flush(seq, b.WriteLine) }
 
 // ExtendBytesLines writes all byte slices from the iterator 'seq' to the
 // builder, each followed by a newline character. Each byte slice is written
@@ -427,3 +462,32 @@ func (b *Builder) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) {
 		b.Write(elem)
 	}
 }
+
+// ExtendMutableJoin writes all Mutable byte slices from the iterator 'seq' to
+// the builder, separated by 'sep'. The first element is not preceded by a separator.
+func (b *Builder) ExtendMutableJoin(seq iter.Seq[Mutable], sep Mutable) {
+	var ct int
+	for elem := range seq {
+		if ct != 0 {
+			b.Write(sep)
+		}
+		ct++
+		b.Write(elem)
+	}
+}
+
+// Bytes returns the builder's accumulated content as a byte slice.
+func (b *Builder) Bytes() []byte { return []byte(b.Builder.String()) }
+
+// Format implements fmt.Formatter, writing the builder's contents directly
+// to the formatter state without allocating an intermediate string.
+func (b *Builder) Format(state fmt.State, _ rune) { _, _ = io.WriteString(state, b.String()) }
+
+// Print writes the builder's contents to standard output.
+func (b *Builder) Print() { _, _ = io.WriteString(os.Stdout, b.String()) }
+
+// Println writes the builder's contents to standard output followed by a newline.
+func (b *Builder) Println() { b.Print(); _, _ = os.Stdout.Write(newline) }
+
+// Mutable returns the builder's contents as a Mutable byte slice.
+func (b *Builder) Mutable() Mutable { return Mutable(b.Bytes()) }

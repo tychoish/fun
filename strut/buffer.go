@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"iter"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -92,6 +93,17 @@ func (b *Buffer) WriteBytesLine(ln []byte) { b.Write(ln); b.Line() }
 // WriteBytesLines writes each string in 'lns' followed by a newline
 // character to the buffer. Each string is written on its own line.
 func (b *Buffer) WriteBytesLines(lns ...[]byte) { apply(b.WriteBytesLine, lns) }
+
+// WriteMutable writes the Mutable byte slice 'in' to the buffer.
+func (b *Buffer) WriteMutable(in Mutable) { b.Write(in) }
+
+// WriteMutableLine writes the Mutable byte slice 'in' followed by a newline
+// character to the buffer.
+func (b *Buffer) WriteMutableLine(in Mutable) { b.Write(in); b.Line() }
+
+// WriteMutableLines writes each Mutable byte slice in 'in' followed by a
+// newline character to the buffer. Each element is written on its own line.
+func (b *Buffer) WriteMutableLines(in ...Mutable) { apply(b.WriteMutableLine, in) }
 
 // Append writes the byte slice 'buf' to the buffer.
 // This is a convenience wrapper around Write.
@@ -191,6 +203,20 @@ func (b *Buffer) WhenWriteLines(cond bool, lns ...string) { ifargs(cond, b.Write
 // WhenConcat concatenates all strings in 'strs' if 'cond' is true and is
 // a no-op otherwise.
 func (b *Buffer) WhenConcat(cond bool, strs ...string) { ifwith(cond, b.cat, strs) }
+
+// WhenWriteMutable writes the Mutable byte slice 'm' if 'cond' is true and is
+// a no-op otherwise.
+func (b *Buffer) WhenWriteMutable(cond bool, m Mutable) { ifwith(cond, b.WriteMutable, m) }
+
+// WhenWriteMutableLine writes the Mutable byte slice 'm' followed by a newline
+// if 'cond' is true and is a no-op otherwise.
+func (b *Buffer) WhenWriteMutableLine(cond bool, m Mutable) { ifwith(cond, b.WriteMutableLine, m) }
+
+// WhenWriteMutableLines writes each Mutable byte slice in 'ms' on its own line
+// if 'cond' is true and is a no-op otherwise.
+func (b *Buffer) WhenWriteMutableLines(cond bool, ms ...Mutable) {
+	ifargs(cond, b.WriteMutableLines, ms)
+}
 
 // WhenJoin joins all strings from 'sl' with 'sep' if 'cond' is true and is
 // a no-op otherwise.
@@ -384,6 +410,14 @@ func (b *Buffer) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.Append) }
 // the buffer, interspersing a newline character.
 func (b *Buffer) ExtendBytesLines(seq iter.Seq[[]byte]) { flush(seq, b.WriteBytesLine) }
 
+// ExtendMutable writes all Mutable byte slices from the iterator 'seq'
+// consecutively to the buffer.
+func (b *Buffer) ExtendMutable(seq iter.Seq[Mutable]) { flush(seq, b.WriteMutable) }
+
+// ExtendMutableLines writes each Mutable byte slice from the iterator 'seq'
+// on its own line to the buffer. Each element is followed by a newline character.
+func (b *Buffer) ExtendMutableLines(seq iter.Seq[Mutable]) { flush(seq, b.WriteMutableLine) }
+
 // ExtendJoin writes all strings from the iterator 'seq' to the buffer,
 // separated by 'sep'. The first string is not preceded by a separator.
 func (b *Buffer) ExtendJoin(seq iter.Seq[string], sep string) {
@@ -409,3 +443,29 @@ func (b *Buffer) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) {
 		b.Write(elem)
 	}
 }
+
+// ExtendMutableJoin writes all Mutable byte slices from the iterator 'seq' to
+// the buffer, separated by 'sep'. The first element is not preceded by a separator.
+func (b *Buffer) ExtendMutableJoin(seq iter.Seq[Mutable], sep Mutable) {
+	var ct int
+	for elem := range seq {
+		if ct != 0 {
+			b.Write(sep)
+		}
+		ct++
+		b.Write(elem)
+	}
+}
+
+// Format implements fmt.Formatter, writing the buffer's contents directly
+// to the formatter state without allocating an intermediate string.
+func (b *Buffer) Format(state fmt.State, _ rune) { _, _ = state.Write(b.Bytes()) }
+
+// Print writes the buffer's contents to standard output.
+func (b *Buffer) Print() { _, _ = os.Stdout.Write(b.Bytes()) }
+
+// Println writes the buffer's contents to standard output followed by a newline.
+func (b *Buffer) Println() { b.Print(); _, _ = os.Stdout.Write(newline) }
+
+// Mutable returns the buffer's contents as a Mutable byte slice.
+func (b *Buffer) Mutable() Mutable { return Mutable(b.Bytes()) }

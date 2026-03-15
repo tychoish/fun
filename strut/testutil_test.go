@@ -89,6 +89,15 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	ExtendBytes(iter.Seq[[]byte])
 	ExtendBytesLines(iter.Seq[[]byte])
 	ExtendBytesJoin(iter.Seq[[]byte], []byte)
+	ExtendMutable(iter.Seq[Mutable])
+	ExtendMutableLines(iter.Seq[Mutable])
+	ExtendMutableJoin(iter.Seq[Mutable], Mutable)
+	WriteMutable(Mutable)
+	WriteMutableLine(Mutable)
+	WriteMutableLines(...Mutable)
+	WhenWriteMutable(bool, Mutable)
+	WhenWriteMutableLine(bool, Mutable)
+	WhenWriteMutableLines(bool, ...Mutable)
 	Len() int
 	Cap() int
 	Reset()
@@ -1662,6 +1671,231 @@ func extendBytesTests[T stringWriter[T]]() []testCase[T] {
 				w.ExtendBytesJoin(slices.Values([][]byte{[]byte("a"), []byte("b")}), []byte(""))
 			},
 			expected: "ab",
+		},
+	}
+}
+
+func extendMutableTests[T stringWriter[T]]() []testCase[T] {
+	return []testCase[T]{
+		{
+			name: "ExtendMutable with values",
+			buildFn: func(w T) {
+				w.ExtendMutable(slices.Values([]Mutable{Mutable("a"), Mutable("b"), Mutable("c")}))
+			},
+			expected: "abc",
+		},
+		{
+			name: "ExtendMutable empty",
+			buildFn: func(w T) {
+				w.ExtendMutable(slices.Values([]Mutable{}))
+			},
+			expected: "",
+		},
+		{
+			name: "ExtendMutable unicode",
+			buildFn: func(w T) {
+				w.ExtendMutable(slices.Values([]Mutable{Mutable("世"), Mutable("界")}))
+			},
+			expected: "世界",
+		},
+		{
+			name: "ExtendMutableLines basic",
+			buildFn: func(w T) {
+				w.ExtendMutableLines(slices.Values([]Mutable{Mutable("line1"), Mutable("line2")}))
+			},
+			expected: "line1\nline2\n",
+		},
+		{
+			name: "ExtendMutableLines empty",
+			buildFn: func(w T) {
+				w.ExtendMutableLines(slices.Values([]Mutable{}))
+			},
+			expected: "",
+		},
+		{
+			name: "ExtendMutableJoin multi-element",
+			buildFn: func(w T) {
+				w.ExtendMutableJoin(slices.Values([]Mutable{Mutable("a"), Mutable("b"), Mutable("c")}), Mutable(","))
+			},
+			expected: "a,b,c",
+		},
+		{
+			name: "ExtendMutableJoin single",
+			buildFn: func(w T) {
+				w.ExtendMutableJoin(slices.Values([]Mutable{Mutable("alone")}), Mutable(","))
+			},
+			expected: "alone",
+		},
+		{
+			name: "ExtendMutableJoin empty",
+			buildFn: func(w T) {
+				w.ExtendMutableJoin(slices.Values([]Mutable{}), Mutable(","))
+			},
+			expected: "",
+		},
+		{
+			name: "ExtendMutableJoin empty sep",
+			buildFn: func(w T) {
+				w.ExtendMutableJoin(slices.Values([]Mutable{Mutable("a"), Mutable("b")}), Mutable(""))
+			},
+			expected: "ab",
+		},
+	}
+}
+
+func writeMutableLinesTests[T stringWriter[T]]() []testCase[T] {
+	return []testCase[T]{
+		{
+			name: "WriteMutable simple",
+			buildFn: func(w T) {
+				w.WriteMutable(Mutable("hello"))
+			},
+			expected: "hello",
+		},
+		{
+			name: "WriteMutable empty",
+			buildFn: func(w T) {
+				w.WriteMutable(Mutable(""))
+			},
+			expected: "",
+		},
+		{
+			name: "WriteMutable unicode",
+			buildFn: func(w T) {
+				w.WriteMutable(Mutable("世界"))
+			},
+			expected: "世界",
+		},
+		{
+			name: "WriteMutableLine simple",
+			buildFn: func(w T) {
+				w.WriteMutableLine(Mutable("hello"))
+			},
+			expected: "hello\n",
+		},
+		{
+			name: "WriteMutableLine empty",
+			buildFn: func(w T) {
+				w.WriteMutableLine(Mutable(""))
+			},
+			expected: "\n",
+		},
+		{
+			name: "WriteMutableLines multiple",
+			buildFn: func(w T) {
+				w.WriteMutableLines(Mutable("first"), Mutable("second"), Mutable("third"))
+			},
+			expected: "first\nsecond\nthird\n",
+		},
+		{
+			name: "WriteMutableLines single",
+			buildFn: func(w T) {
+				w.WriteMutableLines(Mutable("only"))
+			},
+			expected: "only\n",
+		},
+		{
+			name: "WriteMutableLines none",
+			buildFn: func(w T) {
+				w.WriteMutableLines()
+			},
+			expected: "",
+		},
+		{
+			name: "WriteMutableLines with empty element",
+			buildFn: func(w T) {
+				w.WriteMutableLines(Mutable("a"), Mutable(""), Mutable("b"))
+			},
+			expected: "a\n\nb\n",
+		},
+	}
+}
+
+func whenWriteMutableTests[T stringWriter[T]]() []testCase[T] {
+	return []testCase[T]{
+		{
+			name: "WhenWriteMutable true",
+			buildFn: func(w T) {
+				w.WhenWriteMutable(true, Mutable("hello"))
+			},
+			expected: "hello",
+		},
+		{
+			name: "WhenWriteMutable false",
+			buildFn: func(w T) {
+				w.WhenWriteMutable(false, Mutable("hello"))
+			},
+			expected: "",
+		},
+		{
+			name: "WhenWriteMutable true empty",
+			buildFn: func(w T) {
+				w.WhenWriteMutable(true, Mutable(""))
+			},
+			expected: "",
+		},
+		{
+			name: "WhenWriteMutable true unicode",
+			buildFn: func(w T) {
+				w.WhenWriteMutable(true, Mutable("世界"))
+			},
+			expected: "世界",
+		},
+		{
+			name: "WhenWriteMutableLine true",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLine(true, Mutable("hello"))
+			},
+			expected: "hello\n",
+		},
+		{
+			name: "WhenWriteMutableLine false",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLine(false, Mutable("hello"))
+			},
+			expected: "",
+		},
+		{
+			name: "WhenWriteMutableLine true empty",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLine(true, Mutable(""))
+			},
+			expected: "\n",
+		},
+		{
+			name: "WhenWriteMutableLines true",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLines(true, Mutable("a"), Mutable("b"))
+			},
+			expected: "a\nb\n",
+		},
+		{
+			name: "WhenWriteMutableLines false",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLines(false, Mutable("a"), Mutable("b"))
+			},
+			expected: "",
+		},
+		{
+			name: "WhenWriteMutableLines true none",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLines(true)
+			},
+			expected: "",
+		},
+		{
+			name: "WhenWriteMutableLines false none",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLines(false)
+			},
+			expected: "",
+		},
+		{
+			name: "WhenWriteMutableLines true with empty element",
+			buildFn: func(w T) {
+				w.WhenWriteMutableLines(true, Mutable("x"), Mutable(""), Mutable("y"))
+			},
+			expected: "x\n\ny\n",
 		},
 	}
 }

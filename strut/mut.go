@@ -834,9 +834,11 @@ func (mut Mutable) IsNullTerminated() bool {
 	return mut[len(mut)-1] == 0
 }
 
+var newline = []byte{'\n'}
+
 // Print writes the contents of the mutable string to standard output.
 func (mut Mutable) Print() { _, _ = os.Stdout.Write(mut) }
 
 // Println writes the context of the Mutable to standard output, adding
 // a new line at the end.
-func (mut Mutable) Println() { mut.Print(); _, _ = os.Stdout.Write([]byte{'\n'}) }
+func (mut Mutable) Println() { mut.Print(); _, _ = os.Stdout.Write(newline) }
