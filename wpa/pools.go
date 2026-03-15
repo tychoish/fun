@@ -87,7 +87,7 @@ func RunWithPool[T Job](seq iter.Seq[T], opts ...opt.Provider[*WorkerGroupConf])
 //
 // Execution is lazy and depends on a consumer of the output sequence
 // consuming the sequence.
-func Pull[T any, HF Handler[T]](ctx context.Context, seq iter.Seq[T], hf HF) iter.Seq[error] {
+func Pull[T any, HF HandlerFunc[T]](ctx context.Context, seq iter.Seq[T], hf HF) iter.Seq[error] {
 	return func(yield func(error) bool) {
 	WORKLOAD:
 		for job := range WithHandler(hf).For(seq) {
@@ -117,7 +117,7 @@ func Pull[T any, HF Handler[T]](ctx context.Context, seq iter.Seq[T], hf HF) ite
 //
 // Execution is lazy and depends on a consumer of the output sequence
 // consuming the sequence.
-func PullAll[T any, HF Handler[T]](ctx context.Context, seq iter.Seq[T], hf HF) iter.Seq[error] {
+func PullAll[T any, HF HandlerFunc[T]](ctx context.Context, seq iter.Seq[T], hf HF) iter.Seq[error] {
 	return func(yield func(error) bool) {
 		for job := range WithHandler(hf).For(seq) {
 			if err := job.Run(ctx); err != nil && !yield(err) {
@@ -135,7 +135,7 @@ func PullAll[T any, HF Handler[T]](ctx context.Context, seq iter.Seq[T], hf HF) 
 // iterated. While there is no _extra_ buffering, each of the pool's
 // worker effectively buffers an item from the pool, if the consumer
 // backs up.
-func PullWithPool[T any, HF Handler[T]](
+func PullWithPool[T any, HF HandlerFunc[T]](
 	ctx context.Context,
 	seq iter.Seq[T],
 	hf HF,
