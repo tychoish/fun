@@ -145,7 +145,6 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("EnsureSemantics", func(t *testing.T) {
 		mp := &Map[int, int]{}
-		mp.Default.SetConstructor(func() int { return 42 })
 		for i := range 100 {
 			mp.Store(i, rand.Int()+43)
 		}
@@ -162,13 +161,12 @@ func TestMap(t *testing.T) {
 				assert.True(t, value >= 43)
 				continue
 			}
-			assert.True(t, value == 42)
+			assert.True(t, value == 0)
 		}
 		assert.Equal(t, count, 200)
 	})
 	t.Run("Iterators", func(t *testing.T) {
 		mp := &Map[int, int]{}
-		mp.Default.SetConstructor(func() int { return 42 })
 		for i := range 200 {
 			mp.Ensure(i)
 		}
@@ -177,7 +175,7 @@ func TestMap(t *testing.T) {
 		count := 0
 		for value := range mp.Values() {
 			count++
-			assert.True(t, value == 42)
+			assert.True(t, value == 0)
 		}
 		assert.Equal(t, count, 200)
 	})
@@ -250,7 +248,6 @@ func TestMap(t *testing.T) {
 	t.Run("Iterators", func(t *testing.T) {
 		t.Run("Keys", func(t *testing.T) {
 			mp := &Map[string, int]{}
-			mp.Default.SetConstructor(func() int { return 38 })
 			for i := range 100 {
 				mp.Ensure(fmt.Sprint(i))
 			}
@@ -267,7 +264,6 @@ func TestMap(t *testing.T) {
 		})
 		t.Run("Values", func(t *testing.T) {
 			mp := &Map[string, int]{}
-			mp.Default.SetConstructor(func() int { return 38 })
 			for i := range 100 {
 				mp.Ensure(fmt.Sprint(i))
 			}
@@ -276,7 +272,7 @@ func TestMap(t *testing.T) {
 			count := 0
 			for value := range mp.Values() {
 				count++
-				assert.Equal(t, value, 38)
+				assert.Equal(t, value, 0)
 			}
 			assert.Equal(t, count, 100)
 		})

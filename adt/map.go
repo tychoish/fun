@@ -14,13 +14,7 @@ import (
 // methods, and Extend provide compatibility with iter.Seq2[]
 // sequences.
 type Map[K comparable, V any] struct {
-	// Default handles construction and pools objects in
-	// the map for the Ensure operation that
-	// constructs zero-value items. No configuration or
-	// construction is necessary; however, callers can modify the
-	// default value constructed as needed.
-	Default Pool[V]
-	mp      sync.Map
+	mp sync.Map
 }
 
 // Len counts and reports on the number of items in the map. This is
@@ -70,22 +64,11 @@ func (mp *Map[K, V]) safeCast(v any, ok bool) (out V, _ bool) {
 	return v.(V), ok
 }
 
-// Ensure is similar to EnsureStore but provides
-// the default value as a function that produces a value rather than
-// the value directly. The returned value is *always* the value of the
-// key, which is either the value from the map or the value produced
-// by the function.
-//
-// The constructor function is *always* called, even when the key
-// exists in the map. Unlike Get and Ensure which have similar
-// semantics and roles, the value produced by function does not
-// participate in the default object pool.
+// Ensure stores the zero value for V at key if the key is not already
+// present. Reports true if the key already existed.
 func (mp *Map[K, V]) Ensure(key K) bool {
-	defaultValue := mp.Default.Get()
-	_, loaded := mp.mp.LoadOrStore(key, defaultValue)
-	if !loaded {
-		mp.Default.Put(defaultValue)
-	}
+	var zero V
+	_, loaded := mp.mp.LoadOrStore(key, zero)
 	return loaded
 }
 
