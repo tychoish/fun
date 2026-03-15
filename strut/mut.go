@@ -6,6 +6,7 @@ import (
 	"io"
 	"iter"
 	"os"
+	"slices"
 	"sync"
 	"unicode"
 	"unicode/utf8"
@@ -15,6 +16,8 @@ const (
 	// asciiCaseDiff is the difference between uppercase and lowercase ASCII letters ('a' - 'A').
 	asciiCaseDiff = 'a' - 'A' // 32
 )
+
+var newline = []byte{'\n'}
 
 var bufpool = sync.Pool{
 	New: func() any { return new(Mutable) },
@@ -66,7 +69,9 @@ func (mut Mutable) Format(state fmt.State, _ rune) { _, _ = state.Write(mut) }
 
 // ref returns the Mutable value itself, used internally for capacity
 // checks.
-func (mut Mutable) ref() Mutable { return mut }
+func (mut Mutable) ref() Mutable    { return mut }
+func (mut Mutable) ptr() *Mutable   { return &mut }
+func (mut *Mutable) push(m Mutable) { mut.Append(m.ptr()) }
 
 // Append appends the contents of 'next' to this mutable string,
 // mutating in place. May allocate if capacity is insufficient.
@@ -146,7 +151,7 @@ func (mut *Mutable) WriteString(s string) (n int, err error) {
 }
 
 // Reader provides access to an io.Reader for reading from the
-// mutable string. Allocates a new bytes.Reader.
+// mutable string.) Does not copy the underlying data.
 func (mut Mutable) Reader() io.Reader { return bytes.NewReader(mut) }
 
 // String returns the mutable string as a regular string.
@@ -327,65 +332,16 @@ func (mut Mutable) Fields() iter.Seq[Mutable] {
 // 'c' satisfying 'f(c)', returning an iterator. Zero allocation for
 // the iterator itself.
 func (mut Mutable) FieldsFunc(f func(rune) bool) iter.Seq[Mutable] {
-	return func(yield func(Mutable) bool) {
-		s := []byte(mut)
-		start := -1
-
-		for i := 0; i < len(s); {
-			r, size := utf8.DecodeRune(s[i:])
-			isField := f(r)
-			switch {
-			case isField && start >= 0:
-				m := Mutable(s[start:i])
-				if !yield(m) {
-					return
-				}
-				start = -1
-			case !isField && start < 0:
-				start = i
-			}
-			i += size
-		}
-		if start >= 0 {
-			m := Mutable(s[start:])
-			yield(m)
-		}
-	}
+	return wrapSeq(bytes.FieldsFuncSeq(mut, f))
 }
 
-// splitHelper is a helper function that implements the common logic for
-// Split and SplitAfter. The includeSep parameter determines whether the
-// separator is included in the yielded slices.
-func splitHelper(mut Mutable, sep []byte, includeSep bool) iter.Seq[Mutable] {
+// wrapSeq converts an iter.Seq[[]byte] to an iter.Seq[Mutable].
+func wrapSeq(seq iter.Seq[[]byte]) iter.Seq[Mutable] {
 	return func(yield func(Mutable) bool) {
-		if len(sep) == 0 {
-			// Empty separator: split into individual bytes
-			for i := range mut {
-				m := Mutable(mut[i : i+1])
-				if !yield(m) {
-					return
-				}
-			}
-			return
-		}
-
-		s := []byte(mut)
-		for {
-			idx := bytes.Index(s, sep)
-			if idx < 0 {
-				m := Mutable(s)
-				yield(m)
+		for b := range seq {
+			if !yield(Mutable(b)) {
 				return
 			}
-			endIdx := idx
-			if includeSep {
-				endIdx += len(sep)
-			}
-			m := Mutable(s[:endIdx])
-			if !yield(m) {
-				return
-			}
-			s = s[idx+len(sep):]
 		}
 	}
 }
@@ -394,7 +350,7 @@ func splitHelper(mut Mutable, sep []byte, includeSep bool) iter.Seq[Mutable] {
 // Zero allocation for the iterator itself; each yielded slice is a
 // subslice of the original data (no copying).
 func (mut Mutable) Split(sep Mutable) iter.Seq[Mutable] {
-	return splitHelper(mut, sep, false)
+	return wrapSeq(bytes.SplitSeq(mut, sep))
 }
 
 // SplitString returns an iterator that yields subslices separated by
@@ -404,110 +360,18 @@ func (mut Mutable) SplitString(sep string) iter.Seq[Mutable] {
 	return mut.Split([]byte(sep))
 }
 
-// splitNHelper is a helper function that implements the common logic for
-// SplitN and SplitAfterN. The includeSep parameter determines whether the
-// separator is included in the yielded slices.
-func splitNHelper(mut Mutable, sep []byte, n int, includeSep bool, unlimitedSplit func(Mutable) iter.Seq[Mutable]) iter.Seq[Mutable] {
-	return func(yield func(Mutable) bool) {
-		if n == 0 || len(mut) == 0 {
-			return
-		}
-		if n < 0 {
-			// No limit: use regular Split or SplitAfter
-			for part := range unlimitedSplit(sep) {
-				if !yield(part) {
-					return
-				}
-			}
-			return
-		}
-
-		if len(sep) == 0 {
-			// Empty separator: split into individual bytes
-			for i := 0; i < len(mut) && i < n-1; i++ {
-				m := Mutable(mut[i : i+1])
-				if !yield(m) {
-					return
-				}
-			}
-
-			if n == 1 {
-				m := Mutable(mut)
-				yield(m)
-			} else {
-				m := Mutable(mut[n-1:])
-				yield(m)
-			}
-
-			return
-		}
-
-		s := []byte(mut)
-		var count int
-		for count < n-1 {
-			idx := bytes.Index(s, sep)
-			if idx < 0 {
-				break
-			}
-			endIdx := idx
-			if includeSep {
-				endIdx += len(sep)
-			}
-			m := Mutable(s[:endIdx])
-			if !yield(m) {
-				return
-			}
-			s = s[idx+len(sep):]
-			count++
-		}
-		// Yield remainder
-		if len(s) > 0 || count < n {
-			m := Mutable(s)
-			yield(m)
-		}
-	}
-}
-
-// SplitN returns an iterator that yields at most 'n' subslices
-// separated by 'sep'. If n <= 0, yields all subslices. Zero
-// allocation for the iterator itself.
-func (mut Mutable) SplitN(sep []byte, n int) iter.Seq[Mutable] {
-	return splitNHelper(mut, sep, n, false, mut.Split)
-}
-
-// SplitNString returns an iterator that yields at most 'n' subslices
-// separated by 'sep'. If n <= 0, yields all subslices. Zero
-// allocation for the iterator itself.
-func (mut Mutable) SplitNString(sep string, n int) iter.Seq[Mutable] {
-	return mut.SplitN([]byte(sep), n)
-}
-
 // SplitAfter returns an iterator that yields subslices after each
 // instance of 'sep'. Each yielded slice includes the separator. Zero
 // allocation for the iterator itself.
 func (mut Mutable) SplitAfter(sep Mutable) iter.Seq[Mutable] {
-	return splitHelper(mut, sep, true)
+	return wrapSeq(bytes.SplitAfterSeq(mut, sep))
 }
 
-// SplitAfterString returns an iterator that yields subslices after
-// each instance of 'sep'. Each yielded slice includes the separator.
-// Zero allocation for the iterator itself.
+// SplitAfterString returns an iterator that yields subslices after each
+// instance of 'sep'. Each yielded slice includes the separator. Zero
+// allocation for the iterator itself.
 func (mut Mutable) SplitAfterString(sep string) iter.Seq[Mutable] {
-	return mut.SplitAfter([]byte(sep))
-}
-
-// SplitAfterN returns an iterator that yields at most 'n' subslices
-// after each instance of 'sep'. Each yielded slice includes the
-// separator. Zero allocation for the iterator itself.
-func (mut Mutable) SplitAfterN(sep []byte, n int) iter.Seq[Mutable] {
-	return splitNHelper(mut, sep, n, true, mut.SplitAfter)
-}
-
-// SplitAfterNString returns an iterator that yields at most 'n'
-// subslices after each instance of 'sep'. Each yielded slice includes
-// the separator. Zero allocation for the iterator itself.
-func (mut Mutable) SplitAfterNString(sep string, n int) iter.Seq[Mutable] {
-	return mut.SplitAfterN([]byte(sep), n)
+	return wrapSeq(bytes.SplitAfterSeq(mut, []byte(sep)))
 }
 
 // Replace replaces the first 'n' non-overlapping instances of 'old'
@@ -828,13 +692,8 @@ func (mut Mutable) IsUnicode() bool {
 // IsNullTerminated reports whether the mutable string ends with a
 // null byte (0x00), indicating C-style null termination.
 func (mut Mutable) IsNullTerminated() bool {
-	if len(mut) == 0 {
-		return false
-	}
-	return mut[len(mut)-1] == 0
+	return len(mut) > 0 && mut[len(mut)-1] == 0
 }
-
-var newline = []byte{'\n'}
 
 // Print writes the contents of the mutable string to standard output.
 func (mut Mutable) Print() { _, _ = os.Stdout.Write(mut) }
@@ -842,3 +701,68 @@ func (mut Mutable) Print() { _, _ = os.Stdout.Write(mut) }
 // Println writes the context of the Mutable to standard output, adding
 // a new line at the end.
 func (mut Mutable) Println() { mut.Print(); _, _ = os.Stdout.Write(newline) }
+
+// Extend appends all Mutable values from seq to the receiver.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) Extend(seq iter.Seq[Mutable]) *Mutable { flush(seq, mut.push); return mut }
+
+// ExtendStrings appends all strings from seq to the receiver.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) ExtendStrings(seq iter.Seq[string]) *Mutable {
+	for elem := range seq {
+		*mut = append(*mut, elem...)
+	}
+	return mut
+}
+
+// ExtendBytes appends all byte slices from seq to the receiver.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) ExtendBytes(seq iter.Seq[[]byte]) *Mutable { mut.Extend(wrapSeq(seq)); return mut }
+
+// ExtendJoin appends Mutable values from seq separated by sep.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) ExtendJoin(seq iter.Seq[Mutable], sep Mutable) *Mutable {
+	var ct int
+	for elem := range seq {
+		if ct != 0 {
+			*mut = append(*mut, sep...)
+		}
+		ct++
+		*mut = append(*mut, elem...)
+	}
+	return mut
+}
+
+// ExtendStringsJoin appends strings from seq separated by sep.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) ExtendStringsJoin(seq iter.Seq[string], sep string) *Mutable {
+	var ct int
+	for elem := range seq {
+		if ct != 0 {
+			*mut = append(*mut, sep...)
+		}
+		ct++
+		*mut = append(*mut, elem...)
+	}
+	return mut
+}
+
+// ExtendBytesJoin appends []byte values from seq separated by sep.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) *Mutable {
+	var ct int
+	for elem := range seq {
+		if ct != 0 {
+			*mut = append(*mut, sep...)
+		}
+		ct++
+		*mut = append(*mut, elem...)
+	}
+	return mut
+}
+
+// Join appends all mutables from the slice separated by sep.
+// Delegates to ExtendJoin(slices.Values(mutables), sep).
+func (mut *Mutable) Join(mutables []Mutable, sep Mutable) *Mutable {
+	return mut.ExtendJoin(slices.Values(mutables), sep)
+}

@@ -1313,37 +1313,6 @@ func TestMutableTrimFuncVariants(t *testing.T) {
 	}
 }
 
-func TestMutableSplitVariants(t *testing.T) {
-	// Test SplitNString
-	mut := Mutable([]byte("a,b,c,d"))
-	parts := slices.Collect(mut.SplitNString(",", 2))
-	if len(parts) != 2 || parts[0].String() != "a" || parts[1].String() != "b,c,d" {
-		t.Errorf("SplitNString() failed, got %v", parts)
-	}
-
-	// Test SplitAfterString
-	mut = Mutable([]byte("a,b,c"))
-	parts = slices.Collect(mut.SplitAfterString(","))
-	if len(parts) != 3 || parts[0].String() != "a," || parts[1].String() != "b," || parts[2].String() != "c" {
-		t.Errorf("SplitAfterString() failed, got %v", parts)
-	}
-
-	// Test SplitAfterNString
-	mut = Mutable([]byte("a,b,c,d"))
-	parts = slices.Collect(mut.SplitAfterNString(",", 2))
-	if len(parts) != 2 || parts[0].String() != "a," || parts[1].String() != "b,c,d" {
-		t.Errorf("SplitAfterNString() failed, got %v", parts)
-	}
-
-	// Test FieldsFunc
-	isComma := func(r rune) bool { return r == ',' }
-	mut = Mutable([]byte("a,b,c"))
-	parts = slices.Collect(mut.FieldsFunc(isComma))
-	if len(parts) != 3 || parts[0].String() != "a" || parts[1].String() != "b" || parts[2].String() != "c" {
-		t.Errorf("FieldsFunc() failed, got %v", parts)
-	}
-}
-
 func TestMutableIndexVariants(t *testing.T) {
 	mut := Mutable([]byte("hello world"))
 
@@ -1864,27 +1833,11 @@ func TestMutableSplitString(t *testing.T) {
 	}
 }
 
-func TestMutableSplitN(t *testing.T) {
-	mut := Mutable([]byte("a,b,c,d"))
-	parts := slices.Collect(mut.SplitN([]byte(","), 2))
-	if len(parts) != 2 || string(parts[0]) != "a" || string(parts[1]) != "b,c,d" {
-		t.Errorf("SplitN() failed, got %v", parts)
-	}
-}
-
 func TestMutableSplitAfter(t *testing.T) {
 	mut := Mutable([]byte("a,b,c"))
 	parts := slices.Collect(mut.SplitAfter([]byte(",")))
 	if len(parts) != 3 || string(parts[0]) != "a," || string(parts[1]) != "b," || string(parts[2]) != "c" {
 		t.Errorf("SplitAfter() failed, got %v", parts)
-	}
-}
-
-func TestMutableSplitAfterN(t *testing.T) {
-	mut := Mutable([]byte("a,b,c,d"))
-	parts := slices.Collect(mut.SplitAfterN([]byte(","), 2))
-	if len(parts) != 2 || string(parts[0]) != "a," || string(parts[1]) != "b,c,d" {
-		t.Errorf("SplitAfterN() failed, got %v", parts)
 	}
 }
 
@@ -1894,40 +1847,28 @@ func TestIteratorConformance(t *testing.T) {
 		name string
 		data []byte
 		sep  []byte
-		n    int
 	}{
-		{"simple comma", []byte("a,b,c"), []byte(","), -1},
-		{"empty separator", []byte("abc"), []byte(""), -1},
-		{"no match", []byte("abc"), []byte("x"), -1},
-		{"empty data", []byte(""), []byte(","), -1},
-		{"separator at start", []byte(",a,b"), []byte(","), -1},
-		{"separator at end", []byte("a,b,"), []byte(","), -1},
-		{"consecutive separators", []byte("a,,b"), []byte(","), -1},
-		{"multi-byte separator", []byte("a::b::c"), []byte("::"), -1},
-		{"unicode data", []byte("hello 世界 test"), []byte(" "), -1},
-		{"n=0", []byte("a,b,c"), []byte(","), 0},
-		{"n=1", []byte("a,b,c"), []byte(","), 1},
-		{"n=2", []byte("a,b,c"), []byte(","), 2},
-		{"n=10 (more than matches)", []byte("a,b,c"), []byte(","), 10},
+		{"simple comma", []byte("a,b,c"), []byte(",")},
+		{"empty separator", []byte("abc"), []byte("")},
+		{"no match", []byte("abc"), []byte("x")},
+		{"empty data", []byte(""), []byte(",")},
+		{"separator at start", []byte(",a,b"), []byte(",")},
+		{"separator at end", []byte("a,b,"), []byte(",")},
+		{"consecutive separators", []byte("a,,b"), []byte(",")},
+		{"multi-byte separator", []byte("a::b::c"), []byte("::")},
+		{"unicode data", []byte("hello 世界 test"), []byte(" ")},
+		{"n=0", []byte("a,b,c"), []byte(",")},
+		{"n=1", []byte("a,b,c"), []byte(",")},
+		{"n=2", []byte("a,b,c"), []byte(",")},
+		{"n=10 (more than matches)", []byte("a,b,c"), []byte(",")},
 	}
 
 	t.Run("Split", func(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mut := Mutable(tc.data)
-				var expected [][]byte
-				if tc.n >= 0 {
-					expected = bytes.SplitN(tc.data, tc.sep, tc.n)
-				} else {
-					expected = bytes.Split(tc.data, tc.sep)
-				}
-
-				var got []Mutable
-				if tc.n >= 0 {
-					got = slices.Collect(mut.SplitN(tc.sep, tc.n))
-				} else {
-					got = slices.Collect(mut.Split(tc.sep))
-				}
+				expected := bytes.Split(tc.data, tc.sep)
+				got := slices.Collect(mut.Split(tc.sep))
 
 				if len(got) != len(expected) {
 					t.Errorf("length mismatch: got %d, want %d", len(got), len(expected))
@@ -1946,19 +1887,8 @@ func TestIteratorConformance(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mut := Mutable(tc.data)
-				var expected [][]byte
-				if tc.n >= 0 {
-					expected = bytes.SplitAfterN(tc.data, tc.sep, tc.n)
-				} else {
-					expected = bytes.SplitAfter(tc.data, tc.sep)
-				}
-
-				var got []Mutable
-				if tc.n >= 0 {
-					got = slices.Collect(mut.SplitAfterN(tc.sep, tc.n))
-				} else {
-					got = slices.Collect(mut.SplitAfter(tc.sep))
-				}
+				expected := bytes.SplitAfter(tc.data, tc.sep)
+				got := slices.Collect(mut.SplitAfter(tc.sep))
 
 				if len(got) != len(expected) {
 					t.Errorf("length mismatch: got %d, want %d", len(got), len(expected))
@@ -2042,44 +1972,6 @@ func TestIteratorConformance(t *testing.T) {
 
 // TestUncoveredPaths covers code paths not hit by other tests.
 func TestUncoveredPaths(t *testing.T) {
-	t.Run("SplitN with empty separator", func(t *testing.T) {
-		mut := Mutable([]byte("abc"))
-
-		// n=1 with empty separator
-		parts := slices.Collect(mut.SplitN([]byte(""), 1))
-		if len(parts) != 1 || string(parts[0]) != "abc" {
-			t.Errorf("SplitN empty sep n=1: got %v", parts)
-		}
-
-		// n=2 with empty separator
-		parts = slices.Collect(mut.SplitN([]byte(""), 2))
-		if len(parts) != 2 || string(parts[0]) != "a" || string(parts[1]) != "bc" {
-			t.Errorf("SplitN empty sep n=2: got %v", parts)
-		}
-
-		// n=0 with empty separator
-		parts = slices.Collect(mut.SplitN([]byte(""), 0))
-		if len(parts) != 0 {
-			t.Errorf("SplitN empty sep n=0: got %v, want empty", parts)
-		}
-	})
-
-	t.Run("SplitAfterN with empty separator", func(t *testing.T) {
-		mut := Mutable([]byte("abc"))
-
-		// n=1 with empty separator
-		parts := slices.Collect(mut.SplitAfterN([]byte(""), 1))
-		if len(parts) != 1 || string(parts[0]) != "abc" {
-			t.Errorf("SplitAfterN empty sep n=1: got %v", parts)
-		}
-
-		// n=2 with empty separator
-		parts = slices.Collect(mut.SplitAfterN([]byte(""), 2))
-		if len(parts) != 2 || string(parts[0]) != "a" || string(parts[1]) != "bc" {
-			t.Errorf("SplitAfterN empty sep n=2: got %v", parts)
-		}
-	})
-
 	t.Run("Split early termination", func(t *testing.T) {
 		mut := Mutable([]byte("a,b,c,d,e"))
 		count := 0
@@ -2091,48 +1983,6 @@ func TestUncoveredPaths(t *testing.T) {
 		}
 		if count != 2 {
 			t.Errorf("Split early termination: counted %d items", count)
-		}
-	})
-
-	t.Run("SplitN early termination", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c,d,e"))
-		count := 0
-		for range mut.SplitN([]byte(","), 10) {
-			count++
-			if count == 2 {
-				break // Early termination
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitN early termination: counted %d items", count)
-		}
-	})
-
-	t.Run("SplitN with empty separator early termination", func(t *testing.T) {
-		mut := Mutable([]byte("abcde"))
-		count := 0
-		for range mut.SplitN([]byte(""), 10) {
-			count++
-			if count == 2 {
-				break // Early termination
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitN empty sep early termination: counted %d items", count)
-		}
-	})
-
-	t.Run("SplitAfterN early termination", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c,d,e"))
-		count := 0
-		for range mut.SplitAfterN([]byte(","), 10) {
-			count++
-			if count == 2 {
-				break // Early termination
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitAfterN early termination: counted %d items", count)
 		}
 	})
 
@@ -2295,20 +2145,6 @@ func TestUncoveredPaths(t *testing.T) {
 		}
 	})
 
-	t.Run("SplitAfterN with empty separator early termination", func(t *testing.T) {
-		mut := Mutable([]byte("abcde"))
-		count := 0
-		for range mut.SplitAfterN([]byte(""), 10) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitAfterN empty sep early termination: counted %d items", count)
-		}
-	})
-
 	t.Run("Split with empty separator early termination", func(t *testing.T) {
 		mut := Mutable([]byte("abcde"))
 		count := 0
@@ -2373,24 +2209,6 @@ func TestUncoveredPaths(t *testing.T) {
 		}
 	})
 
-	t.Run("SplitN with n equals match count", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c"))
-		parts := slices.Collect(mut.SplitN([]byte(","), 3))
-		// With n=3, we should get exactly 3 parts
-		if len(parts) != 3 {
-			t.Errorf("SplitN n=3: got %d parts, want 3", len(parts))
-		}
-	})
-
-	t.Run("SplitAfterN with n equals match count", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c"))
-		parts := slices.Collect(mut.SplitAfterN([]byte(","), 3))
-		// With n=3, we should get exactly 3 parts
-		if len(parts) != 3 {
-			t.Errorf("SplitAfterN n=3: got %d parts, want 3", len(parts))
-		}
-	})
-
 	t.Run("Replace same length n=-1", func(t *testing.T) {
 		mut := Mutable([]byte("aa bb aa cc aa"))
 		mut.Replace([]byte("aa"), []byte("xx"), -1)
@@ -2408,22 +2226,6 @@ func TestUncoveredPaths(t *testing.T) {
 			t.Errorf("Replace growing no match: got %q", string(mut))
 		}
 	})
-
-	t.Run("SplitN with n=1 and separator present", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c"))
-		parts := slices.Collect(mut.SplitN([]byte(","), 1))
-		if len(parts) != 1 || string(parts[0]) != "a,b,c" {
-			t.Errorf("SplitN n=1: got %v, want full string", parts)
-		}
-	})
-
-	t.Run("SplitAfterN with n=1 and separator present", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c"))
-		parts := slices.Collect(mut.SplitAfterN([]byte(","), 1))
-		if len(parts) != 1 || string(parts[0]) != "a,b,c" {
-			t.Errorf("SplitAfterN n=1: got %v, want full string", parts)
-		}
-	})
 }
 
 // TestStringWrappers tests all String variant wrapper methods.
@@ -2436,27 +2238,11 @@ func TestStringWrappers(t *testing.T) {
 		}
 	})
 
-	t.Run("SplitNString", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c"))
-		parts := slices.Collect(mut.SplitNString(",", 2))
-		if len(parts) != 2 || string(parts[0]) != "a" {
-			t.Errorf("SplitNString failed: got %v", parts)
-		}
-	})
-
 	t.Run("SplitAfterString", func(t *testing.T) {
 		mut := Mutable([]byte("a,b,c"))
 		parts := slices.Collect(mut.SplitAfterString(","))
 		if len(parts) != 3 || string(parts[0]) != "a," {
 			t.Errorf("SplitAfterString failed: got %v", parts)
-		}
-	})
-
-	t.Run("SplitAfterNString", func(t *testing.T) {
-		mut := Mutable([]byte("a,b,c"))
-		parts := slices.Collect(mut.SplitAfterNString(",", 2))
-		if len(parts) != 2 || string(parts[0]) != "a," {
-			t.Errorf("SplitAfterNString failed: got %v", parts)
 		}
 	})
 
@@ -2611,119 +2397,6 @@ func TestMapAndUnicode(t *testing.T) {
 
 // TestSplitEdgeCases tests specific edge cases to reach 100% coverage.
 func TestSplitEdgeCases(t *testing.T) {
-	t.Run("SplitN empty separator n>1", func(t *testing.T) {
-		mut := Mutable([]byte("abcde"))
-		parts := slices.Collect(mut.SplitN([]byte(""), 3))
-		// Should split into individual bytes up to n-1, then remainder
-		if len(parts) != 3 {
-			t.Errorf("SplitN empty sep n=3: got %d parts, want 3", len(parts))
-		}
-		if string(parts[2]) != "cde" {
-			t.Errorf("SplitN empty sep n=3: last part got %q, want \"cde\"", string(parts[2]))
-		}
-	})
-
-	t.Run("SplitAfterN empty separator n>1", func(t *testing.T) {
-		mut := Mutable([]byte("abcde"))
-		parts := slices.Collect(mut.SplitAfterN([]byte(""), 3))
-		if len(parts) != 3 {
-			t.Errorf("SplitAfterN empty sep n=3: got %d parts, want 3", len(parts))
-		}
-		if string(parts[2]) != "cde" {
-			t.Errorf("SplitAfterN empty sep n=3: last part got %q, want \"cde\"", string(parts[2]))
-		}
-	})
-
-	t.Run("SplitN n<0 with early termination", func(t *testing.T) {
-		// Test early return when yield returns false during unlimited mode
-		mut := Mutable([]byte("a,b,c,d,e"))
-		count := 0
-		for range mut.SplitN([]byte(","), -1) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitN n=-1 early term: counted %d", count)
-		}
-	})
-
-	t.Run("SplitN empty sep with early termination", func(t *testing.T) {
-		// Test early return during empty separator iteration
-		mut := Mutable([]byte("abcde"))
-		count := 0
-		for range mut.SplitN([]byte(""), 10) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitN empty sep early term: counted %d", count)
-		}
-	})
-
-	t.Run("SplitAfterN n<0 with early termination", func(t *testing.T) {
-		// Test early return when yield returns false during unlimited mode
-		mut := Mutable([]byte("a,b,c,d,e"))
-		count := 0
-		for range mut.SplitAfterN([]byte(","), -1) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitAfterN n=-1 early term: counted %d", count)
-		}
-	})
-
-	t.Run("SplitAfterN empty sep with early termination", func(t *testing.T) {
-		// Test early return during empty separator iteration
-		mut := Mutable([]byte("abcde"))
-		count := 0
-		for range mut.SplitAfterN([]byte(""), 10) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitAfterN empty sep early term: counted %d", count)
-		}
-	})
-
-	t.Run("SplitN regular with early termination", func(t *testing.T) {
-		// Test early return during regular separator iteration
-		mut := Mutable([]byte("a,b,c,d"))
-		count := 0
-		for range mut.SplitN([]byte(","), 10) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitN regular early term: counted %d", count)
-		}
-	})
-
-	t.Run("SplitAfterN regular with early termination", func(t *testing.T) {
-		// Test early return during regular separator iteration
-		mut := Mutable([]byte("a,b,c,d"))
-		count := 0
-		for range mut.SplitAfterN([]byte(","), 10) {
-			count++
-			if count == 2 {
-				break
-			}
-		}
-		if count != 2 {
-			t.Errorf("SplitAfterN regular early term: counted %d", count)
-		}
-	})
-
 	t.Run("Split no separator found - consume final element", func(t *testing.T) {
 		mut := Mutable([]byte("abc"))
 		parts := slices.Collect(mut.Split([]byte(",")))
@@ -2776,74 +2449,6 @@ func TestSplitEdgeCases(t *testing.T) {
 		mut.Replace([]byte("xyz"), []byte("abcdefgh"), -1)
 		if string(mut) != "foo bar baz" {
 			t.Errorf("Replace growing zero matches: got %q", string(mut))
-		}
-	})
-
-	t.Run("SplitN negative n values", func(t *testing.T) {
-		testCases := []struct {
-			name string
-			data []byte
-			sep  []byte
-			n    int
-		}{
-			{"n=-1", []byte("a,b,c,d"), []byte(","), -1},
-			{"n=-2", []byte("a,b,c,d"), []byte(","), -2},
-			{"n=-10", []byte("a,b,c,d"), []byte(","), -10},
-			{"n=-1 empty sep", []byte("abc"), []byte(""), -1},
-			{"n=-5 empty sep", []byte("abc"), []byte(""), -5},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				mut := Mutable(tc.data)
-				// Compare with stdlib behavior
-				expected := bytes.SplitN(tc.data, tc.sep, tc.n)
-				got := slices.Collect(mut.SplitN(tc.sep, tc.n))
-
-				if len(got) != len(expected) {
-					t.Errorf("SplitN %s: got %d parts, want %d", tc.name, len(got), len(expected))
-					return
-				}
-				for i := range got {
-					if !bytes.Equal(got[i], expected[i]) {
-						t.Errorf("SplitN %s part[%d]: got %q, want %q", tc.name, i, got[i], expected[i])
-					}
-				}
-			})
-		}
-	})
-
-	t.Run("SplitAfterN negative n values", func(t *testing.T) {
-		testCases := []struct {
-			name string
-			data []byte
-			sep  []byte
-			n    int
-		}{
-			{"n=-1", []byte("a,b,c,d"), []byte(","), -1},
-			{"n=-2", []byte("a,b,c,d"), []byte(","), -2},
-			{"n=-10", []byte("a,b,c,d"), []byte(","), -10},
-			{"n=-1 empty sep", []byte("abc"), []byte(""), -1},
-			{"n=-5 empty sep", []byte("abc"), []byte(""), -5},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				mut := Mutable(tc.data)
-				// Compare with stdlib behavior
-				expected := bytes.SplitAfterN(tc.data, tc.sep, tc.n)
-				got := slices.Collect(mut.SplitAfterN(tc.sep, tc.n))
-
-				if len(got) != len(expected) {
-					t.Errorf("SplitAfterN %s: got %d parts, want %d", tc.name, len(got), len(expected))
-					return
-				}
-				for i := range got {
-					if !bytes.Equal(got[i], expected[i]) {
-						t.Errorf("SplitAfterN %s part[%d]: got %q, want %q", tc.name, i, got[i], expected[i])
-					}
-				}
-			})
 		}
 	})
 
@@ -3206,5 +2811,163 @@ func BenchmarkMutableClone(b *testing.B) {
 	original := Mutable([]byte("hello world this is a test"))
 	for i := 0; i < b.N; i++ {
 		_ = original.Clone()
+	}
+}
+
+func TestMutableExtend(t *testing.T) {
+	tests := []struct {
+		name  string
+		start string
+		elems []Mutable
+		want  string
+	}{
+		{"empty seq", "prefix", nil, "prefix"},
+		{"single elem", "", []Mutable{Mutable("hello")}, "hello"},
+		{"multiple elems", "a", []Mutable{Mutable("b"), Mutable("c")}, "abc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mut := Mutable(tt.start)
+			mut.Extend(slices.Values(tt.elems))
+			if got := mut.String(); got != tt.want {
+				t.Errorf("Extend() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableExtendStrings(t *testing.T) {
+	tests := []struct {
+		name  string
+		start string
+		elems []string
+		want  string
+	}{
+		{"empty seq", "prefix", nil, "prefix"},
+		{"single elem", "", []string{"hello"}, "hello"},
+		{"multiple elems", "a", []string{"b", "c"}, "abc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mut := Mutable(tt.start)
+			mut.ExtendStrings(slices.Values(tt.elems))
+			if got := mut.String(); got != tt.want {
+				t.Errorf("ExtendStrings() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableExtendBytes(t *testing.T) {
+	tests := []struct {
+		name  string
+		start string
+		elems [][]byte
+		want  string
+	}{
+		{"empty seq", "prefix", nil, "prefix"},
+		{"single elem", "", [][]byte{[]byte("hello")}, "hello"},
+		{"multiple elems", "a", [][]byte{[]byte("b"), []byte("c")}, "abc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mut := Mutable(tt.start)
+			mut.ExtendBytes(slices.Values(tt.elems))
+			if got := mut.String(); got != tt.want {
+				t.Errorf("ExtendBytes() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableExtendJoin(t *testing.T) {
+	tests := []struct {
+		name  string
+		elems []Mutable
+		sep   Mutable
+		want  string
+	}{
+		{"empty seq", nil, Mutable(","), ""},
+		{"single elem", []Mutable{Mutable("a")}, Mutable(","), "a"},
+		{"multiple elems", []Mutable{Mutable("a"), Mutable("b"), Mutable("c")}, Mutable(","), "a,b,c"},
+		{"multi-char sep", []Mutable{Mutable("foo"), Mutable("bar")}, Mutable(", "), "foo, bar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mut Mutable
+			mut.ExtendJoin(slices.Values(tt.elems), tt.sep)
+			if got := mut.String(); got != tt.want {
+				t.Errorf("ExtendJoin() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableExtendStringsJoin(t *testing.T) {
+	tests := []struct {
+		name  string
+		elems []string
+		sep   string
+		want  string
+	}{
+		{"empty seq", nil, ",", ""},
+		{"single elem", []string{"a"}, ",", "a"},
+		{"multiple elems", []string{"a", "b", "c"}, ",", "a,b,c"},
+		{"multi-char sep", []string{"foo", "bar"}, ", ", "foo, bar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mut Mutable
+			mut.ExtendStringsJoin(slices.Values(tt.elems), tt.sep)
+			if got := mut.String(); got != tt.want {
+				t.Errorf("ExtendStringsJoin() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableExtendBytesJoin(t *testing.T) {
+	tests := []struct {
+		name  string
+		elems [][]byte
+		sep   []byte
+		want  string
+	}{
+		{"empty seq", nil, []byte(","), ""},
+		{"single elem", [][]byte{[]byte("a")}, []byte(","), "a"},
+		{"multiple elems", [][]byte{[]byte("a"), []byte("b"), []byte("c")}, []byte(","), "a,b,c"},
+		{"multi-char sep", [][]byte{[]byte("foo"), []byte("bar")}, []byte(", "), "foo, bar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mut Mutable
+			mut.ExtendBytesJoin(slices.Values(tt.elems), tt.sep)
+			if got := mut.String(); got != tt.want {
+				t.Errorf("ExtendBytesJoin() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableJoin(t *testing.T) {
+	tests := []struct {
+		name  string
+		elems []Mutable
+		sep   Mutable
+		want  string
+	}{
+		{"empty slice", nil, Mutable(","), ""},
+		{"single elem", []Mutable{Mutable("a")}, Mutable(","), "a"},
+		{"multiple elems", []Mutable{Mutable("a"), Mutable("b"), Mutable("c")}, Mutable(","), "a,b,c"},
+		{"empty sep", []Mutable{Mutable("a"), Mutable("b")}, Mutable(""), "ab"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mut Mutable
+			mut.Join(tt.elems, tt.sep)
+			if got := mut.String(); got != tt.want {
+				t.Errorf("Join() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
