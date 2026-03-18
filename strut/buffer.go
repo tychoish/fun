@@ -41,10 +41,9 @@ func (b *Buffer) Release() {
 	bufferPool.Put(b)
 }
 
-func (b *Buffer) ws(s string)       { b.WriteString(s) }
 func (b *Buffer) wb(in byte)        { b.WriteByte(in) }
 func (b *Buffer) wrr(r rune)        { b.WriteRune(r) }
-func (b *Buffer) cat(strs []string) { apply(b.ws, strs) }
+func (b *Buffer) cat(strs []string) { apply(b.PushString, strs) }
 
 // AppendPrint formats its arguments using default formatting and writes to
 // the buffer. Analogous to fmt.Print, fmt.Fprint, and fmt.Sprint.
@@ -109,6 +108,12 @@ func (b *Buffer) WriteMutableLines(in ...Mutable) { apply(b.WriteMutableLine, in
 // This is a convenience wrapper around Write.
 func (b *Buffer) Append(buf []byte) { b.Write(buf) }
 
+// PushString appends string 's' to the buffer.
+func (b *Buffer) PushString(s string) { b.WriteString(s) }
+
+// PushBytes appends the byte slice 'p' to the buffer.
+func (b *Buffer) PushBytes(p []byte) { b.Write(p) }
+
 // Join writes all strings from the slice 's', separated by 'sep', to the
 // buffer. This is analogous to strings.Join but writes directly to
 // the buffer.
@@ -120,7 +125,7 @@ func (b *Buffer) Concat(strs ...string) { b.cat(strs) }
 
 // Repeat writes the string 'ln' to the buffer 'n' times.
 // The 'n' parameter must be non-negative.
-func (b *Buffer) Repeat(ln string, n int) { nwith(n, b.ws, ln) }
+func (b *Buffer) Repeat(ln string, n int) { nwith(n, b.PushString, ln) }
 
 // RepeatByte writes the byte 'char' to the buffer 'n' times.
 // The 'n' parameter must be non-negative.
@@ -182,7 +187,7 @@ func (b *Buffer) WhenWrite(cond bool, buf []byte) { ifwith(cond, b.Append, buf) 
 
 // WhenWriteString writes the string 's' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Buffer) WhenWriteString(cond bool, s string) { ifwith(cond, b.ws, s) }
+func (b *Buffer) WhenWriteString(cond bool, s string) { ifwith(cond, b.PushString, s) }
 
 // WhenWriteByte writes the byte 'bt' if 'cond' is true and is a no-op
 // otherwise.
@@ -225,32 +230,32 @@ func (b *Buffer) WhenJoin(cond bool, sl []string, sep string) { iftuple(cond, b.
 // Quote writes a double-quoted Go string literal representing 'str' to
 // the buffer. The output includes surrounding quotes and uses Go
 // escape sequences.
-func (b *Buffer) Quote(str string) { b.ws(strconv.Quote(str)) }
+func (b *Buffer) Quote(str string) { b.AppendQuote(str) }
 
 // QuoteASCII writes a double-quoted Go string literal representing
 // 'str' to the buffer. Non-ASCII characters are escaped using \u or
 // \U sequences.
-func (b *Buffer) QuoteASCII(str string) { b.ws(strconv.QuoteToASCII(str)) }
+func (b *Buffer) QuoteASCII(str string) { b.AppendQuoteASCII(str) }
 
 // QuoteGrapic writes a double-quoted Go string literal representing
 // 'str' to the buffer. Non-graphic characters as defined by
 // unicode.IsGraphic are escaped.
-func (b *Buffer) QuoteGrapic(str string) { b.ws(strconv.QuoteToGraphic(str)) }
+func (b *Buffer) QuoteGrapic(str string) { b.AppendQuoteGrapic(str) }
 
 // QuoteRune writes a single-quoted Go character literal representing
 // 'r' to the buffer. The output includes surrounding single quotes
 // and uses Go escape sequences.
-func (b *Buffer) QuoteRune(r rune) { b.ws(strconv.QuoteRune(r)) }
+func (b *Buffer) QuoteRune(r rune) { b.AppendQuoteRune(r) }
 
 // QuoteRuneASCII writes a single-quoted Go character literal
 // representing 'r' to the buffer. Non-ASCII characters are escaped
 // using \u or \U sequences.
-func (b *Buffer) QuoteRuneASCII(r rune) { b.ws(strconv.QuoteRuneToASCII(r)) }
+func (b *Buffer) QuoteRuneASCII(r rune) { b.AppendQuoteRuneASCII(r) }
 
 // QuoteRuneGrapic writes a single-quoted Go character literal
 // representing 'r' to the buffer. Non-graphic characters as defined
 // by unicode.IsGraphic are escaped.
-func (b *Buffer) QuoteRuneGrapic(r rune) { b.ws(strconv.QuoteRuneToGraphic(r)) }
+func (b *Buffer) QuoteRuneGrapic(r rune) { b.AppendQuoteRuneGrapic(r) }
 
 // AppendQuote writes a double-quoted Go string literal representing 'str' to
 // the buffer. The output includes surrounding quotes and uses Go
@@ -300,68 +305,68 @@ func (b *Buffer) AppendUint64(n uint64, base int) { b.Write(strconv.AppendUint(n
 // AppendFloat writes the string representation of the floating-point
 // number 'f' to the buffer. The 'tpl' parameter is the format ('b',
 // 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
-// 'size' is the number of bits (32 or 64).
+// 'size' is the number of bits (32 or 64). Functionally equivalent to FormatFloat.
 func (b *Buffer) AppendFloat(f float64, tpl byte, prec, size int) {
 	b.Write(strconv.AppendFloat(nil, f, tpl, prec, size))
 }
 
 // FormatBool writes "true" or "false" according to the value of 'v' to
 // the buffer.
-func (b *Buffer) FormatBool(v bool) { b.ws(strconv.FormatBool(v)) }
+func (b *Buffer) FormatBool(v bool) { b.AppendBool(v) }
 
 // FormatInt64 writes the string representation of 'n' in the given 'base'
 // to the buffer. The 'base' must be between 2 and 36 inclusive.
-func (b *Buffer) FormatInt64(n int64, base int) { b.ws(strconv.FormatInt(n, base)) }
+func (b *Buffer) FormatInt64(n int64, base int) { b.AppendInt64(n, base) }
 
 // FormatUint64 writes the string representation of 'n' in the given
 // 'base' to the buffer. The 'base' must be between 2 and 36 inclusive.
-func (b *Buffer) FormatUint64(n uint64, base int) { b.ws(strconv.FormatUint(n, base)) }
+func (b *Buffer) FormatUint64(n uint64, base int) { b.AppendUint64(n, base) }
 
 // FormatFloat writes the string representation of the floating-point
 // number 'f' to the buffer. The 'tpl' parameter is the format ('b',
 // 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
 // 'size' is the number of bits (32 or 64).
-func (b *Buffer) FormatFloat(f float64, tpl byte, prec, size int) {
-	b.ws(strconv.FormatFloat(f, tpl, prec, size))
-}
+func (b *Buffer) FormatFloat(f float64, tpl byte, prec, size int) { b.AppendFloat(f, tpl, prec, size) }
 
 // FormatComplex writes the string representation of the complex
 // number 'n' to the buffer. The 'tpl' parameter is the format ('b',
 // 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
 // 'size' is the total number of bits (64 or 128).
 func (b *Buffer) FormatComplex(n complex128, tpl byte, prec, size int) {
-	b.ws(strconv.FormatComplex(n, tpl, prec, size))
+	b.PushString(strconv.FormatComplex(n, tpl, prec, size))
 }
 
 // WithTrimSpace writes 'str' with all leading and trailing whitespace
 // removed to the buffer.
-func (b *Buffer) WithTrimSpace(str string) { b.ws(strings.TrimSpace(str)) }
+func (b *Buffer) WithTrimSpace(str string) { b.PushString(strings.TrimSpace(str)) }
 
 // WithTrimRight writes 'str' with all trailing characters contained in
 // 'cut' removed to the buffer.
-func (b *Buffer) WithTrimRight(str string, cut string) { b.ws(strings.TrimRight(str, cut)) }
+func (b *Buffer) WithTrimRight(str string, cut string) { b.PushString(strings.TrimRight(str, cut)) }
 
 // WithTrimLeft writes 'str' with all leading characters contained in
 // 'cut' removed to the buffer.
-func (b *Buffer) WithTrimLeft(str string, cut string) { b.ws(strings.TrimLeft(str, cut)) }
+func (b *Buffer) WithTrimLeft(str string, cut string) { b.PushString(strings.TrimLeft(str, cut)) }
 
 // WithTrimPrefix writes 's' with the leading 'prefix' string removed to
 // the buffer. If 's' doesn't start with 'prefix', 's' is written
 // unchanged.
-func (b *Buffer) WithTrimPrefix(s string, prefix string) { b.ws(strings.TrimPrefix(s, prefix)) }
+func (b *Buffer) WithTrimPrefix(s string, prefix string) { b.PushString(strings.TrimPrefix(s, prefix)) }
 
 // WithTrimSuffix writes 's' with the trailing 'suffix' string removed to
 // the buffer. If 's' doesn't end with 'suffix', 's' is written unchanged.
-func (b *Buffer) WithTrimSuffix(s string, suffix string) { b.ws(strings.TrimSuffix(s, suffix)) }
+func (b *Buffer) WithTrimSuffix(s string, suffix string) { b.PushString(strings.TrimSuffix(s, suffix)) }
 
 // WithReplaceAll writes 's' with all non-overlapping instances of 'old'
 // replaced by 'new' to the buffer.
-func (b *Buffer) WithReplaceAll(s, old, new string) { b.ws(strings.ReplaceAll(s, old, new)) } //nolint:predeclared
+func (b *Buffer) WithReplaceAll(s, old, new string) { b.PushString(strings.ReplaceAll(s, old, new)) } //nolint:predeclared
 
 // WithReplace writes 's' with the first 'n' non-overlapping instances of
 // 'old' replaced by 'new' to the buffer. If 'n' is negative, all
 // instances are replaced.
-func (b *Buffer) WithReplace(s, old, new string, n int) { b.ws(strings.Replace(s, old, new, n)) } //nolint:predeclared
+func (b *Buffer) WithReplace(s, old, new string, n int) {
+	b.PushString(strings.Replace(s, old, new, n))
+} //nolint:predeclared
 
 // AppendTrimSpace writes 'str' with all leading and trailing whitespace
 // removed to the buffer.
@@ -395,7 +400,7 @@ func (b *Buffer) AppendReplace(s, old, new []byte, n int) { b.Write(bytes.Replac
 
 // Extend writes all strings from the iterator 'seq' consecutively to
 // the buffer.
-func (b *Buffer) Extend(seq iter.Seq[string]) { flush(seq, b.ws) }
+func (b *Buffer) Extend(seq iter.Seq[string]) { flush(seq, b.PushString) }
 
 // ExtendLines writes each string from the iterator 'seq' on its own
 // line to the buffer. Each string is followed by a newline

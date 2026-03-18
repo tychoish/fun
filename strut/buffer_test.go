@@ -251,6 +251,54 @@ func TestBuffer_WhenWriteMutable(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, whenWriteMutableTests[*Buffer]())
 }
 
+func TestBuffer_PushBytes(t *testing.T) {
+	tests := appendTests()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var b Buffer
+			b.PushBytes(tt.buf)
+			got := b.String()
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestBuffer_PushString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"empty string", "", ""},
+		{"simple string", "hello", "hello"},
+		{"string with spaces", "hello world", "hello world"},
+		{"string with newline", "line\n", "line\n"},
+		{"unicode string", "世界", "世界"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var b Buffer
+			b.PushString(tt.input)
+			got := b.String()
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+
+	t.Run("sequential pushes", func(t *testing.T) {
+		var b Buffer
+		b.PushString("hello")
+		b.PushString(", ")
+		b.PushString("world")
+		if got := b.String(); got != "hello, world" {
+			t.Errorf("expected %q, got %q", "hello, world", got)
+		}
+	})
+}
+
 func TestBuffer_NewBuffer(t *testing.T) {
 	t.Run("with initial content", func(t *testing.T) {
 		b := NewBuffer([]byte("hello"))

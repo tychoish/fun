@@ -62,6 +62,7 @@ func MakeMutable(capacity int) *Mutable {
 	return mut
 }
 
+
 // Format implements fmt.Formatter, allowing Mutable to be used directly
 // in formatted output. Writes the underlying bytes to the formatter's
 // state.
@@ -149,6 +150,14 @@ func (mut *Mutable) WriteString(s string) (n int, err error) {
 	*mut = append(*mut, s...)
 	return len(s), nil
 }
+
+// PushString appends string 's' to the mutable string.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) PushString(s string) { *mut = append(*mut, s...) }
+
+// PushBytes appends the byte slice 'p' to the mutable string.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) PushBytes(p []byte) { *mut = append(*mut, p...) }
 
 // Reader provides access to an io.Reader for reading from the
 // mutable string.) Does not copy the underlying data.
