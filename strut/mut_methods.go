@@ -66,24 +66,14 @@ func (mut *Mutable) JoinStrings(s []string, sep string) {
 
 // ---- Extend additions ----
 
-// ExtendLines writes each string from seq on its own line to the mutable.
-func (mut *Mutable) ExtendLines(seq iter.Seq[string]) { flush(seq, mut.WriteLine) }
+// ExtendStringsLines writes each string from seq on its own line to the mutable.
+func (mut *Mutable) ExtendStringsLines(seq iter.Seq[string]) { flush(seq, mut.WriteLine) }
 
 // ExtendBytesLines writes each byte slice from seq on its own line to the mutable.
 func (mut *Mutable) ExtendBytesLines(seq iter.Seq[[]byte]) { flush(seq, mut.WriteBytesLine) }
 
-// ExtendMutableLines writes each Mutable from seq on its own line to the mutable.
-func (mut *Mutable) ExtendMutableLines(seq iter.Seq[Mutable]) { flush(seq, mut.WriteMutableLine) }
-
-// ExtendMutable appends all Mutable values from seq to the mutable.
-// Equivalent to Extend.
-func (mut *Mutable) ExtendMutable(seq iter.Seq[Mutable]) *Mutable { return mut.Extend(seq) }
-
-// ExtendMutableJoin appends Mutable values from seq separated by sep.
-// Equivalent to ExtendJoin.
-func (mut *Mutable) ExtendMutableJoin(seq iter.Seq[Mutable], sep Mutable) *Mutable {
-	return mut.ExtendJoin(seq, sep)
-}
+// ExtendLines writes each Mutable from seq on its own line to the mutable.
+func (mut *Mutable) ExtendLines(seq iter.Seq[Mutable]) { flush(seq, mut.WriteMutableLine) }
 
 // RepeatByte writes byte 'char' to the mutable 'n' times.
 // If 'n' is non-positive, the operation is a no-op.
@@ -116,87 +106,55 @@ func (mut *Mutable) AppendPrintln(args ...any) *Mutable { fmt.Fprintln(mut, args
 
 // ---- Numeric / strconv ----
 
-// Int writes the decimal string representation of num to the mutable.
-func (mut *Mutable) Int(num int) { *mut = strconv.AppendInt(*mut, int64(num), 10) }
+// PushInt writes the decimal string representation of num to the mutable.
+func (mut *Mutable) PushInt(num int) { *mut = strconv.AppendInt(*mut, int64(num), 10) }
 
-// AppendBool writes "true" or "false" to the mutable.
-func (mut *Mutable) AppendBool(v bool) { *mut = strconv.AppendBool(*mut, v) }
+// PushBool writes "true" or "false" to the mutable.
+func (mut *Mutable) PushBool(v bool) { *mut = strconv.AppendBool(*mut, v) }
 
-// AppendInt64 writes the string representation of n in the given base to the mutable.
-func (mut *Mutable) AppendInt64(n int64, base int) { *mut = strconv.AppendInt(*mut, n, base) }
+// PushInt64 writes the string representation of n in the given base to the mutable.
+func (mut *Mutable) PushInt64(n int64, base int) { *mut = strconv.AppendInt(*mut, n, base) }
 
-// AppendUint64 writes the string representation of n in the given base to the mutable.
-func (mut *Mutable) AppendUint64(n uint64, base int) { *mut = strconv.AppendUint(*mut, n, base) }
+// PushUint64 writes the string representation of n in the given base to the mutable.
+func (mut *Mutable) PushUint64(n uint64, base int) { *mut = strconv.AppendUint(*mut, n, base) }
 
-// AppendFloat writes the string representation of f to the mutable.
+// PushFloat writes the string representation of f to the mutable.
 // The tpl parameter is the format ('b', 'e', 'E', 'f', 'g', 'G', 'x', 'X'),
 // prec controls precision, and size is the number of bits (32 or 64).
-func (mut *Mutable) AppendFloat(f float64, tpl byte, prec, size int) {
+func (mut *Mutable) PushFloat(f float64, tpl byte, prec, size int) {
 	*mut = strconv.AppendFloat(*mut, f, tpl, prec, size)
 }
 
-// FormatBool writes "true" or "false" to the mutable.
-func (mut *Mutable) FormatBool(v bool) { mut.AppendBool(v) }
-
-// FormatInt64 writes the string representation of n in the given base to the mutable.
-func (mut *Mutable) FormatInt64(n int64, base int) { mut.AppendInt64(n, base) }
-
-// FormatUint64 writes the string representation of n in the given base to the mutable.
-func (mut *Mutable) FormatUint64(n uint64, base int) { mut.AppendUint64(n, base) }
-
-// FormatFloat writes the string representation of f to the mutable.
-// The tpl parameter is the format ('b', 'e', 'E', 'f', 'g', 'G', 'x', 'X'),
-// prec controls precision, and size is the number of bits (32 or 64).
-func (mut *Mutable) FormatFloat(f float64, tpl byte, prec, size int) { mut.AppendFloat(f, tpl, prec, size) }
-
-// FormatComplex writes the string representation of n to the mutable.
+// PushComplex writes the string representation of n to the mutable.
 // The tpl parameter is the format ('b', 'e', 'E', 'f', 'g', 'G', 'x', 'X'),
 // prec controls precision, and size is the total number of bits (64 or 128).
-func (mut *Mutable) FormatComplex(n complex128, tpl byte, prec, size int) {
+func (mut *Mutable) PushComplex(n complex128, tpl byte, prec, size int) {
 	mut.PushString(strconv.FormatComplex(n, tpl, prec, size))
 }
 
-// ---- AppendQuote* ----
+// ---- PushQuote* ----
 
-// AppendQuote writes a double-quoted Go string literal for str to the mutable.
-func (mut *Mutable) AppendQuote(str string) { *mut = strconv.AppendQuote(*mut, str) }
+// PushQuote writes a double-quoted Go string literal for str to the mutable.
+func (mut *Mutable) PushQuote(str string) { *mut = strconv.AppendQuote(*mut, str) }
 
-// AppendQuoteASCII writes a double-quoted Go string literal for str, escaping non-ASCII.
-func (mut *Mutable) AppendQuoteASCII(str string) { *mut = strconv.AppendQuoteToASCII(*mut, str) }
+// PushQuoteASCII writes a double-quoted Go string literal for str, escaping non-ASCII.
+func (mut *Mutable) PushQuoteASCII(str string) { *mut = strconv.AppendQuoteToASCII(*mut, str) }
 
-// AppendQuoteGrapic writes a double-quoted Go string literal for str, escaping non-graphic chars.
-func (mut *Mutable) AppendQuoteGrapic(str string) { *mut = strconv.AppendQuoteToGraphic(*mut, str) }
+// PushQuoteGrapic writes a double-quoted Go string literal for str, escaping non-graphic chars.
+func (mut *Mutable) PushQuoteGrapic(str string) { *mut = strconv.AppendQuoteToGraphic(*mut, str) }
 
-// AppendQuoteRune writes a single-quoted Go character literal for r to the mutable.
-func (mut *Mutable) AppendQuoteRune(r rune) { *mut = strconv.AppendQuoteRune(*mut, r) }
+// PushQuoteRune writes a single-quoted Go character literal for r to the mutable.
+func (mut *Mutable) PushQuoteRune(r rune) { *mut = strconv.AppendQuoteRune(*mut, r) }
 
-// AppendQuoteRuneASCII writes a single-quoted Go character literal for r, escaping non-ASCII.
-func (mut *Mutable) AppendQuoteRuneASCII(r rune) {
+// PushQuoteRuneASCII writes a single-quoted Go character literal for r, escaping non-ASCII.
+func (mut *Mutable) PushQuoteRuneASCII(r rune) {
 	*mut = strconv.AppendQuoteRuneToASCII(*mut, r)
 }
 
-// AppendQuoteRuneGrapic writes a single-quoted Go character literal for r, escaping non-graphic chars.
-func (mut *Mutable) AppendQuoteRuneGrapic(r rune) {
+// PushQuoteRuneGrapic writes a single-quoted Go character literal for r, escaping non-graphic chars.
+func (mut *Mutable) PushQuoteRuneGrapic(r rune) {
 	*mut = strconv.AppendQuoteRuneToGraphic(*mut, r)
 }
-
-// Quote writes a double-quoted Go string literal representing 'str' to the mutable.
-func (mut *Mutable) Quote(str string) { mut.AppendQuote(str) }
-
-// QuoteASCII writes a double-quoted Go string literal for 'str', escaping non-ASCII characters.
-func (mut *Mutable) QuoteASCII(str string) { mut.AppendQuoteASCII(str) }
-
-// QuoteGrapic writes a double-quoted Go string literal for 'str', escaping non-graphic characters.
-func (mut *Mutable) QuoteGrapic(str string) { mut.AppendQuoteGrapic(str) }
-
-// QuoteRune writes a single-quoted Go character literal representing 'r' to the mutable.
-func (mut *Mutable) QuoteRune(r rune) { mut.AppendQuoteRune(r) }
-
-// QuoteRuneASCII writes a single-quoted Go character literal for 'r', escaping non-ASCII characters.
-func (mut *Mutable) QuoteRuneASCII(r rune) { mut.AppendQuoteRuneASCII(r) }
-
-// QuoteRuneGrapic writes a single-quoted Go character literal for 'r', escaping non-graphic characters.
-func (mut *Mutable) QuoteRuneGrapic(r rune) { mut.AppendQuoteRuneGrapic(r) }
 
 // ---- With* (string transformations written to mutable) ----
 
@@ -236,18 +194,10 @@ func (mut *Mutable) WithReplace(s, old, new string, n int) { //nolint:predeclare
 // bytes.TrimSpace returns a subslice of str (no allocation).
 func (mut *Mutable) AppendTrimSpace(str []byte) { mut.PushBytes(bytes.TrimSpace(str)) }
 
-// AppendTrimSpaceString writes str with all leading and trailing whitespace removed.
-func (mut *Mutable) AppendTrimSpaceString(str string) { mut.PushString(strings.TrimSpace(str)) }
-
 // AppendTrimRight writes str with trailing characters in cut removed.
 // bytes.TrimRight returns a subslice of str (no allocation).
 func (mut *Mutable) AppendTrimRight(str []byte, cut string) {
 	mut.PushBytes(bytes.TrimRight(str, cut))
-}
-
-// AppendTrimRightString writes str with trailing characters in cut removed.
-func (mut *Mutable) AppendTrimRightString(str, cut string) {
-	mut.PushString(strings.TrimRight(str, cut))
 }
 
 // AppendTrimLeft writes str with leading characters in cut removed.
@@ -256,20 +206,10 @@ func (mut *Mutable) AppendTrimLeft(str []byte, cut string) {
 	mut.PushBytes(bytes.TrimLeft(str, cut))
 }
 
-// AppendTrimLeftString writes str with leading characters in cut removed.
-func (mut *Mutable) AppendTrimLeftString(str, cut string) {
-	mut.PushString(strings.TrimLeft(str, cut))
-}
-
 // AppendTrimPrefix writes s with the leading prefix removed.
 // bytes.TrimPrefix returns a subslice of s (no allocation).
 func (mut *Mutable) AppendTrimPrefix(s, prefix []byte) {
 	mut.PushBytes(bytes.TrimPrefix(s, prefix))
-}
-
-// AppendTrimPrefixString writes s with the leading prefix removed.
-func (mut *Mutable) AppendTrimPrefixString(s, prefix string) {
-	mut.PushString(strings.TrimPrefix(s, prefix))
 }
 
 // AppendTrimSuffix writes s with the trailing suffix removed.
@@ -278,31 +218,15 @@ func (mut *Mutable) AppendTrimSuffix(s, suffix []byte) {
 	mut.PushBytes(bytes.TrimSuffix(s, suffix))
 }
 
-// AppendTrimSuffixString writes s with the trailing suffix removed.
-func (mut *Mutable) AppendTrimSuffixString(s, suffix string) {
-	mut.PushString(strings.TrimSuffix(s, suffix))
-}
-
 // AppendReplaceAll writes s with all non-overlapping instances of old replaced by new.
 func (mut *Mutable) AppendReplaceAll(s, old, new []byte) { //nolint:predeclared
 	mut.PushBytes(bytes.ReplaceAll(s, old, new))
-}
-
-// AppendReplaceAllString writes s with all non-overlapping instances of old replaced by new.
-func (mut *Mutable) AppendReplaceAllString(s, old, new string) { //nolint:predeclared
-	mut.PushString(strings.ReplaceAll(s, old, new))
 }
 
 // AppendReplace writes s with the first n non-overlapping instances of old replaced by new.
 // If n is negative, all instances are replaced.
 func (mut *Mutable) AppendReplace(s, old, new []byte, n int) { //nolint:predeclared
 	mut.PushBytes(bytes.Replace(s, old, new, n))
-}
-
-// AppendReplaceString writes s with the first n non-overlapping instances of old replaced by new.
-// If n is negative, all instances are replaced.
-func (mut *Mutable) AppendReplaceString(s, old, new string, n int) { //nolint:predeclared
-	mut.PushString(strings.Replace(s, old, new, n))
 }
 
 // ---- When* ----

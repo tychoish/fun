@@ -56,9 +56,6 @@ func (b *Builder) NLines(n int) { ntimes(n, b.Line) }
 // If 'n' is negative, the operaton is a no-op.
 func (b *Builder) NTabs(n int) { ntimes(n, b.Tab) }
 
-// WriteMutable writes the Mutable byte slice 'in' to the builder.
-func (b *Builder) WriteMutable(in Mutable) { b.Write(in) }
-
 // WriteMutableLine writes the Mutable byte slice 'in' followed by a newline
 // character to the builder.
 func (b *Builder) WriteMutableLine(in Mutable) { b.Write(in); b.Line() }
@@ -77,7 +74,7 @@ func (b *Builder) WriteLines(lns ...string) { apply(b.WriteLine, lns) }
 
 // WriteBytesLine writes the byte slice 'ln' followed by a newline character
 // to the builder. The byte slice is copied during the write operation.
-func (b *Builder) WriteBytesLine(ln []byte) { b.Append(ln); b.Line() }
+func (b *Builder) WriteBytesLine(ln []byte) { b.PushBytes(ln); b.Line() }
 
 // WriteBytesLines writes each byte slice in 'lns' followed by a newline
 // character to the builder. Each byte slice is written on its own line.
@@ -98,17 +95,17 @@ func (b *Builder) WhenWriteMutableLines(cond bool, ms ...Mutable) {
 	ifargs(cond, b.WriteMutableLines, ms)
 }
 
-// Append writes the byte slice 'buf' to the builder. The byte slice is
+// Push writes the byte slice 'buf' to the builder. The byte slice is
 // copied during the write operation; the caller retains ownership of 'buf'
 // and may modify it after this call returns. This is a convenience wrapper
 // around Write.
-func (b *Builder) Append(buf []byte) { b.Write(buf) }
+func (b *Builder) PushBytes(buf []byte) { b.Write(buf) }
 
 // PushString appends string 's' to the builder.
 func (b *Builder) PushString(s string) { b.WriteString(s) }
 
-// PushBytes appends the byte slice 'p' to the builder.
-func (b *Builder) PushBytes(p []byte) { b.Write(p) }
+// WriteMutable writes the Mutable byte slice 'in' to the builder.
+func (b *Builder) WriteMutable(in Mutable) { b.Write(in) }
 
 // Join writes all strings from the slice 's', separated by 'sep', to the
 // builder. This is analogous to strings.Join but writes directly to
@@ -179,7 +176,7 @@ func (b *Builder) WhenNTabs(cond bool, n int) { ifwith(cond, b.NTabs, n) }
 
 // WhenWrite writes the byte slice 'buf' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Builder) WhenWrite(cond bool, buf []byte) { ifwith(cond, b.Append, buf) }
+func (b *Builder) WhenWrite(cond bool, buf []byte) { ifwith(cond, b.PushBytes, buf) }
 
 // WhenWriteString writes the string 's' if 'cond' is true and is a no-op
 // otherwise.
@@ -209,131 +206,64 @@ func (b *Builder) WhenConcat(cond bool, strs ...string) { ifwith(cond, b.cat, st
 // a no-op otherwise.
 func (b *Builder) WhenJoin(cond bool, sl []string, sep string) { iftuple(cond, b.Join, sl, sep) }
 
-// AppendQuote writes a double-quoted Go string literal representing 'str' to
+// PushQuote writes a double-quoted Go string literal representing 'str' to
 // the builder. The output includes surrounding quotes and uses Go escape
-// sequences. This method uses strconv.AppendQuote which may be more efficient
-// than Quote for avoiding intermediate string allocations in some cases.
-func (b *Builder) AppendQuote(str string) { b.Write(strconv.AppendQuote(nil, str)) }
+// sequences.
+func (b *Builder) PushQuote(str string) { b.Write(strconv.AppendQuote(nil, str)) }
 
-// AppendQuoteASCII writes a double-quoted Go string literal representing
+// PushQuoteASCII writes a double-quoted Go string literal representing
 // 'str' to the builder. Non-ASCII characters are escaped using \u or \U
-// sequences. This method uses strconv.AppendQuoteToASCII which may be more
-// efficient than QuoteASCII for avoiding intermediate string allocations in
-// some cases.
-func (b *Builder) AppendQuoteASCII(str string) { b.Write(strconv.AppendQuoteToASCII(nil, str)) }
+// sequences.
+func (b *Builder) PushQuoteASCII(str string) { b.Write(strconv.AppendQuoteToASCII(nil, str)) }
 
-// AppendQuoteGrapic writes a double-quoted Go string literal representing
-// 'str' to the builder. Non-graphic characters as defined by
-// unicode.IsGraphic are escaped. This method uses strconv.AppendQuoteToGraphic
-// which may be more efficient than QuoteGrapic for avoiding intermediate
-// string allocations in some cases.
-func (b *Builder) AppendQuoteGrapic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
-
-// AppendQuoteRune writes a single-quoted Go character literal representing
-// 'r' to the builder. The output includes surrounding single quotes and uses
-// Go escape sequences. This method uses strconv.AppendQuoteRune which may be
-// more efficient than QuoteRune for avoiding intermediate string allocations
-// in some cases.
-func (b *Builder) AppendQuoteRune(r rune) { b.Write(strconv.AppendQuoteRune(nil, r)) }
-
-// AppendQuoteRuneASCII writes a single-quoted Go character literal
-// representing 'r' to the builder. Non-ASCII characters are escaped using \u
-// or \U sequences. This method uses strconv.AppendQuoteRuneToASCII which may
-// be more efficient than QuoteRuneASCII for avoiding intermediate string
-// allocations in some cases.
-func (b *Builder) AppendQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneToASCII(nil, r)) }
-
-// AppendQuoteRuneGrapic writes a single-quoted Go character literal
-// representing 'r' to the builder. Non-graphic characters as defined by
-// unicode.IsGraphic are escaped. This method uses strconv.AppendQuoteRuneToGraphic
-// which may be more efficient than QuoteRuneGrapic for avoiding intermediate
-// string allocations in some cases.
-func (b *Builder) AppendQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
-
-// Quote writes a double-quoted Go string literal representing 'str' to
-// the builder. The output includes surrounding quotes and uses Go
-// escape sequences.
-func (b *Builder) Quote(str string) { b.AppendQuote(str) }
-
-// QuoteASCII writes a double-quoted Go string literal representing
-// 'str' to the builder. Non-ASCII characters are escaped using \u or
-// \U sequences.
-func (b *Builder) QuoteASCII(str string) { b.AppendQuoteASCII(str) }
-
-// QuoteGrapic writes a double-quoted Go string literal representing
+// PushQuoteGrapic writes a double-quoted Go string literal representing
 // 'str' to the builder. Non-graphic characters as defined by
 // unicode.IsGraphic are escaped.
-func (b *Builder) QuoteGrapic(str string) { b.AppendQuoteGrapic(str) }
+func (b *Builder) PushQuoteGrapic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
 
-// QuoteRune writes a single-quoted Go character literal representing
-// 'r' to the builder. The output includes surrounding single quotes
-// and uses Go escape sequences.
-func (b *Builder) QuoteRune(r rune) { b.AppendQuoteRune(r) }
+// PushQuoteRune writes a single-quoted Go character literal representing
+// 'r' to the builder. The output includes surrounding single quotes and uses
+// Go escape sequences.
+func (b *Builder) PushQuoteRune(r rune) { b.Write(strconv.AppendQuoteRune(nil, r)) }
 
-// QuoteRuneASCII writes a single-quoted Go character literal
-// representing 'r' to the builder. Non-ASCII characters are escaped
-// using \u or \U sequences.
-func (b *Builder) QuoteRuneASCII(r rune) { b.AppendQuoteRuneASCII(r) }
+// PushQuoteRuneASCII writes a single-quoted Go character literal
+// representing 'r' to the builder. Non-ASCII characters are escaped using \u
+// or \U sequences.
+func (b *Builder) PushQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneToASCII(nil, r)) }
 
-// QuoteRuneGrapic writes a single-quoted Go character literal
-// representing 'r' to the builder. Non-graphic characters as defined
-// by unicode.IsGraphic are escaped.
-func (b *Builder) QuoteRuneGrapic(r rune) { b.AppendQuoteRuneGrapic(r) }
+// PushQuoteRuneGrapic writes a single-quoted Go character literal
+// representing 'r' to the builder. Non-graphic characters as defined by
+// unicode.IsGraphic are escaped.
+func (b *Builder) PushQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
 
-// Int writes the decimal string representation of 'num' to the builder.
-func (b *Builder) Int(num int) { b.PushString(strconv.Itoa(num)) }
+// Int writes the  string representation of the integer 'num' to the builder.
+func (b *Builder) PushInt(num int) { b.Write(strconv.AppendInt(nil, int64(num), 10)) }
 
-// AppendBool writes "true" or "false" according to the value of 'v' to the
-// builder. This method uses strconv.AppendBool which may be more efficient
-// than FormatBool for avoiding intermediate string allocations in some cases.
-// Functionally equivalent to FormatBool.
-func (b *Builder) AppendBool(v bool) { b.Write(strconv.AppendBool(nil, v)) }
+// PushBool writes "true" or "false" according to the value of 'v' to the builder.
+// PushInt writes the decimal string representation of 'num' to the builder.
+func (b *Builder) PushBool(v bool) { b.Write(strconv.AppendBool(nil, v)) }
 
-// AppendInt64 writes the string representation of 'n' in the given 'base' to
-// the builder. The 'base' must be between 2 and 36 inclusive. This method
-// uses strconv.AppendInt which may be more efficient than FormatInt64 for
-// avoiding intermediate string allocations in some cases. Functionally
-// equivalent to FormatInt64.
-func (b *Builder) AppendInt64(n int64, base int) { b.Write(strconv.AppendInt(nil, n, base)) }
+// PushInt64 writes the string representation of 'n' in the given 'base' to
+// the builder. The 'base' must be between 2 and 36 inclusive.
+func (b *Builder) PushInt64(n int64, base int) { b.Write(strconv.AppendInt(nil, n, base)) }
 
-// AppendUint64 writes the string representation of 'n' in the given 'base'
-// to the builder. The 'base' must be between 2 and 36 inclusive. This method
-// uses strconv.AppendUint which may be more efficient than FormatUint64 for
-// avoiding intermediate string allocations in some cases. Functionally
-// equivalent to FormatUint64.
-func (b *Builder) AppendUint64(n uint64, base int) { b.Write(strconv.AppendUint(nil, n, base)) }
+// PushUint64 writes the string representation of 'n' in the given 'base'
+// to the builder. The 'base' must be between 2 and 36 inclusive.
+func (b *Builder) PushUint64(n uint64, base int) { b.Write(strconv.AppendUint(nil, n, base)) }
 
-// AppendFloat writes the string representation of the floating-point number
+// PushFloat writes the string representation of the floating-point number
 // 'f' to the builder. The 'tpl' parameter is the format ('b', 'e', 'E', 'f',
 // 'g', 'G', 'x', 'X'), 'prec' controls precision, and 'size' is the number of
-// bits (32 or 64). Functionally equivalent to FormatFloat.
-func (b *Builder) AppendFloat(f float64, tpl byte, prec, size int) {
+// bits (32 or 64).
+func (b *Builder) PushFloat(f float64, tpl byte, prec, size int) {
 	b.Write(strconv.AppendFloat(nil, f, tpl, prec, size))
 }
 
-// FormatBool writes "true" or "false" according to the value of 'v' to
-// the builder.
-func (b *Builder) FormatBool(v bool) { b.AppendBool(v) }
-
-// FormatInt64 writes the string representation of 'n' in the given 'base'
-// to the builder. The 'base' must be between 2 and 36 inclusive.
-func (b *Builder) FormatInt64(n int64, base int) { b.AppendInt64(n, base) }
-
-// FormatUint64 writes the string representation of 'n' in the given
-// 'base' to the builder. The 'base' must be between 2 and 36 inclusive.
-func (b *Builder) FormatUint64(n uint64, base int) { b.AppendUint64(n, base) }
-
-// FormatFloat writes the string representation of the floating-point
-// number 'f' to the builder. The 'tpl' parameter is the format ('b',
-// 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
-// 'size' is the number of bits (32 or 64).
-func (b *Builder) FormatFloat(f float64, tpl byte, prec, size int) { b.AppendFloat(f, tpl, prec, size) }
-
-// FormatComplex writes the string representation of the complex
+// PushComplex writes the string representation of the complex
 // number 'n' to the builder. The 'tpl' parameter is the format ('b',
 // 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
 // 'size' is the total number of bits (64 or 128).
-func (b *Builder) FormatComplex(n complex128, tpl byte, prec, size int) {
+func (b *Builder) PushComplex(n complex128, tpl byte, prec, size int) {
 	b.PushString(strconv.FormatComplex(n, tpl, prec, size))
 }
 
@@ -369,9 +299,9 @@ func (b *Builder) WithReplaceAll(s, old, new string) { b.PushString(strings.Repl
 // WithReplace writes 's' with the first 'n' non-overlapping instances of
 // 'old' replaced by 'new' to the builder. If 'n' is negative, all
 // instances are replaced.
-func (b *Builder) WithReplace(s, old, new string, n int) {
+func (b *Builder) WithReplace(s, old, new string, n int) { //nolint:predeclared
 	b.PushString(strings.Replace(s, old, new, n))
-} //nolint:predeclared
+}
 
 // AppendTrimSpace writes the byte slice 'str' with all leading and trailing
 // whitespace removed to the builder. The input 'str' is not modified; a
@@ -434,7 +364,7 @@ func (b *Builder) ExtendMutableLines(seq iter.Seq[Mutable]) { flush(seq, b.Write
 // ExtendBytes writes all byte slices from the iterator 'seq' consecutively
 // to the builder. Each byte slice is copied during the write operation. This
 // is the byte slice equivalent of Extend.
-func (b *Builder) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.Append) }
+func (b *Builder) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.PushBytes) }
 
 // ExtendBytesLines writes all byte slices from the iterator 'seq' to the
 // builder, each followed by a newline character. Each byte slice is written

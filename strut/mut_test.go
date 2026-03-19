@@ -745,7 +745,7 @@ func TestMutableIsUnicode(t *testing.T) {
 func TestMutableAppend(t *testing.T) {
 	mut1 := Mutable([]byte("hello"))
 	mut2 := Mutable([]byte(" world"))
-	mut1.Append(&mut2)
+	mut1.Push(&mut2)
 
 	want := "hello world"
 	if got := string(mut1); got != want {

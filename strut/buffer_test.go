@@ -36,7 +36,7 @@ func TestBuffer_Append(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var b Buffer
-			b.Append(tt.buf)
+			b.PushBytes(tt.buf)
 			got := b.String()
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
@@ -71,12 +71,12 @@ func TestBuffer_WhenMethods(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, whenMethodTests[*Buffer]())
 }
 
-func TestBuffer_Quote(t *testing.T) {
-	runBuildTests(t, func() *Buffer { return &Buffer{} }, quoteTests[*Buffer]())
+func TestBuffer_PushQuote(t *testing.T) {
+	runBuildTests(t, func() *Buffer { return &Buffer{} }, pushQuoteTests[*Buffer]())
 }
 
-func TestBuffer_FormatNumbers(t *testing.T) {
-	runBuildTests(t, func() *Buffer { return &Buffer{} }, formatNumberTests[*Buffer]())
+func TestBuffer_PushNumbers(t *testing.T) {
+	runBuildTests(t, func() *Buffer { return &Buffer{} }, pushNumberTests[*Buffer]())
 }
 
 func TestBuffer_Trim(t *testing.T) {
@@ -175,20 +175,20 @@ func TestBuffer_LargeString(t *testing.T) {
 	}
 }
 
-func TestBuffer_AllQuoteMethods(t *testing.T) {
+func TestBuffer_AllPushQuoteMethods(t *testing.T) {
 	var b Buffer
 
-	b.Quote("test")
+	b.PushQuote("test")
 	b.WriteByte(' ')
-	b.QuoteASCII("世")
+	b.PushQuoteASCII("世")
 	b.WriteByte(' ')
-	b.QuoteGrapic("\x00")
+	b.PushQuoteGrapic("\x00")
 	b.WriteByte(' ')
-	b.QuoteRune('a')
+	b.PushQuoteRune('a')
 	b.WriteByte(' ')
-	b.QuoteRuneASCII('世')
+	b.PushQuoteRuneASCII('世')
 	b.WriteByte(' ')
-	b.QuoteRuneGrapic('\n')
+	b.PushQuoteRuneGrapic('\n')
 
 	result := b.String()
 	if !strings.Contains(result, `"test"`) {
@@ -217,14 +217,6 @@ func TestBuffer_ChainedWrites(t *testing.T) {
 
 func TestBuffer_WriteBytesLine(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, writeBytesLineTests[*Buffer]())
-}
-
-func TestBuffer_AppendQuote(t *testing.T) {
-	runBuildTests(t, func() *Buffer { return &Buffer{} }, appendQuoteTests[*Buffer]())
-}
-
-func TestBuffer_AppendNumber(t *testing.T) {
-	runBuildTests(t, func() *Buffer { return &Buffer{} }, appendNumberTests[*Buffer]())
 }
 
 func TestBuffer_AppendTrim(t *testing.T) {

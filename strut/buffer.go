@@ -104,15 +104,12 @@ func (b *Buffer) WriteMutableLine(in Mutable) { b.Write(in); b.Line() }
 // newline character to the buffer. Each element is written on its own line.
 func (b *Buffer) WriteMutableLines(in ...Mutable) { apply(b.WriteMutableLine, in) }
 
-// Append writes the byte slice 'buf' to the buffer.
+// Push writes the byte slice 'buf' to the buffer.
 // This is a convenience wrapper around Write.
-func (b *Buffer) Append(buf []byte) { b.Write(buf) }
+func (b *Buffer) PushBytes(buf []byte) { b.Write(buf) }
 
 // PushString appends string 's' to the buffer.
 func (b *Buffer) PushString(s string) { b.WriteString(s) }
-
-// PushBytes appends the byte slice 'p' to the buffer.
-func (b *Buffer) PushBytes(p []byte) { b.Write(p) }
 
 // Join writes all strings from the slice 's', separated by 'sep', to the
 // buffer. This is analogous to strings.Join but writes directly to
@@ -183,7 +180,7 @@ func (b *Buffer) WhenNTabs(cond bool, n int) { ifwith(cond, b.NTabs, n) }
 
 // WhenWrite writes the byte slice 'buf' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Buffer) WhenWrite(cond bool, buf []byte) { ifwith(cond, b.Append, buf) }
+func (b *Buffer) WhenWrite(cond bool, buf []byte) { ifwith(cond, b.PushBytes, buf) }
 
 // WhenWriteString writes the string 's' if 'cond' is true and is a no-op
 // otherwise.
@@ -227,112 +224,64 @@ func (b *Buffer) WhenWriteMutableLines(cond bool, ms ...Mutable) {
 // a no-op otherwise.
 func (b *Buffer) WhenJoin(cond bool, sl []string, sep string) { iftuple(cond, b.Join, sl, sep) }
 
-// Quote writes a double-quoted Go string literal representing 'str' to
-// the buffer. The output includes surrounding quotes and uses Go
-// escape sequences.
-func (b *Buffer) Quote(str string) { b.AppendQuote(str) }
+// PushQuote writes a double-quoted Go string literal representing 'str' to
+// the buffer. The output includes surrounding quotes and uses Go escape
+// sequences.
+func (b *Buffer) PushQuote(str string) { b.Write(strconv.AppendQuote(nil, str)) }
 
-// QuoteASCII writes a double-quoted Go string literal representing
-// 'str' to the buffer. Non-ASCII characters are escaped using \u or
-// \U sequences.
-func (b *Buffer) QuoteASCII(str string) { b.AppendQuoteASCII(str) }
+// PushQuoteASCII writes a double-quoted Go string literal representing
+// 'str' to the buffer. Non-ASCII characters are escaped using \u or \U
+// sequences.
+func (b *Buffer) PushQuoteASCII(str string) { b.Write(strconv.AppendQuoteToASCII(nil, str)) }
 
-// QuoteGrapic writes a double-quoted Go string literal representing
+// PushQuoteGrapic writes a double-quoted Go string literal representing
 // 'str' to the buffer. Non-graphic characters as defined by
 // unicode.IsGraphic are escaped.
-func (b *Buffer) QuoteGrapic(str string) { b.AppendQuoteGrapic(str) }
+func (b *Buffer) PushQuoteGrapic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
 
-// QuoteRune writes a single-quoted Go character literal representing
-// 'r' to the buffer. The output includes surrounding single quotes
-// and uses Go escape sequences.
-func (b *Buffer) QuoteRune(r rune) { b.AppendQuoteRune(r) }
+// PushQuoteRune writes a single-quoted Go character literal representing
+// 'r' to the buffer. The output includes surrounding single quotes and uses
+// Go escape sequences.
+func (b *Buffer) PushQuoteRune(r rune) { b.Write(strconv.AppendQuoteRune(nil, r)) }
 
-// QuoteRuneASCII writes a single-quoted Go character literal
-// representing 'r' to the buffer. Non-ASCII characters are escaped
-// using \u or \U sequences.
-func (b *Buffer) QuoteRuneASCII(r rune) { b.AppendQuoteRuneASCII(r) }
+// PushQuoteRuneASCII writes a single-quoted Go character literal
+// representing 'r' to the buffer. Non-ASCII characters are escaped using \u
+// or \U sequences.
+func (b *Buffer) PushQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneToASCII(nil, r)) }
 
-// QuoteRuneGrapic writes a single-quoted Go character literal
-// representing 'r' to the buffer. Non-graphic characters as defined
-// by unicode.IsGraphic are escaped.
-func (b *Buffer) QuoteRuneGrapic(r rune) { b.AppendQuoteRuneGrapic(r) }
-
-// AppendQuote writes a double-quoted Go string literal representing 'str' to
-// the buffer. The output includes surrounding quotes and uses Go
-// escape sequences.
-func (b *Buffer) AppendQuote(str string) { b.Write(strconv.AppendQuote(nil, str)) }
-
-// AppendQuoteASCII writes a double-quoted Go string literal representing
-// 'str' to the buffer. Non-ASCII characters are escaped using \u or
-// \U sequences.
-func (b *Buffer) AppendQuoteASCII(str string) { b.Write(strconv.AppendQuoteToASCII(nil, str)) }
-
-// AppendQuoteGrapic writes a double-quoted Go string literal representing
-// 'str' to the buffer. Non-graphic characters as defined by
+// PushQuoteRuneGrapic writes a single-quoted Go character literal
+// representing 'r' to the buffer. Non-graphic characters as defined by
 // unicode.IsGraphic are escaped.
-func (b *Buffer) AppendQuoteGrapic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
+func (b *Buffer) PushQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
 
-// AppendQuoteRune writes a single-quoted Go character literal representing
-// 'r' to the buffer. The output includes surrounding single quotes
-// and uses Go escape sequences.
-func (b *Buffer) AppendQuoteRune(r rune) { b.Write(strconv.AppendQuoteRune(nil, r)) }
+// PushInt writes the string representation of the integer 'num' to the buffer.
+func (b *Buffer) PushInt(num int) { b.Write(strconv.AppendInt(nil, int64(num), 10)) }
 
-// AppendQuoteRuneASCII writes a single-quoted Go character literal
-// representing 'r' to the buffer. Non-ASCII characters are escaped
-// using \u or \U sequences.
-func (b *Buffer) AppendQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneToASCII(nil, r)) }
+// PushBool writes "true" or "false" according to the value of 'v' to the buffer.
+// PushInt writes the decimal string representation of 'num' to the buffer.
+func (b *Buffer) PushBool(v bool) { b.Write(strconv.AppendBool(nil, v)) }
 
-// AppendQuoteRuneGrapic writes a single-quoted Go character literal
-// representing 'r' to the buffer. Non-graphic characters as defined
-// by unicode.IsGraphic are escaped.
-func (b *Buffer) AppendQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
-
-// Int writes the decimal string representation of 'num' to the buffer.
-func (b *Buffer) Int(num int) { b.Write(strconv.AppendInt(nil, int64(num), 10)) }
-
-// AppendBool writes "true" or "false" according to the value of 'v' to
-// the buffer.
-func (b *Buffer) AppendBool(v bool) { b.Write(strconv.AppendBool(nil, v)) }
-
-// AppendInt64 writes the string representation of 'n' in the given 'base'
+// PushInt64 writes the string representation of 'n' in the given 'base'
 // to the buffer. The 'base' must be between 2 and 36 inclusive.
-func (b *Buffer) AppendInt64(n int64, base int) { b.Write(strconv.AppendInt(nil, n, base)) }
+func (b *Buffer) PushInt64(n int64, base int) { b.Write(strconv.AppendInt(nil, n, base)) }
 
-// AppendUint64 writes the string representation of 'n' in the given
-// 'base' to the buffer. The 'base' must be between 2 and 36 inclusive.
-func (b *Buffer) AppendUint64(n uint64, base int) { b.Write(strconv.AppendUint(nil, n, base)) }
+// PushUint64 writes the string representation of 'n' in the given 'base'
+// to the buffer. The 'base' must be between 2 and 36 inclusive.
+func (b *Buffer) PushUint64(n uint64, base int) { b.Write(strconv.AppendUint(nil, n, base)) }
 
-// AppendFloat writes the string representation of the floating-point
-// number 'f' to the buffer. The 'tpl' parameter is the format ('b',
-// 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
-// 'size' is the number of bits (32 or 64). Functionally equivalent to FormatFloat.
-func (b *Buffer) AppendFloat(f float64, tpl byte, prec, size int) {
+// PushFloat writes the string representation of the floating-point number
+// 'f' to the buffer. The 'tpl' parameter is the format ('b', 'e', 'E', 'f',
+// 'g', 'G', 'x', 'X'), 'prec' controls precision, and 'size' is the number of
+// bits (32 or 64).
+func (b *Buffer) PushFloat(f float64, tpl byte, prec, size int) {
 	b.Write(strconv.AppendFloat(nil, f, tpl, prec, size))
 }
 
-// FormatBool writes "true" or "false" according to the value of 'v' to
-// the buffer.
-func (b *Buffer) FormatBool(v bool) { b.AppendBool(v) }
-
-// FormatInt64 writes the string representation of 'n' in the given 'base'
-// to the buffer. The 'base' must be between 2 and 36 inclusive.
-func (b *Buffer) FormatInt64(n int64, base int) { b.AppendInt64(n, base) }
-
-// FormatUint64 writes the string representation of 'n' in the given
-// 'base' to the buffer. The 'base' must be between 2 and 36 inclusive.
-func (b *Buffer) FormatUint64(n uint64, base int) { b.AppendUint64(n, base) }
-
-// FormatFloat writes the string representation of the floating-point
-// number 'f' to the buffer. The 'tpl' parameter is the format ('b',
-// 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
-// 'size' is the number of bits (32 or 64).
-func (b *Buffer) FormatFloat(f float64, tpl byte, prec, size int) { b.AppendFloat(f, tpl, prec, size) }
-
-// FormatComplex writes the string representation of the complex
+// PushComplex writes the string representation of the complex
 // number 'n' to the buffer. The 'tpl' parameter is the format ('b',
 // 'e', 'E', 'f', 'g', 'G', 'x', 'X'), 'prec' controls precision, and
 // 'size' is the total number of bits (64 or 128).
-func (b *Buffer) FormatComplex(n complex128, tpl byte, prec, size int) {
+func (b *Buffer) PushComplex(n complex128, tpl byte, prec, size int) {
 	b.PushString(strconv.FormatComplex(n, tpl, prec, size))
 }
 
@@ -364,9 +313,9 @@ func (b *Buffer) WithReplaceAll(s, old, new string) { b.PushString(strings.Repla
 // WithReplace writes 's' with the first 'n' non-overlapping instances of
 // 'old' replaced by 'new' to the buffer. If 'n' is negative, all
 // instances are replaced.
-func (b *Buffer) WithReplace(s, old, new string, n int) {
+func (b *Buffer) WithReplace(s, old, new string, n int) { //nolint:predeclared
 	b.PushString(strings.Replace(s, old, new, n))
-} //nolint:predeclared
+}
 
 // AppendTrimSpace writes 'str' with all leading and trailing whitespace
 // removed to the buffer.
@@ -409,7 +358,7 @@ func (b *Buffer) ExtendLines(seq iter.Seq[string]) { flush(seq, b.WriteLine) }
 
 // ExtendBytes writes all strings from the iterator 'seq' consecutively to
 // the buffer.
-func (b *Buffer) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.Append) }
+func (b *Buffer) ExtendBytes(seq iter.Seq[[]byte]) { flush(seq, b.PushBytes) }
 
 // ExtendBytesLines writes all strings from the iterator 'seq' consecutively to
 // the buffer, interspersing a newline character.

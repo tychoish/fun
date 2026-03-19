@@ -36,15 +36,15 @@ func semanticCorrectnessTests[T stringWriter[T]]() []testCase[T] {
 		{
 			name: "Append single operation",
 			buildFn: func(w T) {
-				w.Append([]byte("test data with unicode: 世界"))
+				w.PushBytes([]byte("test data with unicode: 世界"))
 			},
 			expected: "test data with unicode: 世界",
 		},
 		{
 			name: "Append multiple operations",
 			buildFn: func(w T) {
-				w.Append([]byte("test data with unicode: 世界"))
-				w.Append([]byte(" more"))
+				w.PushBytes([]byte("test data with unicode: 世界"))
+				w.PushBytes([]byte(" more"))
 			},
 			expected: "test data with unicode: 世界 more",
 		},
@@ -116,22 +116,22 @@ func semanticCorrectnessTests[T stringWriter[T]]() []testCase[T] {
 			expected: "beforeafter",
 		},
 		{
-			name: "Quote methods add quotes",
+			name: "PushQuote methods add quotes",
 			buildFn: func(w T) {
-				w.Quote("hello")
+				w.PushQuote("hello")
 				w.WriteString(" ")
-				w.QuoteRune('a')
+				w.PushQuoteRune('a')
 			},
 			expected: `"hello" 'a'`,
 		},
 		{
 			name: "Format methods convert to strings",
 			buildFn: func(w T) {
-				w.Int(42)
+				w.PushInt(42)
 				w.WriteString(" ")
-				w.FormatBool(true)
+				w.PushBool(true)
 				w.WriteString(" ")
-				w.FormatInt64(255, 16)
+				w.PushInt64(255, 16)
 			},
 			expected: "42 true ff",
 		},
@@ -188,7 +188,7 @@ func semanticEdgeCaseTests[T stringWriter[T]]() []testCase[T] {
 				w.WriteRune('世')
 				w.WriteRune('界')
 				w.WriteString(" ")
-				w.Quote("🎉")
+				w.PushQuote("🎉")
 			},
 			expected: "Hello 世界 \"🎉\"",
 		},
@@ -196,9 +196,9 @@ func semanticEdgeCaseTests[T stringWriter[T]]() []testCase[T] {
 			name: "chaining multiple operations",
 			buildFn: func(w T) {
 				w.WriteString("Start: ")
-				w.Int(1)
+				w.PushInt(1)
 				w.WriteByte(' ')
-				w.FormatBool(true)
+				w.PushBool(true)
 				w.Line()
 				w.WithReplaceAll("old old", "old", "new") //nolint:dupword
 				w.Line()
@@ -222,11 +222,11 @@ func semanticEdgeCaseTests[T stringWriter[T]]() []testCase[T] {
 		{
 			name: "Append with empty and nil slices",
 			buildFn: func(w T) {
-				w.Append([]byte{})
+				w.PushBytes([]byte{})
 				w.WriteString("x")
-				w.Append(nil)
+				w.PushBytes(nil)
 				w.WriteString("y")
-				w.Append([]byte("z"))
+				w.PushBytes([]byte("z"))
 			},
 			expected: "xyz",
 		},
@@ -370,24 +370,24 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 			expected: "yes\n",
 		},
 		{
-			name: "quote operations",
+			name: "push quote operations",
 			buildFn: func(w T) {
-				w.Quote("test")
+				w.PushQuote("test")
 				w.WriteByte(' ')
-				w.QuoteRune('a')
+				w.PushQuoteRune('a')
 				w.WriteByte(' ')
-				w.QuoteASCII("世")
+				w.PushQuoteASCII("世")
 			},
 			expected: `"test" 'a' "\u4e16"`,
 		},
 		{
 			name: "format numbers",
 			buildFn: func(w T) {
-				w.Int(42)
+				w.PushInt(42)
 				w.WriteByte(' ')
-				w.FormatBool(true)
+				w.PushBool(true)
 				w.WriteByte(' ')
-				w.FormatInt64(255, 16)
+				w.PushInt64(255, 16)
 			},
 			expected: "42 true ff",
 		},
@@ -421,35 +421,11 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 		{
 			name: "bytes operations",
 			buildFn: func(w T) {
-				w.Append([]byte("test"))
+				w.PushBytes([]byte("test"))
 				w.WriteBytesLine([]byte("line"))
 				w.WriteBytesLines([]byte("a"), []byte("b"))
 			},
 			expected: "testline\na\nb\n",
-		},
-		{
-			name: "append quote operations",
-			buildFn: func(w T) {
-				w.AppendQuote("test")
-				w.WriteByte(' ')
-				w.AppendQuoteRune('x')
-				w.WriteByte(' ')
-				w.AppendQuoteASCII("世")
-			},
-			expected: `"test" 'x' "\u4e16"`,
-		},
-		{
-			name: "append number operations",
-			buildFn: func(w T) {
-				w.AppendBool(true)
-				w.WriteByte(' ')
-				w.AppendInt64(42, 10)
-				w.WriteByte(' ')
-				w.AppendUint64(255, 16)
-				w.WriteByte(' ')
-				w.AppendFloat(3.14, 'f', 2, 64)
-			},
-			expected: "true 42 ff 3.14",
 		},
 		{
 			name: "append trim operations",
@@ -489,7 +465,7 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 				w.Line()
 				w.Join([]string{"x", "y"}, " | ")
 				w.Line()
-				w.Quote("end")
+				w.PushQuote("end")
 			},
 			expected: "Header\n\tValue: 42\nabc\nx | y\n\"end\"",
 		},

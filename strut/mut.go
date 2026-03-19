@@ -62,7 +62,6 @@ func MakeMutable(capacity int) *Mutable {
 	return mut
 }
 
-
 // Format implements fmt.Formatter, allowing Mutable to be used directly
 // in formatted output. Writes the underlying bytes to the formatter's
 // state.
@@ -70,14 +69,22 @@ func (mut Mutable) Format(state fmt.State, _ rune) { _, _ = state.Write(mut) }
 
 // ref returns the Mutable value itself, used internally for capacity
 // checks.
-func (mut Mutable) ref() Mutable    { return mut }
-func (mut Mutable) ptr() *Mutable   { return &mut }
-func (mut *Mutable) push(m Mutable) { mut.Append(m.ptr()) }
+func (mut Mutable) ref() Mutable       { return mut }
+func (mut Mutable) ptr() *Mutable      { return &mut }
+func (mut *Mutable) pushref(m Mutable) { mut.Push(m.ptr()) }
 
-// Append appends the contents of 'next' to this mutable string,
+// Push appends the contents of 'next' to this mutable string,
 // mutating in place. May allocate if capacity is insufficient.
 // Returns the receiver for method chaining.
-func (mut *Mutable) Append(next *Mutable) *Mutable { *mut = append(*mut, *next...); return mut }
+func (mut *Mutable) Push(next *Mutable) *Mutable { *mut = append(*mut, *next...); return mut }
+
+// PushString appends string 's' to the mutable string.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) PushString(s string) { *mut = append(*mut, s...) }
+
+// PushBytes appends the byte slice 'p' to the mutable string.
+// May allocate if capacity is insufficient.
+func (mut *Mutable) PushBytes(p []byte) { *mut = append(*mut, p...) }
 
 // Release resets the Mutable and returns it to the pool for reuse.
 // Any Mutable instance can be released, whether obtained from NewMutable(),
@@ -150,14 +157,6 @@ func (mut *Mutable) WriteString(s string) (n int, err error) {
 	*mut = append(*mut, s...)
 	return len(s), nil
 }
-
-// PushString appends string 's' to the mutable string.
-// May allocate if capacity is insufficient.
-func (mut *Mutable) PushString(s string) { *mut = append(*mut, s...) }
-
-// PushBytes appends the byte slice 'p' to the mutable string.
-// May allocate if capacity is insufficient.
-func (mut *Mutable) PushBytes(p []byte) { *mut = append(*mut, p...) }
 
 // Reader provides access to an io.Reader for reading from the
 // mutable string.) Does not copy the underlying data.
@@ -713,7 +712,7 @@ func (mut Mutable) Println() { mut.Print(); _, _ = os.Stdout.Write(newline) }
 
 // Extend appends all Mutable values from seq to the receiver.
 // May allocate if capacity is insufficient.
-func (mut *Mutable) Extend(seq iter.Seq[Mutable]) *Mutable { flush(seq, mut.push); return mut }
+func (mut *Mutable) Extend(seq iter.Seq[Mutable]) *Mutable { flush(seq, mut.pushref); return mut }
 
 // ExtendStrings appends all strings from seq to the receiver.
 // May allocate if capacity is insufficient.

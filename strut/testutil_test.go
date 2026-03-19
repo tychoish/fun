@@ -20,7 +20,7 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	NTabs(int)
 	WriteLine(string)
 	WriteLines(...string)
-	Append([]byte)
+	PushBytes([]byte)
 	Join([]string, string)
 	Concat(...string)
 	Repeat(string, int)
@@ -45,18 +45,12 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	WhenWriteLines(bool, ...string)
 	WhenConcat(bool, ...string)
 	WhenJoin(bool, []string, string)
-	Quote(string)
-	QuoteASCII(string)
-	QuoteGrapic(string)
-	QuoteRune(rune)
-	QuoteRuneASCII(rune)
-	QuoteRuneGrapic(rune)
-	Int(int)
-	FormatBool(bool)
-	FormatInt64(int64, int)
-	FormatUint64(uint64, int)
-	FormatFloat(float64, byte, int, int)
-	FormatComplex(complex128, byte, int, int)
+	PushInt(int)
+	PushBool(bool)
+	PushInt64(int64, int)
+	PushUint64(uint64, int)
+	PushFloat(float64, byte, int, int)
+	PushComplex(complex128, byte, int, int)
 	WithTrimSpace(string)
 	WithTrimRight(string, string)
 	WithTrimLeft(string, string)
@@ -69,16 +63,12 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	ExtendJoin(iter.Seq[string], string)
 	WriteBytesLine([]byte)
 	WriteBytesLines(...[]byte)
-	AppendQuote(string)
-	AppendQuoteASCII(string)
-	AppendQuoteGrapic(string)
-	AppendQuoteRune(rune)
-	AppendQuoteRuneASCII(rune)
-	AppendQuoteRuneGrapic(rune)
-	AppendBool(bool)
-	AppendInt64(int64, int)
-	AppendUint64(uint64, int)
-	AppendFloat(float64, byte, int, int)
+	PushQuote(string)
+	PushQuoteASCII(string)
+	PushQuoteGrapic(string)
+	PushQuoteRune(rune)
+	PushQuoteRuneASCII(rune)
+	PushQuoteRuneGrapic(rune)
 	AppendTrimSpace([]byte)
 	AppendTrimRight([]byte, string)
 	AppendTrimLeft([]byte, string)
@@ -773,173 +763,201 @@ func whenMethodTests[T stringWriter[T]]() []testCase[T] {
 	}
 }
 
-// quoteTests returns test cases for quote operations.
-func quoteTests[T stringWriter[T]]() []testCase[T] {
+// pushQuoteTests returns test cases for quote operations.
+func pushQuoteTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "Quote simple",
+			name: "PushQuote simple",
 			buildFn: func(w T) {
-				w.Quote("hello")
+				w.PushQuote("hello")
 			},
 			expected: `"hello"`,
 		},
 		{
-			name: "Quote with special chars",
+			name: "PushQuote with newline",
 			buildFn: func(w T) {
-				w.Quote("hello\nworld")
+				w.PushQuote("hello\nworld")
 			},
 			expected: `"hello\nworld"`,
 		},
 		{
-			name: "Quote unicode",
+			name: "PushQuote with tab",
 			buildFn: func(w T) {
-				w.Quote("世界")
+				w.PushQuote("hello\tworld")
+			},
+			expected: `"hello\tworld"`,
+		},
+		{
+			name: "PushQuote unicode",
+			buildFn: func(w T) {
+				w.PushQuote("世界")
 			},
 			expected: `"世界"`,
 		},
 		{
-			name: "QuoteASCII unicode",
+			name: "PushQuoteASCII unicode",
 			buildFn: func(w T) {
-				w.QuoteASCII("世界")
+				w.PushQuoteASCII("世界")
 			},
 			expected: `"\u4e16\u754c"`,
 		},
 		{
-			name: "QuoteGrapic",
+			name: "PushQuoteGrapic",
 			buildFn: func(w T) {
-				w.QuoteGrapic("hello\x00world")
+				w.PushQuoteGrapic("hello\x00world")
 			},
 			expected: `"hello\x00world"`,
 		},
 		{
-			name: "QuoteRune",
+			name: "PushQuoteRune ASCII",
 			buildFn: func(w T) {
-				w.QuoteRune('a')
+				w.PushQuoteRune('a')
 			},
 			expected: "'a'",
 		},
 		{
-			name: "QuoteRune unicode",
+			name: "PushQuoteRune unicode",
 			buildFn: func(w T) {
-				w.QuoteRune('世')
+				w.PushQuoteRune('世')
 			},
 			expected: "'世'",
 		},
 		{
-			name: "QuoteRuneASCII",
+			name: "PushQuoteRune newline",
 			buildFn: func(w T) {
-				w.QuoteRuneASCII('世')
+				w.PushQuoteRune('\n')
+			},
+			expected: `'\n'`,
+		},
+		{
+			name: "PushQuoteRuneASCII unicode",
+			buildFn: func(w T) {
+				w.PushQuoteRuneASCII('世')
 			},
 			expected: `'\u4e16'`,
 		},
 		{
-			name: "QuoteRuneGrapic",
+			name: "PushQuoteRuneGrapic newline",
 			buildFn: func(w T) {
-				w.QuoteRuneGrapic('\n')
+				w.PushQuoteRuneGrapic('\n')
 			},
 			expected: `'\n'`,
+		},
+		{
+			name: "PushQuoteRuneGrapic control char",
+			buildFn: func(w T) {
+				w.PushQuoteRuneGrapic('\x00')
+			},
+			expected: `'\x00'`,
 		},
 	}
 }
 
-// formatNumberTests returns test cases for number formatting.
-func formatNumberTests[T stringWriter[T]]() []testCase[T] {
+// pushNumberTests returns test cases for numeric push operations.
+func pushNumberTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "Int positive",
-			buildFn: func(w T) {
-				w.Int(42)
-			},
+			name:     "Int positive",
+			buildFn:  func(w T) { w.PushInt(42) },
 			expected: "42",
 		},
 		{
-			name: "Int negative",
-			buildFn: func(w T) {
-				w.Int(-99)
-			},
+			name:     "Int negative",
+			buildFn:  func(w T) { w.PushInt(-99) },
 			expected: "-99",
 		},
 		{
-			name: "Int zero",
-			buildFn: func(w T) {
-				w.Int(0)
-			},
+			name:     "Int zero",
+			buildFn:  func(w T) { w.PushInt(0) },
 			expected: "0",
 		},
 		{
-			name: "FormatBool true",
-			buildFn: func(w T) {
-				w.FormatBool(true)
-			},
+			name:     "PushBool true",
+			buildFn:  func(w T) { w.PushBool(true) },
 			expected: "true",
 		},
 		{
-			name: "FormatBool false",
-			buildFn: func(w T) {
-				w.FormatBool(false)
-			},
+			name:     "PushBool false",
+			buildFn:  func(w T) { w.PushBool(false) },
 			expected: "false",
 		},
 		{
-			name: "FormatInt64 base 10",
-			buildFn: func(w T) {
-				w.FormatInt64(123, 10)
-			},
-			expected: "123",
+			name:     "PushInt64 base 10",
+			buildFn:  func(w T) { w.PushInt64(42, 10) },
+			expected: "42",
 		},
 		{
-			name: "FormatInt64 base 16",
-			buildFn: func(w T) {
-				w.FormatInt64(255, 16)
-			},
+			name:     "PushInt64 base 16",
+			buildFn:  func(w T) { w.PushInt64(255, 16) },
 			expected: "ff",
 		},
 		{
-			name: "FormatInt64 base 2",
-			buildFn: func(w T) {
-				w.FormatInt64(7, 2)
-			},
+			name:     "PushInt64 base 2",
+			buildFn:  func(w T) { w.PushInt64(7, 2) },
 			expected: "111",
 		},
 		{
-			name: "FormatInt64 negative",
-			buildFn: func(w T) {
-				w.FormatInt64(-42, 10)
-			},
+			name:     "PushInt64 negative",
+			buildFn:  func(w T) { w.PushInt64(-42, 10) },
 			expected: "-42",
 		},
 		{
-			name: "FormatUint64",
-			buildFn: func(w T) {
-				w.FormatUint64(255, 16)
-			},
+			name:     "PushInt64 zero",
+			buildFn:  func(w T) { w.PushInt64(0, 10) },
+			expected: "0",
+		},
+		{
+			name:     "PushUint64 base 10",
+			buildFn:  func(w T) { w.PushUint64(42, 10) },
+			expected: "42",
+		},
+		{
+			name:     "PushUint64 base 16",
+			buildFn:  func(w T) { w.PushUint64(255, 16) },
 			expected: "ff",
 		},
 		{
-			name: "FormatFloat",
-			buildFn: func(w T) {
-				w.FormatFloat(3.14159, 'f', 2, 64)
-			},
+			name:     "PushUint64 zero",
+			buildFn:  func(w T) { w.PushUint64(0, 10) },
+			expected: "0",
+		},
+		{
+			name:     "PushFloat fixed",
+			buildFn:  func(w T) { w.PushFloat(3.14159, 'f', 2, 64) },
 			expected: "3.14",
 		},
 		{
-			name: "FormatFloat scientific",
-			buildFn: func(w T) {
-				w.FormatFloat(1000000.0, 'e', 2, 64)
-			},
+			name:     "PushFloat scientific",
+			buildFn:  func(w T) { w.PushFloat(1000000.0, 'e', 2, 64) },
 			expected: "1.00e+06",
 		},
 		{
-			name: "FormatFloat negative",
-			buildFn: func(w T) {
-				w.FormatFloat(-2.5, 'f', 1, 64)
-			},
+			name:     "PushFloat negative",
+			buildFn:  func(w T) { w.PushFloat(-2.5, 'f', 1, 64) },
 			expected: "-2.5",
 		},
 		{
-			name: "FormatComplex",
+			name:     "PushFloat zero",
+			buildFn:  func(w T) { w.PushFloat(0.0, 'f', 1, 64) },
+			expected: "0.0",
+		},
+		{
+			name: "mixed push operations",
 			buildFn: func(w T) {
-				w.FormatComplex(complex(3, 4), 'f', 1, 128)
+				w.PushBool(true)
+				w.WriteByte(' ')
+				w.PushInt64(42, 10)
+				w.WriteByte(' ')
+				w.PushUint64(255, 16)
+				w.WriteByte(' ')
+				w.PushFloat(3.14, 'f', 2, 64)
+			},
+			expected: "true 42 ff 3.14",
+		},
+		{
+			name: "PushComplex",
+			buildFn: func(w T) {
+				w.PushComplex(complex(3, 4), 'f', 1, 128)
 			},
 			expected: "(3.0+4.0i)",
 		},
@@ -1059,7 +1077,7 @@ func edgeCaseTests[T stringWriter[T]]() []validationTestCase[T] {
 				w.WriteByte(' ')
 				w.WriteRune('世')
 				w.Line()
-				w.Int(42)
+				w.PushInt(42)
 			},
 			validate: func(t *testing.T, got string) {
 				expected := "Hello 世\n42"
@@ -1110,7 +1128,7 @@ func edgeCaseTests[T stringWriter[T]]() []validationTestCase[T] {
 		{
 			name: "non-UTF-8 bytes",
 			buildFn: func(w T) {
-				w.Append([]byte{0xFF, 0xFE})
+				w.PushBytes([]byte{0xFF, 0xFE})
 			},
 			validate: func(t *testing.T, got string) {
 				if !utf8.ValidString(got) {
@@ -1124,7 +1142,7 @@ func edgeCaseTests[T stringWriter[T]]() []validationTestCase[T] {
 		{
 			name: "complex number formatting",
 			buildFn: func(w T) {
-				w.FormatComplex(complex(0, 0), 'f', 0, 128)
+				w.PushComplex(complex(0, 0), 'f', 0, 128)
 			},
 			validate: func(t *testing.T, got string) {
 				expected := "(0+0i)"
@@ -1269,204 +1287,6 @@ func writeBytesLineTests[T stringWriter[T]]() []testCase[T] {
 				w.WriteBytesLines([]byte(""), []byte("middle"), []byte(""))
 			},
 			expected: "\nmiddle\n\n",
-		},
-	}
-}
-
-func appendQuoteTests[T stringWriter[T]]() []testCase[T] {
-	return []testCase[T]{
-		{
-			name: "AppendQuote simple",
-			buildFn: func(w T) {
-				w.AppendQuote("hello")
-			},
-			expected: `"hello"`,
-		},
-		{
-			name: "AppendQuote with newline",
-			buildFn: func(w T) {
-				w.AppendQuote("hello\nworld")
-			},
-			expected: `"hello\nworld"`,
-		},
-		{
-			name: "AppendQuote with tab",
-			buildFn: func(w T) {
-				w.AppendQuote("hello\tworld")
-			},
-			expected: `"hello\tworld"`,
-		},
-		{
-			name: "AppendQuote unicode",
-			buildFn: func(w T) {
-				w.AppendQuote("世界")
-			},
-			expected: `"世界"`,
-		},
-		{
-			name: "AppendQuoteASCII unicode",
-			buildFn: func(w T) {
-				w.AppendQuoteASCII("世界")
-			},
-			expected: `"\u4e16\u754c"`,
-		},
-		{
-			name: "AppendQuoteGrapic control char",
-			buildFn: func(w T) {
-				w.AppendQuoteGrapic("hello\x00world")
-			},
-			expected: `"hello\x00world"`,
-		},
-		{
-			name: "AppendQuoteRune ASCII",
-			buildFn: func(w T) {
-				w.AppendQuoteRune('a')
-			},
-			expected: "'a'",
-		},
-		{
-			name: "AppendQuoteRune unicode",
-			buildFn: func(w T) {
-				w.AppendQuoteRune('世')
-			},
-			expected: "'世'",
-		},
-		{
-			name: "AppendQuoteRune newline",
-			buildFn: func(w T) {
-				w.AppendQuoteRune('\n')
-			},
-			expected: `'\n'`,
-		},
-		{
-			name: "AppendQuoteRuneASCII unicode",
-			buildFn: func(w T) {
-				w.AppendQuoteRuneASCII('世')
-			},
-			expected: `'\u4e16'`,
-		},
-		{
-			name: "AppendQuoteRuneGrapic control char",
-			buildFn: func(w T) {
-				w.AppendQuoteRuneGrapic('\x00')
-			},
-			expected: `'\x00'`,
-		},
-	}
-}
-
-func appendNumberTests[T stringWriter[T]]() []testCase[T] {
-	return []testCase[T]{
-		{
-			name: "AppendBool true",
-			buildFn: func(w T) {
-				w.AppendBool(true)
-			},
-			expected: "true",
-		},
-		{
-			name: "AppendBool false",
-			buildFn: func(w T) {
-				w.AppendBool(false)
-			},
-			expected: "false",
-		},
-		{
-			name: "AppendInt64 positive base 10",
-			buildFn: func(w T) {
-				w.AppendInt64(42, 10)
-			},
-			expected: "42",
-		},
-		{
-			name: "AppendInt64 negative",
-			buildFn: func(w T) {
-				w.AppendInt64(-99, 10)
-			},
-			expected: "-99",
-		},
-		{
-			name: "AppendInt64 zero",
-			buildFn: func(w T) {
-				w.AppendInt64(0, 10)
-			},
-			expected: "0",
-		},
-		{
-			name: "AppendInt64 base 16",
-			buildFn: func(w T) {
-				w.AppendInt64(255, 16)
-			},
-			expected: "ff",
-		},
-		{
-			name: "AppendInt64 base 2",
-			buildFn: func(w T) {
-				w.AppendInt64(7, 2)
-			},
-			expected: "111",
-		},
-		{
-			name: "AppendUint64 base 10",
-			buildFn: func(w T) {
-				w.AppendUint64(42, 10)
-			},
-			expected: "42",
-		},
-		{
-			name: "AppendUint64 base 16",
-			buildFn: func(w T) {
-				w.AppendUint64(255, 16)
-			},
-			expected: "ff",
-		},
-		{
-			name: "AppendUint64 zero",
-			buildFn: func(w T) {
-				w.AppendUint64(0, 10)
-			},
-			expected: "0",
-		},
-		{
-			name: "AppendFloat positive",
-			buildFn: func(w T) {
-				w.AppendFloat(3.14159, 'f', 2, 64)
-			},
-			expected: "3.14",
-		},
-		{
-			name: "AppendFloat negative",
-			buildFn: func(w T) {
-				w.AppendFloat(-2.5, 'f', 1, 64)
-			},
-			expected: "-2.5",
-		},
-		{
-			name: "AppendFloat scientific",
-			buildFn: func(w T) {
-				w.AppendFloat(1000000.0, 'e', 2, 64)
-			},
-			expected: "1.00e+06",
-		},
-		{
-			name: "AppendFloat zero",
-			buildFn: func(w T) {
-				w.AppendFloat(0.0, 'f', 1, 64)
-			},
-			expected: "0.0",
-		},
-		{
-			name: "mixed append operations",
-			buildFn: func(w T) {
-				w.AppendBool(true)
-				w.WriteByte(' ')
-				w.AppendInt64(42, 10)
-				w.WriteByte(' ')
-				w.AppendUint64(255, 16)
-				w.WriteByte(' ')
-				w.AppendFloat(3.14, 'f', 2, 64)
-			},
-			expected: "true 42 ff 3.14",
 		},
 	}
 }

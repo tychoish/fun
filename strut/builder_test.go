@@ -36,7 +36,7 @@ func TestBuilder_Append(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var b Builder
-			b.Append(tt.buf)
+			b.PushBytes(tt.buf)
 			got := b.String()
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
@@ -71,12 +71,12 @@ func TestBuilder_WhenMethods(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, whenMethodTests[*Builder]())
 }
 
-func TestBuilder_Quote(t *testing.T) {
-	runBuildTests(t, func() *Builder { return &Builder{} }, quoteTests[*Builder]())
+func TestBuilder_PushQuote(t *testing.T) {
+	runBuildTests(t, func() *Builder { return &Builder{} }, pushQuoteTests[*Builder]())
 }
 
-func TestBuilder_FormatNumbers(t *testing.T) {
-	runBuildTests(t, func() *Builder { return &Builder{} }, formatNumberTests[*Builder]())
+func TestBuilder_PushNumbers(t *testing.T) {
+	runBuildTests(t, func() *Builder { return &Builder{} }, pushNumberTests[*Builder]())
 }
 
 func TestBuilder_Trim(t *testing.T) {
@@ -212,20 +212,20 @@ func TestBuilder_LargeString(t *testing.T) {
 	}
 }
 
-func TestBuilder_AllQuoteMethods(t *testing.T) {
+func TestBuilder_AllPushQuoteMethods(t *testing.T) {
 	var b Builder
 
-	b.Quote("test")
+	b.PushQuote("test")
 	b.WriteByte(' ')
-	b.QuoteASCII("世")
+	b.PushQuoteASCII("世")
 	b.WriteByte(' ')
-	b.QuoteGrapic("\x00")
+	b.PushQuoteGrapic("\x00")
 	b.WriteByte(' ')
-	b.QuoteRune('a')
+	b.PushQuoteRune('a')
 	b.WriteByte(' ')
-	b.QuoteRuneASCII('世')
+	b.PushQuoteRuneASCII('世')
 	b.WriteByte(' ')
-	b.QuoteRuneGrapic('\n')
+	b.PushQuoteRuneGrapic('\n')
 
 	result := b.String()
 	if !strings.Contains(result, `"test"`) {
@@ -254,14 +254,6 @@ func TestBuilder_ChainedWrites(t *testing.T) {
 
 func TestBuilder_WriteBytesLine(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, writeBytesLineTests[*Builder]())
-}
-
-func TestBuilder_AppendQuote(t *testing.T) {
-	runBuildTests(t, func() *Builder { return &Builder{} }, appendQuoteTests[*Builder]())
-}
-
-func TestBuilder_AppendNumber(t *testing.T) {
-	runBuildTests(t, func() *Builder { return &Builder{} }, appendNumberTests[*Builder]())
 }
 
 func TestBuilder_AppendTrim(t *testing.T) {
