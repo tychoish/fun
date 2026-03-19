@@ -63,7 +63,7 @@ func TestBuilder_Repeat(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, repeatTests[*Builder]())
 }
 
-func TestBuilder_AppendPrint(t *testing.T) {
+func TestBuilder_PushPrint(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, wprintTests[*Builder]())
 }
 
@@ -256,11 +256,11 @@ func TestBuilder_WriteBytesLine(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, writeBytesLineTests[*Builder]())
 }
 
-func TestBuilder_AppendTrim(t *testing.T) {
+func TestBuilder_PushTrim(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, appendTrimTests[*Builder]())
 }
 
-func TestBuilder_AppendReplace(t *testing.T) {
+func TestBuilder_PushReplace(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, appendReplaceTests[*Builder]())
 }
 

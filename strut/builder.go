@@ -24,23 +24,23 @@ func (b *Builder) wb(in byte)        { b.WriteByte(in) }
 func (b *Builder) wrr(r rune)        { b.WriteRune(r) }
 func (b *Builder) cat(strs []string) { apply(b.PushString, strs) }
 
-// AppendPrint formats its arguments using default formatting and writes to
+// PushPrint formats its arguments using default formatting and writes to
 // the builder. Analogous to fmt.Print, fmt.Fprint, and fmt.Sprint.
-func (b *Builder) AppendPrint(args ...any) *Builder { fmt.Fprint(b, args...); return b }
+func (b *Builder) PushPrint(args ...any) *Builder { fmt.Fprint(b, args...); return b }
 
-// AppendPrintf formats according to a format specifier and writes to the
+// PushPrintf formats according to a format specifier and writes to the
 // builder. The 'tpl' parameter is the format string, and 'args' are the
 // values to format. Analgous to fmt.Printf, fmt.Sprintf, and
 // fmt.Fprintf.
-func (b *Builder) AppendPrintf(tpl string, args ...any) *Builder {
+func (b *Builder) PushPrintf(tpl string, args ...any) *Builder {
 	fmt.Fprintf(b, tpl, args...)
 	return b
 }
 
-// AppendPrintln formats its arguments using default formatting, adds a
+// PushPrintln formats its arguments using default formatting, adds a
 // newline, and writes to the builder. Analogous to fmt.Println,
 // fmt.Sprintln, fmt.Fprintln.
-func (b *Builder) AppendPrintln(args ...any) *Builder { fmt.Fprintln(b, args...); return b }
+func (b *Builder) PushPrintln(args ...any) *Builder { fmt.Fprintln(b, args...); return b }
 
 // Line writes a single newline character to the builder.
 func (b *Builder) Line() { b.WriteByte('\n') }
@@ -133,29 +133,29 @@ func (b *Builder) RepeatRune(r rune, n int) { nwith(n, b.wrr, r) }
 // repetition is on its own line.
 func (b *Builder) RepeatLine(ln string, n int) { nwith(n, b.WriteLine, ln) }
 
-// WhenAppendPrint calls AppendPrint with 'args' if 'cond' is true and is a no-op
+// WhenPushPrint calls PushPrint with 'args' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Builder) WhenAppendPrint(cond bool, args ...any) *Builder {
+func (b *Builder) WhenPushPrint(cond bool, args ...any) *Builder {
 	if cond {
-		b.AppendPrint(args...)
+		b.PushPrint(args...)
 	}
 	return b
 }
 
-// WhenAppendPrintf calls AppendPrintf with 'tpl' and 'args' if 'cond' is true and is
+// WhenPushPrintf calls PushPrintf with 'tpl' and 'args' if 'cond' is true and is
 // a no-op otherwise.
-func (b *Builder) WhenAppendPrintf(cond bool, tpl string, args ...any) *Builder {
+func (b *Builder) WhenPushPrintf(cond bool, tpl string, args ...any) *Builder {
 	if cond {
-		b.AppendPrintf(tpl, args...)
+		b.PushPrintf(tpl, args...)
 	}
 	return b
 }
 
-// WhenAppendPrintln calls AppendPrintln with 'args' if 'cond' is true and is a
+// WhenPushPrintln calls PushPrintln with 'args' if 'cond' is true and is a
 // no-op otherwise.
-func (b *Builder) WhenAppendPrintln(cond bool, args ...any) *Builder {
+func (b *Builder) WhenPushPrintln(cond bool, args ...any) *Builder {
 	if cond {
-		b.AppendPrintln(args...)
+		b.PushPrintln(args...)
 	}
 	return b
 }
@@ -303,47 +303,47 @@ func (b *Builder) WithReplace(s, old, new string, n int) { //nolint:predeclared
 	b.PushString(strings.Replace(s, old, new, n))
 }
 
-// AppendTrimSpace writes the byte slice 'str' with all leading and trailing
+// PushTrimSpace writes the byte slice 'str' with all leading and trailing
 // whitespace removed to the builder. The input 'str' is not modified; a
 // transformed copy is written. This is the byte slice equivalent of
 // WithTrimSpace.
-func (b *Builder) AppendTrimSpace(str []byte) { b.Write(bytes.TrimSpace(str)) }
+func (b *Builder) PushTrimSpace(str []byte) { b.Write(bytes.TrimSpace(str)) }
 
-// AppendTrimRight writes the byte slice 'str' with all trailing characters
+// PushTrimRight writes the byte slice 'str' with all trailing characters
 // contained in 'cut' removed to the builder. The input 'str' is not modified;
 // a transformed copy is written. This is the byte slice equivalent of
 // WithTrimRight.
-func (b *Builder) AppendTrimRight(str []byte, cut string) { b.Write(bytes.TrimRight(str, cut)) }
+func (b *Builder) PushTrimRight(str []byte, cut string) { b.Write(bytes.TrimRight(str, cut)) }
 
-// AppendTrimLeft writes the byte slice 'str' with all leading characters
+// PushTrimLeft writes the byte slice 'str' with all leading characters
 // contained in 'cut' removed to the builder. The input 'str' is not modified;
 // a transformed copy is written. This is the byte slice equivalent of
 // WithTrimLeft.
-func (b *Builder) AppendTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
+func (b *Builder) PushTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
 
-// AppendTrimPrefix writes the byte slice 's' with the leading 'prefix'
+// PushTrimPrefix writes the byte slice 's' with the leading 'prefix'
 // removed to the builder. If 's' doesn't start with 'prefix', 's' is written
 // unchanged. The input 's' is not modified; a transformed copy is written.
 // This is the byte slice equivalent of WithTrimPrefix.
-func (b *Builder) AppendTrimPrefix(s []byte, prefix []byte) { b.Write(bytes.TrimPrefix(s, prefix)) }
+func (b *Builder) PushTrimPrefix(s []byte, prefix []byte) { b.Write(bytes.TrimPrefix(s, prefix)) }
 
-// AppendTrimSuffix writes the byte slice 's' with the trailing 'suffix'
+// PushTrimSuffix writes the byte slice 's' with the trailing 'suffix'
 // removed to the builder. If 's' doesn't end with 'suffix', 's' is written
 // unchanged. The input 's' is not modified; a transformed copy is written.
 // This is the byte slice equivalent of WithTrimSuffix.
-func (b *Builder) AppendTrimSuffix(s []byte, suffix []byte) { b.Write(bytes.TrimSuffix(s, suffix)) }
+func (b *Builder) PushTrimSuffix(s []byte, suffix []byte) { b.Write(bytes.TrimSuffix(s, suffix)) }
 
-// AppendReplaceAll writes the byte slice 's' with all non-overlapping
+// PushReplaceAll writes the byte slice 's' with all non-overlapping
 // instances of 'old' replaced by 'new' to the builder. The input 's' is not
 // modified; a transformed copy is written. This is the byte slice equivalent
 // of WithReplaceAll.
-func (b *Builder) AppendReplaceAll(s, old, new []byte) { b.Write(bytes.ReplaceAll(s, old, new)) } //nolint:predeclared
+func (b *Builder) PushReplaceAll(s, old, new []byte) { b.Write(bytes.ReplaceAll(s, old, new)) } //nolint:predeclared
 
-// AppendReplace writes the byte slice 's' with the first 'n' non-overlapping
+// PushReplace writes the byte slice 's' with the first 'n' non-overlapping
 // instances of 'old' replaced by 'new' to the builder. If 'n' is negative,
 // all instances are replaced. The input 's' is not modified; a transformed
 // copy is written. This is the byte slice equivalent of WithReplace.
-func (b *Builder) AppendReplace(s, old, new []byte, n int) { b.Write(bytes.Replace(s, old, new, n)) } //nolint:predeclared
+func (b *Builder) PushReplace(s, old, new []byte, n int) { b.Write(bytes.Replace(s, old, new, n)) } //nolint:predeclared
 
 // Extend writes all strings from the iterator 'seq' consecutively to
 // the builder.

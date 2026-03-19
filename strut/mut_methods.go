@@ -87,22 +87,22 @@ func (mut *Mutable) RepeatRune(r rune, n int) { nwith(n, mut.wrr, r) }
 // If 'n' is non-positive, the operation is a no-op.
 func (mut *Mutable) RepeatLine(ln string, n int) { nwith(n, mut.WriteLine, ln) }
 
-// ---- AppendPrint* ----
+// ---- PushPrint* ----
 
-// AppendPrint formats args using default formatting and writes to the mutable.
+// PushPrint formats args using default formatting and writes to the mutable.
 // Analogous to fmt.Fprint.
-func (mut *Mutable) AppendPrint(args ...any) *Mutable { fmt.Fprint(mut, args...); return mut }
+func (mut *Mutable) PushPrint(args ...any) *Mutable { fmt.Fprint(mut, args...); return mut }
 
-// AppendPrintf formats according to tpl and writes to the mutable.
+// PushPrintf formats according to tpl and writes to the mutable.
 // Analogous to fmt.Fprintf.
-func (mut *Mutable) AppendPrintf(tpl string, args ...any) *Mutable {
+func (mut *Mutable) PushPrintf(tpl string, args ...any) *Mutable {
 	fmt.Fprintf(mut, tpl, args...)
 	return mut
 }
 
-// AppendPrintln formats args using default formatting, appends a newline, and writes to the mutable.
+// PushPrintln formats args using default formatting, appends a newline, and writes to the mutable.
 // Analogous to fmt.Fprintln.
-func (mut *Mutable) AppendPrintln(args ...any) *Mutable { fmt.Fprintln(mut, args...); return mut }
+func (mut *Mutable) PushPrintln(args ...any) *Mutable { fmt.Fprintln(mut, args...); return mut }
 
 // ---- Numeric / strconv ----
 
@@ -188,69 +188,69 @@ func (mut *Mutable) WithReplace(s, old, new string, n int) { //nolint:predeclare
 	mut.PushString(strings.Replace(s, old, new, n))
 }
 
-// ---- AppendTrim* (byte slice transformations written to mutable) ----
+// ---- PushTrim* (byte slice transformations written to mutable) ----
 
-// AppendTrimSpace writes str with all leading and trailing whitespace removed.
+// PushTrimSpace writes str with all leading and trailing whitespace removed.
 // bytes.TrimSpace returns a subslice of str (no allocation).
-func (mut *Mutable) AppendTrimSpace(str []byte) { mut.PushBytes(bytes.TrimSpace(str)) }
+func (mut *Mutable) PushTrimSpace(str []byte) { mut.PushBytes(bytes.TrimSpace(str)) }
 
-// AppendTrimRight writes str with trailing characters in cut removed.
+// PushTrimRight writes str with trailing characters in cut removed.
 // bytes.TrimRight returns a subslice of str (no allocation).
-func (mut *Mutable) AppendTrimRight(str []byte, cut string) {
+func (mut *Mutable) PushTrimRight(str []byte, cut string) {
 	mut.PushBytes(bytes.TrimRight(str, cut))
 }
 
-// AppendTrimLeft writes str with leading characters in cut removed.
+// PushTrimLeft writes str with leading characters in cut removed.
 // bytes.TrimLeft returns a subslice of str (no allocation).
-func (mut *Mutable) AppendTrimLeft(str []byte, cut string) {
+func (mut *Mutable) PushTrimLeft(str []byte, cut string) {
 	mut.PushBytes(bytes.TrimLeft(str, cut))
 }
 
-// AppendTrimPrefix writes s with the leading prefix removed.
+// PushTrimPrefix writes s with the leading prefix removed.
 // bytes.TrimPrefix returns a subslice of s (no allocation).
-func (mut *Mutable) AppendTrimPrefix(s, prefix []byte) {
+func (mut *Mutable) PushTrimPrefix(s, prefix []byte) {
 	mut.PushBytes(bytes.TrimPrefix(s, prefix))
 }
 
-// AppendTrimSuffix writes s with the trailing suffix removed.
+// PushTrimSuffix writes s with the trailing suffix removed.
 // bytes.TrimSuffix returns a subslice of s (no allocation).
-func (mut *Mutable) AppendTrimSuffix(s, suffix []byte) {
+func (mut *Mutable) PushTrimSuffix(s, suffix []byte) {
 	mut.PushBytes(bytes.TrimSuffix(s, suffix))
 }
 
-// AppendReplaceAll writes s with all non-overlapping instances of old replaced by new.
-func (mut *Mutable) AppendReplaceAll(s, old, new []byte) { //nolint:predeclared
+// PushReplaceAll writes s with all non-overlapping instances of old replaced by new.
+func (mut *Mutable) PushReplaceAll(s, old, new []byte) { //nolint:predeclared
 	mut.PushBytes(bytes.ReplaceAll(s, old, new))
 }
 
-// AppendReplace writes s with the first n non-overlapping instances of old replaced by new.
+// PushReplace writes s with the first n non-overlapping instances of old replaced by new.
 // If n is negative, all instances are replaced.
-func (mut *Mutable) AppendReplace(s, old, new []byte, n int) { //nolint:predeclared
+func (mut *Mutable) PushReplace(s, old, new []byte, n int) { //nolint:predeclared
 	mut.PushBytes(bytes.Replace(s, old, new, n))
 }
 
 // ---- When* ----
 
-// WhenAppendPrint calls AppendPrint with args if cond is true.
-func (mut *Mutable) WhenAppendPrint(cond bool, args ...any) *Mutable {
+// WhenPushPrint calls PushPrint with args if cond is true.
+func (mut *Mutable) WhenPushPrint(cond bool, args ...any) *Mutable {
 	if cond {
-		mut.AppendPrint(args...)
+		mut.PushPrint(args...)
 	}
 	return mut
 }
 
-// WhenAppendPrintf calls AppendPrintf with tpl and args if cond is true.
-func (mut *Mutable) WhenAppendPrintf(cond bool, tpl string, args ...any) *Mutable {
+// WhenPushPrintf calls PushPrintf with tpl and args if cond is true.
+func (mut *Mutable) WhenPushPrintf(cond bool, tpl string, args ...any) *Mutable {
 	if cond {
-		mut.AppendPrintf(tpl, args...)
+		mut.PushPrintf(tpl, args...)
 	}
 	return mut
 }
 
-// WhenAppendPrintln calls AppendPrintln with args if cond is true.
-func (mut *Mutable) WhenAppendPrintln(cond bool, args ...any) *Mutable {
+// WhenPushPrintln calls PushPrintln with args if cond is true.
+func (mut *Mutable) WhenPushPrintln(cond bool, args ...any) *Mutable {
 	if cond {
-		mut.AppendPrintln(args...)
+		mut.PushPrintln(args...)
 	}
 	return mut
 }

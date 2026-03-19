@@ -27,12 +27,12 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	RepeatByte(byte, int)
 	RepeatRune(rune, int)
 	RepeatLine(string, int)
-	AppendPrint(...any) T
-	AppendPrintf(string, ...any) T
-	AppendPrintln(...any) T
-	WhenAppendPrint(bool, ...any) T
-	WhenAppendPrintf(bool, string, ...any) T
-	WhenAppendPrintln(bool, ...any) T
+	PushPrint(...any) T
+	PushPrintf(string, ...any) T
+	PushPrintln(...any) T
+	WhenPushPrint(bool, ...any) T
+	WhenPushPrintf(bool, string, ...any) T
+	WhenPushPrintln(bool, ...any) T
 	WhenLine(bool)
 	WhenTab(bool)
 	WhenNLines(bool, int)
@@ -69,13 +69,13 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	PushQuoteRune(rune)
 	PushQuoteRuneASCII(rune)
 	PushQuoteRuneGrapic(rune)
-	AppendTrimSpace([]byte)
-	AppendTrimRight([]byte, string)
-	AppendTrimLeft([]byte, string)
-	AppendTrimPrefix([]byte, []byte)
-	AppendTrimSuffix([]byte, []byte)
-	AppendReplaceAll([]byte, []byte, []byte)
-	AppendReplace([]byte, []byte, []byte, int)
+	PushTrimSpace([]byte)
+	PushTrimRight([]byte, string)
+	PushTrimLeft([]byte, string)
+	PushTrimPrefix([]byte, []byte)
+	PushTrimSuffix([]byte, []byte)
+	PushReplaceAll([]byte, []byte, []byte)
+	PushReplace([]byte, []byte, []byte, int)
 	ExtendBytes(iter.Seq[[]byte])
 	ExtendBytesLines(iter.Seq[[]byte])
 	ExtendBytesJoin(iter.Seq[[]byte], []byte)
@@ -503,44 +503,44 @@ func repeatTests[T stringWriter[T]]() []testCase[T] {
 func wprintTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "AppendPrint simple",
+			name: "PushPrint simple",
 			buildFn: func(w T) {
-				w.AppendPrint("hello", " ", "world")
+				w.PushPrint("hello", " ", "world")
 			},
 			expected: "hello world",
 		},
 		{
-			name: "AppendPrint numbers",
+			name: "PushPrint numbers",
 			buildFn: func(w T) {
-				w.AppendPrint(42, " ", 3.14)
+				w.PushPrint(42, " ", 3.14)
 			},
 			expected: "42 3.14",
 		},
 		{
-			name: "AppendPrintf format",
+			name: "PushPrintf format",
 			buildFn: func(w T) {
-				w.AppendPrintf("Hello %s, number %d", "world", 42)
+				w.PushPrintf("Hello %s, number %d", "world", 42)
 			},
 			expected: "Hello world, number 42",
 		},
 		{
-			name: "AppendPrintf empty",
+			name: "PushPrintf empty",
 			buildFn: func(w T) {
-				w.AppendPrintf("")
+				w.PushPrintf("")
 			},
 			expected: "",
 		},
 		{
-			name: "AppendPrintln",
+			name: "PushPrintln",
 			buildFn: func(w T) {
-				w.AppendPrintln("test")
+				w.PushPrintln("test")
 			},
 			expected: "test\n",
 		},
 		{
-			name: "AppendPrintln multiple args",
+			name: "PushPrintln multiple args",
 			buildFn: func(w T) {
-				w.AppendPrintln("a", "b", "c")
+				w.PushPrintln("a", "b", "c")
 			},
 			expected: "a b c\n",
 		},
@@ -551,44 +551,44 @@ func wprintTests[T stringWriter[T]]() []testCase[T] {
 func whenMethodTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "WhenAppendPrint true",
+			name: "WhenPushPrint true",
 			buildFn: func(w T) {
-				w.WhenAppendPrint(true, "hello")
+				w.WhenPushPrint(true, "hello")
 			},
 			expected: "hello",
 		},
 		{
-			name: "WhenAppendPrint false",
+			name: "WhenPushPrint false",
 			buildFn: func(w T) {
-				w.WhenAppendPrint(false, "hello")
+				w.WhenPushPrint(false, "hello")
 			},
 			expected: "",
 		},
 		{
-			name: "WhenAppendPrintf true",
+			name: "WhenPushPrintf true",
 			buildFn: func(w T) {
-				w.WhenAppendPrintf(true, "num=%d", 42)
+				w.WhenPushPrintf(true, "num=%d", 42)
 			},
 			expected: "num=42",
 		},
 		{
-			name: "WhenAppendPrintf false",
+			name: "WhenPushPrintf false",
 			buildFn: func(w T) {
-				w.WhenAppendPrintf(false, "num=%d", 42)
+				w.WhenPushPrintf(false, "num=%d", 42)
 			},
 			expected: "",
 		},
 		{
-			name: "WhenAppendPrintln true",
+			name: "WhenPushPrintln true",
 			buildFn: func(w T) {
-				w.WhenAppendPrintln(true, "test")
+				w.WhenPushPrintln(true, "test")
 			},
 			expected: "test\n",
 		},
 		{
-			name: "WhenAppendPrintln false",
+			name: "WhenPushPrintln false",
 			buildFn: func(w T) {
-				w.WhenAppendPrintln(false, "test")
+				w.WhenPushPrintln(false, "test")
 			},
 			expected: "",
 		},
@@ -1294,79 +1294,79 @@ func writeBytesLineTests[T stringWriter[T]]() []testCase[T] {
 func appendTrimTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "AppendTrimSpace leading and trailing",
+			name: "PushTrimSpace leading and trailing",
 			buildFn: func(w T) {
-				w.AppendTrimSpace([]byte("  hello  "))
+				w.PushTrimSpace([]byte("  hello  "))
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendTrimSpace newlines and tabs",
+			name: "PushTrimSpace newlines and tabs",
 			buildFn: func(w T) {
-				w.AppendTrimSpace([]byte("\n\thello\t\n"))
+				w.PushTrimSpace([]byte("\n\thello\t\n"))
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendTrimSpace empty",
+			name: "PushTrimSpace empty",
 			buildFn: func(w T) {
-				w.AppendTrimSpace([]byte("   "))
+				w.PushTrimSpace([]byte("   "))
 			},
 			expected: "",
 		},
 		{
-			name: "AppendTrimRight",
+			name: "PushTrimRight",
 			buildFn: func(w T) {
-				w.AppendTrimRight([]byte("hello!!!"), "!")
+				w.PushTrimRight([]byte("hello!!!"), "!")
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendTrimRight multiple chars",
+			name: "PushTrimRight multiple chars",
 			buildFn: func(w T) {
-				w.AppendTrimRight([]byte("hello123"), "321")
+				w.PushTrimRight([]byte("hello123"), "321")
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendTrimLeft",
+			name: "PushTrimLeft",
 			buildFn: func(w T) {
-				w.AppendTrimLeft([]byte("!!!hello"), "!")
+				w.PushTrimLeft([]byte("!!!hello"), "!")
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendTrimLeft multiple chars",
+			name: "PushTrimLeft multiple chars",
 			buildFn: func(w T) {
-				w.AppendTrimLeft([]byte("123hello"), "321")
+				w.PushTrimLeft([]byte("123hello"), "321")
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendTrimPrefix exists",
+			name: "PushTrimPrefix exists",
 			buildFn: func(w T) {
-				w.AppendTrimPrefix([]byte("prefix_content"), []byte("prefix_"))
+				w.PushTrimPrefix([]byte("prefix_content"), []byte("prefix_"))
 			},
 			expected: "content",
 		},
 		{
-			name: "AppendTrimPrefix not exists",
+			name: "PushTrimPrefix not exists",
 			buildFn: func(w T) {
-				w.AppendTrimPrefix([]byte("content"), []byte("prefix_"))
+				w.PushTrimPrefix([]byte("content"), []byte("prefix_"))
 			},
 			expected: "content",
 		},
 		{
-			name: "AppendTrimSuffix exists",
+			name: "PushTrimSuffix exists",
 			buildFn: func(w T) {
-				w.AppendTrimSuffix([]byte("content_suffix"), []byte("_suffix"))
+				w.PushTrimSuffix([]byte("content_suffix"), []byte("_suffix"))
 			},
 			expected: "content",
 		},
 		{
-			name: "AppendTrimSuffix not exists",
+			name: "PushTrimSuffix not exists",
 			buildFn: func(w T) {
-				w.AppendTrimSuffix([]byte("content"), []byte("_suffix"))
+				w.PushTrimSuffix([]byte("content"), []byte("_suffix"))
 			},
 			expected: "content",
 		},
@@ -1376,51 +1376,51 @@ func appendTrimTests[T stringWriter[T]]() []testCase[T] {
 func appendReplaceTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "AppendReplaceAll",
+			name: "PushReplaceAll",
 			buildFn: func(w T) {
-				w.AppendReplaceAll([]byte("hello hello"), []byte("hello"), []byte("hi")) //nolint:dupword
+				w.PushReplaceAll([]byte("hello hello"), []byte("hello"), []byte("hi")) //nolint:dupword
 			},
 			expected: "hi hi", //nolint:dupword
 		},
 		{
-			name: "AppendReplaceAll no match",
+			name: "PushReplaceAll no match",
 			buildFn: func(w T) {
-				w.AppendReplaceAll([]byte("hello"), []byte("world"), []byte("hi"))
+				w.PushReplaceAll([]byte("hello"), []byte("world"), []byte("hi"))
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendReplaceAll with empty",
+			name: "PushReplaceAll with empty",
 			buildFn: func(w T) {
-				w.AppendReplaceAll([]byte("abc"), []byte("b"), []byte(""))
+				w.PushReplaceAll([]byte("abc"), []byte("b"), []byte(""))
 			},
 			expected: "ac",
 		},
 		{
-			name: "AppendReplace limited",
+			name: "PushReplace limited",
 			buildFn: func(w T) {
-				w.AppendReplace([]byte("a a a a"), []byte("a"), []byte("b"), 2) //nolint:dupword
+				w.PushReplace([]byte("a a a a"), []byte("a"), []byte("b"), 2) //nolint:dupword
 			},
 			expected: "b b a a", //nolint:dupword
 		},
 		{
-			name: "AppendReplace zero",
+			name: "PushReplace zero",
 			buildFn: func(w T) {
-				w.AppendReplace([]byte("hello"), []byte("l"), []byte("x"), 0)
+				w.PushReplace([]byte("hello"), []byte("l"), []byte("x"), 0)
 			},
 			expected: "hello",
 		},
 		{
-			name: "AppendReplace negative (all)",
+			name: "PushReplace negative (all)",
 			buildFn: func(w T) {
-				w.AppendReplace([]byte("a a a"), []byte("a"), []byte("b"), -1) //nolint:dupword
+				w.PushReplace([]byte("a a a"), []byte("a"), []byte("b"), -1) //nolint:dupword
 			},
 			expected: "b b b", //nolint:dupword
 		},
 		{
-			name: "AppendReplace one",
+			name: "PushReplace one",
 			buildFn: func(w T) {
-				w.AppendReplace([]byte("hello"), []byte("l"), []byte("L"), 1)
+				w.PushReplace([]byte("hello"), []byte("l"), []byte("L"), 1)
 			},
 			expected: "heLlo",
 		},

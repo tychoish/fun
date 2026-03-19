@@ -45,23 +45,23 @@ func (b *Buffer) wb(in byte)        { b.WriteByte(in) }
 func (b *Buffer) wrr(r rune)        { b.WriteRune(r) }
 func (b *Buffer) cat(strs []string) { apply(b.PushString, strs) }
 
-// AppendPrint formats its arguments using default formatting and writes to
+// PushPrint formats its arguments using default formatting and writes to
 // the buffer. Analogous to fmt.Print, fmt.Fprint, and fmt.Sprint.
-func (b *Buffer) AppendPrint(args ...any) *Buffer { fmt.Fprint(b, args...); return b }
+func (b *Buffer) PushPrint(args ...any) *Buffer { fmt.Fprint(b, args...); return b }
 
-// AppendPrintf formats according to a format specifier and writes to the
+// PushPrintf formats according to a format specifier and writes to the
 // buffer. The 'tpl' parameter is the format string, and 'args' are the
 // values to format. Analgous to fmt.Printf, fmt.Sprintf, and
 // fmt.Fprintf.
-func (b *Buffer) AppendPrintf(tpl string, args ...any) *Buffer {
+func (b *Buffer) PushPrintf(tpl string, args ...any) *Buffer {
 	fmt.Fprintf(b, tpl, args...)
 	return b
 }
 
-// AppendPrintln formats its arguments using default formatting, adds a
+// PushPrintln formats its arguments using default formatting, adds a
 // newline, and writes to the buffer. Analogous to fmt.Println,
 // fmt.Sprintln, fmt.Fprintln.
-func (b *Buffer) AppendPrintln(args ...any) *Buffer { fmt.Fprintln(b, args...); return b }
+func (b *Buffer) PushPrintln(args ...any) *Buffer { fmt.Fprintln(b, args...); return b }
 
 // Line writes a single newline character to the buffer.
 func (b *Buffer) Line() { b.WriteByte('\n') }
@@ -137,29 +137,29 @@ func (b *Buffer) RepeatRune(r rune, n int) { nwith(n, b.wrr, r) }
 // repetition is on its own line.
 func (b *Buffer) RepeatLine(ln string, n int) { nwith(n, b.WriteLine, ln) }
 
-// WhenAppendPrint calls AppendPrint with 'args' if 'cond' is true and is a no-op
+// WhenPushPrint calls PushPrint with 'args' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Buffer) WhenAppendPrint(cond bool, args ...any) *Buffer {
+func (b *Buffer) WhenPushPrint(cond bool, args ...any) *Buffer {
 	if cond {
-		b.AppendPrint(args...)
+		b.PushPrint(args...)
 	}
 	return b
 }
 
-// WhenAppendPrintf calls AppendPrintf with 'tpl' and 'args' if 'cond' is true and is
+// WhenPushPrintf calls PushPrintf with 'tpl' and 'args' if 'cond' is true and is
 // a no-op otherwise.
-func (b *Buffer) WhenAppendPrintf(cond bool, tpl string, args ...any) *Buffer {
+func (b *Buffer) WhenPushPrintf(cond bool, tpl string, args ...any) *Buffer {
 	if cond {
-		b.AppendPrintf(tpl, args...)
+		b.PushPrintf(tpl, args...)
 	}
 	return b
 }
 
-// WhenAppendPrintln calls AppendPrintln with 'args' if 'cond' is true and is a
+// WhenPushPrintln calls PushPrintln with 'args' if 'cond' is true and is a
 // no-op otherwise.
-func (b *Buffer) WhenAppendPrintln(cond bool, args ...any) *Buffer {
+func (b *Buffer) WhenPushPrintln(cond bool, args ...any) *Buffer {
 	if cond {
-		b.AppendPrintln(args...)
+		b.PushPrintln(args...)
 	}
 	return b
 }
@@ -317,35 +317,35 @@ func (b *Buffer) WithReplace(s, old, new string, n int) { //nolint:predeclared
 	b.PushString(strings.Replace(s, old, new, n))
 }
 
-// AppendTrimSpace writes 'str' with all leading and trailing whitespace
+// PushTrimSpace writes 'str' with all leading and trailing whitespace
 // removed to the buffer.
-func (b *Buffer) AppendTrimSpace(str []byte) { b.Write(bytes.TrimSpace(str)) }
+func (b *Buffer) PushTrimSpace(str []byte) { b.Write(bytes.TrimSpace(str)) }
 
-// AppendTrimRight writes 'str' with all trailing characters contained in
+// PushTrimRight writes 'str' with all trailing characters contained in
 // 'cut' removed to the buffer.
-func (b *Buffer) AppendTrimRight(str []byte, cut string) { b.Write(bytes.TrimRight(str, cut)) }
+func (b *Buffer) PushTrimRight(str []byte, cut string) { b.Write(bytes.TrimRight(str, cut)) }
 
-// AppendTrimLeft writes 'str' with all leading characters contained in
+// PushTrimLeft writes 'str' with all leading characters contained in
 // 'cut' removed to the buffer.
-func (b *Buffer) AppendTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
+func (b *Buffer) PushTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
 
-// AppendTrimPrefix writes 's' with the leading 'prefix' string removed to
+// PushTrimPrefix writes 's' with the leading 'prefix' string removed to
 // the buffer. If 's' doesn't start with 'prefix', 's' is written
 // unchanged.
-func (b *Buffer) AppendTrimPrefix(s []byte, prefix []byte) { b.Write(bytes.TrimPrefix(s, prefix)) }
+func (b *Buffer) PushTrimPrefix(s []byte, prefix []byte) { b.Write(bytes.TrimPrefix(s, prefix)) }
 
-// AppendTrimSuffix writes 's' with the trailing 'suffix' string removed to
+// PushTrimSuffix writes 's' with the trailing 'suffix' string removed to
 // the buffer. If 's' doesn't end with 'suffix', 's' is written unchanged.
-func (b *Buffer) AppendTrimSuffix(s []byte, suffix []byte) { b.Write(bytes.TrimSuffix(s, suffix)) }
+func (b *Buffer) PushTrimSuffix(s []byte, suffix []byte) { b.Write(bytes.TrimSuffix(s, suffix)) }
 
-// AppendReplaceAll writes 's' with all non-overlapping instances of 'old'
+// PushReplaceAll writes 's' with all non-overlapping instances of 'old'
 // replaced by 'new' to the buffer.
-func (b *Buffer) AppendReplaceAll(s, old, new []byte) { b.Write(bytes.ReplaceAll(s, old, new)) } //nolint:predeclared
+func (b *Buffer) PushReplaceAll(s, old, new []byte) { b.Write(bytes.ReplaceAll(s, old, new)) } //nolint:predeclared
 
-// AppendReplace writes 's' with the first 'n' non-overlapping instances of
+// PushReplace writes 's' with the first 'n' non-overlapping instances of
 // 'old' replaced by 'new' to the buffer. If 'n' is negative, all
 // instances are replaced.
-func (b *Buffer) AppendReplace(s, old, new []byte, n int) { b.Write(bytes.Replace(s, old, new, n)) } //nolint:predeclared
+func (b *Buffer) PushReplace(s, old, new []byte, n int) { b.Write(bytes.Replace(s, old, new, n)) } //nolint:predeclared
 
 // Extend writes all strings from the iterator 'seq' consecutively to
 // the buffer.

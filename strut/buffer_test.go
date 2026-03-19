@@ -63,7 +63,7 @@ func TestBuffer_Repeat(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, repeatTests[*Buffer]())
 }
 
-func TestBuffer_AppendPrint(t *testing.T) {
+func TestBuffer_PushPrint(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, wprintTests[*Buffer]())
 }
 
@@ -219,11 +219,11 @@ func TestBuffer_WriteBytesLine(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, writeBytesLineTests[*Buffer]())
 }
 
-func TestBuffer_AppendTrim(t *testing.T) {
+func TestBuffer_PushTrim(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, appendTrimTests[*Buffer]())
 }
 
-func TestBuffer_AppendReplace(t *testing.T) {
+func TestBuffer_PushReplace(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, appendReplaceTests[*Buffer]())
 }
 

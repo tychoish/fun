@@ -231,9 +231,9 @@ func semanticEdgeCaseTests[T stringWriter[T]]() []testCase[T] {
 			expected: "xyz",
 		},
 		{
-			name: "AppendPrintf formatting",
+			name: "PushPrintf formatting",
 			buildFn: func(w T) {
-				w.AppendPrintf("Value: %d, %s, %v", 42, "test", true)
+				w.PushPrintf("Value: %d, %s, %v", 42, "test", true)
 			},
 			expected: "Value: 42, test, true",
 		},
@@ -430,18 +430,18 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 		{
 			name: "append trim operations",
 			buildFn: func(w T) {
-				w.AppendTrimSpace([]byte("  hello  "))
+				w.PushTrimSpace([]byte("  hello  "))
 				w.WriteByte(' ')
-				w.AppendTrimPrefix([]byte("prefix_test"), []byte("prefix_"))
+				w.PushTrimPrefix([]byte("prefix_test"), []byte("prefix_"))
 			},
 			expected: "hello test",
 		},
 		{
 			name: "append replace operations",
 			buildFn: func(w T) {
-				w.AppendReplaceAll([]byte("aa"), []byte("a"), []byte("b"))
+				w.PushReplaceAll([]byte("aa"), []byte("a"), []byte("b"))
 				w.WriteByte(' ')
-				w.AppendReplace([]byte("aaa"), []byte("a"), []byte("b"), 1)
+				w.PushReplace([]byte("aaa"), []byte("a"), []byte("b"), 1)
 			},
 			expected: "bb baa",
 		},
@@ -459,7 +459,7 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 			buildFn: func(w T) {
 				w.WriteLine("Header")
 				w.Tab()
-				w.AppendPrintf("Value: %d", 42)
+				w.PushPrintf("Value: %d", 42)
 				w.Line()
 				w.Concat("a", "b", "c")
 				w.Line()

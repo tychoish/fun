@@ -281,35 +281,35 @@ func TestMutable_RepeatLine(t *testing.T) {
 	})
 }
 
-// ---- AppendPrint* ----
+// ---- PushPrint* ----
 
-func TestMutable_AppendPrint(t *testing.T) {
+func TestMutable_PushPrint(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"simple", func(m *Mutable) { m.AppendPrint("hello world") }, "hello world"},
-		{"multiple args", func(m *Mutable) { m.AppendPrint("a", "b", "c") }, "abc"},
-		{"numbers", func(m *Mutable) { m.AppendPrint(42, 3.14) }, "42 3.14"},
-		{"no args", func(m *Mutable) { m.AppendPrint() }, ""},
-		{"returns self", func(m *Mutable) { m.AppendPrint("x").AppendPrint("y") }, "xy"},
+		{"simple", func(m *Mutable) { m.PushPrint("hello world") }, "hello world"},
+		{"multiple args", func(m *Mutable) { m.PushPrint("a", "b", "c") }, "abc"},
+		{"numbers", func(m *Mutable) { m.PushPrint(42, 3.14) }, "42 3.14"},
+		{"no args", func(m *Mutable) { m.PushPrint() }, ""},
+		{"returns self", func(m *Mutable) { m.PushPrint("x").PushPrint("y") }, "xy"},
 	})
 }
 
-func TestMutable_AppendPrintf(t *testing.T) {
+func TestMutable_PushPrintf(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"format string", func(m *Mutable) { m.AppendPrintf("Hello %s, number %d", "world", 42) }, "Hello world, number 42"},
-		{"empty format", func(m *Mutable) { m.AppendPrintf("") }, ""},
-		{"no args", func(m *Mutable) { m.AppendPrintf("plain") }, "plain"},
-		{"float format", func(m *Mutable) { m.AppendPrintf("%.2f", 3.14159) }, "3.14"},
-		{"returns self", func(m *Mutable) { m.AppendPrintf("%s", "x").AppendPrintf("%s", "y") }, "xy"},
+		{"format string", func(m *Mutable) { m.PushPrintf("Hello %s, number %d", "world", 42) }, "Hello world, number 42"},
+		{"empty format", func(m *Mutable) { m.PushPrintf("") }, ""},
+		{"no args", func(m *Mutable) { m.PushPrintf("plain") }, "plain"},
+		{"float format", func(m *Mutable) { m.PushPrintf("%.2f", 3.14159) }, "3.14"},
+		{"returns self", func(m *Mutable) { m.PushPrintf("%s", "x").PushPrintf("%s", "y") }, "xy"},
 	})
 }
 
-func TestMutable_AppendPrintln(t *testing.T) {
+func TestMutable_PushPrintln(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"single arg", func(m *Mutable) { m.AppendPrintln("test") }, "test\n"},
-		{"multiple args", func(m *Mutable) { m.AppendPrintln("a", "b", "c") }, "a b c\n"},
-		{"no args", func(m *Mutable) { m.AppendPrintln() }, "\n"},
-		{"numbers", func(m *Mutable) { m.AppendPrintln(1, 2) }, "1 2\n"},
-		{"returns self", func(m *Mutable) { m.AppendPrintln("x").AppendPrintln("y") }, "x\ny\n"},
+		{"single arg", func(m *Mutable) { m.PushPrintln("test") }, "test\n"},
+		{"multiple args", func(m *Mutable) { m.PushPrintln("a", "b", "c") }, "a b c\n"},
+		{"no args", func(m *Mutable) { m.PushPrintln() }, "\n"},
+		{"numbers", func(m *Mutable) { m.PushPrintln(1, 2) }, "1 2\n"},
+		{"returns self", func(m *Mutable) { m.PushPrintln("x").PushPrintln("y") }, "x\ny\n"},
 	})
 }
 
@@ -506,111 +506,111 @@ func TestMutable_WithReplace(t *testing.T) {
 	})
 }
 
-// ---- AppendTrim* ----
+// ---- PushTrim* ----
 
-func TestMutable_AppendTrimSpace(t *testing.T) {
+func TestMutable_PushTrimSpace(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"leading and trailing", func(m *Mutable) { m.AppendTrimSpace([]byte("  hello  ")) }, "hello"},
-		{"newlines", func(m *Mutable) { m.AppendTrimSpace([]byte("\nhello\n")) }, "hello"},
-		{"all whitespace", func(m *Mutable) { m.AppendTrimSpace([]byte("   ")) }, ""},
-		{"empty", func(m *Mutable) { m.AppendTrimSpace([]byte{}) }, ""},
-		{"nil", func(m *Mutable) { m.AppendTrimSpace(nil) }, ""},
-		{"no whitespace", func(m *Mutable) { m.AppendTrimSpace([]byte("hello")) }, "hello"},
-		{"appends to existing", func(m *Mutable) { m.PushString("x"); m.AppendTrimSpace([]byte(" y ")) }, "xy"},
+		{"leading and trailing", func(m *Mutable) { m.PushTrimSpace([]byte("  hello  ")) }, "hello"},
+		{"newlines", func(m *Mutable) { m.PushTrimSpace([]byte("\nhello\n")) }, "hello"},
+		{"all whitespace", func(m *Mutable) { m.PushTrimSpace([]byte("   ")) }, ""},
+		{"empty", func(m *Mutable) { m.PushTrimSpace([]byte{}) }, ""},
+		{"nil", func(m *Mutable) { m.PushTrimSpace(nil) }, ""},
+		{"no whitespace", func(m *Mutable) { m.PushTrimSpace([]byte("hello")) }, "hello"},
+		{"appends to existing", func(m *Mutable) { m.PushString("x"); m.PushTrimSpace([]byte(" y ")) }, "xy"},
 	})
 }
 
-func TestMutable_AppendTrimRight(t *testing.T) {
+func TestMutable_PushTrimRight(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"simple", func(m *Mutable) { m.AppendTrimRight([]byte("hello!!!"), "!") }, "hello"},
-		{"no match", func(m *Mutable) { m.AppendTrimRight([]byte("hello"), "x") }, "hello"},
-		{"empty slice", func(m *Mutable) { m.AppendTrimRight([]byte{}, "!") }, ""},
-		{"nil", func(m *Mutable) { m.AppendTrimRight(nil, "!") }, ""},
-		{"trim all", func(m *Mutable) { m.AppendTrimRight([]byte("!!!"), "!") }, ""},
+		{"simple", func(m *Mutable) { m.PushTrimRight([]byte("hello!!!"), "!") }, "hello"},
+		{"no match", func(m *Mutable) { m.PushTrimRight([]byte("hello"), "x") }, "hello"},
+		{"empty slice", func(m *Mutable) { m.PushTrimRight([]byte{}, "!") }, ""},
+		{"nil", func(m *Mutable) { m.PushTrimRight(nil, "!") }, ""},
+		{"trim all", func(m *Mutable) { m.PushTrimRight([]byte("!!!"), "!") }, ""},
 	})
 }
 
-func TestMutable_AppendTrimLeft(t *testing.T) {
+func TestMutable_PushTrimLeft(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"simple", func(m *Mutable) { m.AppendTrimLeft([]byte("!!!hello"), "!") }, "hello"},
-		{"no match", func(m *Mutable) { m.AppendTrimLeft([]byte("hello"), "x") }, "hello"},
-		{"empty slice", func(m *Mutable) { m.AppendTrimLeft([]byte{}, "!") }, ""},
-		{"nil", func(m *Mutable) { m.AppendTrimLeft(nil, "!") }, ""},
-		{"trim all", func(m *Mutable) { m.AppendTrimLeft([]byte("!!!"), "!") }, ""},
+		{"simple", func(m *Mutable) { m.PushTrimLeft([]byte("!!!hello"), "!") }, "hello"},
+		{"no match", func(m *Mutable) { m.PushTrimLeft([]byte("hello"), "x") }, "hello"},
+		{"empty slice", func(m *Mutable) { m.PushTrimLeft([]byte{}, "!") }, ""},
+		{"nil", func(m *Mutable) { m.PushTrimLeft(nil, "!") }, ""},
+		{"trim all", func(m *Mutable) { m.PushTrimLeft([]byte("!!!"), "!") }, ""},
 	})
 }
 
-func TestMutable_AppendTrimPrefix(t *testing.T) {
+func TestMutable_PushTrimPrefix(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"exists", func(m *Mutable) { m.AppendTrimPrefix([]byte("prefix_content"), []byte("prefix_")) }, "content"},
-		{"not found", func(m *Mutable) { m.AppendTrimPrefix([]byte("content"), []byte("prefix_")) }, "content"},
-		{"empty prefix", func(m *Mutable) { m.AppendTrimPrefix([]byte("hello"), []byte{}) }, "hello"},
-		{"nil prefix", func(m *Mutable) { m.AppendTrimPrefix([]byte("hello"), nil) }, "hello"},
-		{"nil slice", func(m *Mutable) { m.AppendTrimPrefix(nil, []byte("p")) }, ""},
-		{"prefix equals string", func(m *Mutable) { m.AppendTrimPrefix([]byte("hello"), []byte("hello")) }, ""},
+		{"exists", func(m *Mutable) { m.PushTrimPrefix([]byte("prefix_content"), []byte("prefix_")) }, "content"},
+		{"not found", func(m *Mutable) { m.PushTrimPrefix([]byte("content"), []byte("prefix_")) }, "content"},
+		{"empty prefix", func(m *Mutable) { m.PushTrimPrefix([]byte("hello"), []byte{}) }, "hello"},
+		{"nil prefix", func(m *Mutable) { m.PushTrimPrefix([]byte("hello"), nil) }, "hello"},
+		{"nil slice", func(m *Mutable) { m.PushTrimPrefix(nil, []byte("p")) }, ""},
+		{"prefix equals string", func(m *Mutable) { m.PushTrimPrefix([]byte("hello"), []byte("hello")) }, ""},
 	})
 }
 
-func TestMutable_AppendTrimSuffix(t *testing.T) {
+func TestMutable_PushTrimSuffix(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"exists", func(m *Mutable) { m.AppendTrimSuffix([]byte("content_suffix"), []byte("_suffix")) }, "content"},
-		{"not found", func(m *Mutable) { m.AppendTrimSuffix([]byte("content"), []byte("_suffix")) }, "content"},
-		{"empty suffix", func(m *Mutable) { m.AppendTrimSuffix([]byte("hello"), []byte{}) }, "hello"},
-		{"nil suffix", func(m *Mutable) { m.AppendTrimSuffix([]byte("hello"), nil) }, "hello"},
-		{"nil slice", func(m *Mutable) { m.AppendTrimSuffix(nil, []byte("s")) }, ""},
-		{"suffix equals string", func(m *Mutable) { m.AppendTrimSuffix([]byte("hello"), []byte("hello")) }, ""},
+		{"exists", func(m *Mutable) { m.PushTrimSuffix([]byte("content_suffix"), []byte("_suffix")) }, "content"},
+		{"not found", func(m *Mutable) { m.PushTrimSuffix([]byte("content"), []byte("_suffix")) }, "content"},
+		{"empty suffix", func(m *Mutable) { m.PushTrimSuffix([]byte("hello"), []byte{}) }, "hello"},
+		{"nil suffix", func(m *Mutable) { m.PushTrimSuffix([]byte("hello"), nil) }, "hello"},
+		{"nil slice", func(m *Mutable) { m.PushTrimSuffix(nil, []byte("s")) }, ""},
+		{"suffix equals string", func(m *Mutable) { m.PushTrimSuffix([]byte("hello"), []byte("hello")) }, ""},
 	})
 }
 
-func TestMutable_AppendReplaceAll(t *testing.T) {
+func TestMutable_PushReplaceAll(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"simple", func(m *Mutable) { m.AppendReplaceAll([]byte("hello hello"), []byte("hello"), []byte("hi")) }, "hi hi"}, //nolint:dupword
-		{"no match", func(m *Mutable) { m.AppendReplaceAll([]byte("hello"), []byte("world"), []byte("hi")) }, "hello"},
-		{"replace with empty", func(m *Mutable) { m.AppendReplaceAll([]byte("abc"), []byte("b"), []byte{}) }, "ac"},
-		{"empty input", func(m *Mutable) { m.AppendReplaceAll([]byte{}, []byte("x"), []byte("y")) }, ""},
-		{"nil input", func(m *Mutable) { m.AppendReplaceAll(nil, []byte("x"), []byte("y")) }, ""},
-		{"appends to existing", func(m *Mutable) { m.PushString("z:"); m.AppendReplaceAll([]byte("ab"), []byte("b"), []byte("B")) }, "z:aB"},
+		{"simple", func(m *Mutable) { m.PushReplaceAll([]byte("hello hello"), []byte("hello"), []byte("hi")) }, "hi hi"}, //nolint:dupword
+		{"no match", func(m *Mutable) { m.PushReplaceAll([]byte("hello"), []byte("world"), []byte("hi")) }, "hello"},
+		{"replace with empty", func(m *Mutable) { m.PushReplaceAll([]byte("abc"), []byte("b"), []byte{}) }, "ac"},
+		{"empty input", func(m *Mutable) { m.PushReplaceAll([]byte{}, []byte("x"), []byte("y")) }, ""},
+		{"nil input", func(m *Mutable) { m.PushReplaceAll(nil, []byte("x"), []byte("y")) }, ""},
+		{"appends to existing", func(m *Mutable) { m.PushString("z:"); m.PushReplaceAll([]byte("ab"), []byte("b"), []byte("B")) }, "z:aB"},
 	})
 }
 
-func TestMutable_AppendReplace(t *testing.T) {
+func TestMutable_PushReplace(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"n=2", func(m *Mutable) { m.AppendReplace([]byte("a a a a"), []byte("a"), []byte("b"), 2) }, "b b a a"}, //nolint:dupword
-		{"n=0", func(m *Mutable) { m.AppendReplace([]byte("hello"), []byte("l"), []byte("x"), 0) }, "hello"},
-		{"n=-1 (all)", func(m *Mutable) { m.AppendReplace([]byte("a a a"), []byte("a"), []byte("b"), -1) }, "b b b"}, //nolint:dupword
-		{"no match", func(m *Mutable) { m.AppendReplace([]byte("hello"), []byte("z"), []byte("x"), 1) }, "hello"},
-		{"n=1", func(m *Mutable) { m.AppendReplace([]byte("hello"), []byte("l"), []byte("L"), 1) }, "heLlo"},
-		{"empty input", func(m *Mutable) { m.AppendReplace([]byte{}, []byte("x"), []byte("y"), 1) }, ""},
+		{"n=2", func(m *Mutable) { m.PushReplace([]byte("a a a a"), []byte("a"), []byte("b"), 2) }, "b b a a"}, //nolint:dupword
+		{"n=0", func(m *Mutable) { m.PushReplace([]byte("hello"), []byte("l"), []byte("x"), 0) }, "hello"},
+		{"n=-1 (all)", func(m *Mutable) { m.PushReplace([]byte("a a a"), []byte("a"), []byte("b"), -1) }, "b b b"}, //nolint:dupword
+		{"no match", func(m *Mutable) { m.PushReplace([]byte("hello"), []byte("z"), []byte("x"), 1) }, "hello"},
+		{"n=1", func(m *Mutable) { m.PushReplace([]byte("hello"), []byte("l"), []byte("L"), 1) }, "heLlo"},
+		{"empty input", func(m *Mutable) { m.PushReplace([]byte{}, []byte("x"), []byte("y"), 1) }, ""},
 	})
 }
 
 // ---- When* ----
 
-func TestMutable_WhenAppendPrint(t *testing.T) {
+func TestMutable_WhenPushPrint(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"true", func(m *Mutable) { m.WhenAppendPrint(true, "hello") }, "hello"},
-		{"false", func(m *Mutable) { m.WhenAppendPrint(false, "hello") }, ""},
-		{"true multiple args", func(m *Mutable) { m.WhenAppendPrint(true, "a", "b") }, "ab"},
-		{"true no args", func(m *Mutable) { m.WhenAppendPrint(true) }, ""},
-		{"returns self for chaining", func(m *Mutable) { m.WhenAppendPrint(true, "x").WhenAppendPrint(false, "y") }, "x"},
+		{"true", func(m *Mutable) { m.WhenPushPrint(true, "hello") }, "hello"},
+		{"false", func(m *Mutable) { m.WhenPushPrint(false, "hello") }, ""},
+		{"true multiple args", func(m *Mutable) { m.WhenPushPrint(true, "a", "b") }, "ab"},
+		{"true no args", func(m *Mutable) { m.WhenPushPrint(true) }, ""},
+		{"returns self for chaining", func(m *Mutable) { m.WhenPushPrint(true, "x").WhenPushPrint(false, "y") }, "x"},
 	})
 }
 
-func TestMutable_WhenAppendPrintf(t *testing.T) {
+func TestMutable_WhenPushPrintf(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"true", func(m *Mutable) { m.WhenAppendPrintf(true, "n=%d", 42) }, "n=42"},
-		{"false", func(m *Mutable) { m.WhenAppendPrintf(false, "n=%d", 42) }, ""},
-		{"true no format args", func(m *Mutable) { m.WhenAppendPrintf(true, "plain") }, "plain"},
-		{"returns self for chaining", func(m *Mutable) { m.WhenAppendPrintf(true, "x").WhenAppendPrintf(true, "y") }, "xy"},
+		{"true", func(m *Mutable) { m.WhenPushPrintf(true, "n=%d", 42) }, "n=42"},
+		{"false", func(m *Mutable) { m.WhenPushPrintf(false, "n=%d", 42) }, ""},
+		{"true no format args", func(m *Mutable) { m.WhenPushPrintf(true, "plain") }, "plain"},
+		{"returns self for chaining", func(m *Mutable) { m.WhenPushPrintf(true, "x").WhenPushPrintf(true, "y") }, "xy"},
 	})
 }
 
-func TestMutable_WhenAppendPrintln(t *testing.T) {
+func TestMutable_WhenPushPrintln(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"true", func(m *Mutable) { m.WhenAppendPrintln(true, "test") }, "test\n"},
-		{"false", func(m *Mutable) { m.WhenAppendPrintln(false, "test") }, ""},
-		{"true no args", func(m *Mutable) { m.WhenAppendPrintln(true) }, "\n"},
-		{"returns self for chaining", func(m *Mutable) { m.WhenAppendPrintln(true, "a").WhenAppendPrintln(true, "b") }, "a\nb\n"},
+		{"true", func(m *Mutable) { m.WhenPushPrintln(true, "test") }, "test\n"},
+		{"false", func(m *Mutable) { m.WhenPushPrintln(false, "test") }, ""},
+		{"true no args", func(m *Mutable) { m.WhenPushPrintln(true) }, "\n"},
+		{"returns self for chaining", func(m *Mutable) { m.WhenPushPrintln(true, "a").WhenPushPrintln(true, "b") }, "a\nb\n"},
 	})
 }
 
@@ -759,11 +759,11 @@ func TestMutable_WhenJoin(t *testing.T) {
 // ---- Composition / integration tests ----
 
 func TestMutable_MethodsReturnSelfForChaining(t *testing.T) {
-	// AppendPrint* return *Mutable for chaining; verify the returned value IS the receiver.
+	// PushPrint* return *Mutable for chaining; verify the returned value IS the receiver.
 	var m Mutable
-	result := m.AppendPrint("a").AppendPrintf("%s", "b").AppendPrintln("c")
+	result := m.PushPrint("a").PushPrintf("%s", "b").PushPrintln("c")
 	if result != &m {
-		t.Error("chained AppendPrint* did not return the receiver")
+		t.Error("chained PushPrint* did not return the receiver")
 	}
 	if got := m.String(); got != "abc\n" {
 		t.Errorf("got %q, want %q", got, "abc\n")
@@ -777,7 +777,7 @@ func TestMutable_MixedHighLevelOps(t *testing.T) {
 	m.Concat("key", "=")
 	m.PushQuote("value")
 	m.Line()
-	m.AppendPrintf("count=%d", 3)
+	m.PushPrintf("count=%d", 3)
 	m.Line()
 
 	want := "header\n\tkey=\"value\"\ncount=3\n"
@@ -825,12 +825,12 @@ func TestMutable_ExtendLinesAppendsBytesLinesConsistency(t *testing.T) {
 	}
 }
 
-func TestMutable_AppendTrimReturnSubsliceNotCopy(t *testing.T) {
+func TestMutable_PushTrimReturnSubsliceNotCopy(t *testing.T) {
 	// bytes.TrimSpace returns a subslice; PushBytes appends it into mut.
 	// Verify content is correct and the original slice is unmodified.
 	orig := []byte("  hello  ")
 	var m Mutable
-	m.AppendTrimSpace(orig)
+	m.PushTrimSpace(orig)
 	if got := m.String(); got != "hello" {
 		t.Errorf("got %q, want %q", got, "hello")
 	}
