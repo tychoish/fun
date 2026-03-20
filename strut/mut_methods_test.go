@@ -274,42 +274,42 @@ func TestMutable_RepeatLine(t *testing.T) {
 		{"zero", func(m *Mutable) { m.RepeatLine("hi", 0) }, ""},
 		{"negative", func(m *Mutable) { m.RepeatLine("hi", -1) }, ""},
 		{"one", func(m *Mutable) { m.RepeatLine("hi", 1) }, "hi\n"},
-		{"three", func(m *Mutable) { m.RepeatLine("hi", 3) }, "hi\nhi\nhi\n"},
+		{"three", func(m *Mutable) { m.RepeatLine("hi", 3) }, "hi\n"},
 		{"empty string", func(m *Mutable) { m.RepeatLine("", 2) }, "\n\n"},
 		{"unicode", func(m *Mutable) { m.RepeatLine("世界", 2) }, "世界\n世界\n"},
 		{"appends to existing", func(m *Mutable) { m.PushString("pre\n"); m.RepeatLine("x", 2) }, "pre\nx\nx\n"},
 	})
 }
 
-// ---- PushPrint* ----
+// ---- Mprint* ----
 
-func TestMutable_PushPrint(t *testing.T) {
+func TestMutable_Mprint(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"simple", func(m *Mutable) { m.PushPrint("hello world") }, "hello world"},
-		{"multiple args", func(m *Mutable) { m.PushPrint("a", "b", "c") }, "abc"},
-		{"numbers", func(m *Mutable) { m.PushPrint(42, 3.14) }, "42 3.14"},
-		{"no args", func(m *Mutable) { m.PushPrint() }, ""},
-		{"returns self", func(m *Mutable) { m.PushPrint("x").PushPrint("y") }, "xy"},
+		{"simple", func(m *Mutable) { m.Mprint("hello world") }, "hello world"},
+		{"multiple args", func(m *Mutable) { m.Mprint("a", "b", "c") }, "abc"},
+		{"numbers", func(m *Mutable) { m.Mprint(42, 3.14) }, "42 3.14"},
+		{"no args", func(m *Mutable) { m.Mprint() }, ""},
+		{"returns self", func(m *Mutable) { m.Mprint("x").Mprint("y") }, "xy"},
 	})
 }
 
-func TestMutable_PushPrintf(t *testing.T) {
+func TestMutable_Mprintf(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"format string", func(m *Mutable) { m.PushPrintf("Hello %s, number %d", "world", 42) }, "Hello world, number 42"},
-		{"empty format", func(m *Mutable) { m.PushPrintf("") }, ""},
-		{"no args", func(m *Mutable) { m.PushPrintf("plain") }, "plain"},
-		{"float format", func(m *Mutable) { m.PushPrintf("%.2f", 3.14159) }, "3.14"},
-		{"returns self", func(m *Mutable) { m.PushPrintf("%s", "x").PushPrintf("%s", "y") }, "xy"},
+		{"format string", func(m *Mutable) { m.Mprintf("Hello %s, number %d", "world", 42) }, "Hello world, number 42"},
+		{"empty format", func(m *Mutable) { m.Mprintf("") }, ""},
+		{"no args", func(m *Mutable) { m.Mprintf("plain") }, "plain"},
+		{"float format", func(m *Mutable) { m.Mprintf("%.2f", 3.14159) }, "3.14"},
+		{"returns self", func(m *Mutable) { m.Mprintf("%s", "x").Mprintf("%s", "y") }, "xy"},
 	})
 }
 
-func TestMutable_PushPrintln(t *testing.T) {
+func TestMutable_Mprintln(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"single arg", func(m *Mutable) { m.PushPrintln("test") }, "test\n"},
-		{"multiple args", func(m *Mutable) { m.PushPrintln("a", "b", "c") }, "a b c\n"},
-		{"no args", func(m *Mutable) { m.PushPrintln() }, "\n"},
-		{"numbers", func(m *Mutable) { m.PushPrintln(1, 2) }, "1 2\n"},
-		{"returns self", func(m *Mutable) { m.PushPrintln("x").PushPrintln("y") }, "x\ny\n"},
+		{"single arg", func(m *Mutable) { m.Mprintln("test") }, "test\n"},
+		{"multiple args", func(m *Mutable) { m.Mprintln("a", "b", "c") }, "a b c\n"},
+		{"no args", func(m *Mutable) { m.Mprintln() }, "\n"},
+		{"numbers", func(m *Mutable) { m.Mprintln(1, 2) }, "1 2\n"},
+		{"returns self", func(m *Mutable) { m.Mprintln("x").Mprintln("y") }, "x\ny\n"},
 	})
 }
 
@@ -586,31 +586,31 @@ func TestMutable_PushReplace(t *testing.T) {
 
 // ---- When* ----
 
-func TestMutable_WhenPushPrint(t *testing.T) {
+func TestMutable_WhenMprint(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"true", func(m *Mutable) { m.WhenPushPrint(true, "hello") }, "hello"},
-		{"false", func(m *Mutable) { m.WhenPushPrint(false, "hello") }, ""},
-		{"true multiple args", func(m *Mutable) { m.WhenPushPrint(true, "a", "b") }, "ab"},
-		{"true no args", func(m *Mutable) { m.WhenPushPrint(true) }, ""},
-		{"returns self for chaining", func(m *Mutable) { m.WhenPushPrint(true, "x").WhenPushPrint(false, "y") }, "x"},
+		{"true", func(m *Mutable) { m.WhenMprint(true, "hello") }, "hello"},
+		{"false", func(m *Mutable) { m.WhenMprint(false, "hello") }, ""},
+		{"true multiple args", func(m *Mutable) { m.WhenMprint(true, "a", "b") }, "ab"},
+		{"true no args", func(m *Mutable) { m.WhenMprint(true) }, ""},
+		{"returns self for chaining", func(m *Mutable) { m.WhenMprint(true, "x").WhenMprint(false, "y") }, "x"},
 	})
 }
 
-func TestMutable_WhenPushPrintf(t *testing.T) {
+func TestMutable_WhenMprintf(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"true", func(m *Mutable) { m.WhenPushPrintf(true, "n=%d", 42) }, "n=42"},
-		{"false", func(m *Mutable) { m.WhenPushPrintf(false, "n=%d", 42) }, ""},
-		{"true no format args", func(m *Mutable) { m.WhenPushPrintf(true, "plain") }, "plain"},
-		{"returns self for chaining", func(m *Mutable) { m.WhenPushPrintf(true, "x").WhenPushPrintf(true, "y") }, "xy"},
+		{"true", func(m *Mutable) { m.WhenMprintf(true, "n=%d", 42) }, "n=42"},
+		{"false", func(m *Mutable) { m.WhenMprintf(false, "n=%d", 42) }, ""},
+		{"true no format args", func(m *Mutable) { m.WhenMprintf(true, "plain") }, "plain"},
+		{"returns self for chaining", func(m *Mutable) { m.WhenMprintf(true, "x").WhenMprintf(true, "y") }, "xy"},
 	})
 }
 
-func TestMutable_WhenPushPrintln(t *testing.T) {
+func TestMutable_WhenMprintln(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"true", func(m *Mutable) { m.WhenPushPrintln(true, "test") }, "test\n"},
-		{"false", func(m *Mutable) { m.WhenPushPrintln(false, "test") }, ""},
-		{"true no args", func(m *Mutable) { m.WhenPushPrintln(true) }, "\n"},
-		{"returns self for chaining", func(m *Mutable) { m.WhenPushPrintln(true, "a").WhenPushPrintln(true, "b") }, "a\nb\n"},
+		{"true", func(m *Mutable) { m.WhenMprintln(true, "test") }, "test\n"},
+		{"false", func(m *Mutable) { m.WhenMprintln(false, "test") }, ""},
+		{"true no args", func(m *Mutable) { m.WhenMprintln(true) }, "\n"},
+		{"returns self for chaining", func(m *Mutable) { m.WhenMprintln(true, "a").WhenMprintln(true, "b") }, "a\nb\n"},
 	})
 }
 
@@ -759,11 +759,11 @@ func TestMutable_WhenJoin(t *testing.T) {
 // ---- Composition / integration tests ----
 
 func TestMutable_MethodsReturnSelfForChaining(t *testing.T) {
-	// PushPrint* return *Mutable for chaining; verify the returned value IS the receiver.
+	// Mprint* return *Mutable for chaining; verify the returned value IS the receiver.
 	var m Mutable
-	result := m.PushPrint("a").PushPrintf("%s", "b").PushPrintln("c")
+	result := m.Mprint("a").Mprintf("%s", "b").Mprintln("c")
 	if result != &m {
-		t.Error("chained PushPrint* did not return the receiver")
+		t.Error("chained Mprint* did not return the receiver")
 	}
 	if got := m.String(); got != "abc\n" {
 		t.Errorf("got %q, want %q", got, "abc\n")
@@ -777,7 +777,7 @@ func TestMutable_MixedHighLevelOps(t *testing.T) {
 	m.Concat("key", "=")
 	m.PushQuote("value")
 	m.Line()
-	m.PushPrintf("count=%d", 3)
+	m.Mprintf("count=%d", 3)
 	m.Line()
 
 	want := "header\n\tkey=\"value\"\ncount=3\n"

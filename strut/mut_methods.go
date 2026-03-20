@@ -87,22 +87,22 @@ func (mut *Mutable) RepeatRune(r rune, n int) { nwith(n, mut.wrr, r) }
 // If 'n' is non-positive, the operation is a no-op.
 func (mut *Mutable) RepeatLine(ln string, n int) { nwith(n, mut.WriteLine, ln) }
 
-// ---- PushPrint* ----
+// ---- Mprint* ----
 
-// PushPrint formats args using default formatting and writes to the mutable.
+// Mprint formats args using default formatting and writes to the mutable.
 // Analogous to fmt.Fprint.
-func (mut *Mutable) PushPrint(args ...any) *Mutable { fmt.Fprint(mut, args...); return mut }
+func (mut *Mutable) Mprint(args ...any) *Mutable { fmt.Fprint(mut, args...); return mut }
 
-// PushPrintf formats according to tpl and writes to the mutable.
+// Mprintf formats according to tpl and writes to the mutable.
 // Analogous to fmt.Fprintf.
-func (mut *Mutable) PushPrintf(tpl string, args ...any) *Mutable {
+func (mut *Mutable) Mprintf(tpl string, args ...any) *Mutable {
 	fmt.Fprintf(mut, tpl, args...)
 	return mut
 }
 
-// PushPrintln formats args using default formatting, appends a newline, and writes to the mutable.
+// Mprintln formats args using default formatting, appends a newline, and writes to the mutable.
 // Analogous to fmt.Fprintln.
-func (mut *Mutable) PushPrintln(args ...any) *Mutable { fmt.Fprintln(mut, args...); return mut }
+func (mut *Mutable) Mprintln(args ...any) *Mutable { fmt.Fprintln(mut, args...); return mut }
 
 // ---- Numeric / strconv ----
 
@@ -231,26 +231,26 @@ func (mut *Mutable) PushReplace(s, old, new []byte, n int) { //nolint:predeclare
 
 // ---- When* ----
 
-// WhenPushPrint calls PushPrint with args if cond is true.
-func (mut *Mutable) WhenPushPrint(cond bool, args ...any) *Mutable {
+// WhenMprint calls Mprint with args if cond is true.
+func (mut *Mutable) WhenMprint(cond bool, args ...any) *Mutable {
 	if cond {
-		mut.PushPrint(args...)
+		mut.Mprint(args...)
 	}
 	return mut
 }
 
-// WhenPushPrintf calls PushPrintf with tpl and args if cond is true.
-func (mut *Mutable) WhenPushPrintf(cond bool, tpl string, args ...any) *Mutable {
+// WhenMprintf calls Mprintf with tpl and args if cond is true.
+func (mut *Mutable) WhenMprintf(cond bool, tpl string, args ...any) *Mutable {
 	if cond {
-		mut.PushPrintf(tpl, args...)
+		mut.Mprintf(tpl, args...)
 	}
 	return mut
 }
 
-// WhenPushPrintln calls PushPrintln with args if cond is true.
-func (mut *Mutable) WhenPushPrintln(cond bool, args ...any) *Mutable {
+// WhenMprintln calls Mprintln with args if cond is true.
+func (mut *Mutable) WhenMprintln(cond bool, args ...any) *Mutable {
 	if cond {
-		mut.PushPrintln(args...)
+		mut.Mprintln(args...)
 	}
 	return mut
 }

@@ -231,9 +231,9 @@ func semanticEdgeCaseTests[T stringWriter[T]]() []testCase[T] {
 			expected: "xyz",
 		},
 		{
-			name: "PushPrintf formatting",
+			name: "Bprintf formatting",
 			buildFn: func(w T) {
-				w.PushPrintf("Value: %d, %s, %v", 42, "test", true)
+				w.Bprintf("Value: %d, %s, %v", 42, "test", true)
 			},
 			expected: "Value: 42, test, true",
 		},
@@ -459,7 +459,7 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 			buildFn: func(w T) {
 				w.WriteLine("Header")
 				w.Tab()
-				w.PushPrintf("Value: %d", 42)
+				w.Bprintf("Value: %d", 42)
 				w.Line()
 				w.Concat("a", "b", "c")
 				w.Line()

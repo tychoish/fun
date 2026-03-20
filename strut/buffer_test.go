@@ -63,7 +63,7 @@ func TestBuffer_Repeat(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, repeatTests[*Buffer]())
 }
 
-func TestBuffer_PushPrint(t *testing.T) {
+func TestBuffer_Bprint(t *testing.T) {
 	runBuildTests(t, func() *Buffer { return &Buffer{} }, wprintTests[*Buffer]())
 }
 

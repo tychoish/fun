@@ -63,7 +63,7 @@ func TestBuilder_Repeat(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, repeatTests[*Builder]())
 }
 
-func TestBuilder_PushPrint(t *testing.T) {
+func TestBuilder_Bprint(t *testing.T) {
 	runBuildTests(t, func() *Builder { return &Builder{} }, wprintTests[*Builder]())
 }
 

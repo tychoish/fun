@@ -24,23 +24,23 @@ func (b *Builder) wb(in byte)        { b.WriteByte(in) }
 func (b *Builder) wrr(r rune)        { b.WriteRune(r) }
 func (b *Builder) cat(strs []string) { apply(b.PushString, strs) }
 
-// PushPrint formats its arguments using default formatting and writes to
+// Bprint formats its arguments using default formatting and writes to
 // the builder. Analogous to fmt.Print, fmt.Fprint, and fmt.Sprint.
-func (b *Builder) PushPrint(args ...any) *Builder { fmt.Fprint(b, args...); return b }
+func (b *Builder) Bprint(args ...any) *Builder { fmt.Fprint(b, args...); return b }
 
-// PushPrintf formats according to a format specifier and writes to the
+// Bprintf formats according to a format specifier and writes to the
 // builder. The 'tpl' parameter is the format string, and 'args' are the
 // values to format. Analgous to fmt.Printf, fmt.Sprintf, and
 // fmt.Fprintf.
-func (b *Builder) PushPrintf(tpl string, args ...any) *Builder {
+func (b *Builder) Bprintf(tpl string, args ...any) *Builder {
 	fmt.Fprintf(b, tpl, args...)
 	return b
 }
 
-// PushPrintln formats its arguments using default formatting, adds a
+// Bprintln formats its arguments using default formatting, adds a
 // newline, and writes to the builder. Analogous to fmt.Println,
 // fmt.Sprintln, fmt.Fprintln.
-func (b *Builder) PushPrintln(args ...any) *Builder { fmt.Fprintln(b, args...); return b }
+func (b *Builder) Bprintln(args ...any) *Builder { fmt.Fprintln(b, args...); return b }
 
 // Line writes a single newline character to the builder.
 func (b *Builder) Line() { b.WriteByte('\n') }
@@ -95,7 +95,7 @@ func (b *Builder) WhenWriteMutableLines(cond bool, ms ...Mutable) {
 	ifargs(cond, b.WriteMutableLines, ms)
 }
 
-// Push writes the byte slice 'buf' to the builder. The byte slice is
+// PushBytes writes the byte slice 'buf' to the builder. The byte slice is
 // copied during the write operation; the caller retains ownership of 'buf'
 // and may modify it after this call returns. This is a convenience wrapper
 // around Write.
@@ -133,29 +133,29 @@ func (b *Builder) RepeatRune(r rune, n int) { nwith(n, b.wrr, r) }
 // repetition is on its own line.
 func (b *Builder) RepeatLine(ln string, n int) { nwith(n, b.WriteLine, ln) }
 
-// WhenPushPrint calls PushPrint with 'args' if 'cond' is true and is a no-op
+// WhenBprint calls Bprint with 'args' if 'cond' is true and is a no-op
 // otherwise.
-func (b *Builder) WhenPushPrint(cond bool, args ...any) *Builder {
+func (b *Builder) WhenBprint(cond bool, args ...any) *Builder {
 	if cond {
-		b.PushPrint(args...)
+		b.Bprint(args...)
 	}
 	return b
 }
 
-// WhenPushPrintf calls PushPrintf with 'tpl' and 'args' if 'cond' is true and is
+// WhenBprintf calls Bprintf with 'tpl' and 'args' if 'cond' is true and is
 // a no-op otherwise.
-func (b *Builder) WhenPushPrintf(cond bool, tpl string, args ...any) *Builder {
+func (b *Builder) WhenBprintf(cond bool, tpl string, args ...any) *Builder {
 	if cond {
-		b.PushPrintf(tpl, args...)
+		b.Bprintf(tpl, args...)
 	}
 	return b
 }
 
-// WhenPushPrintln calls PushPrintln with 'args' if 'cond' is true and is a
+// WhenBprintln calls Bprintln with 'args' if 'cond' is true and is a
 // no-op otherwise.
-func (b *Builder) WhenPushPrintln(cond bool, args ...any) *Builder {
+func (b *Builder) WhenBprintln(cond bool, args ...any) *Builder {
 	if cond {
-		b.PushPrintln(args...)
+		b.Bprintln(args...)
 	}
 	return b
 }
@@ -236,7 +236,7 @@ func (b *Builder) PushQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneTo
 // unicode.IsGraphic are escaped.
 func (b *Builder) PushQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
 
-// Int writes the  string representation of the integer 'num' to the builder.
+// PushInt writes the  string representation of the integer 'num' to the builder.
 func (b *Builder) PushInt(num int) { b.Write(strconv.AppendInt(nil, int64(num), 10)) }
 
 // PushBool writes "true" or "false" according to the value of 'v' to the builder.

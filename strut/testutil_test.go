@@ -27,12 +27,12 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	RepeatByte(byte, int)
 	RepeatRune(rune, int)
 	RepeatLine(string, int)
-	PushPrint(...any) T
-	PushPrintf(string, ...any) T
-	PushPrintln(...any) T
-	WhenPushPrint(bool, ...any) T
-	WhenPushPrintf(bool, string, ...any) T
-	WhenPushPrintln(bool, ...any) T
+	Bprint(...any) T
+	Bprintf(string, ...any) T
+	Bprintln(...any) T
+	WhenBprint(bool, ...any) T
+	WhenBprintf(bool, string, ...any) T
+	WhenBprintln(bool, ...any) T
 	WhenLine(bool)
 	WhenTab(bool)
 	WhenNLines(bool, int)
@@ -503,44 +503,44 @@ func repeatTests[T stringWriter[T]]() []testCase[T] {
 func wprintTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "PushPrint simple",
+			name: "Bprint simple",
 			buildFn: func(w T) {
-				w.PushPrint("hello", " ", "world")
+				w.Bprint("hello", " ", "world")
 			},
 			expected: "hello world",
 		},
 		{
-			name: "PushPrint numbers",
+			name: "Bprint numbers",
 			buildFn: func(w T) {
-				w.PushPrint(42, " ", 3.14)
+				w.Bprint(42, " ", 3.14)
 			},
 			expected: "42 3.14",
 		},
 		{
-			name: "PushPrintf format",
+			name: "Bprintf format",
 			buildFn: func(w T) {
-				w.PushPrintf("Hello %s, number %d", "world", 42)
+				w.Bprintf("Hello %s, number %d", "world", 42)
 			},
 			expected: "Hello world, number 42",
 		},
 		{
-			name: "PushPrintf empty",
+			name: "Bprintf empty",
 			buildFn: func(w T) {
-				w.PushPrintf("")
+				w.Bprintf("")
 			},
 			expected: "",
 		},
 		{
-			name: "PushPrintln",
+			name: "Bprintln",
 			buildFn: func(w T) {
-				w.PushPrintln("test")
+				w.Bprintln("test")
 			},
 			expected: "test\n",
 		},
 		{
-			name: "PushPrintln multiple args",
+			name: "Bprintln multiple args",
 			buildFn: func(w T) {
-				w.PushPrintln("a", "b", "c")
+				w.Bprintln("a", "b", "c")
 			},
 			expected: "a b c\n",
 		},
@@ -551,44 +551,44 @@ func wprintTests[T stringWriter[T]]() []testCase[T] {
 func whenMethodTests[T stringWriter[T]]() []testCase[T] {
 	return []testCase[T]{
 		{
-			name: "WhenPushPrint true",
+			name: "WhenBprint true",
 			buildFn: func(w T) {
-				w.WhenPushPrint(true, "hello")
+				w.WhenBprint(true, "hello")
 			},
 			expected: "hello",
 		},
 		{
-			name: "WhenPushPrint false",
+			name: "WhenBprint false",
 			buildFn: func(w T) {
-				w.WhenPushPrint(false, "hello")
+				w.WhenBprint(false, "hello")
 			},
 			expected: "",
 		},
 		{
-			name: "WhenPushPrintf true",
+			name: "WhenBprintf true",
 			buildFn: func(w T) {
-				w.WhenPushPrintf(true, "num=%d", 42)
+				w.WhenBprintf(true, "num=%d", 42)
 			},
 			expected: "num=42",
 		},
 		{
-			name: "WhenPushPrintf false",
+			name: "WhenBprintf false",
 			buildFn: func(w T) {
-				w.WhenPushPrintf(false, "num=%d", 42)
+				w.WhenBprintf(false, "num=%d", 42)
 			},
 			expected: "",
 		},
 		{
-			name: "WhenPushPrintln true",
+			name: "WhenBprintln true",
 			buildFn: func(w T) {
-				w.WhenPushPrintln(true, "test")
+				w.WhenBprintln(true, "test")
 			},
 			expected: "test\n",
 		},
 		{
-			name: "WhenPushPrintln false",
+			name: "WhenBprintln false",
 			buildFn: func(w T) {
-				w.WhenPushPrintln(false, "test")
+				w.WhenBprintln(false, "test")
 			},
 			expected: "",
 		},
