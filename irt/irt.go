@@ -1124,6 +1124,22 @@ func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter
 	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), toCmp2(cf))))
 }
 
+// SortFunc consumes the sequence, sorts it using the provided
+// cmp.Compare-style comparison function, and returns a new sorted
+// sequence.
+func SortFunc[T any](seq iter.Seq[T], cf func(T, T) int) iter.Seq[T] {
+	return slices.Values(slices.SortedFunc(seq, cf))
+}
+
+// SortFunc2 consumes the iterator, sorts its pairs using the provided
+// cmp.Compare-style comparison function, and returns a new sorted
+// iterator.
+func SortFunc2[A, B any](seq iter.Seq2[A, B], cf func(A, B, A, B) int) iter.Seq2[A, B] {
+	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), func(l, r KV[A, B]) int {
+		return cf(l.Key, l.Value, r.Key, r.Value)
+	})))
+}
+
 // ReadLines returns a sequence of strings from the reader, with one
 // item for every line, stopping when the reader is exhausted at the
 // first error.

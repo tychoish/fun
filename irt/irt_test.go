@@ -2,6 +2,7 @@ package irt
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -9175,6 +9176,148 @@ func TestSort1(t *testing.T) {
 		}
 		if result[0].Key != 1 || result[1].Key != 3 {
 			t.Errorf("Sort1(non-ordered second) = keys %d,%d, want 1,3", result[0].Key, result[1].Key)
+		}
+	})
+}
+
+func TestSortFunc(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		result := Collect(SortFunc(Slice([]int{}), cmp.Compare))
+		if len(result) != 0 {
+			t.Errorf("SortFunc(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		result := Collect(SortFunc(Slice([]int{42}), cmp.Compare))
+		expected := []int{42}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc(single) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Ascending", func(t *testing.T) {
+		result := Collect(SortFunc(Slice([]int{3, 1, 2}), cmp.Compare))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc(ascending) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Descending", func(t *testing.T) {
+		result := Collect(SortFunc(Slice([]int{3, 1, 2}), func(a, b int) int { return cmp.Compare(b, a) }))
+		expected := []int{3, 2, 1}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc(descending) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Strings", func(t *testing.T) {
+		result := Collect(SortFunc(Slice([]string{"banana", "apple", "cherry"}), cmp.Compare))
+		expected := []string{"apple", "banana", "cherry"}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc(strings) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("CustomComparator", func(t *testing.T) {
+		// Sort by string length
+		result := Collect(SortFunc(Slice([]string{"bb", "aaa", "c"}), func(a, b string) int {
+			return cmp.Compare(len(a), len(b))
+		}))
+		expected := []string{"c", "bb", "aaa"}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc(custom) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("Duplicates", func(t *testing.T) {
+		result := Collect(SortFunc(Slice([]int{2, 1, 2, 1}), cmp.Compare))
+		expected := []int{1, 1, 2, 2}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc(duplicates) = %v, want %v", result, expected)
+		}
+	})
+}
+
+func TestSortFunc2(t *testing.T) {
+	t.Run("EmptySequence", func(t *testing.T) {
+		result := Collect(KVjoin(SortFunc2(KVsplit(Slice([]KV[int, int]{})), func(ak, av, bk, bv int) int {
+			return cmp.Compare(ak, bk)
+		})))
+		if len(result) != 0 {
+			t.Errorf("SortFunc2(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("SingleElement", func(t *testing.T) {
+		input := []KV[int, string]{{1, "a"}}
+		result := Collect(KVjoin(SortFunc2(KVsplit(Slice(input)), func(ak int, av string, bk int, bv string) int {
+			return cmp.Compare(ak, bk)
+		})))
+		if !slices.Equal(result, input) {
+			t.Errorf("SortFunc2(single) = %v, want %v", result, input)
+		}
+	})
+
+	t.Run("SortByKey", func(t *testing.T) {
+		input := []KV[int, string]{{3, "c"}, {1, "a"}, {2, "b"}}
+		result := Collect(KVjoin(SortFunc2(KVsplit(Slice(input)), func(ak int, av string, bk int, bv string) int {
+			return cmp.Compare(ak, bk)
+		})))
+		expected := []KV[int, string]{{1, "a"}, {2, "b"}, {3, "c"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc2(by key) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SortByValue", func(t *testing.T) {
+		input := []KV[int, string]{{1, "c"}, {2, "a"}, {3, "b"}}
+		result := Collect(KVjoin(SortFunc2(KVsplit(Slice(input)), func(ak int, av string, bk int, bv string) int {
+			return cmp.Compare(av, bv)
+		})))
+		expected := []KV[int, string]{{2, "a"}, {3, "b"}, {1, "c"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc2(by value) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("SortDescending", func(t *testing.T) {
+		input := []KV[int, string]{{1, "a"}, {3, "c"}, {2, "b"}}
+		result := Collect(KVjoin(SortFunc2(KVsplit(Slice(input)), func(ak int, av string, bk int, bv string) int {
+			return cmp.Compare(bk, ak)
+		})))
+		expected := []KV[int, string]{{3, "c"}, {2, "b"}, {1, "a"}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc2(descending) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("CompositeComparator", func(t *testing.T) {
+		input := []KV[int, int]{{1, 3}, {1, 1}, {2, 2}, {1, 2}}
+		result := Collect(KVjoin(SortFunc2(KVsplit(Slice(input)), func(ak, av, bk, bv int) int {
+			return cmp.Or(cmp.Compare(ak, bk), cmp.Compare(av, bv))
+		})))
+		expected := []KV[int, int]{{1, 1}, {1, 2}, {1, 3}, {2, 2}}
+		if !slices.Equal(result, expected) {
+			t.Errorf("SortFunc2(composite) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := []KV[int, string]{{3, "c"}, {1, "a"}, {2, "b"}}
+		count := 0
+		for k, v := range SortFunc2(KVsplit(Slice(input)), func(ak int, av string, bk int, bv string) int {
+			return cmp.Compare(ak, bk)
+		}) {
+			count++
+			if k != 1 || v != "a" {
+				t.Errorf("first element should be (1,a), got (%d,%s)", k, v)
+			}
+			break
+		}
+		if count != 1 {
+			t.Errorf("should have iterated exactly once, got %d", count)
 		}
 	})
 }
