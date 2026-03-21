@@ -340,6 +340,38 @@ func Convert2[A, B, C, D any, OP ~func(A, B) (C, D)](seq iter.Seq2[A, B], op OP)
 	}
 }
 
+// Cast returns a sequence of U by performing a type assertion on each
+// element of seq. Because all elements of a sequence share the same
+// type, a failed assertion means no element can satisfy the cast, so
+// iteration stops immediately on the first failure.
+func Cast[T, U any](seq iter.Seq[T]) iter.Seq[U] {
+	return func(yield func(U) bool) {
+		for value := range seq {
+			if out, ok := any(value).(U); !ok || !yield(out) {
+				return
+			}
+		}
+	}
+}
+
+// Cast2 returns an iterator of (C, D) pairs by performing type
+// assertions on the keys and values of seq independently. A failed
+// key assertion stops iteration immediately; a failed value assertion
+// likewise stops iteration immediately. Because all keys share one
+// type and all values share another, a single failure predicts all
+// subsequent failures for that position.
+func Cast2[A, B, C, D any](seq iter.Seq2[A, B]) iter.Seq2[C, D] {
+	return func(yield func(C, D) bool) {
+		for key, value := range seq {
+			if outKey, ok := any(key).(C); !ok {
+				return
+			} else if outVal, ok := any(value).(D); !ok || !yield(outKey, outVal) {
+				return
+			}
+		}
+	}
+}
+
 // Modify2 applies a transformation function to each pair in the
 // sequence.  If the operation is nil, the sequence is returned
 // unchanged.

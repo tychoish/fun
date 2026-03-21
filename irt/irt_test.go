@@ -4342,6 +4342,157 @@ func TestLimit2(t *testing.T) {
 	})
 }
 
+func TestCast(t *testing.T) {
+	type myInt = int // true alias: same type, cast always succeeds
+
+	t.Run("Empty", func(t *testing.T) {
+		result := Collect(Cast[any, int](Slice([]any{})))
+		if len(result) != 0 {
+			t.Errorf("Cast(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("AllMatch", func(t *testing.T) {
+		input := []any{1, 2, 3}
+		result := Collect(Cast[any, int](Slice(input)))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Cast(all match) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StopsOnFirstFailure", func(t *testing.T) {
+		// First element fails: no output expected.
+		input := []any{"not an int", 2, 3}
+		result := Collect(Cast[any, int](Slice(input)))
+		if len(result) != 0 {
+			t.Errorf("Cast(first fails) = %v, want []", result)
+		}
+	})
+
+	t.Run("StopsAtFailure", func(t *testing.T) {
+		// Two good elements then a failure: only the first two are yielded.
+		input := []any{1, 2, "stop", 4, 5}
+		result := Collect(Cast[any, int](Slice(input)))
+		expected := []int{1, 2}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Cast(stops at failure) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("NoneMatch", func(t *testing.T) {
+		input := []any{"a", "b", "c"}
+		result := Collect(Cast[any, int](Slice(input)))
+		if len(result) != 0 {
+			t.Errorf("Cast(none match) = %v, want []", result)
+		}
+	})
+
+	t.Run("TypeAlias", func(t *testing.T) {
+		// myInt is a true alias of int; the cast should succeed.
+		input := []myInt{1, 2, 3}
+		result := Collect(Cast[myInt, int](Slice(input)))
+		expected := []int{1, 2, 3}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Cast(type alias) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := []any{1, 2, 3, 4, 5}
+		count := 0
+		for range Cast[any, int](Slice(input)) {
+			count++
+			break
+		}
+		if count != 1 {
+			t.Errorf("Cast early termination: iterated %d times, want 1", count)
+		}
+	})
+}
+
+func TestCast2(t *testing.T) {
+	type myString = string // true alias
+
+	t.Run("Empty", func(t *testing.T) {
+		result := Collect2(Cast2[any, any, int, string](KVsplit(Slice([]KV[any, any]{}))))
+		if len(result) != 0 {
+			t.Errorf("Cast2(empty) = %v, want {}", result)
+		}
+	})
+
+	t.Run("AllMatch", func(t *testing.T) {
+		input := KVargs(MakeKV[any, any](1, "a"), MakeKV[any, any](2, "b"))
+		result := Collect2(Cast2[any, any, int, string](input))
+		expected := map[int]string{1: "a", 2: "b"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Cast2(all match) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StopsOnBadKey", func(t *testing.T) {
+		// Good pair, then bad key: stops after the first element.
+		input := KVargs(MakeKV[any, any](1, "a"), MakeKV[any, any]("bad", "b"), MakeKV[any, any](3, "c"))
+		result := Collect2(Cast2[any, any, int, string](input))
+		expected := map[int]string{1: "a"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Cast2(bad key) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("StopsOnBadValue", func(t *testing.T) {
+		// Good pair, then bad value: stops after the first element.
+		input := KVargs(MakeKV[any, any](1, "a"), MakeKV[any, any](2, 99), MakeKV[any, any](3, "c"))
+		result := Collect2(Cast2[any, any, int, string](input))
+		expected := map[int]string{1: "a"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Cast2(bad value) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("KeyTypeUnchanged", func(t *testing.T) {
+		// Key type stays int; only value is cast from any to string.
+		input := KVargs(MakeKV(1, any("a")), MakeKV(2, any("b")), MakeKV(3, any("c")))
+		result := Collect2(Cast2[int, any, int, string](input))
+		expected := map[int]string{1: "a", 2: "b", 3: "c"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Cast2(key unchanged) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("ValueTypeUnchanged", func(t *testing.T) {
+		// Value type stays string; only key is cast from any to int.
+		input := KVargs(MakeKV(any(1), "a"), MakeKV(any(2), "b"), MakeKV(any(3), "c"))
+		result := Collect2(Cast2[any, string, int, string](input))
+		expected := map[int]string{1: "a", 2: "b", 3: "c"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Cast2(value unchanged) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("TypeAlias", func(t *testing.T) {
+		// myString is a true alias of string; both positions cast cleanly.
+		input := KVargs(MakeKV[any, myString](1, "a"), MakeKV[any, myString](2, "b"))
+		result := Collect2(Cast2[any, myString, int, string](input))
+		expected := map[int]string{1: "a", 2: "b"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Cast2(type alias) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := KVargs(MakeKV[any, any](1, "a"), MakeKV[any, any](2, "b"), MakeKV[any, any](3, "c"))
+		count := 0
+		for range Cast2[any, any, int, string](input) {
+			count++
+			break
+		}
+		if count != 1 {
+			t.Errorf("Cast2 early termination: iterated %d times, want 1", count)
+		}
+	})
+}
+
 func TestConvert2(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
 		input := Map(map[string]int{"a": 1, "b": 2})
