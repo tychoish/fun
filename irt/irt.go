@@ -1021,6 +1021,26 @@ func Contains[T comparable](seq iter.Seq[T], cmp T) (ok bool) {
 	return
 }
 
+// HasValues returns true if any items are found in the iterator. Use
+// this, potentially in combination with 'Keep()' and 'Remove' to
+// implement arbitrary "contains"-type expressions.
+func HasValues[T any](seq iter.Seq[T]) bool {
+	for range seq {
+		return true
+	}
+	return false
+}
+
+// HasValues2 returns true if any items are found in the iterator. Use
+// this, potentially in combination with 'Keep()' and 'Remove' to
+// implement arbitrary "contains"-type expressions.
+func HasValues2[A, B any](seq iter.Seq2[A, B]) bool {
+	for range seq {
+		return true
+	}
+	return false
+}
+
 // Equal returns true if the two sequences contain the same elements
 // in the same order.
 func Equal[T comparable](rh iter.Seq[T], lh iter.Seq[T]) bool {

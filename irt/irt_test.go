@@ -9897,3 +9897,22 @@ func TestWithWMutex2(t *testing.T) {
 		}
 	})
 }
+
+func TestHasValues(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		if HasValues(Zero[string]()) {
+			t.Error("should not have had values")
+		}
+		if HasValues2(Zero2[string, string]()) {
+			t.Error("should not have had values (2)")
+		}
+	})
+	t.Run("HadValues", func(t *testing.T) {
+		if !HasValues(One("value")) {
+			t.Error("should have had values")
+		}
+		if !HasValues2(Two("key", "value")) {
+			t.Error("should have had values (2)")
+		}
+	})
+}
