@@ -1,6 +1,10 @@
 package erc
 
-import "iter"
+import (
+	"iter"
+
+	"github.com/tychoish/fun/irt"
+)
 
 // Handle converts an error-producing iterator into a regular iterator by
 // handling errors separately. Values with non-nil errors are skipped and
@@ -115,11 +119,7 @@ func FromIteratorUntil[T any](seq iter.Seq2[T, error]) ([]T, error) {
 // called for the values where the error is nil.
 func ForIterator[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 	var ec Collector
-	for value, err := range seq {
-		if ec.PushOk(err) {
-			op(value)
-		}
-	}
+	irt.Apply(Handle(seq, ec.Push), op)
 	return ec.Resolve()
 }
 
@@ -128,10 +128,7 @@ func ForIterator[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 // called, even if the error is nil.
 func ForIteratorAll[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 	var ec Collector
-	for value, err := range seq {
-		ec.Push(err)
-		op(value)
-	}
+	irt.Apply(HandleAll(seq, ec.Push), op)
 	return ec.Resolve()
 }
 
@@ -139,13 +136,9 @@ func ForIteratorAll[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
 // value to the function UNTIL the error value is non nil. The first
 // error encountered is always returned.
 func ForIteratorUntil[T any, OP ~func(T)](seq iter.Seq2[T, error], op OP) error {
-	for value, err := range seq {
-		if err != nil {
-			return err
-		}
-		op(value)
-	}
-	return nil
+	var ec Collector
+	irt.Apply(HandleUntil(seq, ec.Push), op)
+	return ec.Resolve()
 }
 
 type slice[T any] []T

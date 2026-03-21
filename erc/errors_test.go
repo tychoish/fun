@@ -255,6 +255,22 @@ func TestError(t *testing.T) {
 				t.Fatal(ec.Resolve())
 			}
 		})
+		t.Run("PushOk", func(t *testing.T) {
+			var ec Collector
+			if !ec.PushOk(nil) {
+				t.Error("should be ok when nil error")
+			}
+			if ec.Len() != 0 || !ec.Ok() {
+				t.Error("collector should be ok")
+			}
+
+			if ec.PushOk(io.EOF) {
+				t.Error("should NOT  when nil error")
+			}
+			if ec.Len() == 0 || ec.Ok() {
+				t.Error("collector should be ok")
+			}
+		})
 		t.Run("RecoverCall", func(t *testing.T) {
 			ec := &Collector{}
 
