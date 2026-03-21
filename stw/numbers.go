@@ -2,6 +2,7 @@ package stw
 
 import (
 	"fmt"
+	"iter"
 
 	"github.com/tychoish/fun/ers"
 )
@@ -126,4 +127,20 @@ func RoundToSmallestMultiple[T SignedInteger](a, b T) T {
 // The output value is always *larget* than the input value.
 func RoundToLargestMultiple[T SignedInteger](a, b T) T {
 	return max(RoundToMultipleTowardZero(a, b), RoundToMultipleAwayFromZero(a, b))
+}
+
+// SumIter iterates over a sequence of integers and returns their total.
+func SumIter[T Integers](seq iter.Seq[T]) (total T) {
+	for num := range seq {
+		total += num
+	}
+	return
+}
+
+// Sum adds the provided integers and returns their total.
+func Sum[T Integers](nums ...T) (total T) {
+	for _, num := range nums {
+		total += num
+	}
+	return
 }

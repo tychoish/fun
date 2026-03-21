@@ -5,8 +5,39 @@ import (
 	"math"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 )
+
+func TestSum(t *testing.T) {
+	if v := Sum(1, 2, 3, 4, 5); v != 15 {
+		t.Error(v)
+	}
+	if v := Sum[int](); v != 0 {
+		t.Error(v)
+	}
+	if v := Sum(-3, 3); v != 0 {
+		t.Error(v)
+	}
+	if v := Sum[uint](10, 20, 30); v != 60 {
+		t.Error(v)
+	}
+}
+
+func TestSumIter(t *testing.T) {
+	if v := SumIter(slices.Values([]int{1, 2, 3, 4, 5})); v != 15 {
+		t.Error(v)
+	}
+	if v := SumIter(slices.Values([]int{})); v != 0 {
+		t.Error(v)
+	}
+	if v := SumIter(slices.Values([]int{-3, 3})); v != 0 {
+		t.Error(v)
+	}
+	if v := SumIter(slices.Values([]uint{10, 20, 30})); v != 60 {
+		t.Error(v)
+	}
+}
 
 func TestMath(t *testing.T) {
 	t.Run("Abs", func(t *testing.T) {
