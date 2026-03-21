@@ -396,7 +396,7 @@ func opwithstart[T any](ch chan T, op func()) chan T       { go op(); return ch 
 func opwithclose[T any](ch chan T, op func(chan T)) func() { return func() { defer close(ch); op(ch) } }
 func opwithch[T any](o func(chan T)) (chan T, func())      { c := make(chan T); return c, opwithclose(c, o) }
 
-func seqToChan[T any](ctx context.Context, seq iter.Seq[T], ch chan T) { flush(seq, yieldTo(ctx, ch)) }
+func seqToChan[T any](ctx context.Context, seq iter.Seq[T], ch chan T) { Flush(seq, yieldTo(ctx, ch)) }
 
 func yieldTo[T any](ctx context.Context, ch chan T) func(T) bool {
 	return func(v T) bool { return ctx.Err() == nil && sendTo(ctx, v, ch) }
@@ -439,23 +439,6 @@ func flushTo[T any](ctx context.Context, seq iter.Seq[T], ch chan<- T) bool {
 	return true
 }
 
-func flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
-	for value := range seq {
-		if !yield(value) {
-			return false
-		}
-	}
-	return true
-}
-
-func flush2[A, B any](seq iter.Seq2[A, B], yield func(A, B) bool) bool {
-	for key, value := range seq {
-		if !yield(key, value) {
-			return false
-		}
-	}
-	return true
-}
 
 // unpull converts next and stop functions back into an iter.Seq.
 // This is the inverse of iter.Pull.

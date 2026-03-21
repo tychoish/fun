@@ -349,7 +349,7 @@ func Modify2[A, B any, OP ~func(A, B) (A, B)](seq iter.Seq2[A, B], op OP) iter.S
 			seq = Convert2(seq, op)
 		}
 
-		flush2(seq, yield)
+		Flush2(seq, yield)
 	}
 }
 
@@ -369,7 +369,7 @@ func ModifyAll2[A, B any](seq iter.Seq2[A, B], ops ...func(A, B) (A, B)) iter.Se
 			})
 		}
 
-		flush2(seq, yield)
+		Flush2(seq, yield)
 	}
 }
 
@@ -382,7 +382,7 @@ func Modify[T any, OP ~func(T) T](seq iter.Seq[T], op OP) iter.Seq[T] {
 			seq = Convert(seq, op)
 		}
 
-		flush(seq, yield)
+		Flush(seq, yield)
 	}
 }
 
@@ -402,7 +402,7 @@ func ModifyAll[T any, OP ~func(T) T](seq iter.Seq[T], ops ...OP) iter.Seq[T] {
 			})
 		}
 
-		flush(seq, yield)
+		Flush(seq, yield)
 	}
 }
 
@@ -871,7 +871,7 @@ func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[
 
 		go func() { defer close(sink); flushTo(ctx, seq, sink) }()
 
-		flush(Channel(ctx, sink), yield)
+		Flush(Channel(ctx, sink), yield)
 	}
 }
 
@@ -879,14 +879,14 @@ func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[
 // starts and after() when iteration ends.  after() is called even if
 // iteration stops early. Nil hooks are ignored.
 func WithHooks[T any](seq iter.Seq[T], before func(), after func()) iter.Seq[T] {
-	return func(yield func(T) bool) { whenop(before); defer whenop(after); flush(seq, yield) }
+	return func(yield func(T) bool) { whenop(before); defer whenop(after); Flush(seq, yield) }
 }
 
 // WithSetup returns a sequence that calls setup() exactly once when
 // iteration starts for the first time.
 func WithSetup[T any](seq iter.Seq[T], setup func()) iter.Seq[T] {
 	setup = oncewhenop(setup)
-	return func(yield func(T) bool) { whenop(setup); flush(seq, yield) }
+	return func(yield func(T) bool) { whenop(setup); Flush(seq, yield) }
 }
 
 // WithMutex returns a sequence that synchronizes all calls to the
@@ -1138,6 +1138,34 @@ func SortFunc2[A, B any](seq iter.Seq2[A, B], cf func(A, B, A, B) int) iter.Seq2
 	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), func(l, r KV[A, B]) int {
 		return cf(l.Key, l.Value, r.Key, r.Value)
 	})))
+}
+
+// Flush iterates seq, passing each value to yield. It returns false
+// if yield signals early termination, and true if the sequence is
+// exhausted normally. Flush is the core building block for composing
+// iterators: use it inside an iter.Seq body to forward elements from
+// one sequence into another yield function.
+func Flush[T any](seq iter.Seq[T], yield func(T) bool) bool {
+	for value := range seq {
+		if !yield(value) {
+			return false
+		}
+	}
+	return true
+}
+
+// Flush2 iterates seq, passing each key-value pair to yield. It
+// returns false if yield signals early termination, and true if the
+// sequence is exhausted normally. Flush2 is the iter.Seq2 counterpart
+// to Flush: use it inside an iter.Seq2 body to forward pairs from one
+// sequence into another yield function.
+func Flush2[A, B any](seq iter.Seq2[A, B], yield func(A, B) bool) bool {
+	for key, value := range seq {
+		if !yield(key, value) {
+			return false
+		}
+	}
+	return true
 }
 
 // ReadLines returns a sequence of strings from the reader, with one
