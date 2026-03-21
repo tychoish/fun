@@ -54,6 +54,39 @@ func TestPtr(t *testing.T) {
 	})
 }
 
+func TestCheckOr(t *testing.T) {
+	isPositive := func(n int) bool { return n > 0 }
+	isEven := func(n int) bool { return n%2 == 0 }
+
+	check.True(t, CheckOr(isPositive, isEven)(2))
+	check.True(t, CheckOr(isPositive, isEven)(3))
+	check.True(t, CheckOr(isPositive, isEven)(-2))
+	check.True(t, !CheckOr(isPositive, isEven)(-3))
+	check.True(t, !CheckOr[int]()(0))
+
+	// short-circuits: second op never called if first returns true
+	called := false
+	second := func(int) bool { called = true; return false }
+	CheckOr(isPositive, second)(1)
+	check.True(t, !called)
+}
+
+func TestCheckAnd(t *testing.T) {
+	isPositive := func(n int) bool { return n > 0 }
+	isEven := func(n int) bool { return n%2 == 0 }
+
+	check.True(t, CheckAnd(isPositive, isEven)(4))
+	check.True(t, !CheckAnd(isPositive, isEven)(3))
+	check.True(t, !CheckAnd(isPositive, isEven)(-2))
+	check.True(t, CheckAnd[int]()(0))
+
+	// short-circuits: second op never called if first returns false
+	called := false
+	second := func(int) bool { called = true; return true }
+	CheckAnd(isEven, second)(3)
+	check.True(t, !called)
+}
+
 func TestDefault(t *testing.T) {
 	assert.Equal(t, Default(0, 42), 42)
 	assert.Equal(t, Default(77, 42), 77)

@@ -51,3 +51,32 @@ func DerefZ[T any](in *T) (value T) { value, _ = DerefOk(in); return }
 
 // Deref de-references a pointer, panicing if the pointer is nil.
 func Deref[T any](in *T) T { return *in }
+
+// CheckOr returns a function that runs each provided predicate against the
+// input value and returns true if any predicate returns true (short-circuits
+// on the first match). Returns false if no predicates are provided.
+func CheckOr[T any](ops ...func(T) bool) func(T) bool {
+	return func(in T) bool {
+		for _, op := range ops {
+			if op(in) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// CheckAnd returns a function that runs each provided predicate against the
+// input value and returns true only if all predicates return true
+// (short-circuits on the first failure). Returns true if no predicates are
+// provided.
+func CheckAnd[T any](ops ...func(T) bool) func(T) bool {
+	return func(in T) bool {
+		for _, op := range ops {
+			if !op(in) {
+				return false
+			}
+		}
+		return true
+	}
+}
