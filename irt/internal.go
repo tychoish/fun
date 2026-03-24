@@ -439,7 +439,6 @@ func flushTo[T any](ctx context.Context, seq iter.Seq[T], ch chan<- T) bool {
 	return true
 }
 
-
 // unpull converts next and stop functions back into an iter.Seq.
 // This is the inverse of iter.Pull.
 func unpull[T any](next func() (T, bool), stop func()) iter.Seq[T] {
