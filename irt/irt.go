@@ -1323,3 +1323,23 @@ func ResolveWrap2[A, B, C any, F ~func(A) (B, C)](seq iter.Seq[F], wrapping A) i
 		}
 	}
 }
+
+// Flatten a sequence/mapping of key/value pairs where the value is a
+// sequence, into a sequence of pairs to single values.
+func Flatten[K, V any, S iter.Seq[V]](seq iter.Seq2[K, S]) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for key, seqVals := range seq {
+			for value := range seqVals {
+				if !yield(key, value) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// FlattenSlice a sequence/mapping of key/value pairs where the value is a
+// slice of values, into a sequence of pairs to single values.
+func FlattenSlice[K, V any, S ~[]V](seq iter.Seq2[K, S]) iter.Seq2[K, V] {
+	return Flatten(Convert2(seq, kvslice2seq))
+}

@@ -235,11 +235,12 @@ func orDefaultNew[T comparable](val T, op func() T) T { return ifdoelse(isZero(v
 
 // slices -- access-by-index
 
-func idx[E any, S ~[]E](sl S, idx int) E          { return sl[idx] }
-func idxfn[E any, S ~[]E](sl S, idx int) func() E { return func() E { return sl[idx] } }
-func idxcheck[E any, S ~[]E](s S, idx int) bool   { return isWithin(idx, len(s)) }
-func idxorz[E any, S ~[]E](sl S, idx int) E       { return first(idxok(sl, idx)) }
-func idxorzfn[E any, S ~[]E](sl S) func(int) E    { return methodize(sl, idxorz) }
+func idx[E any, S ~[]E](sl S, idx int) E                       { return sl[idx] }
+func idxfn[E any, S ~[]E](sl S, idx int) func() E              { return func() E { return sl[idx] } }
+func idxcheck[E any, S ~[]E](s S, idx int) bool                { return isWithin(idx, len(s)) }
+func idxorz[E any, S ~[]E](sl S, idx int) E                    { return first(idxok(sl, idx)) }
+func idxorzfn[E any, S ~[]E](sl S) func(int) E                 { return methodize(sl, idxorz) }
+func kvslice2seq[K, V any, S ~[]V](k K, sl S) (K, iter.Seq[V]) { return k, Slice(sl) }
 
 func idxok[E any, S ~[]E](sl S, i int) (out E, ok bool) {
 	if ok = isWithin(i, len(sl)); ok {

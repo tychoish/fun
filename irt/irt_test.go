@@ -10210,3 +10210,146 @@ func TestHasValues(t *testing.T) {
 		}
 	})
 }
+
+func TestFlatten(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    iter.Seq2[string, []int]
+		expected []KV[string, int]
+	}{
+		{
+			name:     "EmptyOuterSequence",
+			input:    func(yield func(string, []int) bool) {},
+			expected: []KV[string, int]{},
+		},
+		{
+			name: "SingleKeyEmptySlice",
+			input: func(yield func(string, []int) bool) {
+				yield("a", []int{})
+			},
+			expected: []KV[string, int]{},
+		},
+		{
+			name: "MultipleKeysAllEmptySlices",
+			input: func(yield func(string, []int) bool) {
+				_ = yield("a", []int{}) && yield("b", []int{}) && yield("c", []int{})
+			},
+			expected: []KV[string, int]{},
+		},
+		{
+			name: "SingleKeyWithValues",
+			input: func(yield func(string, []int) bool) {
+				yield("a", []int{1, 2, 3})
+			},
+			expected: []KV[string, int]{
+				MakeKV("a", 1), MakeKV("a", 2), MakeKV("a", 3),
+			},
+		},
+		{
+			name: "MultipleKeysWithValues",
+			input: func(yield func(string, []int) bool) {
+				_ = yield("a", []int{1, 2}) && yield("b", []int{3, 4})
+			},
+			expected: []KV[string, int]{
+				MakeKV("a", 1), MakeKV("a", 2), MakeKV("b", 3), MakeKV("b", 4),
+			},
+		},
+		{
+			name: "MixedEmptyAndNonEmptySlices",
+			input: func(yield func(string, []int) bool) {
+				_ = yield("a", []int{}) && yield("b", []int{1, 2}) && yield("c", []int{})
+			},
+			expected: []KV[string, int]{
+				MakeKV("b", 1), MakeKV("b", 2),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(KVjoin(FlattenSlice(tt.input)))
+			expected := Collect(Slice(tt.expected))
+			if !slices.Equal(result, expected) {
+				t.Errorf("Flatten() = %v, want %v", result, expected)
+			}
+		})
+	}
+}
+
+func TestSquash(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    iter.Seq2[string, iter.Seq[int]]
+		expected []KV[string, int]
+	}{
+		{
+			name:     "EmptyOuterSequence",
+			input:    func(yield func(string, iter.Seq[int]) bool) {},
+			expected: []KV[string, int]{},
+		},
+		{
+			name: "SingleKeyEmptyInnerSequence",
+			input: func(yield func(string, iter.Seq[int]) bool) {
+				yield("a", func(yield func(int) bool) {})
+			},
+			expected: []KV[string, int]{},
+		},
+		{
+			name: "MultipleKeysAllEmptyInnerSequences",
+			input: func(yield func(string, iter.Seq[int]) bool) {
+				empty := func(yield func(int) bool) {}
+				_ = yield("a", empty) && yield("b", empty) && yield("c", empty)
+			},
+			expected: []KV[string, int]{},
+		},
+		{
+			name: "SingleKeyWithValues",
+			input: func(yield func(string, iter.Seq[int]) bool) {
+				yield("a", Args(1, 2, 3))
+			},
+			expected: []KV[string, int]{
+				MakeKV("a", 1), MakeKV("a", 2), MakeKV("a", 3),
+			},
+		},
+		{
+			name: "MultipleKeysWithValues",
+			input: func(yield func(string, iter.Seq[int]) bool) {
+				_ = yield("a", Args(1, 2)) && yield("b", Args(3, 4))
+			},
+			expected: []KV[string, int]{
+				MakeKV("a", 1), MakeKV("a", 2), MakeKV("b", 3), MakeKV("b", 4),
+			},
+		},
+		{
+			name: "MixedEmptyAndNonEmptyInnerSequences",
+			input: func(yield func(string, iter.Seq[int]) bool) {
+				empty := func(yield func(int) bool) {}
+				_ = yield("a", empty) && yield("b", Args(1, 2)) && yield("c", empty)
+			},
+			expected: []KV[string, int]{
+				MakeKV("b", 1), MakeKV("b", 2),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Collect(KVjoin(Flatten(tt.input)))
+			expected := Collect(Slice(tt.expected))
+			if !slices.Equal(result, expected) {
+				t.Errorf("Squash() = %v, want %v", result, expected)
+			}
+		})
+	}
+
+	t.Run("EarlyTermination", func(t *testing.T) {
+		input := func(yield func(string, iter.Seq[int]) bool) {
+			_ = yield("a", Args(1, 2)) && yield("b", Args(3, 4))
+		}
+		result := CollectFirstN(KVjoin(Flatten(input)), 1)
+		expected := []KV[string, int]{MakeKV("a", 1)}
+		if !slices.Equal(result, expected) {
+			t.Errorf("Squash() early termination = %v, want %v", result, expected)
+		}
+	})
+}
