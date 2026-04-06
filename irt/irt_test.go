@@ -10353,3 +10353,64 @@ func TestSquash(t *testing.T) {
 		}
 	})
 }
+
+func TestReverseMapping(t *testing.T) {
+	t.Run("BasicMapping", func(t *testing.T) {
+		input := maps.All(map[string][]int{
+			"a": {1, 2, 3},
+			"b": {4, 5},
+		})
+		result := Collect2(ReverseMapping(input))
+		expected := map[int]string{1: "a", 2: "a", 3: "a", 4: "b", 5: "b"}
+		if !maps.Equal(result, expected) {
+			t.Errorf("ReverseMapping() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EmptySequence", func(t *testing.T) {
+		input := Zero2[string, []int]()
+		result := Collect2(ReverseMapping(input))
+		if len(result) != 0 {
+			t.Errorf("ReverseMapping(empty) = %v, want empty map", result)
+		}
+	})
+
+	t.Run("EmptySliceValues", func(t *testing.T) {
+		input := maps.All(map[string][]int{
+			"a": {},
+			"b": {},
+		})
+		result := Collect2(ReverseMapping(input))
+		if len(result) != 0 {
+			t.Errorf("ReverseMapping(empty slices) = %v, want empty map", result)
+		}
+	})
+
+	t.Run("SingleEntry", func(t *testing.T) {
+		input := maps.All(map[int][]string{
+			42: {"x", "y"},
+		})
+		result := Collect2(ReverseMapping(input))
+		expected := map[string]int{"x": 42, "y": 42}
+		if !maps.Equal(result, expected) {
+			t.Errorf("ReverseMapping(single entry) = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("EarlyReturn", func(t *testing.T) {
+		input := Two("a", []int{1, 2, 3, 4, 5})
+		var count int
+		for k, v := range ReverseMapping(input) {
+			count++
+			if k == 0 || v == "" {
+				t.Error("zero value yielded")
+			}
+			if count == 2 {
+				break
+			}
+		}
+		if count != 2 {
+			t.Errorf("early return stopped after %d items, want 2", count)
+		}
+	})
+}
