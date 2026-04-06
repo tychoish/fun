@@ -19,7 +19,7 @@ func TestHandle(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0, 4)
 		for val := range Handle(seq, handler) {
 			result = append(result, val)
 		}
@@ -41,7 +41,7 @@ func TestHandle(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0, 3)
 		for val := range Handle(seq, handler) {
 			result = append(result, val)
 		}
@@ -72,12 +72,12 @@ func TestHandle(t *testing.T) {
 			yield(3, nil)
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []int{}
+		result := make([]int, 0, 4)
 		for val := range Handle(seq, handler) {
 			result = append(result, val)
 		}
@@ -108,12 +108,12 @@ func TestHandle(t *testing.T) {
 			yield(0, err3)
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []int{}
+		result := make([]int, 0, 3)
 		for val := range Handle(seq, handler) {
 			result = append(result, val)
 		}
@@ -145,7 +145,7 @@ func TestHandle(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0)
 		for val := range Handle(seq, handler) {
 			result = append(result, val)
 			if val == 2 {
@@ -183,7 +183,7 @@ func TestHandle(t *testing.T) {
 			ec.Push(err)
 		}
 
-		result := []string{}
+		result := make([]string, 0, 3)
 		for val := range Handle(seq, handler) {
 			result = append(result, val)
 		}
@@ -237,7 +237,7 @@ func TestHandleUntil(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0, 0)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 		}
@@ -259,7 +259,7 @@ func TestHandleUntil(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0, 3)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 		}
@@ -290,12 +290,12 @@ func TestHandleUntil(t *testing.T) {
 			yield(0, err2) // never reached
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []int{}
+		result := make([]int, 0, 2)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 		}
@@ -320,12 +320,12 @@ func TestHandleUntil(t *testing.T) {
 			yield("never", nil) // never reached
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0, 1)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []string{}
+		result := make([]string, 0, 0)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 		}
@@ -350,12 +350,12 @@ func TestHandleUntil(t *testing.T) {
 			yield(0, expectedErr)
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []int{}
+		result := make([]int, 0, 3)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 		}
@@ -385,7 +385,7 @@ func TestHandleUntil(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 			if val == 2 {
@@ -417,11 +417,11 @@ func TestHandleUntil(t *testing.T) {
 			}
 			yield(0, err2)
 		}
-		handlerUntilErrors := []error{}
+		handlerUntilErrors := make([]error, 0, 1)
 		handlerUntil := func(err error) {
 			handlerUntilErrors = append(handlerUntilErrors, err)
 		}
-		resultUntil := []int{}
+		resultUntil := make([]int, 0, 1)
 		for val := range HandleUntil(seqUntil, handlerUntil) {
 			resultUntil = append(resultUntil, val)
 		}
@@ -441,11 +441,11 @@ func TestHandleUntil(t *testing.T) {
 			}
 			yield(0, err2)
 		}
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0, 2)
 		handlerHandle := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
-		resultHandle := []int{}
+		resultHandle := make([]int, 0, 2)
 		for val := range Handle(seqHandle, handlerHandle) {
 			resultHandle = append(resultHandle, val)
 		}
@@ -468,12 +468,12 @@ func TestHandleUntil(t *testing.T) {
 			yield("never", nil)
 		}
 
-		logged := []string{}
+		logged := make([]string, 0)
 		handler := func(err error) {
 			logged = append(logged, "ERROR: "+err.Error())
 		}
 
-		result := []string{}
+		result := make([]string, 0, 2)
 		for val := range HandleUntil(seq, handler) {
 			result = append(result, val)
 		}
@@ -492,7 +492,7 @@ func TestHandleAll(t *testing.T) {
 		handlerCalled := 0
 		handler := func(err error) { handlerCalled++ }
 
-		result := []int{}
+		result := make([]int, 0, 0)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 		}
@@ -521,7 +521,7 @@ func TestHandleAll(t *testing.T) {
 			}
 		}
 
-		result := []int{}
+		result := make([]int, 0, 3)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 		}
@@ -554,12 +554,12 @@ func TestHandleAll(t *testing.T) {
 			yield(3, nil)
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []int{}
+		result := make([]int, 0, 5)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 		}
@@ -595,12 +595,12 @@ func TestHandleAll(t *testing.T) {
 			yield(300, err3)
 		}
 
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handler := func(err error) {
 			handlerErrors = append(handlerErrors, err)
 		}
 
-		result := []int{}
+		result := make([]int, 0, 3)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 		}
@@ -635,7 +635,7 @@ func TestHandleAll(t *testing.T) {
 		handlerCalls := 0
 		handler := func(err error) { handlerCalls++ }
 
-		result := []int{}
+		result := make([]int, 0)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 			if val == 2 {
@@ -673,7 +673,7 @@ func TestHandleAll(t *testing.T) {
 			ec.Push(err)
 		}
 
-		result := []string{}
+		result := make([]string, 0, 5)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 		}
@@ -707,7 +707,7 @@ func TestHandleAll(t *testing.T) {
 		}
 		handlerAllCalls := 0
 		handlerAll := func(err error) { handlerAllCalls++ }
-		resultAll := []int{}
+		resultAll := make([]int, 0, 3)
 		for val := range HandleAll(seqAll, handlerAll) {
 			resultAll = append(resultAll, val)
 		}
@@ -727,7 +727,7 @@ func TestHandleAll(t *testing.T) {
 		}
 		handlerCalls := 0
 		handlerHandle := func(err error) { handlerCalls++ }
-		resultHandle := []int{}
+		resultHandle := make([]int, 2, 2)
 		for val := range Handle(seqHandle, handlerHandle) {
 			resultHandle = append(resultHandle, val)
 		}
@@ -746,7 +746,7 @@ func TestHandleAll(t *testing.T) {
 		}
 		handlerUntilCalls := 0
 		handlerUntil := func(err error) { handlerUntilCalls++ }
-		resultUntil := []int{}
+		resultUntil := make([]int, 0, 1)
 		for val := range HandleUntil(seqUntil, handlerUntil) {
 			resultUntil = append(resultUntil, val)
 		}
@@ -775,7 +775,7 @@ func TestHandleAll(t *testing.T) {
 			}
 		}
 
-		result := []int{}
+		result := make([]int, 0, 4)
 		for val := range HandleAll(seq, handler) {
 			result = append(result, val)
 		}
@@ -813,13 +813,13 @@ func TestHandlerComparison(t *testing.T) {
 		}
 
 		// Test Handle
-		handlerErrors := []error{}
+		handlerErrors := make([]error, 0)
 		handlerHandle := func(err error) {
 			if err != nil {
 				handlerErrors = append(handlerErrors, err)
 			}
 		}
-		resultHandle := []int{}
+		resultHandle := make([]int, 0, 3)
 		for val := range Handle(makeSeq(), handlerHandle) {
 			resultHandle = append(resultHandle, val)
 		}
@@ -828,13 +828,13 @@ func TestHandlerComparison(t *testing.T) {
 		assert.Equal(t, 2, len(handlerErrors))            // both errors handled
 
 		// Test HandleUntil
-		handlerUntilErrors := []error{}
+		handlerUntilErrors := make([]error, 0)
 		handlerUntil := func(err error) {
 			if err != nil {
 				handlerUntilErrors = append(handlerUntilErrors, err)
 			}
 		}
-		resultUntil := []int{}
+		resultUntil := make([]int, 0, 1)
 		for val := range HandleUntil(makeSeq(), handlerUntil) {
 			resultUntil = append(resultUntil, val)
 		}
@@ -844,11 +844,11 @@ func TestHandlerComparison(t *testing.T) {
 		assert.ErrorIs(t, handlerUntilErrors[0], err1)
 
 		// Test HandleAll
-		handlerAllErrors := []error{}
+		handlerAllErrors := make([]error, 0)
 		handlerAll := func(err error) {
 			handlerAllErrors = append(handlerAllErrors, err)
 		}
-		resultAll := []int{}
+		resultAll := make([]int, 0, 5)
 		for val := range HandleAll(makeSeq(), handlerAll) {
 			resultAll = append(resultAll, val)
 		}
