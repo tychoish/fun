@@ -89,7 +89,7 @@ func must2[T any](v T, err error) T { must(err); return v }
 // statefull function utilities
 
 func counter() func() int                             { return counterFrom(0) }
-func counterFrom(next int) func() int                 { return func() int { next++; return next } }
+func counterFrom[T ~int](next T) func() T             { return func() T { next++; return next } }
 func seen[T comparable]() func(T) bool                { s := set[T]{}; return s.add }
 func seenkey[K comparable, V any]() func(K, V) bool   { return ignoreSecond[K, V](seen[K]()) }
 func seenvalue[K comparable, V any]() func(V, K) bool { s := seen[K](); return ignoreFirst[V](s) }

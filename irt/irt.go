@@ -199,10 +199,10 @@ func Monotonic() iter.Seq[int] { return Generate(counter()) }
 
 // MonotonicFrom returns an infinite sequence of integers starting
 // from start.
-func MonotonicFrom(start int) iter.Seq[int] { return Generate(counterFrom(start - 1)) }
+func MonotonicFrom[T ~int](start T) iter.Seq[T] { return Generate(counterFrom(start - 1)) }
 
 // Range returns a sequence of integers from start to end (inclusive).
-func Range(start int, end int) iter.Seq[int] { return While(MonotonicFrom(start), predLTE(end)) }
+func Range[T ~int](start T, end T) iter.Seq[T] { return While(MonotonicFrom(start), predLTE(end)) }
 
 // Index returns a iterator where each element from the input sequence
 // is paired with its 0-based index.
@@ -1342,4 +1342,19 @@ func Flatten[K, V any, S iter.Seq[V]](seq iter.Seq2[K, S]) iter.Seq2[K, V] {
 // slice of values, into a sequence of pairs to single values.
 func FlattenSlice[K, V any, S ~[]V](seq iter.Seq2[K, S]) iter.Seq2[K, V] {
 	return Flatten(Convert2(seq, kvslice2seq))
+}
+
+// ReverseMapping expands a mapping of keys to slices of values to a
+// mapping of values to keys. Values may appear more than once in the
+// output sequence.
+func ReverseMapping[A, B any](seq iter.Seq2[A, []B]) iter.Seq2[B, A] {
+	return func(yield func(B, A) bool) {
+		for value, keys := range seq {
+			for key := range Slice(keys) {
+				if !yield(key, value) {
+					return
+				}
+			}
+		}
+	}
 }
