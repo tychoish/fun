@@ -727,7 +727,7 @@ func TestHandleAll(t *testing.T) {
 		}
 		handlerCalls := 0
 		handlerHandle := func(err error) { handlerCalls++ }
-		resultHandle := make([]int, 2, 2)
+		resultHandle := make([]int, 0, 2)
 		for val := range Handle(seqHandle, handlerHandle) {
 			resultHandle = append(resultHandle, val)
 		}

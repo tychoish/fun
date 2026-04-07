@@ -119,3 +119,65 @@ func TestErrorf(t *testing.T) {
 		}
 	})
 }
+
+func TestErrorln_NoArgs(t *testing.T) {
+	if err := Errorln(); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestErrorln_OnlyNonErrorArgs(t *testing.T) {
+	err := Errorln("foo", "bar", 123)
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	if !ers.IsError(err) || err.Error() != "foo bar 123" {
+		t.Errorf(`unexpected error: %T %q`, err, err.Error())
+	}
+}
+
+func TestErrorln_OnlyErrorArgs(t *testing.T) {
+	e1 := errors.New("err1")
+	e2 := ers.Error("err2")
+	err := Errorln(e1, e2)
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	str := err.Error()
+	if !(strings.Contains(str, "[0]") && strings.Contains(str, "[1]")) {
+		t.Errorf("got %q, want both '[0]' and '[1]'", str)
+	}
+	if !strings.Contains(str, "err1") || !strings.Contains(str, "err2") {
+		t.Errorf("missing error messages in error: %q", str)
+	}
+}
+
+func TestErrorln_MixedArgs(t *testing.T) {
+	e1 := errors.New("err1")
+	err := Errorln("prefix", e1, "middle", 42)
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	s := err.Error()
+	if !strings.Contains(s, "prefix") || !strings.Contains(s, "middle") || !strings.Contains(s, "42") {
+		t.Errorf("missing non-error args in error: %q", s)
+	}
+	if !strings.Contains(s, "[1]") || !strings.Contains(s, "err1") {
+		t.Errorf("did not tag error with '[1]': %q", s)
+	}
+}
+
+func TestErrorln_InterleavedArgs(t *testing.T) {
+	e1 := errors.New("err1")
+	e2 := errors.New("err2")
+	err := Errorln("start", e1, "mid", e2, "end")
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	s := err.Error()
+	for _, part := range []string{"start", "mid", "end", "err1", "err2", "[1]", "[3]"} {
+		if !strings.Contains(s, part) {
+			t.Errorf("missing %q in %q", part, s)
+		}
+	}
+}

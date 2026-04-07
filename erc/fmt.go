@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/strut"
 )
 
 const (
@@ -75,4 +76,41 @@ func Errorf(tmpl string, args ...any) error {
 	}
 
 	return ec.Err()
+}
+
+// Errorln builds an error from a list of arguments, treating any
+// error values specially.
+//
+// Non-error arguments are concatenated as a message. Each error
+// argument is added to a collector and marked by its index in the
+// message. Returns nil if no arguments.
+func Errorln(args ...any) error {
+	if len(args) == 0 {
+		return nil
+	}
+
+	var ec Collector
+	mut := strut.MakeMutable(1024)
+	defer mut.Release()
+	argbuf := make([]any, 0, len(args))
+	for i, a := range args {
+		switch tv := a.(type) {
+		case error:
+			if len(argbuf) > 0 {
+				mut.Mprintln(argbuf...).TrimRight("\n")
+				argbuf = argbuf[:0]
+			}
+			ec.Push(tv)
+			mut.Mprintf("[%d]", i)
+		default:
+			argbuf = append(argbuf, a)
+		}
+	}
+	if len(argbuf) > 0 {
+		mut.Mprintln(argbuf...).TrimRight("\n")
+		argbuf = nil
+	}
+
+	ec.list.root().list.PushFront(ers.Error(mut.String()))
+	return ec.Resolve()
 }
