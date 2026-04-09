@@ -41,6 +41,11 @@ func (b *Buffer) Release() {
 	bufferPool.Put(b)
 }
 
+// Resolve renders the contents of the buffer to a string and then
+// returns the underlying buffer to the pool. It is an error to use
+// the buffer after calling Export().
+func (b *Buffer) Resolve() string { defer b.Release(); return b.String() }
+
 func (b *Buffer) wb(in byte)        { b.WriteByte(in) }
 func (b *Buffer) wrr(r rune)        { b.WriteRune(r) }
 func (b *Buffer) cat(strs []string) { apply(b.PushString, strs) }

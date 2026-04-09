@@ -15,6 +15,15 @@ import (
 const (
 	// asciiCaseDiff is the difference between uppercase and lowercase ASCII letters ('a' - 'A').
 	asciiCaseDiff = 'a' - 'A' // 32
+
+	// copyExtendGrowthFactor controls the over-allocation multiplier used by
+	// copyExtend and copyExtendString when the buffer needs to grow. A value
+	// of 2 doubles the current capacity on each reallocation, matching the
+	// amortised behaviour of append and keeping reallocations to O(log n) for
+	// sequential writes of unknown total size (e.g. Seq variants in Joiner).
+	// Increase the value to trade memory for fewer reallocations; decrease it
+	// toward 1 for tighter memory usage at the cost of more copies.
+	copyExtendGrowthFactor = 2
 )
 
 var newline = []byte{'\n'}
@@ -45,6 +54,10 @@ type Mutable []byte
 // should be released with Release() when no longer needed to enable
 // reuse. The initial content is empty but may have non-zero capacity.
 func NewMutable() *Mutable { return bufpool.Get().(*Mutable) }
+
+// MutableFrom constructs a new Mutable instance from the input
+// string. This is a copy operation.
+func MutableFrom(in string) *Mutable { m := MakeMutable(len(in)); m.PushString(in); return m }
 
 // MakeMutable retrieves a Mutable from the pool and ensures it has
 // at least the specified capacity. The returned Mutable has zero length
@@ -100,6 +113,11 @@ func (mut *Mutable) Release() {
 	bufpool.Put(mut)
 }
 
+// Resolve returns the string form of the Mutable and returns the
+// underlying buffer to the pool. Allocates and copies the underlying
+// byes. It is an error to use the mutable after calling Resolve().
+func (mut *Mutable) Resolve() string { defer mut.Release(); return mut.String() }
+
 // Len returns the length of the mutable string.
 func (mut Mutable) Len() int { return len(mut) }
 
@@ -123,6 +141,11 @@ func (mut *Mutable) Grow(n int) {
 
 // Reset resets the mutable string to be empty but retains the underlying storage.
 func (mut *Mutable) Reset() { *mut = mut.ref()[:0] }
+
+// Truncate trims tue mutable to the specified index. If the mutable
+// has a length of 0, or you specify an index beyond the end of the
+// mutable, this operation is a noop.
+func (mut *Mutable) Truncate(idx int) { *mut = mut.ref()[:max(0, min(mut.Len()-1, idx))] }
 
 // Write implements io.Writer, appending the contents of 'p' to the
 // mutable string. May allocate if capacity is insufficient.
@@ -710,15 +733,46 @@ func (mut Mutable) Print() { _, _ = os.Stdout.Write(mut) }
 // a new line at the end.
 func (mut Mutable) Println() { mut.Print(); _, _ = os.Stdout.Write(newline) }
 
+// copyExtend grows mut if needed and copies b to the end. When growth
+// is required it attempts to amortise repeated calls, approaching the
+// behaviour of append.
+func (mut *Mutable) copyExtend(b []byte) {
+	n := mut.Len()
+	if len(b) > mut.Cap()-n {
+		target := max(n+len(b), mut.Cap()*copyExtendGrowthFactor)
+		mut.Grow(target - mut.Cap())
+	}
+	*mut = (*mut)[:n+len(b)]
+	copy((*mut)[n:], b)
+}
+
+// copyExtendString grows mut if needed and copies s to the end. When
+// growth is required it attempts to amortise repeated calls, approaching
+// the behaviour of append.
+func (mut *Mutable) copyExtendString(s string) {
+	n := mut.Len()
+	if len(s) > mut.Cap()-n {
+		target := max(n+len(s), mut.Cap()*copyExtendGrowthFactor)
+		mut.Grow(target - mut.Cap())
+	}
+	*mut = (*mut)[:n+len(s)]
+	copy((*mut)[n:], s)
+}
+
 // Extend appends all Mutable values from seq to the receiver.
 // May allocate if capacity is insufficient.
-func (mut *Mutable) Extend(seq iter.Seq[Mutable]) *Mutable { flush(seq, mut.pushref); return mut }
+func (mut *Mutable) Extend(seq iter.Seq[Mutable]) *Mutable {
+	for elem := range seq {
+		mut.copyExtend(elem)
+	}
+	return mut
+}
 
 // ExtendStrings appends all strings from seq to the receiver.
 // May allocate if capacity is insufficient.
 func (mut *Mutable) ExtendStrings(seq iter.Seq[string]) *Mutable {
 	for elem := range seq {
-		*mut = append(*mut, elem...)
+		mut.copyExtendString(elem)
 	}
 	return mut
 }
@@ -733,10 +787,10 @@ func (mut *Mutable) ExtendJoin(seq iter.Seq[Mutable], sep Mutable) *Mutable {
 	var ct int
 	for elem := range seq {
 		if ct != 0 {
-			*mut = append(*mut, sep...)
+			mut.copyExtend(sep)
 		}
 		ct++
-		*mut = append(*mut, elem...)
+		mut.copyExtend(elem)
 	}
 	return mut
 }
@@ -747,10 +801,10 @@ func (mut *Mutable) ExtendStringsJoin(seq iter.Seq[string], sep string) *Mutable
 	var ct int
 	for elem := range seq {
 		if ct != 0 {
-			*mut = append(*mut, sep...)
+			mut.copyExtendString(sep)
 		}
 		ct++
-		*mut = append(*mut, elem...)
+		mut.copyExtendString(elem)
 	}
 	return mut
 }
@@ -761,10 +815,10 @@ func (mut *Mutable) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) *Mutable {
 	var ct int
 	for elem := range seq {
 		if ct != 0 {
-			*mut = append(*mut, sep...)
+			mut.copyExtend(sep)
 		}
 		ct++
-		*mut = append(*mut, elem...)
+		mut.copyExtend(elem)
 	}
 	return mut
 }
