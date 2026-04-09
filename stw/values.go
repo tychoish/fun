@@ -80,3 +80,14 @@ func CheckAnd[T any](ops ...func(T) bool) func(T) bool {
 		return true
 	}
 }
+
+// Given a list of pointes return the value of the first non-nil
+// pointer. The value may be the zero value of the underlying type.
+func DerefOrZ[T any](ptrs ...*T) (z T) {
+	for _, p := range ptrs {
+		if p != nil {
+			return *p
+		}
+	}
+	return z
+}

@@ -87,6 +87,44 @@ func TestCheckAnd(t *testing.T) {
 	check.True(t, !called)
 }
 
+func TestDerefOrZ(t *testing.T) {
+	t.Run("NilPointer", func(t *testing.T) {
+		var p *int
+		assert.Equal(t, 0, DerefOrZ(p))
+	})
+	t.Run("NonNilPointer", func(t *testing.T) {
+		v := 42
+		assert.Equal(t, 42, DerefOrZ(&v))
+	})
+	t.Run("ZeroValuePointer", func(t *testing.T) {
+		v := 0
+		assert.Equal(t, 0, DerefOrZ(&v))
+	})
+	t.Run("NoArgs", func(t *testing.T) {
+		assert.Equal(t, 0, DerefOrZ[int]())
+	})
+	t.Run("FirstNonNilWins", func(t *testing.T) {
+		a := 1
+		b := 2
+		assert.Equal(t, 1, DerefOrZ(&a, &b))
+	})
+	t.Run("SkipsLeadingNils", func(t *testing.T) {
+		v := 99
+		assert.Equal(t, 99, DerefOrZ[int](nil, nil, &v))
+	})
+	t.Run("AllNil", func(t *testing.T) {
+		assert.Equal(t, "", DerefOrZ[string](nil, nil))
+	})
+	t.Run("String", func(t *testing.T) {
+		s := "hello"
+		assert.Equal(t, "hello", DerefOrZ(&s))
+	})
+	t.Run("ZeroStringPointer", func(t *testing.T) {
+		s := ""
+		assert.Equal(t, "", DerefOrZ((*string)(nil), &s))
+	})
+}
+
 func TestDefault(t *testing.T) {
 	assert.Equal(t, Default(0, 42), 42)
 	assert.Equal(t, Default(77, 42), 77)
