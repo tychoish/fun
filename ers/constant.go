@@ -97,3 +97,8 @@ const ErrInvalidInput Error = Error("invalid input")
 // ErrInvariantViolation is the root error of the error object that is
 // the content of all panics produced by the Invariant helper.
 const ErrInvariantViolation Error = Error("invariant violation")
+
+// ErrNotFound indicates a result not found condition. Use use this as
+// an alternative to Ok checks to avoid returning a nil error *and* a
+// nil result value.
+const ErrNotFound Error = Error("not found")

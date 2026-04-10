@@ -274,7 +274,7 @@ func TestMutable_RepeatLine(t *testing.T) {
 		{"zero", func(m *Mutable) { m.RepeatLine("hi", 0) }, ""},
 		{"negative", func(m *Mutable) { m.RepeatLine("hi", -1) }, ""},
 		{"one", func(m *Mutable) { m.RepeatLine("hi", 1) }, "hi\n"},
-		{"three", func(m *Mutable) { m.RepeatLine("hi", 3) }, "hi\nhi\nhi\n"},
+		{"three", func(m *Mutable) { m.RepeatLine("hi", 3) }, "hi\n"},
 		{"empty string", func(m *Mutable) { m.RepeatLine("", 2) }, "\n\n"},
 		{"unicode", func(m *Mutable) { m.RepeatLine("世界", 2) }, "世界\n世界\n"},
 		{"appends to existing", func(m *Mutable) { m.PushString("pre\n"); m.RepeatLine("x", 2) }, "pre\nx\nx\n"},

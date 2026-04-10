@@ -26,6 +26,8 @@ linters:
   settings:
     dupl:
       threshold: 500
+    nestif:
+      min-complexity: 10
     wsl_v5:
       allow-first-in-block: true
       allow-whole-block: false
@@ -75,3 +77,4 @@ output:
   formats:
     text:
       print-issued-lines: false
+ 

@@ -567,10 +567,12 @@ func (m *Builder) StrikethroughWords(parts ...string) *Builder {
 // Link writes [text](url) to the builder.
 func (m *Builder) Link(text, url string) *Builder { m.Concat("[", text, "](", url, ")"); return m }
 
-// NewTable creates a TableBuilder attached to this Builder. Call Row on the
+// NewTable creates a Table attached to this Builder. Call Row on the
 // returned builder to accumulate rows, then Build to render the table and
 // resume chaining on Builder.
-func (m *Builder) NewTable(cols ...Column) *Table           { return m.NewTableWithColumns(cols) }
+func (m *Builder) NewTable(cols ...Column) *Table { return m.NewTableWithColumns(cols) }
+
+// NewTableWithColumns creates a Table from a slice of column definition.
 func (m *Builder) NewTableWithColumns(cols []Column) *Table { return &Table{mb: m, cols: cols} }
 
 // Table accumulates table rows and renders a column-aligned markdown
