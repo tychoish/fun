@@ -5,11 +5,8 @@ package testt
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/tychoish/fun/assert"
 )
 
 // Context creates a context and attaches its cancellation function to
@@ -82,32 +79,4 @@ func Must[T any](out T, err error) func(t testing.TB) T {
 		}
 		return out
 	}
-}
-
-// WithEnv sets an environment variable according to the key-value
-// pair, and then and runs a function with that environment variable
-// set. When WithEnv returns the state of the current process's
-// environment.
-//
-// WithEnv will assert if there are any problems setting
-// environment variables. Callers are responsible for managing
-// concurrency between multiple.
-func WithEnv(t *testing.T, key, value string, op func()) {
-	t.Helper()
-	Logf(t, "key=%q value %q", key, value)
-
-	prev, wasSet := os.LookupEnv(key)
-
-	defer func() {
-		if wasSet {
-			assert.NotError(t, os.Setenv(key, prev))
-			return
-		}
-
-		assert.NotError(t, os.Unsetenv(key))
-	}()
-
-	assert.NotError(t, os.Setenv(key, value))
-
-	op()
 }
