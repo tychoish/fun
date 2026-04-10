@@ -404,7 +404,7 @@ func TestJoinerReaders(t *testing.T) {
 		{"single", JOIN.WithComma(), []string{"only"}, "only"},
 		{"two", JOIN.WithSpace(), []string{"hello", "world"}, "hello world"},
 		{"multi", JOIN.WithDash(), []string{"a", "b", "c"}, "a-b-c"},
-		{"dobule-dash", JOIN.WithDash(), []string{"a", "b", "c"}, "a--b--c"},
+		{"double-dash", JOIN.WithDoubleDash(), []string{"a", "b", "c"}, "a--b--c"},
 		{"concat sep", JOIN.WithConcat(), []string{"go", "lang"}, "golang"},
 		{"multi-char sep", JOIN.With(" -> "), []string{"x", "y"}, "x -> y"},
 		{"tab sep", JOIN.WithTab(), []string{"col1", "col2", "col3"}, "col1\tcol2\tcol3"},
