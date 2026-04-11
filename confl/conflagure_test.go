@@ -979,7 +979,7 @@ func Test_conflagure_flag_value(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Custom testFlagValue `flag:"custom" default:"defval" help:"custom flag"`
+		Custom testFlagValue `default:"defval" flag:"custom" help:"custom flag"`
 	}
 
 	t.Run("default applied when no args", func(t *testing.T) {

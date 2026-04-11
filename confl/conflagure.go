@@ -53,7 +53,7 @@ func Parse(cfg any) error { return conflagure(flag.CommandLine, cfg, commandLine
 // subcommand struct pointer as any. Callers must type-switch on the result to
 // identify which subcommand was selected. Returns an error if no subcommand
 // was selected or if parsing fails. Subcommand types need not implement
-// Commander; use ParseCommand if you need that that guarantee.
+// Commander; use ParseCommand if you need that guarantee.
 func Dispatch(cfg any) (any, error) {
 	return dispatch(flag.CommandLine, cfg, commandLineArgs())
 }
