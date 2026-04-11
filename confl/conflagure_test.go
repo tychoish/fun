@@ -2729,7 +2729,7 @@ func Test_registerFlag_duplicate_short(t *testing.T) {
 func Test_registerFlag_bool_impossible_default(t *testing.T) {
 	t.Parallel()
 	type cfg struct {
-		Flag bool `flag:"flag" default:"maybe"`
+		Flag bool `default:"maybe" flag:"flag"`
 	}
 	var c cfg
 	err := conflagure(newTestFS(), &c, nil)
@@ -2745,7 +2745,9 @@ func Test_registerFlag_bool_impossible_default(t *testing.T) {
 // by passing an unknown flag that fails fs.Parse.
 func Test_dispatch_parse_error(t *testing.T) {
 	t.Parallel()
-	type sub struct{ X string `flag:"x"` }
+	type sub struct {
+		X string `flag:"x"`
+	}
 	type cfg struct {
 		Deploy sub `cmd:"deploy"`
 	}
@@ -2762,7 +2764,9 @@ func Test_dispatch_parse_error(t *testing.T) {
 // dispatch by naming a subcommand that does not exist.
 func Test_dispatch_unknown_subcommand(t *testing.T) {
 	t.Parallel()
-	type sub struct{ X string `flag:"x"` }
+	type sub struct {
+		X string `flag:"x"`
+	}
 	type cfg struct {
 		Deploy sub `cmd:"deploy"`
 	}
