@@ -717,8 +717,8 @@ func Test_ParseCommand(t *testing.T) {
 
 func Test_Dispatch(t *testing.T) {
 	// Not parallel: modifies flag.CommandLine.
-	// Pre-seed CommandLine.Args() with positional args; Parse re-parses them
-	// (stopping at the subcommand name), leaving them available for Dispatch.
+	// Dispatch is full two-phase: pre-seed CommandLine so commandLineArgs()
+	// returns the subcommand args, then call Dispatch directly.
 	type cfg struct {
 		Deploy testDeployCmd `cmd:"deploy"`
 	}
@@ -733,18 +733,15 @@ func Test_Dispatch(t *testing.T) {
 	}
 
 	var c cfg
-	if err := Parse(&c); err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-	cmd, err := Dispatch(&c)
+	result, err := Dispatch(&c)
 	if err != nil {
 		t.Fatalf("Dispatch() error = %v", err)
 	}
-	if cmd == nil {
-		t.Fatal("Dispatch() returned nil Commander")
+	if result == nil {
+		t.Fatal("Dispatch() returned nil")
 	}
-	if _, ok := cmd.(*testDeployCmd); !ok {
-		t.Errorf("cmd type = %T, want *testDeployCmd", cmd)
+	if _, ok := result.(*testDeployCmd); !ok {
+		t.Errorf("result type = %T, want *testDeployCmd", result)
 	}
 	if c.Deploy.Target != "prod" {
 		t.Errorf("Target = %q, want %q", c.Deploy.Target, "prod")
@@ -2288,6 +2285,8 @@ func Test_collectSubcommands_not_struct(t *testing.T) {
 func Test_collectSubcommands_no_commander(t *testing.T) {
 	t.Parallel()
 
+	// collectSubcommands no longer requires Commander; non-Commander structs
+	// are accepted. validateCommanders / conflagureCmd enforce the requirement.
 	type notCmd struct {
 		Target string `flag:"target"`
 	}
@@ -2295,7 +2294,27 @@ func Test_collectSubcommands_no_commander(t *testing.T) {
 		Deploy notCmd `cmd:"deploy"`
 	}
 	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
+	entries, err := collectSubcommands(reflectVal(&c), "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+}
+
+func Test_conflagureCmd_no_commander(t *testing.T) {
+	t.Parallel()
+
+	// conflagureCmd must error when a cmd: field does not implement Commander.
+	type notCmd struct {
+		Target string `flag:"target"`
+	}
+	type cfg struct {
+		Deploy notCmd `cmd:"deploy"`
+	}
+	var c cfg
+	_, err := conflagureCmd(newTestFS(), &c, nil)
 	if err == nil {
 		t.Fatal("expected error for type not implementing Commander")
 	}

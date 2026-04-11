@@ -72,6 +72,12 @@ func registerFlag(fs *flag.FlagSet, ptr any, name, short, defStr, format, help s
 	if short != "" && len(short) != 1 {
 		return ers.Wrapf(ErrInvalidSpecification, "short flag for %q must be exactly one character, got %q", name, short)
 	}
+	if fs.Lookup(name) != nil {
+		return ers.Wrapf(ErrInvalidSpecification, "flag %q already registered (duplicate field or flat-namespace collision)", name)
+	}
+	if short != "" && fs.Lookup(short) != nil {
+		return ers.Wrapf(ErrInvalidSpecification, "short flag %q (for %q) already registered", short, name)
+	}
 
 	switch p := ptr.(type) {
 	// ── scalar types ──────────────────────────────────────────────────────────
