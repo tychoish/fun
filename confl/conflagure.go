@@ -37,14 +37,14 @@ func commandLineArgs() []string {
 // with that name (e.g. flag:"srv" + nested flag:"host" → "-srv.host").
 // Namespaces nest and are separated by ".".
 //
-// A named struct field without a flag: tag is traversed with the same prefix
-// as its parent — identical to anonymous embedding. If any of its leaf flags
-// share a name with a flag already registered at the enclosing level,
-// ErrInvalidSpecification is returned. Use a flag: tag to give the nested
-// struct its own namespace and avoid collisions.
+// A named struct field without a flag: tag is traversed with the same
+// prefix as its parent — identical to anonymous embedding. If any of
+// its leaf flags share a name with a flag already registered at the
+// enclosing level, Parse returns ErrInvalidSpecification. Use a 'flag'
+// tag to give the nested struct its own namespace and avoid collisions.
 //
-// Supported types: string, bool, int, int64, uint, uint64, float64,
-// time.Time, time.Duration, and slices thereof.
+// Supported underlying types: string, bool, int, int64, uint, uint64,
+// float64, time.Time, time.Duration, and slices thereof.
 //
 // Fields tagged cmd: are skipped; use ParseCommand or Dispatch for subcommands.
 func Parse(cfg any) error { return conflagure(flag.CommandLine, cfg, commandLineArgs()) }

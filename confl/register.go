@@ -327,6 +327,17 @@ func registerFlag(fs *flag.FlagSet, ptr any, name, short, defStr, format, help s
 			fs.Func(short, joinStr("short for -", name), fn)
 		}
 
+	case flag.Value:
+		if defStr != "" {
+			if err := p.Set(defStr); err != nil {
+				return ers.Wrapf(ErrInvalidSpecification, "field %q default %q: %w", name, defStr, err)
+			}
+		}
+		fs.Var(p, name, help)
+		if short != "" {
+			fs.Var(p, short, joinStr("short for -", name))
+		}
+
 	default:
 		return ers.Wrapf(ErrInvalidSpecification, "unsupported field type %T for flag %q", ptr, name)
 	}

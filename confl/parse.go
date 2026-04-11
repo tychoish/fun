@@ -60,14 +60,23 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 				}
 				continue // top-level subcommand field; handled by collectSubcommands
 			}
-			childPrefix := prefix
-			if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
-				childPrefix = joinStr(prefix, ns, ".")
+			// If the exported pointer implements flag.Value, treat as a leaf below.
+			if !field.IsExported() {
+				if err := bindFlags(fs, fval, prefix, depth); err != nil {
+					return err
+				}
+				continue
 			}
-			if err := bindFlags(fs, fval, childPrefix, depth); err != nil {
-				return err
+			if _, ok := fval.Addr().Interface().(flag.Value); !ok {
+				childPrefix := prefix
+				if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
+					childPrefix = joinStr(prefix, ns, ".")
+				}
+				if err := bindFlags(fs, fval, childPrefix, depth); err != nil {
+					return err
+				}
+				continue
 			}
-			continue
 		}
 
 		name := field.Tag.Get("flag")
@@ -102,16 +111,25 @@ func checkRequired(val reflect.Value, prefix string) error {
 			if field.Tag.Get("cmd") != "" {
 				continue // subcommand fields are validated separately during dispatch
 			}
-			childPrefix := prefix
-			if !field.Anonymous {
-				if ns := field.Tag.Get("flag"); ns != "" {
-					childPrefix = joinStr(prefix, ns, ".")
+			// If the exported pointer implements flag.Value, treat as a leaf below.
+			if !field.IsExported() {
+				if err := checkRequired(fval, prefix); err != nil {
+					return err
 				}
+				continue
 			}
-			if err := checkRequired(fval, childPrefix); err != nil {
-				return err
+			if _, ok := fval.Addr().Interface().(flag.Value); !ok {
+				childPrefix := prefix
+				if !field.Anonymous {
+					if ns := field.Tag.Get("flag"); ns != "" {
+						childPrefix = joinStr(prefix, ns, ".")
+					}
+				}
+				if err := checkRequired(fval, childPrefix); err != nil {
+					return err
+				}
+				continue
 			}
-			continue
 		}
 
 		if fval.Kind() == reflect.Slice {

@@ -916,6 +916,107 @@ func Test_registerFlag_short_for_numeric_types(t *testing.T) {
 	}
 }
 
+func Test_registerFlag_flag_value(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic registration and set via flag", func(t *testing.T) {
+		fs := newTestFS()
+		v := &testFlagValue{}
+		if err := registerFlag(fs, v, "custom", "", "", "", "help"); err != nil {
+			t.Fatalf("registerFlag() error = %v", err)
+		}
+		if err := fs.Parse([]string{"-custom=hello"}); err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		if v.String() != "hello" {
+			t.Errorf("got %q, want %q", v.String(), "hello")
+		}
+	})
+
+	t.Run("default applied via Set", func(t *testing.T) {
+		fs := newTestFS()
+		v := &testFlagValue{}
+		if err := registerFlag(fs, v, "custom", "", "defaultval", "", "help"); err != nil {
+			t.Fatalf("registerFlag() error = %v", err)
+		}
+		// default is applied before fs.Parse, so vals should already contain it
+		if len(v.vals) != 1 || v.vals[0] != "defaultval" {
+			t.Errorf("vals after default = %v, want [defaultval]", v.vals)
+		}
+	})
+
+	t.Run("short alias registered", func(t *testing.T) {
+		fs := newTestFS()
+		v := &testFlagValue{}
+		if err := registerFlag(fs, v, "custom", "c", "", "", "help"); err != nil {
+			t.Fatalf("registerFlag() error = %v", err)
+		}
+		if fs.Lookup("c") == nil {
+			t.Error("short alias 'c' was not registered")
+		}
+		if err := fs.Parse([]string{"-c=via-short"}); err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		if v.String() != "via-short" {
+			t.Errorf("got %q, want %q", v.String(), "via-short")
+		}
+	})
+
+	t.Run("bad default returns ErrInvalidSpecification", func(t *testing.T) {
+		fs := newTestFS()
+		v := &testFlagValue{setErr: errors.New("bad value")}
+		err := registerFlag(fs, v, "custom", "", "baddefault", "", "help")
+		if err == nil {
+			t.Fatal("expected error for failing Set on default, got nil")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+}
+
+func Test_conflagure_flag_value(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Custom testFlagValue `flag:"custom" default:"defval" help:"custom flag"`
+	}
+
+	t.Run("default applied when no args", func(t *testing.T) {
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if c.Custom.String() != "defval" {
+			t.Errorf("got %q, want %q", c.Custom.String(), "defval")
+		}
+	})
+
+	t.Run("explicit value overrides default", func(t *testing.T) {
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-custom=explicit"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if c.Custom.String() != "explicit" {
+			t.Errorf("got %q, want %q", c.Custom.String(), "explicit")
+		}
+	})
+
+	t.Run("required field not set returns error", func(t *testing.T) {
+		type requiredCfg struct {
+			Custom testFlagValue `flag:"custom" required:"true"`
+		}
+		var c requiredCfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for required flag.Value field not set")
+		}
+		if !isErr(err, ErrInvalidInput) {
+			t.Errorf("error = %v, want ErrInvalidInput", err)
+		}
+	})
+}
+
 func Test_conflagure_numeric_with_short_via_struct(t *testing.T) {
 	t.Parallel()
 
@@ -1493,7 +1594,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	}
 
 	t.Run("RFC3339 value", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-at", "2024-06-01T12:00:00Z"}); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1505,7 +1605,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("zero value when flag absent", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1516,7 +1615,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("RFC3339 default applied", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `default:"2023-01-15T00:00:00Z" flag:"at"`
 		}
@@ -1531,7 +1629,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("now default sets non-zero time", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `default:"now" flag:"at"`
 		}
@@ -1546,7 +1643,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("custom format tag", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Date time.Time `flag:"date" format:"2006-01-02"`
 		}
@@ -1561,7 +1657,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("short alias", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `flag:"at" short:"a"`
 		}
@@ -1575,7 +1670,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("required field missing returns error", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `flag:"at" required:"true"`
 		}
@@ -1586,7 +1680,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("required field satisfied", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `flag:"at" required:"true"`
 		}
@@ -1597,7 +1690,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("invalid value returns error", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-at", "not-a-time"}); err == nil {
 			t.Fatal("expected error for invalid time value, got nil")
@@ -1605,7 +1697,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("invalid default returns error at bind time", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `default:"not-a-time" flag:"at"`
 		}
@@ -1616,7 +1707,6 @@ func Test_conflagure_time_Time(t *testing.T) {
 	})
 
 	t.Run("format and default mismatch returns error at bind time", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			At time.Time `default:"2024-01-01T00:00:00Z" flag:"at" format:"2006-01-02"`
 		}
@@ -1635,7 +1725,6 @@ func Test_conflagure_time_Duration(t *testing.T) {
 	}
 
 	t.Run("parses Go duration string", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-timeout", "1h30m"}); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1646,7 +1735,6 @@ func Test_conflagure_time_Duration(t *testing.T) {
 	})
 
 	t.Run("zero when flag absent", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1657,7 +1745,6 @@ func Test_conflagure_time_Duration(t *testing.T) {
 	})
 
 	t.Run("default applied", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Timeout time.Duration `default:"5s" flag:"timeout"`
 		}
@@ -1671,7 +1758,6 @@ func Test_conflagure_time_Duration(t *testing.T) {
 	})
 
 	t.Run("short alias", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Timeout time.Duration `flag:"timeout" short:"t"`
 		}
@@ -1685,7 +1771,6 @@ func Test_conflagure_time_Duration(t *testing.T) {
 	})
 
 	t.Run("invalid value returns error", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-timeout", "notaduration"}); err == nil {
 			t.Fatal("expected error for invalid duration, got nil")
@@ -1693,7 +1778,6 @@ func Test_conflagure_time_Duration(t *testing.T) {
 	})
 
 	t.Run("invalid default returns error at bind time", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Timeout time.Duration `default:"notaduration" flag:"timeout"`
 		}
@@ -1725,7 +1809,6 @@ func Test_conflagure_slice_time_Duration(t *testing.T) {
 
 	for tt := range slices.Values(tests) {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			var c cfg
 			if err := conflagure(newTestFS(), &c, tt.args); err != nil {
 				t.Fatalf("conflagure() error = %v", err)
@@ -1741,7 +1824,6 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 	t.Parallel()
 
 	t.Run("comma-separated default applied", func(t *testing.T) {
-		t.Parallel()
 		type cfg struct {
 			Timeouts []time.Duration `default:"1s,2m" flag:"timeout"`
 		}
@@ -1756,7 +1838,6 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 	})
 
 	t.Run("default discarded when flag used", func(t *testing.T) {
-		t.Parallel()
 		type cfg struct {
 			Timeouts []time.Duration `default:"1s,2m" flag:"timeout"`
 		}
@@ -1770,7 +1851,6 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 	})
 
 	t.Run("invalid default returns error", func(t *testing.T) {
-		t.Parallel()
 		type cfg struct {
 			Timeouts []time.Duration `default:"1s,notaduration" flag:"timeout"`
 		}
@@ -1781,7 +1861,6 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 	})
 
 	t.Run("invalid value returns error", func(t *testing.T) {
-		t.Parallel()
 		type cfg struct {
 			Timeouts []time.Duration `flag:"timeout"`
 		}
@@ -1800,7 +1879,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	}
 
 	t.Run("single RFC3339 value", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-date", "2024-06-01T12:00:00Z"}); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1812,7 +1890,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("multiple values accumulate", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		args := []string{"-date", "2024-01-01T00:00:00Z", "-date", "2024-06-01T00:00:00Z"}
 		if err := conflagure(newTestFS(), &c, args); err != nil {
@@ -1824,7 +1901,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("short alias", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-d", "2024-03-15T00:00:00Z"}); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1835,7 +1911,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("no flags gives nil", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
 			t.Fatalf("conflagure() error = %v", err)
@@ -1846,7 +1921,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("now in default resolves to non-zero time", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Dates []time.Time `default:"now" flag:"date"`
 		}
@@ -1861,7 +1935,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("custom format tag", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Dates []time.Time `flag:"date" format:"2006-01-02"`
 		}
@@ -1876,7 +1949,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("default discarded when flag used", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Dates []time.Time `default:"2023-01-01T00:00:00Z" flag:"date"`
 		}
@@ -1891,7 +1963,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("invalid value returns error", func(t *testing.T) {
-		t.Parallel()
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-date", "not-a-time"}); err == nil {
 			t.Fatal("expected error for invalid time value, got nil")
@@ -1899,7 +1970,6 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 	})
 
 	t.Run("invalid default returns error", func(t *testing.T) {
-		t.Parallel()
 		type cfg2 struct {
 			Dates []time.Time `default:"not-a-time" flag:"date"`
 		}
@@ -1914,7 +1984,6 @@ func Test_parseTimeFunc(t *testing.T) {
 	t.Parallel()
 
 	t.Run("parses RFC3339", func(t *testing.T) {
-		t.Parallel()
 		parse := parseTimeFunc(time.RFC3339)
 		got, err := parse("2024-06-01T00:00:00Z")
 		if err != nil {
@@ -1927,7 +1996,6 @@ func Test_parseTimeFunc(t *testing.T) {
 	})
 
 	t.Run("now returns current time", func(t *testing.T) {
-		t.Parallel()
 		before := time.Now().UTC().Add(-time.Second)
 		parse := parseTimeFunc(time.RFC3339)
 		got, err := parse("now")
@@ -1940,7 +2008,6 @@ func Test_parseTimeFunc(t *testing.T) {
 	})
 
 	t.Run("invalid string returns error", func(t *testing.T) {
-		t.Parallel()
 		parse := parseTimeFunc(time.RFC3339)
 		if _, err := parse("not-a-time"); err == nil {
 			t.Fatal("expected error, got nil")
@@ -1948,7 +2015,6 @@ func Test_parseTimeFunc(t *testing.T) {
 	})
 
 	t.Run("custom layout", func(t *testing.T) {
-		t.Parallel()
 		parse := parseTimeFunc("2006-01-02")
 		got, err := parse("2024-03-15")
 		if err != nil {
@@ -1962,8 +2028,6 @@ func Test_parseTimeFunc(t *testing.T) {
 }
 
 func Test_conflagure_short_help_text(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name      string
 		flagName  string
@@ -2060,7 +2124,6 @@ func Test_conflagureCmd_basic_dispatch(t *testing.T) {
 
 	for tt := range slices.Values(tests) {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			var c cfg
 			cmd, err := conflagureCmd(newTestFS(), &c, tt.args)
 			if err != nil {
@@ -2599,4 +2662,27 @@ func reflectVal(ptr any) reflect.Value {
 // isErr reports whether err wraps target using errors.Is.
 func isErr(err, target error) bool {
 	return errors.Is(err, target)
+}
+
+// testFlagValue is a minimal flag.Value implementation used to test the
+// flag.Value case in registerFlag. Set appends each call to vals so tests can
+// verify how many times it was called and with what arguments.
+type testFlagValue struct {
+	vals   []string
+	setErr error // if non-nil, Set returns this error
+}
+
+func (v *testFlagValue) String() string {
+	if len(v.vals) == 0 {
+		return ""
+	}
+	return v.vals[len(v.vals)-1]
+}
+
+func (v *testFlagValue) Set(s string) error {
+	if v.setErr != nil {
+		return v.setErr
+	}
+	v.vals = append(v.vals, s)
+	return nil
 }
