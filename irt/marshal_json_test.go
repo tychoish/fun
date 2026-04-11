@@ -1472,7 +1472,7 @@ func TestMarshalToJSONL(t *testing.T) {
 // splitJSONLLines splits JSONL output into non-empty trimmed lines.
 func splitJSONLLines(data []byte) []string {
 	var out []string
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if line != "" {
 			out = append(out, line)
 		}
