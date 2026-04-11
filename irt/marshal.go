@@ -44,9 +44,11 @@ func MarshalToJSON[T any](seq iter.Seq[T], w io.Writer) error {
 			return err
 		}
 	}
-	suffix := "]"
+	var suffix string
 	if first {
 		suffix = "[]"
+	} else {
+		suffix = "]"
 	}
 	_, err := io.WriteString(w, suffix)
 	return err
