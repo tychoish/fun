@@ -3,6 +3,7 @@ package irt
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"iter"
 	"strings"
 	"testing"
@@ -941,4 +942,676 @@ func TestUnmarshalErroneousJSON(t *testing.T) {
 			t.Error(count)
 		}
 	})
+}
+
+// errorWriter always returns an error on Write.
+type errorWriter struct{ err error }
+
+func (e *errorWriter) Write(p []byte) (int, error) { return 0, e.err }
+
+// failAfterNWriter succeeds on the first N-1 Write calls then returns an error
+// on the Nth call and all subsequent calls. Successful writes are forwarded to
+// an internal buffer so callers can inspect partial output.
+type failAfterNWriter struct {
+	buf    bytes.Buffer
+	calls  int
+	failAt int
+}
+
+func (w *failAfterNWriter) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls >= w.failAt {
+		return 0, errors.New("write failed")
+	}
+	return w.buf.Write(p)
+}
+
+func TestMarshalToJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		seq      iter.Seq[any]
+		expected string
+	}{
+		{
+			name:     "EmptySequence",
+			seq:      func(yield func(any) bool) {},
+			expected: "[]",
+		},
+		{
+			name:     "SingleInt",
+			seq:      func(yield func(any) bool) { yield(42) },
+			expected: "[42]",
+		},
+		{
+			name: "MultipleInts",
+			seq: func(yield func(any) bool) {
+				yield(1)
+				yield(2)
+				yield(3)
+			},
+			expected: "[1,2,3]",
+		},
+		{
+			name: "Strings",
+			seq: func(yield func(any) bool) {
+				yield("hello")
+				yield("world")
+			},
+			expected: `["hello","world"]`,
+		},
+		{
+			name: "MixedTypes",
+			seq: func(yield func(any) bool) {
+				yield(42)
+				yield("hello")
+				yield(true)
+				yield(nil)
+			},
+			expected: `[42,"hello",true,null]`,
+		},
+		{
+			name: "NestedStructs",
+			seq: func(yield func(any) bool) {
+				yield(map[string]any{"name": "Alice", "age": 30})
+				yield(map[string]any{"name": "Bob", "age": 25})
+			},
+			expected: `[{"age":30,"name":"Alice"},{"age":25,"name":"Bob"}]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := MarshalToJSON(tt.seq, &buf); err != nil {
+				t.Fatalf("MarshalToJSON() error = %v", err)
+			}
+			var got, want any
+			if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+				t.Fatalf("unmarshal result: %v", err)
+			}
+			if err := json.Unmarshal([]byte(tt.expected), &want); err != nil {
+				t.Fatalf("unmarshal expected: %v", err)
+			}
+			gotJSON, _ := json.Marshal(got)
+			wantJSON, _ := json.Marshal(want)
+			if string(gotJSON) != string(wantJSON) {
+				t.Errorf("MarshalToJSON() = %s, want %s", gotJSON, wantJSON)
+			}
+		})
+	}
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		original := []int{1, 2, 3, 4, 5}
+		var buf bytes.Buffer
+		if err := MarshalToJSON(Slice(original), &buf); err != nil {
+			t.Fatalf("MarshalToJSON() error = %v", err)
+		}
+		var result []int
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("Unmarshal: %v", err)
+		}
+		if len(result) != len(original) {
+			t.Fatalf("got %d items, want %d", len(result), len(original))
+		}
+		for i, v := range result {
+			if v != original[i] {
+				t.Errorf("[%d] = %d, want %d", i, v, original[i])
+			}
+		}
+	})
+
+	t.Run("MatchesMarshalJSON", func(t *testing.T) {
+		// MarshalToJSON and MarshalJSON must produce identical output.
+		seq := func(yield func(int) bool) {
+			for i := range 5 {
+				if !yield(i + 1) {
+					return
+				}
+			}
+		}
+		want, err := MarshalJSON(seq)
+		if err != nil {
+			t.Fatalf("MarshalJSON: %v", err)
+		}
+		var buf bytes.Buffer
+		if err := MarshalToJSON(seq, &buf); err != nil {
+			t.Fatalf("MarshalToJSON: %v", err)
+		}
+		if buf.String() != string(want) {
+			t.Errorf("MarshalToJSON = %s, MarshalJSON = %s", buf.String(), want)
+		}
+	})
+
+	t.Run("UnmarshalableElement", func(t *testing.T) {
+		type bad struct{ Ch chan int }
+		seq := func(yield func(bad) bool) { yield(bad{Ch: make(chan int)}) }
+		var buf bytes.Buffer
+		if err := MarshalToJSON(seq, &buf); err == nil {
+			t.Error("expected error for unmarshallable element")
+		}
+	})
+
+	t.Run("ErrorInMiddle", func(t *testing.T) {
+		type bad struct{ Ch chan int }
+		seq := func(yield func(any) bool) {
+			yield(1)
+			yield(bad{Ch: make(chan int)})
+		}
+		var buf bytes.Buffer
+		if err := MarshalToJSON(seq, &buf); err == nil {
+			t.Error("expected error after valid first element")
+		}
+	})
+
+	t.Run("WriterError", func(t *testing.T) {
+		import_err := errors.New("write failed")
+		seq := func(yield func(int) bool) { yield(1) }
+		if err := MarshalToJSON(seq, &errorWriter{err: import_err}); err == nil {
+			t.Error("expected error from failing writer")
+		}
+	})
+}
+
+func TestMarshalToJSON2(t *testing.T) {
+	tests := []struct {
+		name     string
+		seq      iter.Seq2[string, any]
+		expected string
+	}{
+		{
+			name:     "EmptySequence",
+			seq:      func(yield func(string, any) bool) {},
+			expected: "{}",
+		},
+		{
+			name: "SinglePair",
+			seq: func(yield func(string, any) bool) {
+				yield("name", "Alice")
+			},
+			expected: `{"name":"Alice"}`,
+		},
+		{
+			name: "MultiplePairs",
+			seq: func(yield func(string, any) bool) {
+				yield("name", "Alice")
+				yield("age", 30)
+				yield("active", true)
+			},
+			expected: `{"name":"Alice","age":30,"active":true}`,
+		},
+		{
+			name: "NestedObject",
+			seq: func(yield func(string, any) bool) {
+				yield("user", map[string]any{"name": "Alice", "age": 30})
+				yield("admin", false)
+			},
+			expected: `{"user":{"age":30,"name":"Alice"},"admin":false}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := MarshalToJSON2(tt.seq, &buf); err != nil {
+				t.Fatalf("MarshalToJSON2() error = %v", err)
+			}
+			var got, want any
+			if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+				t.Fatalf("unmarshal result: %v", err)
+			}
+			if err := json.Unmarshal([]byte(tt.expected), &want); err != nil {
+				t.Fatalf("unmarshal expected: %v", err)
+			}
+			gotJSON, _ := json.Marshal(got)
+			wantJSON, _ := json.Marshal(want)
+			if string(gotJSON) != string(wantJSON) {
+				t.Errorf("MarshalToJSON2() = %s, want %s", gotJSON, wantJSON)
+			}
+		})
+	}
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		original := map[string]int{"one": 1, "two": 2, "three": 3}
+		var buf bytes.Buffer
+		if err := MarshalToJSON2(Map(original), &buf); err != nil {
+			t.Fatalf("MarshalToJSON2() error = %v", err)
+		}
+		var result map[string]int
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("Unmarshal: %v", err)
+		}
+		if len(result) != len(original) {
+			t.Fatalf("got %d pairs, want %d", len(result), len(original))
+		}
+		for k, v := range original {
+			if result[k] != v {
+				t.Errorf("[%q] = %d, want %d", k, result[k], v)
+			}
+		}
+	})
+
+	t.Run("MatchesMarshalJSON2", func(t *testing.T) {
+		// MarshalToJSON2 and MarshalJSON2 must produce semantically identical output.
+		seq := func(yield func(string, int) bool) {
+			yield("a", 1)
+			yield("b", 2)
+		}
+		want, err := MarshalJSON2(seq)
+		if err != nil {
+			t.Fatalf("MarshalJSON2: %v", err)
+		}
+		var buf bytes.Buffer
+		if err := MarshalToJSON2(seq, &buf); err != nil {
+			t.Fatalf("MarshalToJSON2: %v", err)
+		}
+		var gotMap, wantMap map[string]int
+		if err := json.Unmarshal(buf.Bytes(), &gotMap); err != nil {
+			t.Fatalf("unmarshal MarshalToJSON2 result: %v", err)
+		}
+		if err := json.Unmarshal(want, &wantMap); err != nil {
+			t.Fatalf("unmarshal MarshalJSON2 result: %v", err)
+		}
+		for k, v := range wantMap {
+			if gotMap[k] != v {
+				t.Errorf("[%q] = %d, want %d", k, gotMap[k], v)
+			}
+		}
+	})
+
+	t.Run("UnmarshalableValue", func(t *testing.T) {
+		type bad struct{ Ch chan int }
+		seq := func(yield func(string, bad) bool) {
+			yield("key", bad{Ch: make(chan int)})
+		}
+		var buf bytes.Buffer
+		if err := MarshalToJSON2(seq, &buf); err == nil {
+			t.Error("expected error for unmarshallable value")
+		}
+	})
+
+	t.Run("UnmarshalableKey", func(t *testing.T) {
+		// complex128 is not JSON-serializable as a key
+		seq := func(yield func(complex128, int) bool) {
+			yield(complex(1, 2), 42)
+		}
+		var buf bytes.Buffer
+		if err := MarshalToJSON2(seq, &buf); err == nil {
+			t.Error("expected error for unmarshallable key")
+		}
+	})
+
+	t.Run("WriterError", func(t *testing.T) {
+		writeErr := errors.New("write failed")
+		seq := func(yield func(string, int) bool) { yield("k", 1) }
+		if err := MarshalToJSON2(seq, &errorWriter{err: writeErr}); err == nil {
+			t.Error("expected error from failing writer")
+		}
+	})
+}
+
+func TestMarshalJSONL(t *testing.T) {
+	tests := []struct {
+		name          string
+		seq           iter.Seq[any]
+		wantLineCount int
+		wantLines     []string
+	}{
+		{
+			name:          "EmptySequence",
+			seq:           func(yield func(any) bool) {},
+			wantLineCount: 0,
+		},
+		{
+			name:          "SingleValue",
+			seq:           func(yield func(any) bool) { yield(42) },
+			wantLineCount: 1,
+			wantLines:     []string{"42"},
+		},
+		{
+			name: "MultipleValues",
+			seq: func(yield func(any) bool) {
+				yield(1)
+				yield(2)
+				yield(3)
+			},
+			wantLineCount: 3,
+			wantLines:     []string{"1", "2", "3"},
+		},
+		{
+			name: "Strings",
+			seq: func(yield func(any) bool) {
+				yield("hello")
+				yield("world")
+			},
+			wantLineCount: 2,
+			wantLines:     []string{`"hello"`, `"world"`},
+		},
+		{
+			name: "Objects",
+			seq: func(yield func(any) bool) {
+				yield(map[string]any{"id": 1, "name": "Alice"})
+				yield(map[string]any{"id": 2, "name": "Bob"})
+			},
+			wantLineCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := MarshalJSONL(tt.seq)
+			if err != nil {
+				t.Fatalf("MarshalJSONL() error = %v", err)
+			}
+
+			// Each line must be valid JSON.
+			lines := splitJSONLLines(data)
+			if len(lines) != tt.wantLineCount {
+				t.Fatalf("got %d lines, want %d (output: %q)", len(lines), tt.wantLineCount, data)
+			}
+			for i, line := range lines {
+				var v any
+				if err := json.Unmarshal([]byte(line), &v); err != nil {
+					t.Errorf("line %d %q is not valid JSON: %v", i, line, err)
+				}
+			}
+			for i, want := range tt.wantLines {
+				if i >= len(lines) {
+					break
+				}
+				var got, wantV any
+				json.Unmarshal([]byte(lines[i]), &got)
+				json.Unmarshal([]byte(want), &wantV)
+				gotJSON, _ := json.Marshal(got)
+				wantJSON, _ := json.Marshal(wantV)
+				if string(gotJSON) != string(wantJSON) {
+					t.Errorf("line %d = %s, want %s", i, gotJSON, wantJSON)
+				}
+			}
+		})
+	}
+
+	t.Run("NewlineTerminated", func(t *testing.T) {
+		seq := func(yield func(int) bool) { yield(1); yield(2) }
+		data, err := MarshalJSONL(seq)
+		if err != nil {
+			t.Fatalf("MarshalJSONL() error = %v", err)
+		}
+		if len(data) == 0 {
+			t.Fatal("expected non-empty output")
+		}
+		if data[len(data)-1] != '\n' {
+			t.Errorf("output does not end with newline: %q", data)
+		}
+	})
+
+	t.Run("EachLineIsValidJSON", func(t *testing.T) {
+		seq := func(yield func(any) bool) {
+			yield(map[string]int{"x": 1})
+			yield([]int{1, 2, 3})
+			yield("plain string")
+			yield(true)
+		}
+		data, err := MarshalJSONL(seq)
+		if err != nil {
+			t.Fatalf("MarshalJSONL() error = %v", err)
+		}
+		for i, line := range splitJSONLLines(data) {
+			var v any
+			if err := json.Unmarshal([]byte(line), &v); err != nil {
+				t.Errorf("line %d %q: %v", i, line, err)
+			}
+		}
+	})
+
+	t.Run("UnmarshalableElement", func(t *testing.T) {
+		type bad struct{ Ch chan int }
+		seq := func(yield func(bad) bool) { yield(bad{Ch: make(chan int)}) }
+		if _, err := MarshalJSONL(seq); err == nil {
+			t.Error("expected error for unmarshallable element")
+		}
+	})
+
+	t.Run("ErrorInMiddle", func(t *testing.T) {
+		type bad struct{ Ch chan int }
+		seq := func(yield func(any) bool) {
+			yield(1)
+			yield(bad{Ch: make(chan int)})
+		}
+		if _, err := MarshalJSONL(seq); err == nil {
+			t.Error("expected error after valid first element")
+		}
+	})
+}
+
+func TestMarshalToJSONL(t *testing.T) {
+	tests := []struct {
+		name          string
+		seq           iter.Seq[any]
+		wantLineCount int
+	}{
+		{
+			name:          "EmptySequence",
+			seq:           func(yield func(any) bool) {},
+			wantLineCount: 0,
+		},
+		{
+			name:          "SingleValue",
+			seq:           func(yield func(any) bool) { yield(1) },
+			wantLineCount: 1,
+		},
+		{
+			name: "MultipleValues",
+			seq: func(yield func(any) bool) {
+				yield(1)
+				yield(2)
+				yield(3)
+			},
+			wantLineCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := MarshalToJSONL(tt.seq, &buf); err != nil {
+				t.Fatalf("MarshalToJSONL() error = %v", err)
+			}
+			lines := splitJSONLLines(buf.Bytes())
+			if len(lines) != tt.wantLineCount {
+				t.Fatalf("got %d lines, want %d", len(lines), tt.wantLineCount)
+			}
+			for i, line := range lines {
+				var v any
+				if err := json.Unmarshal([]byte(line), &v); err != nil {
+					t.Errorf("line %d %q is not valid JSON: %v", i, line, err)
+				}
+			}
+		})
+	}
+
+	t.Run("MatchesMarshalJSONL", func(t *testing.T) {
+		// MarshalToJSONL and MarshalJSONL must produce identical output.
+		seq := func(yield func(int) bool) {
+			for i := range 5 {
+				if !yield(i + 1) {
+					return
+				}
+			}
+		}
+		want, err := MarshalJSONL(seq)
+		if err != nil {
+			t.Fatalf("MarshalJSONL: %v", err)
+		}
+		var buf bytes.Buffer
+		if err := MarshalToJSONL(seq, &buf); err != nil {
+			t.Fatalf("MarshalToJSONL: %v", err)
+		}
+		if buf.String() != string(want) {
+			t.Errorf("MarshalToJSONL = %q, MarshalJSONL = %q", buf.String(), want)
+		}
+	})
+
+	t.Run("WriterError", func(t *testing.T) {
+		writeErr := errors.New("write failed")
+		seq := func(yield func(int) bool) { yield(1) }
+		if err := MarshalToJSONL(seq, &errorWriter{err: writeErr}); err == nil {
+			t.Error("expected error from failing writer")
+		}
+	})
+
+	t.Run("UnmarshalableElement", func(t *testing.T) {
+		type bad struct{ Ch chan int }
+		seq := func(yield func(bad) bool) { yield(bad{Ch: make(chan int)}) }
+		var buf bytes.Buffer
+		if err := MarshalToJSONL(seq, &buf); err == nil {
+			t.Error("expected error for unmarshallable element")
+		}
+	})
+}
+
+// splitJSONLLines splits JSONL output into non-empty trimmed lines.
+func splitJSONLLines(data []byte) []string {
+	var out []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// TestTrailingNewlineStripper exercises both branches of the stripper's Write
+// method. The newline-stripping branch is covered implicitly by every
+// MarshalToJSON/MarshalToJSON2 test (json.Encoder always appends \n). The
+// non-newline branch — data that does not end with \n — is only reachable
+// outside the encoder path and must be tested directly.
+func TestTrailingNewlineStripper(t *testing.T) {
+	t.Run("StripsTrailingNewline", func(t *testing.T) {
+		var buf bytes.Buffer
+		s := trailingNewlineStripper{&buf}
+		n, err := s.Write([]byte("hello\n"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// reported length includes the stripped newline
+		if n != 6 {
+			t.Errorf("n = %d, want 6", n)
+		}
+		if buf.String() != "hello" {
+			t.Errorf("buf = %q, want %q", buf.String(), "hello")
+		}
+	})
+	t.Run("PassthroughWithoutNewline", func(t *testing.T) {
+		// Data without a trailing newline must be written verbatim.
+		var buf bytes.Buffer
+		s := trailingNewlineStripper{&buf}
+		n, err := s.Write([]byte("hello"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if n != 5 {
+			t.Errorf("n = %d, want 5", n)
+		}
+		if buf.String() != "hello" {
+			t.Errorf("buf = %q, want %q", buf.String(), "hello")
+		}
+	})
+	t.Run("PassthroughWriterError", func(t *testing.T) {
+		// Writer errors must propagate through the non-newline branch.
+		s := trailingNewlineStripper{&errorWriter{err: errors.New("fail")}}
+		_, err := s.Write([]byte("no-newline"))
+		if err == nil {
+			t.Error("expected error from underlying writer")
+		}
+	})
+	t.Run("EmptyWrite", func(t *testing.T) {
+		var buf bytes.Buffer
+		s := trailingNewlineStripper{&buf}
+		n, err := s.Write([]byte{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if n != 0 {
+			t.Errorf("n = %d, want 0", n)
+		}
+	})
+}
+
+// TestMarshalToJSON_DelimiterWriteErrors verifies that write failures on the
+// comma separator and closing bracket are propagated correctly. Each sub-test
+// uses failAfterNWriter to make exactly one specific write call fail.
+//
+// Write-call order for a two-element sequence:
+//
+//	call 1 → "["         (opening bracket)
+//	call 2 → elem1 data  (through trailingNewlineStripper)
+//	call 3 → ","         (separator)        ← was uncovered
+//	call 4 → elem2 data
+//	call 5 → "]"         (closing bracket)
+func TestMarshalToJSON_DelimiterWriteErrors(t *testing.T) {
+	twoElems := func(yield func(int) bool) {
+		yield(1)
+		yield(2)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		failAt int
+	}{
+		{name: "CommaSeparator", failAt: 3},
+		{name: "ClosingBracket", failAt: 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &failAfterNWriter{failAt: tc.failAt}
+			if err := MarshalToJSON(twoElems, w); err == nil {
+				t.Errorf("failAt=%d: expected write error, got nil", tc.failAt)
+			}
+		})
+	}
+}
+
+// TestMarshalToJSON2_DelimiterWriteErrors verifies that write failures on the
+// colon separator, comma separator, and closing brace are propagated correctly.
+//
+// Write-call order for a one-pair sequence:
+//
+//	call 1 → "{"       (opening brace)
+//	call 2 → key data  (through trailingNewlineStripper)
+//	call 3 → ":"       (key-value separator)  ← was uncovered
+//	call 4 → val data
+//	call 5 → "}"       (closing brace)
+//
+// Write-call order for a two-pair sequence (calls 1-4 same as above):
+//
+//	call 5 → ","       (pair separator)        ← was uncovered
+//	call 6 → key2 data
+//	call 7 → ":"
+//	call 8 → val2 data
+//	call 9 → "}"
+func TestMarshalToJSON2_DelimiterWriteErrors(t *testing.T) {
+	onePair := func(yield func(string, int) bool) {
+		yield("k", 1)
+	}
+	twoPairs := func(yield func(string, int) bool) {
+		yield("k1", 1)
+		yield("k2", 2)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		seq    iter.Seq2[string, int]
+		failAt int
+	}{
+		{name: "ColonSeparator", seq: onePair, failAt: 3},
+		{name: "ClosingBrace_OnePair", seq: onePair, failAt: 5},
+		{name: "CommaSeparator", seq: twoPairs, failAt: 5},
+		{name: "ClosingBrace_TwoPairs", seq: twoPairs, failAt: 9},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &failAfterNWriter{failAt: tc.failAt}
+			if err := MarshalToJSON2(tc.seq, w); err == nil {
+				t.Errorf("failAt=%d: expected write error, got nil", tc.failAt)
+			}
+		})
+	}
 }

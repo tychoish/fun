@@ -10,10 +10,113 @@ import (
 	"iter"
 )
 
+// trailingNewlineStripper strips the single trailing '\n' that json.Encoder
+// appends after every Encode call, so that the encoded value can be embedded
+// inside a larger JSON structure without an unwanted newline.
+type trailingNewlineStripper struct{ w io.Writer }
+
+func (s trailingNewlineStripper) Write(p []byte) (int, error) {
+	if len(p) > 0 && p[len(p)-1] == '\n' {
+		n, err := s.w.Write(p[:len(p)-1])
+		return n + 1, err // report full length to avoid a spurious short-write error
+	}
+	return s.w.Write(p)
+}
+
+// MarshalToJSON encodes a sequence as a JSON array, writing directly to w.
+// Returns an error if any element fails to marshal or if the writer fails.
+// Callers that need buffered output should wrap w in a bufio.Writer.
+func MarshalToJSON[T any](seq iter.Seq[T], w io.Writer) error {
+	enc := json.NewEncoder(trailingNewlineStripper{w})
+	first := true
+	for value := range seq {
+		if first {
+			if _, err := io.WriteString(w, "["); err != nil {
+				return err
+			}
+			first = false
+		} else {
+			if _, err := io.WriteString(w, ","); err != nil {
+				return err
+			}
+		}
+		if err := enc.Encode(value); err != nil {
+			return err
+		}
+	}
+	suffix := "]"
+	if first {
+		suffix = "[]"
+	}
+	_, err := io.WriteString(w, suffix)
+	return err
+}
+
+// MarshalToJSON2 encodes a pair sequence as a JSON object, writing directly to w.
+// Returns an error if any key or value fails to marshal or if the writer fails.
+// Callers that need buffered output should wrap w in a bufio.Writer.
+func MarshalToJSON2[K any, V any](seq iter.Seq2[K, V], w io.Writer) error {
+	enc := json.NewEncoder(trailingNewlineStripper{w})
+	first := true
+	for k, v := range seq {
+		if first {
+			if _, err := io.WriteString(w, "{"); err != nil {
+				return err
+			}
+			first = false
+		} else {
+			if _, err := io.WriteString(w, ","); err != nil {
+				return err
+			}
+		}
+		if err := enc.Encode(k); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(w, ":"); err != nil {
+			return err
+		}
+		if err := enc.Encode(v); err != nil {
+			return err
+		}
+	}
+	suffix := "}"
+	if first {
+		suffix = "{}"
+	}
+	_, err := io.WriteString(w, suffix)
+	return err
+}
+
+// MarshalJSONL encodes a sequence in JSON Lines format: one JSON value per
+// line, with each line terminated by a newline character. Returns an error if
+// any element fails to marshal.
+func MarshalJSONL[T any](seq iter.Seq[T]) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := MarshalToJSONL(seq, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// MarshalToJSONL encodes a sequence in JSON Lines format, writing directly to
+// w. Each element is written as a JSON value followed by a newline. Returns an
+// error if any element fails to marshal or if the writer fails.
+// Callers that need buffered output should wrap w in a bufio.Writer.
+func MarshalToJSONL[T any](seq iter.Seq[T], w io.Writer) error {
+	enc := json.NewEncoder(w)
+	for value := range seq {
+		if err := enc.Encode(value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // MarshalJSON consumes a sequence and returns its JSON encoding as an
 // array. Returns an error if any element fails to marshal.
 func MarshalJSON[T any](seq iter.Seq[T]) ([]byte, error) {
 	var buf bytes.Buffer
+	enc := json.NewEncoder(trailingNewlineStripper{&buf})
 
 	for value := range seq {
 		if buf.Len() == 0 {
@@ -22,12 +125,9 @@ func MarshalJSON[T any](seq iter.Seq[T]) ([]byte, error) {
 			must(buf.WriteByte(','))
 		}
 
-		data, err := json.Marshal(value)
-		if err != nil {
+		if err := enc.Encode(value); err != nil {
 			return nil, err
 		}
-
-		must2(buf.Write(data))
 	}
 	if buf.Len() > 0 {
 		must2(buf.WriteString("]"))
@@ -43,6 +143,7 @@ func MarshalJSON[T any](seq iter.Seq[T]) ([]byte, error) {
 // element fails to marshal.
 func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 	var buf bytes.Buffer
+	enc := json.NewEncoder(trailingNewlineStripper{&buf})
 
 	for k, v := range seq {
 		if buf.Len() == 0 {
@@ -51,14 +152,12 @@ func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 			must(buf.WriteByte(','))
 		}
 
-		must2(buf.Write(must2(json.Marshal(k))))
+		must(enc.Encode(k))
 		must(buf.WriteByte(':'))
 
-		value, err := json.Marshal(v)
-		if err != nil {
+		if err := enc.Encode(v); err != nil {
 			return nil, err
 		}
-		must2(buf.Write(value))
 	}
 	if buf.Len() > 0 {
 		must2(buf.WriteString("}"))
@@ -106,9 +205,6 @@ func UnmarshalJSON[T any](data io.Reader) iter.Seq2[T, error] {
 		}
 	}
 }
-
-func castOk[T any](in any) (out T, ok bool) { out, ok = in.(T); return }
-func cast[T any](in any) T                  { return first(castOk[T](in)) }
 
 // UnmarshalJSON2 decodes a JSON object from the reader and yields each
 // key-value pair as KV with a potential error. The reader is wrapped

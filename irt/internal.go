@@ -30,6 +30,8 @@ func mtxcallr(mtx *sync.RWMutex, op func()) func()             { return func() {
 func mtxcallw(mtx *sync.RWMutex, op func()) func()             { return func() { defer withw(lockw(mtx)); op() } }
 func toany[T any](in T) any                                    { return in }
 func toany2[A, B any](first A, second B) (A, any)              { return first, any(second) }
+func castOk[T any](in any) (out T, ok bool)                    { out, ok = in.(T); return }
+func cast[T any](in any) T                                     { return first(castOk[T](in)) }
 
 func mtxdo[T any](mtx *sync.Mutex, op func() T) func() T {
 	return func() T { defer with(lock(mtx)); return op() }
