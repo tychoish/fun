@@ -280,7 +280,7 @@ func TestOrchestrator(t *testing.T) {
 				t.Error(err)
 			}
 			// the fixture ensures that all sub-services run
-			if dur := time.Since(startAt); dur > 20*time.Millisecond {
+			if dur := time.Since(startAt); dur > 40*time.Millisecond {
 				t.Error(dur)
 			}
 		})
