@@ -139,31 +139,17 @@ func selectSubcommand(entries []subcommandEntry, remaining []string) (any, error
 // selection. It returns the selected subcommand struct pointer as any, or
 // (nil, nil) when no subcommand was selected.
 func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
-	if conf == nil {
-		return nil, ers.Wrap(ErrInvalidSpecification, "conf must be a pointer to a struct, got nil")
+	val, err := unwrapConf(conf)
+	if err != nil {
+		return nil, err
 	}
-	t := reflect.TypeOf(conf)
-	v := reflect.ValueOf(conf)
-	if t.Kind() != reflect.Pointer || t.Elem().Kind() != reflect.Struct {
-		return nil, ers.Wrapf(ErrInvalidSpecification, "conf must be a pointer to a struct, got %T", conf)
-	}
-	val := v.Elem()
 
 	entries, err := collectSubcommands(val, fs.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := bindFlags(fs, val, "", 0); err != nil {
-		return nil, err
-	}
-
-	if err := fs.Parse(args); err != nil {
-		callWhen(errors.Is(err, flag.ErrHelp), os.Exit, 0)
-		return nil, err
-	}
-
-	if err := checkRequired(val, ""); err != nil {
+	if err := parseAndCheck(fs, val, args); err != nil {
 		return nil, err
 	}
 
@@ -182,15 +168,10 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 // lists registered subcommands when there are any. All cmd: fields must
 // implement Commander; an error is returned if any do not.
 func conflagureCmd(fs *flag.FlagSet, conf any, args []string) (Commander, error) {
-	if conf == nil {
-		return nil, ers.Wrap(ErrInvalidSpecification, "conf must be a pointer to a struct, got nil")
+	val, err := unwrapConf(conf)
+	if err != nil {
+		return nil, err
 	}
-	t := reflect.TypeOf(conf)
-	v := reflect.ValueOf(conf)
-	if t.Kind() != reflect.Pointer || t.Elem().Kind() != reflect.Struct {
-		return nil, ers.Wrapf(ErrInvalidSpecification, "conf must be a pointer to a struct, got %T", conf)
-	}
-	val := v.Elem()
 
 	entries, err := collectSubcommands(val, fs.Name())
 	if err != nil {
@@ -221,16 +202,7 @@ func conflagureCmd(fs *flag.FlagSet, conf any, args []string) (Commander, error)
 		}
 	}
 
-	if err := bindFlags(fs, val, "", 0); err != nil {
-		return nil, err
-	}
-
-	if err := fs.Parse(args); err != nil {
-		callWhen(errors.Is(err, flag.ErrHelp), os.Exit, 0)
-		return nil, err
-	}
-
-	if err := checkRequired(val, ""); err != nil {
+	if err := parseAndCheck(fs, val, args); err != nil {
 		return nil, err
 	}
 

@@ -2686,3 +2686,92 @@ func (v *testFlagValue) Set(s string) error {
 	v.vals = append(v.vals, s)
 	return nil
 }
+
+// Test_registerFlag_duplicate_name covers the fs.Lookup(name) != nil branch
+// in registerFlag, triggered by two struct fields sharing the same flag: tag.
+func Test_registerFlag_duplicate_name(t *testing.T) {
+	t.Parallel()
+	type cfg struct {
+		A string `flag:"dup"`
+		B string `flag:"dup"`
+	}
+	var c cfg
+	err := conflagure(newTestFS(), &c, nil)
+	if err == nil {
+		t.Fatal("expected error for duplicate flag name")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("error = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_registerFlag_duplicate_short covers the fs.Lookup(short) != nil branch
+// in registerFlag, triggered by two fields sharing the same short: alias.
+func Test_registerFlag_duplicate_short(t *testing.T) {
+	t.Parallel()
+	type cfg struct {
+		Alpha string `flag:"alpha" short:"x"`
+		Beta  string `flag:"beta"  short:"x"`
+	}
+	var c cfg
+	err := conflagure(newTestFS(), &c, nil)
+	if err == nil {
+		t.Fatal("expected error for duplicate short flag")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("error = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_registerFlag_bool_impossible_default covers the default: branch in
+// registerFlag's bool switch, reached when the default value is neither a
+// recognised bool string nor empty.
+func Test_registerFlag_bool_impossible_default(t *testing.T) {
+	t.Parallel()
+	type cfg struct {
+		Flag bool `flag:"flag" default:"maybe"`
+	}
+	var c cfg
+	err := conflagure(newTestFS(), &c, nil)
+	if err == nil {
+		t.Fatal("expected error for impossible bool default")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("error = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_dispatch_parse_error covers the parseAndCheck error branch in dispatch
+// by passing an unknown flag that fails fs.Parse.
+func Test_dispatch_parse_error(t *testing.T) {
+	t.Parallel()
+	type sub struct{ X string `flag:"x"` }
+	type cfg struct {
+		Deploy sub `cmd:"deploy"`
+	}
+	var c cfg
+	fs := newTestFS()
+	fs.SetOutput(io.Discard)
+	_, err := dispatch(fs, &c, []string{"-no-such-flag"})
+	if err == nil {
+		t.Fatal("expected parse error for unknown flag")
+	}
+}
+
+// Test_dispatch_unknown_subcommand covers the selectSubcommand error branch in
+// dispatch by naming a subcommand that does not exist.
+func Test_dispatch_unknown_subcommand(t *testing.T) {
+	t.Parallel()
+	type sub struct{ X string `flag:"x"` }
+	type cfg struct {
+		Deploy sub `cmd:"deploy"`
+	}
+	var c cfg
+	_, err := dispatch(newTestFS(), &c, []string{"nosuchcmd"})
+	if err == nil {
+		t.Fatal("expected error for unknown subcommand")
+	}
+	if !isErr(err, ErrInvalidInput) {
+		t.Errorf("error = %v, want ErrInvalidInput", err)
+	}
+}

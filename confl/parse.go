@@ -16,28 +16,42 @@ import (
 // rather than recursed into.
 var timeTimeType = reflect.TypeFor[time.Time]()
 
-// conflagure is the internal implementation. Tests call it directly with a
-// custom FlagSet and explicit args to avoid touching flag.CommandLine.
-func conflagure(fs *flag.FlagSet, conf any, args []string) error {
+// unwrapConf validates that conf is a non-nil pointer to a struct and returns
+// its Elem value. Returns ErrInvalidSpecification otherwise.
+func unwrapConf(conf any) (reflect.Value, error) {
 	if conf == nil {
-		return ers.Wrap(ErrInvalidSpecification, "conf must be a pointer to a struct, got nil")
+		return reflect.Value{}, ers.Wrap(ErrInvalidSpecification, "conf must be a pointer to a struct, got nil")
 	}
 	t := reflect.TypeOf(conf)
 	v := reflect.ValueOf(conf)
 	if t.Kind() != reflect.Pointer || t.Elem().Kind() != reflect.Struct {
-		return ers.Wrapf(ErrInvalidSpecification, "conf must be a pointer to a struct, got %T", conf)
+		return reflect.Value{}, ers.Wrapf(ErrInvalidSpecification, "conf must be a pointer to a struct, got %T", conf)
 	}
+	return v.Elem(), nil
+}
 
-	if err := bindFlags(fs, v.Elem(), "", 0); err != nil {
+// parseAndCheck binds flags from val onto fs, parses args, and validates
+// required fields. It is the common parse/validate sequence shared by
+// conflagure, dispatch, and conflagureCmd.
+func parseAndCheck(fs *flag.FlagSet, val reflect.Value, args []string) error {
+	if err := bindFlags(fs, val, "", 0); err != nil {
 		return err
 	}
-
 	if err := fs.Parse(args); err != nil {
 		callWhen(errors.Is(err, flag.ErrHelp), os.Exit, 0)
 		return err
 	}
+	return checkRequired(val, "")
+}
 
-	return checkRequired(v.Elem(), "")
+// conflagure is the internal implementation. Tests call it directly with a
+// custom FlagSet and explicit args to avoid touching flag.CommandLine.
+func conflagure(fs *flag.FlagSet, conf any, args []string) error {
+	val, err := unwrapConf(conf)
+	if err != nil {
+		return err
+	}
+	return parseAndCheck(fs, val, args)
 }
 
 // bindFlags recursively walks val, registering every field tagged with `flag:`
