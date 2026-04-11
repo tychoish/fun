@@ -59,9 +59,10 @@ type Error struct {
 	Err       error
 }
 
-func (e *Error) Error() string {
-	return fmt.Sprintf("%s got error %v: err=%s", e.Name, e.Err, e.StdError.String())
-}
+func (e *Error) Is(other error) bool { return errors.Is(e.Err, other) }
+func (e *Error) As(other any) bool   { return errors.As(e.Err, other) }
+func (e *Error) Unwrap() error       { return e.Err }
+func (e *Error) Error() string       { return fmt.Sprintf("[%s] got %v: err=%q", e.Name, e.Err, e.StdError) }
 
 // ResolveError extracts an *Error from err if it is one, returning it
 // and true. If err is nil or is not an exc.Error, it returns nil and false.
