@@ -14,6 +14,10 @@ import (
 	"github.com/tychoish/fun/exc"
 )
 
+type testCustomErr struct{ msg string }
+
+func (e *testCustomErr) Error() string { return e.msg }
+
 func TestCommand_Builder(t *testing.T) {
 	t.Parallel()
 
@@ -535,6 +539,161 @@ func TestError_Format(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestError_IsAsUnwrap(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Is", func(t *testing.T) {
+		t.Parallel()
+
+		sentinel := errors.New("sentinel error")
+		unrelated := errors.New("unrelated error")
+
+		for _, tc := range []struct {
+			name string
+			err  *exc.Error
+			tgt  error
+			want bool
+		}{
+			{
+				name: "DirectMatch",
+				err: &exc.Error{
+					Name:      "cmd",
+					Err:       sentinel,
+					StdError:  new(bytes.Buffer),
+					StdOutput: new(bytes.Buffer),
+				},
+				tgt:  sentinel,
+				want: true,
+			},
+			{
+				name: "WrappedMatch",
+				err: &exc.Error{
+					Name:      "cmd",
+					Err:       fmt.Errorf("wrapped: %w", sentinel),
+					StdError:  new(bytes.Buffer),
+					StdOutput: new(bytes.Buffer),
+				},
+				tgt:  sentinel,
+				want: true,
+			},
+			{
+				name: "NoMatch",
+				err: &exc.Error{
+					Name:      "cmd",
+					Err:       unrelated,
+					StdError:  new(bytes.Buffer),
+					StdOutput: new(bytes.Buffer),
+				},
+				tgt:  sentinel,
+				want: false,
+			},
+			{
+				name: "NilErr",
+				err: &exc.Error{
+					Name:      "cmd",
+					Err:       nil,
+					StdError:  new(bytes.Buffer),
+					StdOutput: new(bytes.Buffer),
+				},
+				tgt:  sentinel,
+				want: false,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				got := errors.Is(tc.err, tc.tgt)
+				if got != tc.want {
+					t.Errorf("errors.Is(%v, %v) = %v, want %v", tc.err, tc.tgt, got, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("As", func(t *testing.T) {
+		t.Parallel()
+
+		customErrPtr := &testCustomErr{msg: "custom"}
+
+		t.Run("MatchesConcreteType", func(t *testing.T) {
+			t.Parallel()
+			excErr := &exc.Error{
+				Name:      "cmd",
+				Err:       customErrPtr,
+				StdError:  new(bytes.Buffer),
+				StdOutput: new(bytes.Buffer),
+			}
+			var target *testCustomErr
+			if !errors.As(excErr, &target) {
+				t.Errorf("errors.As returned false, expected true")
+			}
+			if target != customErrPtr {
+				t.Errorf("errors.As populated target = %v, want %v", target, customErrPtr)
+			}
+		})
+
+		t.Run("NilErr", func(t *testing.T) {
+			t.Parallel()
+			excErr := &exc.Error{
+				Name:      "cmd",
+				Err:       nil,
+				StdError:  new(bytes.Buffer),
+				StdOutput: new(bytes.Buffer),
+			}
+			var target *testCustomErr
+			if errors.As(excErr, &target) {
+				t.Errorf("errors.As returned true, expected false for nil Err")
+			}
+		})
+
+		t.Run("WrongType", func(t *testing.T) {
+			t.Parallel()
+			excErr := &exc.Error{
+				Name:      "cmd",
+				Err:       errors.New("plain error"),
+				StdError:  new(bytes.Buffer),
+				StdOutput: new(bytes.Buffer),
+			}
+			var target *testCustomErr
+			if errors.As(excErr, &target) {
+				t.Errorf("errors.As returned true, expected false for mismatched type")
+			}
+		})
+	})
+
+	t.Run("Unwrap", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("NonNilErr", func(t *testing.T) {
+			t.Parallel()
+			inner := errors.New("inner error")
+			excErr := &exc.Error{
+				Name:      "cmd",
+				Err:       inner,
+				StdError:  new(bytes.Buffer),
+				StdOutput: new(bytes.Buffer),
+			}
+			got := excErr.Unwrap()
+			if got != inner {
+				t.Errorf("Unwrap() = %v, want %v", got, inner)
+			}
+		})
+
+		t.Run("NilErr", func(t *testing.T) {
+			t.Parallel()
+			excErr := &exc.Error{
+				Name:      "cmd",
+				Err:       nil,
+				StdError:  new(bytes.Buffer),
+				StdOutput: new(bytes.Buffer),
+			}
+			got := excErr.Unwrap()
+			if got != nil {
+				t.Errorf("Unwrap() = %v, want nil", got)
+			}
+		})
+	})
 }
 
 func TestResolveError(t *testing.T) {
