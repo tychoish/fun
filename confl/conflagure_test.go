@@ -318,7 +318,7 @@ func Test_registerFlag_short_validation(t *testing.T) {
 			// Call registerFlag directly to isolate the short validation
 			// without needing real struct tags.
 			var s string
-			err := registerFlag(newTestFS(), &s, "name", tt.short, "", "", "help")
+			err := registerFlag(newTestFS(), &s, flagSpec{Name: "name", Short: tt.short, Help: "help"})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("registerFlag() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -880,7 +880,7 @@ func Test_registerFlag_invalid_defaults(t *testing.T) {
 
 	for tt := range slices.Values(tests) {
 		t.Run(tt.name, func(t *testing.T) {
-			err := registerFlag(newTestFS(), tt.ptr(), "flag-name", "", tt.defStr, "", "help")
+			err := registerFlag(newTestFS(), tt.ptr(), flagSpec{Name: "flag-name", Default: tt.defStr, Help: "help"})
 			if err == nil {
 				t.Errorf("registerFlag() expected error for invalid default %q, got nil", tt.defStr)
 			}
@@ -905,7 +905,7 @@ func Test_registerFlag_short_for_numeric_types(t *testing.T) {
 	for tt := range slices.Values(tests) {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := newTestFS()
-			err := registerFlag(fs, tt.ptr(), "long-flag", "x", "0", "", "help")
+			err := registerFlag(fs, tt.ptr(), flagSpec{Name: "long-flag", Short: "x", Default: "0", Help: "help"})
 			if err != nil {
 				t.Fatalf("registerFlag() unexpected error: %v", err)
 			}
@@ -922,7 +922,7 @@ func Test_registerFlag_flag_value(t *testing.T) {
 	t.Run("basic registration and set via flag", func(t *testing.T) {
 		fs := newTestFS()
 		v := &testFlagValue{}
-		if err := registerFlag(fs, v, "custom", "", "", "", "help"); err != nil {
+		if err := registerFlag(fs, v, flagSpec{Name: "custom", Help: "help"}); err != nil {
 			t.Fatalf("registerFlag() error = %v", err)
 		}
 		if err := fs.Parse([]string{"-custom=hello"}); err != nil {
@@ -936,7 +936,7 @@ func Test_registerFlag_flag_value(t *testing.T) {
 	t.Run("default applied via Set", func(t *testing.T) {
 		fs := newTestFS()
 		v := &testFlagValue{}
-		if err := registerFlag(fs, v, "custom", "", "defaultval", "", "help"); err != nil {
+		if err := registerFlag(fs, v, flagSpec{Name: "custom", Default: "defaultval", Help: "help"}); err != nil {
 			t.Fatalf("registerFlag() error = %v", err)
 		}
 		// default is applied before fs.Parse, so vals should already contain it
@@ -948,7 +948,7 @@ func Test_registerFlag_flag_value(t *testing.T) {
 	t.Run("short alias registered", func(t *testing.T) {
 		fs := newTestFS()
 		v := &testFlagValue{}
-		if err := registerFlag(fs, v, "custom", "c", "", "", "help"); err != nil {
+		if err := registerFlag(fs, v, flagSpec{Name: "custom", Short: "c", Help: "help"}); err != nil {
 			t.Fatalf("registerFlag() error = %v", err)
 		}
 		if fs.Lookup("c") == nil {
@@ -965,7 +965,7 @@ func Test_registerFlag_flag_value(t *testing.T) {
 	t.Run("bad default returns ErrInvalidSpecification", func(t *testing.T) {
 		fs := newTestFS()
 		v := &testFlagValue{setErr: errors.New("bad value")}
-		err := registerFlag(fs, v, "custom", "", "baddefault", "", "help")
+		err := registerFlag(fs, v, flagSpec{Name: "custom", Default: "baddefault", Help: "help"})
 		if err == nil {
 			t.Fatal("expected error for failing Set on default, got nil")
 		}
@@ -2052,7 +2052,7 @@ func Test_conflagure_short_help_text(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := newTestFS()
 			var s string
-			if err := registerFlag(fs, &s, tt.flagName, tt.shortName, "", "", "long help text"); err != nil {
+			if err := registerFlag(fs, &s, flagSpec{Name: tt.flagName, Short: tt.shortName, Help: "long help text"}); err != nil {
 				t.Fatalf("registerFlag() error = %v", err)
 			}
 			f := fs.Lookup(tt.shortName)

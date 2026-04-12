@@ -11,6 +11,218 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
+// registerFuncFlag registers a scalar flag for types with no native FlagSet
+// method. The default in spec is applied immediately via parse if non-empty.
+func registerFuncFlag[T any](fs *flag.FlagSet, p *T, spec flagSpec, parse func(string) (T, error)) error {
+	if spec.Default != "" {
+		def, err := parse(spec.Default)
+		if err != nil {
+			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+		}
+		*p = def
+	}
+	registerAlias(spec, func(n, u string) {
+		fs.Func(n, u, func(s string) error {
+			v, err := parse(s)
+			if err != nil {
+				return err
+			}
+			*p = v
+			return nil
+		})
+	})
+	return nil
+}
+
+// registerSliceFlag registers a slice flag. The default in spec is a
+// comma-separated list pre-populated into *p before parsing begins.
+func registerSliceFlag[T any](fs *flag.FlagSet, p *[]T, spec flagSpec, parse func(string) (T, error)) error {
+	if err := parseAndSetSliceDefault(p, spec.Default, parse); err != nil {
+		return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+	}
+	fn := appendOnce(p, parse, spec.Default != "")
+	registerAlias(spec, func(n, u string) { fs.Func(n, u, fn) })
+	return nil
+}
+
+// registerFlag registers a single flag (and optional short alias) on fs.
+// ptr must be the result of fval.Addr().Interface() for the struct field.
+// format is the value of the `format:` struct tag; it is only meaningful for
+// *time.Time fields (Go reference-time layout) and ignored for all other types.
+func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
+	if err := spec.validate(fs); err != nil {
+		return err
+	}
+
+	switch p := ptr.(type) {
+	// ── scalar types ──────────────────────────────────────────────────────────
+	case *string:
+		registerAlias(spec, func(n, u string) { fs.StringVar(p, n, spec.Default, u) })
+	case *bool:
+		switch strings.ToLower(spec.Default) {
+		case "true", "t", "yes", "y", "1":
+			// Inverted boolean: default is true, so the flag negates it.
+			// Register "no-<name>" which sets the field to false when passed.
+			*p = true
+			fn := func(s string) error {
+				b, err := strconv.ParseBool(s)
+				if err != nil {
+					return err
+				}
+				*p = !b
+				return nil
+			}
+			fs.BoolFunc(joinStr("no-", spec.Name), spec.Help, fn)
+			if spec.Short != "" {
+				fs.BoolFunc(joinStr("no-", spec.Short), joinStr("short for -no-", spec.Name), fn)
+			}
+		case "false", "f", "no", "n", "", "0", "-1":
+			registerAlias(spec, func(n, u string) { fs.BoolVar(p, n, false, u) })
+			return nil
+		default:
+			return ers.Wrapf(ErrInvalidSpecification, "field %q has impossible default %q", spec.Name, spec.Default)
+		}
+	case *int:
+		return registerFuncFlag(fs, p, spec, parseInt[int](strconv.IntSize))
+	case *int64:
+		return registerFuncFlag(fs, p, spec, parseInt[int64](64))
+	case *uint:
+		return registerFuncFlag(fs, p, spec, parseUint[uint](strconv.IntSize))
+	case *uint64:
+		return registerFuncFlag(fs, p, spec, parseUint[uint64](64))
+	case *float64:
+		return registerFuncFlag(fs, p, spec, parseFloat[float64](64))
+	case *float32:
+		return registerFuncFlag(fs, p, spec, parseFloat[float32](32))
+	case *int32:
+		return registerFuncFlag(fs, p, spec, parseInt[int32](32))
+	case *int16:
+		return registerFuncFlag(fs, p, spec, parseInt[int16](16))
+	case *int8:
+		return registerFuncFlag(fs, p, spec, parseInt[int8](8))
+	case *uint32:
+		return registerFuncFlag(fs, p, spec, parseUint[uint32](32))
+	case *uint16:
+		return registerFuncFlag(fs, p, spec, parseUint[uint16](16))
+	case *uint8:
+		return registerFuncFlag(fs, p, spec, parseUint[uint8](8))
+
+	// ── slice types ───────────────────────────────────────────────────────────
+	case *[]string:
+		return registerSliceFlag(fs, p, spec, func(s string) (string, error) { return s, nil })
+	case *[]int:
+		return registerSliceFlag(fs, p, spec, parseInt[int](strconv.IntSize))
+	case *[]int64:
+		return registerSliceFlag(fs, p, spec, parseInt[int64](64))
+	case *[]uint:
+		return registerSliceFlag(fs, p, spec, parseUint[uint](strconv.IntSize))
+	case *[]uint64:
+		return registerSliceFlag(fs, p, spec, parseUint[uint64](64))
+	case *[]float64:
+		return registerSliceFlag(fs, p, spec, parseFloat[float64](64))
+	case *[]float32:
+		return registerSliceFlag(fs, p, spec, parseFloat[float32](32))
+	case *[]int32:
+		return registerSliceFlag(fs, p, spec, parseInt[int32](32))
+	case *[]int16:
+		return registerSliceFlag(fs, p, spec, parseInt[int16](16))
+	case *[]int8:
+		return registerSliceFlag(fs, p, spec, parseInt[int8](8))
+	case *[]uint32:
+		return registerSliceFlag(fs, p, spec, parseUint[uint32](32))
+	case *[]uint16:
+		return registerSliceFlag(fs, p, spec, parseUint[uint16](16))
+	case *[]uint8:
+		return registerSliceFlag(fs, p, spec, parseUint[uint8](8))
+	case *[]bool:
+		// Normalize aliases that strconv.ParseBool doesn't accept.
+		switch strings.ToLower(spec.Default) {
+		case "yes", "y", "true", "t", "1":
+			spec.Default = "true"
+		case "no", "n", "false", "f", "0", "-1":
+			spec.Default = "false"
+		}
+		if err := parseAndSetSliceDefault(p, spec.Default, strconv.ParseBool); err != nil {
+			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+		}
+		switch spec.Default {
+		case "true":
+			// Inverted: register as no-<name> using BoolFunc so bare
+			// -no-flag (without =value) is accepted, mirroring the scalar
+			// bool inverted-flag convention. Each occurrence appends !b.
+			fn := appendOnce(p, func(s string) (bool, error) {
+				b, err := strconv.ParseBool(s)
+				return !b, err
+			}, true)
+			fs.BoolFunc(joinStr("no-", spec.Name), spec.Help, fn)
+			if spec.Short != "" {
+				fs.BoolFunc(joinStr("no-", spec.Short), joinStr("short for -no-", spec.Name), fn)
+			}
+		case "false":
+			fallthrough
+		default:
+			fn := appendOnce(p, strconv.ParseBool, spec.Default != "")
+			registerAlias(spec, func(n, u string) { fs.Func(n, u, fn) })
+		}
+
+	// ── time types ────────────────────────────────────────────────────────────
+	case *time.Time:
+		layout := spec.Format
+		if layout == "" {
+			layout = time.RFC3339
+		}
+		parse := parseTimeFunc(layout)
+		if spec.Default != "" {
+			t, err := parse(spec.Default)
+			if err != nil {
+				return erc.Join(ErrInvalidSpecification, err,
+					fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+			}
+			*p = t
+		}
+		fn := func(s string) error {
+			t, err := parse(s)
+			if err != nil {
+				return err
+			}
+			*p = t
+			return nil
+		}
+		registerAlias(spec, func(n, u string) { fs.Func(n, u, fn) })
+	case *time.Duration:
+		var def time.Duration
+		if spec.Default != "" {
+			d, err := time.ParseDuration(spec.Default)
+			if err != nil {
+				return erc.Join(ErrInvalidSpecification, err,
+					fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+			}
+			def = d
+		}
+		registerAlias(spec, func(n, u string) { fs.DurationVar(p, n, def, u) })
+	case *[]time.Time:
+		layout := spec.Format
+		if layout == "" {
+			layout = time.RFC3339
+		}
+		return registerSliceFlag(fs, p, spec, parseTimeFunc(layout))
+	case *[]time.Duration:
+		return registerSliceFlag(fs, p, spec, time.ParseDuration)
+
+	case flag.Value:
+		if spec.Default != "" {
+			if err := p.Set(spec.Default); err != nil {
+				return ers.Wrapf(ErrInvalidSpecification, "field %q default %q: %w", spec.Name, spec.Default, err)
+			}
+		}
+		registerAlias(spec, func(n, u string) { fs.Var(p, n, u) })
+
+	default:
+		return ers.Wrapf(ErrInvalidSpecification, "unsupported field type %T for flag %q", ptr, spec.Name)
+	}
+	return nil
+}
+
 // parseTimeFunc returns a parser for time.Time values using the given layout.
 // The special value "now" resolves to time.Now().UTC() at call time.
 func parseTimeFunc(layout string) func(string) (time.Time, error) {
@@ -64,183 +276,14 @@ func parseAndSetSliceDefault[T any](p *[]T, defStr string, parse func(string) (T
 	return nil
 }
 
-// registerSliceFlag registers a slice flag (and optional short alias) on fs.
-// parse converts a single token to T. defStr is comma-separated default values
-// pre-populated into *p before parsing begins.
-func registerSliceFlag[T any](fs *flag.FlagSet, p *[]T, name, short, defStr, help string, parse func(string) (T, error)) error {
-	if err := parseAndSetSliceDefault(p, defStr, parse); err != nil {
-		return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-	}
-	fn := appendOnce(p, parse, defStr != "")
-	registerAlias(name, short, help, func(n, u string) { fs.Func(n, u, fn) })
-	return nil
+func parseInt[T ~int | ~int8 | ~int16 | ~int32 | ~int64](bits int) func(string) (T, error) {
+	return func(s string) (T, error) { v, err := strconv.ParseInt(s, 10, bits); return T(v), err }
 }
 
-// registerFlag registers a single flag (and optional short alias) on fs.
-// ptr must be the result of fval.Addr().Interface() for the struct field.
-// format is the value of the `format:` struct tag; it is only meaningful for
-// *time.Time fields (Go reference-time layout) and ignored for all other types.
-func registerFlag(fs *flag.FlagSet, ptr any, name, short, defStr, format, help string) error {
-	if short != "" && len(short) != 1 {
-		return ers.Wrapf(ErrInvalidSpecification, "short flag for %q must be exactly one character, got %q", name, short)
-	}
-	if fs.Lookup(name) != nil {
-		return ers.Wrapf(ErrInvalidSpecification, "flag %q already registered (duplicate field or flat-namespace collision)", name)
-	}
-	if short != "" && fs.Lookup(short) != nil {
-		return ers.Wrapf(ErrInvalidSpecification, "short flag %q (for %q) already registered", short, name)
-	}
+func parseUint[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](bits int) func(string) (T, error) {
+	return func(s string) (T, error) { v, err := strconv.ParseUint(s, 10, bits); return T(v), err }
+}
 
-	switch p := ptr.(type) {
-	// ── scalar types ──────────────────────────────────────────────────────────
-	case *string:
-		registerAlias(name, short, help, func(n, u string) { fs.StringVar(p, n, defStr, u) })
-	case *bool:
-		switch strings.ToLower(defStr) {
-		case "true", "t", "yes", "y":
-			// Inverted boolean: default is true, so the flag negates it.
-			// Register "no-<name>" which sets the field to false when passed.
-			*p = true
-			fn := func(s string) error {
-				b, err := strconv.ParseBool(s)
-				if err != nil {
-					return err
-				}
-				*p = !b
-				return nil
-			}
-			fs.BoolFunc(joinStr("no-", name), help, fn)
-			if short != "" {
-				fs.BoolFunc(joinStr("no-", short), joinStr("short for -no-", name), fn)
-			}
-		case "false", "f", "no", "n", "":
-			registerAlias(name, short, help, func(n, u string) { fs.BoolVar(p, n, false, u) })
-			return nil
-		default:
-			return ers.Wrapf(ErrInvalidSpecification, "field %q has impossible default %q", name, defStr)
-		}
-	case *int:
-		def, err := strconv.Atoi(defStr)
-		if err != nil && defStr != "" {
-			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.IntVar(p, n, def, u) })
-	case *int64:
-		def, err := strconv.ParseInt(defStr, 10, 64)
-		if err != nil && defStr != "" {
-			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.Int64Var(p, n, def, u) })
-	case *uint:
-		raw, err := strconv.ParseUint(defStr, 10, 64)
-		if err != nil && defStr != "" {
-			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.UintVar(p, n, uint(raw), u) })
-	case *uint64:
-		def, err := strconv.ParseUint(defStr, 10, 64)
-		if err != nil && defStr != "" {
-			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.Uint64Var(p, n, def, u) })
-	case *float64:
-		def, err := strconv.ParseFloat(defStr, 64)
-		if err != nil && defStr != "" {
-			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.Float64Var(p, n, def, u) })
-
-	// ── slice types ───────────────────────────────────────────────────────────
-	case *[]string:
-		return registerSliceFlag(fs, p, name, short, defStr, help, func(s string) (string, error) { return s, nil })
-	case *[]int:
-		return registerSliceFlag(fs, p, name, short, defStr, help, strconv.Atoi)
-	case *[]int64:
-		return registerSliceFlag(fs, p, name, short, defStr, help, func(s string) (int64, error) { return strconv.ParseInt(s, 10, 64) })
-	case *[]uint:
-		return registerSliceFlag(fs, p, name, short, defStr, help, func(s string) (uint, error) {
-			v, err := strconv.ParseUint(s, 10, 64)
-			return uint(v), err
-		})
-	case *[]uint64:
-		return registerSliceFlag(fs, p, name, short, defStr, help, func(s string) (uint64, error) { return strconv.ParseUint(s, 10, 64) })
-	case *[]float64:
-		return registerSliceFlag(fs, p, name, short, defStr, help, func(s string) (float64, error) { return strconv.ParseFloat(s, 64) })
-	case *[]bool:
-		if err := parseAndSetSliceDefault(p, defStr, strconv.ParseBool); err != nil {
-			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", name, defStr))
-		}
-		if defStr == "true" {
-			// Inverted: register as no-<name> using BoolFunc so bare
-			// -no-flag (without =value) is accepted, mirroring the scalar
-			// bool inverted-flag convention. Each occurrence appends !b.
-			fn := appendOnce(p, func(s string) (bool, error) {
-				b, err := strconv.ParseBool(s)
-				return !b, err
-			}, true)
-			fs.BoolFunc(joinStr("no-", name), help, fn)
-			if short != "" {
-				fs.BoolFunc(joinStr("no-", short), joinStr("short for -no-", name), fn)
-			}
-		} else {
-			fn := appendOnce(p, strconv.ParseBool, defStr != "")
-			registerAlias(name, short, help, func(n, u string) { fs.Func(n, u, fn) })
-		}
-
-	// ── time types ────────────────────────────────────────────────────────────
-	case *time.Time:
-		layout := format
-		if layout == "" {
-			layout = time.RFC3339
-		}
-		parse := parseTimeFunc(layout)
-		if defStr != "" {
-			t, err := parse(defStr)
-			if err != nil {
-				return erc.Join(ErrInvalidSpecification, err,
-					fmt.Errorf("field %q had default %q", name, defStr))
-			}
-			*p = t
-		}
-		fn := func(s string) error {
-			t, err := parse(s)
-			if err != nil {
-				return err
-			}
-			*p = t
-			return nil
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.Func(n, u, fn) })
-	case *time.Duration:
-		var def time.Duration
-		if defStr != "" {
-			d, err := time.ParseDuration(defStr)
-			if err != nil {
-				return erc.Join(ErrInvalidSpecification, err,
-					fmt.Errorf("field %q had default %q", name, defStr))
-			}
-			def = d
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.DurationVar(p, n, def, u) })
-	case *[]time.Time:
-		layout := format
-		if layout == "" {
-			layout = time.RFC3339
-		}
-		return registerSliceFlag(fs, p, name, short, defStr, help, parseTimeFunc(layout))
-	case *[]time.Duration:
-		return registerSliceFlag(fs, p, name, short, defStr, help, time.ParseDuration)
-
-	case flag.Value:
-		if defStr != "" {
-			if err := p.Set(defStr); err != nil {
-				return ers.Wrapf(ErrInvalidSpecification, "field %q default %q: %w", name, defStr, err)
-			}
-		}
-		registerAlias(name, short, help, func(n, u string) { fs.Var(p, n, u) })
-
-	default:
-		return ers.Wrapf(ErrInvalidSpecification, "unsupported field type %T for flag %q", ptr, name)
-	}
-	return nil
+func parseFloat[T ~float32 | ~float64](bits int) func(string) (T, error) {
+	return func(s string) (T, error) { v, err := strconv.ParseFloat(s, bits); return T(v), err }
 }

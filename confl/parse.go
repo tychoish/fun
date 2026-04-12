@@ -82,12 +82,13 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 		if !field.IsExported() {
 			return ers.Wrapf(ErrInvalidSpecification, "field %q with flag tag %q must be exported", field.Name, name)
 		}
-		if err := registerFlag(fs, fval.Addr().Interface(), joinStr(prefix, name),
-			field.Tag.Get("short"),
-			field.Tag.Get("default"),
-			field.Tag.Get("format"),
-			field.Tag.Get("help"),
-		); err != nil {
+		if err := registerFlag(fs, fval.Addr().Interface(), flagSpec{
+			Name:    joinStr(prefix, name),
+			Short:   field.Tag.Get("short"),
+			Default: field.Tag.Get("default"),
+			Format:  field.Tag.Get("format"),
+			Help:    field.Tag.Get("help"),
+		}); err != nil {
 			return erc.Join(ErrInvalidSpecification, err)
 		}
 	}
