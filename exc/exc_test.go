@@ -22,7 +22,6 @@ func TestCommand_Builder(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FluentMethodsReturnSamePointer", func(t *testing.T) {
-		t.Parallel()
 		var buf bytes.Buffer
 		cmd := &exc.Command{}
 		if cmd.WithName("true") != cmd {
@@ -55,7 +54,6 @@ func TestCommand_Builder(t *testing.T) {
 	})
 
 	t.Run("WithName", func(t *testing.T) {
-		t.Parallel()
 		for _, tc := range []struct {
 			name string
 			in   string
@@ -75,7 +73,6 @@ func TestCommand_Builder(t *testing.T) {
 	})
 
 	t.Run("Args", func(t *testing.T) {
-		t.Parallel()
 		for _, tc := range []struct {
 			name string
 			args []string
@@ -95,7 +92,6 @@ func TestCommand_Builder(t *testing.T) {
 	})
 
 	t.Run("ResetArgs", func(t *testing.T) {
-		t.Parallel()
 		cmd := (&exc.Command{}).WithArgs("a", "b")
 		cmd.ResetArgs()
 		if cmd.Args != nil {
@@ -104,7 +100,6 @@ func TestCommand_Builder(t *testing.T) {
 	})
 
 	t.Run("SetArgs", func(t *testing.T) {
-		t.Parallel()
 		for _, tc := range []struct {
 			name string
 			in   []string
@@ -125,7 +120,6 @@ func TestCommand_Builder(t *testing.T) {
 	})
 
 	t.Run("EnvVars", func(t *testing.T) {
-		t.Parallel()
 		cmd := &exc.Command{}
 		cmd.SetEnvVar("FOO", "bar")
 		cmd.SetEnvVar("BAZ", "qux")
@@ -143,7 +137,6 @@ func TestCommand_Builder(t *testing.T) {
 	})
 
 	t.Run("IO", func(t *testing.T) {
-		t.Parallel()
 		cmd := &exc.Command{}
 		var buf bytes.Buffer
 
@@ -185,7 +178,6 @@ func TestCommand_Resolve(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Fields", func(t *testing.T) {
-		t.Parallel()
 		var out, in bytes.Buffer
 		cmd := (&exc.Command{}).
 			WithName("true").
@@ -213,7 +205,6 @@ func TestCommand_Resolve(t *testing.T) {
 	})
 
 	t.Run("Env", func(t *testing.T) {
-		t.Parallel()
 		for _, tc := range []struct {
 			name    string
 			setup   func(*exc.Command)
@@ -319,7 +310,6 @@ func TestCommand_Exec(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Table", func(t *testing.T) {
-		t.Parallel()
 		for _, tc := range []struct {
 			name       string
 			cmd        string
@@ -381,7 +371,6 @@ func TestCommand_Exec(t *testing.T) {
 	})
 
 	t.Run("ErrorType", func(t *testing.T) {
-		t.Parallel()
 		for _, tc := range []struct {
 			name          string
 			cmd           string
@@ -434,8 +423,6 @@ func TestCommand_Start(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Table", func(t *testing.T) {
-		t.Parallel()
-
 		for _, tc := range []struct {
 			name    string
 			cmd     string
@@ -461,7 +448,6 @@ func TestCommand_Start(t *testing.T) {
 	})
 
 	t.Run("ContextCancellationCancelsWork", func(t *testing.T) {
-		t.Parallel()
 		// The context passed to Start controls the process lifetime.
 		// Canceling it should terminate a long-running process promptly.
 		cmd := (&exc.Command{Name: "sleep"}).WithArgs("60")
@@ -481,7 +467,6 @@ func TestCommand_Start(t *testing.T) {
 	})
 
 	t.Run("WorkerContextCancellation", func(t *testing.T) {
-		t.Parallel()
 		// Canceling the context passed to the worker (not Start) should
 		// also unblock the caller without waiting for the process.
 		cmd := (&exc.Command{Name: "sleep"}).WithArgs("60")
@@ -545,8 +530,6 @@ func TestError_IsAsUnwrap(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Is", func(t *testing.T) {
-		t.Parallel()
-
 		sentinel := errors.New("sentinel error")
 		unrelated := errors.New("unrelated error")
 
@@ -602,7 +585,6 @@ func TestError_IsAsUnwrap(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
 				got := errors.Is(tc.err, tc.tgt)
 				if got != tc.want {
 					t.Errorf("errors.Is(%v, %v) = %v, want %v", tc.err, tc.tgt, got, tc.want)
@@ -612,12 +594,9 @@ func TestError_IsAsUnwrap(t *testing.T) {
 	})
 
 	t.Run("As", func(t *testing.T) {
-		t.Parallel()
-
 		customErrPtr := &testCustomErr{msg: "custom"}
 
 		t.Run("MatchesConcreteType", func(t *testing.T) {
-			t.Parallel()
 			excErr := &exc.Error{
 				Name:      "cmd",
 				Err:       customErrPtr,
@@ -634,7 +613,6 @@ func TestError_IsAsUnwrap(t *testing.T) {
 		})
 
 		t.Run("NilErr", func(t *testing.T) {
-			t.Parallel()
 			excErr := &exc.Error{
 				Name:      "cmd",
 				Err:       nil,
@@ -648,7 +626,6 @@ func TestError_IsAsUnwrap(t *testing.T) {
 		})
 
 		t.Run("WrongType", func(t *testing.T) {
-			t.Parallel()
 			excErr := &exc.Error{
 				Name:      "cmd",
 				Err:       errors.New("plain error"),
@@ -663,10 +640,7 @@ func TestError_IsAsUnwrap(t *testing.T) {
 	})
 
 	t.Run("Unwrap", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("NonNilErr", func(t *testing.T) {
-			t.Parallel()
 			inner := errors.New("inner error")
 			excErr := &exc.Error{
 				Name:      "cmd",
@@ -681,7 +655,6 @@ func TestError_IsAsUnwrap(t *testing.T) {
 		})
 
 		t.Run("NilErr", func(t *testing.T) {
-			t.Parallel()
 			excErr := &exc.Error{
 				Name:      "cmd",
 				Err:       nil,
@@ -693,6 +666,132 @@ func TestError_IsAsUnwrap(t *testing.T) {
 				t.Errorf("Unwrap() = %v, want nil", got)
 			}
 		})
+	})
+}
+
+func TestCommand_Worker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SuccessfulCommand", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("true")
+		worker := cmd.Worker()
+		if worker == nil {
+			t.Fatal("Worker() returned nil")
+		}
+		if err := worker(context.Background()); err != nil {
+			t.Errorf("worker() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("FailingCommand", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("false")
+		if err := cmd.Worker()(context.Background()); err == nil {
+			t.Error("worker() expected error for failing command, got nil")
+		}
+	})
+
+	t.Run("ReturnsSamePointer", func(t *testing.T) {
+		// Worker() should return cmd.Run, so calling it twice on the same
+		// command should produce workers with equivalent behaviour.
+		cmd := (&exc.Command{}).WithName("true")
+		w1 := cmd.Worker()
+		w2 := cmd.Worker()
+		if err := w1(context.Background()); err != nil {
+			t.Fatalf("w1() error = %v", err)
+		}
+		if err := w2(context.Background()); err != nil {
+			t.Fatalf("w2() error = %v", err)
+		}
+	})
+
+	t.Run("MutatingCommandAfterWorkerAffectsWorker", func(t *testing.T) {
+		// Worker captures cmd by pointer, so mutations after Worker() is
+		// called are visible when the worker runs.
+		cmd := &exc.Command{}
+		worker := cmd.Worker()
+		cmd.WithName("true")
+		if err := worker(context.Background()); err != nil {
+			t.Errorf("worker() error = %v after mutating cmd to 'true'", err)
+		}
+	})
+
+	t.Run("CapturesOutput", func(t *testing.T) {
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).WithName("echo").WithArgs("hello").WithStdOutput(&buf)
+		if err := cmd.Worker()(context.Background()); err != nil {
+			t.Fatalf("worker() error = %v", err)
+		}
+		if !strings.Contains(buf.String(), "hello") {
+			t.Errorf("output %q does not contain 'hello'", buf.String())
+		}
+	})
+}
+
+func TestCommand_Shell(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetsNameAndArgs", func(t *testing.T) {
+		cmd := &exc.Command{}
+		result := cmd.Shell("sh", "echo hi")
+		if result != cmd {
+			t.Error("Shell() did not return the same pointer")
+		}
+		if cmd.Name != "sh" {
+			t.Errorf("Name = %q, want %q", cmd.Name, "sh")
+		}
+		if !slices.Equal(cmd.Args, []string{"-c", "echo hi"}) {
+			t.Errorf("Args = %v, want [-c echo hi]", cmd.Args)
+		}
+	})
+
+	t.Run("RunsBlock", func(t *testing.T) {
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).WithStdOutput(&buf).Shell("sh", "echo shellout")
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if !strings.Contains(buf.String(), "shellout") {
+			t.Errorf("output %q does not contain 'shellout'", buf.String())
+		}
+	})
+
+	t.Run("MultiStatementBlock", func(t *testing.T) {
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).WithStdOutput(&buf).Shell("sh", "echo a; echo b; echo c")
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+		if len(lines) != 3 {
+			t.Errorf("got %d lines, want 3: %v", len(lines), lines)
+		}
+	})
+
+	t.Run("FailingBlockReturnsError", func(t *testing.T) {
+		cmd := (&exc.Command{}).Shell("sh", "exit 1")
+		if err := cmd.Run(context.Background()); err == nil {
+			t.Error("Run() expected error for failing shell block, got nil")
+		}
+	})
+
+	t.Run("ReplacesExistingArgs", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithArgs("old", "args")
+		cmd.Shell("sh", "true")
+		if !slices.Equal(cmd.Args, []string{"-c", "true"}) {
+			t.Errorf("Args = %v, want [-c true]", cmd.Args)
+		}
+	})
+
+	t.Run("ExecViaCapturedOutput", func(t *testing.T) {
+		cmd := (&exc.Command{}).Shell("sh", "printf '%s' hello")
+		r, err := cmd.Exec(context.Background())
+		if err != nil {
+			t.Fatalf("Exec() error = %v", err)
+		}
+		data, _ := io.ReadAll(r)
+		if string(data) != "hello" {
+			t.Errorf("output = %q, want %q", string(data), "hello")
+		}
 	})
 }
 

@@ -32,6 +32,13 @@ type Command struct {
 	Error     io.Writer
 }
 
+// Shell runs code using the specified shell (or path to shell
+// binary,) and runs the 'block' accordingly (via the '-c'
+// option). Usable with bash/zsh/dash/sh/nu/fish/python/python3.
+func (cmd *Command) Shell(shell string, block string) *Command {
+	return cmd.WithName(shell).WithArgs("-c", block)
+}
+
 // WithName sets the executable name or path and returns the receiver.
 func (cmd *Command) WithName(n string) *Command { cmd.Name = n; return cmd }
 
@@ -90,6 +97,9 @@ func (cmd *Command) WithArgs(a ...string) *Command { cmd.Args = a; return cmd }
 // discarded if those fields are nil. Use Exec to capture output as a reader,
 // or Start for non-blocking execution.
 func (cmd *Command) Run(ctx context.Context) error { return cmd.Resolve(ctx).Run() }
+
+// Worker provides access to the command as an fnx.Worker function.
+func (cmd *Command) Worker() fnx.Worker { return cmd.Run }
 
 // Exec runs the command and returns its stdout as a reader. Both stdout and
 // stderr are buffered internally. If the process fails, Exec returns a nil
