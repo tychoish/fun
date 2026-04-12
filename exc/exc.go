@@ -55,13 +55,8 @@ func (cmd *Command) ResetLabels() *Command {
 	return cmd
 }
 
-// Format implements fmt.Formatter.
-// %v / %q: "'name arg1 arg2'"  (single-quoted command line)
-// %+v: "exc.Command<[id] {label1,label2} name args>'name args'"
-//
-//	id and label sections are omitted when empty.
-//
-// %s and all other verbs: plain "name arg1 arg2"
+// Format implements fmt.Formatter. For %v and %+v the exc.Command<[+ID][+LABELS] command>. %q
+// encloses with brackets.)
 func (cmd *Command) Format(f fmt.State, verb rune) {
 	var b strut.Buffer
 	switch verb {
