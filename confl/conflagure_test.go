@@ -1509,12 +1509,12 @@ func Test_conflagure_small_int_types(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		I8  int8  `flag:"i8"`
-		I16 int16 `flag:"i16"`
-		I32 int32 `flag:"i32"`
-		U8  uint8 `flag:"u8"`
-		U16 uint16 `flag:"u16"`
-		U32 uint32 `flag:"u32"`
+		I8  int8    `flag:"i8"`
+		I16 int16   `flag:"i16"`
+		I32 int32   `flag:"i32"`
+		U8  uint8   `flag:"u8"`
+		U16 uint16  `flag:"u16"`
+		U32 uint32  `flag:"u32"`
 		F32 float32 `flag:"f32"`
 	}
 
@@ -1741,12 +1741,12 @@ func Test_conflagure_slice_small_int_types(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		I8s  []int8   `flag:"i8"`
-		I16s []int16  `flag:"i16"`
-		I32s []int32  `flag:"i32"`
-		U8s  []uint8  `flag:"u8"`
-		U16s []uint16 `flag:"u16"`
-		U32s []uint32 `flag:"u32"`
+		I8s  []int8    `flag:"i8"`
+		I16s []int16   `flag:"i16"`
+		I32s []int32   `flag:"i32"`
+		U8s  []uint8   `flag:"u8"`
+		U16s []uint16  `flag:"u16"`
+		U32s []uint32  `flag:"u32"`
 		F32s []float32 `flag:"f32"`
 	}
 
@@ -1962,7 +1962,7 @@ func Test_parseTimeFuncAuto(t *testing.T) {
 			},
 		},
 		{
-			name: "now resolves",
+			name:  "now resolves",
 			input: "now",
 			check: func(t *testing.T, got time.Time) {
 				if got.IsZero() {
