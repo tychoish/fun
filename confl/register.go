@@ -167,11 +167,12 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 
 	// ── time types ────────────────────────────────────────────────────────────
 	case *time.Time:
-		layout := spec.Format
-		if layout == "" {
-			layout = time.RFC3339
+		var parse func(string) (time.Time, error)
+		if spec.Format != "" {
+			parse = parseTimeFunc(spec.Format)
+		} else {
+			parse = parseTimeFuncAuto()
 		}
-		parse := parseTimeFunc(layout)
 		if spec.Default != "" {
 			t, err := parse(spec.Default)
 			if err != nil {
@@ -201,11 +202,13 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 		}
 		registerAlias(spec, func(n, u string) { fs.DurationVar(p, n, def, u) })
 	case *[]time.Time:
-		layout := spec.Format
-		if layout == "" {
-			layout = time.RFC3339
+		var parse func(string) (time.Time, error)
+		if spec.Format != "" {
+			parse = parseTimeFunc(spec.Format)
+		} else {
+			parse = parseTimeFuncAuto()
 		}
-		return registerSliceFlag(fs, p, spec, parseTimeFunc(layout))
+		return registerSliceFlag(fs, p, spec, parse)
 	case *[]time.Duration:
 		return registerSliceFlag(fs, p, spec, time.ParseDuration)
 
@@ -235,6 +238,24 @@ func parseTimeFunc(layout string) func(string) (time.Time, error) {
 			return time.Time{}, fmt.Errorf("parsing time %q with layout %q: %w", s, layout, err)
 		}
 		return t, nil
+	}
+}
+
+// parseTimeFuncAuto returns a parser that tries RFC3339, then DateTime, then
+// DateOnly in order, accepting the first layout that succeeds. The special
+// value "now" resolves to time.Now().UTC() at call time.
+func parseTimeFuncAuto() func(string) (time.Time, error) {
+	layouts := []string{time.RFC3339, time.DateTime, time.DateOnly}
+	return func(s string) (time.Time, error) {
+		if s == "now" {
+			return time.Now().UTC(), nil
+		}
+		for _, layout := range layouts {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("parsing time %q: tried layouts %v", s, layouts)
 	}
 }
 

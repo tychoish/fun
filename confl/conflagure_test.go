@@ -1505,6 +1505,496 @@ func Test_conflagure_slice_numeric_short_alias(t *testing.T) {
 	}
 }
 
+func Test_conflagure_small_int_types(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		I8  int8  `flag:"i8"`
+		I16 int16 `flag:"i16"`
+		I32 int32 `flag:"i32"`
+		U8  uint8 `flag:"u8"`
+		U16 uint16 `flag:"u16"`
+		U32 uint32 `flag:"u32"`
+		F32 float32 `flag:"f32"`
+	}
+
+	tests := []struct {
+		name  string
+		args  []string
+		check func(*testing.T, cfg)
+	}{
+		{
+			name: "int8",
+			args: []string{"-i8", "127"},
+			check: func(t *testing.T, c cfg) {
+				if c.I8 != 127 {
+					t.Errorf("I8 = %d, want 127", c.I8)
+				}
+			},
+		},
+		{
+			name: "int16",
+			args: []string{"-i16", "32767"},
+			check: func(t *testing.T, c cfg) {
+				if c.I16 != 32767 {
+					t.Errorf("I16 = %d, want 32767", c.I16)
+				}
+			},
+		},
+		{
+			name: "int32",
+			args: []string{"-i32", "2147483647"},
+			check: func(t *testing.T, c cfg) {
+				if c.I32 != 2147483647 {
+					t.Errorf("I32 = %d, want 2147483647", c.I32)
+				}
+			},
+		},
+		{
+			name: "uint8",
+			args: []string{"-u8", "255"},
+			check: func(t *testing.T, c cfg) {
+				if c.U8 != 255 {
+					t.Errorf("U8 = %d, want 255", c.U8)
+				}
+			},
+		},
+		{
+			name: "uint16",
+			args: []string{"-u16", "65535"},
+			check: func(t *testing.T, c cfg) {
+				if c.U16 != 65535 {
+					t.Errorf("U16 = %d, want 65535", c.U16)
+				}
+			},
+		},
+		{
+			name: "uint32",
+			args: []string{"-u32", "4294967295"},
+			check: func(t *testing.T, c cfg) {
+				if c.U32 != 4294967295 {
+					t.Errorf("U32 = %d, want 4294967295", c.U32)
+				}
+			},
+		},
+		{
+			name: "float32",
+			args: []string{"-f32", "1.5"},
+			check: func(t *testing.T, c cfg) {
+				if c.F32 != 1.5 {
+					t.Errorf("F32 = %f, want 1.5", c.F32)
+				}
+			},
+		},
+		{
+			name: "negative int8",
+			args: []string{"-i8", "-128"},
+			check: func(t *testing.T, c cfg) {
+				if c.I8 != -128 {
+					t.Errorf("I8 = %d, want -128", c.I8)
+				}
+			},
+		},
+		{
+			name: "negative int32",
+			args: []string{"-i32", "-2147483648"},
+			check: func(t *testing.T, c cfg) {
+				if c.I32 != -2147483648 {
+					t.Errorf("I32 = %d, want -2147483648", c.I32)
+				}
+			},
+		},
+		{
+			name: "defaults when all absent",
+			args: nil,
+			check: func(t *testing.T, c cfg) {
+				if c.I8 != 0 || c.I16 != 0 || c.I32 != 0 ||
+					c.U8 != 0 || c.U16 != 0 || c.U32 != 0 || c.F32 != 0 {
+					t.Errorf("expected all zero, got %+v", c)
+				}
+			},
+		},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			if err := conflagure(newTestFS(), &c, tt.args); err != nil {
+				t.Fatalf("conflagure() error = %v", err)
+			}
+			tt.check(t, c)
+		})
+	}
+}
+
+func Test_conflagure_small_int_defaults(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		I8  int8    `default:"10"  flag:"i8"`
+		I16 int16   `default:"200" flag:"i16"`
+		I32 int32   `default:"300" flag:"i32"`
+		U8  uint8   `default:"20"  flag:"u8"`
+		U16 uint16  `default:"400" flag:"u16"`
+		U32 uint32  `default:"500" flag:"u32"`
+		F32 float32 `default:"2.5" flag:"f32"`
+	}
+
+	var c cfg
+	if err := conflagure(newTestFS(), &c, nil); err != nil {
+		t.Fatalf("conflagure() error = %v", err)
+	}
+	if c.I8 != 10 {
+		t.Errorf("I8 = %d, want 10", c.I8)
+	}
+	if c.I16 != 200 {
+		t.Errorf("I16 = %d, want 200", c.I16)
+	}
+	if c.I32 != 300 {
+		t.Errorf("I32 = %d, want 300", c.I32)
+	}
+	if c.U8 != 20 {
+		t.Errorf("U8 = %d, want 20", c.U8)
+	}
+	if c.U16 != 400 {
+		t.Errorf("U16 = %d, want 400", c.U16)
+	}
+	if c.U32 != 500 {
+		t.Errorf("U32 = %d, want 500", c.U32)
+	}
+	if c.F32 != 2.5 {
+		t.Errorf("F32 = %f, want 2.5", c.F32)
+	}
+}
+
+func Test_conflagure_small_int_invalid_defaults(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  any
+	}{
+		{name: "int8 overflow", cfg: &struct {
+			V int8 `default:"200" flag:"v"`
+		}{}},
+		{name: "int16 overflow", cfg: &struct {
+			V int16 `default:"40000" flag:"v"`
+		}{}},
+		{name: "int32 overflow", cfg: &struct {
+			V int32 `default:"3000000000" flag:"v"`
+		}{}},
+		{name: "uint8 overflow", cfg: &struct {
+			V uint8 `default:"300" flag:"v"`
+		}{}},
+		{name: "uint16 overflow", cfg: &struct {
+			V uint16 `default:"70000" flag:"v"`
+		}{}},
+		{name: "uint32 overflow", cfg: &struct {
+			V uint32 `default:"5000000000" flag:"v"`
+		}{}},
+		{name: "float32 non-numeric", cfg: &struct {
+			V float32 `default:"notafloat" flag:"v"`
+		}{}},
+		{name: "int8 non-numeric", cfg: &struct {
+			V int8 `default:"notanint" flag:"v"`
+		}{}},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := conflagure(newTestFS(), tt.cfg, nil); err == nil {
+				t.Fatal("expected error for invalid default, got nil")
+			}
+		})
+	}
+}
+
+func Test_conflagure_small_int_invalid_values(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  any
+		args []string
+	}{
+		{name: "int8 overflow at parse", cfg: &struct {
+			V int8 `flag:"v"`
+		}{}, args: []string{"-v", "200"}},
+		{name: "uint8 overflow at parse", cfg: &struct {
+			V uint8 `flag:"v"`
+		}{}, args: []string{"-v", "300"}},
+		{name: "float32 bad value", cfg: &struct {
+			V float32 `flag:"v"`
+		}{}, args: []string{"-v", "notafloat"}},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := conflagure(newTestFS(), tt.cfg, tt.args); err == nil {
+				t.Fatal("expected error for out-of-range value, got nil")
+			}
+		})
+	}
+}
+
+func Test_conflagure_slice_small_int_types(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		I8s  []int8   `flag:"i8"`
+		I16s []int16  `flag:"i16"`
+		I32s []int32  `flag:"i32"`
+		U8s  []uint8  `flag:"u8"`
+		U16s []uint16 `flag:"u16"`
+		U32s []uint32 `flag:"u32"`
+		F32s []float32 `flag:"f32"`
+	}
+
+	tests := []struct {
+		name  string
+		args  []string
+		check func(*testing.T, cfg)
+	}{
+		{
+			name: "[]int8 accumulates",
+			args: []string{"-i8", "1", "-i8", "2", "-i8", "-3"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.I8s, []int8{1, 2, -3}) {
+					t.Errorf("I8s = %v, want [1 2 -3]", c.I8s)
+				}
+			},
+		},
+		{
+			name: "[]int16 accumulates",
+			args: []string{"-i16", "100", "-i16", "-200"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.I16s, []int16{100, -200}) {
+					t.Errorf("I16s = %v, want [100 -200]", c.I16s)
+				}
+			},
+		},
+		{
+			name: "[]int32 accumulates",
+			args: []string{"-i32", "1000", "-i32", "2000"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.I32s, []int32{1000, 2000}) {
+					t.Errorf("I32s = %v, want [1000 2000]", c.I32s)
+				}
+			},
+		},
+		{
+			name: "[]uint8 accumulates",
+			args: []string{"-u8", "10", "-u8", "20"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.U8s, []uint8{10, 20}) {
+					t.Errorf("U8s = %v, want [10 20]", c.U8s)
+				}
+			},
+		},
+		{
+			name: "[]uint16 accumulates",
+			args: []string{"-u16", "1000", "-u16", "2000"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.U16s, []uint16{1000, 2000}) {
+					t.Errorf("U16s = %v, want [1000 2000]", c.U16s)
+				}
+			},
+		},
+		{
+			name: "[]uint32 accumulates",
+			args: []string{"-u32", "100000", "-u32", "200000"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.U32s, []uint32{100000, 200000}) {
+					t.Errorf("U32s = %v, want [100000 200000]", c.U32s)
+				}
+			},
+		},
+		{
+			name: "[]float32 accumulates",
+			args: []string{"-f32", "1.5", "-f32", "2.5"},
+			check: func(t *testing.T, c cfg) {
+				if !slices.Equal(c.F32s, []float32{1.5, 2.5}) {
+					t.Errorf("F32s = %v, want [1.5 2.5]", c.F32s)
+				}
+			},
+		},
+		{
+			name: "no flags gives nil slices",
+			args: nil,
+			check: func(t *testing.T, c cfg) {
+				if c.I8s != nil || c.I16s != nil || c.I32s != nil ||
+					c.U8s != nil || c.U16s != nil || c.U32s != nil || c.F32s != nil {
+					t.Errorf("expected all nil slices, got %+v", c)
+				}
+			},
+		},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			if err := conflagure(newTestFS(), &c, tt.args); err != nil {
+				t.Fatalf("conflagure() error = %v", err)
+			}
+			tt.check(t, c)
+		})
+	}
+}
+
+func Test_conflagure_slice_small_int_defaults(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		I8s  []int8    `default:"1,2"     flag:"i8"`
+		I16s []int16   `default:"10,20"   flag:"i16"`
+		I32s []int32   `default:"100,200" flag:"i32"`
+		U8s  []uint8   `default:"3,4"     flag:"u8"`
+		U16s []uint16  `default:"30,40"   flag:"u16"`
+		U32s []uint32  `default:"300,400" flag:"u32"`
+		F32s []float32 `default:"1.5,2.5" flag:"f32"`
+	}
+
+	t.Run("defaults applied when no flags given", func(t *testing.T) {
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.I8s, []int8{1, 2}) {
+			t.Errorf("I8s = %v, want [1 2]", c.I8s)
+		}
+		if !slices.Equal(c.F32s, []float32{1.5, 2.5}) {
+			t.Errorf("F32s = %v, want [1.5 2.5]", c.F32s)
+		}
+	})
+
+	t.Run("flag use discards defaults", func(t *testing.T) {
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-i8", "99"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.I8s, []int8{99}) {
+			t.Errorf("I8s = %v, want [99] (defaults cleared)", c.I8s)
+		}
+	})
+}
+
+func Test_conflagure_slice_small_int_invalid_defaults(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  any
+	}{
+		{name: "[]int8 overflow in default", cfg: &struct {
+			V []int8 `default:"1,200" flag:"v"`
+		}{}},
+		{name: "[]int16 overflow in default", cfg: &struct {
+			V []int16 `default:"1,40000" flag:"v"`
+		}{}},
+		{name: "[]int32 overflow in default", cfg: &struct {
+			V []int32 `default:"1,3000000000" flag:"v"`
+		}{}},
+		{name: "[]uint8 overflow in default", cfg: &struct {
+			V []uint8 `default:"1,300" flag:"v"`
+		}{}},
+		{name: "[]uint16 overflow in default", cfg: &struct {
+			V []uint16 `default:"1,70000" flag:"v"`
+		}{}},
+		{name: "[]uint32 overflow in default", cfg: &struct {
+			V []uint32 `default:"1,5000000000" flag:"v"`
+		}{}},
+		{name: "[]float32 non-numeric in default", cfg: &struct {
+			V []float32 `default:"1.0,notafloat" flag:"v"`
+		}{}},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := conflagure(newTestFS(), tt.cfg, nil); err == nil {
+				t.Fatal("expected error for invalid slice default, got nil")
+			}
+		})
+	}
+}
+
+func Test_parseTimeFuncAuto(t *testing.T) {
+	t.Parallel()
+
+	parse := parseTimeFuncAuto()
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		check   func(*testing.T, time.Time)
+	}{
+		{
+			name:  "RFC3339",
+			input: "2024-03-15T10:30:00Z",
+			check: func(t *testing.T, got time.Time) {
+				if got.Year() != 2024 || got.Month() != 3 || got.Day() != 15 {
+					t.Errorf("got %v, want 2024-03-15", got)
+				}
+			},
+		},
+		{
+			name:  "DateTime",
+			input: "2024-03-15 10:30:00",
+			check: func(t *testing.T, got time.Time) {
+				if got.Year() != 2024 || got.Month() != 3 || got.Day() != 15 {
+					t.Errorf("got %v, want 2024-03-15", got)
+				}
+				if got.Hour() != 10 || got.Minute() != 30 {
+					t.Errorf("got %v, want 10:30", got)
+				}
+			},
+		},
+		{
+			name:  "DateOnly",
+			input: "2024-03-15",
+			check: func(t *testing.T, got time.Time) {
+				if got.Year() != 2024 || got.Month() != 3 || got.Day() != 15 {
+					t.Errorf("got %v, want 2024-03-15", got)
+				}
+				if got.Hour() != 0 || got.Minute() != 0 || got.Second() != 0 {
+					t.Errorf("expected midnight, got %v", got)
+				}
+			},
+		},
+		{
+			name: "now resolves",
+			input: "now",
+			check: func(t *testing.T, got time.Time) {
+				if got.IsZero() {
+					t.Error("now produced zero time")
+				}
+			},
+		},
+		{
+			name:    "invalid returns error",
+			input:   "not-a-date",
+			wantErr: true,
+		},
+		{
+			name:    "partial date rejected",
+			input:   "2024-03",
+			wantErr: true,
+		},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parse(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseTimeFuncAuto()(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if !tt.wantErr && tt.check != nil {
+				tt.check(t, got)
+			}
+		})
+	}
+}
+
 func Test_appendOnce(t *testing.T) {
 	t.Parallel()
 
