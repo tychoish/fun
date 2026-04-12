@@ -741,7 +741,7 @@ func TestCommand_Format(t *testing.T) {
 		{
 			name: "plus_v_labels_only",
 			setup: func() *exc.Command {
-				return (&exc.Command{}).WithName("echo").WithArgs("hi").SetLabel("prod")
+				return (&exc.Command{}).WithName("echo").WithArgs("hi").WithLabel("prod")
 			},
 			format: "%+v",
 			want:   "exc.Command<[prod]echo hi>",
@@ -749,7 +749,7 @@ func TestCommand_Format(t *testing.T) {
 		{
 			name: "plus_v_id_and_labels",
 			setup: func() *exc.Command {
-				return (&exc.Command{}).WithID("job-1").WithName("echo").WithArgs("hi").SetLabel("prod").SetLabel("web")
+				return (&exc.Command{}).WithID("job-1").WithName("echo").WithArgs("hi").WithLabel("prod").WithLabel("web")
 			},
 			format: "%+v",
 			want:   "exc.Command<[job-1][prod,web]echo hi>",
@@ -770,7 +770,7 @@ func TestCommand_Format(t *testing.T) {
 		{
 			name: "plus_v_labels_sorted",
 			setup: func() *exc.Command {
-				return (&exc.Command{}).WithName("true").SetLabel("z").SetLabel("a").SetLabel("m")
+				return (&exc.Command{}).WithName("true").WithLabel("z").WithLabel("a").WithLabel("m")
 			},
 			format: "%+v",
 			want:   "exc.Command<[a,m,z]true>",
@@ -795,7 +795,7 @@ func TestCommand_Labels(t *testing.T) {
 		if cmd.HasLabel("x") {
 			t.Error("HasLabel returned true before any labels set")
 		}
-		result := cmd.SetLabel("x")
+		result := cmd.WithLabel("x")
 		if result != cmd {
 			t.Error("SetLabel did not return same pointer")
 		}
@@ -805,7 +805,7 @@ func TestCommand_Labels(t *testing.T) {
 	})
 
 	t.Run("MultipleLabels", func(t *testing.T) {
-		cmd := (&exc.Command{}).SetLabel("a").SetLabel("b").SetLabel("c")
+		cmd := (&exc.Command{}).WithLabel("a").WithLabel("b").WithLabel("c")
 		if !cmd.HasLabel("a") || !cmd.HasLabel("b") || !cmd.HasLabel("c") {
 			t.Error("not all labels present after three SetLabel calls")
 		}
@@ -815,14 +815,14 @@ func TestCommand_Labels(t *testing.T) {
 	})
 
 	t.Run("DuplicateLabel", func(t *testing.T) {
-		cmd := (&exc.Command{}).SetLabel("x").SetLabel("x")
+		cmd := (&exc.Command{}).WithLabel("x").WithLabel("x")
 		if cmd.Labels.Len() != 1 {
 			t.Errorf("Labels.Len() = %d after duplicate SetLabel, want 1", cmd.Labels.Len())
 		}
 	})
 
 	t.Run("ResetLabels", func(t *testing.T) {
-		cmd := (&exc.Command{}).SetLabel("a").SetLabel("b")
+		cmd := (&exc.Command{}).WithLabel("a").WithLabel("b")
 		result := cmd.ResetLabels()
 		if result != cmd {
 			t.Error("ResetLabels did not return same pointer")
@@ -836,17 +836,17 @@ func TestCommand_Labels(t *testing.T) {
 	})
 
 	t.Run("CloneLabelsIndependent", func(t *testing.T) {
-		orig := (&exc.Command{}).WithName("true").SetLabel("orig")
+		orig := (&exc.Command{}).WithName("true").WithLabel("orig")
 		c := orig.Clone()
 
 		if !c.HasLabel("orig") {
 			t.Error("clone missing label from original")
 		}
-		c.SetLabel("clone-only")
+		c.WithLabel("clone-only")
 		if orig.HasLabel("clone-only") {
 			t.Error("label added to clone appeared in original")
 		}
-		orig.SetLabel("orig-only")
+		orig.WithLabel("orig-only")
 		if c.HasLabel("orig-only") {
 			t.Error("label added to original appeared in clone")
 		}

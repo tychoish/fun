@@ -26,7 +26,7 @@ import (
 // chained: new(Command).WithName("echo").WithArgs("hello").
 type Command struct {
 	ID        string
-	Labels    dt.Set[string]
+	Labels    dt.OrderedSet[string]
 	Name      string
 	Args      []string
 	Env       dt.OrderedMap[string, string]
@@ -41,8 +41,8 @@ type Command struct {
 // used only for logging and formatting.
 func (cmd *Command) WithID(id string) *Command { cmd.ID = id; return cmd }
 
-// SetLabel adds label to the command's label set and returns the receiver.
-func (cmd *Command) SetLabel(label string) *Command { cmd.Labels.Add(label); return cmd }
+// WithLabel adds label to the command's label set and returns the receiver.
+func (cmd *Command) WithLabel(label string) *Command { cmd.Labels.Add(label); return cmd }
 
 // HasLabel reports whether label is in the command's label set.
 func (cmd *Command) HasLabel(label string) bool { return cmd.Labels.Check(label) }
