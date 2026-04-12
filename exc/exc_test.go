@@ -669,6 +669,221 @@ func TestError_IsAsUnwrap(t *testing.T) {
 	})
 }
 
+func TestCommand_WithID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetsID", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithID("job-1")
+		if cmd.ID != "job-1" {
+			t.Errorf("ID = %q, want %q", cmd.ID, "job-1")
+		}
+	})
+
+	t.Run("ReturnsSamePointer", func(t *testing.T) {
+		cmd := &exc.Command{}
+		if cmd.WithID("x") != cmd {
+			t.Error("WithID did not return same pointer")
+		}
+	})
+
+	t.Run("Chainable", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithID("task").WithName("echo").WithArgs("hi")
+		if cmd.ID != "task" || cmd.Name != "echo" {
+			t.Errorf("chaining broken: ID=%q Name=%q", cmd.ID, cmd.Name)
+		}
+	})
+}
+
+func TestCommand_Format(t *testing.T) {
+	t.Parallel()
+
+	// %v: single-quoted command line "'name arg1 arg2'"
+	t.Run("PercentV", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("echo").WithArgs("hello", "world")
+		got := fmt.Sprintf("%v", cmd)
+		want := "'echo hello world'"
+		if got != want {
+			t.Errorf("%%v = %q, want %q", got, want)
+		}
+	})
+
+	// %s and unknown verbs: plain command line, no quoting
+	t.Run("PercentS", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("ls").WithArgs("-la")
+		got := fmt.Sprintf("%s", cmd)
+		want := "ls -la"
+		if got != want {
+			t.Errorf("%%s = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("UnknownVerb", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("echo").WithArgs("hi")
+		got := fmt.Sprintf("%d", cmd)
+		want := "echo hi"
+		if got != want {
+			t.Errorf("%%d = %q, want %q", got, want)
+		}
+	})
+
+	// %q: same single-quoted form as %v
+	t.Run("PercentQ", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("echo").WithArgs("hello world", "foo")
+		got := fmt.Sprintf("%q", cmd)
+		want := "'echo hello world foo'"
+		if got != want {
+			t.Errorf("%%q = %q, want %q", got, want)
+		}
+	})
+
+	// %+v with ID: "exc.Command<[id] name args>'name args'"
+	t.Run("PercentPlusV_WithID", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithID("job-1").WithName("echo").WithArgs("hi")
+		got := fmt.Sprintf("%+v", cmd)
+		want := "exc.Command<[job-1] echo hi>'echo hi'"
+		if got != want {
+			t.Errorf("%%+v (with ID) = %q, want %q", got, want)
+		}
+	})
+
+	// %+v without ID: "exc.Command<name args>'name args'"
+	t.Run("PercentPlusV_NoID", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("echo").WithArgs("hi")
+		got := fmt.Sprintf("%+v", cmd)
+		want := "exc.Command<echo hi>'echo hi'"
+		if got != want {
+			t.Errorf("%%+v (no ID) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("NoArgs", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("true")
+		if got := fmt.Sprintf("%v", cmd); got != "'true'" {
+			t.Errorf("%%v no args = %q, want %q", got, "'true'")
+		}
+		if got := fmt.Sprintf("%s", cmd); got != "true" {
+			t.Errorf("%%s no args = %q, want %q", got, "true")
+		}
+	})
+}
+
+func TestCommand_Clone(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ScalarFieldsCopied", func(t *testing.T) {
+		var out bytes.Buffer
+		orig := (&exc.Command{}).
+			WithID("orig-id").
+			WithName("echo").
+			WithDirectory("/tmp").
+			WithStdOutput(&out)
+		orig.Error = &out
+
+		c := orig.Clone()
+		if c.ID != orig.ID {
+			t.Errorf("ID = %q, want %q", c.ID, orig.ID)
+		}
+		if c.Name != orig.Name {
+			t.Errorf("Name = %q, want %q", c.Name, orig.Name)
+		}
+		if c.Directory != orig.Directory {
+			t.Errorf("Directory = %q, want %q", c.Directory, orig.Directory)
+		}
+		if c.Output != orig.Output {
+			t.Error("Output not copied")
+		}
+		if c.Input != orig.Input {
+			t.Error("Input not copied")
+		}
+		if c.Error != orig.Error {
+			t.Error("Error not copied")
+		}
+	})
+
+	t.Run("ArgsIndependent", func(t *testing.T) {
+		orig := (&exc.Command{}).WithName("echo").WithArgs("a", "b")
+		c := orig.Clone()
+
+		// Mutate clone's args; original must be unaffected.
+		c.Args[0] = "X"
+		if orig.Args[0] != "a" {
+			t.Errorf("orig.Args[0] = %q after mutating clone, want %q", orig.Args[0], "a")
+		}
+
+		// Mutate original's args; clone must be unaffected.
+		orig.Args[1] = "Y"
+		if c.Args[1] != "b" {
+			t.Errorf("clone.Args[1] = %q after mutating original, want %q", c.Args[1], "b")
+		}
+	})
+
+	t.Run("EmptyArgsIsEmpty", func(t *testing.T) {
+		orig := &exc.Command{Name: "true"}
+		c := orig.Clone()
+		if len(c.Args) != 0 {
+			t.Errorf("Args = %v, want empty", c.Args)
+		}
+	})
+
+	t.Run("EnvCopied", func(t *testing.T) {
+		orig := &exc.Command{}
+		orig.SetEnvVar("KEY", "val")
+		c := orig.Clone()
+
+		if c.Env.Len() != 1 {
+			t.Fatalf("clone Env.Len() = %d, want 1", c.Env.Len())
+		}
+
+		// Mutate clone env; original must be unaffected.
+		c.SetEnvVar("KEY", "changed")
+		if v := orig.Env.Get("KEY"); v != "val" {
+			t.Errorf("orig KEY = %q after mutating clone, want %q", v, "val")
+		}
+
+		// Add a new key to original; clone must not see it.
+		orig.SetEnvVar("NEW", "x")
+		if c.Env.Check("NEW") {
+			t.Error("clone has NEW key that was added to original after Clone()")
+		}
+	})
+
+	t.Run("EmptyEnvIndependent", func(t *testing.T) {
+		orig := &exc.Command{Name: "true"}
+		c := orig.Clone()
+		c.SetEnvVar("K", "v")
+		if orig.Env.Len() != 0 {
+			t.Errorf("orig Env.Len() = %d after adding to clone, want 0", orig.Env.Len())
+		}
+	})
+
+	t.Run("ReturnsNewPointer", func(t *testing.T) {
+		orig := &exc.Command{Name: "true"}
+		if orig.Clone() == orig {
+			t.Error("Clone() returned the same pointer")
+		}
+	})
+
+	t.Run("CloneRunsIndependently", func(t *testing.T) {
+		var origOut, cloneOut bytes.Buffer
+		orig := (&exc.Command{}).WithName("echo").WithArgs("original").WithStdOutput(&origOut)
+		c := orig.Clone()
+		c.WithArgs("clone").WithStdOutput(&cloneOut)
+
+		if err := orig.Run(context.Background()); err != nil {
+			t.Fatalf("orig.Run() error = %v", err)
+		}
+		if err := c.Run(context.Background()); err != nil {
+			t.Fatalf("clone.Run() error = %v", err)
+		}
+		if !strings.Contains(origOut.String(), "original") {
+			t.Errorf("orig output %q does not contain 'original'", origOut.String())
+		}
+		if !strings.Contains(cloneOut.String(), "clone") {
+			t.Errorf("clone output %q does not contain 'clone'", cloneOut.String())
+		}
+	})
+}
+
 func TestCommand_Worker(t *testing.T) {
 	t.Parallel()
 
@@ -791,6 +1006,74 @@ func TestCommand_Shell(t *testing.T) {
 		data, _ := io.ReadAll(r)
 		if string(data) != "hello" {
 			t.Errorf("output = %q, want %q", string(data), "hello")
+		}
+	})
+}
+
+func TestCommand_SSH(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetsNameAndHost", func(t *testing.T) {
+		cmd := &exc.Command{}
+		result := cmd.SSH("user@host")
+		if result != cmd {
+			t.Error("SSH() did not return the same pointer")
+		}
+		if cmd.Name != "ssh" {
+			t.Errorf("Name = %q, want %q", cmd.Name, "ssh")
+		}
+		if !slices.Equal(cmd.Args, []string{"user@host"}) {
+			t.Errorf("Args = %v, want [user@host]", cmd.Args)
+		}
+	})
+
+	t.Run("HostAndRemoteCommand", func(t *testing.T) {
+		cmd := (&exc.Command{}).SSH("user@host", "ls", "-la")
+		if !slices.Equal(cmd.Args, []string{"user@host", "ls", "-la"}) {
+			t.Errorf("Args = %v, want [user@host ls -la]", cmd.Args)
+		}
+	})
+
+	t.Run("NoExtraArgs", func(t *testing.T) {
+		cmd := (&exc.Command{}).SSH("192.0.2.1")
+		if !slices.Equal(cmd.Args, []string{"192.0.2.1"}) {
+			t.Errorf("Args = %v, want [192.0.2.1]", cmd.Args)
+		}
+	})
+
+	t.Run("ReplacesExistingArgs", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithArgs("stale", "args")
+		cmd.SSH("host", "uptime")
+		if !slices.Equal(cmd.Args, []string{"host", "uptime"}) {
+			t.Errorf("Args = %v, want [host uptime]", cmd.Args)
+		}
+	})
+
+	t.Run("ResolvesCorrectly", func(t *testing.T) {
+		cmd := (&exc.Command{}).SSH("user@host", "echo", "hello")
+		cc := cmd.Resolve(context.Background())
+		if !strings.HasSuffix(cc.Path, "ssh") {
+			t.Errorf("Path = %q, want suffix 'ssh'", cc.Path)
+		}
+		if !slices.Equal(cc.Args[1:], []string{"user@host", "echo", "hello"}) {
+			t.Errorf("Args = %v, want [user@host echo hello]", cc.Args[1:])
+		}
+	})
+
+	t.Run("ChainableAfterOtherBuilders", func(t *testing.T) {
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithDirectory("/tmp").
+			WithStdOutput(&buf).
+			SSH("host", "date")
+		if cmd.Name != "ssh" {
+			t.Errorf("Name = %q, want %q", cmd.Name, "ssh")
+		}
+		if cmd.Output != &buf {
+			t.Error("Output was cleared by SSH()")
+		}
+		if cmd.Directory != "/tmp" {
+			t.Errorf("Directory = %q, want /tmp", cmd.Directory)
 		}
 	})
 }

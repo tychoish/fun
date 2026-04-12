@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
@@ -23,6 +24,7 @@ import (
 // The methods all return the same *Command pointer, so calls can be
 // chained: new(Command).WithName("echo").WithArgs("hello").
 type Command struct {
+	ID        string
 	Name      string
 	Args      []string
 	Env       dt.OrderedMap[string, string]
@@ -32,11 +34,67 @@ type Command struct {
 	Error     io.Writer
 }
 
+// WithID sets the user-supplied identifier for the command and returns
+// the receiver. The ID is not passed to the underlying process; it is
+// used only for logging and formatting.
+func (cmd *Command) WithID(id string) *Command { cmd.ID = id; return cmd }
+
+// Format implements fmt.Formatter.
+// %v / %s: "name arg1 arg2 ..."
+// %+v: "[id] name arg1 arg2 ..." (id omitted when empty)
+// %q: each token individually quoted with %q, space-separated
+// other verbs render the name only.
+func (cmd *Command) Format(f fmt.State, verb rune) {
+	tokens := append([]string{cmd.Name}, cmd.Args...)
+	switch verb {
+	case 'v':
+		if plus := f.Flag('+'); plus && cmd.ID != "" {
+			fmt.Fprintf(f, "exc.Command<[%s] %s>", cmd.ID, strings.Join(tokens, " "))
+		} else if plus {
+			fmt.Fprintf(f, "exc.Command<%s>", strings.Join(tokens, " "))
+		}
+		fallthrough
+	case 'q':
+		fmt.Fprintf(f, "'%s'", strings.Join(tokens, " "))
+	case 's':
+		fallthrough
+	default:
+		_, _ = io.WriteString(f, strings.Join(tokens, " "))
+	}
+}
+
 // Shell runs code using the specified shell (or path to shell
 // binary,) and runs the 'block' accordingly (via the '-c'
 // option). Usable with bash/zsh/dash/sh/nu/fish/python/python3.
 func (cmd *Command) Shell(shell string, block string) *Command {
 	return cmd.WithName(shell).WithArgs("-c", block)
+}
+
+// SSH sets the command to ssh and passes host followed by args
+// directly to the ssh binary. host may include a user prefix
+// (user@host). args may contain ssh options, a remote command,
+// or both, in the order ssh expects them.
+func (cmd *Command) SSH(host string, args ...string) *Command {
+	return cmd.WithName("ssh").WithArgs(append([]string{host}, args...)...)
+}
+
+// Clone returns a new Command with all fields copied. The Args slice
+// is cloned so mutations to one do not affect the other. Input,
+// Output, and Error share the same underlying io.Reader/Writer
+// values as the original, since those cannot be meaningfully copied.
+func (cmd *Command) Clone() *Command {
+	out := &Command{
+		ID:        cmd.ID,
+		Name:      cmd.Name,
+		Directory: cmd.Directory,
+		Input:     cmd.Input,
+		Output:    cmd.Output,
+		Error:     cmd.Error,
+		Args:      append(make([]string, 0, len(cmd.Args)), cmd.Args...),
+	}
+	out.Env.Extend(cmd.Env.Iterator())
+
+	return out
 }
 
 // WithName sets the executable name or path and returns the receiver.
