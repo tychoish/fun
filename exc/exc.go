@@ -10,11 +10,12 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"strings"
+	"slices"
 
 	"github.com/tychoish/fun/dt"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/strut"
 )
 
 // Command describes an external process. All fields are public and may
@@ -25,6 +26,7 @@ import (
 // chained: new(Command).WithName("echo").WithArgs("hello").
 type Command struct {
 	ID        string
+	Labels    dt.Set[string]
 	Name      string
 	Args      []string
 	Env       dt.OrderedMap[string, string]
@@ -39,28 +41,54 @@ type Command struct {
 // used only for logging and formatting.
 func (cmd *Command) WithID(id string) *Command { cmd.ID = id; return cmd }
 
+// SetLabel adds label to the command's label set and returns the receiver.
+func (cmd *Command) SetLabel(label string) *Command { cmd.Labels.Add(label); return cmd }
+
+// HasLabel reports whether label is in the command's label set.
+func (cmd *Command) HasLabel(label string) bool { return cmd.Labels.Check(label) }
+
+// ResetLabels removes all labels from the command and returns the receiver.
+func (cmd *Command) ResetLabels() *Command {
+	for l := range cmd.Labels.Iterator() {
+		cmd.Labels.Delete(l)
+	}
+	return cmd
+}
+
 // Format implements fmt.Formatter.
-// %v / %s: "name arg1 arg2 ..."
-// %+v: "[id] name arg1 arg2 ..." (id omitted when empty)
-// %q: each token individually quoted with %q, space-separated
-// other verbs render the name only.
+// %v / %q: "'name arg1 arg2'"  (single-quoted command line)
+// %+v: "exc.Command<[id] {label1,label2} name args>'name args'"
+//
+//	id and label sections are omitted when empty.
+//
+// %s and all other verbs: plain "name arg1 arg2"
 func (cmd *Command) Format(f fmt.State, verb rune) {
-	tokens := append([]string{cmd.Name}, cmd.Args...)
+	var b strut.Buffer
 	switch verb {
 	case 'v':
-		if plus := f.Flag('+'); plus && cmd.ID != "" {
-			fmt.Fprintf(f, "exc.Command<[%s] %s>", cmd.ID, strings.Join(tokens, " "))
-		} else if plus {
-			fmt.Fprintf(f, "exc.Command<%s>", strings.Join(tokens, " "))
+		b.WriteString("exc.Command<")
+		if f.Flag('+') {
+			if cmd.ID != "" {
+				b.Concat("[", cmd.ID, "]")
+			}
+			if cmd.Labels.Len() > 0 {
+				b.WriteByte('[')
+				b.Join(slices.Sorted(cmd.Labels.Iterator()), ",")
+				b.WriteByte(']')
+			}
 		}
-		fallthrough
+		b.Join(append([]string{cmd.Name}, cmd.Args...), " ")
+		b.WriteByte('>')
 	case 'q':
-		fmt.Fprintf(f, "'%s'", strings.Join(tokens, " "))
+		b.WriteByte('<')
+		b.Join(append([]string{cmd.Name}, cmd.Args...), " ")
+		b.WriteByte('>')
 	case 's':
 		fallthrough
 	default:
-		_, _ = io.WriteString(f, strings.Join(tokens, " "))
+		b.Join(append([]string{cmd.Name}, cmd.Args...), " ")
 	}
+	_, _ = b.WriteTo(f)
 }
 
 // Shell runs code using the specified shell (or path to shell
@@ -93,6 +121,7 @@ func (cmd *Command) Clone() *Command {
 		Args:      append(make([]string, 0, len(cmd.Args)), cmd.Args...),
 	}
 	out.Env.Extend(cmd.Env.Iterator())
+	out.Labels.Extend(cmd.Labels.Iterator())
 
 	return out
 }

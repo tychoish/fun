@@ -697,72 +697,158 @@ func TestCommand_WithID(t *testing.T) {
 func TestCommand_Format(t *testing.T) {
 	t.Parallel()
 
-	// %v: single-quoted command line "'name arg1 arg2'"
-	t.Run("PercentV", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithName("echo").WithArgs("hello", "world")
-		got := fmt.Sprintf("%v", cmd)
-		want := "'echo hello world'"
-		if got != want {
-			t.Errorf("%%v = %q, want %q", got, want)
+	tests := []struct {
+		name   string
+		setup  func() *exc.Command
+		format string
+		want   string
+	}{
+		// %v: outputs only with + flag; bare %v produces empty string
+		{
+			name:   "v_bare_empty",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithName("echo").WithArgs("hello", "world") },
+			format: "%v",
+			want:   "exc.Command<echo hello world>",
+		},
+		// %q: angle-bracket wrapped cmdline
+		{
+			name:   "q_wrapped",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithName("echo").WithArgs("hello", "world") },
+			format: "%q",
+			want:   "<echo hello world>",
+		},
+		// %s: plain cmdline
+		{
+			name:   "s_plain",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithName("ls").WithArgs("-la") },
+			format: "%s",
+			want:   "ls -la",
+		},
+		// unknown verb: plain cmdline (same as %s)
+		{
+			name:   "unknown_verb_plain",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithName("echo").WithArgs("hi") },
+			format: "%d",
+			want:   "echo hi",
+		},
+		// %+v: "exc.Command<[id][labels]cmdline>"
+		{
+			name:   "plus_v_id_only",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithID("job-1").WithName("echo").WithArgs("hi") },
+			format: "%+v",
+			want:   "exc.Command<[job-1]echo hi>",
+		},
+		{
+			name: "plus_v_labels_only",
+			setup: func() *exc.Command {
+				return (&exc.Command{}).WithName("echo").WithArgs("hi").SetLabel("prod")
+			},
+			format: "%+v",
+			want:   "exc.Command<[prod]echo hi>",
+		},
+		{
+			name: "plus_v_id_and_labels",
+			setup: func() *exc.Command {
+				return (&exc.Command{}).WithID("job-1").WithName("echo").WithArgs("hi").SetLabel("prod").SetLabel("web")
+			},
+			format: "%+v",
+			want:   "exc.Command<[job-1][prod,web]echo hi>",
+		},
+		{
+			name:   "plus_v_neither",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithName("echo").WithArgs("hi") },
+			format: "%+v",
+			want:   "exc.Command<echo hi>",
+		},
+		{
+			name:   "plus_v_no_args",
+			setup:  func() *exc.Command { return (&exc.Command{}).WithName("true") },
+			format: "%+v",
+			want:   "exc.Command<true>",
+		},
+		// labels sorted alphabetically regardless of insertion order
+		{
+			name: "plus_v_labels_sorted",
+			setup: func() *exc.Command {
+				return (&exc.Command{}).WithName("true").SetLabel("z").SetLabel("a").SetLabel("m")
+			},
+			format: "%+v",
+			want:   "exc.Command<[a,m,z]true>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := fmt.Sprintf(tt.format, tt.setup())
+			if got != tt.want {
+				t.Errorf("Sprintf(%q) = %q, want %q", tt.format, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCommand_Labels(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetAndHas", func(t *testing.T) {
+		cmd := &exc.Command{}
+		if cmd.HasLabel("x") {
+			t.Error("HasLabel returned true before any labels set")
+		}
+		result := cmd.SetLabel("x")
+		if result != cmd {
+			t.Error("SetLabel did not return same pointer")
+		}
+		if !cmd.HasLabel("x") {
+			t.Error("HasLabel returned false after SetLabel")
 		}
 	})
 
-	// %s and unknown verbs: plain command line, no quoting
-	t.Run("PercentS", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithName("ls").WithArgs("-la")
-		got := fmt.Sprintf("%s", cmd)
-		want := "ls -la"
-		if got != want {
-			t.Errorf("%%s = %q, want %q", got, want)
+	t.Run("MultipleLabels", func(t *testing.T) {
+		cmd := (&exc.Command{}).SetLabel("a").SetLabel("b").SetLabel("c")
+		if !cmd.HasLabel("a") || !cmd.HasLabel("b") || !cmd.HasLabel("c") {
+			t.Error("not all labels present after three SetLabel calls")
+		}
+		if cmd.Labels.Len() != 3 {
+			t.Errorf("Labels.Len() = %d, want 3", cmd.Labels.Len())
 		}
 	})
 
-	t.Run("UnknownVerb", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithName("echo").WithArgs("hi")
-		got := fmt.Sprintf("%d", cmd)
-		want := "echo hi"
-		if got != want {
-			t.Errorf("%%d = %q, want %q", got, want)
+	t.Run("DuplicateLabel", func(t *testing.T) {
+		cmd := (&exc.Command{}).SetLabel("x").SetLabel("x")
+		if cmd.Labels.Len() != 1 {
+			t.Errorf("Labels.Len() = %d after duplicate SetLabel, want 1", cmd.Labels.Len())
 		}
 	})
 
-	// %q: same single-quoted form as %v
-	t.Run("PercentQ", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithName("echo").WithArgs("hello world", "foo")
-		got := fmt.Sprintf("%q", cmd)
-		want := "'echo hello world foo'"
-		if got != want {
-			t.Errorf("%%q = %q, want %q", got, want)
+	t.Run("ResetLabels", func(t *testing.T) {
+		cmd := (&exc.Command{}).SetLabel("a").SetLabel("b")
+		result := cmd.ResetLabels()
+		if result != cmd {
+			t.Error("ResetLabels did not return same pointer")
+		}
+		if cmd.Labels.Len() != 0 {
+			t.Errorf("Labels.Len() = %d after ResetLabels, want 0", cmd.Labels.Len())
+		}
+		if cmd.HasLabel("a") || cmd.HasLabel("b") {
+			t.Error("labels still present after ResetLabels")
 		}
 	})
 
-	// %+v with ID: "exc.Command<[id] name args>'name args'"
-	t.Run("PercentPlusV_WithID", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithID("job-1").WithName("echo").WithArgs("hi")
-		got := fmt.Sprintf("%+v", cmd)
-		want := "exc.Command<[job-1] echo hi>'echo hi'"
-		if got != want {
-			t.Errorf("%%+v (with ID) = %q, want %q", got, want)
-		}
-	})
+	t.Run("CloneLabelsIndependent", func(t *testing.T) {
+		orig := (&exc.Command{}).WithName("true").SetLabel("orig")
+		c := orig.Clone()
 
-	// %+v without ID: "exc.Command<name args>'name args'"
-	t.Run("PercentPlusV_NoID", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithName("echo").WithArgs("hi")
-		got := fmt.Sprintf("%+v", cmd)
-		want := "exc.Command<echo hi>'echo hi'"
-		if got != want {
-			t.Errorf("%%+v (no ID) = %q, want %q", got, want)
+		if !c.HasLabel("orig") {
+			t.Error("clone missing label from original")
 		}
-	})
-
-	t.Run("NoArgs", func(t *testing.T) {
-		cmd := (&exc.Command{}).WithName("true")
-		if got := fmt.Sprintf("%v", cmd); got != "'true'" {
-			t.Errorf("%%v no args = %q, want %q", got, "'true'")
+		c.SetLabel("clone-only")
+		if orig.HasLabel("clone-only") {
+			t.Error("label added to clone appeared in original")
 		}
-		if got := fmt.Sprintf("%s", cmd); got != "true" {
-			t.Errorf("%%s no args = %q, want %q", got, "true")
+		orig.SetLabel("orig-only")
+		if c.HasLabel("orig-only") {
+			t.Error("label added to original appeared in clone")
 		}
 	})
 }
