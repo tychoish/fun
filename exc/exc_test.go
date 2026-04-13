@@ -1164,6 +1164,166 @@ func TestCommand_SSH(t *testing.T) {
 	})
 }
 
+// TestCommand_OutputRouting verifies that every byte written to stdout and
+// stderr by a process ends up in the writer assigned to cmd.Output and
+// cmd.Error respectively, and nowhere else.  The "in full" property is
+// checked with exact line counts rather than mere substring presence.
+func TestCommand_OutputRouting(t *testing.T) {
+	t.Parallel()
+
+	// stdout flows to cmd.Output; cmd.Error receives nothing from stdout.
+	t.Run("StdoutToOutput", func(t *testing.T) {
+		t.Parallel()
+		var out, errBuf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").WithArgs("-c", "printf '%s' stdout-content").
+			WithStdOutput(&out)
+		cmd.Error = &errBuf
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if out.String() != "stdout-content" {
+			t.Errorf("Output = %q, want %q", out.String(), "stdout-content")
+		}
+		if errBuf.Len() != 0 {
+			t.Errorf("Error received stdout bytes: %q", errBuf.String())
+		}
+	})
+
+	// stderr flows to cmd.Error; cmd.Output receives nothing from stderr.
+	t.Run("StderrToError", func(t *testing.T) {
+		t.Parallel()
+		var out, errBuf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").WithArgs("-c", "printf '%s' stderr-content >&2")
+		cmd.Output = &out
+		cmd.Error = &errBuf
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if errBuf.String() != "stderr-content" {
+			t.Errorf("Error = %q, want %q", errBuf.String(), "stderr-content")
+		}
+		if out.Len() != 0 {
+			t.Errorf("Output received stderr bytes: %q", out.String())
+		}
+	})
+
+	// Every line of a large stdout stream reaches cmd.Output without
+	// truncation: first, last, and exact count are all verified.
+	t.Run("LargeStdoutFullyWritten", func(t *testing.T) {
+		t.Parallel()
+		const n = 500
+		var out bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", fmt.Sprintf("seq 1 %d", n)).
+			WithStdOutput(&out)
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+		if len(lines) != n {
+			t.Fatalf("got %d lines, want %d", len(lines), n)
+		}
+		if lines[0] != "1" {
+			t.Errorf("first line = %q, want %q", lines[0], "1")
+		}
+		if lines[n-1] != fmt.Sprintf("%d", n) {
+			t.Errorf("last line = %q, want %q", lines[n-1], fmt.Sprintf("%d", n))
+		}
+	})
+
+	// Every line of a large stderr stream reaches cmd.Error without
+	// truncation.
+	t.Run("LargeStderrFullyWritten", func(t *testing.T) {
+		t.Parallel()
+		const n = 500
+		var errBuf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", fmt.Sprintf("seq 1 %d >&2", n))
+		cmd.Error = &errBuf
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(errBuf.String(), "\n"), "\n")
+		if len(lines) != n {
+			t.Fatalf("got %d lines, want %d", len(lines), n)
+		}
+		if lines[0] != "1" {
+			t.Errorf("first line = %q, want %q", lines[0], "1")
+		}
+		if lines[n-1] != fmt.Sprintf("%d", n) {
+			t.Errorf("last line = %q, want %q", lines[n-1], fmt.Sprintf("%d", n))
+		}
+	})
+
+	// Concurrent stdout and stderr both arrive at their respective writers
+	// in full when both streams are active simultaneously.
+	t.Run("StdoutAndStderrConcurrently", func(t *testing.T) {
+		t.Parallel()
+		const n = 100
+		var out, errBuf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", fmt.Sprintf(
+				"for i in $(seq 1 %d); do echo out$i; echo err$i >&2; done", n)).
+			WithStdOutput(&out)
+		cmd.Error = &errBuf
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		outLines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+		if len(outLines) != n {
+			t.Errorf("stdout: got %d lines, want %d", len(outLines), n)
+		}
+		errLines := strings.Split(strings.TrimRight(errBuf.String(), "\n"), "\n")
+		if len(errLines) != n {
+			t.Errorf("stderr: got %d lines, want %d", len(errLines), n)
+		}
+	})
+
+	// Start delivers output to cmd.Output in full after the worker returns.
+	t.Run("StartWritesOutputInFull", func(t *testing.T) {
+		t.Parallel()
+		const n = 200
+		var out bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", fmt.Sprintf("seq 1 %d", n)).
+			WithStdOutput(&out)
+		if err := cmd.Start(context.Background())(context.Background()); err != nil {
+			t.Fatalf("worker() error = %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+		if len(lines) != n {
+			t.Fatalf("got %d lines via Start, want %d", len(lines), n)
+		}
+	})
+
+	// stdin is read in full by the process; the complete content appears in
+	// stdout when piped through cat.
+	t.Run("StdinPassedInFull", func(t *testing.T) {
+		t.Parallel()
+		payload := strings.Repeat("x", 1<<16) // 64 KiB
+		var out bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("cat").
+			WithStdInput(strings.NewReader(payload)).
+			WithStdOutput(&out)
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if out.Len() != len(payload) {
+			t.Errorf("output length = %d, want %d", out.Len(), len(payload))
+		}
+		if out.String() != payload {
+			t.Error("stdin content not echoed back exactly by cat")
+		}
+	})
+}
+
 func TestResolveError(t *testing.T) {
 	t.Parallel()
 
