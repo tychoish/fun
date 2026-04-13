@@ -150,7 +150,7 @@ func (cmd *Command) WithStdOutput(w io.Writer) *Command { cmd.Output = w; return
 
 // WithStdError sets the writer that receives the process's stderr and returns
 // the receiver. Pass nil to discard stderr.
-func (cmd *Command) WithStdError(w io.Writer) *Command { cmd.Output = w; return cmd }
+func (cmd *Command) WithStdError(w io.Writer) *Command { cmd.Error = w; return cmd }
 
 // ResetStdInput clears the stdin reader and returns the receiver.
 func (cmd *Command) ResetStdInput() *Command { cmd.Input = nil; return cmd }
