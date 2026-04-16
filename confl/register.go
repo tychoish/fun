@@ -34,13 +34,15 @@ func registerFuncFlag[T any](fs *flag.FlagSet, p *T, spec flagSpec, parse func(s
 	return nil
 }
 
-// registerSliceFlag registers a slice flag. The default in spec is a
-// comma-separated list pre-populated into *p before parsing begins.
+// registerSliceFlag registers a slice flag. The default in spec is split on
+// sep: (if present) or on commas (if sep: is absent) and pre-populated into *p
+// before parsing begins. Live flag invocations are also split on sep: when the
+// tag is present and non-empty.
 func registerSliceFlag[T any](fs *flag.FlagSet, p *[]T, spec flagSpec, parse func(string) (T, error)) error {
-	if err := parseAndSetSliceDefault(p, spec.Default, parse); err != nil {
+	if err := parseAndSetSliceDefault(p, spec.Default, spec.Sep, spec.SepSet, parse); err != nil {
 		return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
 	}
-	fn := appendOnce(p, parse, spec.Default != "")
+	fn := appendOnce(p, parse, spec.Default != "", spec.Sep, spec.SepSet)
 	registerAlias(spec, func(n, u string) { fs.Func(n, u, fn) })
 	return nil
 }
@@ -142,7 +144,7 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 		case "no", "n", "false", "f", "0", "-1":
 			spec.Default = "false"
 		}
-		if err := parseAndSetSliceDefault(p, spec.Default, strconv.ParseBool); err != nil {
+		if err := parseAndSetSliceDefault(p, spec.Default, spec.Sep, spec.SepSet, strconv.ParseBool); err != nil {
 			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
 		}
 		switch spec.Default {
@@ -153,7 +155,7 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 			fn := appendOnce(p, func(s string) (bool, error) {
 				b, err := strconv.ParseBool(s)
 				return !b, err
-			}, true)
+			}, true, spec.Sep, spec.SepSet)
 			fs.BoolFunc(joinStr("no-", spec.Name), spec.Help, fn)
 			if spec.Short != "" {
 				fs.BoolFunc(joinStr("no-", spec.Short), joinStr("short for -no-", spec.Name), fn)
@@ -161,7 +163,7 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 		case "false":
 			fallthrough
 		default:
-			fn := appendOnce(p, strconv.ParseBool, spec.Default != "")
+			fn := appendOnce(p, strconv.ParseBool, spec.Default != "", spec.Sep, spec.SepSet)
 			registerAlias(spec, func(n, u string) { fs.Func(n, u, fn) })
 		}
 
@@ -265,11 +267,26 @@ func parseTimeFuncAuto() func(string) (time.Time, error) {
 // defaults. Both the long and short aliases for the same flag must share the
 // same returned function so that whichever alias fires first clears the
 // defaults exactly once.
-func appendOnce[T any](p *[]T, parse func(string) (T, error), clearOnFirst bool) func(string) error {
+//
+// When sepSet is true and sep is non-empty, a single flag invocation is split
+// on sep before parsing each part, allowing e.g. -tags a:b:c with sep:":" to
+// populate three elements in one invocation. When sepSet is false or sep is
+// empty, each invocation appends exactly one element (existing behavior).
+func appendOnce[T any](p *[]T, parse func(string) (T, error), clearOnFirst bool, sep string, sepSet bool) func(string) error {
 	return func(s string) error {
 		if clearOnFirst {
 			*p = (*p)[:0]
 			clearOnFirst = false
+		}
+		if sepSet && sep != "" {
+			for part := range strings.SplitSeq(s, sep) {
+				v, err := parse(strings.TrimSpace(part))
+				if err != nil {
+					return err
+				}
+				*p = append(*p, v)
+			}
+			return nil
 		}
 		v, err := parse(s)
 		if err != nil {
@@ -280,14 +297,38 @@ func appendOnce[T any](p *[]T, parse func(string) (T, error), clearOnFirst bool)
 	}
 }
 
-// parseAndSetSliceDefault splits defStr on commas, parses each element with
-// parse, and appends the results to *p. Returns an error if any element fails
-// to parse. A blank defStr is a no-op.
-func parseAndSetSliceDefault[T any](p *[]T, defStr string, parse func(string) (T, error)) error {
+// parseAndSetSliceDefault splits defStr on sep and parses each element with
+// parse, appending the results to *p. Returns an error if any element fails to
+// parse. A blank defStr is a no-op.
+//
+// sep and sepSet reflect the sep: struct tag. When sepSet is false (no sep: tag
+// was present) and defStr is non-empty, an error is returned — callers must
+// supply an explicit sep: tag when using default values on slice fields. When
+// sepSet is true and sep is empty, no splitting is performed and defStr is
+// treated as a single element. When sepSet is true and sep is non-empty, defStr
+// is split on sep.
+func parseAndSetSliceDefault[T any](p *[]T, defStr string, sep string, sepSet bool, parse func(string) (T, error)) error {
 	if defStr == "" {
 		return nil
 	}
-	for part := range strings.SplitSeq(defStr, ",") {
+	// Require an explicit sep: tag when a default is present.
+	if !sepSet {
+		return ers.Wrap(ErrInvalidSpecification,
+			"slice field has a non-empty default: value but no sep: tag; add sep:\",\" to preserve the old comma-splitting behaviour, sep:\"<x>\" to split on a custom separator, or sep:\"\" to treat the whole value as a single element")
+	}
+	// Choose the effective separator.
+	// - sep:""  → no splitting (treat entire value as one element)
+	// - sep:"x" → split on x
+	actualSep := sep
+	if actualSep == "" {
+		v, err := parse(strings.TrimSpace(defStr))
+		if err != nil {
+			return err
+		}
+		*p = append(*p, v)
+		return nil
+	}
+	for part := range strings.SplitSeq(defStr, actualSep) {
 		v, err := parse(strings.TrimSpace(part))
 		if err != nil {
 			return err

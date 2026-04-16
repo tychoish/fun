@@ -18,12 +18,17 @@ func callWhen[T any](cond bool, op func(T), num T) {
 // It is constructed from struct field tags in bindFlags and passed through
 // registerFlag, registerFuncFlag, and registerSliceFlag to avoid long argument
 // lists. The Format field is only meaningful for time.Time fields.
+// Sep and SepSet carry the sep: struct tag. SepSet is true when the tag was
+// explicitly present (even if its value is empty). Sep is only meaningful for
+// slice fields; the registerFlag dispatcher rejects it on scalar types.
 type flagSpec struct {
 	Name    string
 	Short   string
 	Default string
 	Help    string
 	Format  string
+	Sep     string // separator for slice element splitting; "" means no splitting
+	SepSet  bool   // true when the sep: tag was explicitly present
 }
 
 // validate checks structural constraints that can be verified without a

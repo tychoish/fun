@@ -12,9 +12,9 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
-// Commander is implemented by every subcommand struct that can be dispatched
-// to. Parse/conflagure populate the struct's flags first, then the caller is
-// responsible for invoking Run.
+// Commander is the interface for subcommand structs used with ParseCommand.
+// Flags are populated before Run is called; the caller is responsible for
+// invoking Run on the returned Commander.
 type Commander interface {
 	Run(context.Context) error
 }
@@ -33,6 +33,25 @@ type subcommandEntry struct {
 // returns one entry per field with a dedicated FlagSet already bound to the
 // field's flags. programName is used as the FlagSet name prefix.
 func collectSubcommands(val reflect.Value, programName string) ([]subcommandEntry, error) {
+	// Pre-scan for narg:"rest" fields. rest + cmd: fields are incompatible.
+	t0 := val.Type()
+	var restFieldName string
+	hasCmdField := false
+	for i := range t0.NumField() {
+		f := t0.Field(i)
+		if f.Tag.Get("cmd") != "" {
+			hasCmdField = true
+		}
+		if f.Tag.Get("narg") == "rest" {
+			restFieldName = f.Name
+		}
+	}
+	if restFieldName != "" && hasCmdField {
+		return nil, ers.Wrapf(ErrInvalidSpecification,
+			"field %q has narg:\"rest\" but struct also has cmd: fields; they are incompatible",
+			restFieldName)
+	}
+
 	var entries []subcommandEntry
 	t := val.Type()
 	for i := range t.NumField() {
@@ -123,8 +142,17 @@ func selectSubcommand(entries []subcommandEntry, remaining []string) (any, error
 		return nil, ers.Wrapf(ErrInvalidInput, "unknown subcommand %q", subcmdName)
 	}
 
+	untilFlags := collectUntilFlags(matched.val, "")
+	if len(untilFlags) > 0 {
+		subArgs = expandUntilArgs(subArgs, untilFlags)
+	}
+
 	if err := matched.fs.Parse(subArgs); err != nil {
 		callWhen(errors.Is(err, flag.ErrHelp), os.Exit, 0)
+		return nil, err
+	}
+
+	if err := populateRestField(matched.val, matched.fs.Args()); err != nil {
 		return nil, err
 	}
 

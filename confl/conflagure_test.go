@@ -1221,7 +1221,7 @@ func Test_conflagure_slice_defaults(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Tags []string `default:"debug,info" flag:"tag"`
+		Tags []string `default:"debug,info" flag:"tag" sep:","`
 	}
 
 	t.Run("default applied when no flags given", func(t *testing.T) {
@@ -1246,7 +1246,7 @@ func Test_conflagure_slice_defaults(t *testing.T) {
 
 	t.Run("default discarded when short alias is used first", func(t *testing.T) {
 		type cfg2 struct {
-			Tags []string `default:"debug,info" flag:"tag" short:"t"`
+			Tags []string `default:"debug,info" flag:"tag" short:"t" sep:","`
 		}
 		var c cfg2
 		if err := conflagure(newTestFS(), &c, []string{"-t", "warn", "-tag", "error"}); err != nil {
@@ -1284,7 +1284,7 @@ func Test_conflagure_slice_required(t *testing.T) {
 
 	t.Run("required slice satisfied by default", func(t *testing.T) {
 		type cfg2 struct {
-			Tags []string `default:"fallback" flag:"tag" required:"true"`
+			Tags []string `default:"fallback" flag:"tag" required:"true" sep:""`
 		}
 		var c cfg2
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -1297,7 +1297,7 @@ func Test_conflagure_slice_inverted_bool(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Flags []bool `default:"true" flag:"flag" short:"f"`
+		Flags []bool `default:"true" flag:"flag" short:"f" sep:""`
 	}
 
 	tests := []struct {
@@ -1424,37 +1424,37 @@ func Test_conflagure_slice_invalid_default(t *testing.T) {
 		{
 			name: "[]int bad default",
 			cfg: &struct {
-				V []int `default:"1,bad" flag:"v"`
+				V []int `default:"1,bad" flag:"v" sep:","`
 			}{},
 		},
 		{
 			name: "[]int64 bad default",
 			cfg: &struct {
-				V []int64 `default:"1,bad" flag:"v"`
+				V []int64 `default:"1,bad" flag:"v" sep:","`
 			}{},
 		},
 		{
 			name: "[]uint bad default",
 			cfg: &struct {
-				V []uint `default:"1,bad" flag:"v"`
+				V []uint `default:"1,bad" flag:"v" sep:","`
 			}{},
 		},
 		{
 			name: "[]uint64 bad default",
 			cfg: &struct {
-				V []uint64 `default:"1,bad" flag:"v"`
+				V []uint64 `default:"1,bad" flag:"v" sep:","`
 			}{},
 		},
 		{
 			name: "[]float64 bad default",
 			cfg: &struct {
-				V []float64 `default:"1.0,notafloat" flag:"v"`
+				V []float64 `default:"1.0,notafloat" flag:"v" sep:","`
 			}{},
 		},
 		{
 			name: "[]bool bad default",
 			cfg: &struct {
-				V []bool `default:"true,notabool" flag:"v"`
+				V []bool `default:"true,notabool" flag:"v" sep:","`
 			}{},
 		},
 	}
@@ -1472,12 +1472,12 @@ func Test_conflagure_slice_numeric_short_alias(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Ints    []int     `default:"0"     flag:"int"    short:"i"`
-		Int64s  []int64   `default:"0"     flag:"int64"  short:"I"`
-		Uints   []uint    `default:"0"     flag:"uint"   short:"u"`
-		Uint64s []uint64  `default:"0"     flag:"uint64" short:"U"`
-		Floats  []float64 `default:"0"     flag:"float"  short:"f"`
-		Bools   []bool    `default:"false" flag:"bool"   short:"b"`
+		Ints    []int     `default:"0"     flag:"int"    short:"i" sep:""`
+		Int64s  []int64   `default:"0"     flag:"int64"  short:"I" sep:""`
+		Uints   []uint    `default:"0"     flag:"uint"   short:"u" sep:""`
+		Uint64s []uint64  `default:"0"     flag:"uint64" short:"U" sep:""`
+		Floats  []float64 `default:"0"     flag:"float"  short:"f" sep:""`
+		Bools   []bool    `default:"false" flag:"bool"   short:"b" sep:""`
 	}
 
 	var c cfg
@@ -1845,13 +1845,13 @@ func Test_conflagure_slice_small_int_defaults(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		I8s  []int8    `default:"1,2"     flag:"i8"`
-		I16s []int16   `default:"10,20"   flag:"i16"`
-		I32s []int32   `default:"100,200" flag:"i32"`
-		U8s  []uint8   `default:"3,4"     flag:"u8"`
-		U16s []uint16  `default:"30,40"   flag:"u16"`
-		U32s []uint32  `default:"300,400" flag:"u32"`
-		F32s []float32 `default:"1.5,2.5" flag:"f32"`
+		I8s  []int8    `default:"1,2"     flag:"i8"  sep:","`
+		I16s []int16   `default:"10,20"   flag:"i16" sep:","`
+		I32s []int32   `default:"100,200" flag:"i32" sep:","`
+		U8s  []uint8   `default:"3,4"     flag:"u8"  sep:","`
+		U16s []uint16  `default:"30,40"   flag:"u16" sep:","`
+		U32s []uint32  `default:"300,400" flag:"u32" sep:","`
+		F32s []float32 `default:"1.5,2.5" flag:"f32" sep:","`
 	}
 
 	t.Run("defaults applied when no flags given", func(t *testing.T) {
@@ -1886,25 +1886,25 @@ func Test_conflagure_slice_small_int_invalid_defaults(t *testing.T) {
 		cfg  any
 	}{
 		{name: "[]int8 overflow in default", cfg: &struct {
-			V []int8 `default:"1,200" flag:"v"`
+			V []int8 `default:"1,200" flag:"v" sep:","`
 		}{}},
 		{name: "[]int16 overflow in default", cfg: &struct {
-			V []int16 `default:"1,40000" flag:"v"`
+			V []int16 `default:"1,40000" flag:"v" sep:","`
 		}{}},
 		{name: "[]int32 overflow in default", cfg: &struct {
-			V []int32 `default:"1,3000000000" flag:"v"`
+			V []int32 `default:"1,3000000000" flag:"v" sep:","`
 		}{}},
 		{name: "[]uint8 overflow in default", cfg: &struct {
-			V []uint8 `default:"1,300" flag:"v"`
+			V []uint8 `default:"1,300" flag:"v" sep:","`
 		}{}},
 		{name: "[]uint16 overflow in default", cfg: &struct {
-			V []uint16 `default:"1,70000" flag:"v"`
+			V []uint16 `default:"1,70000" flag:"v" sep:","`
 		}{}},
 		{name: "[]uint32 overflow in default", cfg: &struct {
-			V []uint32 `default:"1,5000000000" flag:"v"`
+			V []uint32 `default:"1,5000000000" flag:"v" sep:","`
 		}{}},
 		{name: "[]float32 non-numeric in default", cfg: &struct {
-			V []float32 `default:"1.0,notafloat" flag:"v"`
+			V []float32 `default:"1.0,notafloat" flag:"v" sep:","`
 		}{}},
 	}
 
@@ -2000,7 +2000,7 @@ func Test_appendOnce(t *testing.T) {
 
 	t.Run("appends without clearing when no defaults", func(t *testing.T) {
 		s := []int{9}
-		fn := appendOnce(&s, strconv.Atoi, false)
+		fn := appendOnce(&s, strconv.Atoi, false, "", false)
 		if err := fn("1"); err != nil {
 			t.Fatal(err)
 		}
@@ -2014,7 +2014,7 @@ func Test_appendOnce(t *testing.T) {
 
 	t.Run("clears pre-populated defaults on first call", func(t *testing.T) {
 		s := []int{10, 20}
-		fn := appendOnce(&s, strconv.Atoi, true)
+		fn := appendOnce(&s, strconv.Atoi, true, "", false)
 		if err := fn("1"); err != nil {
 			t.Fatal(err)
 		}
@@ -2028,7 +2028,7 @@ func Test_appendOnce(t *testing.T) {
 
 	t.Run("parse error propagates", func(t *testing.T) {
 		var s []int
-		fn := appendOnce(&s, strconv.Atoi, false)
+		fn := appendOnce(&s, strconv.Atoi, false, "", false)
 		if err := fn("notanint"); err == nil {
 			t.Fatal("expected parse error, got nil")
 		}
@@ -2040,7 +2040,7 @@ func Test_parseAndSetSliceDefault(t *testing.T) {
 
 	t.Run("empty defStr is a no-op", func(t *testing.T) {
 		var s []string
-		if err := parseAndSetSliceDefault(&s, "", func(v string) (string, error) { return v, nil }); err != nil {
+		if err := parseAndSetSliceDefault(&s, "", "", false, func(v string) (string, error) { return v, nil }); err != nil {
 			t.Fatal(err)
 		}
 		if s != nil {
@@ -2050,7 +2050,7 @@ func Test_parseAndSetSliceDefault(t *testing.T) {
 
 	t.Run("comma-separated values are parsed and appended", func(t *testing.T) {
 		var s []int
-		if err := parseAndSetSliceDefault(&s, "1,2,3", strconv.Atoi); err != nil {
+		if err := parseAndSetSliceDefault(&s, "1,2,3", ",", true, strconv.Atoi); err != nil {
 			t.Fatal(err)
 		}
 		if !slices.Equal(s, []int{1, 2, 3}) {
@@ -2060,7 +2060,7 @@ func Test_parseAndSetSliceDefault(t *testing.T) {
 
 	t.Run("whitespace around values is trimmed", func(t *testing.T) {
 		var s []string
-		if err := parseAndSetSliceDefault(&s, " a , b , c ", func(v string) (string, error) { return v, nil }); err != nil {
+		if err := parseAndSetSliceDefault(&s, " a , b , c ", ",", true, func(v string) (string, error) { return v, nil }); err != nil {
 			t.Fatal(err)
 		}
 		if !slices.Equal(s, []string{"a", "b", "c"}) {
@@ -2070,8 +2070,444 @@ func Test_parseAndSetSliceDefault(t *testing.T) {
 
 	t.Run("parse error is returned", func(t *testing.T) {
 		var s []int
-		if err := parseAndSetSliceDefault(&s, "1,bad,3", strconv.Atoi); err == nil {
+		if err := parseAndSetSliceDefault(&s, "1,bad,3", ",", true, strconv.Atoi); err == nil {
 			t.Fatal("expected error for unparseable element, got nil")
+		}
+	})
+
+	t.Run("no sep tag with non-empty default returns ErrInvalidSpecification", func(t *testing.T) {
+		var s []string
+		err := parseAndSetSliceDefault(&s, "a,b,c", "", false, func(v string) (string, error) { return v, nil })
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification for missing sep: tag, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("err = %v, want ErrInvalidSpecification", err)
+		}
+	})
+}
+
+// ── sep: tag tests ────────────────────────────────────────────────────────────
+
+func Test_sep_tag_default_splitting(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sep colon splits default into three elements", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"a:b:c" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Tags, []string{"a", "b", "c"}) {
+			t.Errorf("Tags = %v, want [a b c]", c.Tags)
+		}
+	})
+
+	t.Run("sep pipe splits default", func(t *testing.T) {
+		type cfg struct {
+			Items []string `flag:"item" default:"x|y|z" sep:"|"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Items, []string{"x", "y", "z"}) {
+			t.Errorf("Items = %v, want [x y z]", c.Items)
+		}
+	})
+
+	t.Run("sep colon on int slice splits default", func(t *testing.T) {
+		type cfg struct {
+			Nums []int `flag:"num" default:"1:2:3" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Nums, []int{1, 2, 3}) {
+			t.Errorf("Nums = %v, want [1 2 3]", c.Nums)
+		}
+	})
+
+	t.Run("explicit sep comma behaves same as absent sep for defaults", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"a,b,c" sep:","`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Tags, []string{"a", "b", "c"}) {
+			t.Errorf("Tags = %v, want [a b c]", c.Tags)
+		}
+	})
+
+	t.Run("sep empty string disables default splitting", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"a,b,c" sep:""`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		// sep:"" means no splitting: "a,b,c" is one element
+		if !slices.Equal(c.Tags, []string{"a,b,c"}) {
+			t.Errorf("Tags = %v, want [a,b,c]", c.Tags)
+		}
+	})
+
+	t.Run("absent sep tag with non-empty default returns ErrInvalidSpecification", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"debug,info,warn"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification for missing sep: tag, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+}
+
+func Test_sep_tag_live_flag_splitting(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sep colon splits single flag invocation into multiple elements", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-tag", "a:b:c"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Tags, []string{"a", "b", "c"}) {
+			t.Errorf("Tags = %v, want [a b c]", c.Tags)
+		}
+	})
+
+	t.Run("multiple flag invocations each split and accumulate", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-tag", "a:b", "-tag", "c"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Tags, []string{"a", "b", "c"}) {
+			t.Errorf("Tags = %v, want [a b c]", c.Tags)
+		}
+	})
+
+	t.Run("absent sep tag does not split live flag values", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-tag", "a:b:c"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		// Without sep: tag, "a:b:c" is a single element
+		if !slices.Equal(c.Tags, []string{"a:b:c"}) {
+			t.Errorf("Tags = %v, want [a:b:c]", c.Tags)
+		}
+	})
+
+	t.Run("sep empty string does not split live flag values", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" sep:""`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-tag", "a,b,c"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		// sep:"" → no splitting on live flags
+		if !slices.Equal(c.Tags, []string{"a,b,c"}) {
+			t.Errorf("Tags = %v, want [a,b,c]", c.Tags)
+		}
+	})
+
+	t.Run("sep colon on int slice splits live flag value", func(t *testing.T) {
+		type cfg struct {
+			Nums []int `flag:"num" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-num", "10:20:30"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Nums, []int{10, 20, 30}) {
+			t.Errorf("Nums = %v, want [10 20 30]", c.Nums)
+		}
+	})
+
+	t.Run("sep colon with short alias also splits", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" short:"t" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-t", "x:y"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Tags, []string{"x", "y"}) {
+			t.Errorf("Tags = %v, want [x y]", c.Tags)
+		}
+	})
+
+	t.Run("sep colon parse error on bad element returns error", func(t *testing.T) {
+		type cfg struct {
+			Nums []int `flag:"num" sep:":"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, []string{"-num", "1:notanint:3"})
+		if err == nil {
+			t.Fatal("expected parse error, got nil")
+		}
+	})
+}
+
+func Test_sep_tag_default_cleared_on_first_invocation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("defaults are cleared when first flag invocation occurs", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"a:b" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-tag", "c:d"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		// defaults ["a","b"] replaced by ["c","d"]
+		if !slices.Equal(c.Tags, []string{"c", "d"}) {
+			t.Errorf("Tags = %v, want [c d]", c.Tags)
+		}
+	})
+
+	t.Run("multiple invocations after clearing accumulate", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"a:b" sep:":" short:"t"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, []string{"-t", "c:d", "-tag", "e"}); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		// First invocation clears defaults, splits "c:d" → c,d; second appends e
+		if !slices.Equal(c.Tags, []string{"c", "d", "e"}) {
+			t.Errorf("Tags = %v, want [c d e]", c.Tags)
+		}
+	})
+
+	t.Run("no invocation leaves defaults intact", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" default:"a:b" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Fatalf("conflagure() error = %v", err)
+		}
+		if !slices.Equal(c.Tags, []string{"a", "b"}) {
+			t.Errorf("Tags = %v, want [a b]", c.Tags)
+		}
+	})
+}
+
+func Test_sep_tag_validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sep on string scalar returns ErrInvalidSpecification", func(t *testing.T) {
+		type cfg struct {
+			Name string `flag:"name" sep:":"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("sep on int scalar returns ErrInvalidSpecification", func(t *testing.T) {
+		type cfg struct {
+			Count int `flag:"count" sep:":"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("sep on bool scalar returns ErrInvalidSpecification", func(t *testing.T) {
+		type cfg struct {
+			Flag bool `flag:"flag" sep:":"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("sep on float64 scalar returns ErrInvalidSpecification", func(t *testing.T) {
+		type cfg struct {
+			Ratio float64 `flag:"ratio" sep:":"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("sep on slice is valid", func(t *testing.T) {
+		type cfg struct {
+			Tags []string `flag:"tag" sep:":"`
+		}
+		var c cfg
+		if err := conflagure(newTestFS(), &c, nil); err != nil {
+			t.Errorf("unexpected error for sep on slice: %v", err)
+		}
+	})
+}
+
+func Test_parseAndSetSliceDefault_sep(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sepSet false returns ErrInvalidSpecification when defStr non-empty", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		err := parseAndSetSliceDefault(&s, "a,b,c", "", false, id)
+		if err == nil {
+			t.Fatal("expected ErrInvalidSpecification, got nil")
+		}
+		if !errors.Is(err, ErrInvalidSpecification) {
+			t.Errorf("err = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("sepSet true sep colon uses colon", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		if err := parseAndSetSliceDefault(&s, "a:b:c", ":", true, id); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"a", "b", "c"}) {
+			t.Errorf("s = %v, want [a b c]", s)
+		}
+	})
+
+	t.Run("sepSet true sep empty treats whole value as single element", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		if err := parseAndSetSliceDefault(&s, "a,b,c", "", true, id); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"a,b,c"}) {
+			t.Errorf("s = %v, want [a,b,c]", s)
+		}
+	})
+
+	t.Run("whitespace trimmed with custom sep", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		if err := parseAndSetSliceDefault(&s, " x : y : z ", ":", true, id); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"x", "y", "z"}) {
+			t.Errorf("s = %v, want [x y z]", s)
+		}
+	})
+}
+
+func Test_appendOnce_sep(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sepSet false does not split on any character", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		fn := appendOnce(&s, id, false, "", false)
+		if err := fn("a:b:c"); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"a:b:c"}) {
+			t.Errorf("s = %v, want [a:b:c]", s)
+		}
+	})
+
+	t.Run("sepSet true sep colon splits value", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		fn := appendOnce(&s, id, false, ":", true)
+		if err := fn("a:b:c"); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"a", "b", "c"}) {
+			t.Errorf("s = %v, want [a b c]", s)
+		}
+	})
+
+	t.Run("sepSet true sep empty does not split", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		fn := appendOnce(&s, id, false, "", true)
+		if err := fn("a:b:c"); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"a:b:c"}) {
+			t.Errorf("s = %v, want [a:b:c]", s)
+		}
+	})
+
+	t.Run("clearOnFirst still fires exactly once with sep", func(t *testing.T) {
+		s := []string{"old"}
+		id := func(v string) (string, error) { return v, nil }
+		fn := appendOnce(&s, id, true, ":", true)
+		if err := fn("x:y"); err != nil {
+			t.Fatal(err)
+		}
+		// old cleared, x and y appended
+		if !slices.Equal(s, []string{"x", "y"}) {
+			t.Errorf("s = %v, want [x y]", s)
+		}
+		// second call appends without clearing again
+		if err := fn("z"); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"x", "y", "z"}) {
+			t.Errorf("s = %v, want [x y z]", s)
+		}
+	})
+
+	t.Run("parse error inside split propagates", func(t *testing.T) {
+		var s []int
+		fn := appendOnce(&s, strconv.Atoi, false, ":", true)
+		if err := fn("1:notanint:3"); err == nil {
+			t.Fatal("expected parse error, got nil")
+		}
+	})
+
+	t.Run("whitespace trimmed per-element with sep", func(t *testing.T) {
+		var s []string
+		id := func(v string) (string, error) { return v, nil }
+		fn := appendOnce(&s, id, false, ":", true)
+		if err := fn(" a : b : c "); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(s, []string{"a", "b", "c"}) {
+			t.Errorf("s = %v, want [a b c]", s)
 		}
 	})
 }
@@ -2315,7 +2751,7 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 
 	t.Run("comma-separated default applied", func(t *testing.T) {
 		type cfg struct {
-			Timeouts []time.Duration `default:"1s,2m" flag:"timeout"`
+			Timeouts []time.Duration `default:"1s,2m" flag:"timeout" sep:","`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -2329,7 +2765,7 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 
 	t.Run("default discarded when flag used", func(t *testing.T) {
 		type cfg struct {
-			Timeouts []time.Duration `default:"1s,2m" flag:"timeout"`
+			Timeouts []time.Duration `default:"1s,2m" flag:"timeout" sep:","`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-timeout", "5s"}); err != nil {
@@ -2342,7 +2778,7 @@ func Test_conflagure_slice_time_Duration_defaults(t *testing.T) {
 
 	t.Run("invalid default returns error", func(t *testing.T) {
 		type cfg struct {
-			Timeouts []time.Duration `default:"1s,notaduration" flag:"timeout"`
+			Timeouts []time.Duration `default:"1s,notaduration" flag:"timeout" sep:","`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err == nil {
@@ -2412,7 +2848,7 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 
 	t.Run("now in default resolves to non-zero time", func(t *testing.T) {
 		type cfg2 struct {
-			Dates []time.Time `default:"now" flag:"date"`
+			Dates []time.Time `default:"now" flag:"date" sep:""`
 		}
 		before := time.Now().UTC().Add(-time.Second)
 		var c cfg2
@@ -2440,7 +2876,7 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 
 	t.Run("default discarded when flag used", func(t *testing.T) {
 		type cfg2 struct {
-			Dates []time.Time `default:"2023-01-01T00:00:00Z" flag:"date"`
+			Dates []time.Time `default:"2023-01-01T00:00:00Z" flag:"date" sep:""`
 		}
 		var c cfg2
 		if err := conflagure(newTestFS(), &c, []string{"-date", "2024-06-01T00:00:00Z"}); err != nil {
@@ -2461,7 +2897,7 @@ func Test_conflagure_slice_time_Time(t *testing.T) {
 
 	t.Run("invalid default returns error", func(t *testing.T) {
 		type cfg2 struct {
-			Dates []time.Time `default:"not-a-time" flag:"date"`
+			Dates []time.Time `default:"not-a-time" flag:"date" sep:""`
 		}
 		var c cfg2
 		if err := conflagure(newTestFS(), &c, nil); err == nil {
@@ -2768,92 +3204,90 @@ func Test_conflagureCmd_subcommand_short_alias(t *testing.T) {
 	}
 }
 
-func Test_conflagureCmd_nil_conf(t *testing.T) {
+func Test_conflagureCmd_conf_errors(t *testing.T) {
 	t.Parallel()
-	_, err := conflagureCmd(newTestFS(), nil, nil)
-	if err == nil {
-		t.Fatal("expected error for nil conf")
-	}
-}
 
-func Test_conflagureCmd_non_pointer_conf(t *testing.T) {
-	t.Parallel()
-	type cfg struct{ X string }
-	_, err := conflagureCmd(newTestFS(), cfg{}, nil)
-	if err == nil {
-		t.Fatal("expected error for non-pointer conf")
-	}
+	t.Run("nil conf", func(t *testing.T) {
+		_, err := conflagureCmd(newTestFS(), nil, nil)
+		if err == nil {
+			t.Fatal("expected error for nil conf")
+		}
+	})
+
+	t.Run("non-pointer conf", func(t *testing.T) {
+		type cfg struct{ X string }
+		_, err := conflagureCmd(newTestFS(), cfg{}, nil)
+		if err == nil {
+			t.Fatal("expected error for non-pointer conf")
+		}
+	})
 }
 
 // ── collectSubcommands error paths ────────────────────────────────────────────
 
-func Test_collectSubcommands_both_flag_and_cmd(t *testing.T) {
+func Test_collectSubcommands_errors(t *testing.T) {
 	t.Parallel()
 
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
-	}
-	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
-	if err == nil {
-		t.Fatal("expected error for field with both flag: and cmd: tags")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
-}
+	t.Run("field with both flag: and cmd: tags", func(t *testing.T) {
+		type cfg struct {
+			Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
+		}
+		var c cfg
+		_, err := collectSubcommands(reflectVal(&c), "test")
+		if err == nil {
+			t.Fatal("expected error for field with both flag: and cmd: tags")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
 
-func Test_collectSubcommands_unexported_field(t *testing.T) {
-	t.Parallel()
+	t.Run("unexported cmd: field", func(t *testing.T) {
+		type cfg struct {
+			deploy testDeployCmd `cmd:"deploy"` //nolint:unused
+		}
+		var c cfg
+		_, err := collectSubcommands(reflectVal(&c), "test")
+		if err == nil {
+			t.Fatal("expected error for unexported cmd: field")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
 
-	type cfg struct {
-		deploy testDeployCmd `cmd:"deploy"` //nolint:unused
-	}
-	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
-	if err == nil {
-		t.Fatal("expected error for unexported cmd: field")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
-}
+	t.Run("non-struct cmd: field", func(t *testing.T) {
+		type cfg struct {
+			Deploy string `cmd:"deploy"`
+		}
+		var c cfg
+		_, err := collectSubcommands(reflectVal(&c), "test")
+		if err == nil {
+			t.Fatal("expected error for non-struct cmd: field")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
 
-func Test_collectSubcommands_not_struct(t *testing.T) {
-	t.Parallel()
-
-	type cfg struct {
-		Deploy string `cmd:"deploy"`
-	}
-	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
-	if err == nil {
-		t.Fatal("expected error for non-struct cmd: field")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
-}
-
-func Test_collectSubcommands_no_commander(t *testing.T) {
-	t.Parallel()
-
-	// collectSubcommands no longer requires Commander; non-Commander structs
-	// are accepted. validateCommanders / conflagureCmd enforce the requirement.
-	type notCmd struct {
-		Target string `flag:"target"`
-	}
-	type cfg struct {
-		Deploy notCmd `cmd:"deploy"`
-	}
-	var c cfg
-	entries, err := collectSubcommands(reflectVal(&c), "test")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
-	}
+	t.Run("non-Commander struct is accepted by collectSubcommands", func(t *testing.T) {
+		// collectSubcommands no longer requires Commander; non-Commander structs
+		// are accepted. validateCommanders / conflagureCmd enforce the requirement.
+		type notCmd struct {
+			Target string `flag:"target"`
+		}
+		type cfg struct {
+			Deploy notCmd `cmd:"deploy"`
+		}
+		var c cfg
+		entries, err := collectSubcommands(reflectVal(&c), "test")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(entries))
+		}
+	})
 }
 
 func Test_conflagureCmd_no_commander(t *testing.T) {
@@ -2907,101 +3341,92 @@ func Test_bindFlags_nested_cmd_tag_errors(t *testing.T) {
 
 // ── dispatch ──────────────────────────────────────────────────────────────────
 
-func Test_dispatch_nil_conf(t *testing.T) {
+func Test_dispatch_conf_errors(t *testing.T) {
 	t.Parallel()
-	_, err := dispatch(newTestFS(), nil, nil)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
 
-func Test_dispatch_non_pointer(t *testing.T) {
-	t.Parallel()
-	type cfg struct{ X string }
-	_, err := dispatch(newTestFS(), cfg{}, nil)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
+	t.Run("nil conf", func(t *testing.T) {
+		_, err := dispatch(newTestFS(), nil, nil)
+		if err == nil {
+			t.Fatal("expected error for nil conf")
+		}
+	})
 
-func Test_dispatch_no_subcommands(t *testing.T) {
-	t.Parallel()
-	type cfg struct {
-		X string `flag:"x"`
-	}
-	var c cfg
-	_, err := dispatch(newTestFS(), &c, nil)
-	if !isErr(err, ers.ErrNotFound) {
-		t.Errorf("expected ErrNotFound when no cmd: fields, got %v", err)
-	}
+	t.Run("non-pointer conf", func(t *testing.T) {
+		type cfg struct{ X string }
+		_, err := dispatch(newTestFS(), cfg{}, nil)
+		if err == nil {
+			t.Fatal("expected error for non-pointer conf")
+		}
+	})
+
+	t.Run("no subcommands returns ErrNotFound", func(t *testing.T) {
+		type cfg struct {
+			X string `flag:"x"`
+		}
+		var c cfg
+		_, err := dispatch(newTestFS(), &c, nil)
+		if !isErr(err, ers.ErrNotFound) {
+			t.Errorf("expected ErrNotFound when no cmd: fields, got %v", err)
+		}
+	})
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 // ── additional coverage tests ─────────────────────────────────────────────────
 
-// Test_conflagureCmd_usage_closure_triggered passes an unknown global flag so
-// that fs.Parse calls our custom Usage closure (without os.Exit since it is not
-// a -help flag). Exercises both the "has help" and "no help" branches.
-func Test_conflagureCmd_usage_closure_triggered(t *testing.T) {
+// Test_conflagureCmd_usage_closure exercises the custom Usage closure installed
+// by conflagureCmd: triggered by an unknown flag, covering the with-help,
+// nil-origUsage, and preset-origUsage branches.
+func Test_conflagureCmd_usage_closure(t *testing.T) {
 	t.Parallel()
 
-	type cfg struct {
+	t.Run("with help and no-help subcommands", func(t *testing.T) {
 		// Deploy has a help tag; Rollback does not — both loop branches are hit.
-		Deploy   testDeployCmd   `cmd:"deploy"   help:"deploy to target"`
-		Rollback testRollbackCmd `cmd:"rollback"`
-	}
+		type cfg struct {
+			Deploy   testDeployCmd   `cmd:"deploy"   help:"deploy to target"`
+			Rollback testRollbackCmd `cmd:"rollback"`
+		}
+		fs := newTestFS()
+		fs.SetOutput(io.Discard)
+		var c cfg
+		_, err := conflagureCmd(fs, &c, []string{"-unknown-flag"})
+		if err == nil {
+			t.Fatal("expected parse error for unknown flag")
+		}
+	})
 
-	fs := newTestFS()
-	fs.SetOutput(io.Discard) // suppress output in test logs
-	var c cfg
-	_, err := conflagureCmd(fs, &c, []string{"-unknown-flag"})
-	if err == nil {
-		t.Fatal("expected parse error for unknown flag")
-	}
-}
+	t.Run("nil origUsage", func(t *testing.T) {
+		type cfg struct {
+			Deploy testDeployCmd `cmd:"deploy" help:"deploy"`
+		}
+		fs := newTestFS()
+		fs.Usage = nil // explicitly nil so origUsage is nil inside the closure
+		fs.SetOutput(io.Discard)
+		var c cfg
+		_, err := conflagureCmd(fs, &c, []string{"-unknown-flag"})
+		if err == nil {
+			t.Fatal("expected parse error for unknown flag")
+		}
+	})
 
-// Test_conflagureCmd_usage_nil_origUsage covers the else branch in the closure
-// where origUsage is nil (explicitly zeroed before conflagureCmd runs).
-func Test_conflagureCmd_usage_nil_origUsage(t *testing.T) {
-	t.Parallel()
-
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy" help:"deploy"`
-	}
-
-	fs := newTestFS()
-	fs.Usage = nil // explicitly nil so origUsage is nil inside the closure
-	fs.SetOutput(io.Discard)
-	var c cfg
-	_, err := conflagureCmd(fs, &c, []string{"-unknown-flag"})
-	if err == nil {
-		t.Fatal("expected parse error for unknown flag")
-	}
-}
-
-// Test_conflagureCmd_usage_with_preset_origUsage verifies that a pre-existing
-// Usage function is called inside our closure (origUsage != nil branch).
-func Test_conflagureCmd_usage_with_preset_origUsage(t *testing.T) {
-	t.Parallel()
-
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy" help:"deploy"`
-	}
-
-	fs := newTestFS()
-	fs.SetOutput(io.Discard)
-	customUsageCalled := false
-	fs.Usage = func() { customUsageCalled = true }
-
-	var c cfg
-	_, err := conflagureCmd(fs, &c, []string{"-unknown-flag"})
-	if err == nil {
-		t.Fatal("expected parse error")
-	}
-	if !customUsageCalled {
-		t.Error("expected original Usage func to be called")
-	}
+	t.Run("preset origUsage is called", func(t *testing.T) {
+		type cfg struct {
+			Deploy testDeployCmd `cmd:"deploy" help:"deploy"`
+		}
+		fs := newTestFS()
+		fs.SetOutput(io.Discard)
+		customUsageCalled := false
+		fs.Usage = func() { customUsageCalled = true }
+		var c cfg
+		_, err := conflagureCmd(fs, &c, []string{"-unknown-flag"})
+		if err == nil {
+			t.Fatal("expected parse error")
+		}
+		if !customUsageCalled {
+			t.Error("expected original Usage func to be called")
+		}
+	})
 }
 
 // Test_conflagureCmd_global_required_error checks that a required global flag
@@ -3024,77 +3449,121 @@ func Test_conflagureCmd_global_required_error(t *testing.T) {
 	}
 }
 
-// Test_conflagureCmd_collectSubcommands_error triggers a collectSubcommands
-// error (flag: and cmd: on the same field) from conflagureCmd.
-func Test_conflagureCmd_collectSubcommands_error(t *testing.T) {
+// Test_conflagureCmd_errors consolidates error-path coverage for conflagureCmd:
+// collectSubcommands failure, bindFlags failure, global required flag missing,
+// and subcommand parse failure.
+func Test_conflagureCmd_errors(t *testing.T) {
 	t.Parallel()
 
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
-	}
-	var c cfg
-	_, err := conflagureCmd(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error for field with both flag: and cmd: tags")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
+	t.Run("collectSubcommands error", func(t *testing.T) {
+		type cfg struct {
+			Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
+		}
+		var c cfg
+		_, err := conflagureCmd(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for field with both flag: and cmd: tags")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("bindFlags error — invalid short flag", func(t *testing.T) {
+		type cfg struct {
+			Verbose bool          `flag:"verbose" short:"ab"` // short must be 1 char
+			Deploy  testDeployCmd `cmd:"deploy"`
+		}
+		var c cfg
+		_, err := conflagureCmd(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for invalid short flag")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("global required flag missing", func(t *testing.T) {
+		type cfg struct {
+			Username string        `flag:"username" required:"true"`
+			Deploy   testDeployCmd `cmd:"deploy"`
+		}
+		var c cfg
+		_, err := conflagureCmd(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for missing required global flag")
+		}
+		if !isErr(err, ErrInvalidInput) {
+			t.Errorf("error = %v, want ErrInvalidInput", err)
+		}
+	})
+
+	t.Run("subcommand parse error — unknown subcmd flag", func(t *testing.T) {
+		type cfg struct {
+			Deploy testDeployCmd `cmd:"deploy"`
+		}
+		fs := newTestFS()
+		fs.SetOutput(io.Discard)
+		var c cfg
+		_, err := conflagureCmd(fs, &c, []string{"deploy", "-unknown-subcmd-flag"})
+		if err == nil {
+			t.Fatal("expected error for unknown subcommand flag")
+		}
+	})
 }
 
-// Test_conflagureCmd_bindFlags_error triggers bindFlags failure for a global
-// field (invalid short flag) from conflagureCmd.
-func Test_conflagureCmd_bindFlags_error(t *testing.T) {
+// Test_dispatch_errors consolidates error-path coverage for dispatch:
+// collectSubcommands failure, global parse failure, and unknown subcommand.
+func Test_dispatch_errors(t *testing.T) {
 	t.Parallel()
 
-	type cfg struct {
-		Verbose bool          `flag:"verbose" short:"ab"` // short must be 1 char
-		Deploy  testDeployCmd `cmd:"deploy"`
-	}
-	var c cfg
-	_, err := conflagureCmd(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error for invalid short flag")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
-}
+	t.Run("collectSubcommands error", func(t *testing.T) {
+		type cfg struct {
+			Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
+		}
+		var c cfg
+		_, err := dispatch(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
 
-// Test_conflagureCmd_subcommand_parse_error passes an unknown flag to the
-// subcommand FlagSet, covering the matched.fs.Parse error path in dispatchEntries.
-func Test_conflagureCmd_subcommand_parse_error(t *testing.T) {
-	t.Parallel()
+	t.Run("global parse error — unknown flag", func(t *testing.T) {
+		type sub struct {
+			X string `flag:"x"`
+		}
+		type cfg struct {
+			Deploy sub `cmd:"deploy"`
+		}
+		var c cfg
+		fs := newTestFS()
+		fs.SetOutput(io.Discard)
+		_, err := dispatch(fs, &c, []string{"-no-such-flag"})
+		if err == nil {
+			t.Fatal("expected parse error for unknown flag")
+		}
+	})
 
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy"`
-	}
-
-	fs := newTestFS()
-	fs.SetOutput(io.Discard)
-	var c cfg
-	_, err := conflagureCmd(fs, &c, []string{"deploy", "-unknown-subcmd-flag"})
-	if err == nil {
-		t.Fatal("expected error for unknown subcommand flag")
-	}
-}
-
-// Test_dispatch_collectSubcommands_error exercises the collectSubcommands error
-// path inside dispatch directly.
-func Test_dispatch_collectSubcommands_error(t *testing.T) {
-	t.Parallel()
-
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
-	}
-	var c cfg
-	_, err := dispatch(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
+	t.Run("unknown subcommand", func(t *testing.T) {
+		type sub struct {
+			X string `flag:"x"`
+		}
+		type cfg struct {
+			Deploy sub `cmd:"deploy"`
+		}
+		var c cfg
+		_, err := dispatch(newTestFS(), &c, []string{"nosuchcmd"})
+		if err == nil {
+			t.Fatal("expected error for unknown subcommand")
+		}
+		if !isErr(err, ErrInvalidInput) {
+			t.Errorf("error = %v, want ErrInvalidInput", err)
+		}
+	})
 }
 
 // Test_collectSubcommands_bindflags_error exercises the path where bindFlags
@@ -3177,95 +3646,591 @@ func (v *testFlagValue) Set(s string) error {
 	return nil
 }
 
-// Test_registerFlag_duplicate_name covers the fs.Lookup(name) != nil branch
-// in registerFlag, triggered by two struct fields sharing the same flag: tag.
-func Test_registerFlag_duplicate_name(t *testing.T) {
+// Test_registerFlag_errors covers the duplicate-name, duplicate-short, and
+// impossible-bool-default error branches in registerFlag / bindFlags.
+func Test_registerFlag_errors(t *testing.T) {
 	t.Parallel()
-	type cfg struct {
-		A string `flag:"dup"`
-		B string `flag:"dup"`
-	}
-	var c cfg
-	err := conflagure(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error for duplicate flag name")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
+
+	t.Run("duplicate long flag name", func(t *testing.T) {
+		type cfg struct {
+			A string `flag:"dup"`
+			B string `flag:"dup"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for duplicate flag name")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("duplicate short flag", func(t *testing.T) {
+		type cfg struct {
+			Alpha string `flag:"alpha" short:"x"`
+			Beta  string `flag:"beta"  short:"x"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for duplicate short flag")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("bool impossible default", func(t *testing.T) {
+		// The default: value is neither a recognised bool string nor empty.
+		type cfg struct {
+			Flag bool `default:"maybe" flag:"flag"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for impossible bool default")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
 }
 
-// Test_registerFlag_duplicate_short covers the fs.Lookup(short) != nil branch
-// in registerFlag, triggered by two fields sharing the same short: alias.
-func Test_registerFlag_duplicate_short(t *testing.T) {
+// Test_dispatch_subcommand_rest_parse_error checks that populateRestField errors
+// are propagated from selectSubcommand when a subcommand's rest field cannot
+// parse the remaining args (e.g. []int rest field given a non-integer arg).
+func Test_dispatch_subcommand_rest_parse_error(t *testing.T) {
 	t.Parallel()
-	type cfg struct {
-		Alpha string `flag:"alpha" short:"x"`
-		Beta  string `flag:"beta"  short:"x"`
-	}
-	var c cfg
-	err := conflagure(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error for duplicate short flag")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
-}
 
-// Test_registerFlag_bool_impossible_default covers the default: branch in
-// registerFlag's bool switch, reached when the default value is neither a
-// recognised bool string nor empty.
-func Test_registerFlag_bool_impossible_default(t *testing.T) {
-	t.Parallel()
-	type cfg struct {
-		Flag bool `default:"maybe" flag:"flag"`
-	}
-	var c cfg
-	err := conflagure(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error for impossible bool default")
-	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
-	}
-}
-
-// Test_dispatch_parse_error covers the parseAndCheck error branch in dispatch
-// by passing an unknown flag that fails fs.Parse.
-func Test_dispatch_parse_error(t *testing.T) {
-	t.Parallel()
-	type sub struct {
-		X string `flag:"x"`
+	type intCmd struct {
+		Nums []int `narg:"rest"`
 	}
 	type cfg struct {
-		Deploy sub `cmd:"deploy"`
+		Verbose bool   `flag:"verbose"`
+		Calc    intCmd `cmd:"calc"`
 	}
 	var c cfg
-	fs := newTestFS()
-	fs.SetOutput(io.Discard)
-	_, err := dispatch(fs, &c, []string{"-no-such-flag"})
+	// "notanint" is passed as a remaining arg after the subcommand name.
+	_, err := dispatch(newTestFS(), &c, []string{"calc", "notanint"})
 	if err == nil {
-		t.Fatal("expected parse error for unknown flag")
-	}
-}
-
-// Test_dispatch_unknown_subcommand covers the selectSubcommand error branch in
-// dispatch by naming a subcommand that does not exist.
-func Test_dispatch_unknown_subcommand(t *testing.T) {
-	t.Parallel()
-	type sub struct {
-		X string `flag:"x"`
-	}
-	type cfg struct {
-		Deploy sub `cmd:"deploy"`
-	}
-	var c cfg
-	_, err := dispatch(newTestFS(), &c, []string{"nosuchcmd"})
-	if err == nil {
-		t.Fatal("expected error for unknown subcommand")
+		t.Fatal("expected error from populateRestField with non-integer rest arg")
 	}
 	if !isErr(err, ErrInvalidInput) {
 		t.Errorf("error = %v, want ErrInvalidInput", err)
+	}
+}
+
+// ── narg:"rest" tests ─────────────────────────────────────────────────────────
+
+func Test_narg_rest_basic(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Files []string `narg:"rest"`
+	}
+
+	tests := []struct {
+		name    string
+		args    []string
+		want    []string
+		wantErr bool
+	}{
+		{name: "single arg", args: []string{"foo.txt"}, want: []string{"foo.txt"}},
+		{name: "multiple args", args: []string{"a", "b", "c"}, want: []string{"a", "b", "c"}},
+		{name: "no args", args: nil, want: nil},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			if err := conflagure(newTestFS(), &c, tt.args); (err != nil) != tt.wantErr {
+				t.Fatalf("conflagure() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(c.Files, tt.want) {
+				t.Errorf("Files = %v, want %v", c.Files, tt.want)
+			}
+		})
+	}
+}
+
+func Test_narg_rest_with_flags(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Output string   `flag:"output"`
+		Files  []string `narg:"rest"`
+	}
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantOutput string
+		wantFiles  []string
+	}{
+		{
+			name:       "flags then rest",
+			args:       []string{"-output", "out.txt", "foo.txt", "bar.txt"},
+			wantOutput: "out.txt",
+			wantFiles:  []string{"foo.txt", "bar.txt"},
+		},
+		{
+			name:       "rest only",
+			args:       []string{"foo.txt", "bar.txt"},
+			wantOutput: "",
+			wantFiles:  []string{"foo.txt", "bar.txt"},
+		},
+		{
+			name:       "flag only, no rest",
+			args:       []string{"-output", "out.txt"},
+			wantOutput: "out.txt",
+			wantFiles:  nil,
+		},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			if err := conflagure(newTestFS(), &c, tt.args); err != nil {
+				t.Fatalf("conflagure() error = %v", err)
+			}
+			if c.Output != tt.wantOutput {
+				t.Errorf("Output = %q, want %q", c.Output, tt.wantOutput)
+			}
+			if !reflect.DeepEqual(c.Files, tt.wantFiles) {
+				t.Errorf("Files = %v, want %v", c.Files, tt.wantFiles)
+			}
+		})
+	}
+}
+
+func Test_narg_rest_typed_int(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Numbers []int `narg:"rest"`
+	}
+
+	tests := []struct {
+		name    string
+		args    []string
+		want    []int
+		wantErr bool
+	}{
+		{name: "multiple ints", args: []string{"1", "2", "3"}, want: []int{1, 2, 3}},
+		{name: "single int", args: []string{"42"}, want: []int{42}},
+		{name: "invalid int", args: []string{"notanint"}, wantErr: true},
+		{name: "no args", args: nil, want: nil},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			if err := conflagure(newTestFS(), &c, tt.args); (err != nil) != tt.wantErr {
+				t.Fatalf("conflagure() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && !reflect.DeepEqual(c.Numbers, tt.want) {
+				t.Errorf("Numbers = %v, want %v", c.Numbers, tt.want)
+			}
+		})
+	}
+}
+
+func Test_narg_rest_typed_float64(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Values []float64 `narg:"rest"`
+	}
+
+	var c cfg
+	if err := conflagure(newTestFS(), &c, []string{"1.1", "2.2", "3.3"}); err != nil {
+		t.Fatalf("conflagure() error = %v", err)
+	}
+	want := []float64{1.1, 2.2, 3.3}
+	if !reflect.DeepEqual(c.Values, want) {
+		t.Errorf("Values = %v, want %v", c.Values, want)
+	}
+}
+
+func Test_narg_rest_required_empty(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Files []string `narg:"rest" required:"true"`
+	}
+
+	var c cfg
+	err := conflagure(newTestFS(), &c, nil)
+	if err == nil {
+		t.Fatal("expected error for required rest field with no args")
+	}
+	if !isErr(err, ErrInvalidInput) {
+		t.Errorf("error = %v, want ErrInvalidInput", err)
+	}
+}
+
+func Test_narg_rest_required_provided(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Files []string `narg:"rest" required:"true"`
+	}
+
+	var c cfg
+	if err := conflagure(newTestFS(), &c, []string{"a.txt"}); err != nil {
+		t.Fatalf("conflagure() unexpected error = %v", err)
+	}
+	if len(c.Files) != 1 || c.Files[0] != "a.txt" {
+		t.Errorf("Files = %v, want [a.txt]", c.Files)
+	}
+}
+
+// ── narg:"until" tests ────────────────────────────────────────────────────────
+
+func Test_narg_until_basic(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Files  []string `flag:"files" narg:"until"`
+		Output string   `flag:"output"`
+	}
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantFiles  []string
+		wantOutput string
+	}{
+		{
+			name:       "basic until",
+			args:       []string{"-files", "a.txt", "b.txt", "c.txt", "-output", "out.txt"},
+			wantFiles:  []string{"a.txt", "b.txt", "c.txt"},
+			wantOutput: "out.txt",
+		},
+		{
+			name:      "until at end",
+			args:      []string{"-files", "a.txt", "b.txt"},
+			wantFiles: []string{"a.txt", "b.txt"},
+		},
+		{
+			name:      "single value",
+			args:      []string{"-files", "a.txt"},
+			wantFiles: []string{"a.txt"},
+		},
+		{
+			name:       "no until values, just output",
+			args:       []string{"-output", "out.txt"},
+			wantOutput: "out.txt",
+		},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			if err := conflagure(newTestFS(), &c, tt.args); err != nil {
+				t.Fatalf("conflagure() error = %v", err)
+			}
+			if !reflect.DeepEqual(c.Files, tt.wantFiles) {
+				t.Errorf("Files = %v, want %v", c.Files, tt.wantFiles)
+			}
+			if c.Output != tt.wantOutput {
+				t.Errorf("Output = %q, want %q", c.Output, tt.wantOutput)
+			}
+		})
+	}
+}
+
+func Test_narg_until_eq_form(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Files  []string `flag:"files" narg:"until"`
+		Output string   `flag:"output"`
+	}
+
+	// -files=a.txt b.txt c.txt -output out.txt -> Files = [a.txt, b.txt, c.txt], Output = out.txt
+	var c cfg
+	if err := conflagure(newTestFS(), &c, []string{"-files=a.txt", "b.txt", "c.txt", "-output", "out.txt"}); err != nil {
+		t.Fatalf("conflagure() error = %v", err)
+	}
+	wantFiles := []string{"a.txt", "b.txt", "c.txt"}
+	if !reflect.DeepEqual(c.Files, wantFiles) {
+		t.Errorf("Files = %v, want %v", c.Files, wantFiles)
+	}
+	if c.Output != "out.txt" {
+		t.Errorf("Output = %q, want out.txt", c.Output)
+	}
+}
+
+func Test_narg_until_multiple_fields(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Inputs  []string `flag:"input" narg:"until"`
+		Outputs []string `flag:"output" narg:"until"`
+	}
+
+	var c cfg
+	args := []string{"-input", "a.txt", "b.txt", "-output", "x.txt", "y.txt"}
+	if err := conflagure(newTestFS(), &c, args); err != nil {
+		t.Fatalf("conflagure() error = %v", err)
+	}
+	if !reflect.DeepEqual(c.Inputs, []string{"a.txt", "b.txt"}) {
+		t.Errorf("Inputs = %v, want [a.txt b.txt]", c.Inputs)
+	}
+	if !reflect.DeepEqual(c.Outputs, []string{"x.txt", "y.txt"}) {
+		t.Errorf("Outputs = %v, want [x.txt y.txt]", c.Outputs)
+	}
+}
+
+func Test_narg_until_coexists_with_regular_slice(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Tags  []string `flag:"tag"`
+		Files []string `flag:"files" narg:"until"`
+	}
+
+	var c cfg
+	args := []string{"-tag", "go", "-tag", "cli", "-files", "a.txt", "b.txt"}
+	if err := conflagure(newTestFS(), &c, args); err != nil {
+		t.Fatalf("conflagure() error = %v", err)
+	}
+	if !reflect.DeepEqual(c.Tags, []string{"go", "cli"}) {
+		t.Errorf("Tags = %v, want [go cli]", c.Tags)
+	}
+	if !reflect.DeepEqual(c.Files, []string{"a.txt", "b.txt"}) {
+		t.Errorf("Files = %v, want [a.txt b.txt]", c.Files)
+	}
+}
+
+// ── narg validation error tests ───────────────────────────────────────────────
+
+// Test_narg_invalid_spec_errors consolidates all ErrInvalidSpecification cases
+// for narg: tag misuse.
+func Test_narg_invalid_spec_errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rest with flag: tag", func(t *testing.T) {
+		type cfg struct {
+			Files []string `flag:"files" narg:"rest"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for narg:rest with flag: tag")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("until without flag: tag", func(t *testing.T) {
+		type cfg struct {
+			Files []string `narg:"until"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for narg:until without flag: tag")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("rest on non-slice type", func(t *testing.T) {
+		type cfg struct {
+			File string `narg:"rest"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for narg:rest on non-slice type")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("until on non-slice type", func(t *testing.T) {
+		type cfg struct {
+			File string `flag:"file" narg:"until"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for narg:until on non-slice type")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("unknown narg value", func(t *testing.T) {
+		type cfg struct {
+			Files []string `narg:"unknown"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for unknown narg value")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("rest and cmd: are incompatible", func(t *testing.T) {
+		type sub struct {
+			X string `flag:"x"`
+		}
+		type cfg struct {
+			Args   []string `narg:"rest"`
+			Deploy sub      `cmd:"deploy"`
+		}
+		var c cfg
+		_, err := dispatch(newTestFS(), &c, nil)
+		if err == nil {
+			t.Fatal("expected error for narg:rest with cmd: fields")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+
+	t.Run("multiple rest fields", func(t *testing.T) {
+		type cfg struct {
+			Files1 []string `narg:"rest"`
+			Files2 []string `narg:"rest"`
+		}
+		var c cfg
+		err := conflagure(newTestFS(), &c, []string{"a"})
+		if err == nil {
+			t.Fatal("expected error for multiple narg:rest fields")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("error = %v, want ErrInvalidSpecification", err)
+		}
+	})
+}
+
+// ── narg:"rest" in subcommand context ─────────────────────────────────────────
+
+func Test_narg_rest_in_subcommand(t *testing.T) {
+	t.Parallel()
+
+	type sub struct {
+		Output string   `flag:"output"`
+		Files  []string `narg:"rest"`
+	}
+	type cfg struct {
+		Deploy sub `cmd:"deploy"`
+	}
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantOutput string
+		wantFiles  []string
+	}{
+		{
+			name:       "rest after flag",
+			args:       []string{"deploy", "-output", "out.txt", "a.txt", "b.txt"},
+			wantOutput: "out.txt",
+			wantFiles:  []string{"a.txt", "b.txt"},
+		},
+		{
+			name:      "rest only",
+			args:      []string{"deploy", "a.txt", "b.txt"},
+			wantFiles: []string{"a.txt", "b.txt"},
+		},
+	}
+
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cfg
+			result, err := dispatch(newTestFS(), &c, tt.args)
+			if err != nil {
+				t.Fatalf("dispatch() error = %v", err)
+			}
+			got, ok := result.(*sub)
+			if !ok {
+				t.Fatalf("result is not *sub, got %T", result)
+			}
+			if got.Output != tt.wantOutput {
+				t.Errorf("Output = %q, want %q", got.Output, tt.wantOutput)
+			}
+			if !reflect.DeepEqual(got.Files, tt.wantFiles) {
+				t.Errorf("Files = %v, want %v", got.Files, tt.wantFiles)
+			}
+		})
+	}
+}
+
+func Test_narg_until_in_subcommand(t *testing.T) {
+	t.Parallel()
+
+	type sub struct {
+		Files  []string `flag:"files" narg:"until"`
+		Output string   `flag:"output"`
+	}
+	type cfg struct {
+		Deploy sub `cmd:"deploy"`
+	}
+
+	var c cfg
+	args := []string{"deploy", "-files", "a.txt", "b.txt", "-output", "out.txt"}
+	result, err := dispatch(newTestFS(), &c, args)
+	if err != nil {
+		t.Fatalf("dispatch() error = %v", err)
+	}
+	got, ok := result.(*sub)
+	if !ok {
+		t.Fatalf("result is not *sub, got %T", result)
+	}
+	if !reflect.DeepEqual(got.Files, []string{"a.txt", "b.txt"}) {
+		t.Errorf("Files = %v, want [a.txt b.txt]", got.Files)
+	}
+	if got.Output != "out.txt" {
+		t.Errorf("Output = %q, want out.txt", got.Output)
+	}
+}
+
+func Test_narg_rest_required_in_subcommand_empty(t *testing.T) {
+	t.Parallel()
+
+	type sub struct {
+		Files []string `narg:"rest" required:"true"`
+	}
+	type cfg struct {
+		Deploy sub `cmd:"deploy"`
+	}
+
+	var c cfg
+	_, err := dispatch(newTestFS(), &c, []string{"deploy"})
+	if err == nil {
+		t.Fatal("expected error for required rest field in subcommand with no args")
+	}
+	if !isErr(err, ErrInvalidInput) {
+		t.Errorf("error = %v, want ErrInvalidInput", err)
+	}
+}
+
+func Test_narg_until_short_alias(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Files []string `flag:"files" short:"f" narg:"until"`
+	}
+
+	var c cfg
+	args := []string{"-f", "a.txt", "b.txt"}
+	if err := conflagure(newTestFS(), &c, args); err != nil {
+		t.Fatalf("conflagure() error = %v", err)
+	}
+	if !reflect.DeepEqual(c.Files, []string{"a.txt", "b.txt"}) {
+		t.Errorf("Files = %v, want [a.txt b.txt]", c.Files)
 	}
 }
