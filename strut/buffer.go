@@ -302,6 +302,10 @@ func (b *Buffer) WithTrimRight(str string, cut string) { b.PushString(strings.Tr
 // 'cut' removed to the buffer.
 func (b *Buffer) WithTrimLeft(str string, cut string) { b.PushString(strings.TrimLeft(str, cut)) }
 
+// WithTrim writes 'str' with all leading and trailing UTF-8-encoded code
+// points contained in 'cut' removed to the buffer.
+func (b *Buffer) WithTrim(str string, cut string) { b.PushString(strings.Trim(str, cut)) }
+
 // WithTrimPrefix writes 's' with the leading 'prefix' string removed to
 // the buffer. If 's' doesn't start with 'prefix', 's' is written
 // unchanged.
@@ -333,6 +337,12 @@ func (b *Buffer) PushTrimRight(str []byte, cut string) { b.Write(bytes.TrimRight
 // PushTrimLeft writes 'str' with all leading characters contained in
 // 'cut' removed to the buffer.
 func (b *Buffer) PushTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
+
+// PushTrim writes the byte slice 'str' with all leading and trailing
+// UTF-8-encoded code points contained in 'cut' removed to the buffer. The
+// input 'str' is not modified; a transformed copy is written. This is the
+// byte slice equivalent of WithTrim.
+func (b *Buffer) PushTrim(str []byte, cut string) { b.Write(bytes.Trim(str, cut)) }
 
 // PushTrimPrefix writes 's' with the leading 'prefix' string removed to
 // the buffer. If 's' doesn't start with 'prefix', 's' is written
@@ -428,3 +438,11 @@ func (b *Buffer) Println() { b.Print(); _, _ = os.Stdout.Write(newline) }
 
 // Mutable returns the buffer's contents as a Mutable byte slice.
 func (b *Buffer) Mutable() Mutable { return Mutable(b.Bytes()) }
+
+// Ptr returns the receiver pointer. Useful for obtaining a *Buffer from
+// within a method chain that operates on *Buffer values.
+func (b *Buffer) Ptr() *Buffer { return b }
+
+// Deref returns a copy of the Buffer value. Useful for converting from a
+// pointer back to a value.
+func (b Buffer) Deref() Buffer { return b }

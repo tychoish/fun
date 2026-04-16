@@ -849,3 +849,57 @@ func TestMutable_PushBytePushString(t *testing.T) {
 		t.Errorf("WriteByte('x')=%q != PushString(\"x\")=%q", a, b)
 	}
 }
+
+func TestMutable_Truncate(t *testing.T) {
+	runMutCases(t, []mutCase{
+		{"mid", func(m *Mutable) { m.PushString("hello"); m.Truncate(3) }, "hel"},
+		{"zero", func(m *Mutable) { m.PushString("hello"); m.Truncate(0) }, ""},
+		{"beyond end", func(m *Mutable) { m.PushString("hello"); m.Truncate(100) }, "hell"},
+		{"empty noop", func(m *Mutable) { m.Truncate(3) }, ""},
+		{"full length minus one", func(m *Mutable) { m.PushString("hello"); m.Truncate(4) }, "hell"},
+	})
+}
+
+func TestMutable_Ptr(t *testing.T) {
+	var m Mutable
+	m.PushString("hello")
+
+	p := m.Ptr()
+	if p != &m {
+		t.Error("Ptr() did not return the receiver pointer")
+	}
+	if p.String() != "hello" {
+		t.Errorf("Ptr().String() = %q, want \"hello\"", p.String())
+	}
+
+	// Mutations via the pointer are reflected in the original.
+	p.PushString(" world")
+	if m.String() != "hello world" {
+		t.Errorf("after mutating via Ptr(), m.String() = %q, want \"hello world\"", m.String())
+	}
+}
+
+func TestMutable_Deref(t *testing.T) {
+	var m Mutable
+	m.PushString("hello")
+
+	// Deref on a value returns a copy with the same content.
+	cp := m.Deref()
+	if cp.String() != "hello" {
+		t.Errorf("Deref() = %q, want \"hello\"", cp.String())
+	}
+
+	// Deref on a pointer (auto-deref) also returns a copy.
+	cp2 := m.Ptr().Deref()
+	if cp2.String() != "hello" {
+		t.Errorf("Ptr().Deref() = %q, want \"hello\"", cp2.String())
+	}
+
+	// The copy shares the underlying array (slice semantics), so appending to
+	// the copy beyond capacity may diverge. Verify content independence by
+	// checking that a reslice of the copy does not affect the original.
+	cp.PushString(" world")
+	if m.String() != "hello" {
+		t.Errorf("original modified after appending to Deref() copy: m.String() = %q", m.String())
+	}
+}

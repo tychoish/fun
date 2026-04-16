@@ -82,9 +82,7 @@ func (mut Mutable) Format(state fmt.State, _ rune) { _, _ = state.Write(mut) }
 
 // ref returns the Mutable value itself, used internally for capacity
 // checks.
-func (mut Mutable) ref() Mutable       { return mut }
-func (mut Mutable) ptr() *Mutable      { return &mut }
-func (mut *Mutable) pushref(m Mutable) { mut.Push(m.ptr()) }
+func (mut Mutable) ref() Mutable { return mut }
 
 // Push appends the contents of 'next' to this mutable string,
 // mutating in place. May allocate if capacity is insufficient.
@@ -828,3 +826,11 @@ func (mut *Mutable) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) *Mutable {
 func (mut *Mutable) Join(mutables []Mutable, sep Mutable) *Mutable {
 	return mut.ExtendJoin(slices.Values(mutables), sep)
 }
+
+// Ptr returns the receiver pointer. Useful for obtaining a *Mutable from
+// within a method chain that operates on *Mutable values.
+func (mut *Mutable) Ptr() *Mutable { return mut }
+
+// Deref returns a copy of the Mutable value. Useful for converting from a
+// pointer back to a value.
+func (mut Mutable) Deref() Mutable { return mut }

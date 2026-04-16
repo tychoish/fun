@@ -419,3 +419,22 @@ func TestBuilder_Mutable(t *testing.T) {
 		t.Errorf("Mutable() len = %d, want 5", m.Len())
 	}
 }
+
+func TestBuilder_Ptr(t *testing.T) {
+	var b Builder
+	b.WriteString("hello")
+
+	p := b.Ptr()
+	if p != &b {
+		t.Error("Ptr() did not return the receiver pointer")
+	}
+	if p.String() != "hello" {
+		t.Errorf("Ptr().String() = %q, want \"hello\"", p.String())
+	}
+
+	// Mutations via the pointer are reflected in the original.
+	p.WriteString(" world")
+	if b.String() != "hello world" {
+		t.Errorf("after mutating via Ptr(), b.String() = %q, want \"hello world\"", b.String())
+	}
+}

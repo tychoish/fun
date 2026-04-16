@@ -33,6 +33,7 @@ func TestJoinerConstructors(t *testing.T) {
 		{"DoubleSpace", JOIN.WithDoubleSpace(), "  "},
 		{"Tab", JOIN.WithTab(), "\t"},
 		{"Line", JOIN.WithLine(), "\n"},
+		{"DoubleLine", JOIN.WithDoubleLine(), "\n\n"},
 		{"Concat", JOIN.WithConcat(), ""},
 		{"Underscore", JOIN.WithUnderscore(), "_"},
 		{"Dash", JOIN.WithDash(), "-"},

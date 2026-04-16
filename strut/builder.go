@@ -279,6 +279,10 @@ func (b *Builder) WithTrimRight(str string, cut string) { b.PushString(strings.T
 // 'cut' removed to the builder.
 func (b *Builder) WithTrimLeft(str string, cut string) { b.PushString(strings.TrimLeft(str, cut)) }
 
+// WithTrim writes 'str' with all leading and trailing UTF-8-encoded code
+// points contained in 'cut' removed to the builder.
+func (b *Builder) WithTrim(str string, cut string) { b.PushString(strings.Trim(str, cut)) }
+
 // WithTrimPrefix writes 's' with the leading 'prefix' string removed to
 // the builder. If 's' doesn't start with 'prefix', 's' is written
 // unchanged.
@@ -320,6 +324,12 @@ func (b *Builder) PushTrimRight(str []byte, cut string) { b.Write(bytes.TrimRigh
 // a transformed copy is written. This is the byte slice equivalent of
 // WithTrimLeft.
 func (b *Builder) PushTrimLeft(str []byte, cut string) { b.Write(bytes.TrimLeft(str, cut)) }
+
+// PushTrim writes the byte slice 'str' with all leading and trailing
+// UTF-8-encoded code points contained in 'cut' removed to the builder. The
+// input 'str' is not modified; a transformed copy is written. This is the
+// byte slice equivalent of WithTrim.
+func (b *Builder) PushTrim(str []byte, cut string) { b.Write(bytes.Trim(str, cut)) }
 
 // PushTrimPrefix writes the byte slice 's' with the leading 'prefix'
 // removed to the builder. If 's' doesn't start with 'prefix', 's' is written
@@ -428,3 +438,7 @@ func (b *Builder) Println() { b.Print(); _, _ = os.Stdout.Write(newline) }
 
 // Mutable returns the builder's contents as a Mutable byte slice.
 func (b *Builder) Mutable() Mutable { return Mutable(b.Bytes()) }
+
+// Ptr returns the receiver pointer. Useful for obtaining a *Builder from
+// within a method chain that operates on *Builder values.
+func (b *Builder) Ptr() *Builder { return b }

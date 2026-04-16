@@ -497,3 +497,54 @@ func TestBuffer_Mutable(t *testing.T) {
 		t.Errorf("Mutable() len = %d, want 5", m.Len())
 	}
 }
+
+func TestBuffer_Resolve(t *testing.T) {
+	b := MakeBuffer(32)
+	b.WriteString("hello")
+	got := b.Resolve()
+	if got != "hello" {
+		t.Errorf("Resolve() = %q, want \"hello\"", got)
+	}
+}
+
+func TestBuffer_Ptr(t *testing.T) {
+	var b Buffer
+	b.WriteString("hello")
+
+	p := b.Ptr()
+	if p != &b {
+		t.Error("Ptr() did not return the receiver pointer")
+	}
+	if p.String() != "hello" {
+		t.Errorf("Ptr().String() = %q, want \"hello\"", p.String())
+	}
+
+	// Mutations via the pointer are reflected in the original.
+	p.WriteString(" world")
+	if b.String() != "hello world" {
+		t.Errorf("after mutating via Ptr(), b.String() = %q, want \"hello world\"", b.String())
+	}
+}
+
+func TestBuffer_Deref(t *testing.T) {
+	var b Buffer
+	b.WriteString("hello")
+
+	// Deref on a value returns a copy.
+	cp := b.Deref()
+	if cp.String() != "hello" {
+		t.Errorf("Deref() = %q, want \"hello\"", cp.String())
+	}
+
+	// Deref on a pointer (auto-deref) also returns a copy.
+	cp2 := b.Ptr().Deref()
+	if cp2.String() != "hello" {
+		t.Errorf("Ptr().Deref() = %q, want \"hello\"", cp2.String())
+	}
+
+	// The copy is independent: mutating the copy does not affect the original.
+	cp.WriteString(" world")
+	if b.String() != "hello" {
+		t.Errorf("original modified after mutating Deref() copy: b.String() = %q", b.String())
+	}
+}

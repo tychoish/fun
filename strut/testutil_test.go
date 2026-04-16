@@ -52,6 +52,7 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	PushFloat(float64, byte, int, int)
 	PushComplex(complex128, byte, int, int)
 	WithTrimSpace(string)
+	WithTrim(string, string)
 	WithTrimRight(string, string)
 	WithTrimLeft(string, string)
 	WithTrimPrefix(string, string)
@@ -70,6 +71,7 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	PushQuoteRuneASCII(rune)
 	PushQuoteRuneGrapic(rune)
 	PushTrimSpace([]byte)
+	PushTrim([]byte, string)
 	PushTrimRight([]byte, string)
 	PushTrimLeft([]byte, string)
 	PushTrimPrefix([]byte, []byte)
@@ -982,6 +984,20 @@ func trimTests[T stringWriter[T]]() []testCase[T] {
 			expected: "hello",
 		},
 		{
+			name: "Trim both sides",
+			buildFn: func(w T) {
+				w.WithTrim("!!!hello!!!", "!")
+			},
+			expected: "hello",
+		},
+		{
+			name: "Trim multiple chars",
+			buildFn: func(w T) {
+				w.WithTrim("123hello321", "321")
+			},
+			expected: "hello",
+		},
+		{
 			name: "TrimRight",
 			buildFn: func(w T) {
 				w.WithTrimRight("hello!!!", "!")
@@ -1313,6 +1329,20 @@ func appendTrimTests[T stringWriter[T]]() []testCase[T] {
 				w.PushTrimSpace([]byte("   "))
 			},
 			expected: "",
+		},
+		{
+			name: "PushTrim both sides",
+			buildFn: func(w T) {
+				w.PushTrim([]byte("!!!hello!!!"), "!")
+			},
+			expected: "hello",
+		},
+		{
+			name: "PushTrim multiple chars",
+			buildFn: func(w T) {
+				w.PushTrim([]byte("123hello321"), "321")
+			},
+			expected: "hello",
 		},
 		{
 			name: "PushTrimRight",

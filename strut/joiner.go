@@ -223,8 +223,6 @@ func (sj Joiner) BufferSeq(rs iter.Seq[*Buffer]) *Buffer {
 	return out
 }
 
-func lenSeps(sep string, num int) int { return len(sep) * max(0, num-1) }
-
 // BufferSlice joins the content of the provided Buffer slice (by value) with
 // the separator, returning a new pooled Buffer. The output capacity is
 // pre-calculated. Note that Buffer values are copied into the slice parameter;
@@ -335,9 +333,11 @@ func (sj Joiner) ReaderSeq(rs iter.Seq[io.Reader]) io.Reader {
 // behaviour and edge cases.
 func (sj Joiner) ReaderSlice(rs []io.Reader) io.Reader { return joinReaders(sj.sep, rs) }
 
-////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////
 //
 // helpers --
+
+func lenSeps(sep string, num int) int { return len(sep) * max(0, num-1) }
 
 func totalLen[E string | []byte, S ~[]E](sl S) (size int) {
 	for _, str := range sl {
