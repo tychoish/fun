@@ -63,6 +63,18 @@ func (JoinConstructors) WithComma() Joiner { return Joiner{sep: ","} }
 // WithSemiColon returns a Joiner that separates elements with a semicolon (";").
 func (JoinConstructors) WithSemiColon() Joiner { return Joiner{sep: ";"} }
 
+// WithDot returns a Joiner that separates elements with a period (".").
+func (JoinConstructors) WithDot() Joiner { return Joiner{sep: "."} }
+
+// WithSlash returns a Joiner that separates elements with a forward slash ("/").
+func (JoinConstructors) WithSlash() Joiner { return Joiner{sep: "/"} }
+
+// WithPipe returns a Joiner that separates elements with a pipe character ("|").
+func (JoinConstructors) WithPipe() Joiner { return Joiner{sep: "|"} }
+
+// WithColon returns a Joiner that separates elements with a colon (":").
+func (JoinConstructors) WithColon() Joiner { return Joiner{sep: ":"} }
+
 // With returns a Joiner that uses sep as the separator between elements.
 // sep may be any string, including empty (equivalent to WithConcat) or
 // multi-character.

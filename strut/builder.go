@@ -216,10 +216,10 @@ func (b *Builder) PushQuote(str string) { b.Write(strconv.AppendQuote(nil, str))
 // sequences.
 func (b *Builder) PushQuoteASCII(str string) { b.Write(strconv.AppendQuoteToASCII(nil, str)) }
 
-// PushQuoteGrapic writes a double-quoted Go string literal representing
+// PushQuoteGraphic writes a double-quoted Go string literal representing
 // 'str' to the builder. Non-graphic characters as defined by
 // unicode.IsGraphic are escaped.
-func (b *Builder) PushQuoteGrapic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
+func (b *Builder) PushQuoteGraphic(str string) { b.Write(strconv.AppendQuoteToGraphic(nil, str)) }
 
 // PushQuoteRune writes a single-quoted Go character literal representing
 // 'r' to the builder. The output includes surrounding single quotes and uses
@@ -231,10 +231,10 @@ func (b *Builder) PushQuoteRune(r rune) { b.Write(strconv.AppendQuoteRune(nil, r
 // or \U sequences.
 func (b *Builder) PushQuoteRuneASCII(r rune) { b.Write(strconv.AppendQuoteRuneToASCII(nil, r)) }
 
-// PushQuoteRuneGrapic writes a single-quoted Go character literal
+// PushQuoteRuneGraphic writes a single-quoted Go character literal
 // representing 'r' to the builder. Non-graphic characters as defined by
 // unicode.IsGraphic are escaped.
-func (b *Builder) PushQuoteRuneGrapic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
+func (b *Builder) PushQuoteRuneGraphic(r rune) { b.Write(strconv.AppendQuoteRuneToGraphic(nil, r)) }
 
 // PushInt writes the  string representation of the integer 'num' to the builder.
 func (b *Builder) PushInt(num int) { b.Write(strconv.AppendInt(nil, int64(num), 10)) }
@@ -435,6 +435,17 @@ func (b *Builder) Print() { _, _ = io.WriteString(os.Stdout, b.String()) }
 
 // Println writes the builder's contents to standard output followed by a newline.
 func (b *Builder) Println() { b.Print(); _, _ = os.Stdout.Write(newline) }
+
+// WriteTo writes the builder's contents to w and returns the number of bytes
+// written. Implements io.WriterTo.
+func (b *Builder) WriteTo(w io.Writer) (int64, error) {
+	n, err := io.WriteString(w, b.String())
+	return int64(n), err
+}
+
+// MarshalText implements encoding.TextMarshaler. Returns the builder's current
+// contents as a byte slice.
+func (b *Builder) MarshalText() ([]byte, error) { return b.Bytes(), nil }
 
 // Mutable returns the builder's contents as a Mutable byte slice.
 func (b *Builder) Mutable() Mutable { return Mutable(b.Bytes()) }

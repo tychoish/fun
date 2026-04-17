@@ -567,6 +567,35 @@ func (m *Builder) StrikethroughWords(parts ...string) *Builder {
 // Link writes [text](url) to the builder.
 func (m *Builder) Link(text, url string) *Builder { m.Concat("[", text, "](", url, ")"); return m }
 
+// Image writes ![altText](url) to the builder.
+func (m *Builder) Image(altText, url string) *Builder {
+	m.Concat("![", altText, "](", url, ")")
+	return m
+}
+
+// HorizontalRule writes a horizontal rule (---) followed by a blank line.
+func (m *Builder) HorizontalRule() *Builder { m.PushString("---"); m.NLines(2); return m }
+
+// TaskListItem writes a GitHub-Flavored Markdown task list item. If done is
+// true it writes "- [x] item", otherwise "- [ ] item". Multiple parts are
+// concatenated directly without a separator. For space-joined words use
+// TaskListItemWords.
+func (m *Builder) TaskListItem(done bool, item ...string) *Builder {
+	if done {
+		m.PushString("- [x] ")
+	} else {
+		m.PushString("- [ ] ")
+	}
+	m.Concat(item...)
+	m.Line()
+	return m
+}
+
+// TaskListItemWords writes a task list item with parts joined by a single space.
+func (m *Builder) TaskListItemWords(done bool, words ...string) *Builder {
+	return m.TaskListItem(done, strings.Join(words, " "))
+}
+
 // NewTable creates a Table attached to this Builder. Call Row on the
 // returned builder to accumulate rows, then Build to render the table and
 // resume chaining on Builder.

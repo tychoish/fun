@@ -219,13 +219,13 @@ func TestBuilder_AllPushQuoteMethods(t *testing.T) {
 	b.WriteByte(' ')
 	b.PushQuoteASCII("世")
 	b.WriteByte(' ')
-	b.PushQuoteGrapic("\x00")
+	b.PushQuoteGraphic("\x00")
 	b.WriteByte(' ')
 	b.PushQuoteRune('a')
 	b.WriteByte(' ')
 	b.PushQuoteRuneASCII('世')
 	b.WriteByte(' ')
-	b.PushQuoteRuneGrapic('\n')
+	b.PushQuoteRuneGraphic('\n')
 
 	result := b.String()
 	if !strings.Contains(result, `"test"`) {
@@ -436,5 +436,33 @@ func TestBuilder_Ptr(t *testing.T) {
 	p.WriteString(" world")
 	if b.String() != "hello world" {
 		t.Errorf("after mutating via Ptr(), b.String() = %q, want \"hello world\"", b.String())
+	}
+}
+
+func TestBuilder_WriteTo(t *testing.T) {
+	var b Builder
+	b.PushString("hello world")
+	var dst bytes.Buffer
+	n, err := b.WriteTo(&dst)
+	if err != nil {
+		t.Fatalf("WriteTo() error = %v", err)
+	}
+	if n != 11 {
+		t.Errorf("WriteTo() n = %d, want 11", n)
+	}
+	if dst.String() != "hello world" {
+		t.Errorf("WriteTo() dst = %q, want \"hello world\"", dst.String())
+	}
+}
+
+func TestBuilder_MarshalText(t *testing.T) {
+	var b Builder
+	b.PushString("hello")
+	data, err := b.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText() error = %v", err)
+	}
+	if string(data) != "hello" {
+		t.Errorf("MarshalText() = %q, want \"hello\"", data)
 	}
 }

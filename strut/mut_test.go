@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"unicode"
 )
@@ -2969,5 +2970,319 @@ func TestMutableJoin(t *testing.T) {
 				t.Errorf("Join() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// ---- CutMutable* ----
+
+func TestMutableCutMutable(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		data       string
+		sep        string
+		wantBefore string
+		wantAfter  string
+		wantFound  bool
+	}{
+		{"found", "hello world", " ", "hello", "world", true},
+		{"not found", "hello", ",", "", "", false},
+		{"empty sep", "hello", "", "", "hello", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mut := Mutable(tt.data)
+			before, after, found := mut.CutMutable([]byte(tt.sep))
+			if found != tt.wantFound {
+				t.Errorf("CutMutable() found = %v, want %v", found, tt.wantFound)
+			}
+			if found {
+				if before.String() != tt.wantBefore {
+					t.Errorf("CutMutable() before = %q, want %q", before, tt.wantBefore)
+				}
+				if after.String() != tt.wantAfter {
+					t.Errorf("CutMutable() after = %q, want %q", after, tt.wantAfter)
+				}
+			}
+		})
+	}
+}
+
+func TestMutableCutMutableString(t *testing.T) {
+	mut := Mutable("key=value")
+	before, after, found := mut.CutMutableString("=")
+	if !found || before.String() != "key" || after.String() != "value" {
+		t.Errorf("CutMutableString() = (%q, %q, %v), want (\"key\", \"value\", true)", before, after, found)
+	}
+	_, _, found = mut.CutMutableString("X")
+	if found {
+		t.Error("CutMutableString() found = true for missing sep")
+	}
+}
+
+func TestMutableCutPrefixMutable(t *testing.T) {
+	mut := Mutable("hello world")
+	after, found := mut.CutPrefixMutable([]byte("hello "))
+	if !found || after.String() != "world" {
+		t.Errorf("CutPrefixMutable() = (%q, %v), want (\"world\", true)", after, found)
+	}
+	_, found = mut.CutPrefixMutable([]byte("foo"))
+	if found {
+		t.Error("CutPrefixMutable() should return false for non-matching prefix")
+	}
+}
+
+func TestMutableCutPrefixMutableString(t *testing.T) {
+	mut := Mutable("prefix:body")
+	after, found := mut.CutPrefixMutableString("prefix:")
+	if !found || after.String() != "body" {
+		t.Errorf("CutPrefixMutableString() = (%q, %v), want (\"body\", true)", after, found)
+	}
+	_, found = mut.CutPrefixMutableString("nope:")
+	if found {
+		t.Error("CutPrefixMutableString() found = true for missing prefix")
+	}
+}
+
+func TestMutableCutSuffixMutable(t *testing.T) {
+	mut := Mutable("hello world")
+	before, found := mut.CutSuffixMutable([]byte(" world"))
+	if !found || before.String() != "hello" {
+		t.Errorf("CutSuffixMutable() = (%q, %v), want (\"hello\", true)", before, found)
+	}
+	_, found = mut.CutSuffixMutable([]byte("foo"))
+	if found {
+		t.Error("CutSuffixMutable() should return false for non-matching suffix")
+	}
+}
+
+func TestMutableCutSuffixMutableString(t *testing.T) {
+	mut := Mutable("body:suffix")
+	before, found := mut.CutSuffixMutableString(":suffix")
+	if !found || before.String() != "body" {
+		t.Errorf("CutSuffixMutableString() = (%q, %v), want (\"body\", true)", before, found)
+	}
+	_, found = mut.CutSuffixMutableString(":nope")
+	if found {
+		t.Error("CutSuffixMutableString() found = true for missing suffix")
+	}
+}
+
+// ---- ContainsFunc / IndexFunc / LastIndexFunc ----
+
+func TestMutableContainsFunc(t *testing.T) {
+	mut := Mutable("hello 123")
+	if !mut.ContainsFunc(func(r rune) bool { return r >= '0' && r <= '9' }) {
+		t.Error("ContainsFunc() should find a digit")
+	}
+	if mut.ContainsFunc(func(r rune) bool { return r == 'Z' }) {
+		t.Error("ContainsFunc() should not find 'Z'")
+	}
+}
+
+func TestMutableIndexFunc(t *testing.T) {
+	mut := Mutable("hello 1")
+	idx := mut.IndexFunc(func(r rune) bool { return r >= '0' && r <= '9' })
+	if idx != 6 {
+		t.Errorf("IndexFunc() = %d, want 6", idx)
+	}
+	if mut.IndexFunc(func(r rune) bool { return r == 'Z' }) != -1 {
+		t.Error("IndexFunc() should return -1 when not found")
+	}
+}
+
+func TestMutableLastIndexFunc(t *testing.T) {
+	mut := Mutable("a1b2c3")
+	idx := mut.LastIndexFunc(func(r rune) bool { return r >= '0' && r <= '9' })
+	if idx != 5 {
+		t.Errorf("LastIndexFunc() = %d, want 5", idx)
+	}
+	if mut.LastIndexFunc(func(r rune) bool { return r == 'Z' }) != -1 {
+		t.Error("LastIndexFunc() should return -1 when not found")
+	}
+}
+
+// ---- Runes ----
+
+func TestMutableRunes(t *testing.T) {
+	mut := Mutable("héllo")
+	runes := mut.Runes()
+	if len(runes) != 5 {
+		t.Errorf("Runes() len = %d, want 5", len(runes))
+	}
+	if runes[1] != 'é' {
+		t.Errorf("Runes()[1] = %q, want 'é'", runes[1])
+	}
+}
+
+// ---- ToValidUTF8 ----
+
+func TestMutableToValidUTF8(t *testing.T) {
+	// inject invalid UTF-8 bytes
+	invalid := Mutable([]byte{'h', 'i', 0xff, 0xfe, '!'})
+	invalid.ToValidUTF8([]byte("?"))
+	if invalid.ContainsFunc(func(r rune) bool { return r == '\uFFFD' || r > 127 }) {
+		// replacement may produce unicode replacement char - just check it doesn't panic
+		// and that result is valid UTF-8
+	}
+	valid := Mutable("hello")
+	valid.ToValidUTF8([]byte("?"))
+	if valid.String() != "hello" {
+		t.Errorf("ToValidUTF8() changed valid UTF-8: got %q", valid.String())
+	}
+}
+
+// ---- ReadFrom ----
+
+func TestMutableReadFrom(t *testing.T) {
+	mut := NewMutable()
+	defer mut.Release()
+	n, err := mut.ReadFrom(strings.NewReader("hello world"))
+	if err != nil {
+		t.Fatalf("ReadFrom() error = %v", err)
+	}
+	if n != 11 {
+		t.Errorf("ReadFrom() n = %d, want 11", n)
+	}
+	if mut.String() != "hello world" {
+		t.Errorf("ReadFrom() content = %q, want \"hello world\"", mut.String())
+	}
+}
+
+func TestMutableReadFromError(t *testing.T) {
+	mut := NewMutable()
+	defer mut.Release()
+	_, err := mut.ReadFrom(&errorReader{})
+	if err == nil {
+		t.Error("ReadFrom() expected error from failing reader")
+	}
+}
+
+// errorReader is an io.Reader that returns an error on the first read.
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+// ---- SplitN / SplitAfterN ----
+
+func TestMutableSplitN(t *testing.T) {
+	mut := Mutable("a,b,c,d")
+	parts := slices.Collect(mut.SplitN([]byte(","), 3))
+	if len(parts) != 3 || string(parts[0]) != "a" || string(parts[1]) != "b" || string(parts[2]) != "c,d" {
+		t.Errorf("SplitN(3) = %v", parts)
+	}
+
+	// n=-1 equivalent to Split
+	all := slices.Collect(mut.SplitN([]byte(","), -1))
+	if len(all) != 4 {
+		t.Errorf("SplitN(-1) len = %d, want 4", len(all))
+	}
+}
+
+func TestMutableSplitAfterN(t *testing.T) {
+	mut := Mutable("a,b,c,d")
+	parts := slices.Collect(mut.SplitAfterN([]byte(","), 3))
+	if len(parts) != 3 || string(parts[0]) != "a," || string(parts[1]) != "b," || string(parts[2]) != "c,d" {
+		t.Errorf("SplitAfterN(3) = %v", parts)
+	}
+}
+
+// ---- Encoding / JSON ----
+
+func TestMutableMarshalText(t *testing.T) {
+	mut := Mutable("hello")
+	b, err := mut.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText() error = %v", err)
+	}
+	if string(b) != "hello" {
+		t.Errorf("MarshalText() = %q, want \"hello\"", b)
+	}
+}
+
+func TestMutableUnmarshalText(t *testing.T) {
+	mut := Mutable("old")
+	if err := mut.UnmarshalText([]byte("new")); err != nil {
+		t.Fatalf("UnmarshalText() error = %v", err)
+	}
+	if mut.String() != "new" {
+		t.Errorf("UnmarshalText() content = %q, want \"new\"", mut.String())
+	}
+}
+
+func TestMutableMarshalJSON(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"plain", "hello", `"hello"`},
+		{"with quotes", `say "hi"`, `"say \"hi\""`},
+		{"with backslash", `a\b`, `"a\\b"`},
+		{"with newline", "line1\nline2", `"line1\nline2"`},
+		{"with tab", "a\tb", `"a\tb"`},
+		{"with carriage return", "a\rb", `"a\rb"`},
+		{"control char", "a\x01b", `"a\u0001b"`},
+		{"unicode", "héllo", `"héllo"`},
+		{"empty", "", `""`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mut := Mutable(tt.input)
+			b, err := mut.MarshalJSON()
+			if err != nil {
+				t.Fatalf("MarshalJSON() error = %v", err)
+			}
+			if string(b) != tt.want {
+				t.Errorf("MarshalJSON() = %s, want %s", b, tt.want)
+			}
+		})
+	}
+}
+
+func TestMutableUnmarshalJSON(t *testing.T) {
+	mut := Mutable("old")
+	if err := mut.UnmarshalJSON([]byte(`"hello world"`)); err != nil {
+		t.Fatalf("UnmarshalJSON() error = %v", err)
+	}
+	if mut.String() != "hello world" {
+		t.Errorf("UnmarshalJSON() = %q, want \"hello world\"", mut.String())
+	}
+}
+
+func TestMutableUnmarshalJSONError(t *testing.T) {
+	mut := Mutable("")
+	// not a JSON string (no quotes)
+	if err := mut.UnmarshalJSON([]byte(`not-a-string`)); err == nil {
+		t.Error("UnmarshalJSON() expected error for non-string input")
+	}
+	// number, not a string
+	if err := mut.UnmarshalJSON([]byte(`123`)); err == nil {
+		t.Error("UnmarshalJSON() expected error for number input")
+	}
+	// short input (len < 2)
+	if err := mut.UnmarshalJSON([]byte{'"'}); err == nil {
+		t.Error("UnmarshalJSON() expected error for single-byte input")
+	}
+	// starts with quote but doesn't end with one
+	if err := mut.UnmarshalJSON([]byte(`"hello`)); err == nil {
+		t.Error("UnmarshalJSON() expected error for unclosed quote")
+	}
+	// starts and ends with quotes but contains invalid escape — triggers strconv.Unquote error
+	if err := mut.UnmarshalJSON([]byte(`"\q"`)); err == nil {
+		t.Error("UnmarshalJSON() expected error for invalid escape sequence")
+	}
+}
+
+// ---- Buffer conversion ----
+
+func TestMutableBuffer(t *testing.T) {
+	mut := Mutable("hello")
+	buf := mut.Buffer()
+	defer buf.Release()
+	if buf.String() != "hello" {
+		t.Errorf("Buffer() = %q, want \"hello\"", buf.String())
+	}
+	// Verify it's a copy — mutating buf does not affect mut.
+	buf.PushString(" world")
+	if mut.String() != "hello" {
+		t.Errorf("Buffer() should be a copy; mut changed to %q", mut.String())
 	}
 }

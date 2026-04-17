@@ -397,11 +397,11 @@ func TestMutable_PushQuoteASCII(t *testing.T) {
 	})
 }
 
-func TestMutable_PushQuoteGrapic(t *testing.T) {
+func TestMutable_PushQuoteGraphic(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"simple", func(m *Mutable) { m.PushQuoteGrapic("hello") }, `"hello"`},
-		{"control char", func(m *Mutable) { m.PushQuoteGrapic("hi\x00") }, `"hi\x00"`},
-		{"empty", func(m *Mutable) { m.PushQuoteGrapic("") }, `""`},
+		{"simple", func(m *Mutable) { m.PushQuoteGraphic("hello") }, `"hello"`},
+		{"control char", func(m *Mutable) { m.PushQuoteGraphic("hi\x00") }, `"hi\x00"`},
+		{"empty", func(m *Mutable) { m.PushQuoteGraphic("") }, `""`},
 	})
 }
 
@@ -422,11 +422,11 @@ func TestMutable_PushQuoteRuneASCII(t *testing.T) {
 	})
 }
 
-func TestMutable_PushQuoteRuneGrapic(t *testing.T) {
+func TestMutable_PushQuoteRuneGraphic(t *testing.T) {
 	runMutCases(t, []mutCase{
-		{"printable", func(m *Mutable) { m.PushQuoteRuneGrapic('a') }, "'a'"},
-		{"control char", func(m *Mutable) { m.PushQuoteRuneGrapic('\x00') }, `'\x00'`},
-		{"emoji", func(m *Mutable) { m.PushQuoteRuneGrapic('🎉') }, "'🎉'"},
+		{"printable", func(m *Mutable) { m.PushQuoteRuneGraphic('a') }, "'a'"},
+		{"control char", func(m *Mutable) { m.PushQuoteRuneGraphic('\x00') }, `'\x00'`},
+		{"emoji", func(m *Mutable) { m.PushQuoteRuneGraphic('🎉') }, "'🎉'"},
 	})
 }
 

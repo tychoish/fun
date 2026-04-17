@@ -7,6 +7,7 @@ import (
 	"iter"
 	"os"
 	"slices"
+	"strconv"
 	"sync"
 	"unicode"
 	"unicode/utf8"
@@ -347,6 +348,107 @@ func (mut Mutable) CutSuffix(suffix []byte) (before []byte, found bool) {
 // ending 'suffix' and reports whether it found the suffix.
 func (mut Mutable) CutSuffixString(suffix string) (before []byte, found bool) {
 	return bytes.CutSuffix(mut, []byte(suffix))
+}
+
+// CutMutable slices the mutable string around the first instance of sep,
+// returning the text before and after sep as Mutable values. Unlike Cut,
+// the returned values are Mutable so callers can continue operating on them
+// without a type conversion.
+func (mut Mutable) CutMutable(sep []byte) (before, after Mutable, found bool) {
+	b, a, ok := bytes.Cut(mut, sep)
+	return Mutable(b), Mutable(a), ok
+}
+
+// CutMutableString slices the mutable string around the first instance of
+// sep, returning before and after as Mutable values.
+func (mut Mutable) CutMutableString(sep string) (before, after Mutable, found bool) {
+	b, a, ok := bytes.Cut(mut, []byte(sep))
+	return Mutable(b), Mutable(a), ok
+}
+
+// CutPrefixMutable returns the mutable string without the provided leading
+// prefix as a Mutable value. Unlike CutPrefix, the result does not require
+// a type conversion to use as Mutable.
+func (mut Mutable) CutPrefixMutable(prefix []byte) (after Mutable, found bool) {
+	a, ok := bytes.CutPrefix(mut, prefix)
+	return Mutable(a), ok
+}
+
+// CutPrefixMutableString returns the mutable string without the provided
+// leading prefix string as a Mutable value.
+func (mut Mutable) CutPrefixMutableString(prefix string) (after Mutable, found bool) {
+	a, ok := bytes.CutPrefix(mut, []byte(prefix))
+	return Mutable(a), ok
+}
+
+// CutSuffixMutable returns the mutable string without the provided trailing
+// suffix as a Mutable value. Unlike CutSuffix, the result does not require
+// a type conversion to use as Mutable.
+func (mut Mutable) CutSuffixMutable(suffix []byte) (before Mutable, found bool) {
+	b, ok := bytes.CutSuffix(mut, suffix)
+	return Mutable(b), ok
+}
+
+// CutSuffixMutableString returns the mutable string without the provided
+// trailing suffix string as a Mutable value.
+func (mut Mutable) CutSuffixMutableString(suffix string) (before Mutable, found bool) {
+	b, ok := bytes.CutSuffix(mut, []byte(suffix))
+	return Mutable(b), ok
+}
+
+// ContainsFunc reports whether any UTF-8 encoded code point in the mutable
+// string satisfies f.
+func (mut Mutable) ContainsFunc(f func(rune) bool) bool { return bytes.ContainsFunc(mut, f) }
+
+// IndexFunc returns the byte index of the first UTF-8 encoded code point
+// satisfying f, or -1 if none does.
+func (mut Mutable) IndexFunc(f func(rune) bool) int { return bytes.IndexFunc(mut, f) }
+
+// LastIndexFunc returns the byte index of the last UTF-8 encoded code point
+// satisfying f, or -1 if none does.
+func (mut Mutable) LastIndexFunc(f func(rune) bool) int { return bytes.LastIndexFunc(mut, f) }
+
+// Runes returns a slice of runes decoded from the mutable string.
+func (mut Mutable) Runes() []rune { return []rune(string(mut)) }
+
+// ToValidUTF8 replaces each run of invalid UTF-8 byte sequences in the
+// mutable string with the replacement byte slice, mutating in place.
+func (mut *Mutable) ToValidUTF8(replacement []byte) *Mutable {
+	*mut = bytes.ToValidUTF8(*mut, replacement)
+	return mut
+}
+
+// ReadFrom reads from r until EOF and appends the data to the mutable string.
+// Implements io.ReaderFrom.
+func (mut *Mutable) ReadFrom(r io.Reader) (int64, error) {
+	var total int64
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			*mut = append(*mut, buf[:n]...)
+			total += int64(n)
+		}
+		if err == io.EOF {
+			return total, nil
+		}
+		if err != nil {
+			return total, err
+		}
+	}
+}
+
+// SplitN returns an iterator that yields at most n subslices separated by sep.
+// If n is negative, it is equivalent to Split (no limit). If sep is empty, it
+// splits between each UTF-8 sequence.
+func (mut Mutable) SplitN(sep Mutable, n int) iter.Seq[Mutable] {
+	return wrapSeq(slices.Values(bytes.SplitN(mut, sep, n)))
+}
+
+// SplitAfterN returns an iterator that yields at most n subslices after each
+// instance of sep, with each yielded slice including the separator.
+func (mut Mutable) SplitAfterN(sep Mutable, n int) iter.Seq[Mutable] {
+	return wrapSeq(slices.Values(bytes.SplitAfterN(mut, sep, n)))
 }
 
 // Fields splits the mutable string around each instance of one or
@@ -724,6 +826,74 @@ func (mut Mutable) IsNullTerminated() bool {
 	return len(mut) > 0 && mut[len(mut)-1] == 0
 }
 
+// MarshalText implements encoding.TextMarshaler. Returns the mutable string
+// as a byte slice without allocation (the caller may copy if needed).
+func (mut Mutable) MarshalText() ([]byte, error) { return []byte(mut), nil }
+
+// UnmarshalText implements encoding.TextUnmarshaler. Replaces the mutable
+// string's content with a copy of text.
+func (mut *Mutable) UnmarshalText(text []byte) error {
+	*mut = append((*mut)[:0], text...)
+	return nil
+}
+
+// MarshalJSON implements json.Marshaler. Encodes the mutable string as a
+// JSON string (quoted UTF-8), not as a base64-encoded JSON array — which is
+// the default behavior for []byte types.
+func (mut Mutable) MarshalJSON() ([]byte, error) {
+	out := make([]byte, 0, len(mut)+2)
+	out = append(out, '"')
+	for i := 0; i < len(mut); {
+		b := mut[i]
+		if b < 0x80 {
+			switch b {
+			case '"':
+				out = append(out, '\\', '"')
+			case '\\':
+				out = append(out, '\\', '\\')
+			case '\n':
+				out = append(out, '\\', 'n')
+			case '\r':
+				out = append(out, '\\', 'r')
+			case '\t':
+				out = append(out, '\\', 't')
+			default:
+				if b < 0x20 {
+					out = append(out, '\\', 'u', '0', '0',
+						"0123456789abcdef"[b>>4],
+						"0123456789abcdef"[b&0xf])
+				} else {
+					out = append(out, b)
+				}
+			}
+			i++
+		} else {
+			// Multi-byte UTF-8: copy rune bytes verbatim.
+			_, size := utf8.DecodeRune(mut[i:])
+			out = append(out, mut[i:i+size]...)
+			i += size
+		}
+	}
+	out = append(out, '"')
+	return out, nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler. Expects a JSON string value and
+// sets the mutable string to the unquoted content. Returns an error if the
+// input is not a JSON string.
+func (mut *Mutable) UnmarshalJSON(data []byte) error {
+	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
+		return fmt.Errorf("strut.Mutable.UnmarshalJSON: input is not a JSON string")
+	}
+	// Use strconv.Unquote to handle all JSON escape sequences.
+	s, err := strconv.Unquote(string(data))
+	if err != nil {
+		return fmt.Errorf("strut.Mutable.UnmarshalJSON: %w", err)
+	}
+	*mut = append((*mut)[:0], s...)
+	return nil
+}
+
 // Print writes the contents of the mutable string to standard output.
 func (mut Mutable) Print() { _, _ = os.Stdout.Write(mut) }
 
@@ -825,6 +995,14 @@ func (mut *Mutable) ExtendBytesJoin(seq iter.Seq[[]byte], sep []byte) *Mutable {
 // Delegates to ExtendJoin(slices.Values(mutables), sep).
 func (mut *Mutable) Join(mutables []Mutable, sep Mutable) *Mutable {
 	return mut.ExtendJoin(slices.Values(mutables), sep)
+}
+
+// Buffer returns a new pooled Buffer whose contents are copied from the
+// mutable string. This is the symmetric counterpart of Buffer.Mutable().
+func (mut Mutable) Buffer() *Buffer {
+	b := MakeBuffer(len(mut))
+	b.PushBytes(mut)
+	return b
 }
 
 // Ptr returns the receiver pointer. Useful for obtaining a *Mutable from

@@ -66,10 +66,10 @@ type stringWriter[T any] interface { //nolint:interfacebloat
 	WriteBytesLines(...[]byte)
 	PushQuote(string)
 	PushQuoteASCII(string)
-	PushQuoteGrapic(string)
+	PushQuoteGraphic(string)
 	PushQuoteRune(rune)
 	PushQuoteRuneASCII(rune)
-	PushQuoteRuneGrapic(rune)
+	PushQuoteRuneGraphic(rune)
 	PushTrimSpace([]byte)
 	PushTrim([]byte, string)
 	PushTrimRight([]byte, string)
@@ -804,9 +804,9 @@ func pushQuoteTests[T stringWriter[T]]() []testCase[T] {
 			expected: `"\u4e16\u754c"`,
 		},
 		{
-			name: "PushQuoteGrapic",
+			name: "PushQuoteGraphic",
 			buildFn: func(w T) {
-				w.PushQuoteGrapic("hello\x00world")
+				w.PushQuoteGraphic("hello\x00world")
 			},
 			expected: `"hello\x00world"`,
 		},
@@ -839,16 +839,16 @@ func pushQuoteTests[T stringWriter[T]]() []testCase[T] {
 			expected: `'\u4e16'`,
 		},
 		{
-			name: "PushQuoteRuneGrapic newline",
+			name: "PushQuoteRuneGraphic newline",
 			buildFn: func(w T) {
-				w.PushQuoteRuneGrapic('\n')
+				w.PushQuoteRuneGraphic('\n')
 			},
 			expected: `'\n'`,
 		},
 		{
-			name: "PushQuoteRuneGrapic control char",
+			name: "PushQuoteRuneGraphic control char",
 			buildFn: func(w T) {
-				w.PushQuoteRuneGrapic('\x00')
+				w.PushQuoteRuneGraphic('\x00')
 			},
 			expected: `'\x00'`,
 		},

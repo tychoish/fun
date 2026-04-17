@@ -789,3 +789,69 @@ func TestRuneByteOffset(t *testing.T) {
 		}
 	}
 }
+
+func TestHorizontalRule(t *testing.T) {
+	got := build(func(m *Builder) { m.HorizontalRule() })
+	if got != "---\n\n" {
+		t.Errorf("HorizontalRule() = %q, want %q", got, "---\n\n")
+	}
+}
+
+func TestImage(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		altText string
+		url     string
+		want    string
+	}{
+		{"basic", "logo", "https://example.com/logo.png", "![logo](https://example.com/logo.png)"},
+		{"empty alt", "", "https://example.com/img.png", "![](https://example.com/img.png)"},
+		{"empty url", "alt text", "", "![alt text]()"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := build(func(m *Builder) { m.Image(c.altText, c.url) })
+			if got != c.want {
+				t.Errorf("Image() = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+func TestTaskListItem(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		done bool
+		item []string
+		want string
+	}{
+		{"done single", true, []string{"buy milk"}, "- [x] buy milk\n"},
+		{"not done single", false, []string{"buy milk"}, "- [ ] buy milk\n"},
+		{"done multi-part", true, []string{"foo", "bar"}, "- [x] foobar\n"},
+		{"not done empty", false, []string{}, "- [ ] \n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := build(func(m *Builder) { m.TaskListItem(c.done, c.item...) })
+			if got != c.want {
+				t.Errorf("TaskListItem() = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+func TestTaskListItemWords(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		done bool
+		want string
+	}{
+		{"done", true, "- [x] buy milk\n"},
+		{"not done", false, "- [ ] buy milk\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := build(func(m *Builder) { m.TaskListItemWords(c.done, "buy", "milk") })
+			if got != c.want {
+				t.Errorf("TaskListItemWords() = %q, want %q", got, c.want)
+			}
+		})
+	}
+}

@@ -140,8 +140,8 @@ func (mut *Mutable) PushQuote(str string) { *mut = strconv.AppendQuote(*mut, str
 // PushQuoteASCII writes a double-quoted Go string literal for str, escaping non-ASCII.
 func (mut *Mutable) PushQuoteASCII(str string) { *mut = strconv.AppendQuoteToASCII(*mut, str) }
 
-// PushQuoteGrapic writes a double-quoted Go string literal for str, escaping non-graphic chars.
-func (mut *Mutable) PushQuoteGrapic(str string) { *mut = strconv.AppendQuoteToGraphic(*mut, str) }
+// PushQuoteGraphic writes a double-quoted Go string literal for str, escaping non-graphic chars.
+func (mut *Mutable) PushQuoteGraphic(str string) { *mut = strconv.AppendQuoteToGraphic(*mut, str) }
 
 // PushQuoteRune writes a single-quoted Go character literal for r to the mutable.
 func (mut *Mutable) PushQuoteRune(r rune) { *mut = strconv.AppendQuoteRune(*mut, r) }
@@ -151,8 +151,8 @@ func (mut *Mutable) PushQuoteRuneASCII(r rune) {
 	*mut = strconv.AppendQuoteRuneToASCII(*mut, r)
 }
 
-// PushQuoteRuneGrapic writes a single-quoted Go character literal for r, escaping non-graphic chars.
-func (mut *Mutable) PushQuoteRuneGrapic(r rune) {
+// PushQuoteRuneGraphic writes a single-quoted Go character literal for r, escaping non-graphic chars.
+func (mut *Mutable) PushQuoteRuneGraphic(r rune) {
 	*mut = strconv.AppendQuoteRuneToGraphic(*mut, r)
 }
 
