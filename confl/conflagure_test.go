@@ -1246,7 +1246,7 @@ func Test_conflagure_slice_defaults(t *testing.T) {
 
 	t.Run("default discarded when short alias is used first", func(t *testing.T) {
 		type cfg2 struct {
-			Tags []string `default:"debug,info" flag:"tag" short:"t" sep:","`
+			Tags []string `default:"debug,info" flag:"tag" sep:"," short:"t"`
 		}
 		var c cfg2
 		if err := conflagure(newTestFS(), &c, []string{"-t", "warn", "-tag", "error"}); err != nil {
@@ -1297,7 +1297,7 @@ func Test_conflagure_slice_inverted_bool(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Flags []bool `default:"true" flag:"flag" short:"f" sep:""`
+		Flags []bool `default:"true" flag:"flag" sep:"" short:"f"`
 	}
 
 	tests := []struct {
@@ -1472,12 +1472,12 @@ func Test_conflagure_slice_numeric_short_alias(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Ints    []int     `default:"0"     flag:"int"    short:"i" sep:""`
-		Int64s  []int64   `default:"0"     flag:"int64"  short:"I" sep:""`
-		Uints   []uint    `default:"0"     flag:"uint"   short:"u" sep:""`
-		Uint64s []uint64  `default:"0"     flag:"uint64" short:"U" sep:""`
-		Floats  []float64 `default:"0"     flag:"float"  short:"f" sep:""`
-		Bools   []bool    `default:"false" flag:"bool"   short:"b" sep:""`
+		Ints    []int     `default:"0"     flag:"int"    sep:"" short:"i"`
+		Int64s  []int64   `default:"0"     flag:"int64"  sep:"" short:"I"`
+		Uints   []uint    `default:"0"     flag:"uint"   sep:"" short:"u"`
+		Uint64s []uint64  `default:"0"     flag:"uint64" sep:"" short:"U"`
+		Floats  []float64 `default:"0"     flag:"float"  sep:"" short:"f"`
+		Bools   []bool    `default:"false" flag:"bool"   sep:"" short:"b"`
 	}
 
 	var c cfg
@@ -2094,7 +2094,7 @@ func Test_sep_tag_default_splitting(t *testing.T) {
 
 	t.Run("sep colon splits default into three elements", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"a:b:c" sep:":"`
+			Tags []string `default:"a:b:c" flag:"tag" sep:":"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -2107,7 +2107,7 @@ func Test_sep_tag_default_splitting(t *testing.T) {
 
 	t.Run("sep pipe splits default", func(t *testing.T) {
 		type cfg struct {
-			Items []string `flag:"item" default:"x|y|z" sep:"|"`
+			Items []string `default:"x|y|z" flag:"item" sep:"|"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -2120,7 +2120,7 @@ func Test_sep_tag_default_splitting(t *testing.T) {
 
 	t.Run("sep colon on int slice splits default", func(t *testing.T) {
 		type cfg struct {
-			Nums []int `flag:"num" default:"1:2:3" sep:":"`
+			Nums []int `default:"1:2:3" flag:"num" sep:":"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -2133,7 +2133,7 @@ func Test_sep_tag_default_splitting(t *testing.T) {
 
 	t.Run("explicit sep comma behaves same as absent sep for defaults", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"a,b,c" sep:","`
+			Tags []string `default:"a,b,c" flag:"tag" sep:","`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -2146,7 +2146,7 @@ func Test_sep_tag_default_splitting(t *testing.T) {
 
 	t.Run("sep empty string disables default splitting", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"a,b,c" sep:""`
+			Tags []string `default:"a,b,c" flag:"tag" sep:""`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -2160,7 +2160,7 @@ func Test_sep_tag_default_splitting(t *testing.T) {
 
 	t.Run("absent sep tag with non-empty default returns ErrInvalidSpecification", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"debug,info,warn"`
+			Tags []string `default:"debug,info,warn" flag:"tag"`
 		}
 		var c cfg
 		err := conflagure(newTestFS(), &c, nil)
@@ -2245,7 +2245,7 @@ func Test_sep_tag_live_flag_splitting(t *testing.T) {
 
 	t.Run("sep colon with short alias also splits", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" short:"t" sep:":"`
+			Tags []string `flag:"tag" sep:":" short:"t"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-t", "x:y"}); err != nil {
@@ -2273,7 +2273,7 @@ func Test_sep_tag_default_cleared_on_first_invocation(t *testing.T) {
 
 	t.Run("defaults are cleared when first flag invocation occurs", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"a:b" sep:":"`
+			Tags []string `default:"a:b" flag:"tag" sep:":"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-tag", "c:d"}); err != nil {
@@ -2287,7 +2287,7 @@ func Test_sep_tag_default_cleared_on_first_invocation(t *testing.T) {
 
 	t.Run("multiple invocations after clearing accumulate", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"a:b" sep:":" short:"t"`
+			Tags []string `default:"a:b" flag:"tag" sep:":" short:"t"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, []string{"-t", "c:d", "-tag", "e"}); err != nil {
@@ -2301,7 +2301,7 @@ func Test_sep_tag_default_cleared_on_first_invocation(t *testing.T) {
 
 	t.Run("no invocation leaves defaults intact", func(t *testing.T) {
 		type cfg struct {
-			Tags []string `flag:"tag" default:"a:b" sep:":"`
+			Tags []string `default:"a:b" flag:"tag" sep:":"`
 		}
 		var c cfg
 		if err := conflagure(newTestFS(), &c, nil); err != nil {
@@ -3892,7 +3892,7 @@ func Test_narg_until_basic(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Files  []string `flag:"files" narg:"until"`
+		Files  []string `flag:"files"  narg:"until"`
 		Output string   `flag:"output"`
 	}
 
@@ -3945,7 +3945,7 @@ func Test_narg_until_eq_form(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Files  []string `flag:"files" narg:"until"`
+		Files  []string `flag:"files"  narg:"until"`
 		Output string   `flag:"output"`
 	}
 
@@ -3967,7 +3967,7 @@ func Test_narg_until_multiple_fields(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Inputs  []string `flag:"input" narg:"until"`
+		Inputs  []string `flag:"input"  narg:"until"`
 		Outputs []string `flag:"output" narg:"until"`
 	}
 
@@ -4173,7 +4173,7 @@ func Test_narg_until_in_subcommand(t *testing.T) {
 	t.Parallel()
 
 	type sub struct {
-		Files  []string `flag:"files" narg:"until"`
+		Files  []string `flag:"files"  narg:"until"`
 		Output string   `flag:"output"`
 	}
 	type cfg struct {
@@ -4222,7 +4222,7 @@ func Test_narg_until_short_alias(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Files []string `flag:"files" short:"f" narg:"until"`
+		Files []string `flag:"files" narg:"until" short:"f"`
 	}
 
 	var c cfg

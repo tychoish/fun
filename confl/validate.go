@@ -39,45 +39,14 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 
 		// ── struct fields ────────────────────────────────────────────────────
 		if fval.Kind() == reflect.Struct && fval.Type() != timeTimeType {
-			cmdName := field.Tag.Get("cmd")
-			if cmdName != "" {
+			isCmd, handled, err := validateStructField(fs, field, fval, prefix, depth)
+			if err != nil {
+				return err
+			}
+			if isCmd {
 				hasCmdField = true
-				if depth > 0 {
-					return ers.Wrapf(ErrInvalidSpecification,
-						"field %q: nested cmd: tags (subcommands inside subcommands) are not supported",
-						field.Name)
-				}
-				if !field.IsExported() {
-					return ers.Wrapf(ErrInvalidSpecification,
-						"field %q with cmd: tag must be exported", field.Name)
-				}
-				if _, hasFlag := field.Tag.Lookup("flag"); hasFlag {
-					return ers.Wrapf(ErrInvalidSpecification,
-						"field %q has both flag: and cmd: tags; they are mutually exclusive",
-						field.Name)
-				}
-				// Recurse into subcommand struct at depth+1.
-				if err := validateStruct(fs, fval, "", depth+1); err != nil {
-					return err
-				}
-				continue
 			}
-			if !field.IsExported() {
-				if err := validateStruct(fs, fval, prefix, depth); err != nil {
-					return err
-				}
-				continue
-			}
-			if _, ok := fval.Addr().Interface().(flag.Value); ok {
-				// Falls through to leaf handling below.
-			} else {
-				childPrefix := prefix
-				if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
-					childPrefix = joinStr(prefix, ns, ".")
-				}
-				if err := validateStruct(fs, fval, childPrefix, depth); err != nil {
-					return err
-				}
+			if handled {
 				continue
 			}
 		}
@@ -85,33 +54,11 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 		// ── narg tag ─────────────────────────────────────────────────────────
 		name := field.Tag.Get("flag")
 		narg := field.Tag.Get("narg")
-
-		if narg != "" {
-			switch narg {
-			case "rest", "until":
-				// valid values
-			default:
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q has unknown narg value %q (must be \"rest\" or \"until\")",
-					field.Name, narg)
-			}
-			if !field.IsExported() {
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q with narg tag must be exported", field.Name)
-			}
-			if fval.Kind() != reflect.Slice {
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q has narg:%q but is not a slice type (got %s)",
-					field.Name, narg, fval.Kind())
-			}
+		if err := checkNargTags(field, fval, name, narg); err != nil {
+			return err
 		}
 
 		if narg == "rest" {
-			if name != "" {
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q has both narg:\"rest\" and flag: tag; they are mutually exclusive",
-					field.Name)
-			}
 			if restFieldName != "" {
 				return ers.Wrapf(ErrInvalidSpecification,
 					"multiple narg:\"rest\" fields found (%q and %q); only one is allowed per struct",
@@ -121,26 +68,17 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 			continue
 		}
 
-		if narg == "until" && name == "" {
-			return ers.Wrapf(ErrInvalidSpecification,
-				"field %q has narg:\"until\" but no flag: tag; until fields must have a flag: tag",
-				field.Name)
-		}
-
 		if name == "" {
 			continue
 		}
-		if !field.IsExported() {
-			return ers.Wrapf(ErrInvalidSpecification,
-				"field %q with flag tag %q must be exported", field.Name, name)
+		if err := checkExportedFlag(field, name); err != nil {
+			return err
 		}
 
 		// ── sep: tag ─────────────────────────────────────────────────────────
 		sepVal, sepSet := field.Tag.Lookup("sep")
-		if sepSet && fval.Kind() != reflect.Slice {
-			return ers.Wrapf(ErrInvalidSpecification,
-				"field %q has sep: tag but is not a slice type (got %s); sep: is only valid on slice fields",
-				field.Name, fval.Kind())
+		if err := checkSepTag(field, fval, sepSet); err != nil {
+			return err
 		}
 
 		// Slice field with non-empty default but no sep: tag.
@@ -191,6 +129,46 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 	}
 
 	return nil
+}
+
+// validateStructField handles a struct-kinded field during validateStruct
+// traversal. Returns (hasCmdField, handled, err):
+//   - hasCmdField: true when a cmd: tag was found on this field
+//   - handled: true when the caller should continue to the next field
+//   - err: non-nil on a validation failure
+func validateStructField(fs *flag.FlagSet, field reflect.StructField, fval reflect.Value, prefix string, depth int) (hasCmdField, handled bool, err error) {
+	cmdName := field.Tag.Get("cmd")
+	if cmdName != "" {
+		if depth > 0 {
+			return false, false, ers.Wrapf(ErrInvalidSpecification,
+				"field %q: nested cmd: tags (subcommands inside subcommands) are not supported",
+				field.Name)
+		}
+		if !field.IsExported() {
+			return false, false, ers.Wrapf(ErrInvalidSpecification,
+				"field %q with cmd: tag must be exported", field.Name)
+		}
+		if _, hasFlag := field.Tag.Lookup("flag"); hasFlag {
+			return false, false, ers.Wrapf(ErrInvalidSpecification,
+				"field %q has both flag: and cmd: tags; they are mutually exclusive",
+				field.Name)
+		}
+		if err := validateStruct(fs, fval, "", depth+1); err != nil {
+			return false, false, err
+		}
+		return true, true, nil
+	}
+	if !field.IsExported() {
+		return false, true, validateStruct(fs, fval, prefix, depth)
+	}
+	if _, ok := fval.Addr().Interface().(flag.Value); ok {
+		return false, false, nil // treat as leaf
+	}
+	childPrefix := prefix
+	if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
+		childPrefix = joinStr(prefix, ns, ".")
+	}
+	return false, true, validateStruct(fs, fval, childPrefix, depth)
 }
 
 // validateDefault checks that defStr can be parsed for the type of ptr.

@@ -349,3 +349,17 @@ func parseUint[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](bits int) func(st
 func parseFloat[T ~float32 | ~float64](bits int) func(string) (T, error) {
 	return func(s string) (T, error) { v, err := strconv.ParseFloat(s, bits); return T(v), err }
 }
+
+// restAppend parses each element in args with parse and appends the result to
+// *p. On a parse error it wraps ErrInvalidInput, naming the element type.
+// Used by appendRestArgs to eliminate repetitive parse-and-append cases.
+func restAppend[T any](p *[]T, args []string, parse func(string) (T, error), typeName string) error {
+	for _, arg := range args {
+		v, err := parse(arg)
+		if err != nil {
+			return ers.Wrapf(ErrInvalidInput, "parsing %s %q: %w", typeName, arg, err)
+		}
+		*p = append(*p, v)
+	}
+	return nil
+}

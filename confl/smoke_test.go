@@ -56,7 +56,7 @@ func TestSmoke_String(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Name string `flag:"name" default:"world"`
+		Name string `default:"world" flag:"name"`
 	}
 
 	tests := []struct {
@@ -103,7 +103,7 @@ func TestSmoke_Bool(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Flag bool `flag:"flag" default:"false" short:"f"`
+		Flag bool `default:"false" flag:"flag" short:"f"`
 	}
 
 	tests := []struct {
@@ -152,7 +152,7 @@ func TestSmoke_InvertedBool(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Enabled bool `flag:"enabled" default:"true" short:"e"`
+		Enabled bool `default:"true" flag:"enabled" short:"e"`
 	}
 
 	tests := []struct {
@@ -189,18 +189,18 @@ func TestSmoke_InvertedBool(t *testing.T) {
 // ── Numeric scalars ───────────────────────────────────────────────────────────
 
 type wantNumerics struct {
-	I    int
-	I64  int64
-	U    uint
-	U64  uint64
-	F64  float64
-	F32  float32
-	I32  int32
-	I16  int16
-	I8   int8
-	U32  uint32
-	U16  uint16
-	U8   uint8
+	I   int
+	I64 int64
+	U   uint
+	U64 uint64
+	F64 float64
+	F32 float32
+	I32 int32
+	I16 int16
+	I8  int8
+	U32 uint32
+	U16 uint16
+	U8  uint8
 }
 
 func (w wantNumerics) IsEqual(t *testing.T, got wantNumerics) {
@@ -404,9 +404,9 @@ func TestSmoke_ShortAliases(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Name    string `flag:"name"    short:"n" default:"default"`
-		Verbose bool   `flag:"verbose" short:"v"`
-		Count   int    `flag:"count"   short:"c" default:"0"`
+		Name    string `default:"default" flag:"name"  short:"n"`
+		Verbose bool   `flag:"verbose"    short:"v"`
+		Count   int    `default:"0"       flag:"count" short:"c"`
 	}
 
 	tests := []struct {
@@ -472,10 +472,10 @@ func TestSmoke_Defaults(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		S   string  `flag:"s"   default:"hello"`
-		I   int     `flag:"i"   default:"42"`
-		B   bool    `flag:"b"   default:"false"`
-		F64 float64 `flag:"f64" default:"2.71"`
+		S   string  `default:"hello" flag:"s"`
+		I   int     `default:"42"    flag:"i"`
+		B   bool    `default:"false" flag:"b"`
+		F64 float64 `default:"2.71"  flag:"f64"`
 	}
 
 	tests := []struct {
@@ -578,9 +578,9 @@ func TestSmoke_Required(t *testing.T) {
 // ── 6. Slice types ────────────────────────────────────────────────────────────
 
 type wantSlices struct {
-	Tags    []string
-	Counts  []int
-	Floats  []float64
+	Tags   []string
+	Counts []int
+	Floats []float64
 }
 
 func (w wantSlices) IsEqual(t *testing.T, got wantSlices) {
@@ -600,9 +600,9 @@ func TestSmoke_Slices(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Tags   []string  `flag:"tag"   short:"t" default:"debug,info" sep:","`
-		Counts []int     `flag:"count" short:"c"`
-		Floats []float64 `flag:"float" short:"f"`
+		Tags   []string  `default:"debug,info" flag:"tag" sep:"," short:"t"`
+		Counts []int     `flag:"count"         short:"c"`
+		Floats []float64 `flag:"float"         short:"f"`
 	}
 
 	tests := []struct {
@@ -817,7 +817,7 @@ func TestSmoke_TimeTime_formats(t *testing.T) {
 
 	t.Run("now default", func(t *testing.T) {
 		type cfg struct {
-			At time.Time `flag:"at" default:"now"`
+			At time.Time `default:"now" flag:"at"`
 		}
 		before := time.Now().UTC().Add(-time.Second)
 		var c cfg
@@ -931,7 +931,7 @@ func TestSmoke_Duration_Default(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Timeout time.Duration `flag:"timeout" default:"5s"`
+		Timeout time.Duration `default:"5s" flag:"timeout"`
 	}
 
 	var c cfg
@@ -969,10 +969,11 @@ func TestSmoke_AnonymousEmbedding(t *testing.T) {
 
 	type base struct {
 		Verbose bool   `flag:"verbose" short:"v"`
-		Format  string `flag:"format"  default:"text"`
+		Format  string `default:"text" flag:"format"`
 	}
 	type cfg struct {
 		base
+
 		Name string `flag:"name"`
 	}
 
@@ -1013,8 +1014,8 @@ func TestSmoke_NamedStructFlatNamespace(t *testing.T) {
 
 	// Named struct field without a flag: tag → flat namespace.
 	type network struct {
-		Host string `flag:"host" default:"localhost"`
-		Port int    `flag:"port" default:"8080"`
+		Host string `default:"localhost" flag:"host"`
+		Port int    `default:"8080"      flag:"port"`
 	}
 	type cfg struct {
 		Server network // no flag: tag → flat
@@ -1089,8 +1090,8 @@ func TestSmoke_NamespacedStruct(t *testing.T) {
 	t.Parallel()
 
 	type network struct {
-		Host string `flag:"host" default:"localhost"`
-		Port int    `flag:"port" default:"8080"`
+		Host string `default:"localhost" flag:"host"`
+		Port int    `default:"8080"      flag:"port"`
 	}
 	type cfg struct {
 		Server network `flag:"srv"`
@@ -1143,7 +1144,7 @@ func TestSmoke_NestedNamespaceAccumulates(t *testing.T) {
 
 	// Nested namespaces: outer.inner.key
 	type leaf struct {
-		Key string `flag:"key" default:"val"`
+		Key string `default:"val" flag:"key"`
 	}
 	type middle struct {
 		Inner leaf `flag:"inner"`
@@ -1197,7 +1198,7 @@ func TestSmoke_FlagValueInterface(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Custom smokeMultiValue `flag:"custom" default:"defval"`
+		Custom smokeMultiValue `default:"defval" flag:"custom"`
 	}
 
 	tests := []struct {
@@ -1274,7 +1275,7 @@ func TestSmoke_FlagValueInterface_extra(t *testing.T) {
 // to keep these smoke tests self-contained.
 
 type smokeDeployCmd struct {
-	Target string `flag:"target" required:"true"`
+	Target string `flag:"target"  required:"true"`
 	DryRun bool   `flag:"dry-run" short:"n"`
 }
 
@@ -1537,7 +1538,7 @@ func TestSmoke_NargRest_Int(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Output string `flag:"out" default:"-"`
+		Output string `default:"-" flag:"out"`
 		Rest   []int  `narg:"rest"`
 	}
 
@@ -1617,27 +1618,37 @@ func TestSmoke_Errors_BadValueType(t *testing.T) {
 	}{
 		{
 			name: "int-non-numeric",
-			cfg:  &struct{ V int `flag:"v"` }{},
+			cfg: &struct {
+				V int `flag:"v"`
+			}{},
 			args: []string{"-v", "notanint"},
 		},
 		{
 			name: "float64-non-numeric",
-			cfg:  &struct{ V float64 `flag:"v"` }{},
+			cfg: &struct {
+				V float64 `flag:"v"`
+			}{},
 			args: []string{"-v", "notafloat"},
 		},
 		{
 			name: "uint-negative",
-			cfg:  &struct{ V uint `flag:"v"` }{},
+			cfg: &struct {
+				V uint `flag:"v"`
+			}{},
 			args: []string{"-v", "-1"},
 		},
 		{
 			name: "duration-invalid",
-			cfg:  &struct{ V time.Duration `flag:"v"` }{},
+			cfg: &struct {
+				V time.Duration `flag:"v"`
+			}{},
 			args: []string{"-v", "notaduration"},
 		},
 		{
 			name: "time-invalid",
-			cfg:  &struct{ V time.Time `flag:"v"` }{},
+			cfg: &struct {
+				V time.Time `flag:"v"`
+			}{},
 			args: []string{"-v", "not-a-time"},
 		},
 	}
@@ -1696,35 +1707,51 @@ func TestSmoke_Errors_InvalidDefaults(t *testing.T) {
 	}{
 		{
 			name: "int-bad-default",
-			cfg:  &struct{ V int `flag:"v" default:"notanint"` }{},
+			cfg: &struct {
+				V int `default:"notanint" flag:"v"`
+			}{},
 		},
 		{
 			name: "uint-bad-default",
-			cfg:  &struct{ V uint `flag:"v" default:"notauint"` }{},
+			cfg: &struct {
+				V uint `default:"notauint" flag:"v"`
+			}{},
 		},
 		{
 			name: "float64-bad-default",
-			cfg:  &struct{ V float64 `flag:"v" default:"notafloat"` }{},
+			cfg: &struct {
+				V float64 `default:"notafloat" flag:"v"`
+			}{},
 		},
 		{
 			name: "bool-impossible-default",
-			cfg:  &struct{ V bool `flag:"v" default:"maybe"` }{},
+			cfg: &struct {
+				V bool `default:"maybe" flag:"v"`
+			}{},
 		},
 		{
 			name: "time-bad-default",
-			cfg:  &struct{ V time.Time `flag:"v" default:"not-a-time"` }{},
+			cfg: &struct {
+				V time.Time `default:"not-a-time" flag:"v"`
+			}{},
 		},
 		{
 			name: "duration-bad-default",
-			cfg:  &struct{ V time.Duration `flag:"v" default:"notaduration"` }{},
+			cfg: &struct {
+				V time.Duration `default:"notaduration" flag:"v"`
+			}{},
 		},
 		{
 			name: "int8-overflow-default",
-			cfg:  &struct{ V int8 `flag:"v" default:"200"` }{},
+			cfg: &struct {
+				V int8 `default:"200" flag:"v"`
+			}{},
 		},
 		{
 			name: "uint8-overflow-default",
-			cfg:  &struct{ V uint8 `flag:"v" default:"300"` }{},
+			cfg: &struct {
+				V uint8 `default:"300" flag:"v"`
+			}{},
 		},
 	}
 

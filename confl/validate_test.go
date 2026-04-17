@@ -26,7 +26,7 @@ func TestValidate_valid_structs(t *testing.T) {
 		{
 			name: "bool with default",
 			cfg: &struct {
-				Flag bool `flag:"flag" default:"true"`
+				Flag bool `default:"true" flag:"flag"`
 			}{},
 		},
 		{
@@ -38,13 +38,13 @@ func TestValidate_valid_structs(t *testing.T) {
 		{
 			name: "slice with sep tag",
 			cfg: &struct {
-				Tags []string `flag:"tags" default:"a,b" sep:","`
+				Tags []string `default:"a,b" flag:"tags" sep:","`
 			}{},
 		},
 		{
 			name: "slice with sep-empty tag",
 			cfg: &struct {
-				Tags []string `flag:"tags" default:"whole-value" sep:""`
+				Tags []string `default:"whole-value" flag:"tags" sep:""`
 			}{},
 		},
 		{
@@ -69,6 +69,7 @@ func TestValidate_valid_structs(t *testing.T) {
 			name: "nested anonymous struct",
 			cfg: &struct {
 				BaseTest
+
 				Name string `flag:"name"`
 			}{},
 		},
@@ -95,7 +96,7 @@ func TestValidate_valid_structs(t *testing.T) {
 		{
 			name: "time.Duration field",
 			cfg: &struct {
-				Timeout time.Duration `flag:"timeout" default:"5s"`
+				Timeout time.Duration `default:"5s" flag:"timeout"`
 			}{},
 		},
 		{
@@ -308,7 +309,7 @@ func TestValidate_slice_default_no_sep(t *testing.T) {
 	t.Parallel()
 
 	cfg := &struct {
-		Tags []string `flag:"tags" default:"a,b,c"`
+		Tags []string `default:"a,b,c" flag:"tags"`
 	}{}
 	err := Validate(cfg)
 	if err == nil {
@@ -328,27 +329,39 @@ func TestValidate_bad_default_value(t *testing.T) {
 	}{
 		{
 			name: "int bad default",
-			cfg:  &struct{ V int `flag:"v" default:"notanint"` }{},
+			cfg: &struct {
+				V int `default:"notanint" flag:"v"`
+			}{},
 		},
 		{
 			name: "uint bad default",
-			cfg:  &struct{ V uint `flag:"v" default:"notauint"` }{},
+			cfg: &struct {
+				V uint `default:"notauint" flag:"v"`
+			}{},
 		},
 		{
 			name: "float64 bad default",
-			cfg:  &struct{ V float64 `flag:"v" default:"notafloat"` }{},
+			cfg: &struct {
+				V float64 `default:"notafloat" flag:"v"`
+			}{},
 		},
 		{
 			name: "bool impossible default",
-			cfg:  &struct{ V bool `flag:"v" default:"maybe"` }{},
+			cfg: &struct {
+				V bool `default:"maybe" flag:"v"`
+			}{},
 		},
 		{
 			name: "time.Time bad default",
-			cfg:  &struct{ V time.Time `flag:"v" default:"not-a-time"` }{},
+			cfg: &struct {
+				V time.Time `default:"not-a-time" flag:"v"`
+			}{},
 		},
 		{
 			name: "time.Duration bad default",
-			cfg:  &struct{ V time.Duration `flag:"v" default:"notaduration"` }{},
+			cfg: &struct {
+				V time.Duration `default:"notaduration" flag:"v"`
+			}{},
 		},
 	}
 
@@ -546,7 +559,7 @@ func TestValidate_flag_value_bad_default(t *testing.T) {
 
 	// flag.Value with a bad default should be caught by validateDefault.
 	cfg := &struct {
-		Custom testFlagValue `flag:"custom" default:"baddefault"`
+		Custom testFlagValue `default:"baddefault" flag:"custom"`
 	}{
 		// setErr is only set on the instance; for struct field tests the zero
 		// value is fine — Set won't error.  Use a pointer-to-struct field

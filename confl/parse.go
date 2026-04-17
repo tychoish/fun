@@ -92,53 +92,23 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 		name := field.Tag.Get("flag")
 		narg := field.Tag.Get("narg")
 
-		// Validate narg tag values.
-		if narg != "" {
-			switch narg {
-			case "rest", "until":
-				// valid
-			default:
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q has unknown narg value %q (must be \"rest\" or \"until\")",
-					field.Name, narg)
-			}
-			if !field.IsExported() {
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q with narg tag must be exported", field.Name)
-			}
-			if fval.Kind() != reflect.Slice {
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q has narg:%q but is not a slice type (got %s)",
-					field.Name, narg, fval.Kind())
-			}
+		if err := checkNargTags(field, fval, name, narg); err != nil {
+			return err
 		}
 
 		if narg == "rest" {
-			if name != "" {
-				return ers.Wrapf(ErrInvalidSpecification,
-					"field %q has both narg:\"rest\" and flag: tag; they are mutually exclusive",
-					field.Name)
-			}
-			continue // rest fields are not registered as flags
-		}
-		if narg == "until" && name == "" {
-			return ers.Wrapf(ErrInvalidSpecification,
-				"field %q has narg:\"until\" but no flag: tag; until fields must have a flag: tag",
-				field.Name)
+			continue // rest fields are not registered as flags; handled by populateRestField
 		}
 
 		if name == "" {
 			continue
 		}
-		if !field.IsExported() {
-			return ers.Wrapf(ErrInvalidSpecification, "field %q with flag tag %q must be exported", field.Name, name)
+		if err := checkExportedFlag(field, name); err != nil {
+			return err
 		}
 		sepVal, sepSet := field.Tag.Lookup("sep")
-		// sep: is only meaningful on slice fields; reject it on everything else.
-		if sepSet && fval.Kind() != reflect.Slice {
-			return ers.Wrapf(ErrInvalidSpecification,
-				"field %q has sep: tag but is not a slice type (got %s); sep: is only valid on slice fields",
-				field.Name, fval.Kind())
+		if err := checkSepTag(field, fval, sepSet); err != nil {
+			return err
 		}
 		if err := registerFlag(fs, fval.Addr().Interface(), flagSpec{
 			Name:    joinStr(prefix, name),
@@ -311,102 +281,36 @@ func populateRestField(val reflect.Value, args []string) error {
 // registerSliceFlag in register.go.
 func appendRestArgs(field reflect.Value, args []string) error {
 	ptr := field.Addr().Interface()
-	for _, arg := range args {
-		var appendErr error
-		switch p := ptr.(type) {
-		case *[]string:
-			*p = append(*p, arg)
-		case *[]int:
-			v, err := strconv.ParseInt(arg, 10, strconv.IntSize)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing int %q: %w", arg, err)
-			} else {
-				*p = append(*p, int(v))
-			}
-		case *[]int64:
-			v, err := strconv.ParseInt(arg, 10, 64)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing int64 %q: %w", arg, err)
-			} else {
-				*p = append(*p, v)
-			}
-		case *[]int32:
-			v, err := strconv.ParseInt(arg, 10, 32)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing int32 %q: %w", arg, err)
-			} else {
-				*p = append(*p, int32(v))
-			}
-		case *[]int16:
-			v, err := strconv.ParseInt(arg, 10, 16)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing int16 %q: %w", arg, err)
-			} else {
-				*p = append(*p, int16(v))
-			}
-		case *[]int8:
-			v, err := strconv.ParseInt(arg, 10, 8)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing int8 %q: %w", arg, err)
-			} else {
-				*p = append(*p, int8(v))
-			}
-		case *[]uint:
-			v, err := strconv.ParseUint(arg, 10, strconv.IntSize)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing uint %q: %w", arg, err)
-			} else {
-				*p = append(*p, uint(v))
-			}
-		case *[]uint64:
-			v, err := strconv.ParseUint(arg, 10, 64)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing uint64 %q: %w", arg, err)
-			} else {
-				*p = append(*p, v)
-			}
-		case *[]uint32:
-			v, err := strconv.ParseUint(arg, 10, 32)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing uint32 %q: %w", arg, err)
-			} else {
-				*p = append(*p, uint32(v))
-			}
-		case *[]uint16:
-			v, err := strconv.ParseUint(arg, 10, 16)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing uint16 %q: %w", arg, err)
-			} else {
-				*p = append(*p, uint16(v))
-			}
-		case *[]uint8:
-			v, err := strconv.ParseUint(arg, 10, 8)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing uint8 %q: %w", arg, err)
-			} else {
-				*p = append(*p, uint8(v))
-			}
-		case *[]float64:
-			v, err := strconv.ParseFloat(arg, 64)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing float64 %q: %w", arg, err)
-			} else {
-				*p = append(*p, v)
-			}
-		case *[]float32:
-			v, err := strconv.ParseFloat(arg, 32)
-			if err != nil {
-				appendErr = ers.Wrapf(ErrInvalidInput, "parsing float32 %q: %w", arg, err)
-			} else {
-				*p = append(*p, float32(v))
-			}
-		default:
-			return ers.Wrapf(ErrInvalidSpecification,
-				"narg:\"rest\" field has unsupported element type %T", ptr)
-		}
-		if appendErr != nil {
-			return appendErr
-		}
+	switch p := ptr.(type) {
+	case *[]string:
+		*p = append(*p, args...)
+	case *[]int:
+		return restAppend(p, args, parseInt[int](strconv.IntSize), "int")
+	case *[]int64:
+		return restAppend(p, args, parseInt[int64](64), "int64")
+	case *[]int32:
+		return restAppend(p, args, parseInt[int32](32), "int32")
+	case *[]int16:
+		return restAppend(p, args, parseInt[int16](16), "int16")
+	case *[]int8:
+		return restAppend(p, args, parseInt[int8](8), "int8")
+	case *[]uint:
+		return restAppend(p, args, parseUint[uint](strconv.IntSize), "uint")
+	case *[]uint64:
+		return restAppend(p, args, parseUint[uint64](64), "uint64")
+	case *[]uint32:
+		return restAppend(p, args, parseUint[uint32](32), "uint32")
+	case *[]uint16:
+		return restAppend(p, args, parseUint[uint16](16), "uint16")
+	case *[]uint8:
+		return restAppend(p, args, parseUint[uint8](8), "uint8")
+	case *[]float64:
+		return restAppend(p, args, parseFloat[float64](64), "float64")
+	case *[]float32:
+		return restAppend(p, args, parseFloat[float32](32), "float32")
+	default:
+		return ers.Wrapf(ErrInvalidSpecification,
+			"narg:\"rest\" field has unsupported element type %T", ptr)
 	}
 	return nil
 }
