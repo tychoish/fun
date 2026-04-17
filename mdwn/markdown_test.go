@@ -792,8 +792,8 @@ func TestRuneByteOffset(t *testing.T) {
 
 func TestHorizontalRule(t *testing.T) {
 	got := build(func(m *Builder) { m.HorizontalRule() })
-	if got != "---\n\n" {
-		t.Errorf("HorizontalRule() = %q, want %q", got, "---\n\n")
+	if got != "-----\n\n" {
+		t.Errorf("HorizontalRule() = %q, want %q", got, "-----\n\n")
 	}
 }
 
@@ -854,4 +854,372 @@ func TestTaskListItemWords(t *testing.T) {
 			}
 		})
 	}
+}
+
+// rowWidth computes the visual width (rune count) of a pipe-delimited table
+// row, not counting the trailing newline.
+func rowWidth(line string) int { return utf8.RuneCountInString(line) }
+
+func TestTableBuildMaxWidth(t *testing.T) {
+	// Helper: build the table with BuildMaxWidth and return the output string.
+	buildMaxWidth := func(t *testing.T, maxWidth int, cols []Column, rows [][]string) (string, error) {
+		t.Helper()
+		var mb Builder
+		tb := mb.NewTableWithColumns(cols)
+		for _, row := range rows {
+			tb.Row(row...)
+		}
+		result, err := tb.BuildMaxWidth(maxWidth)
+		if err != nil {
+			return "", err
+		}
+		return result.String(), nil
+	}
+
+	t.Run("basic truncation", func(t *testing.T) {
+		// 2 cols: "A" (fixed, natural width=3) + "B" (elastic)
+		// separatorOverhead = 1 + 2*3 = 7
+		// maxWidth = 20 → budget = 20 - 7 - 3 = 10
+		// elastic content "This is quite long" (18 runes) > 10 → truncated to "This is..." (10)
+		// row visual: | ab  | This is.. | = 1+(3+3)+(10+3) = 20
+		cols := []Column{
+			{Name: "A"},
+			{Name: "B", Elastic: true},
+		}
+		rows := [][]string{{"ab", "This is quite long content here"}}
+		got, err := buildMaxWidth(t, 20, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		dataLine := lines[2]
+		// The data row must be exactly maxWidth runes wide.
+		if w := rowWidth(dataLine); w != 20 {
+			t.Errorf("data row width = %d, want 20; line=%q", w, dataLine)
+		}
+		// Elastic column must contain the truncation marker.
+		if !strings.Contains(dataLine, "...") {
+			t.Errorf("expected truncation marker in %q", dataLine)
+		}
+		// Full original content must NOT appear.
+		if strings.Contains(got, "This is quite long content here") {
+			t.Errorf("expected content to be truncated in %q", got)
+		}
+	})
+
+	t.Run("no truncation needed", func(t *testing.T) {
+		// elastic column content fits within budget — no truncation.
+		// cols: "Key" (3 runes, width=3) + "Desc" (elastic)
+		// separatorOverhead = 1 + 2*3 = 7
+		// maxWidth = 30 → budget = 30 - 7 - 3 = 20
+		// content "short" (5 runes) ≤ 20 — no truncation
+		cols := []Column{
+			{Name: "Key"},
+			{Name: "Desc", Elastic: true},
+		}
+		rows := [][]string{{"abc", "short"}}
+		got, err := buildMaxWidth(t, 30, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(got, "...") {
+			t.Errorf("unexpected truncation marker in %q", got)
+		}
+		if !strings.Contains(got, "short") {
+			t.Errorf("expected full content 'short' in %q", got)
+		}
+	})
+
+	t.Run("other columns exhaust budget", func(t *testing.T) {
+		// budget < 3 → elastic clamped to max(3, MinWidth) = 3; no error.
+		// cols: "LongColName" (11 runes, width=11) + "E" (elastic)
+		// separatorOverhead = 1 + 2*3 = 7
+		// maxWidth = 10 → budget = 10 - 7 - 11 = -8 < 3 → width = 3
+		cols := []Column{
+			{Name: "LongColName"},
+			{Name: "E", Elastic: true},
+		}
+		rows := [][]string{{"v", "hello"}}
+		got, err := buildMaxWidth(t, 10, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Elastic column must still be present with width 3.
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		// The elastic column header cell has at least 3 chars of content width.
+		parts := strings.Split(lines[0], "|")
+		if len(parts) < 3 {
+			t.Fatalf("unexpected header format: %q", lines[0])
+		}
+		// parts[2] is " E   " or similar — inner content width = rune count - 2 spaces
+		cellContent := strings.TrimSpace(parts[2])
+		if utf8.RuneCountInString(parts[2])-2 < 3 {
+			t.Errorf("elastic column cell too narrow: %q", cellContent)
+		}
+	})
+
+	t.Run("elastic column has MaxWidth ceiling", func(t *testing.T) {
+		// budget > MaxWidth → elastic clamped to MaxWidth.
+		// cols: "A" (width=3) + "Elastic" (Elastic, MaxWidth=8)
+		// separatorOverhead = 1 + 2*3 = 7
+		// maxWidth = 40 → budget = 40 - 7 - 3 = 30 > MaxWidth=8 → width = 8
+		// table total = 7 + 3 + 8 = 18 < maxWidth
+		cols := []Column{
+			{Name: "A"},
+			{Name: "Elastic", Elastic: true, MaxWidth: 8},
+		}
+		rows := [][]string{{"hi", "This is very long cell content indeed"}}
+		got, err := buildMaxWidth(t, 40, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Elastic column must be capped at 8.
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		dataLine := lines[2]
+		// Total row width should be 18, not 40.
+		if w := rowWidth(dataLine); w != 18 {
+			t.Errorf("data row width = %d, want 18 (table narrower than maxWidth); line=%q", w, dataLine)
+		}
+		// Truncated with default marker.
+		if !strings.Contains(dataLine, "...") {
+			t.Errorf("expected truncation marker in %q", dataLine)
+		}
+	})
+
+	t.Run("MinWidth overrides budget", func(t *testing.T) {
+		// col.MinWidth=15, budget=8 → widths[elasticIdx] = max(8, 3, 15) = 15
+		// cols: "Long" (4) + "E" (Elastic, MinWidth=15)
+		// separatorOverhead = 1 + 2*3 = 7
+		// maxWidth = 22 → budget = 22 - 7 - 4 = 11 ... let me recalculate
+		// "Long" header natural width = max(4, 0, 3) = 4, but row "longvalue" (9) > 4 → 9
+		// maxWidth = 20 → budget = 20 - 7 - 9 = 4 < 15 → elastic width = max(4,3,15) = 15
+		cols := []Column{
+			{Name: "Long"},
+			{Name: "E", Elastic: true, MinWidth: 15},
+		}
+		rows := [][]string{{"longvalue", "x"}}
+		got, err := buildMaxWidth(t, 20, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Elastic column header cell should have visual width of at least 15.
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		parts := strings.Split(lines[0], "|")
+		if len(parts) < 3 {
+			t.Fatalf("unexpected header format: %q", lines[0])
+		}
+		// inner cell width = len(parts[2]) - 2 (surrounding spaces)
+		innerWidth := utf8.RuneCountInString(parts[2]) - 2
+		if innerWidth < 15 {
+			t.Errorf("elastic column width = %d, want >= 15 (MinWidth)", innerWidth)
+		}
+	})
+
+	t.Run("custom TruncMarker", func(t *testing.T) {
+		// Custom marker "…" (single rune) on elastic column.
+		// cols: "A" (width=3) + "B" (Elastic, MaxWidth=10, TruncMarker="…")
+		// separatorOverhead = 7, maxWidth = 20
+		// budget = 20 - 7 - 3 = 10 = MaxWidth → elastic width = 10
+		// cell "123456789012345" (15 runes) > 10 → truncated: "123456789…" (9+1=10)
+		cols := []Column{
+			{Name: "A"},
+			{Name: "B", Elastic: true, TruncMarker: "…"},
+		}
+		rows := [][]string{{"hi", "123456789012345"}}
+		got, err := buildMaxWidth(t, 20, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(got, "…") {
+			t.Errorf("expected custom marker '…' in %q", got)
+		}
+		if strings.Contains(got, "123456789012345") {
+			t.Errorf("expected truncated content, got full content in %q", got)
+		}
+	})
+
+	t.Run("right-aligned elastic column", func(t *testing.T) {
+		// Elastic column with RightAlign=true.
+		// cols: "A" (width=3) + "Num" (Elastic, RightAlign=true)
+		// separatorOverhead = 7, maxWidth = 20
+		// budget = 20 - 7 - 3 = 10
+		// cell "42" (2 runes) ≤ 10 → right-padded to width 10: "        42"
+		cols := []Column{
+			{Name: "A"},
+			{Name: "Num", Elastic: true, RightAlign: true},
+		}
+		rows := [][]string{{"hi", "42"}}
+		got, err := buildMaxWidth(t, 20, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		dataLine := lines[2]
+		// Right-aligned: "42" should appear immediately before " |" at the end.
+		if !strings.HasSuffix(dataLine, "42 |") {
+			t.Errorf("expected right-aligned value '42 |' at end of %q", dataLine)
+		}
+		// Separator row must have "----:" colon for right alignment.
+		sepLine := lines[1]
+		if !strings.Contains(sepLine, ":") {
+			t.Errorf("expected ':' in separator for right-aligned column: %q", sepLine)
+		}
+	})
+
+	t.Run("error no elastic column", func(t *testing.T) {
+		var mb Builder
+		tb := mb.NewTable(Column{Name: "A"}, Column{Name: "B"})
+		tb.Row("x", "y")
+		_, err := tb.BuildMaxWidth(30)
+		if err == nil {
+			t.Error("expected error for table with no elastic column, got nil")
+		}
+	})
+
+	t.Run("error two elastic columns", func(t *testing.T) {
+		var mb Builder
+		tb := mb.NewTable(
+			Column{Name: "A", Elastic: true},
+			Column{Name: "B", Elastic: true},
+		)
+		tb.Row("x", "y")
+		_, err := tb.BuildMaxWidth(30)
+		if err == nil {
+			t.Error("expected error for table with two elastic columns, got nil")
+		}
+	})
+
+	t.Run("error maxWidth zero", func(t *testing.T) {
+		var mb Builder
+		tb := mb.NewTable(Column{Name: "A", Elastic: true})
+		tb.Row("x")
+		_, err := tb.BuildMaxWidth(0)
+		if err == nil {
+			t.Error("expected error for maxWidth=0, got nil")
+		}
+	})
+
+	t.Run("error maxWidth negative", func(t *testing.T) {
+		var mb Builder
+		tb := mb.NewTable(Column{Name: "A", Elastic: true})
+		tb.Row("x")
+		_, err := tb.BuildMaxWidth(-5)
+		if err == nil {
+			t.Error("expected error for maxWidth=-5, got nil")
+		}
+	})
+
+	t.Run("single-column elastic table", func(t *testing.T) {
+		// separatorOverhead = 1 + 1*3 = 4
+		// cols: "Desc" (Elastic)
+		// maxWidth = 14 → budget = 14 - 4 = 10
+		// natural width of "Desc" header = max(4,0,3) = 4, but budget=10 wins
+		// Actually: natural width is scanned first (max over header/rows), then
+		// budget replaces it for elastic col. Row "hello" (5) → natural width=5.
+		// budget = 14 - 4 - 0 (no other cols) = 10 → elastic width = max(10,3,0)=10
+		cols := []Column{{Name: "Desc", Elastic: true}}
+		rows := [][]string{{"hello"}}
+		got, err := buildMaxWidth(t, 14, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		dataLine := lines[2]
+		// Row width = 1 + (10+3) = 14
+		if w := rowWidth(dataLine); w != 14 {
+			t.Errorf("data row width = %d, want 14; line=%q", w, dataLine)
+		}
+	})
+
+	t.Run("exact fit content", func(t *testing.T) {
+		// Elastic column content length == budget exactly → no truncation marker.
+		// cols: "A" (width=3) + "B" (Elastic)
+		// separatorOverhead = 7, maxWidth = 20
+		// budget = 20 - 7 - 3 = 10
+		// cell exactly 10 runes: "1234567890"
+		cols := []Column{
+			{Name: "A"},
+			{Name: "B", Elastic: true},
+		}
+		rows := [][]string{{"hi", "1234567890"}}
+		got, err := buildMaxWidth(t, 20, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(got, "...") {
+			t.Errorf("unexpected truncation for exact-fit content in %q", got)
+		}
+		if !strings.Contains(got, "1234567890") {
+			t.Errorf("expected full content '1234567890' in %q", got)
+		}
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		if w := rowWidth(lines[2]); w != 20 {
+			t.Errorf("data row width = %d, want 20; line=%q", w, lines[2])
+		}
+	})
+
+	t.Run("empty table returns builder without error", func(t *testing.T) {
+		// Covers the len(t.rows)==0 early-return path (markdown.go:725-727).
+		var mb Builder
+		tb := mb.NewTable(Column{Name: "Col", Elastic: true})
+		// No rows added.
+		result, err := tb.BuildMaxWidth(40)
+		if err != nil {
+			t.Fatalf("unexpected error for empty table: %v", err)
+		}
+		if result == nil {
+			t.Fatal("expected non-nil Builder for empty table")
+		}
+	})
+
+	t.Run("non-elastic column MaxWidth cap applied", func(t *testing.T) {
+		// Covers markdown.go:749-751: a non-elastic column whose natural content
+		// width exceeds its MaxWidth is capped before the budget is computed.
+		// Col A: MaxWidth=5, content "verylongvalue" (13 runes) → capped to 5.
+		// Col B: Elastic.
+		// separatorOverhead = 1 + 2*3 = 7
+		// maxWidth = 30 → budget = 30 - 7 - 5 = 18
+		cols := []Column{
+			{Name: "A", MaxWidth: 5},
+			{Name: "B", Elastic: true},
+		}
+		rows := [][]string{{"verylongvalue", "content"}}
+		got, err := buildMaxWidth(t, 30, cols, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		if len(lines) < 3 {
+			t.Fatalf("expected at least 3 lines, got %d:\n%s", len(lines), got)
+		}
+		// The data row must be exactly maxWidth=30 wide.
+		if w := rowWidth(lines[2]); w != 30 {
+			t.Errorf("data row width = %d, want 30; line=%q", w, lines[2])
+		}
+		// Col A cell must be truncated to 5 runes (the MaxWidth cap).
+		if !strings.Contains(lines[2], "ve...") {
+			t.Errorf("expected col A truncated to 5 with marker, got line %q", lines[2])
+		}
+	})
 }
