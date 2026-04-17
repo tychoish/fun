@@ -23,11 +23,14 @@ package confl
 import (
 	"context"
 	"errors"
+	"flag"
+	"io"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/tychoish/fun/assert"
 )
 
 // splitArgs splits a space-separated argument string into a []string.
@@ -1877,3 +1880,72 @@ func TestSmoke_SliceSmallInts(t *testing.T) {
 // first version. Remove duplicate by ensuring only one TestSmoke_Scalars_String
 // variant compiles. The version using want_string's IsEqual method is the live
 // one; the stub above compiles but does nothing harmful.
+
+// ── Public API: Parse, ParseCommand, Dispatch ─────────────────────────────────
+
+// Test_Parse exercises the public Parse function. Must not run in parallel
+// because it mutates flag.CommandLine and os.Args.
+func Test_Parse(t *testing.T) {
+	// Not parallel: modifies flag.CommandLine.
+	// Pre-parse with nil so Parsed()=true; commandLineArgs() then returns
+	// flag.CommandLine.Args() (nil) rather than falling back to os.Args[1:].
+	type cfg struct {
+		Env string `default:"dev" flag:"env" help:"environment"`
+	}
+
+	oldFS := flag.CommandLine
+	t.Cleanup(func() { flag.CommandLine = oldFS })
+	flag.CommandLine = flag.NewFlagSet("cmd", flag.ContinueOnError)
+	assert.NotError(t, flag.CommandLine.Parse(nil))
+
+	var c cfg
+	assert.NotError(t, Parse(&c))
+	assert.Equal(t, c.Env, "dev")
+}
+
+func Test_ParseCommand(t *testing.T) {
+	// Not parallel: modifies flag.CommandLine.
+	// Pre-seed CommandLine.Args() by parsing the subcommand name as a
+	// positional arg; flag.Parse stops at the first non-'-' token so the
+	// entire remaining slice stays in Args().
+	type cfg struct {
+		Deploy testDeployCmd `cmd:"deploy"`
+	}
+
+	oldFS := flag.CommandLine
+	t.Cleanup(func() { flag.CommandLine = oldFS })
+
+	flag.CommandLine = flag.NewFlagSet("cmd", flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+	assert.NotError(t, flag.CommandLine.Parse([]string{"deploy", "-target=staging"}))
+
+	var c cfg
+	cmd, err := ParseCommand(&c)
+	assert.NotError(t, err)
+	assert.True(t, cmd != nil)
+	_, ok := cmd.(*testDeployCmd)
+	assert.True(t, ok)
+	assert.Equal(t, c.Deploy.Target, "staging")
+}
+
+func Test_Dispatch(t *testing.T) {
+	// Not parallel: modifies flag.CommandLine.
+	type cfg struct {
+		Deploy testDeployCmd `cmd:"deploy"`
+	}
+
+	oldFS := flag.CommandLine
+	t.Cleanup(func() { flag.CommandLine = oldFS })
+
+	flag.CommandLine = flag.NewFlagSet("cmd", flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+	assert.NotError(t, flag.CommandLine.Parse([]string{"deploy", "-target=prod"}))
+
+	var c cfg
+	result, err := Dispatch(&c)
+	assert.NotError(t, err)
+	assert.True(t, result != nil)
+	_, ok := result.(*testDeployCmd)
+	assert.True(t, ok)
+	assert.Equal(t, c.Deploy.Target, "prod")
+}
