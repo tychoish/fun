@@ -287,6 +287,7 @@ func Test_conflagure_anonymous_embedded_struct(t *testing.T) {
 	}
 	type cfg struct {
 		base
+
 		Name string `flag:"name" help:"name"`
 	}
 
@@ -320,6 +321,7 @@ func Test_conflagure_conflaguration_embedding(t *testing.T) {
 
 	type cfg struct {
 		BaseTest
+
 		Target string `flag:"target" help:"target"`
 	}
 
@@ -413,6 +415,7 @@ func Test_conflagure_named_struct_namespace(t *testing.T) {
 	}
 	type cfg struct {
 		BaseTest
+
 		Server network `flag:"srv"`
 		Label  string  `flag:"label" help:"top-level flag unchanged by namespace"`
 	}
@@ -477,6 +480,7 @@ func Test_conflagure_named_struct_no_tag_flat(t *testing.T) {
 	}
 	type cfg struct {
 		BaseTest
+
 		Server network
 	}
 

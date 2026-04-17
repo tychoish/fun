@@ -492,6 +492,7 @@ func Test_conflagure_slice_embedded(t *testing.T) {
 	}
 	type cfg struct {
 		base
+
 		Name string `flag:"name"`
 	}
 
@@ -583,48 +584,48 @@ func Test_conflagure_small_int_types(t *testing.T) {
 		check func(*testing.T, cfg)
 	}{
 		{
-			name: "int8",
-			args: []string{"-i8", "127"},
+			name:  "int8",
+			args:  []string{"-i8", "127"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.I8, int8(127)) },
 		},
 		{
-			name: "int16",
-			args: []string{"-i16", "32767"},
+			name:  "int16",
+			args:  []string{"-i16", "32767"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.I16, int16(32767)) },
 		},
 		{
-			name: "int32",
-			args: []string{"-i32", "2147483647"},
+			name:  "int32",
+			args:  []string{"-i32", "2147483647"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.I32, int32(2147483647)) },
 		},
 		{
-			name: "uint8",
-			args: []string{"-u8", "255"},
+			name:  "uint8",
+			args:  []string{"-u8", "255"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.U8, uint8(255)) },
 		},
 		{
-			name: "uint16",
-			args: []string{"-u16", "65535"},
+			name:  "uint16",
+			args:  []string{"-u16", "65535"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.U16, uint16(65535)) },
 		},
 		{
-			name: "uint32",
-			args: []string{"-u32", "4294967295"},
+			name:  "uint32",
+			args:  []string{"-u32", "4294967295"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.U32, uint32(4294967295)) },
 		},
 		{
-			name: "float32",
-			args: []string{"-f32", "1.5"},
+			name:  "float32",
+			args:  []string{"-f32", "1.5"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.F32, float32(1.5)) },
 		},
 		{
-			name: "negative int8",
-			args: []string{"-i8", "-128"},
+			name:  "negative int8",
+			args:  []string{"-i8", "-128"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.I8, int8(-128)) },
 		},
 		{
-			name: "negative int32",
-			args: []string{"-i32", "-2147483648"},
+			name:  "negative int32",
+			args:  []string{"-i32", "-2147483648"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.I32, int32(-2147483648)) },
 		},
 		{
@@ -1066,28 +1067,28 @@ func Test_conflagure_numeric_with_short_via_struct(t *testing.T) {
 		check func(*testing.T, cfg)
 	}{
 		{
-			name: "int short alias",
-			args: []string{"-c", "99"},
+			name:  "int short alias",
+			args:  []string{"-c", "99"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.Count, 99) },
 		},
 		{
-			name: "int64 short alias",
-			args: []string{"-b", "88"},
+			name:  "int64 short alias",
+			args:  []string{"-b", "88"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.Big, int64(88)) },
 		},
 		{
-			name: "uint short alias",
-			args: []string{"-s", "77"},
+			name:  "uint short alias",
+			args:  []string{"-s", "77"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.Size, uint(77)) },
 		},
 		{
-			name: "uint64 short alias",
-			args: []string{"-l", "66"},
+			name:  "uint64 short alias",
+			args:  []string{"-l", "66"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.Large, uint64(66)) },
 		},
 		{
-			name: "float64 short alias",
-			args: []string{"-r", "2.71"},
+			name:  "float64 short alias",
+			args:  []string{"-r", "2.71"},
 			check: func(t *testing.T, c cfg) { assert.Equal(t, c.Ratio, 2.71) },
 		},
 	}

@@ -40,7 +40,7 @@
 //
 //	type CLI struct {
 //	    Verbose bool  `flag:"verbose" short:"v"`
-//	    Serve   Serve `cmd:"serve"   help:"start the server"`
+//	    Serve   `cmd:"serve"   help:"start the server"`
 //	}
 //
 // Use ParseCommand when all subcommand structs implement Commander:
