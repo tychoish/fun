@@ -59,9 +59,7 @@ type Table struct {
 func (t *Table) ExtendRow(seq iter.Seq[string]) *Table {
 	var row []*strut.Mutable
 	for cell := range seq {
-		m := strut.NewMutable()
-		m.WithReplaceAll(cell, "|", `\|`)
-		row = append(row, m)
+		row = append(row, strut.MutableFrom(strings.ReplaceAll(cell, "|", `\|`)))
 	}
 	if len(row) > 0 {
 		t.rows = append(t.rows, row)
@@ -77,8 +75,7 @@ func (t *Table) Row(cells ...string) *Table {
 	// make avoids the irt.GenerateN iterator + irt.Collect overhead.
 	row := make([]*strut.Mutable, len(cells))
 	for i, cell := range cells {
-		row[i] = strut.NewMutable()
-		row[i].WithReplaceAll(cell, "|", `\|`)
+		row[i] = strut.MutableFrom(strings.ReplaceAll(cell, "|", `\|`))
 	}
 	t.rows = append(t.rows, row)
 	return t
@@ -95,22 +92,15 @@ func (t *Table) Extend(seq iter.Seq[[]string]) *Table {
 	return t
 }
 
-// Build renders the accumulated table into the parent Builder and returns it
-// for further chaining. Column widths are auto-sized to content,
-// lower-bounded by ColumnDef.MinWidth, at least 3 (minimum for a valid
-// markdown separator), and capped by ColumnDef.MaxWidth when set.
-// Cells exceeding MaxWidth are truncated with ColumnDef.TruncMarker ("...").
-// The pooled Mutable cell buffers are released after rendering.
-// Column.Elastic is silently ignored by Build.
-func (t *Table) Build() *Builder {
-	if len(t.rows) == 0 {
-		return t.mb
-	}
-	defer t.releaseRows()
-
-	// Compute per-column widths using rune count (visual width), not byte
-	// length. Multi-byte Unicode characters (e.g. ♯ = 3 UTF-8 bytes, 1 rune)
-	// must count as one column character to keep rows visually aligned.
+// naturalWidths computes per-column widths from header names and row content,
+// applying MinWidth and the 3-rune markdown minimum. Columns listed in skip
+// are excluded from MaxWidth capping (used by BuildMaxWidth for the elastic
+// column). Callers that want all caps applied pass an empty skip set.
+//
+// Uses rune count (visual width) rather than byte length so that multi-byte
+// Unicode characters (e.g. ♯ = 3 UTF-8 bytes, 1 rune) count as one column
+// character and keep rows visually aligned.
+func (t *Table) naturalWidths(skipMaxCap map[int]struct{}) []int {
 	widths := make([]int, len(t.cols))
 	for i, col := range t.cols {
 		widths[i] = max(utf8.RuneCountInString(col.Name), col.MinWidth, 3)
@@ -124,14 +114,30 @@ func (t *Table) Build() *Builder {
 			}
 		}
 	}
-	// Apply MaxWidth cap.
 	for i, col := range t.cols {
+		if _, skip := skipMaxCap[i]; skip {
+			continue
+		}
 		if col.MaxWidth > 0 && widths[i] > col.MaxWidth {
 			widths[i] = max(col.MaxWidth, col.MinWidth, 3)
 		}
 	}
+	return widths
+}
 
-	return t.buildWithWidths(widths)
+// Build renders the accumulated table into the parent Builder and returns it
+// for further chaining. Column widths are auto-sized to content,
+// lower-bounded by ColumnDef.MinWidth, at least 3 (minimum for a valid
+// markdown separator), and capped by ColumnDef.MaxWidth when set.
+// Cells exceeding MaxWidth are truncated with ColumnDef.TruncMarker ("...").
+// The pooled Mutable cell buffers are released after rendering.
+// Column.Elastic is silently ignored by Build.
+func (t *Table) Build() *Builder {
+	if len(t.rows) == 0 {
+		return t.mb
+	}
+	defer t.releaseRows()
+	return t.buildWithWidths(t.naturalWidths(nil))
 }
 
 // BuildMaxWidth renders the accumulated table constraining total row width to
@@ -168,29 +174,8 @@ func (t *Table) BuildMaxWidth(maxWidth int) (*Builder, error) {
 		return t.mb, nil
 	}
 
-	// Compute natural widths for all columns (same logic as Build).
-	widths := make([]int, len(t.cols))
-	for i, col := range t.cols {
-		widths[i] = max(utf8.RuneCountInString(col.Name), col.MinWidth, 3)
-	}
-	for _, row := range t.rows {
-		for i, cell := range row {
-			if i < len(widths) {
-				if rw := utf8.RuneCount([]byte(*cell)); rw > widths[i] {
-					widths[i] = rw
-				}
-			}
-		}
-	}
-	// Apply MaxWidth cap to non-elastic columns only.
-	for i, col := range t.cols {
-		if i == elasticIdx {
-			continue
-		}
-		if col.MaxWidth > 0 && widths[i] > col.MaxWidth {
-			widths[i] = max(col.MaxWidth, col.MinWidth, 3)
-		}
-	}
+	// Compute natural widths, skipping MaxWidth cap on the elastic column.
+	widths := t.naturalWidths(map[int]struct{}{elasticIdx: {}})
 
 	// Compute the budget for the elastic column.
 	// Separator overhead: 1 (leading "|") + len(cols)*3 (" x |" per column)

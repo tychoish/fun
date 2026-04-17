@@ -1,6 +1,7 @@
 package mdwn
 
 import (
+	"fmt"
 	"iter"
 	"strings"
 	"testing"
@@ -479,5 +480,59 @@ func TestTableBuildMaxWidth(t *testing.T) {
 		assert.Equal(t, rowWidth(lines[2]), 30)
 		// Col A cell must be truncated to 5 runes (the MaxWidth cap).
 		assert.True(t, strings.Contains(lines[2], "ve..."))
+	})
+}
+
+// TestTableRowCellContentPreserved is a regression test for pool-aliasing
+// corruption in Row and ExtendRow. Before the fix, NewMutable drew *Mutable
+// objects from the pool that could all share the same backing array (via
+// stale pointers deposited by callers that created aliased Mutables and
+// released them). Each PushString call started at offset 0 of that array,
+// so every write overwrote earlier cells. The symptom was that early rows
+// displayed the content of the last-written cell. The fix (MutableFrom)
+// ensures each cell gets its own fresh backing array.
+func TestTableRowCellContentPreserved(t *testing.T) {
+	const n = 30
+	type entry struct{ key, val, note string }
+	rows := make([]entry, n)
+	for i := range n {
+		rows[i] = entry{
+			key:  fmt.Sprintf("key-%02d", i),
+			val:  fmt.Sprintf("val-%02d", i),
+			note: fmt.Sprintf("note-%02d", i),
+		}
+	}
+
+	check := func(t *testing.T, out string) {
+		t.Helper()
+		for i, r := range rows {
+			if !strings.Contains(out, r.key) {
+				t.Errorf("row %d: key %q missing from output", i, r.key)
+			}
+			if !strings.Contains(out, r.val) {
+				t.Errorf("row %d: val %q missing from output", i, r.val)
+			}
+			if !strings.Contains(out, r.note) {
+				t.Errorf("row %d: note %q missing from output", i, r.note)
+			}
+		}
+	}
+
+	t.Run("Row", func(t *testing.T) {
+		var mb Builder
+		tb := mb.NewTable(Column{Name: "Key"}, Column{Name: "Val"}, Column{Name: "Note"})
+		for _, r := range rows {
+			tb.Row(r.key, r.val, r.note)
+		}
+		check(t, tb.Build().String())
+	})
+
+	t.Run("ExtendRow", func(t *testing.T) {
+		var mb Builder
+		tb := mb.NewTable(Column{Name: "Key"}, Column{Name: "Val"}, Column{Name: "Note"})
+		for _, r := range rows {
+			tb.ExtendRow(irt.Slice([]string{r.key, r.val, r.note}))
+		}
+		check(t, tb.Build().String())
 	})
 }
