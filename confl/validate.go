@@ -139,11 +139,6 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 func validateStructField(fs *flag.FlagSet, field reflect.StructField, fval reflect.Value, prefix string, depth int) (hasCmdField, handled bool, err error) {
 	cmdName := field.Tag.Get("cmd")
 	if cmdName != "" {
-		if depth > 0 {
-			return false, false, ers.Wrapf(ErrInvalidSpecification,
-				"field %q: nested cmd: tags (subcommands inside subcommands) are not supported",
-				field.Name)
-		}
 		if !field.IsExported() {
 			return false, false, ers.Wrapf(ErrInvalidSpecification,
 				"field %q with cmd: tag must be exported", field.Name)
@@ -153,7 +148,10 @@ func validateStructField(fs *flag.FlagSet, field reflect.StructField, fval refle
 				"field %q has both flag: and cmd: tags; they are mutually exclusive",
 				field.Name)
 		}
-		if err := validateStruct(fs, fval, "", depth+1); err != nil {
+		// Use a fresh FlagSet per subcommand so duplicate-name detection is
+		// scoped to the subcommand's own flag namespace.
+		subFS := flag.NewFlagSet("validate", flag.ContinueOnError)
+		if err := validateStruct(subFS, fval, "", depth+1); err != nil {
 			return false, false, err
 		}
 		return true, true, nil

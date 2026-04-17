@@ -130,13 +130,8 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 // (false, nil) when the field should be processed as a leaf, and (false, err)
 // on error.
 func bindStructField(fs *flag.FlagSet, field reflect.StructField, fval reflect.Value, prefix string, depth int) (bool, error) {
-	if name := field.Tag.Get("cmd"); name != "" {
-		if depth > 0 {
-			return false, ers.Wrapf(ErrInvalidSpecification,
-				"field %q: nested cmd: tags (subcommands inside subcommands) are not supported",
-				field.Name)
-		}
-		return true, nil // top-level subcommand field; handled by collectSubcommands
+	if field.Tag.Get("cmd") != "" {
+		return true, nil // subcommand field; dispatch handles it, skip in bindFlags
 	}
 	// Unexported struct fields are always recursed without a flag.Value check.
 	if !field.IsExported() {

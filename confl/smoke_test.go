@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun/ers"
 )
 
 // splitArgs splits a space-separated argument string into a []string.
@@ -1354,7 +1353,7 @@ func TestSmoke_Subcommands_conflagureCmd(t *testing.T) {
 		{
 			name: "no-subcommand-errors",
 			args: nil,
-			err:  ers.ErrNotFound,
+			err:  ErrDispatchNoSelection,
 		},
 		{
 			name: "unknown-subcommand-errors",
@@ -1418,9 +1417,9 @@ func TestSmoke_Subcommands_dispatch(t *testing.T) {
 			target: "qa",
 		},
 		{
-			name: "no-subcommand-returns-ErrNotFound",
+			name: "no-subcommand-returns-ErrDispatchNoSelection",
 			args: nil,
-			err:  ers.ErrNotFound,
+			err:  ErrDispatchNoSelection,
 		},
 		{
 			name: "unknown-subcommand-errors",
@@ -1453,17 +1452,17 @@ func TestSmoke_Subcommands_dispatch(t *testing.T) {
 	}
 }
 
-func TestSmoke_Subcommands_RequiredSubcommand(t *testing.T) {
+func TestSmoke_Subcommands_NoSubcommandNamed(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Deploy smokeDeployCmd `cmd:"deploy" required:"true"`
+		Deploy smokeDeployCmd `cmd:"deploy"`
 	}
 
 	var c cfg
 	_, err := conflagureCmd(newTestFS(), &c, nil)
-	if !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("err = %v, want ErrInvalidInput", err)
+	if !errors.Is(err, ErrDispatchNoSelection) {
+		t.Fatalf("err = %v, want ErrDispatchNoSelection", err)
 	}
 }
 

@@ -462,18 +462,34 @@ func TestValidate_subcommand_fields(t *testing.T) {
 		}
 	})
 
-	t.Run("nested cmd at depth>0 errors", func(t *testing.T) {
+	t.Run("nested cmd is valid", func(t *testing.T) {
 		cfg := &struct {
 			Deploy testCmdWithNestedCmd `cmd:"deploy"`
 		}{}
-		err := Validate(cfg)
-		if err == nil {
-			t.Fatal("expected error for nested cmd at depth>0")
-		}
-		if !errors.Is(err, ErrInvalidSpecification) {
-			t.Errorf("err = %v, want ErrInvalidSpecification", err)
+		if err := Validate(cfg); err != nil {
+			t.Errorf("Validate() unexpected error for nested cmd: %v", err)
 		}
 	})
+}
+
+func TestValidate_subcommand_inner_struct_error_propagates(t *testing.T) {
+	t.Parallel()
+
+	// A cmd: field whose inner struct contains an invalid flag spec (bad default).
+	// Covers validate.go:154-156 where validateStruct errors on the subcommand body.
+	type badSub struct {
+		V int `default:"notanint" flag:"v"`
+	}
+	cfg := &struct {
+		Deploy badSub `cmd:"deploy"`
+	}{}
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error from inner struct validation inside cmd: field")
+	}
+	if !errors.Is(err, ErrInvalidSpecification) {
+		t.Errorf("err = %v, want ErrInvalidSpecification", err)
+	}
 }
 
 func TestValidate_namespaced_struct_error_propagates(t *testing.T) {

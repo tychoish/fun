@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tychoish/fun/ers"
 )
 
 type BaseTest struct {
@@ -3088,16 +3087,52 @@ func Test_conflagureCmd_no_subcommand_optional(t *testing.T) {
 
 	var c cfg
 	_, err := conflagureCmd(newTestFS(), &c, []string{"-verbose"})
-	if !isErr(err, ers.ErrNotFound) {
-		t.Errorf("expected ErrNotFound when no subcommand selected, got %v", err)
+	if !isErr(err, ErrDispatchNoSelection) {
+		t.Errorf("expected ErrDispatchNoSelection when no subcommand selected, got %v", err)
 	}
 	if !c.Verbose {
 		t.Error("Verbose not set")
 	}
 }
 
-// testCmdWithNestedCmd is a Commander whose struct body contains a cmd: field,
-// which triggers the nested-cmd error when bindFlags processes it at depth=1.
+// testRestAndCmdSub implements Commander but has both narg:"rest" and a cmd:
+// field, which is an invalid combination. Used to exercise the error path in
+// validateCommanders where collectSubcommands is called on the sub-struct after
+// the outer collect already succeeded.
+type testRestAndCmdSub struct {
+	Rest []string      `narg:"rest"`
+	Sub  testDeployCmd `cmd:"sub"`
+}
+
+func (t *testRestAndCmdSub) Run(_ context.Context) error { return nil }
+
+// testFlagAndCmdField implements Commander and has an inner field that carries
+// both flag: and cmd: tags. The outer collectSubcommands succeeds (bindFlags
+// skips cmd: fields silently), but when selectSubcommand calls collectSubcommands
+// on this struct after dispatch, the flag+cmd conflict is detected.
+// This is the correct type to exercise subcommand.go:163-165.
+type testFlagAndCmdField struct {
+	Sub testDeployCmd `cmd:"sub" flag:"sub"`
+}
+
+func (t *testFlagAndCmdField) Run(_ context.Context) error { return nil }
+
+// testL3NoCommander is a plain struct with no Run method used to test that
+// validateCommanders catches a missing Commander implementation three levels deep.
+type testL3NoCommander struct {
+	V string `flag:"v"`
+}
+
+// testL2WithDeepBadSub has a nested cmd: field whose type does not implement
+// Commander. Used to test the recursive-error path in validateCommanders.
+type testL2WithDeepBadSub struct {
+	Nested testL3NoCommander `cmd:"nested"`
+}
+
+func (t *testL2WithDeepBadSub) Run(_ context.Context) error { return nil }
+
+// testCmdWithNestedCmd is a Commander whose struct body contains a nested cmd:
+// field, allowing multi-level subcommand dispatch.
 type testCmdWithNestedCmd struct {
 	Target string        `flag:"target"`
 	Sub    testDeployCmd `cmd:"sub"`
@@ -3135,20 +3170,17 @@ func Test_conflagureCmd_root_commander(t *testing.T) {
 	}
 }
 
-func Test_conflagureCmd_required_subcommand(t *testing.T) {
+func Test_conflagureCmd_no_subcommand_named(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy" required:"true"`
+		Deploy testDeployCmd `cmd:"deploy"`
 	}
 
 	var c cfg
 	_, err := conflagureCmd(newTestFS(), &c, nil)
-	if err == nil {
-		t.Fatal("expected error for missing required subcommand")
-	}
-	if !isErr(err, ErrInvalidInput) {
-		t.Errorf("error = %v, want ErrInvalidInput", err)
+	if !isErr(err, ErrDispatchNoSelection) {
+		t.Errorf("error = %v, want ErrDispatchNoSelection", err)
 	}
 }
 
@@ -3310,32 +3342,25 @@ func Test_conflagureCmd_no_commander(t *testing.T) {
 	}
 }
 
-// ── nested cmd: tag detection ─────────────────────────────────────────────────
+// ── nested cmd: tag ───────────────────────────────────────────────────────────
 
-func Test_bindFlags_nested_cmd_tag_errors(t *testing.T) {
+func Test_bindFlags_nested_cmd_tag_skipped(t *testing.T) {
 	t.Parallel()
 
-	// A subcommand struct that itself contains a cmd: field.
-	type innerSub struct {
-		testDeployCmd
-
-		Nested testRollbackCmd `cmd:"nested"`
-	}
-	// innerSub must implement Commander for collectSubcommands to accept it.
-	// We can't add methods to local types, so define it at package level.
-	// Instead, confirm the error is triggered from bindFlags when depth=1.
+	// bindFlags silently skips cmd: fields at any depth; subcommand dispatch
+	// handles them separately.
 	fs := newTestFS()
-	type badInner struct {
+	type inner struct {
 		Target string        `flag:"target"`
 		Sub    testDeployCmd `cmd:"sub"`
 	}
-	var b badInner
-	err := bindFlags(fs, reflectVal(&b), "", 1)
-	if err == nil {
-		t.Fatal("expected error for nested cmd: tag at depth > 0")
+	var b inner
+	if err := bindFlags(fs, reflectVal(&b), "", 1); err != nil {
+		t.Errorf("bindFlags() unexpected error for nested cmd: field: %v", err)
 	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
+	// Only -target should be registered; cmd: field is skipped.
+	if fs.Lookup("target") == nil {
+		t.Error("expected -target flag to be registered")
 	}
 }
 
@@ -3359,14 +3384,14 @@ func Test_dispatch_conf_errors(t *testing.T) {
 		}
 	})
 
-	t.Run("no subcommands returns ErrNotFound", func(t *testing.T) {
+	t.Run("no subcommands returns ErrDispatchNoSelection", func(t *testing.T) {
 		type cfg struct {
 			X string `flag:"x"`
 		}
 		var c cfg
 		_, err := dispatch(newTestFS(), &c, nil)
-		if !isErr(err, ers.ErrNotFound) {
-			t.Errorf("expected ErrNotFound when no cmd: fields, got %v", err)
+		if !isErr(err, ErrDispatchNoSelection) {
+			t.Errorf("expected ErrDispatchNoSelection when no cmd: fields, got %v", err)
 		}
 	})
 }
@@ -3566,23 +3591,44 @@ func Test_dispatch_errors(t *testing.T) {
 	})
 }
 
-// Test_collectSubcommands_bindflags_error exercises the path where bindFlags
-// errors while processing a subcommand struct (nested cmd: at depth=1).
-func Test_collectSubcommands_bindflags_error(t *testing.T) {
+// Test_collectSubcommands_nested_cmd collects a subcommand whose struct
+// itself contains a nested cmd: field. Nesting is now supported.
+func Test_collectSubcommands_nested_cmd(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		// testCmdWithNestedCmd implements Commander but has a cmd: field inside,
-		// causing bindFlags to error when called at depth=1.
 		Deploy testCmdWithNestedCmd `cmd:"deploy"`
 	}
 	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
-	if err == nil {
-		t.Fatal("expected error for nested cmd: inside subcommand struct")
+	entries, err := collectSubcommands(reflectVal(&c), "test")
+	if err != nil {
+		t.Fatalf("collectSubcommands() unexpected error: %v", err)
 	}
-	if !isErr(err, ErrInvalidSpecification) {
-		t.Errorf("error = %v, want ErrInvalidSpecification", err)
+	if len(entries) != 1 || entries[0].name != "deploy" {
+		t.Errorf("entries = %v, want [{deploy ...}]", entries)
+	}
+}
+
+// Test_conflagureCmd_nested_subcommand exercises two-level dispatch via
+// conflagureCmd: the outer subcommand itself has a cmd: field.
+func Test_conflagureCmd_nested_subcommand(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Verbose bool                 `flag:"verbose"`
+		Deploy  testCmdWithNestedCmd `cmd:"deploy"`
+	}
+	var c cfg
+	// "deploy sub -target=prod" → global parse, then deploy, then sub.
+	cmd, err := conflagureCmd(newTestFS(), &c, []string{"deploy", "sub", "-target=prod"})
+	if err != nil {
+		t.Fatalf("conflagureCmd() error = %v", err)
+	}
+	if _, ok := cmd.(*testDeployCmd); !ok {
+		t.Errorf("cmd type = %T, want *testDeployCmd", cmd)
+	}
+	if c.Deploy.Sub.Target != "prod" {
+		t.Errorf("Sub.Target = %q, want %q", c.Deploy.Sub.Target, "prod")
 	}
 }
 
@@ -4218,6 +4264,35 @@ func Test_narg_rest_required_in_subcommand_empty(t *testing.T) {
 	}
 }
 
+func Test_tryCastCommander(t *testing.T) {
+	t.Parallel()
+
+	t.Run("implements Commander returns it", func(t *testing.T) {
+		var d testDeployCmd
+		cmd, err := tryCastCommander(&d)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cmd == nil {
+			t.Fatal("expected non-nil Commander")
+		}
+		if _, ok := cmd.(*testDeployCmd); !ok {
+			t.Errorf("cmd type = %T, want *testDeployCmd", cmd)
+		}
+	})
+
+	t.Run("does not implement Commander returns ErrInvalidSpecification", func(t *testing.T) {
+		type plain struct{ X string }
+		_, err := tryCastCommander(&plain{})
+		if err == nil {
+			t.Fatal("expected error for non-Commander type")
+		}
+		if !isErr(err, ErrInvalidSpecification) {
+			t.Errorf("err = %v, want ErrInvalidSpecification", err)
+		}
+	})
+}
+
 func Test_narg_until_short_alias(t *testing.T) {
 	t.Parallel()
 
@@ -4232,5 +4307,123 @@ func Test_narg_until_short_alias(t *testing.T) {
 	}
 	if !reflect.DeepEqual(c.Files, []string{"a.txt", "b.txt"}) {
 		t.Errorf("Files = %v, want [a.txt b.txt]", c.Files)
+	}
+}
+
+// ── coverage: subcommand.go uncovered paths ───────────────────────────────────
+
+// Test_collectSubcommands_bindflags_err covers the error path at
+// subcommand.go:79-81 where bindFlags returns an error while building a
+// subcommand entry (e.g. an unexported flag field inside the subcommand struct).
+func Test_collectSubcommands_bindflags_err(t *testing.T) {
+	t.Parallel()
+
+	// badSub has an unexported field with a flag: tag; bindFlags rejects this.
+	type badSub struct {
+		//nolint:unused
+		secret string `flag:"secret"` //nolint:structcheck
+	}
+	type cfg struct {
+		Deploy badSub `cmd:"deploy"`
+	}
+	var c cfg
+	_, err := collectSubcommands(reflectVal(&c), "test")
+	if err == nil {
+		t.Fatal("expected error from bindFlags for unexported flag field in subcommand")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("err = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_validateCommanders_inner_collectSubcommands_err covers subcommand.go:104-106
+// where collectSubcommands errors on the sub-struct inside validateCommanders.
+// The outer collectSubcommands succeeds because it does not recurse into cmd:
+// fields; only validateCommanders calls collectSubcommands on each entry value.
+func Test_validateCommanders_inner_collectSubcommands_err(t *testing.T) {
+	t.Parallel()
+
+	// testRestAndCmdSub has narg:"rest" and cmd: at the same level — invalid, but
+	// the outer collectSubcommands does not catch it; validateCommanders does.
+	type cfg struct {
+		Deploy testRestAndCmdSub `cmd:"deploy"`
+	}
+	var c cfg
+	entries, err := collectSubcommands(reflectVal(&c), "test")
+	if err != nil {
+		t.Fatalf("outer collectSubcommands() unexpected error: %v", err)
+	}
+	err = validateCommanders(entries)
+	if err == nil {
+		t.Fatal("expected error from collectSubcommands inside validateCommanders")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("err = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_validateCommanders_recursive_err covers subcommand.go:107-109 where
+// the recursive validateCommanders call returns an error because a nested
+// subcommand does not implement Commander.
+func Test_validateCommanders_recursive_err(t *testing.T) {
+	t.Parallel()
+
+	// testL2WithDeepBadSub implements Commander but contains testL3NoCommander
+	// (which does not implement Commander) as a nested subcommand.
+	type cfg struct {
+		Mid testL2WithDeepBadSub `cmd:"mid"`
+	}
+	var c cfg
+	_, err := conflagureCmd(newTestFS(), &c, nil)
+	if err == nil {
+		t.Fatal("expected ErrInvalidSpecification for non-Commander nested subcommand")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("err = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_selectSubcommand_inner_collectSubcommands_err covers subcommand.go:163-165
+// where collectSubcommands errors on the matched subcommand's struct during
+// recursive dispatch. Reached via dispatch (which skips validateCommanders).
+//
+// testFlagAndCmdField is used because its inner flag+cmd conflict is not caught
+// by the outer collectSubcommands (bindFlags skips cmd: fields) or by
+// populateRestField (no rest field), so it reaches line 162 before failing.
+func Test_selectSubcommand_inner_collectSubcommands_err(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Deploy testFlagAndCmdField `cmd:"deploy"`
+	}
+	var c cfg
+	_, err := dispatch(newTestFS(), &c, []string{"deploy"})
+	if err == nil {
+		t.Fatal("expected error from inner collectSubcommands during selectSubcommand")
+	}
+	if !isErr(err, ErrInvalidSpecification) {
+		t.Errorf("err = %v, want ErrInvalidSpecification", err)
+	}
+}
+
+// Test_selectSubcommand_recursive_unknown_subcommand covers subcommand.go:168-170
+// where the recursive selectSubcommand call returns a non-ErrNotFound error
+// (an unknown subcommand name at the nested level).
+func Test_selectSubcommand_recursive_unknown_subcommand(t *testing.T) {
+	t.Parallel()
+
+	// testCmdWithNestedCmd has cmd:"sub" internally. Dispatching to "deploy bogus"
+	// selects deploy, then tries to select "bogus" from deploy's subcommands, which
+	// fails with ErrInvalidInput (unknown subcommand).
+	type cfg struct {
+		Deploy testCmdWithNestedCmd `cmd:"deploy"`
+	}
+	var c cfg
+	_, err := dispatch(newTestFS(), &c, []string{"deploy", "bogus"})
+	if err == nil {
+		t.Fatal("expected error for unknown nested subcommand")
+	}
+	if !isErr(err, ErrInvalidInput) {
+		t.Errorf("err = %v, want ErrInvalidInput", err)
 	}
 }

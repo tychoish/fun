@@ -32,6 +32,28 @@
 // sep:, a single invocation like -tags a:b:c (sep:":") appends three elements.
 // Slice fields with a non-empty default: must carry a sep: tag. The first
 // command-line invocation of a slice flag clears its defaults.
+//
+// # Subcommands
+//
+// Tag exported struct fields cmd:"<name>" to declare subcommands. Global flags
+// belong to the root struct; each subcommand struct carries its own flag: tags.
+//
+//	type CLI struct {
+//	    Verbose bool  `flag:"verbose" short:"v"`
+//	    Serve   Serve `cmd:"serve"   help:"start the server"`
+//	}
+//
+// Use ParseCommand when all subcommand structs implement Commander:
+//
+//	cmd, err := confl.ParseCommand(&CLI{})
+//	if err != nil { log.Fatal(err) }
+//	cmd.Run(ctx)
+//
+// Use Dispatch when subcommand structs do not implement Commander; it returns
+// the selected subcommand as any for the caller to type-switch on.
+//
+// Dispatch and ParseCommand return ErrDispatchNoSelection when the user
+// provides no subcommand name. Subcommands nest to arbitrary depth.
 package confl
 
 import (
@@ -46,6 +68,9 @@ const (
 	ErrInvalidSpecification = ers.Error("incorrect flag/configuration specification")
 	// ErrInvalidInput signals an unparseable user-supplied flag value.
 	ErrInvalidInput = ers.Error("received invalid/impossible flag/configuration")
+	// ErrDispatchNoSelection is returned by Dispatch and ParseCommand when
+	// the caller provided no subcommand name.
+	ErrDispatchNoSelection = ers.Error("no subcommand selected")
 )
 
 // commandLineArgs returns os.Args[1:], or flag.CommandLine.Args() when a prior
@@ -73,9 +98,9 @@ func Dispatch(cfg any) (any, error) {
 
 // ParseCommand parses global flags and selects a subcommand, returning it as a
 // Commander. All cmd: fields must implement Commander; ParseCommand returns an
-// error if any do not. When no subcommand matches and cfg itself implements
-// Commander, ParseCommand returns cfg. ParseCommand returns ers.ErrNotFound
-// when no subcommand matches and cfg does not implement Commander.
+// error if any do not. When no subcommand is named and cfg itself implements
+// Commander, ParseCommand returns cfg. ParseCommand returns ErrDispatchNoSelection
+// when no subcommand is named and cfg does not implement Commander.
 func ParseCommand(cfg any) (Commander, error) {
 	return conflagureCmd(flag.CommandLine, cfg, commandLineArgs())
 }

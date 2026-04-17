@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
 
+	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 )
 
@@ -22,11 +22,10 @@ type Commander interface {
 var commanderType = reflect.TypeFor[Commander]()
 
 type subcommandEntry struct {
-	name     string
-	val      reflect.Value
-	fs       *flag.FlagSet
-	required bool
-	help     string
+	name string
+	val  reflect.Value
+	fs   *flag.FlagSet
+	help string
 }
 
 // collectSubcommands scans the top-level struct val for fields tagged cmd: and
@@ -82,18 +81,18 @@ func collectSubcommands(val reflect.Value, programName string) ([]subcommandEntr
 			return nil, err
 		}
 		entries = append(entries, subcommandEntry{
-			name:     name,
-			val:      fval,
-			fs:       subcmdFS,
-			required: field.Tag.Get("required") == "true",
-			help:     field.Tag.Get("help"),
+			name: name,
+			val:  fval,
+			fs:   subcmdFS,
+			help: field.Tag.Get("help"),
 		})
 	}
 	return entries, nil
 }
 
-// validateCommanders checks that every subcommand entry implements Commander.
-// Used by conflagureCmd/ParseCommand to enforce the Commander contract.
+// validateCommanders checks that every subcommand entry implements Commander,
+// recursing into nested subcommand structs. Used by conflagureCmd/ParseCommand
+// to enforce the Commander contract at all levels.
 func validateCommanders(entries []subcommandEntry) error {
 	for _, e := range entries {
 		addr := e.val.Addr()
@@ -102,30 +101,27 @@ func validateCommanders(entries []subcommandEntry) error {
 				"subcommand %q type %s does not implement Commander",
 				e.name, e.val.Type())
 		}
+		innerEntries, err := collectSubcommands(e.val, e.fs.Name())
+		if err != nil {
+			return err
+		}
+		if err := validateCommanders(innerEntries); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // selectSubcommand picks and parses the subcommand identified by remaining[0].
-// Returns the pointer-to-subcommand-struct as any, or (nil, nil) when no
-// subcommand was selected and none is required.
+// Returns the pointer-to-subcommand-struct as any, or (nil, ers.ErrNotFound)
+// when no subcommand name appears in remaining or no cmd: fields exist.
 func selectSubcommand(entries []subcommandEntry, remaining []string) (any, error) {
 	if len(entries) == 0 {
-		return nil, nil
+		return nil, ers.ErrNotFound
 	}
 
 	if len(remaining) == 0 {
-		for _, e := range entries {
-			if e.required {
-				names := make([]string, len(entries))
-				for i, entry := range entries {
-					names[i] = entry.name
-				}
-				return nil, ers.Wrapf(ErrInvalidInput,
-					"subcommand required; one of: %s", strings.Join(names, ", "))
-			}
-		}
-		return nil, nil
+		return nil, ers.ErrNotFound
 	}
 
 	subcmdName := remaining[0]
@@ -160,6 +156,24 @@ func selectSubcommand(entries []subcommandEntry, remaining []string) (any, error
 		return nil, err
 	}
 
+	// Try to recurse into nested subcommands. If the matched struct has cmd:
+	// fields and a further subcommand name appears in the remaining args, select
+	// it. A ErrNotFound result means no nested subcommand was named; return the
+	// current level instead.
+	innerEntries, err := collectSubcommands(matched.val, matched.fs.Name())
+	if err != nil {
+		return nil, err
+	}
+	if len(innerEntries) > 0 {
+		inner, err := selectSubcommand(innerEntries, matched.fs.Args())
+		if err != nil && !errors.Is(err, ers.ErrNotFound) {
+			return nil, err
+		}
+		if err == nil {
+			return inner, nil
+		}
+	}
+
 	return matched.val.Addr().Interface(), nil
 }
 
@@ -183,10 +197,10 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 
 	result, err := selectSubcommand(entries, fs.Args())
 	if err != nil {
+		if errors.Is(err, ers.ErrNotFound) {
+			return nil, erc.Join(err, ErrDispatchNoSelection)
+		}
 		return nil, err
-	}
-	if result == nil {
-		return nil, ers.ErrNotFound
 	}
 	return result, nil
 }
@@ -195,6 +209,10 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 // selection and flag parsing. It installs a custom Usage function on fs that
 // lists registered subcommands when there are any. All cmd: fields must
 // implement Commander; an error is returned if any do not.
+//
+// conflagureCmd is validate → dispatch → cast: it validates the Commander
+// contract, installs the Usage function, delegates parsing to dispatch, then
+// casts the result to Commander.
 func conflagureCmd(fs *flag.FlagSet, conf any, args []string) (Commander, error) {
 	val, err := unwrapConf(conf)
 	if err != nil {
@@ -230,20 +248,25 @@ func conflagureCmd(fs *flag.FlagSet, conf any, args []string) (Commander, error)
 		}
 	}
 
-	if err := parseAndCheck(fs, val, args); err != nil {
+	result, err := dispatch(fs, conf, args)
+	if err != nil {
+		if errors.Is(err, ErrDispatchNoSelection) {
+			// No subcommand named; return root Commander if conf implements it.
+			if cmd, ok := conf.(Commander); ok {
+				return cmd, nil
+			}
+		}
 		return nil, err
 	}
 
-	result, err := selectSubcommand(entries, fs.Args())
-	if err != nil {
-		return nil, err
+	return tryCastCommander(result)
+}
+
+func tryCastCommander[T any](result T) (Commander, error) {
+	cmd, ok := any(result).(Commander)
+	if !ok {
+		return nil, ers.Wrapf(ErrInvalidSpecification,
+			"selected subcommand type %T does not implement Commander", result)
 	}
-	if result != nil {
-		return result.(Commander), nil
-	}
-	// No subcommand selected; return root Commander if conf implements it.
-	if cmd, ok := conf.(Commander); ok {
-		return cmd, nil
-	}
-	return nil, ers.ErrNotFound
+	return cmd, nil
 }
