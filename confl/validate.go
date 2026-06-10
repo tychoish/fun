@@ -3,6 +3,7 @@ package confl
 import (
 	"flag"
 	"reflect"
+	"strings"
 
 	"github.com/tychoish/fun/ers"
 )
@@ -68,11 +69,38 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 			continue
 		}
 
+		// env: requires flag:
+		if _, hasEnv := field.Tag.Lookup("env"); hasEnv && name == "" {
+			return ers.Wrapf(ErrInvalidSpecification,
+				"field %q has env: tag but no flag: tag; env: requires flag:", field.Name)
+		}
+
 		if name == "" {
 			continue
 		}
 		if err := checkExportedFlag(field, name); err != nil {
 			return err
+		}
+
+		// ── env: / opts: tag validation ───────────────────────────────────────
+		envTag, hasEnv := field.Tag.Lookup("env")
+		if hasEnv && strings.TrimSpace(envTag) == "" {
+			return ers.Wrapf(ErrInvalidSpecification,
+				"field %q has an empty env: tag; provide at least one env var name", field.Name)
+		}
+		if optsTag := field.Tag.Get("opts"); optsTag != "" {
+			if !hasEnv {
+				return ers.Wrapf(ErrInvalidSpecification,
+					"field %q has opts: tag but no env: tag; opts: is only meaningful with env:", field.Name)
+			}
+			for _, part := range splitTrimmed(optsTag, ",") {
+				if !isKnownEnvOpt(part) {
+					return ers.Wrapf(ErrInvalidSpecification,
+						"field %q has unknown opts: value %q (known: %s, %s, %s, %s, %s)",
+						field.Name, part,
+						envOptNonEmptyOnly, envOptTakesPriority, envOptOrCLI, envOptExclusive, envOptLastWins)
+				}
+			}
 		}
 
 		// ── sep: tag ─────────────────────────────────────────────────────────

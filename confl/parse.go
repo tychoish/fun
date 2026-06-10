@@ -14,6 +14,75 @@ import (
 	"github.com/tychoish/fun/ers"
 )
 
+const (
+	envOptNonEmptyOnly  = "env-nonempty-only"
+	envOptTakesPriority = "env-takes-priority"
+	envOptOrCLI         = "env-or-cli"
+	envOptExclusive     = "env-exclusive"
+	envOptLastWins      = "env-last-wins"
+)
+
+type envOpts struct {
+	nonEmptyOnly  bool // envOptNonEmptyOnly: skip env vars with empty value
+	takesPriority bool // envOptTakesPriority: env wins silently over CLI
+	orCLI         bool // envOptOrCLI: error if both env var and CLI flag are set
+	exclusive     bool // envOptExclusive: CLI flag is always an error; only env var accepted
+	lastWins      bool // envOptLastWins: last set env var in list wins
+}
+
+func isKnownEnvOpt(s string) bool {
+	switch s {
+	case envOptNonEmptyOnly, envOptTakesPriority, envOptOrCLI, envOptExclusive, envOptLastWins:
+		return true
+	default:
+		return false
+	}
+}
+
+func parseEnvOpts(optsTag string) envOpts {
+	var o envOpts
+	for _, part := range splitTrimmed(optsTag, ",") {
+		switch part {
+		case envOptNonEmptyOnly:
+			o.nonEmptyOnly = true
+		case envOptTakesPriority:
+			o.takesPriority = true
+		case envOptOrCLI:
+			o.orCLI = true
+		case envOptExclusive:
+			o.exclusive = true
+		case envOptLastWins:
+			o.lastWins = true
+		}
+	}
+	return o
+}
+
+func resolveEnvVars(vars []string, opts envOpts) (string, bool) {
+	if opts.lastWins {
+		for i := len(vars) - 1; i >= 0; i-- {
+			if v, ok := os.LookupEnv(vars[i]); ok {
+				if opts.nonEmptyOnly && v == "" {
+					continue
+				}
+				return v, true
+			}
+		}
+		return "", false
+	}
+	for _, name := range vars {
+		v, ok := os.LookupEnv(name)
+		if !ok {
+			continue
+		}
+		if opts.nonEmptyOnly && v == "" {
+			continue
+		}
+		return v, true
+	}
+	return "", false
+}
+
 // timeTimeType is the reflect.Type for time.Time. Used to detect time.Time
 // struct fields in bindFlags and checkRequired so they are treated as leaves
 // rather than recursed into.
@@ -52,6 +121,10 @@ func parseAndCheck(fs *flag.FlagSet, val reflect.Value, args []string) error {
 	}
 
 	if err := populateRestField(val, fs.Args()); err != nil {
+		return err
+	}
+
+	if err := applyEnvVars(fs, val, ""); err != nil {
 		return err
 	}
 
@@ -417,4 +490,90 @@ func expandUntilArgs(args []string, untilFlags map[string]bool) []string {
 		}
 	}
 	return result
+}
+
+// applyEnvVars walks val and applies environment variable values to fields
+// tagged with env:. It uses fs.Visit to determine which flags were explicitly
+// set on the CLI; CLI values always take priority over env vars.
+func applyEnvVars(fs *flag.FlagSet, val reflect.Value, prefix string) error {
+	cliSet := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { cliSet[f.Name] = true })
+	return applyEnvVarsWalk(fs, val, prefix, cliSet)
+}
+
+// applyEnvVarsWalk is the recursive implementation of applyEnvVars. It mirrors
+// the struct-walk logic of collectUntilFlags (same prefix accumulation, cmd
+// skip, unexported recurse, flag.Value leaf-stop).
+func applyEnvVarsWalk(fs *flag.FlagSet, val reflect.Value, prefix string, cliSet map[string]bool) error {
+	t := val.Type()
+	for i := range t.NumField() {
+		field := t.Field(i)
+		fval := val.Field(i)
+
+		if fval.Kind() == reflect.Struct && fval.Type() != timeTimeType {
+			if field.Tag.Get("cmd") != "" {
+				continue
+			}
+			if !field.IsExported() {
+				if err := applyEnvVarsWalk(fs, fval, prefix, cliSet); err != nil {
+					return err
+				}
+				continue
+			}
+			if _, ok := fval.Addr().Interface().(flag.Value); !ok {
+				childPrefix := prefix
+				if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
+					childPrefix = joinStr(prefix, ns, ".")
+				}
+				if err := applyEnvVarsWalk(fs, fval, childPrefix, cliSet); err != nil {
+					return err
+				}
+				continue
+			}
+			// flag.Value implementation: fall through to leaf check
+		}
+
+		name := field.Tag.Get("flag")
+		envTag := field.Tag.Get("env")
+		if name == "" || envTag == "" {
+			continue
+		}
+		fullName := joinStr(prefix, name)
+		opts := parseEnvOpts(field.Tag.Get("opts"))
+
+		short := field.Tag.Get("short")
+		cliWasSet := cliSet[fullName] || (short != "" && cliSet[short])
+
+		// envOptExclusive: CLI flag is never accepted regardless of env var state.
+		if opts.exclusive && cliWasSet {
+			return ers.Wrapf(ErrInvalidInput,
+				"flag -%s: CLI flag not accepted; use env var only (%s)", fullName, envOptExclusive)
+		}
+
+		envVal, envFound := resolveEnvVars(splitTrimmed(envTag, ","), opts)
+		if !envFound {
+			continue
+		}
+
+		// envOptOrCLI: error if both sources are provided.
+		if opts.orCLI && cliWasSet {
+			return ers.Wrapf(ErrInvalidInput,
+				"flag -%s: cannot specify both env var and CLI flag (%s)", fullName, envOptOrCLI)
+		}
+
+		if cliWasSet && !opts.takesPriority {
+			continue // CLI takes priority unless envOptTakesPriority
+		}
+		// envOptTakesPriority: fall through to apply env var even when CLI was set
+
+		f := fs.Lookup(fullName)
+		if f == nil {
+			// Inverted bool (default:"true") registers as "no-<name>"; skip silently.
+			continue
+		}
+		if err := f.Value.Set(envVal); err != nil {
+			return ers.Wrapf(ErrInvalidInput, "env var for flag -%s: %w", fullName, err)
+		}
+	}
+	return nil
 }

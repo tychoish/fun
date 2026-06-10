@@ -14,6 +14,31 @@
 //   - narg:"until"     collect args until the next flag (requires flag:)
 //   - cmd:"name"       declare a subcommand field (use ParseCommand or Dispatch)
 //   - format:"layout"  Go reference-time layout string for time.Time fields
+//   - env:"VAR1,VAR2"  env var names to check; requires flag:
+//   - opts:"..."       comma-separated options controlling env var behaviour
+//
+// # Environment variables
+//
+// A field tagged env:"VAR" is populated from the environment when no CLI flag
+// was provided. Multiple names may be listed: env:"PRIMARY,FALLBACK". By
+// default the first variable that is set (as reported by os.LookupEnv) wins,
+// regardless of its value. The CLI flag always takes priority over any env var.
+//
+// The opts: tag accepts a comma-separated list of the following options; order
+// does not matter, and options may be freely combined:
+//
+//   - env-nonempty-only      skip env vars that are set but have an empty value;
+//                            the search continues to the next name in the list
+//   - env-last-wins          use the last set var in the list instead of the first;
+//                            combined with env-nonempty-only this gives the last
+//                            non-empty var
+//   - env-takes-priority     env var wins over the CLI flag when both are provided;
+//                            the CLI value is silently ignored
+//   - env-or-cli             either source may be used, but providing both is an
+//                            error; an empty env var counts as unset when combined
+//                            with env-nonempty-only
+//   - env-exclusive          the CLI flag is never accepted; any CLI value is an
+//                            error regardless of whether the env var is set
 //
 // # Supported types
 //

@@ -3,6 +3,7 @@ package confl
 import (
 	"flag"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/tychoish/fun/ers"
@@ -114,4 +115,19 @@ func registerAlias(spec flagSpec, register func(name, usage string)) {
 	if spec.Short != "" {
 		register(spec.Short, joinStr("short for -", spec.Name))
 	}
+}
+
+// splitTrimmed splits s on sep and returns non-empty trimmed tokens.
+func splitTrimmed(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+
+	return slices.Collect(func(yield func(string) bool) {
+		for p := range strings.SplitSeq(s, sep) {
+			if !yield(strings.TrimSpace(p)) {
+				return
+			}
+		}
+	})
 }
