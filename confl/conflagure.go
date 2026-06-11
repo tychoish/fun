@@ -28,17 +28,17 @@
 // does not matter, and options may be freely combined:
 //
 //   - env-nonempty-only      skip env vars that are set but have an empty value;
-//                            the search continues to the next name in the list
+//     the search continues to the next name in the list
 //   - env-last-wins          use the last set var in the list instead of the first;
-//                            combined with env-nonempty-only this gives the last
-//                            non-empty var
+//     combined with env-nonempty-only this gives the last
+//     non-empty var
 //   - env-takes-priority     env var wins over the CLI flag when both are provided;
-//                            the CLI value is silently ignored
+//     the CLI value is silently ignored
 //   - env-or-cli             either source may be used, but providing both is an
-//                            error; an empty env var counts as unset when combined
-//                            with env-nonempty-only
+//     error; an empty env var counts as unset when combined
+//     with env-nonempty-only
 //   - env-exclusive          the CLI flag is never accepted; any CLI value is an
-//                            error regardless of whether the env var is set
+//     error regardless of whether the env var is set
 //
 // # Supported types
 //

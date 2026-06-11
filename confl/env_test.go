@@ -11,7 +11,7 @@ import (
 
 func Test_env_basic(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_HOST"`
+		Host string `env:"CONFL_TEST_HOST" flag:"host"`
 	}
 
 	tests := []struct {
@@ -40,7 +40,7 @@ func Test_env_basic(t *testing.T) {
 
 func Test_env_with_default(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" default:"localhost" env:"CONFL_TEST_HOST2"`
+		Host string `default:"localhost" env:"CONFL_TEST_HOST2" flag:"host"`
 	}
 
 	tests := []struct {
@@ -71,7 +71,7 @@ func Test_env_with_default(t *testing.T) {
 
 func Test_env_multiple_first_wins(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_HOST_A,CONFL_TEST_HOST_B"`
+		Host string `env:"CONFL_TEST_HOST_A,CONFL_TEST_HOST_B" flag:"host"`
 	}
 
 	tests := []struct {
@@ -105,7 +105,7 @@ func Test_env_multiple_first_wins(t *testing.T) {
 
 func Test_env_last_wins(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_LW_A,CONFL_TEST_LW_B" opts:"env-last-wins"`
+		Host string `env:"CONFL_TEST_LW_A,CONFL_TEST_LW_B" flag:"host" opts:"env-last-wins"`
 	}
 
 	tests := []struct {
@@ -139,7 +139,7 @@ func Test_env_last_wins(t *testing.T) {
 
 func Test_env_nonempty_only(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_IE_A,CONFL_TEST_IE_B" opts:"env-nonempty-only"`
+		Host string `env:"CONFL_TEST_IE_A,CONFL_TEST_IE_B" flag:"host" opts:"env-nonempty-only"`
 	}
 
 	tests := []struct {
@@ -172,7 +172,7 @@ func Test_env_nonempty_only(t *testing.T) {
 
 func Test_env_no_ignore_empty_applies_empty(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" default:"localhost" env:"CONFL_TEST_NONIE"`
+		Host string `default:"localhost" env:"CONFL_TEST_NONIE" flag:"host"`
 	}
 
 	t.Setenv("CONFL_TEST_NONIE", "")
@@ -185,7 +185,7 @@ func Test_env_no_ignore_empty_applies_empty(t *testing.T) {
 
 func Test_env_or_cli(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_EOC" opts:"env-or-cli"`
+		Host string `env:"CONFL_TEST_EOC" flag:"host" opts:"env-or-cli"`
 	}
 
 	tests := []struct {
@@ -222,7 +222,7 @@ func Test_env_or_cli(t *testing.T) {
 
 func Test_env_or_cli_short(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" short:"H" env:"CONFL_TEST_EOC_SHORT" opts:"env-or-cli"`
+		Host string `env:"CONFL_TEST_EOC_SHORT" flag:"host" opts:"env-or-cli" short:"H"`
 	}
 
 	t.Setenv("CONFL_TEST_EOC_SHORT", "from-env")
@@ -236,7 +236,7 @@ func Test_env_or_cli_short(t *testing.T) {
 
 func Test_env_takes_priority(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_ETP" opts:"env-takes-priority"`
+		Host string `env:"CONFL_TEST_ETP" flag:"host" opts:"env-takes-priority"`
 	}
 
 	tests := []struct {
@@ -266,7 +266,7 @@ func Test_env_takes_priority(t *testing.T) {
 
 func Test_env_takes_priority_short(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" short:"H" env:"CONFL_TEST_ETP_SHORT" opts:"env-takes-priority"`
+		Host string `env:"CONFL_TEST_ETP_SHORT" flag:"host" opts:"env-takes-priority" short:"H"`
 	}
 
 	t.Setenv("CONFL_TEST_ETP_SHORT", "from-env")
@@ -279,7 +279,7 @@ func Test_env_takes_priority_short(t *testing.T) {
 
 func Test_env_exclusive(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_EX" opts:"env-exclusive"`
+		Host string `env:"CONFL_TEST_EX" flag:"host" opts:"env-exclusive"`
 	}
 
 	tests := []struct {
@@ -316,7 +316,7 @@ func Test_env_exclusive(t *testing.T) {
 
 func Test_env_exclusive_short(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" short:"H" env:"CONFL_TEST_EX_SHORT" opts:"env-exclusive"`
+		Host string `env:"CONFL_TEST_EX_SHORT" flag:"host" opts:"env-exclusive" short:"H"`
 	}
 
 	// Short flag also rejected under env-exclusive.
@@ -332,7 +332,7 @@ func Test_env_exclusive_short(t *testing.T) {
 // env-last-wins: the last *non-empty* env var in the list wins.
 func Test_env_nonempty_last_wins(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_NLW_A,CONFL_TEST_NLW_B" opts:"env-nonempty-only,env-last-wins"`
+		Host string `env:"CONFL_TEST_NLW_A,CONFL_TEST_NLW_B" flag:"host" opts:"env-nonempty-only,env-last-wins"`
 	}
 
 	tests := []struct {
@@ -368,10 +368,10 @@ func Test_env_nonempty_last_wins(t *testing.T) {
 // Test_env_option_order verifies that opts order does not affect behaviour.
 func Test_env_option_order(t *testing.T) {
 	type cfgAB struct {
-		Host string `flag:"host" env:"CONFL_TEST_ORD_A,CONFL_TEST_ORD_B" opts:"env-nonempty-only,env-last-wins"`
+		Host string `env:"CONFL_TEST_ORD_A,CONFL_TEST_ORD_B" flag:"host" opts:"env-nonempty-only,env-last-wins"`
 	}
 	type cfgBA struct {
-		Host string `flag:"host" env:"CONFL_TEST_ORD_A,CONFL_TEST_ORD_B" opts:"env-last-wins,env-nonempty-only"`
+		Host string `env:"CONFL_TEST_ORD_A,CONFL_TEST_ORD_B" flag:"host" opts:"env-last-wins,env-nonempty-only"`
 	}
 
 	// A=empty, B=value; last non-empty wins → B.
@@ -392,7 +392,7 @@ func Test_env_option_order(t *testing.T) {
 // an empty env var is treated as unset, so CLI is not blocked by it.
 func Test_env_nonempty_or_cli(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_NOC" opts:"env-nonempty-only,env-or-cli"`
+		Host string `env:"CONFL_TEST_NOC" flag:"host" opts:"env-nonempty-only,env-or-cli"`
 	}
 
 	tests := []struct {
@@ -431,7 +431,7 @@ func Test_env_nonempty_or_cli(t *testing.T) {
 // env-takes-priority: only non-empty env vars override CLI.
 func Test_env_nonempty_takes_priority(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_NTP" opts:"env-nonempty-only,env-takes-priority"`
+		Host string `env:"CONFL_TEST_NTP" flag:"host" opts:"env-nonempty-only,env-takes-priority"`
 	}
 
 	tests := []struct {
@@ -462,7 +462,7 @@ func Test_env_nonempty_takes_priority(t *testing.T) {
 // env-exclusive: CLI is always rejected regardless of whether the env var is empty.
 func Test_env_nonempty_exclusive(t *testing.T) {
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_NEX" opts:"env-nonempty-only,env-exclusive"`
+		Host string `env:"CONFL_TEST_NEX" flag:"host" opts:"env-nonempty-only,env-exclusive"`
 	}
 
 	tests := []struct {
@@ -515,7 +515,7 @@ func Test_env_validate_empty_env_tag(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Host string `flag:"host" env:""`
+		Host string `env:"" flag:"host"`
 	}
 
 	err := Validate(&cfg{})
@@ -539,7 +539,7 @@ func Test_env_validate_unknown_opts(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Host string `flag:"host" env:"CONFL_TEST_V" opts:"nonexistent-option"`
+		Host string `env:"CONFL_TEST_V" flag:"host" opts:"nonexistent-option"`
 	}
 
 	err := Validate(&cfg{})
@@ -553,11 +553,11 @@ func Test_env_validate_valid_opts(t *testing.T) {
 	// Exercise isKnownEnvOpt's return-true path: all known option values must
 	// pass validation without error.
 	type cfg struct {
-		A string `flag:"a" env:"CONFL_TEST_VAL_A" opts:"env-nonempty-only"`
-		B string `flag:"b" env:"CONFL_TEST_VAL_B" opts:"env-takes-priority"`
-		C string `flag:"c" env:"CONFL_TEST_VAL_C" opts:"env-or-cli"`
-		D string `flag:"d" env:"CONFL_TEST_VAL_D" opts:"env-exclusive"`
-		E string `flag:"e" env:"CONFL_TEST_VAL_E" opts:"env-last-wins"`
+		A string `env:"CONFL_TEST_VAL_A" flag:"a" opts:"env-nonempty-only"`
+		B string `env:"CONFL_TEST_VAL_B" flag:"b" opts:"env-takes-priority"`
+		C string `env:"CONFL_TEST_VAL_C" flag:"c" opts:"env-or-cli"`
+		D string `env:"CONFL_TEST_VAL_D" flag:"d" opts:"env-exclusive"`
+		E string `env:"CONFL_TEST_VAL_E" flag:"e" opts:"env-last-wins"`
 	}
 
 	assert.NotError(t, Validate(&cfg{}))
@@ -567,7 +567,7 @@ func Test_env_validate_valid_opts(t *testing.T) {
 
 func Test_env_anonymous_embedded(t *testing.T) {
 	type Base struct {
-		Host string `flag:"host" env:"CONFL_TEST_ANON_HOST"`
+		Host string `env:"CONFL_TEST_ANON_HOST" flag:"host"`
 	}
 	type cfg struct {
 		Base
@@ -581,7 +581,7 @@ func Test_env_anonymous_embedded(t *testing.T) {
 
 func Test_env_named_substruct_flat(t *testing.T) {
 	type Sub struct {
-		Host string `flag:"host" env:"CONFL_TEST_FLAT_HOST"`
+		Host string `env:"CONFL_TEST_FLAT_HOST" flag:"host"`
 	}
 	type cfg struct {
 		Sub Sub // no flag: tag on Sub → flat namespace
@@ -595,7 +595,7 @@ func Test_env_named_substruct_flat(t *testing.T) {
 
 func Test_env_named_substruct_namespaced(t *testing.T) {
 	type Sub struct {
-		Host string `flag:"host" env:"CONFL_TEST_NS_HOST"`
+		Host string `env:"CONFL_TEST_NS_HOST" flag:"host"`
 	}
 	type cfg struct {
 		Sub Sub `flag:"srv"` // creates prefix "srv."
@@ -609,7 +609,7 @@ func Test_env_named_substruct_namespaced(t *testing.T) {
 
 func Test_env_cmd_field_not_touched(t *testing.T) {
 	type Sub struct {
-		Host string `flag:"host" env:"CONFL_TEST_CMD_HOST"`
+		Host string `env:"CONFL_TEST_CMD_HOST" flag:"host"`
 	}
 	type cfg struct {
 		Sub Sub `cmd:"sub"`
@@ -627,7 +627,7 @@ func Test_env_cmd_field_not_touched(t *testing.T) {
 // flag: and env: tags must still be populated from the environment.
 func Test_env_unexported_struct_field(t *testing.T) {
 	type inner struct {
-		Host string `flag:"host" env:"CONFL_TEST_UNEXP_HOST"`
+		Host string `env:"CONFL_TEST_UNEXP_HOST" flag:"host"`
 	}
 	type cfg struct {
 		inner // unexported anonymous embedding
@@ -644,7 +644,7 @@ func Test_env_unexported_struct_field(t *testing.T) {
 // treated as a leaf and the env var value is applied via its Set method.
 func Test_env_flag_value_struct(t *testing.T) {
 	type cfg struct {
-		V testFlagValue `flag:"v" env:"CONFL_TEST_FV"`
+		V testFlagValue `env:"CONFL_TEST_FV" flag:"v"`
 	}
 
 	t.Setenv("CONFL_TEST_FV", "from-env")
@@ -659,7 +659,7 @@ func Test_env_flag_value_struct(t *testing.T) {
 // so fs.Lookup(name) returns nil and the env var is silently ignored.
 func Test_env_inverted_bool_skipped(t *testing.T) {
 	type cfg struct {
-		Verbose bool `flag:"verbose" default:"true" env:"CONFL_TEST_INV_BOOL"`
+		Verbose bool `default:"true" env:"CONFL_TEST_INV_BOOL" flag:"verbose"`
 	}
 
 	// Env var is set, but the flag was registered as "no-verbose" (inverted).
@@ -675,7 +675,7 @@ func Test_env_inverted_bool_skipped(t *testing.T) {
 // a typed field inside an unexported struct must propagate the error up.
 func Test_env_unexported_struct_error(t *testing.T) {
 	type inner struct {
-		Count int `flag:"count" env:"CONFL_TEST_UNEXP_ERR"`
+		Count int `env:"CONFL_TEST_UNEXP_ERR" flag:"count"`
 	}
 	type cfg struct {
 		inner
@@ -693,7 +693,7 @@ func Test_env_unexported_struct_error(t *testing.T) {
 // value for a typed field inside a named exported struct must propagate up.
 func Test_env_exported_struct_error(t *testing.T) {
 	type Sub struct {
-		Count int `flag:"count" env:"CONFL_TEST_EXP_ERR"`
+		Count int `env:"CONFL_TEST_EXP_ERR" flag:"count"`
 	}
 	type cfg struct {
 		Sub Sub
@@ -710,7 +710,7 @@ func Test_env_exported_struct_error(t *testing.T) {
 
 func Test_env_satisfies_required(t *testing.T) {
 	type cfg struct {
-		Token string `flag:"token" env:"CONFL_TEST_REQ_TOKEN" required:"true"`
+		Token string `env:"CONFL_TEST_REQ_TOKEN" flag:"token" required:"true"`
 	}
 
 	t.Setenv("CONFL_TEST_REQ_TOKEN", "secret")
@@ -723,7 +723,7 @@ func Test_env_required_neither_set(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Token string `flag:"token" env:"CONFL_TEST_REQ_MISS" required:"true"`
+		Token string `env:"CONFL_TEST_REQ_MISS" flag:"token" required:"true"`
 	}
 
 	var c cfg
@@ -736,7 +736,7 @@ func Test_env_required_neither_set(t *testing.T) {
 
 func Test_env_int(t *testing.T) {
 	type cfg struct {
-		Count int `flag:"count" env:"CONFL_TEST_INT_COUNT"`
+		Count int `env:"CONFL_TEST_INT_COUNT" flag:"count"`
 	}
 
 	t.Setenv("CONFL_TEST_INT_COUNT", "42")
@@ -747,7 +747,7 @@ func Test_env_int(t *testing.T) {
 
 func Test_env_int_invalid(t *testing.T) {
 	type cfg struct {
-		Count int `flag:"count" env:"CONFL_TEST_INT_BAD"`
+		Count int `env:"CONFL_TEST_INT_BAD" flag:"count"`
 	}
 
 	t.Setenv("CONFL_TEST_INT_BAD", "not-a-number")
@@ -759,7 +759,7 @@ func Test_env_int_invalid(t *testing.T) {
 
 func Test_env_bool(t *testing.T) {
 	type cfg struct {
-		Verbose bool `flag:"verbose" env:"CONFL_TEST_BOOL_V"`
+		Verbose bool `env:"CONFL_TEST_BOOL_V" flag:"verbose"`
 	}
 
 	tests := []struct {
@@ -785,7 +785,7 @@ func Test_env_bool(t *testing.T) {
 
 func Test_env_string_slice(t *testing.T) {
 	type cfg struct {
-		Tags []string `flag:"tags" sep:"," env:"CONFL_TEST_TAGS"`
+		Tags []string `env:"CONFL_TEST_TAGS" flag:"tags" sep:","`
 	}
 
 	t.Setenv("CONFL_TEST_TAGS", "a,b,c")
