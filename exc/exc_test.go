@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -228,6 +229,19 @@ func TestCommand_Resolve(t *testing.T) {
 					c.SetEnvVar("B", "2")
 				},
 				wantEnv: []string{"A=1", "B=2"},
+			},
+			{
+				name: "InheritEnvWithVar",
+				setup: func(c *exc.Command) {
+					c.WithInheritEnv()
+					c.SetEnvVar("EXTRA", "added")
+				},
+				wantEnv: []string{"EXTRA=added"},
+			},
+			{
+				name:    "InheritEnvEmptyEnvIsNil",
+				setup:   func(c *exc.Command) { c.WithInheritEnv() },
+				wantNil: true,
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -1398,6 +1412,167 @@ func TestResolveError(t *testing.T) {
 		}
 		if e.Err == nil {
 			t.Error("Error.Err should not be nil")
+		}
+	})
+}
+
+func TestCommand_InheritEnv(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WithInheritEnvReturnsSamePointer", func(t *testing.T) {
+		cmd := &exc.Command{}
+		if cmd.WithInheritEnv() != cmd {
+			t.Error("WithInheritEnv did not return same pointer")
+		}
+	})
+
+	t.Run("WithInheritEnvSetsFlag", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithInheritEnv()
+		if !cmd.InheritEnv {
+			t.Error("InheritEnv = false after WithInheritEnv()")
+		}
+	})
+
+	t.Run("ResentEnvClearsFlag", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithInheritEnv()
+		cmd.SetEnvVar("K", "v")
+		cmd.ResentEnv()
+		if cmd.InheritEnv {
+			t.Error("InheritEnv = true after ResentEnv()")
+		}
+	})
+
+	t.Run("CloneCopiesInheritEnvTrue", func(t *testing.T) {
+		orig := (&exc.Command{}).WithInheritEnv()
+		c := orig.Clone()
+		if !c.InheritEnv {
+			t.Error("clone InheritEnv = false, want true")
+		}
+	})
+
+	t.Run("CloneCopiesInheritEnvFalse", func(t *testing.T) {
+		orig := &exc.Command{}
+		c := orig.Clone()
+		if c.InheritEnv {
+			t.Error("clone InheritEnv = true, want false")
+		}
+	})
+
+	t.Run("CloneInheritEnvIsIndependent", func(t *testing.T) {
+		orig := (&exc.Command{}).WithInheritEnv()
+		c := orig.Clone()
+		c.InheritEnv = false
+		if !orig.InheritEnv {
+			t.Error("mutating clone's InheritEnv changed original")
+		}
+	})
+
+	t.Run("ResolveContainsParentEnvWhenInheritEnvTrue", func(t *testing.T) {
+		// PATH must exist in every test environment.
+		parentPath := os.Getenv("PATH")
+		if parentPath == "" {
+			t.Skip("PATH not set; cannot verify parent env inheritance")
+		}
+		cmd := (&exc.Command{}).WithName("true").WithInheritEnv()
+		cmd.SetEnvVar("EXTRA_EXC_TEST", "1")
+		cc := cmd.Resolve(context.Background())
+		foundPATH := false
+		for _, e := range cc.Env {
+			if strings.HasPrefix(e, "PATH=") {
+				foundPATH = true
+				break
+			}
+		}
+		if !foundPATH {
+			t.Error("Resolve() Env does not contain PATH from parent environment")
+		}
+		if !slices.Contains(cc.Env, "EXTRA_EXC_TEST=1") {
+			t.Error("Resolve() Env does not contain explicitly set EXTRA_EXC_TEST")
+		}
+	})
+
+	t.Run("ResolveExcludesParentEnvWhenInheritEnvFalse", func(t *testing.T) {
+		cmd := (&exc.Command{}).WithName("true")
+		cmd.SetEnvVar("ONLY_EXPLICIT", "yes")
+		cc := cmd.Resolve(context.Background())
+		for _, e := range cc.Env {
+			if strings.HasPrefix(e, "PATH=") {
+				t.Errorf("Env contains PATH from parent when InheritEnv=false: %q", e)
+			}
+		}
+		if !slices.Contains(cc.Env, "ONLY_EXPLICIT=yes") {
+			t.Error("Resolve() Env missing explicitly set ONLY_EXPLICIT")
+		}
+	})
+
+}
+
+// TestCommand_InheritEnvProcess covers the observable runtime behavior of
+// InheritEnv. These tests mutate the process environment via t.Setenv and
+// therefore cannot run in parallel.
+func TestCommand_InheritEnvProcess(t *testing.T) {
+	t.Run("ProcessSeesParentEnvVarWhenInheritEnvTrue", func(t *testing.T) {
+		t.Setenv("EXC_INHERIT_PARENT_VAR", "inherited")
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", "printf '%s' \"$EXC_INHERIT_PARENT_VAR\"").
+			WithStdOutput(&buf).
+			WithInheritEnv()
+		cmd.SetEnvVar("EXTRA", "x")
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if buf.String() != "inherited" {
+			t.Errorf("output = %q, want %q; parent env var not visible to child", buf.String(), "inherited")
+		}
+	})
+
+	t.Run("ProcessDoesNotSeeParentEnvVarWhenInheritEnvFalse", func(t *testing.T) {
+		t.Setenv("EXC_ISOLATED_VAR", "should_not_appear")
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", "printf '%s' \"${EXC_ISOLATED_VAR:-absent}\"").
+			WithStdOutput(&buf)
+		cmd.SetEnvVar("PATH", os.Getenv("PATH")) // sh needs PATH to resolve builtins
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if buf.String() != "absent" {
+			t.Errorf("output = %q, want %q; parent env var leaked to isolated child", buf.String(), "absent")
+		}
+	})
+
+	t.Run("ExplicitVarVisibleWithInheritEnvFalse", func(t *testing.T) {
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", "printf '%s' \"$EXC_EXPLICIT_VAR\"").
+			WithStdOutput(&buf)
+		cmd.SetEnvVar("EXC_EXPLICIT_VAR", "explicit_val")
+		cmd.SetEnvVar("PATH", os.Getenv("PATH"))
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if buf.String() != "explicit_val" {
+			t.Errorf("output = %q, want %q", buf.String(), "explicit_val")
+		}
+	})
+
+	t.Run("ExplicitVarVisibleWithInheritEnvTrue", func(t *testing.T) {
+		var buf bytes.Buffer
+		cmd := (&exc.Command{}).
+			WithName("sh").
+			WithArgs("-c", "printf '%s' \"$EXC_EXPLICIT_INHERIT_VAR\"").
+			WithStdOutput(&buf).
+			WithInheritEnv()
+		cmd.SetEnvVar("EXC_EXPLICIT_INHERIT_VAR", "explicit_with_inherit")
+		if err := cmd.Run(context.Background()); err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+		if buf.String() != "explicit_with_inherit" {
+			t.Errorf("output = %q, want %q", buf.String(), "explicit_with_inherit")
 		}
 	})
 }

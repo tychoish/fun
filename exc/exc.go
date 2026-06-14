@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"slices"
 
@@ -25,15 +26,16 @@ import (
 // The methods all return the same *Command pointer, so calls can be
 // chained: new(Command).WithName("echo").WithArgs("hello").
 type Command struct {
-	ID        string
-	Labels    dt.OrderedSet[string]
-	Name      string
-	Args      []string
-	Env       dt.OrderedMap[string, string]
-	Directory string
-	Input     io.Reader
-	Output    io.Writer
-	Error     io.Writer
+	ID         string
+	Labels     dt.OrderedSet[string]
+	Name       string
+	Args       []string
+	Env        dt.OrderedMap[string, string]
+	Directory  string
+	Input      io.Reader
+	Output     io.Writer
+	Error      io.Writer
+	InheritEnv bool
 }
 
 // WithID sets the user-supplied identifier for the command and returns
@@ -101,19 +103,22 @@ func (cmd *Command) SSH(host string, args ...string) *Command {
 	return cmd.WithName("ssh").WithArgs(append([]string{host}, args...)...)
 }
 
+func (cmd *Command) WithInheritEnv() *Command { cmd.InheritEnv = true; return cmd }
+
 // Clone returns a new Command with all fields copied. The Args slice
 // is cloned so mutations to one do not affect the other. Input,
 // Output, and Error share the same underlying io.Reader/Writer
 // values as the original, since those cannot be meaningfully copied.
 func (cmd *Command) Clone() *Command {
 	out := &Command{
-		ID:        cmd.ID,
-		Name:      cmd.Name,
-		Directory: cmd.Directory,
-		Input:     cmd.Input,
-		Output:    cmd.Output,
-		Error:     cmd.Error,
-		Args:      append(make([]string, 0, len(cmd.Args)), cmd.Args...),
+		ID:         cmd.ID,
+		Name:       cmd.Name,
+		Directory:  cmd.Directory,
+		Input:      cmd.Input,
+		Output:     cmd.Output,
+		Error:      cmd.Error,
+		Args:       append(make([]string, 0, len(cmd.Args)), cmd.Args...),
+		InheritEnv: cmd.InheritEnv,
 	}
 	out.Env.Extend(cmd.Env.Iterator())
 	out.Labels.Extend(cmd.Labels.Iterator())
@@ -138,7 +143,11 @@ func (cmd *Command) UnsetEnvVar(k string) *Command { cmd.Env.Delete(k); return c
 
 // ResentEnv clears all explicitly set environment variables and returns the
 // receiver. After this call the process inherits the parent environment.
-func (cmd *Command) ResentEnv() *Command { irt.Apply(cmd.Env.Keys(), cmd.Env.Delete); return cmd }
+func (cmd *Command) ResentEnv() *Command {
+	cmd.InheritEnv = false
+	irt.Apply(cmd.Env.Keys(), cmd.Env.Delete)
+	return cmd
+}
 
 // WithStdInput sets the reader that is connected to the process's stdin and
 // returns the receiver. Pass nil to use no stdin.
@@ -270,13 +279,20 @@ func (cmd *Command) Resolve(ctx context.Context) *exec.Cmd {
 	return cc
 }
 
-func (cmd *Command) materializeEnv() []string {
-	if cmd.Env.Len() == 0 {
+func (cmd *Command) materializeEnv() (out []string) {
+	switch {
+	case cmd.Env.Len() == 0:
 		return nil
+	case cmd.InheritEnv:
+		env := os.Environ()
+		out = make([]string, 0, cmd.Env.Len()+len(env))
+		out = append(out, env...)
+	default:
+		out = make([]string, 0, cmd.Env.Len())
 	}
-	out := make([]string, 0, cmd.Env.Len())
+
 	for k, v := range cmd.Env.Iterator() {
-		out = append(out, fmt.Sprintf("%s=%s", k, v))
+		out = append(out, k+"="+v)
 	}
 	return out
 }

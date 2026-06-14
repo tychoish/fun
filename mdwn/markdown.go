@@ -111,18 +111,14 @@ func (m *Builder) ItalicParagraph(text ...string) *Builder {
 
 // KV writes a **key**: value line followed by a newline.
 func (m *Builder) KV(key, val string) *Builder {
-	m.Concat("**", key, "**: ", val)
+	m.Concat("**", key, "**: ", val, "  ")
 	m.Line()
 	return m
 }
 
 // FromKV writes a **key**: value line followed by a newline, reading key and
 // value from an irt.KV[string, string].
-func (m *Builder) FromKV(kv irt.KV[string, string]) *Builder {
-	m.Concat("**", kv.Key, "**: ", kv.Value)
-	m.Line()
-	return m
-}
+func (m *Builder) FromKV(kv irt.KV[string, string]) *Builder { return m.KV(kv.Key, kv.Value) }
 
 // FromKVany writes a **key**: value line followed by a newline, reading key
 // and value from an irt.KV[string, any] and formatting the value with %v.
