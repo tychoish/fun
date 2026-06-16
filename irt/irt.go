@@ -730,6 +730,21 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 	return opwithstart(opwithch(func(ch chan T) { seqToChan(ctx, seq, ch) }))
 }
 
+// Pool iterates the input sequence with worker pool and combines the results of that worker pool
+// into a single iterator. Effectively, the output iterator is buffered by number of workers in the
+// pool. Runs one go routine (via Pipe) to read from the input iterator in addition to the worker pool.
+func Pool[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		input := Pipe(ctx, seq)
+		push := mtxdowith(&sync.Mutex{}, yield)
+		wgdo(num, func() {
+			for whenopokdo(func() (T, bool) { return recieveFrom(ctx, input)}, push) {
+				continue
+			}
+		})
+	}
+}
+
 // Chunk returns a sequence of sequences, where each inner sequence
 // contains at most num elements from the input sequence. If num <= 0,
 // the sequence is empty.

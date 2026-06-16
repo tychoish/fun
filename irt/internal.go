@@ -65,8 +65,8 @@ func mtxcallwith[T any](mtx *sync.Mutex, op func(T)) func(T) {
 	return func(arg T) { defer with(lock(mtx)); op(arg) }
 }
 
-func mtxdowith[T any](mtx *sync.Mutex, op func(T) T) func(T) T {
-	return func(arg T) T { defer with(lock(mtx)); return op(arg) }
+func mtxdowith[A, B any](mtx *sync.Mutex, op func(A) B) func(A) B {
+	return func(arg A) B { defer with(lock(mtx)); return op(arg) }
 }
 
 func loopWhile(op func() bool) {
@@ -137,6 +137,12 @@ func funcallok[T any](op func(T), arg T) bool  { op(arg); return true }
 func funcallv[T any](op func(...T), args ...T) { op(args...) }
 func funcalls[T any](op func([]T), args []T)   { op(args) }
 func funcallr[A, B any](op func(A) B, arg A) B { return op(arg) }
+
+func funcallop[T any](op func(T), arg T) func()         { return func() { op(arg) } }
+func funcallokop[T any](op func(T), arg T) func() bool  { return func() bool { op(arg); return true } }
+func funcallvop[T any](op func(...T), args ...T) func() { return func() { op(args...) } }
+func funcallsop[T any](op func([]T), args []T) func()   { return func() { op(args) } }
+func funcallrop[A, B any](op func(A) B, arg A) func() B { return func() B { return op(arg) } }
 
 func ignoreSecond[A, B, C any](op func(A) C) func(A, B) C { return func(a A, _ B) C { return op(a) } }
 func ignoreFirst[A, B, C any](op func(B) C) func(A, B) C  { return func(_ A, b B) C { return op(b) } }
@@ -348,6 +354,13 @@ func whendofn[T any](cond bool, do func() T) func() T            { return func()
 func whendowithok[A, B any](c bool, do func(A) B, a A) (B, bool) { return whendowith(c, do, a), c }
 func whendowithfn[A, B any](c bool, o func(A) B, a A) func() B   { return whendofn(c, curry(o, a)) }
 
+func whenokdo[T any](value T, cond bool, op func(T) bool) bool { return cond && op(value) }
+
+func whenopokdo[T any](gen func() (T, bool), push func(T) bool) bool {
+	v, ok := gen()
+	return whenokdo(v, ok, push)
+}
+
 // sorting helpers
 
 func toCmp[T any, K cmp.Ordered](to func(T) K) func(T, T) int {
@@ -361,6 +374,12 @@ func toCmp2[A, B any, K cmp.Ordered](to func(A, B) K) func(KV[A, B], KV[A, B]) i
 ////////////////////////////////
 //
 // higher order operations
+
+func repeatcall(times int, op func()) {
+	for range times {
+		op()
+	}
+}
 
 func repeat[T any](times int, op func() T) func() (T, bool) {
 	return func() (out T, ok bool) {
@@ -393,7 +412,9 @@ func repeatok[T any](limit int, op func() (T, bool)) func() (T, *bool) {
 	}
 }
 
-// channel handling
+// channel/concurrency handling
+
+func wgdo(num int, op func()) { var wg sync.WaitGroup; repeatcall(num, funcallop(wg.Go, op)); wg.Wait() }
 
 func opwithstart[T any](ch chan T, op func()) chan T       { go op(); return ch }
 func opwithclose[T any](ch chan T, op func(chan T)) func() { return func() { defer close(ch); op(ch) } }

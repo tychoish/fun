@@ -2308,3 +2308,52 @@ func TestMust2(t *testing.T) {
 		}
 	})
 }
+
+func TestFuncallOpHelpers(t *testing.T) {
+	t.Run("funcallokop", func(t *testing.T) {
+		var called bool
+		f := funcallokop(func(v int) { called = true }, 42)
+		result := f()
+		if !result {
+			t.Error("funcallokop: returned false, want true")
+		}
+		if !called {
+			t.Error("funcallokop: op was not called")
+		}
+	})
+
+	t.Run("funcallokop_correct_arg", func(t *testing.T) {
+		var got int
+		f := funcallokop(func(v int) { got = v }, 99)
+		f()
+		if got != 99 {
+			t.Errorf("funcallokop: op received %d, want 99", got)
+		}
+	})
+
+	t.Run("funcallvop", func(t *testing.T) {
+		var got []int
+		f := funcallvop(func(vals ...int) { got = append(got, vals...) }, 1, 2, 3)
+		f()
+		if !slices.Equal(got, []int{1, 2, 3}) {
+			t.Errorf("funcallvop: got %v, want [1 2 3]", got)
+		}
+	})
+
+	t.Run("funcallsop", func(t *testing.T) {
+		var got []string
+		f := funcallsop(func(vals []string) { got = vals }, []string{"a", "b"})
+		f()
+		if !slices.Equal(got, []string{"a", "b"}) {
+			t.Errorf("funcallsop: got %v, want [a b]", got)
+		}
+	})
+
+	t.Run("funcallrop", func(t *testing.T) {
+		f := funcallrop(func(v int) string { return strconv.Itoa(v) }, 7)
+		result := f()
+		if result != "7" {
+			t.Errorf("funcallrop: got %q, want \"7\"", result)
+		}
+	})
+}
