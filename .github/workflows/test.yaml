@@ -30,8 +30,8 @@ jobs:
       - uses: actions/setup-go@v3
         if: env.GIT_DIFF
         with:
-          go-version: "1.24"
+          go-version: "1.25"
       - name: go test
         if: env.GIT_DIFF
         run: |
-          go test -race -timeout=5m ./...
+          go test -race -cover -timeout=5m ./...
