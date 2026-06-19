@@ -357,9 +357,7 @@ func TestError(t *testing.T) {
 		wg := &sync.WaitGroup{}
 		catcher := &Collector{}
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				ticker := time.NewTicker(time.Millisecond)
 				defer ticker.Stop()
 				for {
@@ -370,7 +368,7 @@ func TestError(t *testing.T) {
 						catcher.Push(errors.New(errval))
 					}
 				}
-			}()
+			})
 		}
 
 		for i := range 5 {

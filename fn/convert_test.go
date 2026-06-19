@@ -51,13 +51,11 @@ func TestFilter(t *testing.T) {
 		count := 0
 		wlock := double.PostHook(func() { count++ }).WithLock(&sync.Mutex{})
 		for range 8 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for range 100 {
 					check.Equal(t, 10, wlock.Apply(5))
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		assert.Equal(t, 800, count)
@@ -68,13 +66,11 @@ func TestFilter(t *testing.T) {
 		count := 0
 		wlock := double.PostHook(func() { count++ }).Lock()
 		for range 8 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for range 100 {
 					check.Equal(t, 10, wlock.Apply(5))
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		assert.Equal(t, 800, count)
@@ -270,12 +266,10 @@ func TestConverter(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				result := locked.Convert(1)
 				assert.True(t, result > 0 && result <= 10)
-			}()
+			})
 		}
 		wg.Wait()
 		assert.Equal(t, counter, 10)
@@ -284,12 +278,10 @@ func TestConverter(t *testing.T) {
 		locked = c.Lock()
 
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				result := locked.Convert(1)
 				assert.True(t, result > 0 && result <= 10)
-			}()
+			})
 		}
 		wg.Wait()
 		assert.Equal(t, counter, 10)
@@ -308,12 +300,10 @@ func TestConverter(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				result := locked.Convert(1)
 				assert.True(t, result > 0 && result <= 10)
-			}()
+			})
 		}
 		wg.Wait()
 		assert.Equal(t, counter, 10)

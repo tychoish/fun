@@ -253,15 +253,13 @@ func TestOrderedMap(t *testing.T) {
 
 		// Concurrent readers
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for j := range 100 {
 					_ = m.Get(j)
 					_ = m.Check(j)
 					_, _ = m.Load(j)
 				}
-			}()
+			})
 		}
 
 		// Concurrent writers
@@ -278,13 +276,11 @@ func TestOrderedMap(t *testing.T) {
 
 		// Concurrent iterators
 		for range 3 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for range m.Iterator() {
 					// Just iterate
 				}
-			}()
+			})
 		}
 
 		wg.Wait()

@@ -122,13 +122,11 @@ func TestAtomics(t *testing.T) {
 			actor := &Once[int]{}
 			wg := &sync.WaitGroup{}
 			for range 64 {
-				wg.Add(1)
 				// this function panics rather than
 				// asserts because it's very likely to
 				// be correct, and to avoid testing.T
 				// mutexes.
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for range 64 {
 						actor.Do(func() int {
 							count.Add(1)
@@ -139,7 +137,7 @@ func TestAtomics(t *testing.T) {
 							panic(fmt.Errorf("once function produced %d not 42", val))
 						}
 					}
-				}()
+				})
 			}
 
 			wg.Wait()
@@ -156,13 +154,11 @@ func TestAtomics(t *testing.T) {
 			check.True(t, !actor.Called())
 			wg := &sync.WaitGroup{}
 			for range 64 {
-				wg.Add(1)
 				// this function panics rather than
 				// asserts because it's very likely to
 				// be correct, and to avoid testing.T
 				// mutexes.
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for range 64 {
 						val := actor.Resolve()
 						check.True(t, actor.Called())
@@ -170,7 +166,7 @@ func TestAtomics(t *testing.T) {
 							panic(fmt.Errorf("once function produced %d not 42", val))
 						}
 					}
-				}()
+				})
 			}
 
 			wg.Wait()

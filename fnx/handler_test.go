@@ -409,8 +409,7 @@ func TestProcess(t *testing.T) {
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
 			for range 100 {
-				wg.Add(1)
-				go func() { defer wg.Done(); check.NotError(t, wf(ctx, 42)) }()
+				wg.Go(func() { ; check.NotError(t, wf(ctx, 42)) })
 			}
 			wg.Wait()
 			assert.Equal(t, count.Load(), 10)

@@ -47,19 +47,15 @@ func TestMap(t *testing.T) {
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
 		for range 32 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for ctx.Err() == nil && !passed.Load() {
 					for i := range 100 {
 						mp.Set(fmt.Sprint(i), rand.Int())
 					}
 					runtime.Gosched()
 				}
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			})
+			wg.Go(func() {
 				for ctx.Err() == nil && !passed.Load() {
 					size := mp.Len()
 					if size == 100 {
@@ -69,7 +65,7 @@ func TestMap(t *testing.T) {
 					}
 					runtime.Gosched()
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		t.Log(mp.Len())
@@ -84,9 +80,7 @@ func TestMap(t *testing.T) {
 		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
 		for range 32 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for {
 					if ctx.Err() != nil || passed.Load() {
 						return
@@ -97,10 +91,8 @@ func TestMap(t *testing.T) {
 						count.Add(1)
 					}
 				}
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			})
+			wg.Go(func() {
 				time.Sleep(100 * time.Millisecond)
 				for {
 					if ctx.Err() != nil || passed.Load() {
@@ -114,11 +106,9 @@ func TestMap(t *testing.T) {
 						count.Add(1)
 					}
 				}
-			}()
+			})
 			for range 2 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for {
 						time.Sleep(time.Millisecond)
 						if mp.Len() > 0 {
@@ -136,7 +126,7 @@ func TestMap(t *testing.T) {
 							return
 						}
 					}
-				}()
+				})
 			}
 		}
 		wg.Wait()

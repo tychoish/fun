@@ -414,7 +414,11 @@ func repeatok[T any](limit int, op func() (T, bool)) func() (T, *bool) {
 
 // channel/concurrency handling
 
-func wgdo(num int, op func()) { var wg sync.WaitGroup; repeatcall(num, funcallop(wg.Go, op)); wg.Wait() }
+func wgdo(num int, op func()) {
+	var wg sync.WaitGroup
+	repeatcall(num, funcallop(wg.Go, op))
+	wg.Wait()
+}
 
 func opwithstart[T any](ch chan T, op func()) chan T       { go op(); return ch }
 func opwithclose[T any](ch chan T, op func(chan T)) func() { return func() { defer close(ch); op(ch) } }

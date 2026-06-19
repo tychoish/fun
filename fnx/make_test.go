@@ -256,9 +256,7 @@ func TestConstructors(t *testing.T) {
 			wg := &sync.WaitGroup{}
 
 			for range 100 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					op := Operation(func(ctx context.Context) {
 						mu.Lock()
 						count++
@@ -266,7 +264,7 @@ func TestConstructors(t *testing.T) {
 					})
 					err := handler.Read(context.Background(), op)
 					check.NotError(t, err)
-				}()
+				})
 			}
 
 			wg.Wait()

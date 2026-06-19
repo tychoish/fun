@@ -91,9 +91,7 @@ func TestLocked(t *testing.T) {
 		var number int64
 		wg := &sync.WaitGroup{}
 		for range 2 * runtime.NumCPU() {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for range 1000 {
 					func() {
 						defer WithW(LockW(mtx))
@@ -116,7 +114,7 @@ func TestLocked(t *testing.T) {
 						time.Sleep(1 + time.Duration(rand.Int63n(number)))
 					}()
 				}
-			}()
+			})
 		}
 
 		wg.Wait()

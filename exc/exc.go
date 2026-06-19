@@ -103,6 +103,8 @@ func (cmd *Command) SSH(host string, args ...string) *Command {
 	return cmd.WithName("ssh").WithArgs(append([]string{host}, args...)...)
 }
 
+// WithInheritEnv forces the subcommand to inherit the calling process' environment in the case that
+// other environment variables are specified.
 func (cmd *Command) WithInheritEnv() *Command { cmd.InheritEnv = true; return cmd }
 
 // Clone returns a new Command with all fields copied. The Args slice

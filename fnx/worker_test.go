@@ -261,8 +261,7 @@ func TestWorker(t *testing.T) {
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
 			for range 100 {
-				wg.Add(1)
-				go func() { defer wg.Done(); check.NotError(t, wf(ctx)) }()
+				wg.Go(func() { ; check.NotError(t, wf(ctx)) })
 			}
 			wg.Wait()
 			assert.Equal(t, count.Load(), 10)

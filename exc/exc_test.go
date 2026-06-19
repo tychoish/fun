@@ -1504,7 +1504,6 @@ func TestCommand_InheritEnv(t *testing.T) {
 			t.Error("Resolve() Env missing explicitly set ONLY_EXPLICIT")
 		}
 	})
-
 }
 
 // TestCommand_InheritEnvProcess covers the observable runtime behavior of

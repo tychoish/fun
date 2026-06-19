@@ -738,7 +738,7 @@ func Pool[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[T] {
 		input := Pipe(ctx, seq)
 		push := mtxdowith(&sync.Mutex{}, yield)
 		wgdo(num, func() {
-			for whenopokdo(func() (T, bool) { return recieveFrom(ctx, input)}, push) {
+			for whenopokdo(func() (T, bool) { return recieveFrom(ctx, input) }, push) {
 				continue
 			}
 		})

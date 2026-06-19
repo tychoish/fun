@@ -249,19 +249,15 @@ func runLockedMapConcurrentTests(t *testing.T, newMap func() siMap) {
 		passed := &atomic.Bool{}
 		wg := &sync.WaitGroup{}
 		for range 32 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for ctx.Err() == nil && !passed.Load() {
 					for i := range 100 {
 						mp.Set(fmt.Sprint(i), rand.Int())
 					}
 					runtime.Gosched()
 				}
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			})
+			wg.Go(func() {
 				for ctx.Err() == nil && !passed.Load() {
 					if mp.Len() == 100 {
 						passed.Store(true)
@@ -270,7 +266,7 @@ func runLockedMapConcurrentTests(t *testing.T, newMap func() siMap) {
 					}
 					runtime.Gosched()
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		assert.True(t, passed.Load())
@@ -287,13 +283,11 @@ func runLockedMapConcurrentTests(t *testing.T, newMap func() siMap) {
 
 		wg := &sync.WaitGroup{}
 		for range runtime.NumCPU() {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for i := range n {
 					mp.Delete(fmt.Sprint(i))
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		assert.Equal(t, 0, mp.Len())
@@ -339,15 +333,13 @@ func runLockedMapConcurrentTests(t *testing.T, newMap func() siMap) {
 
 		wg := &sync.WaitGroup{}
 		for range 8 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				count := 0
 				for range mp.Iterator() {
 					count++
 				}
 				assert.Equal(t, 100, count)
-			}()
+			})
 		}
 		wg.Wait()
 	})

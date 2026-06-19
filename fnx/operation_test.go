@@ -401,8 +401,7 @@ func TestOperation(t *testing.T) {
 					wf = wf.Limit(10)
 					wg := &sync.WaitGroup{}
 					for range 32 {
-						wg.Add(1)
-						go func() { defer wg.Done(); wf(ctx) }()
+						wg.Go(func() { ; wf(ctx) })
 					}
 					wg.Wait()
 					assert.Equal(t, count.Load(), 10)

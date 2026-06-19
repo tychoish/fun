@@ -627,8 +627,7 @@ func TestFuture(t *testing.T) {
 			wf = wf.Limit(10)
 			wg := &sync.WaitGroup{}
 			for range 100 {
-				wg.Add(1)
-				go func() { defer wg.Done(); out, err := wf(ctx); check.Equal(t, 42, out); check.NotError(t, err) }()
+				wg.Go(func() { ; out, err := wf(ctx); check.Equal(t, 42, out); check.NotError(t, err) })
 			}
 			wg.Wait()
 			assert.Equal(t, count.Load(), 10)

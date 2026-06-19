@@ -165,9 +165,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		var modifierRan atomic.Bool
 
 		// Start iterator goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			iteratorRan.Store(true)
 
 			// Iterate multiple times to increase chance of catching races
@@ -184,12 +182,10 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 					t.Error("Iterator returned no items")
 				}
 			}
-		}()
+		})
 
 		// Start modifier goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			modifierRan.Store(true)
 
 			for i := range 50 {
@@ -206,7 +202,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 					time.Sleep(2 * time.Millisecond)
 				}
 			}
-		}()
+		})
 
 		wg.Wait()
 
@@ -231,9 +227,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 		defer cancel()
 
 		// Iterator goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 10 {
 				items := make([]string, 0, 50)
 				for item := range s.Iterator() {
@@ -241,7 +235,7 @@ func TestSetConcurrentIterationAndModification(t *testing.T) {
 					time.Sleep(500 * time.Microsecond)
 				}
 			}
-		}()
+		})
 
 		// Multiple modifier goroutines
 		for g := range 3 {
@@ -294,9 +288,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 		var modifierRan atomic.Bool
 
 		// Iterator goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			iteratorRan.Store(true)
 
 			for range 5 {
@@ -312,12 +304,10 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 					t.Error("Iterator returned no items")
 				}
 			}
-		}()
+		})
 
 		// Modifier goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			modifierRan.Store(true)
 
 			for i := range 50 {
@@ -334,7 +324,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 					time.Sleep(2 * time.Millisecond)
 				}
 			}
-		}()
+		})
 
 		wg.Wait()
 
@@ -374,9 +364,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 		}
 
 		// Writer goroutine
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range 30 {
 				select {
 				case <-ctx.Done():
@@ -386,7 +374,7 @@ func TestMapConcurrentIterationAndModification(t *testing.T) {
 					time.Sleep(2 * time.Millisecond)
 				}
 			}
-		}()
+		})
 
 		wg.Wait()
 	})
@@ -407,9 +395,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 	defer cancel()
 
 	// Goroutine using irt.Collect
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 5 {
 			result := irt.Collect(s.Iterator())
 			// Should have collected something
@@ -418,23 +404,19 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
-	}()
+	})
 
 	// Goroutine using irt.Apply
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 5 {
 			var sum int
 			irt.Apply(s.Iterator(), func(n int) { sum += n })
 			time.Sleep(5 * time.Millisecond)
 		}
-	}()
+	})
 
 	// Goroutine using irt.Count
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 5 {
 			count := irt.Count(s.Iterator())
 			if count == 0 {
@@ -442,12 +424,10 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
-	}()
+	})
 
 	// Modifier goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := range 50 {
 			select {
 			case <-ctx.Done():
@@ -458,7 +438,7 @@ func TestSetIteratorWithIRTFunctions(t *testing.T) {
 				time.Sleep(1 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 }
@@ -478,9 +458,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 	defer cancel()
 
 	// Goroutine using irt.Collect2
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 5 {
 			result := irt.Collect2(m.Iterator())
 			if len(result) == 0 {
@@ -488,12 +466,10 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
-	}()
+	})
 
 	// Goroutine using irt.First
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 10 {
 			keys := irt.Collect(irt.First(m.Iterator()))
 			if len(keys) == 0 {
@@ -501,12 +477,10 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 			}
 			time.Sleep(3 * time.Millisecond)
 		}
-	}()
+	})
 
 	// Goroutine using irt.Count2
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 10 {
 			count := irt.Count2(m.Iterator())
 			if count == 0 {
@@ -514,12 +488,10 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 			}
 			time.Sleep(3 * time.Millisecond)
 		}
-	}()
+	})
 
 	// Modifier goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := range 50 {
 			select {
 			case <-ctx.Done():
@@ -530,7 +502,7 @@ func TestMapIteratorWithIRTFunctions(t *testing.T) {
 				time.Sleep(1 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 }
@@ -550,9 +522,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 		defer cancel()
 
 		// Iterator that terminates early
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 20 {
 				count := 0
 				for range s.Iterator() {
@@ -563,12 +533,10 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 					time.Sleep(100 * time.Microsecond)
 				}
 			}
-		}()
+		})
 
 		// Heavy modifier
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range 100 {
 				select {
 				case <-ctx.Done():
@@ -579,7 +547,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 					time.Sleep(500 * time.Microsecond)
 				}
 			}
-		}()
+		})
 
 		wg.Wait()
 	})
@@ -596,9 +564,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 		defer cancel()
 
 		// Iterator that terminates early
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 20 {
 				count := 0
 				for range m.Iterator() {
@@ -609,12 +575,10 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 					time.Sleep(100 * time.Microsecond)
 				}
 			}
-		}()
+		})
 
 		// Heavy modifier
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range 100 {
 				select {
 				case <-ctx.Done():
@@ -625,7 +589,7 @@ func TestEarlyTerminationDuringConcurrentModification(t *testing.T) {
 					time.Sleep(500 * time.Microsecond)
 				}
 			}
-		}()
+		})
 
 		wg.Wait()
 	})
