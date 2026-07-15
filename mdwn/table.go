@@ -188,9 +188,9 @@ func (t *Table) BuildMaxWidth(maxWidth int) (*Builder, error) {
 	}
 	budget := maxWidth - separatorOverhead - nonElasticSum
 
-	// Elastic column final width: floor at max(budget, 3, MinWidth).
+	// Elastic column final width: floor at max(budget, 3, MinWidth, len(Name)).
 	elasticCol := t.cols[elasticIdx]
-	w := max(budget, 3, elasticCol.MinWidth)
+	w := max(budget, 3, elasticCol.MinWidth, len(elasticCol.Name))
 	// Apply MaxWidth ceiling if set.
 	if elasticCol.MaxWidth > 0 && w > elasticCol.MaxWidth {
 		w = elasticCol.MaxWidth

@@ -355,6 +355,23 @@ func TestTableBuildMaxWidth(t *testing.T) {
 		assert.True(t, innerWidth >= 15)
 	})
 
+	t.Run("elastic column name length overrides budget", func(t *testing.T) {
+		cols := []Column{
+			{Name: "Long"},
+			{Name: "Even longer", Elastic: true},
+		}
+		rows := [][]string{{"longvalue", "x"}}
+		got, err := buildMaxWidth(t, 10, cols, rows)
+		assert.NotError(t, err)
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		assert.True(t, len(lines) >= 3)
+		parts := strings.Split(lines[0], "|")
+		assert.True(t, len(parts) >= 3)
+		// inner cell width = len(parts[2]) - 2 (surrounding spaces)
+		innerWidth := utf8.RuneCountInString(parts[2]) - 2
+		assert.True(t, innerWidth >= 10)
+	})
+
 	t.Run("custom TruncMarker", func(t *testing.T) {
 		// Custom marker "…" (single rune) on elastic column.
 		cols := []Column{
