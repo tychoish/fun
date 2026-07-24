@@ -730,6 +730,44 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 	return opwithstart(opwithch(func(ch chan T) { seqToChan(ctx, seq, ch) }))
 }
 
+// Sink wraps yield so that concurrent workers can share it safely:
+// calls are serialized by an internal mutex, and once yield returns
+// false, every subsequent call - from any worker, forever after - short-
+// circuits to false instead of invoking yield again, satisfying the
+// range-over-func rule that yield must never be called after it has
+// returned false. Pair with WithMutex (or another input-side lock) to
+// merge multiple producers back into a single consumer, as Pool and
+// ConvertPool do.
+func Sink[T any](yield func(T) bool) func(T) bool {
+	var mtx sync.Mutex
+	done := false
+	return func(v T) bool {
+		mtx.Lock()
+		defer mtx.Unlock()
+		if done || !yield(v) {
+			done = true
+			return false
+		}
+		return true
+	}
+}
+
+// Sink2 is the iter.Seq2 counterpart to Sink: it wraps a pair yield
+// function so that concurrent workers can share it safely.
+func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
+	var mtx sync.Mutex
+	done := false
+	return func(a A, b B) bool {
+		mtx.Lock()
+		defer mtx.Unlock()
+		if done || !yield(a, b) {
+			done = true
+			return false
+		}
+		return true
+	}
+}
+
 // Pool iterates the input sequence with worker pool and combines the
 // results of that worker pool into a single iterator. Effectively, the
 // output iterator is buffered by number of workers in the pool. Runs
@@ -745,6 +783,13 @@ func Pool[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[T] {
 			}
 		})
 	}
+}
+
+// Pool2 is the iter.Seq2 counterpart to Pool: it iterates the input
+// pair sequence with a worker pool and combines the results into a
+// single output pair sequence.
+func Pool2[A, B any](ctx context.Context, num int, seq iter.Seq2[A, B]) iter.Seq2[A, B] {
+	return KVsplit(Pool(ctx, num, KVjoin(seq)))
 }
 
 // ConvertPool iterates seq and applies op to each element using a pool of
@@ -766,6 +811,13 @@ func ConvertPool[A, B any](ctx context.Context, num int, seq iter.Seq[A], op fun
 			}
 		})
 	}
+}
+
+// ConvertPool2 is the iter.Seq2 counterpart to ConvertPool: it iterates
+// seq and applies op to each pair using a pool of num goroutines,
+// merging the results into a single output pair sequence.
+func ConvertPool2[A, B, C, D any](ctx context.Context, num int, seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Seq2[C, D] {
+	return KVsplit(ConvertPool(ctx, num, KVjoin(seq), func(kv KV[A, B]) KV[C, D] { return MakeKV(op(kv.Key, kv.Value)) }))
 }
 
 // Chunk returns a sequence of sequences, where each inner sequence
@@ -930,6 +982,13 @@ func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 // sequences. Elements are distributed.
 func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
 	return GenerateOk(repeat(num, curry2(Channel, ctx, Pipe(ctx, seq))))
+}
+
+// Shard2 is the iter.Seq2 counterpart to Shard: it splits the input
+// pair sequence into num separate pair sequences. Pairs are
+// distributed.
+func Shard2[A, B any](ctx context.Context, num int, seq iter.Seq2[A, B]) iter.Seq[iter.Seq2[A, B]] {
+	return Convert(Shard(ctx, num, KVjoin(seq)), KVsplit)
 }
 
 // WithBuffer maintains a buffer of items read from the source

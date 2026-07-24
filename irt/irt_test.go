@@ -6162,6 +6162,7 @@ func TestWithBuffer(t *testing.T) {
 
 	t.Run("ContextCancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		// Create a long sequence
 		seq := func(yield func(int) bool) {
@@ -10415,6 +10416,88 @@ func TestReverseMapping(t *testing.T) {
 	})
 }
 
+func TestSink(t *testing.T) {
+	t.Run("ConcurrentDeliveryExactlyOnce", func(t *testing.T) {
+		const numWorkers = 8
+		const perWorker = 50
+
+		var mu sync.Mutex
+		var received []int
+		push := Sink(func(v int) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			received = append(received, v)
+			return true
+		})
+
+		var wg sync.WaitGroup
+		for w := range numWorkers {
+			wg.Add(1)
+			go func(worker int) {
+				defer wg.Done()
+				for i := range perWorker {
+					if !push(worker*perWorker + i) {
+						t.Errorf("push unexpectedly returned false")
+					}
+				}
+			}(w)
+		}
+		wg.Wait()
+
+		if len(received) != numWorkers*perWorker {
+			t.Errorf("got %d deliveries, want %d", len(received), numWorkers*perWorker)
+		}
+		seen := make(map[int]int, len(received))
+		for _, v := range received {
+			seen[v]++
+		}
+		for v, cnt := range seen {
+			if cnt > 1 {
+				t.Errorf("value %d delivered %d times (duplicate/lost)", v, cnt)
+			}
+		}
+		if len(seen) != numWorkers*perWorker {
+			t.Errorf("expected %d unique values, got %d", numWorkers*perWorker, len(seen))
+		}
+	})
+
+	t.Run("NoCallAfterFalse", func(t *testing.T) {
+		var calls atomic.Int32
+		push := Sink(func(v int) bool {
+			calls.Add(1)
+			return v < 3
+		})
+
+		if !push(1) {
+			t.Error("push(1) = false, want true")
+		}
+		if !push(2) {
+			t.Error("push(2) = false, want true")
+		}
+		if push(3) {
+			t.Error("push(3) = true, want false")
+		}
+
+		// Subsequent calls, from any goroutine, must short-circuit to false
+		// without ever invoking the underlying yield again.
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if push(99) {
+					t.Error("push after false returned true, want false")
+				}
+			}()
+		}
+		wg.Wait()
+
+		if got := calls.Load(); got != 3 {
+			t.Errorf("underlying yield called %d times, want 3 (no calls after false)", got)
+		}
+	})
+}
+
 func TestPool(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -10718,4 +10801,148 @@ func TestPoolMap(t *testing.T) {
 			t.Errorf("expected at least 20 items before cancel, got %d", count.Load())
 		}
 	})
+}
+
+func TestSink2(t *testing.T) {
+	t.Run("ConcurrentDeliveryExactlyOnce", func(t *testing.T) {
+		const numWorkers = 8
+		const perWorker = 50
+
+		var mu sync.Mutex
+		received := make(map[int]string, numWorkers*perWorker)
+		push := Sink2(func(k int, v string) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			received[k] = v
+			return true
+		})
+
+		var wg sync.WaitGroup
+		for w := range numWorkers {
+			wg.Add(1)
+			go func(worker int) {
+				defer wg.Done()
+				for i := range perWorker {
+					k := worker*perWorker + i
+					if !push(k, fmt.Sprint(k)) {
+						t.Errorf("push unexpectedly returned false")
+					}
+				}
+			}(w)
+		}
+		wg.Wait()
+
+		if len(received) != numWorkers*perWorker {
+			t.Errorf("got %d deliveries, want %d", len(received), numWorkers*perWorker)
+		}
+		for k, v := range received {
+			if v != fmt.Sprint(k) {
+				t.Errorf("key %d: got value %q, want %q", k, v, fmt.Sprint(k))
+			}
+		}
+	})
+
+	t.Run("NoCallAfterFalse", func(t *testing.T) {
+		var calls atomic.Int32
+		push := Sink2(func(k int, v string) bool {
+			calls.Add(1)
+			return k < 3
+		})
+
+		if !push(1, "a") {
+			t.Error("push(1) = false, want true")
+		}
+		if !push(2, "b") {
+			t.Error("push(2) = false, want true")
+		}
+		if push(3, "c") {
+			t.Error("push(3) = true, want false")
+		}
+
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if push(99, "z") {
+					t.Error("push after false returned true, want false")
+				}
+			}()
+		}
+		wg.Wait()
+
+		if got := calls.Load(); got != 3 {
+			t.Errorf("underlying yield called %d times, want 3 (no calls after false)", got)
+		}
+	})
+}
+
+func TestPool2(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		result := Collect2(Pool2(ctx, 3, Zero2[int, string]()))
+		if len(result) != 0 {
+			t.Errorf("Pool2(empty) = %v, want empty map", result)
+		}
+	})
+
+	t.Run("MultipleWorkersAllDelivered", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		input := map[int]string{1: "a", 2: "b", 3: "c", 4: "d", 5: "e"}
+		result := Collect2(Pool2(ctx, 4, Map(input)))
+		if len(result) != len(input) {
+			t.Errorf("Pool2 delivered %d pairs, want %d", len(result), len(input))
+		}
+		for k, v := range input {
+			if result[k] != v {
+				t.Errorf("Pool2: key %d = %q, want %q", k, result[k], v)
+			}
+		}
+	})
+}
+
+func TestConvertPool2(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		result := Collect2(ConvertPool2(ctx, 3, Zero2[int, string](), func(k int, v string) (int, string) { return k, v }))
+		if len(result) != 0 {
+			t.Errorf("ConvertPool2(empty) = %v, want empty map", result)
+		}
+	})
+
+	t.Run("AppliesOp", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		input := map[int]int{1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
+		result := Collect2(ConvertPool2(ctx, 4, Map(input), func(k, v int) (int, int) { return k, v * v }))
+		if len(result) != len(input) {
+			t.Errorf("ConvertPool2 delivered %d pairs, want %d", len(result), len(input))
+		}
+		for k, v := range input {
+			if result[k] != v*v {
+				t.Errorf("ConvertPool2: key %d = %d, want %d", k, result[k], v*v)
+			}
+		}
+	})
+}
+
+func TestShard2(t *testing.T) {
+	ctx := t.Context()
+
+	workload := Map(map[int]string{1: "a", 2: "b", 3: "c", 4: "d", 5: "e", 6: "f", 7: "g", 8: "h", 9: "i", 10: "j"})
+	numShards := 3
+
+	shards := Shard2(ctx, numShards, workload)
+
+	totalItems := 0
+	for shard := range shards {
+		shardItems := Collect2(shard)
+		totalItems += len(shardItems)
+	}
+	if totalItems != 10 {
+		t.Errorf("Total items across shards = %d, want 10", totalItems)
+	}
 }
