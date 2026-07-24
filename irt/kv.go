@@ -12,7 +12,7 @@ type KV[A, B any] struct {
 }
 
 // WithKV creates a KV by applying a function to the first value to derive the second value.
-func WithKV[A, B any](a A, with func(A) B) KV[A, B] { return MakeKV(a, with(a)) }
+func WithKV[A, B any, OP ~func(A) B](a A, with OP) KV[A, B] { return MakeKV(a, with(a)) }
 
 // MakeKV creates a KV from two values.
 func MakeKV[A, B any](a A, b B) KV[A, B] { return KV[A, B]{Key: a, Value: b} }
@@ -34,7 +34,7 @@ func KVjoin[A, B any](seq iter.Seq2[A, B]) iter.Seq[KV[A, B]] { return Merge(seq
 func KVsplit[A, B any](seq iter.Seq[KV[A, B]]) iter.Seq2[A, B] { return With2(seq, elemSplit) }
 
 // KVapply applies a function to each Elem in a sequence.
-func KVapply[A, B any](seq iter.Seq[KV[A, B]], op func(A, B)) { Apply(seq, elemApply(op)) }
+func KVapply[A, B any, OP ~func(A, B)](seq iter.Seq[KV[A, B]], op OP) { Apply(seq, elemApply(op)) }
 
 func elemSplit[A, B any](in KV[A, B]) (A, B)           { return in.Split() }
 func elemApply[A, B any](op func(A, B)) func(KV[A, B]) { return func(e KV[A, B]) { e.Apply(op) } }

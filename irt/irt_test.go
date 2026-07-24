@@ -3140,6 +3140,100 @@ func TestWith2(t *testing.T) {
 	})
 }
 
+func TestPool3(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		result := Collect2(Pool3(ctx, 3, Zero[int](), func(v int) (int, int) { return v, v * v }))
+		if len(result) != 0 {
+			t.Errorf("Pool3(empty) = %v, want {}", result)
+		}
+	})
+
+	t.Run("AppliesOp", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		input := []int{1, 2, 3, 4, 5}
+		result := Collect2(Pool3(ctx, 4, Slice(input), func(v int) (int, int) { return v, v * v }))
+		expected := map[int]int{1: 1, 2: 4, 3: 9, 4: 16, 5: 25}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Pool3() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("OpRunsConcurrentlyAcrossWorkers", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		const numWorkers = 4
+		var inFlight atomic.Int32
+		var maxInFlight atomic.Int32
+		release := make(chan struct{})
+		var releaseOnce sync.Once
+
+		op := func(v int) (int, int) {
+			if inFlight.Add(1) == numWorkers {
+				releaseOnce.Do(func() { close(release) })
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+			for {
+				cur := maxInFlight.Load()
+				if inFlight.Load() <= cur || maxInFlight.CompareAndSwap(cur, inFlight.Load()) {
+					break
+				}
+			}
+			inFlight.Add(-1)
+			return v, v
+		}
+
+		input := Collect(Range(1, numWorkers))
+		result := Collect2(Pool3(ctx, numWorkers, Slice(input), op))
+		if len(result) != len(input) {
+			t.Errorf("Pool3() = %v, want %d items", result, len(input))
+		}
+		if got := maxInFlight.Load(); got < numWorkers {
+			t.Errorf("op ran with at most %d concurrent calls, want %d (op is not parallelized across the pool)", got, numWorkers)
+		}
+	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		seq := func(yield func(int) bool) {
+			for i := 0; ; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		done := make(chan struct{})
+		var count atomic.Int32
+		go func() {
+			defer close(done)
+			for range Pool3(ctx, 3, seq, func(v int) (int, int) { return v, v }) {
+				if count.Add(1) == 20 {
+					cancel()
+				}
+			}
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("Pool3 did not stop after context cancellation")
+			cancel()
+		}
+		if count.Load() < 20 {
+			t.Errorf("expected at least 20 items before cancel, got %d", count.Load())
+		}
+	})
+}
+
 func TestApplyWhile(t *testing.T) {
 	sum := 0
 	var callCount atomic.Int32
@@ -10503,214 +10597,9 @@ func TestPool(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
-		result := Collect(Pool(ctx, 3, Zero[int]()))
+		result := Collect(Pool(ctx, 3, Zero[int](), func(v int) int { return v * 2 }))
 		if len(result) != 0 {
 			t.Errorf("Pool(empty) = %v, want []", result)
-		}
-	})
-
-	t.Run("SingleWorker", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		input := []int{1, 2, 3, 4, 5}
-		result := Collect(Pool(ctx, 1, Slice(input)))
-		// With a single worker, channel order == input order.
-		if !slices.Equal(result, input) {
-			t.Errorf("Pool(1 worker) = %v, want %v", result, input)
-		}
-	})
-
-	t.Run("MultipleWorkersAllDelivered", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		const n = 20
-		input := Collect(Range(1, n))
-		result := Collect(Pool(ctx, 4, Slice(input)))
-		if len(result) != n {
-			t.Errorf("Pool(4 workers) delivered %d elements, want %d", len(result), n)
-		}
-		slices.Sort(result)
-		if !slices.Equal(result, input) {
-			t.Errorf("Pool(4 workers) elements mismatch: got %v, want %v", result, input)
-		}
-	})
-
-	t.Run("NoDuplicates", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		const n = 100
-		input := Collect(Range(0, n-1))
-		result := Collect(Pool(ctx, 8, Slice(input)))
-		seen := make(map[int]int, n)
-		for _, v := range result {
-			seen[v]++
-		}
-		for v, cnt := range seen {
-			if cnt > 1 {
-				t.Errorf("element %d delivered %d times (duplicate)", v, cnt)
-			}
-		}
-		if len(seen) != n {
-			t.Errorf("expected %d unique elements, got %d", len(seen), n)
-		}
-	})
-
-	t.Run("MoreWorkersThanItems", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		input := []int{10, 20, 30}
-		result := Collect(Pool(ctx, 10, Slice(input)))
-		slices.Sort(result)
-		if !slices.Equal(result, []int{10, 20, 30}) {
-			t.Errorf("Pool(10 workers, 3 items) = %v, want [10 20 30]", result)
-		}
-	})
-
-	t.Run("EarlyReturn", func(t *testing.T) {
-		// Early return is safe with num=1: when yield returns false the single
-		// worker exits and wgdo returns without any other goroutine calling yield.
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		input := Collect(Range(1, 20))
-		result := CollectFirstN(Pool(ctx, 1, Slice(input)), 5)
-		if len(result) != 5 {
-			t.Errorf("Pool early return: got %d elements, want 5", len(result))
-		}
-		for _, v := range result {
-			if v < 1 || v > 20 {
-				t.Errorf("Pool early return: unexpected value %d", v)
-			}
-		}
-	})
-
-	t.Run("ContextCancellation", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-
-		// Infinite sequence.
-		seq := func(yield func(int) bool) {
-			for i := 0; ; i++ {
-				if !yield(i) {
-					return
-				}
-			}
-		}
-
-		done := make(chan struct{})
-		var count atomic.Int32
-		go func() {
-			defer close(done)
-			// Do NOT break/return from the range loop — that would cause other
-			// workers to call yield after it returned false. Instead, cancel the
-			// context and let the workers exit cleanly via recieveFrom returning
-			// ok=false when ctx.Done() fires.
-			for range Pool(ctx, 3, seq) {
-				if count.Add(1) == 20 {
-					cancel()
-				}
-			}
-		}()
-
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Error("Pool did not stop after context cancellation")
-			cancel()
-		}
-		if count.Load() < 20 {
-			t.Errorf("expected at least 20 items before cancel, got %d", count.Load())
-		}
-	})
-
-	t.Run("ConcurrentWorkers", func(t *testing.T) {
-		// Verify that Pool's goroutines are live and blocking concurrently:
-		// gate holds the Pipe goroutine until we release it. Pool must not
-		// have returned yet (workers are all blocking on channel receive).
-		// After releasing the gate all items arrive and Pool completes.
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-
-		const numWorkers = 4
-		gate := make(chan struct{})
-
-		seq := func(yield func(int) bool) {
-			select {
-			case <-gate:
-			case <-ctx.Done():
-				return
-			}
-			for i := range numWorkers * 2 {
-				if !yield(i) {
-					return
-				}
-			}
-		}
-
-		poolDone := make(chan []int, 1)
-		go func() {
-			poolDone <- Collect(Pool(ctx, numWorkers, seq))
-		}()
-
-		// Pool must still be running while gate is closed.
-		select {
-		case <-poolDone:
-			t.Error("Pool completed before gate was opened")
-		case <-time.After(20 * time.Millisecond):
-		}
-
-		close(gate)
-
-		select {
-		case result := <-poolDone:
-			slices.Sort(result)
-			expected := Collect(Range(0, numWorkers*2-1))
-			if !slices.Equal(result, expected) {
-				t.Errorf("after gate open: got %v, want %v", result, expected)
-			}
-		case <-time.After(5 * time.Second):
-			t.Error("Pool did not complete after gate was opened")
-		}
-	})
-
-	t.Run("ConcurrentCorrectness", func(t *testing.T) {
-		// Run many Pool iterators concurrently to exercise the data-race detector
-		// and confirm per-iterator isolation.
-		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-		defer cancel()
-
-		const numWorkers = 4
-		const numIters = 20
-		items := Collect(Range(1, 50))
-
-		results := make([][]int, numIters)
-		var wg sync.WaitGroup
-		for i := range numIters {
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				result := Collect(Pool(ctx, numWorkers, Slice(items)))
-				slices.Sort(result)
-				results[idx] = result
-			}(i)
-		}
-		wg.Wait()
-
-		for i, result := range results {
-			if !slices.Equal(result, items) {
-				t.Errorf("concurrent iteration %d: got %v, want %v", i, result, items)
-				break
-			}
-		}
-	})
-}
-
-func TestPoolMap(t *testing.T) {
-	t.Run("Empty", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		result := Collect(ConvertPool(ctx, 3, Zero[int](), func(v int) int { return v * 2 }))
-		if len(result) != 0 {
-			t.Errorf("PoolMap(empty) = %v, want []", result)
 		}
 	})
 
@@ -10718,19 +10607,18 @@ func TestPoolMap(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		input := []int{1, 2, 3, 4, 5}
-		result := Collect(ConvertPool(ctx, 4, Slice(input), func(v int) int { return v * v }))
+		result := Collect(Pool(ctx, 4, Slice(input), func(v int) int { return v * v }))
 		slices.Sort(result)
 		if !slices.Equal(result, []int{1, 4, 9, 16, 25}) {
-			t.Errorf("PoolMap = %v, want [1 4 9 16 25]", result)
+			t.Errorf("Pool = %v, want [1 4 9 16 25]", result)
 		}
 	})
 
 	t.Run("OpRunsConcurrentlyAcrossWorkers", func(t *testing.T) {
-		// Unlike Pool (which only parallelizes handoff of already-produced
-		// values), PoolMap must run op itself inside the worker pool: block
-		// every call to op until numWorkers calls are in flight at once,
-		// proving op executes on numWorkers goroutines concurrently rather
-		// than serially in the single Pipe producer goroutine.
+		// Pool must run op itself inside the worker pool: block every
+		// call to op until numWorkers calls are in flight at once,
+		// proving op executes on numWorkers goroutines concurrently
+		// rather than serially in the single Pipe producer goroutine.
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
@@ -10759,10 +10647,10 @@ func TestPoolMap(t *testing.T) {
 		}
 
 		input := Collect(Range(1, numWorkers))
-		result := Collect(ConvertPool(ctx, numWorkers, Slice(input), op))
+		result := Collect(Pool(ctx, numWorkers, Slice(input), op))
 		slices.Sort(result)
 		if !slices.Equal(result, input) {
-			t.Errorf("PoolMap = %v, want %v", result, input)
+			t.Errorf("Pool = %v, want %v", result, input)
 		}
 		if got := maxInFlight.Load(); got < numWorkers {
 			t.Errorf("op ran with at most %d concurrent calls, want %d (op is not parallelized across the pool)", got, numWorkers)
@@ -10785,7 +10673,7 @@ func TestPoolMap(t *testing.T) {
 		var count atomic.Int32
 		go func() {
 			defer close(done)
-			for range ConvertPool(ctx, 3, seq, func(v int) int { return v }) {
+			for range Pool(ctx, 3, seq, func(v int) int { return v }) {
 				if count.Add(1) == 20 {
 					cancel()
 				}
@@ -10795,7 +10683,7 @@ func TestPoolMap(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
-			t.Error("PoolMap did not stop after context cancellation")
+			t.Error("Pool did not stop after context cancellation")
 			cancel()
 		}
 		if count.Load() < 20 {
@@ -10882,35 +10770,9 @@ func TestPool2(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
-		result := Collect2(Pool2(ctx, 3, Zero2[int, string]()))
+		result := Collect2(Pool2(ctx, 3, Zero2[int, string](), func(k int, v string) (int, string) { return k, v }))
 		if len(result) != 0 {
 			t.Errorf("Pool2(empty) = %v, want empty map", result)
-		}
-	})
-
-	t.Run("MultipleWorkersAllDelivered", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		input := map[int]string{1: "a", 2: "b", 3: "c", 4: "d", 5: "e"}
-		result := Collect2(Pool2(ctx, 4, Map(input)))
-		if len(result) != len(input) {
-			t.Errorf("Pool2 delivered %d pairs, want %d", len(result), len(input))
-		}
-		for k, v := range input {
-			if result[k] != v {
-				t.Errorf("Pool2: key %d = %q, want %q", k, result[k], v)
-			}
-		}
-	})
-}
-
-func TestConvertPool2(t *testing.T) {
-	t.Run("Empty", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		result := Collect2(ConvertPool2(ctx, 3, Zero2[int, string](), func(k int, v string) (int, string) { return k, v }))
-		if len(result) != 0 {
-			t.Errorf("ConvertPool2(empty) = %v, want empty map", result)
 		}
 	})
 
@@ -10918,13 +10780,13 @@ func TestConvertPool2(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		input := map[int]int{1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
-		result := Collect2(ConvertPool2(ctx, 4, Map(input), func(k, v int) (int, int) { return k, v * v }))
+		result := Collect2(Pool2(ctx, 4, Map(input), func(k, v int) (int, int) { return k, v * v }))
 		if len(result) != len(input) {
-			t.Errorf("ConvertPool2 delivered %d pairs, want %d", len(result), len(input))
+			t.Errorf("Pool2 delivered %d pairs, want %d", len(result), len(input))
 		}
 		for k, v := range input {
 			if result[k] != v*v {
-				t.Errorf("ConvertPool2: key %d = %d, want %d", k, result[k], v*v)
+				t.Errorf("Pool2: key %d = %d, want %d", k, result[k], v*v)
 			}
 		}
 	})
@@ -10966,34 +10828,6 @@ func TestPoolDeadlockStress(t *testing.T) {
 
 		seq := func(yield func(int) bool) {
 			for i := range numItems {
-				if slow(i) {
-					time.Sleep(time.Millisecond)
-				}
-				if !yield(i) {
-					return
-				}
-			}
-		}
-
-		done := make(chan []int, 1)
-		go func() { done <- Collect(Pool(ctx, numWorkers, seq)) }()
-
-		select {
-		case result := <-done:
-			if len(result) != numItems {
-				t.Errorf("Pool stress: got %d items, want %d", len(result), numItems)
-			}
-		case <-ctx.Done():
-			t.Fatal("Pool did not complete before hard timeout (possible deadlock)")
-		}
-	})
-
-	t.Run("ConvertPool", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-
-		seq := func(yield func(int) bool) {
-			for i := range numItems {
 				if !yield(i) {
 					return
 				}
@@ -11007,15 +10841,15 @@ func TestPoolDeadlockStress(t *testing.T) {
 		}
 
 		done := make(chan []int, 1)
-		go func() { done <- Collect(ConvertPool(ctx, numWorkers, seq, op)) }()
+		go func() { done <- Collect(Pool(ctx, numWorkers, seq, op)) }()
 
 		select {
 		case result := <-done:
 			if len(result) != numItems {
-				t.Errorf("ConvertPool stress: got %d items, want %d", len(result), numItems)
+				t.Errorf("Pool stress: got %d items, want %d", len(result), numItems)
 			}
 		case <-ctx.Done():
-			t.Fatal("ConvertPool did not complete before hard timeout (possible deadlock)")
+			t.Fatal("Pool did not complete before hard timeout (possible deadlock)")
 		}
 	})
 
@@ -11061,7 +10895,7 @@ func TestPoolDeadlockStress(t *testing.T) {
 }
 
 func TestPoolGoroutineCount(t *testing.T) {
-	// WithMutex (used by Pool/ConvertPool/Shard for the input side) is
+	// WithMutex (used by Pool/Shard for the input side) is
 	// built on iter.Pull, and iter.Pull itself spawns one runtime-managed
 	// coroutine goroutine per call to host seq's resumable body (see
 	// runtime.newcoro) - so total goroutine count during a call is
@@ -11111,7 +10945,7 @@ func TestPoolGoroutineCount(t *testing.T) {
 
 		base := settle()
 		poolDone := make(chan struct{})
-		go func() { Collect(Pool(ctx, numWorkers, seq)); close(poolDone) }()
+		go func() { Collect(Pool(ctx, numWorkers, seq, func(v int) int { return v })); close(poolDone) }()
 
 		// Give the worker pool a moment to spin up and block on gate.
 		time.Sleep(20 * time.Millisecond)

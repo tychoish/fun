@@ -575,7 +575,7 @@ func ForEach[T any, OP ~func(T)](seq iter.Seq[T], op OP) iter.Seq[T] {
 
 // ForEachWhile returns a sequence that calls op for each element of
 // the input sequence.  Iteration stops if op returns false.
-func ForEachWhile[T any, OP func(T) bool](seq iter.Seq[T], op OP) iter.Seq[T] {
+func ForEachWhile[T any, OP ~func(T) bool](seq iter.Seq[T], op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for value := range seq {
 			if !op(value) || !yield(value) {
@@ -737,10 +737,10 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 // range-over-func rule that yield must never be called after it has
 // returned false. Pair with WithMutex (or another input-side lock) to
 // merge multiple producers back into a single consumer, as Pool and
-// ConvertPool do.
+// Pool3 do.
 func Sink[T any](yield func(T) bool) func(T) bool {
 	var mtx sync.Mutex
-	done := false
+	var done bool
 	return func(v T) bool {
 		mtx.Lock()
 		defer mtx.Unlock()
@@ -756,7 +756,7 @@ func Sink[T any](yield func(T) bool) func(T) bool {
 // function so that concurrent workers can share it safely.
 func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 	var mtx sync.Mutex
-	done := false
+	var done bool
 	return func(a A, b B) bool {
 		mtx.Lock()
 		defer mtx.Unlock()
@@ -768,50 +768,23 @@ func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 	}
 }
 
-// Pool iterates the input sequence with worker pool and combines the
-// results of that worker pool into a single iterator. Effectively, the
-// output iterator is buffered by number of workers in the pool. The
+// Pool iterates seq and applies op to each element using a pool of
+// num goroutines, merging the results into a single output sequence. op
+// runs outside the input lock, so it executes in parallel across
+// workers; only pulling the raw element from seq is serialized. The
 // input sequence is pulled through a single, mutex-guarded shared
 // iterator (WithMutex) rather than a dedicated producer goroutine and
 // channel handoff; iter.Pull (used by WithMutex) still runs its own
 // runtime-managed coroutine goroutine, so total goroutine count is
 // unchanged from before, but there is no longer any hand-rolled
 // producer goroutine or channel to manage or leak.
-func Pool[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		input := WithMutex(seq, &sync.Mutex{})
-		push := Sink(yield)
-		wgdo(num, func() {
-			for v := range input {
-				if ctx.Err() != nil || !push(v) {
-					return
-				}
-			}
-		})
-	}
-}
-
-// Pool2 is the iter.Seq2 counterpart to Pool: it iterates the input
-// pair sequence with a worker pool and combines the results into a
-// single output pair sequence.
-func Pool2[A, B any](ctx context.Context, num int, seq iter.Seq2[A, B]) iter.Seq2[A, B] {
-	return KVsplit(Pool(ctx, num, KVjoin(seq)))
-}
-
-// ConvertPool iterates seq and applies op to each element using a pool of
-// num goroutines, merging the results into a single output sequence. op
-// runs outside the input lock, so it executes in parallel across
-// workers; only pulling the raw element from seq is serialized.
-func ConvertPool[A, B any](ctx context.Context, num int, seq iter.Seq[A], op func(A) B) iter.Seq[B] {
+func Pool[A, B any, OP ~func(A) B](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq[B] {
 	return func(yield func(B) bool) {
 		input := WithMutex(seq, &sync.Mutex{})
 		push := Sink(yield)
 		wgdo(num, func() {
 			for a := range input {
-				if ctx.Err() != nil {
-					return
-				}
-				if !push(op(a)) {
+				if ctx.Err() != nil || !push(op(a)) {
 					return
 				}
 			}
@@ -819,11 +792,30 @@ func ConvertPool[A, B any](ctx context.Context, num int, seq iter.Seq[A], op fun
 	}
 }
 
-// ConvertPool2 is the iter.Seq2 counterpart to ConvertPool: it iterates
-// seq and applies op to each pair using a pool of num goroutines,
-// merging the results into a single output pair sequence.
-func ConvertPool2[A, B, C, D any](ctx context.Context, num int, seq iter.Seq2[A, B], op func(A, B) (C, D)) iter.Seq2[C, D] {
-	return KVsplit(ConvertPool(ctx, num, KVjoin(seq), func(kv KV[A, B]) KV[C, D] { return MakeKV(op(kv.Key, kv.Value)) }))
+// Pool2 is the iter.Seq2 counterpart to Pool: it iterates seq and
+// applies op to each pair using a pool of num goroutines, merging the
+// results into a single output pair sequence.
+func Pool2[A, B, C, D any, OP ~func(A, B) (C, D)](ctx context.Context, num int, seq iter.Seq2[A, B], op OP) iter.Seq2[C, D] {
+	return KVsplit(Pool(ctx, num, KVjoin(seq), func(kv KV[A, B]) KV[C, D] { return MakeKV(op(kv.Key, kv.Value)) }))
+}
+
+// Pool3 is the pooled counterpart to With2: it iterates seq and
+// applies op to each element using a pool of num goroutines, merging
+// the resulting pairs into a single output pair sequence. op runs
+// outside the input lock, so it executes in parallel across workers;
+// only pulling the raw element from seq is serialized.
+func Pool3[A, B, C any, OP ~func(A) (B, C)](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq2[B, C] {
+	return func(yield func(B, C) bool) {
+		input := WithMutex(seq, &sync.Mutex{})
+		push := Sink2(yield)
+		wgdo(num, func() {
+			for a := range input {
+				if ctx.Err() != nil || !push(op(a)) {
+					return
+				}
+			}
+		})
+	}
 }
 
 // Chunk returns a sequence of sequences, where each inner sequence
@@ -833,7 +825,6 @@ func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 	return func(yield func(iter.Seq[T]) bool) {
 		next, stop := iter.Pull(seq)
 		defer stop()
-
 		for shouldContinue := num > 0; shouldContinue && yield(func(yield func(T) bool) {
 			for range num {
 				if value, ok := next(); !ok || !yield(value) {
@@ -922,17 +913,19 @@ func UntilError[T any](seq iter.Seq2[T, error]) iter.Seq[T] { return First(Until
 
 // Until returns a sequence that yields elements from the input
 // sequence until the predicate prd returns true.
-func Until[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return While(seq, notf(prd)) }
+func Until[T any, OP ~func(T) bool](seq iter.Seq[T], prd OP) iter.Seq[T] {
+	return While(seq, notf(prd))
+}
 
 // Until2 returns a iterator that yields pairs from the input iterator
 // until the predicate is returns true.
-func Until2[A, B any](seq iter.Seq2[A, B], is func(A, B) bool) iter.Seq2[A, B] {
+func Until2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], is OP) iter.Seq2[A, B] {
 	return While2(seq, notf2(is))
 }
 
 // While returns a sequence that yields elements from the input
 // sequence as long as the predicate prd returns true.
-func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
+func While[T any, OP ~func(T) bool](seq iter.Seq[T], prd OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for value := range seq {
 			switch {
@@ -947,7 +940,7 @@ func While[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 
 // While2 returns a iterator that yields pairs from the input iterator
 // as long as the predicate prd returns true.
-func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
+func While2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for key, value := range seq {
 			switch {
@@ -962,7 +955,7 @@ func While2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] 
 
 // Keep returns a sequence containing only the elements from the input
 // sequence that satisfy the predicate prd.
-func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
+func Keep[T any, OP ~func(T) bool](seq iter.Seq[T], prd OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for value := range seq {
 			if prd(value) && !yield(value) {
@@ -974,7 +967,7 @@ func Keep[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] {
 
 // Keep2 returns a iterator containing only the pairs from the input
 // iterator that satisfy the predicate prd.
-func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
+func Keep2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for key, value := range seq {
 			if prd(key, value) && !yield(key, value) {
@@ -1082,21 +1075,23 @@ func WithWMutex2[A, B any](seq iter.Seq2[A, B], mtx *sync.RWMutex) iter.Seq2[A, 
 
 // Remove returns a sequence containing only the elements from the
 // input sequence that do NOT satisfy the predicate prd.
-func Remove[T any](seq iter.Seq[T], prd func(T) bool) iter.Seq[T] { return Keep(seq, notf(prd)) }
+func Remove[T any, OP ~func(T) bool](seq iter.Seq[T], prd OP) iter.Seq[T] {
+	return Keep(seq, notf(prd))
+}
 
 // RemoveValue returns a sequence with all values equal to the provided values removed.
 func RemoveValue[T comparable](seq iter.Seq[T], to T) iter.Seq[T] { return Remove(seq, equalf(to)) }
 
 // Remove2 returns a iterator containing only the pairs from the input
 // iterator that do NOT satisfy the predicate prd.
-func Remove2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
+func Remove2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2[A, B] {
 	return Keep2(seq, notf2(prd))
 }
 
 // GroupBy consumes the sequence and groups elements into a iterator
 // of keys and slices of values, using the groupBy function to
 // determine the key for each element.
-func GroupBy[K comparable, V any](seq iter.Seq[V], groupBy func(V) K) iter.Seq2[K, []V] {
+func GroupBy[K comparable, V any, OP ~func(V) K](seq iter.Seq[V], groupBy OP) iter.Seq2[K, []V] {
 	grp := grouping(groups[K, V]{})
 	Apply(seq, grp.with(groupBy))
 	return grp.iter()
@@ -1117,7 +1112,7 @@ func Unique[T comparable](seq iter.Seq[T]) iter.Seq[T] { return Remove(seq, seen
 // UniqueBy returns a sequence containing only the first occurrence of
 // each element from the input sequence that produces a unique key
 // when passed to kfn.
-func UniqueBy[K comparable, V any](seq iter.Seq[V], kfn func(V) K) iter.Seq[V] {
+func UniqueBy[K comparable, V any, OP ~func(V) K](seq iter.Seq[V], kfn OP) iter.Seq[V] {
 	return First(Remove2(With(seq, kfn), seenvalue[K, V]()))
 }
 
@@ -1136,7 +1131,7 @@ func Count2[A, B any](seq iter.Seq2[A, B]) (size int) {
 
 // Reduce consumes the sequence and reduces it to a single value by
 // repeatedly applying rfn.
-func Reduce[A, B any](seq iter.Seq[A], rfn func(B, A) B) (out B) {
+func Reduce[A, B any, OP ~func(B, A) B](seq iter.Seq[A], rfn OP) (out B) {
 	for v := range seq {
 		out = rfn(out, v)
 	}
@@ -1145,7 +1140,7 @@ func Reduce[A, B any](seq iter.Seq[A], rfn func(B, A) B) (out B) {
 
 // Reduce2 consumes a sequence o pairs and reduces it to a single value by
 // repeatedly applying rfn.
-func Reduce2[A, B, C any](seq iter.Seq2[A, B], rfn func(C, A, B) C) (out C) {
+func Reduce2[A, B, C any, OP ~func(C, A, B) C](seq iter.Seq2[A, B], rfn OP) (out C) {
 	for a, b := range seq {
 		out = rfn(out, a, b)
 	}
@@ -1252,27 +1247,27 @@ func Sort1[A cmp.Ordered, B any](seq iter.Seq2[A, B]) iter.Seq2[A, B] {
 // SortBy consumes the sequence, sorts it based on the keys produced
 // by the comparison function, cf, and returns a new sequence of the
 // sorted elements.
-func SortBy[K cmp.Ordered, T any](seq iter.Seq[T], cf func(T) K) iter.Seq[T] {
+func SortBy[K cmp.Ordered, T any, OP ~func(T) K](seq iter.Seq[T], cf OP) iter.Seq[T] {
 	return slices.Values(slices.SortedFunc(seq, toCmp(cf)))
 }
 
 // SortBy2 consumes the iterator, sorts it based on the keys produced
 // by cf, and returns a new iterator of the sorted pairs.
-func SortBy2[K cmp.Ordered, A, B any](seq iter.Seq2[A, B], cf func(A, B) K) iter.Seq2[A, B] {
+func SortBy2[K cmp.Ordered, A, B any, OP ~func(A, B) K](seq iter.Seq2[A, B], cf OP) iter.Seq2[A, B] {
 	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), toCmp2(cf))))
 }
 
 // SortFunc consumes the sequence, sorts it using the provided
 // cmp.Compare-style comparison function, and returns a new sorted
 // sequence.
-func SortFunc[T any](seq iter.Seq[T], cf func(T, T) int) iter.Seq[T] {
+func SortFunc[T any, OP ~func(T, T) int](seq iter.Seq[T], cf OP) iter.Seq[T] {
 	return slices.Values(slices.SortedFunc(seq, cf))
 }
 
 // SortFunc2 consumes the iterator, sorts its pairs using the provided
 // cmp.Compare-style comparison function, and returns a new sorted
 // iterator.
-func SortFunc2[A, B any](seq iter.Seq2[A, B], cf func(A, B, A, B) int) iter.Seq2[A, B] {
+func SortFunc2[A, B any, OP ~func(A, B, A, B) int](seq iter.Seq2[A, B], cf OP) iter.Seq2[A, B] {
 	return KVsplit(Slice(slices.SortedFunc(KVjoin(seq), func(l, r KV[A, B]) int {
 		return cf(l.Key, l.Value, r.Key, r.Value)
 	})))
