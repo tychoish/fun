@@ -730,15 +730,38 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 	return opwithstart(opwithch(func(ch chan T) { seqToChan(ctx, seq, ch) }))
 }
 
-// Pool iterates the input sequence with worker pool and combines the results of that worker pool
-// into a single iterator. Effectively, the output iterator is buffered by number of workers in the
-// pool. Runs one go routine (via Pipe) to read from the input iterator in addition to the worker pool.
+// Pool iterates the input sequence with worker pool and combines the
+// results of that worker pool into a single iterator. Effectively, the
+// output iterator is buffered by number of workers in the pool. Runs
+// one go routine (via Pipe) to read from the input iterator in addition
+// to the worker pool.
 func Pool[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		input := Pipe(ctx, seq)
 		push := mtxdowith(&sync.Mutex{}, yield)
 		wgdo(num, func() {
 			for whenopokdo(func() (T, bool) { return recieveFrom(ctx, input) }, push) {
+				continue
+			}
+		})
+	}
+}
+
+// ConvertPool iterates seq and applies op to each element using a pool of
+// num goroutines, merging the results into a single output sequence.
+func ConvertPool[A, B any](ctx context.Context, num int, seq iter.Seq[A], op func(A) B) iter.Seq[B] {
+	return func(yield func(B) bool) {
+		input := Pipe(ctx, seq)
+		push := mtxdowith(&sync.Mutex{}, yield)
+		wgdo(num, func() {
+			for whenopokdo(func() (B, bool) {
+				a, ok := recieveFrom(ctx, input)
+				if !ok {
+					var zero B
+					return zero, false
+				}
+				return op(a), true
+			}, push) {
 				continue
 			}
 		})

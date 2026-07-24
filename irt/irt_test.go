@@ -10619,3 +10619,103 @@ func TestPool(t *testing.T) {
 		}
 	})
 }
+
+func TestPoolMap(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		result := Collect(ConvertPool(ctx, 3, Zero[int](), func(v int) int { return v * 2 }))
+		if len(result) != 0 {
+			t.Errorf("PoolMap(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("AppliesOp", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		input := []int{1, 2, 3, 4, 5}
+		result := Collect(ConvertPool(ctx, 4, Slice(input), func(v int) int { return v * v }))
+		slices.Sort(result)
+		if !slices.Equal(result, []int{1, 4, 9, 16, 25}) {
+			t.Errorf("PoolMap = %v, want [1 4 9 16 25]", result)
+		}
+	})
+
+	t.Run("OpRunsConcurrentlyAcrossWorkers", func(t *testing.T) {
+		// Unlike Pool (which only parallelizes handoff of already-produced
+		// values), PoolMap must run op itself inside the worker pool: block
+		// every call to op until numWorkers calls are in flight at once,
+		// proving op executes on numWorkers goroutines concurrently rather
+		// than serially in the single Pipe producer goroutine.
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		const numWorkers = 4
+		var inFlight atomic.Int32
+		var maxInFlight atomic.Int32
+		release := make(chan struct{})
+		var releaseOnce sync.Once
+
+		op := func(v int) int {
+			if inFlight.Add(1) == numWorkers {
+				releaseOnce.Do(func() { close(release) })
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+			for {
+				cur := maxInFlight.Load()
+				if inFlight.Load() <= cur || maxInFlight.CompareAndSwap(cur, inFlight.Load()) {
+					break
+				}
+			}
+			inFlight.Add(-1)
+			return v
+		}
+
+		input := Collect(Range(1, numWorkers))
+		result := Collect(ConvertPool(ctx, numWorkers, Slice(input), op))
+		slices.Sort(result)
+		if !slices.Equal(result, input) {
+			t.Errorf("PoolMap = %v, want %v", result, input)
+		}
+		if got := maxInFlight.Load(); got < numWorkers {
+			t.Errorf("op ran with at most %d concurrent calls, want %d (op is not parallelized across the pool)", got, numWorkers)
+		}
+	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		seq := func(yield func(int) bool) {
+			for i := 0; ; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		done := make(chan struct{})
+		var count atomic.Int32
+		go func() {
+			defer close(done)
+			for range ConvertPool(ctx, 3, seq, func(v int) int { return v }) {
+				if count.Add(1) == 20 {
+					cancel()
+				}
+			}
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("PoolMap did not stop after context cancellation")
+			cancel()
+		}
+		if count.Load() < 20 {
+			t.Errorf("expected at least 20 items before cancel, got %d", count.Load())
+		}
+	})
+}
