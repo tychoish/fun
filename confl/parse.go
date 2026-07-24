@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ func isKnownEnvOpt(s string) bool {
 
 func parseEnvOpts(optsTag string) envOpts {
 	var o envOpts
-	for _, part := range splitTrimmed(optsTag, ",") {
+	for part := range splitTrimmed(optsTag, ",") {
 		switch part {
 		case envOptNonEmptyOnly:
 			o.nonEmptyOnly = true
@@ -72,10 +73,7 @@ func resolveEnvVars(vars []string, opts envOpts) (string, bool) {
 	}
 	for _, name := range vars {
 		v, ok := os.LookupEnv(name)
-		if !ok {
-			continue
-		}
-		if opts.nonEmptyOnly && v == "" {
+		if !ok || (opts.nonEmptyOnly && v == "") {
 			continue
 		}
 		return v, true
@@ -550,7 +548,7 @@ func applyEnvVarsWalk(fs *flag.FlagSet, val reflect.Value, prefix string, cliSet
 				"flag -%s: CLI flag not accepted; use env var only (%s)", fullName, envOptExclusive)
 		}
 
-		envVal, envFound := resolveEnvVars(splitTrimmed(envTag, ","), opts)
+		envVal, envFound := resolveEnvVars(slices.Collect(splitTrimmed(envTag, ",")), opts)
 		if !envFound {
 			continue
 		}

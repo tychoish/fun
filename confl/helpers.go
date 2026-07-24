@@ -2,11 +2,12 @@ package confl
 
 import (
 	"flag"
+	"iter"
 	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/irt"
 )
 
 func joinStr(args ...string) string { return strings.Join(args, "") }
@@ -117,17 +118,7 @@ func registerAlias(spec flagSpec, register func(name, usage string)) {
 	}
 }
 
-// splitTrimmed splits s on sep and returns non-empty trimmed tokens.
-func splitTrimmed(s, sep string) []string {
-	if s == "" {
-		return nil
-	}
-
-	return slices.Collect(func(yield func(string) bool) {
-		for p := range strings.SplitSeq(s, sep) {
-			if !yield(strings.TrimSpace(p)) {
-				return
-			}
-		}
-	})
+// splitTrimmed splits s on sep and returns trimmed tokens.
+func splitTrimmed(s, sep string) iter.Seq[string] {
+	return irt.Convert(strings.SplitSeq(s, sep), strings.TrimSpace)
 }

@@ -47,6 +47,58 @@ func registerSliceFlag[T any](fs *flag.FlagSet, p *[]T, spec flagSpec, parse fun
 	return nil
 }
 
+// registerPointerFlag registers a flag for a pointer-typed field (**T; the
+// field itself has type *T). A nil field after parsing means the flag was
+// never supplied by any source (CLI, env, or default), letting the caller
+// defer to another configuration layer. Any explicit value — CLI, env, or
+// default: — allocates a fresh T and repoints *p at it, so an explicit zero
+// value (e.g. -org "") is distinguishable from "never set" (p stays nil).
+func registerPointerFlag[T any](fs *flag.FlagSet, p **T, spec flagSpec, parse func(string) (T, error)) error {
+	if spec.Default != "" {
+		def, err := parse(spec.Default)
+		if err != nil {
+			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+		}
+		*p = &def
+	}
+	registerAlias(spec, func(n, u string) {
+		fs.Func(n, u, func(s string) error {
+			v, err := parse(s)
+			if err != nil {
+				return err
+			}
+			*p = &v
+			return nil
+		})
+	})
+	return nil
+}
+
+// registerPointerBoolFlag registers a *bool flag. Unlike the scalar *bool
+// case, it does not support the inverted-default (`default:"true"` ->
+// `-no-<name>`) convention; a pointer bool's nil-vs-set state is the signal
+// callers rely on, so it always registers as a plain presence flag.
+func registerPointerBoolFlag(fs *flag.FlagSet, p **bool, spec flagSpec) error {
+	if spec.Default != "" {
+		def, err := strconv.ParseBool(spec.Default)
+		if err != nil {
+			return erc.Join(ErrInvalidSpecification, err, fmt.Errorf("field %q had default %q", spec.Name, spec.Default))
+		}
+		*p = &def
+	}
+	registerAlias(spec, func(n, u string) {
+		fs.BoolFunc(n, u, func(s string) error {
+			b, err := strconv.ParseBool(s)
+			if err != nil {
+				return err
+			}
+			*p = &b
+			return nil
+		})
+	})
+	return nil
+}
+
 // registerFlag registers a single flag (and optional short alias) on fs.
 // ptr must be the result of fval.Addr().Interface() for the struct field.
 // format is the value of the `format:` struct tag; it is only meaningful for
@@ -203,6 +255,46 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 			def = d
 		}
 		registerAlias(spec, func(n, u string) { fs.DurationVar(p, n, def, u) })
+	// ── pointer types (nil-vs-set tracking) ──────────────────────────────────
+	case **string:
+		return registerPointerFlag(fs, p, spec, func(s string) (string, error) { return s, nil })
+	case **bool:
+		return registerPointerBoolFlag(fs, p, spec)
+	case **int:
+		return registerPointerFlag(fs, p, spec, parseInt[int](strconv.IntSize))
+	case **int64:
+		return registerPointerFlag(fs, p, spec, parseInt[int64](64))
+	case **uint:
+		return registerPointerFlag(fs, p, spec, parseUint[uint](strconv.IntSize))
+	case **uint64:
+		return registerPointerFlag(fs, p, spec, parseUint[uint64](64))
+	case **float64:
+		return registerPointerFlag(fs, p, spec, parseFloat[float64](64))
+	case **float32:
+		return registerPointerFlag(fs, p, spec, parseFloat[float32](32))
+	case **int32:
+		return registerPointerFlag(fs, p, spec, parseInt[int32](32))
+	case **int16:
+		return registerPointerFlag(fs, p, spec, parseInt[int16](16))
+	case **int8:
+		return registerPointerFlag(fs, p, spec, parseInt[int8](8))
+	case **uint32:
+		return registerPointerFlag(fs, p, spec, parseUint[uint32](32))
+	case **uint16:
+		return registerPointerFlag(fs, p, spec, parseUint[uint16](16))
+	case **uint8:
+		return registerPointerFlag(fs, p, spec, parseUint[uint8](8))
+	case **time.Time:
+		var parse func(string) (time.Time, error)
+		if spec.Format != "" {
+			parse = parseTimeFunc(spec.Format)
+		} else {
+			parse = parseTimeFuncAuto()
+		}
+		return registerPointerFlag(fs, p, spec, parse)
+	case **time.Duration:
+		return registerPointerFlag(fs, p, spec, time.ParseDuration)
+
 	case *[]time.Time:
 		var parse func(string) (time.Time, error)
 		if spec.Format != "" {

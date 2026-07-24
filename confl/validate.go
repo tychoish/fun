@@ -93,7 +93,7 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 				return ers.Wrapf(ErrInvalidSpecification,
 					"field %q has opts: tag but no env: tag; opts: is only meaningful with env:", field.Name)
 			}
-			for _, part := range splitTrimmed(optsTag, ",") {
+			for part := range splitTrimmed(optsTag, ",") {
 				if !isKnownEnvOpt(part) {
 					return ers.Wrapf(ErrInvalidSpecification,
 						"field %q has unknown opts: value %q (known: %s, %s, %s, %s, %s)",
