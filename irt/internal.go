@@ -65,10 +65,6 @@ func mtxcallwith[T any](mtx *sync.Mutex, op func(T)) func(T) {
 	return func(arg T) { defer with(lock(mtx)); op(arg) }
 }
 
-func mtxdowith[A, B any](mtx *sync.Mutex, op func(A) B) func(A) B {
-	return func(arg A) B { defer with(lock(mtx)); return op(arg) }
-}
-
 func loopWhile(op func() bool) {
 	for op() {
 		continue
@@ -147,8 +143,7 @@ func funcallrop[A, B any](op func(A) B, arg A) func() B { return func() B { retu
 func ignoreSecond[A, B, C any](op func(A) C) func(A, B) C { return func(a A, _ B) C { return op(a) } }
 func ignoreFirst[A, B, C any](op func(B) C) func(A, B) C  { return func(_ A, b B) C { return op(b) } }
 
-func curry[A, B any](op func(A) B, a A) func() B             { return func() B { return op(a) } }
-func curry2[A, B, C any](op func(A, B) C, a A, b B) func() C { return func() C { return op(a, b) } }
+func curry[A, B any](op func(A) B, a A) func() B { return func() B { return op(a) } }
 func wrap[A, B any](op func() A, fn func(A) B) func() (A, B) {
 	return func() (A, B) { o := op(); return o, fn(o) }
 }
@@ -353,13 +348,6 @@ func whendook[T any](cond bool, do func() T) (T, bool)           { return whendo
 func whendofn[T any](cond bool, do func() T) func() T            { return func() T { return whendo(cond, do) } }
 func whendowithok[A, B any](c bool, do func(A) B, a A) (B, bool) { return whendowith(c, do, a), c }
 func whendowithfn[A, B any](c bool, o func(A) B, a A) func() B   { return whendofn(c, curry(o, a)) }
-
-func whenokdo[T any](value T, cond bool, op func(T) bool) bool { return cond && op(value) }
-
-func whenopokdo[T any](gen func() (T, bool), push func(T) bool) bool {
-	v, ok := gen()
-	return whenokdo(v, ok, push)
-}
 
 // sorting helpers
 

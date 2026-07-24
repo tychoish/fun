@@ -10,6 +10,7 @@ import (
 	"iter"
 	"maps"
 	"math/rand/v2"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -10945,4 +10946,226 @@ func TestShard2(t *testing.T) {
 	if totalItems != 10 {
 		t.Errorf("Total items across shards = %d, want 10", totalItems)
 	}
+}
+
+func TestPoolDeadlockStress(t *testing.T) {
+	// Hammers both the input lock (WithMutex) and the output latch (Sink)
+	// with many workers and a mix of fast/artificially-slowed items,
+	// wrapped in a short hard timeout: this fails by hanging (until the
+	// test framework's own timeout) rather than silently passing if a
+	// future edit reintroduces nested lock acquisition. Empirical
+	// backstop for the Deadlock Analysis section of the design.
+	const numWorkers = 16
+	const numItems = 500
+
+	slow := func(i int) bool { return i%7 == 0 }
+
+	t.Run("Pool", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		seq := func(yield func(int) bool) {
+			for i := range numItems {
+				if slow(i) {
+					time.Sleep(time.Millisecond)
+				}
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		done := make(chan []int, 1)
+		go func() { done <- Collect(Pool(ctx, numWorkers, seq)) }()
+
+		select {
+		case result := <-done:
+			if len(result) != numItems {
+				t.Errorf("Pool stress: got %d items, want %d", len(result), numItems)
+			}
+		case <-ctx.Done():
+			t.Fatal("Pool did not complete before hard timeout (possible deadlock)")
+		}
+	})
+
+	t.Run("ConvertPool", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		seq := func(yield func(int) bool) {
+			for i := range numItems {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		op := func(i int) int {
+			if slow(i) {
+				time.Sleep(time.Millisecond)
+			}
+			return i * i
+		}
+
+		done := make(chan []int, 1)
+		go func() { done <- Collect(ConvertPool(ctx, numWorkers, seq, op)) }()
+
+		select {
+		case result := <-done:
+			if len(result) != numItems {
+				t.Errorf("ConvertPool stress: got %d items, want %d", len(result), numItems)
+			}
+		case <-ctx.Done():
+			t.Fatal("ConvertPool did not complete before hard timeout (possible deadlock)")
+		}
+	})
+
+	t.Run("Shard", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		seq := func(yield func(int) bool) {
+			for i := range numItems {
+				if slow(i) {
+					time.Sleep(time.Millisecond)
+				}
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			var wg sync.WaitGroup
+			var total atomic.Int32
+			for shard := range Shard(ctx, numWorkers, seq) {
+				wg.Add(1)
+				go func(s iter.Seq[int]) {
+					defer wg.Done()
+					total.Add(int32(Count(s)))
+				}(shard)
+			}
+			wg.Wait()
+			done <- int(total.Load())
+		}()
+
+		select {
+		case total := <-done:
+			if total != numItems {
+				t.Errorf("Shard stress: got %d items across shards, want %d", total, numItems)
+			}
+		case <-ctx.Done():
+			t.Fatal("Shard did not complete before hard timeout (possible deadlock)")
+		}
+	})
+}
+
+func TestPoolGoroutineCount(t *testing.T) {
+	// WithMutex (used by Pool/ConvertPool/Shard for the input side) is
+	// built on iter.Pull, and iter.Pull itself spawns one runtime-managed
+	// coroutine goroutine per call to host seq's resumable body (see
+	// runtime.newcoro) - so total goroutine count during a call is
+	// numWorkers (the pool) plus exactly one (iter.Pull's coroutine),
+	// not numWorkers alone. That single goroutine is not the same kind
+	// of overhead the old Pipe-based design had: it is runtime-owned,
+	// requires no channel plumbing, and its lifecycle is tied directly
+	// to the shared iterator (cleaned up when stop() runs or the
+	// sequence is exhausted) rather than a hand-rolled producer
+	// goroutine that must itself select on ctx.Done() to avoid leaking.
+	// This test locks in that there is exactly one such goroutine - not
+	// one per worker, and not one per element pulled.
+	settle := func() int {
+		var last, stable int
+		for range 50 {
+			runtime.Gosched()
+			cur := runtime.NumGoroutine()
+			if cur == last {
+				stable++
+				if stable >= 3 {
+					return cur
+				}
+			} else {
+				stable = 0
+			}
+			last = cur
+			time.Sleep(time.Millisecond)
+		}
+		return last
+	}
+
+	const numWorkers = 4
+
+	t.Run("Pool", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		gate := make(chan struct{})
+		seq := func(yield func(int) bool) {
+			<-gate
+			for i := range numWorkers * 3 {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		base := settle()
+		poolDone := make(chan struct{})
+		go func() { Collect(Pool(ctx, numWorkers, seq)); close(poolDone) }()
+
+		// Give the worker pool a moment to spin up and block on gate.
+		time.Sleep(20 * time.Millisecond)
+		during := runtime.NumGoroutine()
+		close(gate)
+		<-poolDone
+
+		// +1 for the goroutine launched above, +1 for iter.Pull's
+		// internal coroutine (shared once across all numWorkers pulls),
+		// +numWorkers for the pool itself.
+		want := numWorkers + 2
+		if got := during - base; got != want {
+			t.Errorf("Pool: goroutine delta during call = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("Shard", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		gate := make(chan struct{})
+		seq := func(yield func(int) bool) {
+			<-gate
+			for i := range numWorkers * 3 {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		base := settle()
+		shardsDone := make(chan struct{})
+		var wg sync.WaitGroup
+		go func() {
+			for shard := range Shard(ctx, numWorkers, seq) {
+				wg.Add(1)
+				go func(s iter.Seq[int]) { defer wg.Done(); Count(s) }(shard)
+			}
+			wg.Wait()
+			close(shardsDone)
+		}()
+
+		time.Sleep(20 * time.Millisecond)
+		during := runtime.NumGoroutine()
+		close(gate)
+		<-shardsDone
+
+		// +1 for the launcher goroutine above, +1 for iter.Pull's
+		// internal coroutine (Shard's single underlying WithMutex call),
+		// +numWorkers for the test's own per-shard consumer goroutines
+		// (Shard itself spawns none of those - they're test-owned).
+		want := numWorkers + 2
+		if got := during - base; got != want {
+			t.Errorf("Shard: goroutine delta during call = %d, want %d", got, want)
+		}
+	})
 }

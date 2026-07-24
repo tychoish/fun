@@ -2173,45 +2173,6 @@ func TestMtxHelpers(t *testing.T) {
 		mu.Unlock()
 	})
 
-	t.Run("mtxdowith", func(t *testing.T) {
-		mu := &sync.Mutex{}
-		var lockHeld bool
-		var receivedValue int
-
-		op := func(arg int) int {
-			receivedValue = arg
-			// Try to lock - should fail if mutex is held
-			if mu.TryLock() {
-				mu.Unlock()
-				lockHeld = false
-			} else {
-				lockHeld = true
-			}
-			return arg * 2
-		}
-
-		wrapped := mtxdowith(mu, op)
-		result := wrapped(21)
-
-		if result != 42 {
-			t.Errorf("mtxdowith: got result %d, want 42", result)
-		}
-
-		if receivedValue != 21 {
-			t.Errorf("mtxdowith: got arg %d, want 21", receivedValue)
-		}
-
-		if !lockHeld {
-			t.Error("mtxdowith: mutex was not held during operation")
-		}
-
-		// Mutex should be unlocked after wrapped() completes
-		if !mu.TryLock() {
-			t.Error("mtxdowith: mutex still locked after wrapped() returned")
-		}
-		mu.Unlock()
-	})
-
 	t.Run("ConcurrentSafety", func(t *testing.T) {
 		mu := &sync.Mutex{}
 		var counter atomic.Int32

@@ -770,16 +770,22 @@ func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 
 // Pool iterates the input sequence with worker pool and combines the
 // results of that worker pool into a single iterator. Effectively, the
-// output iterator is buffered by number of workers in the pool. Runs
-// one go routine (via Pipe) to read from the input iterator in addition
-// to the worker pool.
+// output iterator is buffered by number of workers in the pool. The
+// input sequence is pulled through a single, mutex-guarded shared
+// iterator (WithMutex) rather than a dedicated producer goroutine and
+// channel handoff; iter.Pull (used by WithMutex) still runs its own
+// runtime-managed coroutine goroutine, so total goroutine count is
+// unchanged from before, but there is no longer any hand-rolled
+// producer goroutine or channel to manage or leak.
 func Pool[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		input := Pipe(ctx, seq)
-		push := mtxdowith(&sync.Mutex{}, yield)
+		input := WithMutex(seq, &sync.Mutex{})
+		push := Sink(yield)
 		wgdo(num, func() {
-			for whenopokdo(func() (T, bool) { return recieveFrom(ctx, input) }, push) {
-				continue
+			for v := range input {
+				if ctx.Err() != nil || !push(v) {
+					return
+				}
 			}
 		})
 	}
@@ -793,21 +799,21 @@ func Pool2[A, B any](ctx context.Context, num int, seq iter.Seq2[A, B]) iter.Seq
 }
 
 // ConvertPool iterates seq and applies op to each element using a pool of
-// num goroutines, merging the results into a single output sequence.
+// num goroutines, merging the results into a single output sequence. op
+// runs outside the input lock, so it executes in parallel across
+// workers; only pulling the raw element from seq is serialized.
 func ConvertPool[A, B any](ctx context.Context, num int, seq iter.Seq[A], op func(A) B) iter.Seq[B] {
 	return func(yield func(B) bool) {
-		input := Pipe(ctx, seq)
-		push := mtxdowith(&sync.Mutex{}, yield)
+		input := WithMutex(seq, &sync.Mutex{})
+		push := Sink(yield)
 		wgdo(num, func() {
-			for whenopokdo(func() (B, bool) {
-				a, ok := recieveFrom(ctx, input)
-				if !ok {
-					var zero B
-					return zero, false
+			for a := range input {
+				if ctx.Err() != nil {
+					return
 				}
-				return op(a), true
-			}, push) {
-				continue
+				if !push(op(a)) {
+					return
+				}
 			}
 		})
 	}
@@ -978,10 +984,13 @@ func Keep2[A, B any](seq iter.Seq2[A, B], prd func(A, B) bool) iter.Seq2[A, B] {
 	}
 }
 
-// Shard splits the input sequence into num separate
-// sequences. Elements are distributed.
-func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
-	return GenerateOk(repeat(num, curry2(Channel, ctx, Pipe(ctx, seq))))
+// Shard splits the input sequence into num separate sequences. All num
+// "shards" alias the same mutex-guarded shared iterator (WithMutex), so
+// elements are distributed dynamically across whichever shard is
+// consumed fastest, not as a static partition.
+func Shard[T any](_ context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
+	guarded := WithMutex(seq, &sync.Mutex{})
+	return GenerateOk(repeat(num, func() iter.Seq[T] { return guarded }))
 }
 
 // Shard2 is the iter.Seq2 counterpart to Shard: it splits the input
