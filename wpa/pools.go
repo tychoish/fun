@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"iter"
-	"sync"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
@@ -141,7 +140,8 @@ func PullWithPool[T any, HF HandlerFunc[T]](
 	hf HF,
 	opts ...opt.Provider[*WorkerGroupConf],
 ) iter.Seq[error] {
-	opts = append(opts,
+	opts = append(
+		opts,
 		WorkerGroupConfDisableErrorCollector(),
 		WorkerGroupConfCustomValidatorAppend(func(conf *WorkerGroupConf) error {
 			return ers.When(conf.ErrorCollector != nil, "cannot define a custom error collector for wpa pooled operations")
@@ -152,38 +152,12 @@ func PullWithPool[T any, HF HandlerFunc[T]](
 		return irt.One(err)
 	}
 
-	wg := &sync.WaitGroup{}
-	ch := make(chan error)
-
-	return irt.WithHooks(
-		// input
-		irt.Channel(ctx, ch),
-		// before:
-		func() {
-			wg.Add(conf.NumWorkers)
-			go func() {
-				wg.Wait()
-				close(ch)
-			}()
-
-			for shard := range irt.Shard(ctx, conf.NumWorkers, seq) {
-				go func() {
-					defer wg.Done()
-					for job := range WithHandler(hf).For(shard) {
-						if err := conf.Filter(job.Run(ctx)); err != nil {
-							select {
-							case <-ctx.Done():
-								return
-							case ch <- err:
-							}
-						}
-					}
-				}()
+	return func(yield func(error) bool) {
+		for err := range irt.Pool(ctx, conf.NumWorkers, WithHandler(hf).For(seq), conf.workerHandler(ctx)) {
+			if err != nil && !yield(err) {
+				return
 			}
-		},
-		// after:
-		nil,
-		// func() {
-		// },
-	)
+		}
+	}
 }
+

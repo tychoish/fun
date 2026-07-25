@@ -1,12 +1,14 @@
 package wpa
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/opt"
 )
@@ -110,6 +112,20 @@ func (o *WorkerGroupConf) Filter(err error) error {
 	default:
 		return err
 	}
+}
+
+// filterPreserving behaves like Filter, but returns the original error
+// instead of the ers.ErrCurrentOpSkip sentinel for errors continued past.
+func (o *WorkerGroupConf) filterPreserving(err error) error {
+	if filtered := o.Filter(err); errors.Is(filtered, ers.ErrCurrentOpSkip) {
+		return err
+	} else {
+		return filtered
+	}
+}
+
+func (conf *WorkerGroupConf) workerHandler(ctx context.Context) func(fnx.Worker) error {
+	return func(job fnx.Worker) error { return conf.filterPreserving(job.Run(ctx)) }
 }
 
 // WorkerGroupConfDefaults sets the "continue-on-error" option and the

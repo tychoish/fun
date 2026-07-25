@@ -70,6 +70,10 @@ func PtrFuture[T any](fn func() *T) Future[T] {
 // function. The underlying Future's panics are converted to errors.
 func WrapFuture[T any](f fn.Future[T]) Future[T] { return MakeFuture(f.RecoverPanic) }
 
+// Job converts the future into a (context, error)-returning function,
+// satisfying constraints (e.g. wpa.FutureJob) that expect a Job method.
+func (pf Future[T]) Job(ctx context.Context) (T, error) { return pf.WithRecover()(ctx) }
+
 // WithRecover returns a wrapped future with a panic handler that converts
 // any panic to an error.
 func (pf Future[T]) WithRecover() Future[T] {
