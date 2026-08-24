@@ -107,8 +107,19 @@ func parseAndCheck(fs *flag.FlagSet, val reflect.Value, args []string) error {
 	if err := bindFlags(fs, val, "", 0); err != nil {
 		return err
 	}
+	return parseAndFinalize(fs, []reflect.Value{val}, args)
+}
 
-	untilFlags := collectUntilFlags(val, "")
+// parseAndFinalize parses args against fs and finalizes each entry in vals, in
+// order: narg:"rest" collection, env: tag application, and required:"true"
+// checks. Every val must already have had its flags bound onto fs (via
+// bindFlags) before this is called; Register does that binding up front so
+// multiple independent structs can share one fs.Parse call through ParseAll.
+func parseAndFinalize(fs *flag.FlagSet, vals []reflect.Value, args []string) error {
+	untilFlags := map[string]bool{}
+	for _, val := range vals {
+		maps.Copy(untilFlags, collectUntilFlags(val, ""))
+	}
 	if len(untilFlags) > 0 {
 		args = expandUntilArgs(args, untilFlags)
 	}
@@ -118,15 +129,18 @@ func parseAndCheck(fs *flag.FlagSet, val reflect.Value, args []string) error {
 		return err
 	}
 
-	if err := populateRestField(val, fs.Args()); err != nil {
-		return err
+	for _, val := range vals {
+		if err := populateRestField(val, fs.Args()); err != nil {
+			return err
+		}
+		if err := applyEnvVars(fs, val, ""); err != nil {
+			return err
+		}
+		if err := checkRequired(val, ""); err != nil {
+			return err
+		}
 	}
-
-	if err := applyEnvVars(fs, val, ""); err != nil {
-		return err
-	}
-
-	return checkRequired(val, "")
+	return nil
 }
 
 // conflagure is the internal implementation. Tests call it directly with a

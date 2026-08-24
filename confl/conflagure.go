@@ -79,11 +79,35 @@
 //
 // Dispatch and ParseCommand return ErrDispatchNoSelection when the user
 // provides no subcommand name. Subcommands nest to arbitrary depth.
+//
+// # Composing multiple config owners
+//
+// Parse binds and parses flag.CommandLine in one call, which is only safe
+// when a single struct owns the entire command line: calling Parse a second
+// time for an unrelated struct parses argv again before the second struct's
+// flags exist, so any of its flags present on the command line fail with
+// "flag provided but not defined". When two independent packages each need
+// to contribute flags to the same process, either embed both structs into
+// one and call Parse once, or, when the structs cannot be embedded (e.g. one
+// is owned by a shared library that already has its own Config type), collect
+// them in a Registry and finish with a single ParseAll:
+//
+//	var reg confl.Registry
+//	if err := reg.Register(&dbCfg); err != nil { ... }
+//	if err := reg.Register(&serverCfg); err != nil { ... }
+//	if err := reg.ParseAll(); err != nil { ... }
+//
+// Register only binds flags; it never touches argv, so calling it any number
+// of times in any order, on the zero value of Registry, is safe. ParseAll
+// parses flag.CommandLine exactly once and then finalizes (narg:"rest", env
+// vars, required-field checks) every struct the Registry collected, in
+// registration order.
 package confl
 
 import (
 	"flag"
 	"os"
+	"reflect"
 
 	"github.com/tychoish/fun/ers"
 )
@@ -107,11 +131,57 @@ func commandLineArgs() []string {
 	return os.Args[1:]
 }
 
+// Registry collects structs bound via Register for later finalization by
+// ParseAll. The zero value is ready to use; a Registry is not safe for
+// concurrent use, matching every other confl entry point (all of them expect
+// to run once, sequentially, during process startup).
+type Registry struct {
+	vals []reflect.Value
+}
+
+// Register binds cfg's flag:-tagged fields onto flag.CommandLine without
+// parsing the command line, and queues cfg in r for finalization by the next
+// ParseAll call. cfg must be a pointer to a struct; see the package
+// documentation for supported struct tags and types. Call Register once per
+// independent config struct that needs to share the process's command line —
+// unlike Parse, Register never touches argv, so calling it repeatedly on the
+// same Registry, for distinct structs, is safe regardless of order.
+func (r *Registry) Register(cfg any) error {
+	val, err := unwrapConf(cfg)
+	if err != nil {
+		return err
+	}
+	if err := bindFlags(flag.CommandLine, val, "", 0); err != nil {
+		return err
+	}
+	r.vals = append(r.vals, val)
+	return nil
+}
+
+// ParseAll parses flag.CommandLine's arguments and finalizes every struct r
+// collected: applying narg:"rest" and env: tag values, and checking
+// required:"true" fields, in registration order. Call it exactly once, after
+// every participant has called Register on r. A struct that declares
+// narg:"rest" receives the full set of leftover positional arguments; when
+// more than one registered struct declares narg:"rest", each gets an
+// independent copy.
+func (r *Registry) ParseAll() error {
+	return parseAndFinalize(flag.CommandLine, r.vals, commandLineArgs())
+}
+
 // Parse populates cfg from command-line arguments. cfg must be a pointer to a
 // struct. See the package documentation for supported struct tags and types.
 // confl ignores fields tagged cmd:; use ParseCommand or Dispatch for
-// subcommand dispatch.
-func Parse(cfg any) error { return conflagure(flag.CommandLine, cfg, commandLineArgs()) }
+// subcommand dispatch. Parse binds and parses in a single call, so it is only
+// safe when cfg is the sole owner of the command line; see Registry for
+// composing multiple independent config structs.
+func Parse(cfg any) error {
+	var reg Registry
+	if err := reg.Register(cfg); err != nil {
+		return err
+	}
+	return reg.ParseAll()
+}
 
 // Dispatch parses global flags and selects a subcommand, returning the chosen
 // subcommand struct pointer as any. Callers type-switch on the result to
