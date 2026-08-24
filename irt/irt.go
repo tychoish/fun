@@ -766,11 +766,7 @@ func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 // runs outside the input lock, so it executes in parallel across
 // workers; only pulling the raw element from seq is serialized. The
 // input sequence is pulled through a single, mutex-guarded shared
-// iterator (WithMutex) rather than a dedicated producer goroutine and
-// channel handoff; iter.Pull (used by WithMutex) still runs its own
-// runtime-managed coroutine goroutine, so total goroutine count is
-// unchanged from before, but there is no longer any hand-rolled
-// producer goroutine or channel to manage or leak.
+// iterator (WithMutex).
 func Pool[A, B any, OP ~func(A) B](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq[B] {
 	return func(yield func(B) bool) {
 		input := WithMutex(seq, &sync.Mutex{})

@@ -64,17 +64,13 @@ func RunWithPool[T Job](seq iter.Seq[T], opts ...opt.Provider[*WorkerGroupConf])
 			return err
 		}
 
-		wg := &fnx.WaitGroup{}
-
 		withFilter := withFilter[T](conf.Filter)
 
-		for shard := range irt.Shard(ctx, conf.NumWorkers, seq) {
-			wg.Launch(ctx, Run(irt.Convert(shard, withFilter)).
-				WithRecover().
-				Ignore())
-		}
+		irt.Apply(irt.Pool(ctx, conf.NumWorkers, irt.Shard(ctx, conf.NumWorkers, seq), func(shard iter.Seq[T]) struct{} {
+			Run(irt.Convert(shard, withFilter)).WithRecover().Ignore()(ctx)
+			return struct{}{}
+		}), func(struct{}) {})
 
-		wg.Wait(ctx)
 		return conf.ErrorCollector.Resolve()
 	}
 }

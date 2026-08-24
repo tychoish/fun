@@ -2,6 +2,8 @@ package wpa
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -584,6 +586,215 @@ func TestPool(t *testing.T) {
 			check.Error(t, panicOperationErr)
 			check.ErrorIs(t, panicOperationErr, panicErr)
 		})
+	})
+}
+
+// TestRunWithPoolConcurrentCompletion regression-tests a bug where RunWithPool
+// resolved conf.ErrorCollector before every shard's goroutine had actually
+// finished: it waited on the run's own ctx via fnx.WaitGroup.Wait(ctx), which
+// returns as soon as ctx is done even if shards are still running. Since one
+// job canceling the shared ctx is a normal, expected occurrence (e.g. a
+// sibling chunk failing in an errgroup-style caller), any shard still
+// in-flight at that moment had its error silently dropped. A second, related
+// bug double-counted errors that CanContinueOnError already recorded as a
+// side effect (context-expiration errors, or any error when ContinueOnError
+// is false), because the shard's own aggregated return value was also pushed
+// into conf.ErrorCollector.
+//
+// A shard not yet claimed by a pool goroutine when ctx is canceled is skipped
+// entirely at the irt.Pool layer (it checks ctx.Err() before calling op).
+// With ContinueOnError, this never loses work: an already-running shard's
+// Run/Pull loop keeps pulling from the same mutex-guarded underlying sequence
+// past a skipped/filtered error, so an unclaimed shard's jobs still get
+// picked up by whichever shard is still going. Without ContinueOnError,
+// though, every shard stops after its first bad error, so a shard that was
+// never claimed at all may legitimately never run -- that is correct
+// abort-on-error behavior, not a bug, so the tests below only assert
+// completeness under ContinueOnError and assert no-duplication either way.
+func TestRunWithPoolConcurrentCompletion(t *testing.T) {
+	const sleeperCount = 8
+	const sleepFor = 20 * time.Millisecond
+
+	// buildJobs returns one context-canceling job and sleeperCount jobs that
+	// each sleep past the point where the canceling job has already returned,
+	// then report a distinct, identifiable error. NumWorkers is sized so every
+	// job gets its own concurrently-running shard.
+	buildJobs := func(cancel context.CancelFunc, sleepFor time.Duration) ([]fnx.Worker, []error) {
+		sentinels := make([]error, sleeperCount)
+		jobs := make([]fnx.Worker, 0, sleeperCount+1)
+		jobs = append(jobs, func(context.Context) error {
+			cancel()
+			return nil
+		})
+		for i := range sleeperCount {
+			sentinels[i] = fmt.Errorf("sleeper %d finished after cancellation", i)
+			err := sentinels[i]
+			jobs = append(jobs, func(context.Context) error {
+				time.Sleep(sleepFor)
+				return err
+			})
+		}
+		return jobs, sentinels
+	}
+
+	countMatches := func(errs []error, target error) int {
+		n := 0
+		for _, e := range errs {
+			if errors.Is(e, target) {
+				n++
+			}
+		}
+		return n
+	}
+
+	t.Run("EveryInFlightShardIsCollectedDespiteCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		jobs, sentinels := buildJobs(cancel, sleepFor)
+
+		err := RunWithPool(
+			irt.Slice(jobs),
+			WorkerGroupConfNumWorkers(len(jobs)),
+			WorkerGroupConfContinueOnError(),
+		).Run(ctx)
+
+		assert.Error(t, err)
+		errs := ers.Unwind(err)
+		for _, sentinel := range sentinels {
+			assert.Equal(t, countMatches(errs, sentinel), 1)
+		}
+	})
+
+	t.Run("NoErrorIsCountedMoreThanOnce", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		jobs, sentinels := buildJobs(cancel, sleepFor)
+
+		err := RunWithPool(
+			irt.Slice(jobs),
+			WorkerGroupConfNumWorkers(len(jobs)),
+			// ContinueOnError is left false (the zero value): every sleeper's
+			// error takes the CanContinueOnError "default, do not continue"
+			// path, which is exactly where the double-count bug lived.
+		).Run(ctx)
+
+		assert.Error(t, err)
+		errs := ers.Unwind(err)
+		for _, sentinel := range sentinels {
+			if n := countMatches(errs, sentinel); n > 1 {
+				t.Errorf("sentinel %v counted %d times, want at most 1", sentinel, n)
+			}
+		}
+	})
+
+	// buildContextExpirationJobs mirrors the original repro
+	// (dymdbtools.BatchWriteWithRetry): one job cancels the shared ctx and
+	// itself observes ctx.Err(), while sibling jobs are still in flight.
+	buildContextExpirationJobs := func(cancel context.CancelFunc) []fnx.Worker {
+		jobs := []fnx.Worker{
+			func(ctx context.Context) error {
+				cancel()
+				<-ctx.Done()
+				return ctx.Err()
+			},
+		}
+		for range sleeperCount {
+			jobs = append(jobs, func(context.Context) error {
+				time.Sleep(sleepFor)
+				return nil
+			})
+		}
+		return jobs
+	}
+
+	t.Run("ContextExpirationErrorIsCountedExactlyOnce", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		jobs := buildContextExpirationJobs(cancel)
+
+		err := RunWithPool(
+			irt.Slice(jobs),
+			WorkerGroupConfNumWorkers(len(jobs)),
+			WorkerGroupConfIncludeContextErrors(),
+		).Run(ctx)
+
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		errs := ers.Unwind(err)
+		assert.Equal(t, countMatches(errs, context.Canceled), 1)
+	})
+
+	t.Run("DefaultConfigSuppressesContextExpirationErrors", func(t *testing.T) {
+		// IncludeContextExpirationErrors is false by default, so
+		// CanContinueOnError's expired-context branch deliberately does not
+		// push into conf.ErrorCollector -- a run where the only "failures" are
+		// context cancellations must resolve to nil, not surface them.
+		for iter := range 50 {
+			ctx, cancel := context.WithCancel(t.Context())
+			jobs := buildContextExpirationJobs(cancel)
+
+			err := RunWithPool(
+				irt.Slice(jobs),
+				WorkerGroupConfNumWorkers(len(jobs)),
+			).Run(ctx)
+
+			if err != nil {
+				t.Fatalf("iteration %d: expected nil error with default config, got: %v", iter, err)
+			}
+		}
+	})
+
+	t.Run("StressContinueOnErrorNeverDropsOrDuplicates", func(t *testing.T) {
+		const iterations = 200
+		const stressSleep = 2 * time.Millisecond
+		for iter := range iterations {
+			ctx, cancel := context.WithCancel(t.Context())
+			jobs, sentinels := buildJobs(cancel, stressSleep)
+
+			// With ContinueOnError, a shard that hasn't started when ctx is
+			// canceled is skipped at the outer irt.Pool layer, but that never
+			// loses work: whichever shard(s) already started keep pulling
+			// (Pull's WORKLOAD loop continues past a skipped/filtered error)
+			// from the same mutex-guarded underlying sequence until it is
+			// exhausted. So every sentinel must still appear exactly once.
+			err := RunWithPool(
+				irt.Slice(jobs),
+				WorkerGroupConfNumWorkers(len(jobs)),
+				WorkerGroupConfContinueOnError(),
+			).Run(ctx)
+
+			assert.Error(t, err)
+			errs := ers.Unwind(err)
+			for _, sentinel := range sentinels {
+				if n := countMatches(errs, sentinel); n != 1 {
+					t.Fatalf("iteration %d: sentinel %v counted %d times, want exactly 1", iter, sentinel, n)
+				}
+			}
+		}
+	})
+
+	t.Run("StressAbortOnErrorNeverDuplicates", func(t *testing.T) {
+		const iterations = 200
+		const stressSleep = 2 * time.Millisecond
+		for iter := range iterations {
+			ctx, cancel := context.WithCancel(t.Context())
+			jobs, sentinels := buildJobs(cancel, stressSleep)
+
+			// ContinueOnError is left false (the zero value): once a shard
+			// aborts on its first bad error it stops pulling more work, so a
+			// shard that hasn't started at all by the time ctx is canceled may
+			// legitimately never run -- that sentinel can be absent. What must
+			// never happen is a sentinel appearing more than once.
+			err := RunWithPool(
+				irt.Slice(jobs),
+				WorkerGroupConfNumWorkers(len(jobs)),
+			).Run(ctx)
+
+			assert.Error(t, err)
+			errs := ers.Unwind(err)
+			for _, sentinel := range sentinels {
+				if n := countMatches(errs, sentinel); n > 1 {
+					t.Fatalf("iteration %d: sentinel %v counted %d times, want at most 1", iter, sentinel, n)
+				}
+			}
+		}
 	})
 }
 
