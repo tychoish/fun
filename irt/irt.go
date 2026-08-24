@@ -184,14 +184,7 @@ func Join2[A, B any](seqs ...iter.Seq2[A, B]) iter.Seq2[A, B] { return Chain2(Sl
 // iterator in reverse order. The contents of the iterator must be
 // materialized first.
 func Reverse[T any](seq iter.Seq[T]) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		s := Collect(seq)
-		for i := len(s) - 1; i >= 0; i-- {
-			if !yield(s[i]) {
-				return
-			}
-		}
-	}
+	return func(yield func(T) bool) { Flush(Second(slices.Backward(Collect(seq))), yield) }
 }
 
 // Monotonic returns an infinite sequence of integers starting from 1.

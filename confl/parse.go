@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/irt"
 )
 
 const (
@@ -61,8 +62,8 @@ func parseEnvOpts(optsTag string) envOpts {
 
 func resolveEnvVars(vars []string, opts envOpts) (string, bool) {
 	if opts.lastWins {
-		for i := len(vars) - 1; i >= 0; i-- {
-			if v, ok := os.LookupEnv(vars[i]); ok {
+		for v := range irt.Reverse(irt.Slice(vars)) {
+			if v, ok := os.LookupEnv(v); ok {
 				if opts.nonEmptyOnly && v == "" {
 					continue
 				}

@@ -11,17 +11,17 @@ import (
 // namespacedFilter is a named, flag-tagged struct nested under a
 // parent, producing dotted flag names.
 type namespacedFilter struct {
-	Org       *string    `flag:"org" help:"limit sync to a single org"`
-	StartDate *time.Time `flag:"start-date" format:"2006-01-02" help:"only sync items on/after this date"`
-	EndDate   *time.Time `flag:"end-date" format:"2006-01-02" help:"only sync items before this date"`
+	Org       *string    `flag:"org"        help:"limit sync to a single org"`
+	StartDate *time.Time `flag:"start-date" format:"2006-01-02"               help:"only sync items on/after this date"`
+	EndDate   *time.Time `flag:"end-date"   format:"2006-01-02"               help:"only sync items before this date"`
 }
 
 // namespacedConfig exercises namespacing, env fallback, and required
 // alongside pointer fields.
 type namespacedConfig struct {
 	Filter       namespacedFilter `flag:"filter"`
-	ValidateOnly *bool            `flag:"validate-only" help:"validate without syncing"`
-	SecretsName  *string          `flag:"secrets-name" env:"CONFL_TEST_SECRETS_NAME" help:"AWS Secrets Manager secret name"`
+	ValidateOnly *bool            `flag:"validate-only"          help:"validate without syncing"`
+	SecretsName  *string          `env:"CONFL_TEST_SECRETS_NAME" flag:"secrets-name"             help:"AWS Secrets Manager secret name"`
 }
 
 func Test_conflagure_pointer_string_unset_is_nil(t *testing.T) {
@@ -305,7 +305,7 @@ func Test_conflagure_pointer_bool_default(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Flag *bool `flag:"flag" default:"true"`
+		Flag *bool `default:"true" flag:"flag"`
 	}
 
 	t.Run("default applies when unset", func(t *testing.T) {

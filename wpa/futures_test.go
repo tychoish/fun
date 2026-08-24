@@ -267,7 +267,6 @@ func TestFutures(t *testing.T) {
 			check.ErrorIs(t, kvs[0].Value, ers.ErrInvalidInput)
 		})
 	})
-
 }
 
 func collect2[A, B any](seq iter.Seq2[A, B]) []irt.KV[A, B] { return irt.Collect(irt.KVjoin(seq)) }

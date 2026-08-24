@@ -160,4 +160,3 @@ func PullWithPool[T any, HF HandlerFunc[T]](
 		}
 	}
 }
-

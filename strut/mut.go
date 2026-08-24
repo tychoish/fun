@@ -612,8 +612,8 @@ func replaceInPlace(s []byte, old, new []byte, n int, newLen int) []byte { //nol
 	// Copy backward to avoid overlapping
 	writePos := newLen
 	readPos := origLen
-	for i := len(matches) - 1; i >= 0; i-- {
-		matchPos := matches[i]
+	for _, v := range slices.Backward(matches) {
+		matchPos := v
 		// Copy everything after this match
 		copyLen := readPos - (matchPos + len(old))
 		writePos -= copyLen

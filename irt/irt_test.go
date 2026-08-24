@@ -10577,13 +10577,11 @@ func TestSink(t *testing.T) {
 		// without ever invoking the underlying yield again.
 		var wg sync.WaitGroup
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				if push(99) {
 					t.Error("push after false returned true, want false")
 				}
-			}()
+			})
 		}
 		wg.Wait()
 
@@ -10750,13 +10748,11 @@ func TestSink2(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				if push(99, "z") {
 					t.Error("push after false returned true, want false")
 				}
-			}()
+			})
 		}
 		wg.Wait()
 
