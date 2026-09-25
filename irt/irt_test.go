@@ -3888,6 +3888,49 @@ func TestShard(t *testing.T) {
 			t.Errorf("goroutines after Shard(num=0) = %d, want %d (iter.Pull coroutine leaked)", got, base)
 		}
 	})
+
+	t.Run("ContextCancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		infinite := func(yield func(int) bool) {
+			for i := 0; ; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+
+		const numShards = 3
+		done := make(chan struct{})
+		var count atomic.Int32
+		go func() {
+			defer close(done)
+			var wg sync.WaitGroup
+			for shard := range Shard(ctx, numShards, infinite) {
+				wg.Add(1)
+				go func(s iter.Seq[int]) {
+					defer wg.Done()
+					for range s {
+						if count.Add(1) == 20 {
+							cancel()
+						}
+					}
+				}(shard)
+			}
+			wg.Wait()
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("Shard did not stop after context cancellation")
+			cancel()
+		}
+		if count.Load() < 20 {
+			t.Errorf("expected at least 20 items before cancel, got %d", count.Load())
+		}
+	})
 }
 
 func TestFirstValue(t *testing.T) {

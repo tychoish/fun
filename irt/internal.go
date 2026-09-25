@@ -26,12 +26,14 @@ func lockr(mtx *sync.RWMutex) *sync.RWMutex                    { mtx.RLock(); re
 func withw(mtx *sync.RWMutex)                                  { mtx.Unlock() }
 func lockw(mtx *sync.RWMutex) *sync.RWMutex                    { mtx.Lock(); return mtx }
 func mtxcall(mtx *sync.Mutex, op func()) func()                { return func() { defer with(lock(mtx)); op() } }
-func mtxcallr(mtx *sync.RWMutex, op func()) func()             { return func() { defer withr(lockr(mtx)); op() } }
-func mtxcallw(mtx *sync.RWMutex, op func()) func()             { return func() { defer withw(lockw(mtx)); op() } }
-func toany[T any](in T) any                                    { return in }
-func toany2[A, B any](first A, second B) (A, any)              { return first, any(second) }
-func castOk[T any](in any) (out T, ok bool)                    { out, ok = in.(T); return }
-func cast[T any](in any) T                                     { return first(castOk[T](in)) }
+
+func mtxcallr(mtx *sync.RWMutex, op func()) func() { return func() { defer withr(lockr(mtx)); op() } }
+
+func mtxcallw(mtx *sync.RWMutex, op func()) func() { return func() { defer withw(lockw(mtx)); op() } }
+func toany[T any](in T) any                        { return in }
+func toany2[A, B any](first A, second B) (A, any)  { return first, any(second) }
+func castOk[T any](in any) (out T, ok bool)        { out, ok = in.(T); return }
+func cast[T any](in any) T                         { return first(castOk[T](in)) }
 
 func mtxdo[T any](mtx *sync.Mutex, op func() T) func() T {
 	return func() T { defer with(lock(mtx)); return op() }
@@ -141,7 +143,8 @@ func funcallsop[T any](op func([]T), args []T) func()   { return func() { op(arg
 func funcallrop[A, B any](op func(A) B, arg A) func() B { return func() B { return op(arg) } }
 
 func ignoreSecond[A, B, C any](op func(A) C) func(A, B) C { return func(a A, _ B) C { return op(a) } }
-func ignoreFirst[A, B, C any](op func(B) C) func(A, B) C  { return func(_ A, b B) C { return op(b) } }
+
+func ignoreFirst[A, B, C any](op func(B) C) func(A, B) C { return func(_ A, b B) C { return op(b) } }
 
 func curry[A, B any](op func(A) B, a A) func() B { return func() B { return op(a) } }
 func wrap[A, B any](op func() A, fn func(A) B) func() (A, B) {
@@ -223,7 +226,7 @@ func withcheck[T any](v T, err error) (T, bool) { ok := isError(err); return ife
 
 func ptr[T any](in T) *T                       { return &in }
 func ptrznil[T comparable](in T) *T            { return ifelsedo(isZero(in), nil, ptrlazy(in)) }
-func ptrznillazy[T comparable](in T) func() *T { return func() *T { return ptrznil((in)) } }
+func ptrznillazy[T comparable](in T) func() *T { return func() *T { return ptrznil(in) } }
 func ptrlazy[T any](in T) func() *T            { return func() *T { return ptr(in) } }
 func deref[T any](in *T) T                     { return *in }
 func dereflazy[T any](in *T) func() T          { return func() T { return deref(in) } }
@@ -232,13 +235,15 @@ func derefz[T any](in *T) T                    { return ifdoelsedo(isNil(in), ze
 
 // default constructors
 
-func zero[T any]() (zero T)                           { return zero }
+func zero[T any]() (zero T) { return zero }
+
 func orDefault[T comparable](val T, defaultValue T) T { return ifelse(isZero(val), defaultValue, val) }
 func orDefaultNew[T comparable](val T, op func() T) T { return ifdoelse(isZero(val), op, val) }
 
 // slices -- access-by-index
 
-func idx[E any, S ~[]E](sl S, idx int) E                       { return sl[idx] }
+func idx[E any, S ~[]E](sl S, idx int) E { return sl[idx] }
+
 func idxfn[E any, S ~[]E](sl S, idx int) func() E              { return func() E { return sl[idx] } }
 func idxcheck[E any, S ~[]E](s S, idx int) bool                { return isWithin(idx, len(s)) }
 func idxorz[E any, S ~[]E](sl S, idx int) E                    { return first(idxok(sl, idx)) }
@@ -410,12 +415,17 @@ func wgdo(num int, op func()) {
 
 func opwithstart[T any](ch chan T, op func()) chan T       { go op(); return ch }
 func opwithclose[T any](ch chan T, op func(chan T)) func() { return func() { defer close(ch); op(ch) } }
-func opwithch[T any](o func(chan T)) (chan T, func())      { c := make(chan T); return c, opwithclose(c, o) }
+
+func opwithch[T any](o func(chan T)) (chan T, func()) { c := make(chan T); return c, opwithclose(c, o) }
 
 func seqToChan[T any](ctx context.Context, seq iter.Seq[T], ch chan T) { Flush(seq, yieldTo(ctx, ch)) }
 
 func yieldTo[T any](ctx context.Context, ch chan T) func(T) bool {
 	return func(v T) bool { return ctx.Err() == nil && sendTo(ctx, v, ch) }
+}
+
+func yieldContext[T any](ctx context.Context, yield func(T) bool) func(T) bool {
+	return func(in T) bool { return ctx.Err() == nil && yield(in) }
 }
 
 func yieldFrom[T any](ctx context.Context, ch <-chan T, yield func(T) bool) bool {

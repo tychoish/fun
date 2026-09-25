@@ -979,11 +979,16 @@ func Keep2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2
 // consumed fastest, not as a static partition. num is clamped to at
 // least 1: with zero shards nothing would ever range over the shared
 // iterator, so its underlying iter.Pull coroutine would never see
-// stop() called and would leak for the life of the process.
-func Shard[T any](_ context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
+// stop() called and would leak for the life of the process. Once ctx
+// is canceled, every shard stops yielding new elements, the same way
+// Pool's workers do.
+func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
 	num = max(num, 1)
 	guarded := WithMutex(seq, &sync.Mutex{})
-	return GenerateOk(repeat(num, func() iter.Seq[T] { return guarded }))
+	shard := func(yield func(T) bool) {
+		Flush(guarded, yieldContext[T](ctx, yield))
+	}
+	return GenerateOk(repeat(num, func() iter.Seq[T] { return shard }))
 }
 
 // Shard2 is the iter.Seq2 counterpart to Shard: it splits the input

@@ -1303,6 +1303,71 @@ func TestYieldHelpers(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("yieldContext", func(t *testing.T) {
+		t.Run("PassesThroughWhenNotCanceled", func(t *testing.T) {
+			ctx := context.Background()
+			var got []int
+			y := yieldContext(ctx, func(v int) bool { got = append(got, v); return true })
+
+			if !y(1) {
+				t.Error("yieldContext(1) returned false, want true")
+			}
+			if !y(2) {
+				t.Error("yieldContext(2) returned false, want true")
+			}
+			if !slices.Equal(got, []int{1, 2}) {
+				t.Errorf("got %v, want [1, 2]", got)
+			}
+		})
+
+		t.Run("PropagatesInnerYieldFalse", func(t *testing.T) {
+			ctx := context.Background()
+			var calls int
+			y := yieldContext(ctx, func(int) bool { calls++; return false })
+
+			if y(1) {
+				t.Error("yieldContext(1) returned true, want false")
+			}
+			if calls != 1 {
+				t.Errorf("inner yield called %d times, want 1", calls)
+			}
+		})
+
+		t.Run("ShortCircuitsWhenAlreadyCanceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			var calls int
+			y := yieldContext(ctx, func(int) bool { calls++; return true })
+
+			if y(1) {
+				t.Error("yieldContext(1) returned true after cancel, want false")
+			}
+			if calls != 0 {
+				t.Errorf("inner yield called %d times after cancel, want 0 (should short-circuit)", calls)
+			}
+		})
+
+		t.Run("StopsAfterCancelMidStream", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			var got []int
+			y := yieldContext(ctx, func(v int) bool { got = append(got, v); return true })
+
+			if !y(1) {
+				t.Error("yieldContext(1) returned false before cancel, want true")
+			}
+			cancel()
+			if y(2) {
+				t.Error("yieldContext(2) returned true after cancel, want false")
+			}
+			if !slices.Equal(got, []int{1}) {
+				t.Errorf("got %v, want [1] (2 should not have reached inner yield)", got)
+			}
+		})
+	})
 }
 
 func TestYieldHookHelpers(t *testing.T) {
