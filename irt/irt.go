@@ -766,8 +766,12 @@ func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 // runs outside the input lock, so it executes in parallel across
 // workers; only pulling the raw element from seq is serialized. The
 // input sequence is pulled through a single, mutex-guarded shared
-// iterator (WithMutex).
+// iterator (WithMutex). num is clamped to at least 1: with zero
+// workers nothing would ever range over the shared iterator, so its
+// underlying iter.Pull coroutine would never see stop() called and
+// would leak for the life of the process.
 func Pool[A, B any, OP ~func(A) B](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq[B] {
+	num = max(num, 1)
 	return func(yield func(B) bool) {
 		input := WithMutex(seq, &sync.Mutex{})
 		push := Sink(yield)
@@ -792,8 +796,11 @@ func Pool2[A, B, C, D any, OP ~func(A, B) (C, D)](ctx context.Context, num int, 
 // applies op to each element using a pool of num goroutines, merging
 // the resulting pairs into a single output pair sequence. op runs
 // outside the input lock, so it executes in parallel across workers;
-// only pulling the raw element from seq is serialized.
+// only pulling the raw element from seq is serialized. num is clamped
+// to at least 1; see Pool for why zero workers would leak the shared
+// iterator's iter.Pull coroutine.
 func Pool3[A, B, C any, OP ~func(A) (B, C)](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq2[B, C] {
+	num = max(num, 1)
 	return func(yield func(B, C) bool) {
 		input := WithMutex(seq, &sync.Mutex{})
 		push := Sink2(yield)
@@ -969,8 +976,12 @@ func Keep2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2
 // Shard splits the input sequence into num separate sequences. All num
 // "shards" alias the same mutex-guarded shared iterator (WithMutex), so
 // elements are distributed dynamically across whichever shard is
-// consumed fastest, not as a static partition.
+// consumed fastest, not as a static partition. num is clamped to at
+// least 1: with zero shards nothing would ever range over the shared
+// iterator, so its underlying iter.Pull coroutine would never see
+// stop() called and would leak for the life of the process.
 func Shard[T any](_ context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
+	num = max(num, 1)
 	guarded := WithMutex(seq, &sync.Mutex{})
 	return GenerateOk(repeat(num, func() iter.Seq[T] { return guarded }))
 }

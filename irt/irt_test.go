@@ -3150,6 +3150,22 @@ func TestPool3(t *testing.T) {
 		}
 	})
 
+	t.Run("ZeroWorkersClampedToOne", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		base := settleGoroutines()
+		input := []int{1, 2, 3}
+		result := Collect2(Pool3(ctx, 0, Slice(input), func(v int) (int, int) { return v, v * v }))
+		expected := map[int]int{1: 1, 2: 4, 3: 9}
+		if !maps.Equal(result, expected) {
+			t.Errorf("Pool3(num=0) = %v, want %v", result, expected)
+		}
+		if got := settleGoroutines(); got != base {
+			t.Errorf("goroutines after Pool3(num=0) = %d, want %d (iter.Pull coroutine leaked)", got, base)
+		}
+	})
+
 	t.Run("AppliesOp", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
@@ -3851,6 +3867,25 @@ func TestShard(t *testing.T) {
 		}
 		if seen == 0 {
 			t.Error("should have seen more than one", seen)
+		}
+	})
+
+	t.Run("ZeroWorkersClampedToOne", func(t *testing.T) {
+		// num=0 would produce zero shards, so nothing would ever
+		// range over the shared, mutex-guarded iterator: its
+		// underlying iter.Pull coroutine would never see stop()
+		// called and would leak forever. num must be clamped to
+		// at least 1.
+		base := settleGoroutines()
+		totalItems := 0
+		for shard := range Shard(ctx, 0, workload) {
+			totalItems += len(Collect(shard))
+		}
+		if totalItems != 10 {
+			t.Errorf("Total items across shards = %d, want 10", totalItems)
+		}
+		if got := settleGoroutines(); got != base {
+			t.Errorf("goroutines after Shard(num=0) = %d, want %d (iter.Pull coroutine leaked)", got, base)
 		}
 	})
 }
@@ -10591,6 +10626,28 @@ func TestSink(t *testing.T) {
 	})
 }
 
+// settleGoroutines waits for runtime.NumGoroutine to stabilize and
+// returns the stable count, so tests can compare goroutine counts
+// before/after an operation without racing background teardown.
+func settleGoroutines() int {
+	var last, stable int
+	for range 50 {
+		runtime.Gosched()
+		cur := runtime.NumGoroutine()
+		if cur == last {
+			stable++
+			if stable >= 3 {
+				return cur
+			}
+		} else {
+			stable = 0
+		}
+		last = cur
+		time.Sleep(time.Millisecond)
+	}
+	return last
+}
+
 func TestPool(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -10598,6 +10655,39 @@ func TestPool(t *testing.T) {
 		result := Collect(Pool(ctx, 3, Zero[int](), func(v int) int { return v * 2 }))
 		if len(result) != 0 {
 			t.Errorf("Pool(empty) = %v, want []", result)
+		}
+	})
+
+	t.Run("ZeroWorkersClampedToOne", func(t *testing.T) {
+		// num=0 would spawn no workers to range over the shared,
+		// mutex-guarded iterator, so nothing would ever call the
+		// iter.Pull coroutine's stop(): the input is silently
+		// dropped and the coroutine leaks forever. num must be
+		// clamped to at least 1.
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		base := settleGoroutines()
+		input := []int{1, 2, 3}
+		result := Collect(Pool(ctx, 0, Slice(input), func(v int) int { return v * v }))
+		slices.Sort(result)
+		if !slices.Equal(result, []int{1, 4, 9}) {
+			t.Errorf("Pool(num=0) = %v, want [1 4 9]", result)
+		}
+		if got := settleGoroutines(); got != base {
+			t.Errorf("goroutines after Pool(num=0) = %d, want %d (iter.Pull coroutine leaked)", got, base)
+		}
+	})
+
+	t.Run("NegativeWorkersClampedToOne", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		input := []int{1, 2, 3}
+		result := Collect(Pool(ctx, -1, Slice(input), func(v int) int { return v * v }))
+		slices.Sort(result)
+		if !slices.Equal(result, []int{1, 4, 9}) {
+			t.Errorf("Pool(num=-1) = %v, want [1 4 9]", result)
 		}
 	})
 
@@ -10904,24 +10994,7 @@ func TestPoolGoroutineCount(t *testing.T) {
 	// goroutine that must itself select on ctx.Done() to avoid leaking.
 	// This test locks in that there is exactly one such goroutine - not
 	// one per worker, and not one per element pulled.
-	settle := func() int {
-		var last, stable int
-		for range 50 {
-			runtime.Gosched()
-			cur := runtime.NumGoroutine()
-			if cur == last {
-				stable++
-				if stable >= 3 {
-					return cur
-				}
-			} else {
-				stable = 0
-			}
-			last = cur
-			time.Sleep(time.Millisecond)
-		}
-		return last
-	}
+	settle := settleGoroutines
 
 	const numWorkers = 4
 
@@ -10996,6 +11069,69 @@ func TestPoolGoroutineCount(t *testing.T) {
 		want := numWorkers + 2
 		if got := during - base; got != want {
 			t.Errorf("Shard: goroutine delta during call = %d, want %d", got, want)
+		}
+	})
+}
+
+// TestPoolStopReleasesPullCoroutine proves that WithMutex's iter.Pull
+// coroutine is always torn down when Pool finishes, no matter how it
+// finishes: sequence exhaustion, the consumer breaking out early, or
+// context cancellation. Each of those exits a worker's `range input`
+// loop differently (natural end-of-sequence, yield returning false,
+// ctx.Err() check), and unpull's `defer stop()` must fire on every one
+// of those paths, or the runtime-managed coroutine goroutine backing
+// iter.Pull leaks for the life of the process.
+func TestPoolStopReleasesPullCoroutine(t *testing.T) {
+	settle := settleGoroutines
+
+	const numWorkers = 4
+
+	t.Run("Exhausted", func(t *testing.T) {
+		base := settle()
+		Collect(Pool(t.Context(), numWorkers, Range(0, numWorkers*5), func(v int) int { return v }))
+		if got := settle(); got != base {
+			t.Errorf("goroutines after Pool exhausted = %d, want %d (iter.Pull coroutine leaked)", got, base)
+		}
+	})
+
+	t.Run("ConsumerBreaksEarly", func(t *testing.T) {
+		base := settle()
+		seq := func(yield func(int) bool) {
+			for i := 0; ; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		for v := range Pool(t.Context(), numWorkers, seq, func(v int) int { return v }) {
+			if v > numWorkers*2 {
+				break
+			}
+		}
+		if got := settle(); got != base {
+			t.Errorf("goroutines after early break = %d, want %d (iter.Pull coroutine leaked)", got, base)
+		}
+	})
+
+	t.Run("ContextCanceled", func(t *testing.T) {
+		base := settle()
+		ctx, cancel := context.WithCancel(t.Context())
+		seq := func(yield func(int) bool) {
+			for i := 0; ; i++ {
+				if !yield(i) {
+					return
+				}
+			}
+		}
+		var count atomic.Int32
+		for range Pool(ctx, numWorkers, seq, func(v int) int { return v }) {
+			if count.Add(1) == 20 {
+				cancel()
+			}
+		}
+		cancel()
+		if got := settle(); got != base {
+			t.Errorf("goroutines after context cancellation = %d, want %d (iter.Pull coroutine leaked)", got, base)
 		}
 	})
 }
