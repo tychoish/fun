@@ -19,6 +19,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/testt"
 )
 
 type BrokerFixture[T comparable] struct {
@@ -660,15 +661,6 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 	})
 }
 
-func settleGoroutines(base int) int {
-	n := runtime.NumGoroutine()
-	for i := 0; i < 100 && n > base; i++ {
-		time.Sleep(20 * time.Millisecond)
-		n = runtime.NumGoroutine()
-	}
-	return n
-}
-
 func brokerConstructors(t *testing.T) map[string]func(ctx context.Context) *Broker[int] {
 	return map[string]func(ctx context.Context) *Broker[int]{
 		"Channel": func(ctx context.Context) *Broker[int] {
@@ -947,7 +939,7 @@ func TestBrokerStopWhileWaiting(t *testing.T) {
 func TestBrokerStopReleasesWorkers(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
-			base := runtime.NumGoroutine()
+			leakCheck := testt.NoGoroutineLeak(t, 5*time.Second)
 			b := mk(context.Background())
 			b.Stop()
 
@@ -958,9 +950,7 @@ func TestBrokerStopReleasesWorkers(t *testing.T) {
 			case <-time.After(2 * time.Second):
 				t.Fatal("Wait did not return after Stop")
 			}
-			if n := settleGoroutines(base); n > base {
-				t.Fatalf("goroutine leak: base=%d now=%d", base, n)
-			}
+			leakCheck()
 		})
 	}
 }

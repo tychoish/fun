@@ -174,3 +174,35 @@ func TestWithJustifiedParallelism(t *testing.T) {
 		}
 	})
 }
+
+func TestGoroutines(t *testing.T) {
+	t.Run("AlreadyAtBaseline", func(t *testing.T) {
+		mock := newMock()
+		GoroutinesAtMost(mock, runtime.NumGoroutine(), time.Second)
+		if mock.fatalCalled {
+			t.Error("should not fail")
+		}
+	})
+	t.Run("ReturnsToBaseline", func(t *testing.T) {
+		mock := newMock()
+		check := NoGoroutineLeak(mock, 10*time.Second)
+		stop := make(chan struct{})
+		go func() { <-stop }()
+		time.AfterFunc(20*time.Millisecond, func() { close(stop) })
+		check()
+		if mock.fatalCalled {
+			t.Error("goroutine exited, should not fail")
+		}
+	})
+	t.Run("Leak", func(t *testing.T) {
+		mock := newMock()
+		check := NoGoroutineLeak(mock, 20*time.Millisecond)
+		stop := make(chan struct{})
+		defer close(stop)
+		go func() { <-stop }()
+		check()
+		if !mock.fatalCalled {
+			t.Error("leaked goroutine should fail")
+		}
+	})
+}
