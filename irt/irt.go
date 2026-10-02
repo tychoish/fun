@@ -770,6 +770,9 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 // after the channel has closed) releases the producer even if the
 // channel is never read. Callers that do not read the channel to
 // completion should call stop, typically with defer.
+//
+// A panic in seq is not recovered and terminates the process, as there
+// is no consumer frame to carry it to: recover inside seq.
 func AsChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	ch := make(chan T)
@@ -1173,7 +1176,9 @@ func Shard2[A, B any](ctx context.Context, num int, seq iter.Seq2[A, B]) iter.Se
 // WithBuffer maintains a buffer of items read from the source
 // iterator, waiting for downstream consumers of the output iterator,
 // to consume them. The producer goroutine is released when the
-// consumer stops iterating, as well as when ctx is canceled.
+// consumer stops iterating, as well as when ctx is canceled. A panic
+// in the source is re-raised on the consuming goroutine once the
+// buffered items have been consumed.
 func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		// cancel when the consumer stops (early break or exhaustion) so
@@ -1183,9 +1188,26 @@ func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[
 
 		sink := make(chan T, max(size, 0))
 
-		go func() { defer close(sink); flushTo(ctx, seq, sink) }()
+		// a panic in seq is carried to the consumer, as Pool does; it is
+		// sent before sink closes, so a consumer that saw the close sees it.
+		failure := make(chan any, 1)
+		go func() {
+			defer close(sink)
+			defer func() {
+				if r := recover(); r != nil {
+					failure <- r
+				}
+			}()
+			flushTo(ctx, seq, sink)
+		}()
 
 		Flush(Channel(ctx, sink), yield)
+
+		select {
+		case r := <-failure:
+			panic(r)
+		default:
+		}
 	}
 }
 
@@ -1541,6 +1563,9 @@ func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, er
 // that abandon the generator before exhaustion must cancel the ctx
 // they passed to the first call to release the goroutine. Cancelling
 // the ctx of a later call only aborts that call; the stream continues.
+//
+// A panic in seq is not recovered and terminates the process, as there
+// is no caller frame to carry it to: recover inside seq.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
 		once sync.Once
