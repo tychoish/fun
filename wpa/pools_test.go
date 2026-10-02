@@ -610,27 +610,41 @@ func TestPool(t *testing.T) {
 // though, every shard stops after its first bad error, so a shard that was
 // never claimed at all may legitimately never run -- that is correct
 // abort-on-error behavior, not a bug, so the tests below only assert
-// completeness under ContinueOnError and assert no-duplication either way.
+// completeness of shards that were in flight at cancellation (guaranteed
+// here by a start barrier) and assert no-duplication either way.
 func TestRunWithPoolConcurrentCompletion(t *testing.T) {
 	const sleeperCount = 8
 	const sleepFor = 20 * time.Millisecond
 
 	// buildJobs returns one context-canceling job and sleeperCount jobs that
-	// each sleep past the point where the canceling job has already returned,
-	// then report a distinct, identifiable error. NumWorkers is sized so every
-	// job gets its own concurrently-running shard.
-	buildJobs := func(cancel context.CancelFunc, sleepFor time.Duration) ([]fnx.Worker, []error) {
+	// each report a distinct, identifiable error only after ctx is canceled.
+	// The canceling job blocks until every sleeper has started, so every
+	// sleeper is deterministically in flight (claimed by a pool worker) when
+	// the cancellation happens. Shards not yet claimed at cancellation are
+	// legitimately skipped, so without this barrier the outcome is racy.
+	// NumWorkers is sized so every job gets its own concurrent shard.
+	buildJobs := func(cancel context.CancelFunc) ([]fnx.Worker, []error) {
 		sentinels := make([]error, sleeperCount)
 		jobs := make([]fnx.Worker, 0, sleeperCount+1)
+		var started sync.WaitGroup
+		started.Add(sleeperCount)
+		allStarted := make(chan struct{})
+		go func() { started.Wait(); close(allStarted) }()
 		jobs = append(jobs, func(context.Context) error {
+			select {
+			case <-allStarted:
+			case <-time.After(10 * time.Second):
+				return errors.New("sleepers never all started")
+			}
 			cancel()
 			return nil
 		})
 		for i := range sleeperCount {
 			sentinels[i] = fmt.Errorf("sleeper %d finished after cancellation", i)
 			err := sentinels[i]
-			jobs = append(jobs, func(context.Context) error {
-				time.Sleep(sleepFor)
+			jobs = append(jobs, func(ctx context.Context) error {
+				started.Done()
+				<-ctx.Done()
 				return err
 			})
 		}
@@ -649,7 +663,7 @@ func TestRunWithPoolConcurrentCompletion(t *testing.T) {
 
 	t.Run("EveryInFlightShardIsCollectedDespiteCancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
-		jobs, sentinels := buildJobs(cancel, sleepFor)
+		jobs, sentinels := buildJobs(cancel)
 
 		err := RunWithPool(
 			irt.Slice(jobs),
@@ -666,7 +680,7 @@ func TestRunWithPoolConcurrentCompletion(t *testing.T) {
 
 	t.Run("NoErrorIsCountedMoreThanOnce", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
-		jobs, sentinels := buildJobs(cancel, sleepFor)
+		jobs, sentinels := buildJobs(cancel)
 
 		err := RunWithPool(
 			irt.Slice(jobs),
@@ -743,10 +757,9 @@ func TestRunWithPoolConcurrentCompletion(t *testing.T) {
 
 	t.Run("StressContinueOnErrorNeverDropsOrDuplicates", func(t *testing.T) {
 		const iterations = 200
-		const stressSleep = 2 * time.Millisecond
 		for iter := range iterations {
 			ctx, cancel := context.WithCancel(t.Context())
-			jobs, sentinels := buildJobs(cancel, stressSleep)
+			jobs, sentinels := buildJobs(cancel)
 
 			// With ContinueOnError, a shard that hasn't started when ctx is
 			// canceled is skipped at the outer irt.Pool layer, but that never
@@ -772,10 +785,9 @@ func TestRunWithPoolConcurrentCompletion(t *testing.T) {
 
 	t.Run("StressAbortOnErrorNeverDuplicates", func(t *testing.T) {
 		const iterations = 200
-		const stressSleep = 2 * time.Millisecond
 		for iter := range iterations {
 			ctx, cancel := context.WithCancel(t.Context())
-			jobs, sentinels := buildJobs(cancel, stressSleep)
+			jobs, sentinels := buildJobs(cancel)
 
 			// ContinueOnError is left false (the zero value): once a shard
 			// aborts on its first bad error it stops pulling more work, so a
