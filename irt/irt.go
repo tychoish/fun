@@ -1133,11 +1133,10 @@ func Keep2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2
 // are distributed dynamically across whichever shard is consumed
 // fastest, not as a static partition. A shard that stops early does
 // not affect the others: the shared iterator is released when the
-// input is exhausted or when every shard has finished. If some shard
-// is never iterated and others stop early, the input is left
-// un-released until it is exhausted. num is clamped to at least 1.
-// Once ctx is canceled, every shard stops yielding new elements, the
-// same way Pool's workers do.
+// input is exhausted, when every shard has finished, or when ctx is
+// canceled, even if some shards never started or never finish. num is
+// clamped to at least 1. Once ctx is canceled, every shard stops
+// yielding new elements, the same way Pool's workers do.
 func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
 	num = max(num, 1)
 	return func(yield func(iter.Seq[T]) bool) {
@@ -1145,6 +1144,7 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 			mtx      sync.Mutex
 			next     func() (T, bool)
 			stop     func()
+			unwatch  func() bool
 			finished = make([]bool, num)
 			remain   = num
 			closed   bool
@@ -1154,6 +1154,18 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 		// never iterated cost nothing, and it is stopped only when the
 		// input is exhausted or every shard has finished: one shard
 		// ending early must not end the others.
+		release := func() { // callers hold mtx
+			if closed {
+				return
+			}
+			closed = true
+			if unwatch != nil {
+				unwatch()
+			}
+			if stop != nil {
+				stop()
+			}
+		}
 		pull := func() (out T, ok bool) {
 			mtx.Lock()
 			defer mtx.Unlock()
@@ -1162,10 +1174,17 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 			}
 			if next == nil {
 				next, stop = iter.Pull(seq)
+				// cancellation releases the pull even if some shards
+				// never start or never finish; it is serialized with
+				// next under mtx.
+				unwatch = context.AfterFunc(ctx, func() {
+					mtx.Lock()
+					defer mtx.Unlock()
+					release()
+				})
 			}
 			if out, ok = next(); !ok {
-				closed = true
-				stop()
+				release()
 			}
 			return out, ok
 		}
@@ -1176,9 +1195,8 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 				return
 			}
 			finished[idx] = true
-			if remain--; remain == 0 && next != nil && !closed {
-				closed = true
-				stop()
+			if remain--; remain == 0 {
+				release()
 			}
 		}
 
