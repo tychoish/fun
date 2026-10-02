@@ -65,11 +65,11 @@ type BrokerStats struct {
 type BrokerState int
 
 const (
-	// BrokerStateUnstarted is the zero value. It means the state is
-	// unknown or the control loop has not answered: a zero-value
-	// BrokerStats, or a Stats call whose caller context ended before
-	// a reply arrived. It does not claim the broker is closed.
-	BrokerStateUnstarted BrokerState = iota
+	// BrokerStateUnknown is the zero value. It means the state is
+	// unknown: a zero-value BrokerStats, or a Stats call whose caller
+	// context ended before the broker replied. It does not claim the
+	// broker is closed.
+	BrokerStateUnknown BrokerState = iota
 	// BrokerStateEmpty means the broker is running with no
 	// subscriptions and nothing buffered.
 	BrokerStateEmpty
@@ -84,8 +84,8 @@ const (
 // String renders the state as a lowercase name.
 func (s BrokerState) String() string {
 	switch s {
-	case BrokerStateUnstarted:
-		return "unstarted"
+	case BrokerStateUnknown:
+		return "unknown"
 	case BrokerStateEmpty:
 		return "empty"
 	case BrokerStateActive:
@@ -324,7 +324,7 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq2[chan T, c
 // promptly with State BrokerStateClosed and zero counters, even if ctx
 // is also canceled. If only the caller's ctx ends before the broker
 // replies, Stats returns promptly with the zero BrokerStats (State
-// BrokerStateUnstarted, i.e. unknown). Otherwise State is
+// BrokerStateUnknown). Otherwise State is
 // BrokerStateEmpty or BrokerStateActive.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	closed := BrokerStats{State: BrokerStateClosed}
