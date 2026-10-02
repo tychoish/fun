@@ -768,6 +768,7 @@ func TestQueueIteratorPop(t *testing.T) {
 
 	t.Run("ContextCancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		queue := NewUnlimitedQueue[string]()
 
 		check.NotError(t, queue.Push("item"))
