@@ -129,8 +129,8 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 
 			broker := opts.Construtor(ctx, t)
 
-			ch1 := broker.Subscribe(ctx)
-			ch2 := broker.Subscribe(ctx)
+			ch1 := mustSubscribe(t, broker, ctx)
+			ch2 := mustSubscribe(t, broker, ctx)
 
 			if stat := broker.Stats(ctx); ctx.Err() != nil {
 				t.Error(stat)
@@ -205,7 +205,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 			go func() {
 				defer wg.Done()
 				for idx := range elems {
-					broker.Publish(ctx, elems[idx])
+					_ = broker.Publish(ctx, elems[idx])
 					runtime.Gosched()
 				}
 				timer := time.NewTimer(250 * time.Millisecond)
@@ -226,8 +226,8 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 						}
 					}
 				}
-				broker.Unsubscribe(ctx, ch2)
-				broker.Unsubscribe(ctx, ch1)
+				_ = broker.Unsubscribe(ctx, ch2)
+				_ = broker.Unsubscribe(ctx, ch1)
 				close(sig)
 			}()
 
@@ -242,10 +242,10 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 			broker.Wait(ctx)
 			cctx, ccancel := context.WithCancel(ctx)
 			ccancel()
-			if broker.Subscribe(cctx) != nil {
+			if ch, err := broker.Subscribe(cctx); ch != nil || err == nil {
 				t.Error("should not subscribe with canceled context", cctx.Err())
 			}
-			broker.Unsubscribe(cctx, ch1)
+			_ = broker.Unsubscribe(cctx, ch1)
 			check.Zero(t, broker.Stats(cctx))
 		})
 	}
@@ -276,7 +276,7 @@ func TestBroker(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
 		nctx, ncancel := context.WithCancel(context.Background())
 		ncancel()
-		if broker.Subscribe(nctx) != nil {
+		if ch, err := broker.Subscribe(nctx); ch != nil || err == nil {
 			t.Error("subscription should be nil with a canceled context")
 		}
 	})
@@ -291,7 +291,7 @@ func TestBroker(t *testing.T) {
 			sa := time.Now()
 			nctx, ncancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 			defer ncancel()
-			broker.Publish(nctx, "foo")
+			_ = broker.Publish(nctx, "foo")
 			dur := time.Since(sa)
 			if dur > 5*time.Millisecond {
 				t.Error(dur)
@@ -310,8 +310,9 @@ func TestBroker(t *testing.T) {
 			// which operations fail promptly rather than blocking.
 			check.ErrorIs(t, broker.Send(nctx, "foo"), ErrBrokerClosed)
 			check.ErrorIs(t, broker.Send(nctx, "foo"), ErrBrokerClosed)
-			check.True(t, broker.Subscribe(nctx) == nil)
-			broker.Publish(nctx, "foo")
+			_, err := broker.Subscribe(nctx)
+			check.Error(t, err)
+			_ = broker.Publish(nctx, "foo")
 			if dur := time.Since(sa); dur > 50*time.Millisecond {
 				t.Error(dur)
 			}
@@ -339,7 +340,7 @@ func TestBroker(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
 		seen := &adt.Set[int]{}
 		sig := make(chan struct{})
-		sub := broker.Subscribe(ctx)
+		sub := mustSubscribe(t, broker, ctx)
 		go func() {
 			defer close(sig)
 
@@ -438,7 +439,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 
 		// Subscribe immediately but don't read from it
 		// This blocks workers on dispatch, allowing queue to fill
-		blockingSub := broker.Subscribe(ctx)
+		blockingSub := mustSubscribe(t, broker, ctx)
 		if blockingSub == nil {
 			t.Fatal("failed to subscribe")
 		}
@@ -535,7 +536,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		defer broker.Stop()
 
 		// Subscribe to receive messages
-		sub := broker.Subscribe(ctx)
+		sub := mustSubscribe(t, broker, ctx)
 		if sub == nil {
 			t.Fatal("failed to subscribe")
 		}
@@ -606,7 +607,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		)
 		defer broker.Stop()
 
-		sub := broker.Subscribe(ctx)
+		sub := mustSubscribe(t, broker, ctx)
 		if sub == nil {
 			t.Fatal("failed to subscribe")
 		}
@@ -729,13 +730,13 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 		}
 		b := NewQueueBroker(ctx, queue, BrokerOptions{})
 		defer b.Stop()
-		sub := b.Subscribe(ctx)
+		sub := mustSubscribe(t, b, ctx)
 		defer b.Unsubscribe(ctx, sub)
 
 		const count = 10
 		go func() {
 			for i := 0; i < count; i++ {
-				b.Publish(ctx, i)
+				_ = b.Publish(ctx, i)
 			}
 		}()
 		for i := 0; i < count; i++ {
@@ -758,7 +759,7 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 		}
 		b := NewQueueBroker(ctx, queue, BrokerOptions{NonBlockingPush: true})
 		defer b.Stop()
-		sub := b.Subscribe(ctx)
+		sub := mustSubscribe(t, b, ctx)
 		defer b.Unsubscribe(ctx, sub)
 
 		// the worker takes one message and blocks on the
@@ -796,20 +797,20 @@ func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
 			b := mk(ctx)
 			defer b.Stop()
 
-			stuck := b.Subscribe(ctx)
+			stuck := mustSubscribe(t, b, ctx)
 			// back the broker up: nobody reads from stuck.
 			for i := 0; i < 3; i++ {
 				go func() {
 					pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
 					defer pcancel()
-					b.Publish(pctx, i)
+					_ = b.Publish(pctx, i)
 				}()
 			}
 			time.Sleep(100 * time.Millisecond)
 
 			uctx, ucancel := context.WithTimeout(ctx, time.Second)
 			defer ucancel()
-			b.Unsubscribe(uctx, stuck)
+			_ = b.Unsubscribe(uctx, stuck)
 			if uctx.Err() != nil {
 				t.Fatal("unsubscribe did not complete")
 			}
@@ -820,7 +821,7 @@ func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
 				t.Fatalf("expected no subscriptions, got %d", n)
 			}
 
-			live := b.Subscribe(ctx)
+			live := mustSubscribe(t, b, ctx)
 			defer b.Unsubscribe(ctx, live)
 			pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
 			defer pcancel()
@@ -856,8 +857,8 @@ func TestBrokerSubscribeUnsubscribeOrdering(t *testing.T) {
 			defer b.Stop()
 
 			for i := 0; i < 500; i++ {
-				ch := b.Subscribe(ctx)
-				b.Unsubscribe(ctx, ch)
+				ch := mustSubscribe(t, b, ctx)
+				_ = b.Unsubscribe(ctx, ch)
 			}
 			// a concurrent burst, each goroutine ordered internally.
 			var wg sync.WaitGroup
@@ -866,8 +867,8 @@ func TestBrokerSubscribeUnsubscribeOrdering(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					for i := 0; i < 100; i++ {
-						ch := b.Subscribe(ctx)
-						b.Unsubscribe(ctx, ch)
+						ch := mustSubscribe(t, b, ctx)
+						_ = b.Unsubscribe(ctx, ch)
 					}
 				}()
 			}
@@ -881,21 +882,21 @@ func TestBrokerOperationsAfterStop(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
 			b := mk(context.Background())
-			sub := b.Subscribe(context.Background())
-			check.True(t, sub != nil)
+			sub := mustSubscribe(t, b, context.Background())
 			b.Stop()
 
 			done := make(chan struct{})
-			var sendErr error
+			var sendErr, pubErr, subErr, unsubErr error
 			var subCh chan int
+			var stats BrokerStats
 			go func() {
 				defer close(done)
 				bg := context.Background()
 				sendErr = b.Send(bg, 1)
-				b.Publish(bg, 2)
-				subCh = b.Subscribe(bg)
-				b.Unsubscribe(bg, sub)
-				_ = b.Stats(bg)
+				pubErr = b.Publish(bg, 2)
+				subCh, subErr = b.Subscribe(bg)
+				unsubErr = b.Unsubscribe(bg, sub)
+				stats = b.Stats(bg)
 			}()
 			select {
 			case <-done:
@@ -903,9 +904,28 @@ func TestBrokerOperationsAfterStop(t *testing.T) {
 				t.Fatal("operations blocked after Stop")
 			}
 			check.ErrorIs(t, sendErr, ErrBrokerClosed)
+			check.ErrorIs(t, pubErr, ErrBrokerClosed)
+			check.ErrorIs(t, subErr, ErrBrokerClosed)
+			check.ErrorIs(t, unsubErr, ErrBrokerClosed)
 			check.True(t, subCh == nil)
+			check.Zero(t, stats)
 		})
 	}
+}
+
+// Canceled caller contexts surface as the context error.
+func TestBrokerCanceledContextErrors(t *testing.T) {
+	b := NewBroker[int](t.Context(), BrokerOptions{})
+	cctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := b.Subscribe(cctx)
+	check.ErrorIs(t, err, context.Canceled)
+	check.ErrorIs(t, b.Publish(cctx, 1), context.Canceled)
+	// the control channel is unbuffered and the loop is idle, so the
+	// request may be accepted; a blocked one reports the ctx error.
+	blocked := NewBroker[int](t.Context(), BrokerOptions{})
+	blocked.ctlCh = make(chan ctlRequest[int])
+	check.ErrorIs(t, blocked.Unsubscribe(cctx, nil), context.Canceled)
 }
 
 func TestBrokerStopWhileWaiting(t *testing.T) {
@@ -951,4 +971,13 @@ func TestBrokerStopReleasesWorkers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustSubscribe[T any](t testing.TB, b *Broker[T], ctx context.Context) chan T {
+	t.Helper()
+	ch, err := b.Subscribe(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ch
 }

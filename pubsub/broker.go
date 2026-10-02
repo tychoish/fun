@@ -267,6 +267,9 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq2[chan T, c
 }
 
 // Stats provides introspection into the current state of the broker.
+//
+// Stats has no error return: if ctx is canceled or the broker has been
+// stopped it returns promptly with the zero BrokerStats.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	signal := make(chan BrokerStats, 1)
 	var output BrokerStats
@@ -309,20 +312,30 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 // buffer size. You *must* call Unsubcribe on this channel when you
 // are no longer listening to this channel.
 //
+// Subscribe waits until the subscription is visible to dispatch, so a
+// Send or Publish that follows a successful Subscribe is delivered to
+// the returned channel.
+//
 // Subscription channels are *not* closed and should never be closed
 // by the caller. Closing a subscription channel will cause an
 // unhandled panic.
-func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
-	if ctx.Err() != nil || b.ctx.Err() != nil {
-		return nil
+//
+// Subscribe returns ErrBrokerClosed if the broker has been stopped,
+// and the context's error if ctx is canceled first.
+func (b *Broker[T]) Subscribe(ctx context.Context) (chan T, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if b.ctx.Err() != nil {
+		return nil, ErrBrokerClosed
 	}
 	msgCh := make(chan T, b.opts.BufferSize)
 	req := ctlRequest[T]{ch: msgCh, ack: make(chan struct{})}
 	select {
 	case <-ctx.Done():
-		return nil
+		return nil, ctx.Err()
 	case <-b.ctx.Done():
-		return nil
+		return nil, ErrBrokerClosed
 	case b.ctlCh <- req:
 	}
 	// wait for registration so that a Publish that follows Subscribe
@@ -331,27 +344,37 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 	case <-ctx.Done():
 		// the request is queued and will be processed; queue the
 		// matching removal behind it so the subscription isn't leaked.
-		b.Unsubscribe(context.Background(), msgCh)
-		return nil
+		_ = b.Unsubscribe(context.Background(), msgCh)
+		return nil, ctx.Err()
 	case <-b.ctx.Done():
-		return nil
+		return nil, ErrBrokerClosed
 	case <-req.ack:
-		return msgCh
+		return msgCh, nil
 	}
 }
 
-// Unsubscribe removes a channel from the broker.
-func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
+// Unsubscribe removes a channel from the broker. It returns
+// ErrBrokerClosed if the broker has been stopped (all subscriptions
+// are then moot), and the context's error if ctx is canceled before
+// the request is accepted.
+func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) error {
+	if b.ctx.Err() != nil {
+		return ErrBrokerClosed
+	}
 	select {
 	case b.ctlCh <- ctlRequest[T]{ch: msgCh, unsub: true}:
+		return nil
 	case <-b.ctx.Done():
+		return ErrBrokerClosed
 	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-// Publish distributes a message to all subscribers. Errors, including
-// ErrBrokerClosed, are discarded; use Send to observe them.
-func (b *Broker[T]) Publish(ctx context.Context, msg T) { _ = b.Send(ctx, msg) }
+// Publish distributes a message to all subscribers. It is equivalent
+// to Send, and returns ErrBrokerClosed after the broker has been
+// stopped.
+func (b *Broker[T]) Publish(ctx context.Context, msg T) error { return b.Send(ctx, msg) }
 
 // Send distributes a message to all subscribers. The message is
 // handed to the broker's sink on the calling goroutine, so
@@ -359,7 +382,9 @@ func (b *Broker[T]) Publish(ctx context.Context, msg T) { _ = b.Send(ctx, msg) }
 // ErrQueueFull) is reported to the caller rather than stalling the
 // broker's control loop.
 //
-// After the broker has been stopped, Send returns ErrBrokerClosed.
+// Send does not wait for subscribers: it returns once the sink has
+// accepted the message. After the broker has been stopped, Send
+// returns ErrBrokerClosed.
 func (b *Broker[T]) Send(ctx context.Context, msg T) error {
 	if err := ctx.Err(); err != nil {
 		return err
