@@ -52,7 +52,6 @@ func TestDequePopOnClosedNonEmptyReturnsNothing(t *testing.T) {
 	if dq.Len() != 2 {
 		t.Fatalf("closed deque lost items: len %d", dq.Len())
 	}
-
 }
 
 func TestQueuePopOnClosedNonEmptyReturnsNothing(t *testing.T) {
