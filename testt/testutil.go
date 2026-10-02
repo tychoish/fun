@@ -5,6 +5,7 @@ package testt
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -94,4 +95,34 @@ func WithJustifiedParallelism(t *testing.T, reason string) {
 		t.Fatal("WithJustifiedParallelism requires a non-empty justification")
 	}
 	t.Parallel()
+}
+
+// GoroutinesAtMost fails the test (with Fatal) unless the number of
+// running goroutines drops to max or below within wait. Goroutines
+// wind down asynchronously after a cancellation, so this polls until
+// the deadline rather than checking once.
+func GoroutinesAtMost(t testing.TB, max int, wait time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(wait)
+	n := runtime.NumGoroutine()
+	for n > max && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+		n = runtime.NumGoroutine()
+	}
+	if n > max {
+		t.Fatal("goroutine leak: have", n, "want at most", max)
+	}
+}
+
+// NoGoroutineLeak records the current number of goroutines and
+// returns a function that checks, waiting up to wait, that the count
+// has returned to that baseline. Use it as:
+//
+//	defer testt.NoGoroutineLeak(t, 5*time.Second)()
+func NoGoroutineLeak(t testing.TB, wait time.Duration) func() {
+	base := runtime.NumGoroutine()
+	return func() {
+		t.Helper()
+		GoroutinesAtMost(t, base, wait)
+	}
 }

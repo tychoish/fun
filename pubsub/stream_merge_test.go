@@ -2,9 +2,10 @@ package pubsub
 
 import (
 	"context"
-	"runtime"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/testt"
 )
 
 func infiniteStream() *Stream[int] {
@@ -35,19 +36,13 @@ func TestAbandonedStreamsStopWorkers(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			before := runtime.NumGoroutine()
+			leakCheck := testt.NoGoroutineLeak(t, 5*time.Second)
 			s := mk()
 			if _, err := s.Read(t.Context()); err != nil {
 				t.Fatal(err)
 			}
 			_ = s.Close()
-			deadline := time.Now().Add(5 * time.Second)
-			for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
-				time.Sleep(10 * time.Millisecond)
-			}
-			if after := runtime.NumGoroutine(); after > before {
-				t.Fatalf("leaked %d goroutines", after-before)
-			}
+			leakCheck()
 		})
 	}
 }
