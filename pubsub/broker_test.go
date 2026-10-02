@@ -1062,11 +1062,16 @@ func TestBrokerSendSemantics(t *testing.T) {
 		for i := range 50 {
 			sub := mustSubscribe(t, b, ctx)
 			check.NotError(t, b.Send(ctx, i))
-			select {
-			case got := <-sub:
-				check.Equal(t, got, i)
-			case <-time.After(time.Second):
-				t.Fatal("message sent after Subscribe was not delivered")
+			// dispatch iterates the live subscriber set, so a message
+			// still being dispatched when this Subscribe landed may
+			// arrive first: drain until the message sent after it.
+			for got := -1; got != i; {
+				select {
+				case got = <-sub:
+					check.True(t, got == i || got == i-1)
+				case <-time.After(time.Second):
+					t.Fatal("message sent after Subscribe was not delivered")
+				}
 			}
 			check.NotError(t, b.Unsubscribe(ctx, sub))
 		}
