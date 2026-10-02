@@ -356,10 +356,10 @@ func TestDeque(t *testing.T) {
 			conf := DequeOptions{
 				Capacity: -1,
 			}
-			if err := conf.Validate(); err != nil {
+			if err := conf.Validate(); err == nil {
 				t.Fatal()
 			}
-			if _, err := NewDeque[string](conf); err != nil {
+			if _, err := NewDeque[string](conf); err == nil {
 				t.Fatal()
 			}
 		})

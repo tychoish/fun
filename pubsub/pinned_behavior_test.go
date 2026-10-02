@@ -2,25 +2,34 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tychoish/fun/ers"
 )
 
 // These tests pin current behavior that is open for a decision; see
 // the follow-up questions in the review tracker.
 
-func TestDequeCapacityNonPositiveBecomesOne(t *testing.T) {
-	for _, capacity := range []int{0, -1, -100} {
+func TestDequeCapacityNegativeIsMalformed(t *testing.T) {
+	for _, capacity := range []int{-1, -100} {
 		dq, err := NewDeque[int](DequeOptions{Capacity: capacity})
-		if err != nil {
-			t.Fatalf("capacity %d: %v", capacity, err)
+		if !errors.Is(err, ers.ErrMalformedConfiguration) || dq != nil {
+			t.Fatalf("capacity %d: got %v", capacity, err)
 		}
-		if err := dq.PushBack(1); err != nil {
-			t.Fatal(err)
-		}
-		if err := dq.PushBack(2); err != ErrQueueFull {
-			t.Fatalf("capacity %d should behave as 1; second push gave %v", capacity, err)
+	}
+}
+
+func TestDequeCapacityZeroIsUnbounded(t *testing.T) {
+	dq, err := NewDeque[int](DequeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 100 {
+		if err := dq.PushBack(i); err != nil {
+			t.Fatalf("push %d: %v", i, err)
 		}
 	}
 }
