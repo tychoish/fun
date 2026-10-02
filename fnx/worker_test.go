@@ -45,16 +45,25 @@ func TestWorker(t *testing.T) {
 	})
 	t.Run("Functions", func(t *testing.T) {
 		t.Run("Blocking", func(t *testing.T) {
-			start := time.Now()
-			err := Worker(func(_ context.Context) error { time.Sleep(80 * time.Millisecond); return nil }).Wait()
-			dur := time.Since(start)
-			if dur < 10*time.Millisecond {
-				t.Error("did not block long enough", dur)
+			release := make(chan struct{})
+			done := make(chan error, 1)
+			go func() {
+				done <- Worker(func(_ context.Context) error { <-release; return nil }).Wait()
+			}()
+
+			// Wait must not return while the function is blocked.
+			select {
+			case <-done:
+				t.Fatal("did not block")
+			case <-time.After(20 * time.Millisecond):
 			}
-			if dur > 100*time.Millisecond {
-				t.Error("blocked too long", dur)
+			close(release)
+			select {
+			case err := <-done:
+				assert.NotError(t, err)
+			case <-time.After(10 * time.Second):
+				t.Fatal("did not unblock")
 			}
-			assert.NotError(t, err)
 		})
 		t.Run("Background", func(t *testing.T) {
 			ctx := t.Context()
