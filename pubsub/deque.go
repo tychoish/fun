@@ -321,12 +321,12 @@ func (dq *Deque[T]) IteratorBack(ctx context.Context) iter.Seq[T] { return dq.it
 // IteratorWaitFront yields items from the front of the Deque to the
 // back. When it reaches the last element, it waits for a new element
 // to be added. It does not modify the elements in the Deque.
-func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] { return dq.iterBackWait(ctx) }
+func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] { return dq.iterFrontWait(ctx) }
 
 // IteratorWaitBack yields items from the back of the Deque to the
 // front. When it reaches the first element, it waits for a new element
 // to be added. It does not modify the elements in the Deque.
-func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] { return dq.iterFrontWait(ctx) }
+func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] { return dq.iterBackWait(ctx) }
 
 // IteratorWaitPopFront returns a sequence that removes
 // and returns objects from the front of the deque.
@@ -354,7 +354,7 @@ func (*Deque[T]) wrapsrc(ctx context.Context, op func(ctx context.Context) (T, e
 func (dq *Deque[T]) iterFrontEnd(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqNext, false) }
 func (dq *Deque[T]) iterBackEnd(ctx context.Context) iter.Seq[T]   { return dq.iter(ctx, dqPrev, false) }
 func (dq *Deque[T]) iterFrontWait(ctx context.Context) iter.Seq[T] { return dq.iter(ctx, dqNext, true) }
-func (dq *Deque[T]) iterBackWait(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqNext, true) }
+func (dq *Deque[T]) iterBackWait(ctx context.Context) iter.Seq[T]  { return dq.iter(ctx, dqPrev, true) }
 
 func (*Deque[T]) zero() (z T) { return z }
 func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bool) iter.Seq[T] {
