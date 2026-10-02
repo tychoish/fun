@@ -1108,71 +1108,30 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 	num = max(num, 1)
 	return func(yield func(iter.Seq[T]) bool) {
 		var (
-			mtx      sync.Mutex
-			next     func() (T, bool)
-			stop     func()
-			unwatch  func() bool
-			finished = make([]bool, num)
-			remain   = num
-			closed   bool
+			mtx    sync.Mutex
+			remain = num
 		)
+		next, stop := iter.Pull(seq)
+		pull := func() (T, bool) { mtx.Lock(); defer mtx.Unlock(); return next() }
+		// stop is idempotent, and next yields nothing once it has run.
+		release := func() { mtx.Lock(); defer mtx.Unlock(); stop() }
+		unwatch := context.AfterFunc(ctx, release)
 
-		// the shared pull iterator starts lazily, so shards that are
-		// never iterated cost nothing, and it is stopped only when the
-		// input is exhausted or every shard has finished: one shard
-		// ending early must not end the others.
-		release := func() { // callers hold mtx
-			if closed {
-				return
-			}
-			closed = true
-			if unwatch != nil {
-				unwatch()
-			}
-			if stop != nil {
-				stop()
-			}
-		}
-		pull := func() (out T, ok bool) {
-			mtx.Lock()
-			defer mtx.Unlock()
-			if closed {
-				return out, false
-			}
-			if next == nil {
-				next, stop = iter.Pull(seq)
-				// cancellation releases the pull even if some shards
-				// never start or never finish; it is serialized with
-				// next under mtx.
-				unwatch = context.AfterFunc(ctx, func() {
-					mtx.Lock()
-					defer mtx.Unlock()
+		for range num {
+			finish := sync.OnceFunc(func() {
+				mtx.Lock()
+				remain--
+				last := remain == 0
+				mtx.Unlock()
+				if last {
+					unwatch()
 					release()
-				})
-			}
-			if out, ok = next(); !ok {
-				release()
-			}
-			return out, ok
-		}
-		finish := func(idx int) {
-			mtx.Lock()
-			defer mtx.Unlock()
-			if finished[idx] {
-				return
-			}
-			finished[idx] = true
-			if remain--; remain == 0 {
-				release()
-			}
-		}
-
-		for idx := range num {
+				}
+			})
 			shard := func(yield func(T) bool) {
-				defer finish(idx)
+				defer finish()
 				for ctx.Err() == nil {
-					value, ok := pull()
-					if !ok || !yield(value) {
+					if value, ok := pull(); !ok || !yield(value) {
 						return
 					}
 				}
