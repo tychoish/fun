@@ -64,7 +64,7 @@ func CollectFirstN[T any](seq iter.Seq[T], n int) []T {
 	if n <= 0 {
 		return make([]T, 0)
 	}
-	out := make([]T, 0, n)
+	out := make([]T, 0, min(n, 1024))
 	idx := 0
 	for value := range seq {
 		out = append(out, value)
@@ -1188,7 +1188,7 @@ func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		sink := make(chan T, size)
+		sink := make(chan T, max(size, 0))
 
 		go func() { defer close(sink); flushTo(ctx, seq, sink) }()
 
