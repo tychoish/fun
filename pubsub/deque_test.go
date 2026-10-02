@@ -969,8 +969,8 @@ func TestDequeLIFO(t *testing.T) {
 			mu := dq.mtx()
 			mu.Lock()
 			defer mu.Unlock()
-			check.NotError(t, dq.addAfter("first", dq.root.prev))
-			check.NotError(t, dq.addAfter("second", dq.root.prev)) // Now "second" is at the back
+			check.NotError(t, dq.add("first", dqPrev))
+			check.NotError(t, dq.add("second", dqPrev)) // Now "second" is at the back
 		}()
 
 		// Get first item - should be from back since LIFO pops from back
