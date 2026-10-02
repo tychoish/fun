@@ -4,6 +4,7 @@ import (
 	"context"
 	"iter"
 	"testing"
+	"time"
 )
 
 func TestCancelledContextBeatsReadyChannel(t *testing.T) {
@@ -24,6 +25,13 @@ func TestCancelledContextBeatsReadyChannel(t *testing.T) {
 			if _, ok := recieveFrom(ctx, ch); ok {
 				t.Fatal("recieveFrom succeeded on a cancelled ctx")
 			}
+		}
+	})
+	t.Run("recieveFromBlocked", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		time.AfterFunc(10*time.Millisecond, cancel)
+		if _, ok := recieveFrom(ctx, make(chan int)); ok {
+			t.Fatal("recieveFrom succeeded on a blocked channel")
 		}
 	})
 }
