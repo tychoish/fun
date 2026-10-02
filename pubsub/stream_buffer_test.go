@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -32,6 +33,35 @@ func TestBufferedStreamsKeepSourceErrors(t *testing.T) {
 			}
 			if err := s.Close(); err == nil {
 				t.Fatal("source error was lost")
+			}
+		})
+	}
+}
+
+func TestBufferOrdering(t *testing.T) {
+	const size = 2000
+	input := make([]int, size)
+	for i := range input {
+		input[i] = i
+	}
+	for _, n := range []int{1, 2, 8} {
+		t.Run("Buffer", func(t *testing.T) {
+			out, err := SliceStream(input).Buffer(n).Slice(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(out, input) {
+				t.Fatalf("Buffer(%d) did not preserve input order", n)
+			}
+		})
+		t.Run("BufferParallel", func(t *testing.T) {
+			out, err := SliceStream(input).BufferParallel(n).Slice(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			slices.Sort(out)
+			if !slices.Equal(out, input) {
+				t.Fatalf("BufferParallel(%d) lost or duplicated items", n)
 			}
 		})
 	}

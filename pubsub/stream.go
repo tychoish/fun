@@ -445,18 +445,21 @@ func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
 // throughput of the system and prevent both components of the system
 // from blocking on eachother.
 //
-// The ordering of elements in the output stream is the same as the
-// order of elements in the input stream.
+// A single worker fills the buffer, so the ordering of elements in the
+// output stream is the same as the order of elements in the input
+// stream; n only sets the capacity of the buffer. Use BufferParallel
+// when order does not matter and throughput does.
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := stw.ChanBlocking(make(chan T, n))
-	pipe := st.Parallel(buf.Send().Write, wpa.WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
+	pipe := st.Parallel(buf.Send().Write, wpa.WorkerGroupConfNumWorkers(1)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
 	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe)).WithHook(st.CloseHook())
 }
 
 // BufferParallel processes the input queue and stores
 // those items in a channel (like Buffer); however, unlike Buffer, multiple workers
 // consume the input stream: as a result the order of the elements
-// in the output stream is not the same as the input order.
+// in the output stream is not the same as the input order. The n
+// sets both the buffer capacity and the number of workers.
 //
 // Otherwise, the two Buffer methods are equivalent and serve the same
 // purpose: process the items from a stream without blocking the
