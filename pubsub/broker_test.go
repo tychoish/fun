@@ -7,6 +7,7 @@ import (
 	"iter"
 	"math/rand"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -852,6 +853,43 @@ func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
 			case <-time.After(2 * time.Second):
 				t.Fatal("broker did not recover after unsubscribing blocked subscriber")
 			}
+		})
+	}
+}
+
+func TestBrokerSubscribeUnsubscribeOrdering(t *testing.T) {
+	for name, mk := range map[string]func(ctx context.Context) *Broker[int]{
+		"Channel": func(ctx context.Context) *Broker[int] {
+			return NewBroker[int](ctx, BrokerOptions{BufferSize: 8})
+		},
+		"Queue": func(ctx context.Context) *Broker[int] {
+			return NewQueueBroker(ctx, NewUnlimitedQueue[int](), BrokerOptions{BufferSize: 8})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			b := mk(ctx)
+			defer b.Stop()
+
+			for i := 0; i < 500; i++ {
+				ch := b.Subscribe(ctx)
+				b.Unsubscribe(ctx, ch)
+			}
+			// a concurrent burst, each goroutine ordered internally.
+			var wg sync.WaitGroup
+			for g := 0; g < 8; g++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for i := 0; i < 100; i++ {
+						ch := b.Subscribe(ctx)
+						b.Unsubscribe(ctx, ch)
+					}
+				}()
+			}
+			wg.Wait()
+			check.Equal(t, b.Stats(ctx).Subscriptions, 0)
 		})
 	}
 }
