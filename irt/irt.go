@@ -919,6 +919,13 @@ func Pool3[A, B, C any, OP ~func(A) (B, C)](ctx context.Context, num int, seq it
 // Chunk returns a sequence of sequences, where each inner sequence
 // contains at most num elements from the input sequence. If num <= 0,
 // the sequence is empty.
+//
+// Chunk pulls from seq lazily and each inner sequence shares that pull
+// and its countdown with the outer loop: inner sequences must be fully
+// consumed (or abandoned) before the outer loop advances, and on the
+// same goroutine. Consuming an inner sequence from another goroutine
+// after the outer loop has moved on races on the countdown and pulls
+// concurrently.
 func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 	return func(yield func(iter.Seq[T]) bool) {
 		if num <= 0 {
