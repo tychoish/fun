@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Collect consumes the sequence and returns a slice of all
@@ -742,10 +743,16 @@ func Sink[T any](yield func(T) bool) func(T) bool {
 	return func(v T) bool {
 		mtx.Lock()
 		defer mtx.Unlock()
-		if done || !yield(v) {
-			done = true
+		if done {
 			return false
 		}
+		// stay "done" if yield panics, so a recovered panic can never
+		// lead to yield being called again.
+		done = true
+		if !yield(v) {
+			return false
+		}
+		done = false
 		return true
 	}
 }
@@ -758,10 +765,14 @@ func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 	return func(a A, b B) bool {
 		mtx.Lock()
 		defer mtx.Unlock()
-		if done || !yield(a, b) {
-			done = true
+		if done {
 			return false
 		}
+		done = true
+		if !yield(a, b) {
+			return false
+		}
+		done = false
 		return true
 	}
 }
@@ -769,24 +780,71 @@ func Sink2[A, B any](yield func(A, B) bool) func(A, B) bool {
 // Pool iterates seq and applies op to each element using a pool of
 // num goroutines, merging the results into a single output sequence. op
 // runs outside the input lock, so it executes in parallel across
-// workers; only pulling the raw element from seq is serialized. The
-// input sequence is pulled through a single, mutex-guarded shared
-// iterator (WithMutex). num is clamped to at least 1: with zero
-// workers nothing would ever range over the shared iterator, so its
-// underlying iter.Pull coroutine would never see stop() called and
-// would leak for the life of the process.
+// workers; only pulling the raw element from seq is serialized. Output
+// order is not preserved.
+//
+// Workers run on their own goroutines, but a panic in op, in the loop
+// body consuming the output, or in seq is recovered and re-raised on
+// the goroutine that is iterating the result, after the workers stop.
+// The loop body is invoked by workers (serialized), not necessarily on
+// the iterating goroutine.
+//
+// ctx is checked before every pull, so a canceled context stops the
+// pool without consuming further input; cancellation is silent. ctx
+// cannot interrupt a pull that is already blocked: seq must itself
+// honor ctx (for example by being built from a channel with Channel
+// and the same ctx) if it can block. num is clamped to at least 1.
 func Pool[A, B any, OP ~func(A) B](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq[B] {
 	num = max(num, 1)
 	return func(yield func(B) bool) {
-		input := WithMutex(seq, &sync.Mutex{})
 		push := Sink(yield)
-		wgdo(num, func() {
-			for a := range input {
-				if ctx.Err() != nil || !push(op(a)) {
-					return
-				}
+		poolRun(ctx, num, seq, func(a A) bool { return push(op(a)) })
+	}
+}
+
+// poolRun pulls from seq under a lock and hands each element to work
+// on one of num worker goroutines. It returns once all workers stop;
+// the first panic raised by a worker (or by seq) is re-raised on the
+// calling goroutine.
+func poolRun[A any](ctx context.Context, num int, seq iter.Seq[A], work func(A) bool) {
+	if ctx.Err() != nil {
+		return
+	}
+
+	var (
+		mtx     sync.Mutex
+		halt    atomic.Bool
+		failure atomic.Pointer[any]
+	)
+	next, stop := iter.Pull(seq)
+	pull := func() (A, bool) {
+		mtx.Lock()
+		defer mtx.Unlock()
+		return next()
+	}
+
+	wgdo(num, func() {
+		defer func() {
+			if r := recover(); r != nil {
+				failure.CompareAndSwap(nil, &r)
+				halt.Store(true)
 			}
-		})
+		}()
+		for ctx.Err() == nil && !halt.Load() {
+			a, ok := pull()
+			if !ok || !work(a) {
+				halt.Store(true)
+				return
+			}
+		}
+	})
+
+	mtx.Lock()
+	stop()
+	mtx.Unlock()
+
+	if r := failure.Load(); r != nil {
+		panic(*r)
 	}
 }
 
@@ -802,20 +860,13 @@ func Pool2[A, B, C, D any, OP ~func(A, B) (C, D)](ctx context.Context, num int, 
 // the resulting pairs into a single output pair sequence. op runs
 // outside the input lock, so it executes in parallel across workers;
 // only pulling the raw element from seq is serialized. num is clamped
-// to at least 1; see Pool for why zero workers would leak the shared
-// iterator's iter.Pull coroutine.
+// to at least 1. Panic propagation and context handling are the same
+// as for Pool: seq must honor ctx if it can block.
 func Pool3[A, B, C any, OP ~func(A) (B, C)](ctx context.Context, num int, seq iter.Seq[A], op OP) iter.Seq2[B, C] {
 	num = max(num, 1)
 	return func(yield func(B, C) bool) {
-		input := WithMutex(seq, &sync.Mutex{})
 		push := Sink2(yield)
-		wgdo(num, func() {
-			for a := range input {
-				if ctx.Err() != nil || !push(op(a)) {
-					return
-				}
-			}
-		})
+		poolRun(ctx, num, seq, func(a A) bool { return push(op(a)) })
 	}
 }
 
