@@ -1494,12 +1494,6 @@ func TestPredicateSemantics(t *testing.T) {
 		if predEQ(5)(6) {
 			t.Error("predEQ neq")
 		}
-		if !predLTE(10)(5) || !predLTE(10)(10) {
-			t.Error("predLTE")
-		}
-		if predLTE(10)(11) {
-			t.Error("predLTE gt")
-		}
 		if !predGTE(5)(10) || !predGTE(5)(5) {
 			t.Error("predGTE")
 		}

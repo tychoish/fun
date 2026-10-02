@@ -63,16 +63,14 @@ func TestShardReview(t *testing.T) {
 			var wg sync.WaitGroup
 			shards := Collect(Shard(t.Context(), 4, Range(1, items)))
 			for i, s := range shards {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for range s {
 						total.Add(1)
 						if i == 0 && total.Load() > 10 {
 							return // one shard quits early
 						}
 					}
-				}()
+				})
 			}
 			wg.Wait()
 			if total.Load() != items {
