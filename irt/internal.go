@@ -437,9 +437,10 @@ func recieveFrom[T any](ctx context.Context, ch <-chan T) (out T, ok bool) {
 	}
 	select {
 	case <-ctx.Done():
+		return
 	case out, ok = <-ch:
+		return
 	}
-	return
 }
 
 func sendTo[T any](ctx context.Context, value T, ch chan<- T) bool {

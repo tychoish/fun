@@ -1597,45 +1597,21 @@ func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, er
 // the ctx of a later call only aborts that call; the stream continues.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
-		once   sync.Once
-		ch     chan T
-		cancel context.CancelFunc
+		once sync.Once
+		ch   <-chan T
 	)
-
-	op := func(ctx context.Context) {
-		ch = make(chan T)
-		go func() {
-			defer close(ch)
-			defer cancel()
-			for item := range seq {
-				if !sendTo(ctx, item, ch) {
-					return
-				}
-			}
-		}()
-	}
 
 	return func(ctx context.Context) (out T, ok bool) {
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		// a cancelled call neither starts the producer (it would be
-		// born dead) nor stops a running one: the cancellation is
-		// local to this call.
+		// a cancelled call must not start the producer (it would be
+		// born dead): recieveFrom checks ctx before consuming.
 		if ctx.Err() != nil {
 			return
 		}
-		once.Do(func() {
-			var gctx context.Context
-			gctx, cancel = context.WithCancel(ctx)
-			op(gctx)
-		})
-		select {
-		case <-ctx.Done():
-		case out, ok = <-ch:
-			whencall(!ok, cancel)
-		}
-		return
+		once.Do(func() { ch, _ = AsChannel(ctx, seq) })
+		return recieveFrom(ctx, ch)
 	}
 }
 
