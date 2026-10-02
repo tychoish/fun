@@ -230,7 +230,7 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 		}
 
 		if err := ctx.Err(); err != nil {
-			return out, ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
+			return out, ers.Wrap(err, "WaitPop() canceled while waiting for an item")
 		}
 
 		q.nempty.Wait()
