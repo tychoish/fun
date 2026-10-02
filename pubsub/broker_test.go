@@ -981,3 +981,75 @@ func mustSubscribe[T any](t testing.TB, b *Broker[T], ctx context.Context) chan 
 	}
 	return ch
 }
+
+// stalledBroker has no control loop, so control requests are accepted
+// (up to buffer) but never processed or acknowledged.
+func stalledBroker(buffer int) *Broker[int] {
+	b := makeBroker[int](BrokerOptions{BufferSize: buffer})
+	b.ctx, b.close = context.WithCancel(context.Background())
+	return b
+}
+
+func TestBrokerControlOperationsInterrupted(t *testing.T) {
+	t.Run("SubscribeCtxWhileSending", func(t *testing.T) {
+		b := stalledBroker(0)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+		_, err := b.Subscribe(ctx)
+		check.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+	t.Run("SubscribeStopWhileSending", func(t *testing.T) {
+		b := stalledBroker(0)
+		time.AfterFunc(10*time.Millisecond, b.Stop)
+		_, err := b.Subscribe(context.Background())
+		check.ErrorIs(t, err, ErrBrokerClosed)
+	})
+	t.Run("SubscribeCtxWhileAwaitingAck", func(t *testing.T) {
+		b := stalledBroker(2)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+		_, err := b.Subscribe(ctx)
+		check.ErrorIs(t, err, context.DeadlineExceeded)
+		// the matching removal was queued behind the subscription.
+		check.Equal(t, len(b.ctlCh), 2)
+	})
+	t.Run("SubscribeStopWhileAwaitingAck", func(t *testing.T) {
+		b := stalledBroker(1)
+		time.AfterFunc(10*time.Millisecond, b.Stop)
+		_, err := b.Subscribe(context.Background())
+		check.ErrorIs(t, err, ErrBrokerClosed)
+	})
+	t.Run("UnsubscribeStopWhileSending", func(t *testing.T) {
+		b := stalledBroker(0)
+		time.AfterFunc(10*time.Millisecond, b.Stop)
+		check.ErrorIs(t, b.Unsubscribe(context.Background(), nil), ErrBrokerClosed)
+	})
+	t.Run("StatsStopWhileAwaitingReply", func(t *testing.T) {
+		b := stalledBroker(1)
+		time.AfterFunc(10*time.Millisecond, b.Stop)
+		check.Zero(t, b.Stats(context.Background()))
+	})
+	t.Run("DuplicateSubscribeIsIdempotent", func(t *testing.T) {
+		b := NewBroker[int](t.Context(), BrokerOptions{})
+		ch := make(chan int)
+		for range 2 {
+			req := ctlRequest[int]{ch: ch, ack: make(chan struct{})}
+			b.ctlCh <- req
+			<-req.ack
+		}
+		check.Equal(t, b.Stats(t.Context()).Subscriptions, 1)
+	})
+}
+
+func TestBrokerSendStoppedWhileSinkBlocked(t *testing.T) {
+	b := makeInternalBrokerImpl(t.Context(),
+		func(context.Context) iter.Seq[int] { return func(func(int) bool) {} },
+		func(ctx context.Context, _ int) error { <-ctx.Done(); return ctx.Err() },
+		func() int { return 0 },
+		BrokerOptions{},
+	)
+	time.AfterFunc(20*time.Millisecond, b.Stop)
+	err := b.Send(context.Background(), 1)
+	check.ErrorIs(t, err, ErrBrokerClosed)
+	check.ErrorIs(t, err, context.Canceled)
+}
