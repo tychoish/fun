@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -325,12 +327,16 @@ func TestCmd(t *testing.T) {
 		t.Run("SIGTERM", func(t *testing.T) {
 			ctx := testt.Context(t)
 			ctx = SetBaseContext(ctx)
-			cmd := exec.CommandContext(ctx, "bash", "-c", "sleep 5; echo 'woop'")
+			// exec so that the signaled process is the sleeper itself: an
+			// orphaned child would keep the output pipe open and block Wait.
+			ready := filepath.Join(t.TempDir(), "ready")
+			cmd := exec.CommandContext(ctx, "bash", "-c", "touch "+ready+"; exec sleep 5")
 			out := &bytes.Buffer{}
 			cmd.Stdout = out
 			cmd.Stderr = out
 			s := Cmd(cmd, 100*time.Millisecond)
 			check.NotError(t, s.Start(ctx))
+			waitForFile(t, ready)
 			s.Shutdown()
 
 			assert.MaxRuntime(t, 500*time.Millisecond, func() {
@@ -343,12 +349,16 @@ func TestCmd(t *testing.T) {
 		t.Run("ForceSigKILL", func(t *testing.T) {
 			ctx := testt.Context(t)
 			ctx = SetBaseContext(ctx)
-			cmd := exec.CommandContext(ctx, "bash", "-c", "trap SIGTERM; sleep 5; echo 'woop'")
+			// SIGTERM is ignored (and the ignore is inherited across exec) once
+			// the marker exists, so only SIGKILL can stop the process.
+			ready := filepath.Join(t.TempDir(), "ready")
+			cmd := exec.CommandContext(ctx, "bash", "-c", "trap '' TERM; touch "+ready+"; exec sleep 5")
 			out := &bytes.Buffer{}
 			cmd.Stdout = out
 			cmd.Stderr = out
 			s := Cmd(cmd, 100*time.Millisecond)
 			check.NotError(t, s.Start(ctx))
+			waitForFile(t, ready)
 			s.Shutdown()
 
 			assert.MaxRuntime(t, 500*time.Millisecond, func() {
@@ -359,6 +369,22 @@ func TestCmd(t *testing.T) {
 			testt.Log(t, out.String())
 		})
 	})
+}
+
+// waitForFile blocks until the path exists, so tests can tell that a
+// subprocess has finished its setup before they signal it.
+func waitForFile(t *testing.T, path string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Minute)
+	for {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("subprocess never became ready")
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func TestDaemon(t *testing.T) {
