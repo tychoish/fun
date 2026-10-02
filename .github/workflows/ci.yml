@@ -35,6 +35,6 @@ jobs:
           go-version: "1.25"
       - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.9.0
+          version: v2.13.2
           args: --timeout 8m
           github-token: ${{ secrets.github_token }}
