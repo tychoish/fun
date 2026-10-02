@@ -260,7 +260,8 @@ func TestHelpers(t *testing.T) {
 		if err := srv.Start(ctx); err != nil {
 			t.Fatal(err)
 		}
-		ch := broker.Subscribe(ctx)
+		ch, err := broker.Subscribe(ctx)
+		check.NotError(t, err)
 		sig := make(chan struct{})
 		go func() {
 			defer close(sig)
@@ -270,7 +271,7 @@ func TestHelpers(t *testing.T) {
 			}
 		}()
 
-		broker.Publish(ctx, 42)
+		check.NotError(t, broker.Publish(ctx, 42))
 		fnx.WaitChannel(sig).Run(ctx)
 	})
 }
