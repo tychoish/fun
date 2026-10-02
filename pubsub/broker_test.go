@@ -1305,8 +1305,8 @@ func TestBrokerIdleCPU(t *testing.T) {
 }
 
 func TestBrokerStatsState(t *testing.T) {
-	t.Run("ZeroValueIsUnstarted", func(t *testing.T) {
-		check.Equal(t, BrokerStats{}.State, BrokerStateUnstarted)
+	t.Run("ZeroValueIsUnknown", func(t *testing.T) {
+		check.Equal(t, BrokerStats{}.State, BrokerStateUnknown)
 	})
 	t.Run("Empty", func(t *testing.T) {
 		b := NewBroker[int](t.Context(), BrokerOptions{})
@@ -1342,7 +1342,7 @@ func TestBrokerStatsState(t *testing.T) {
 		check.Equal(t, b.Stats(cctx), BrokerStats{})
 	})
 	t.Run("String", func(t *testing.T) {
-		check.Equal(t, BrokerStateUnstarted.String(), "unstarted")
+		check.Equal(t, BrokerStateUnknown.String(), "unknown")
 		check.Equal(t, BrokerStateEmpty.String(), "empty")
 		check.Equal(t, BrokerStateActive.String(), "active")
 		check.Equal(t, BrokerStateClosed.String(), "closed")
