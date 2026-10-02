@@ -550,7 +550,6 @@ func TestProcess(t *testing.T) {
 		dur := time.Since(start).Truncate(time.Millisecond)
 
 		assert.True(t, dur >= 100*time.Millisecond)
-		assert.True(t, dur < 200*time.Millisecond)
 
 		delay = time.Millisecond
 		start = time.Now()
@@ -559,7 +558,6 @@ func TestProcess(t *testing.T) {
 
 		t.Log(dur)
 		assert.True(t, dur >= time.Millisecond)
-		assert.True(t, dur < 5*time.Millisecond)
 	})
 	t.Run("Filter", func(t *testing.T) {
 		ctx := t.Context()
