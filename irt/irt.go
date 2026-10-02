@@ -6,12 +6,14 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
 	"maps"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Collect consumes the sequence and returns a slice of all
@@ -771,18 +773,48 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 // channel is never read. Callers that do not read the channel to
 // completion should call stop, typically with defer.
 //
-// A panic in seq is not recovered and terminates the process, as there
-// is no consumer frame to carry it to: recover inside seq.
-func AsChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func()) {
+// A panic in seq is recovered in the producer goroutine: the channel
+// is closed and stop (now and on every later call) returns a
+// *PanicError describing it, or nil if seq did not panic. Check the
+// result of stop after the channel closes.
+func AsChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func() error) {
+	ch, cancel, failed := asChannel(ctx, seq)
+	return ch, func() error {
+		cancel()
+		if p := failed.Load(); p != nil {
+			return p
+		}
+		return nil
+	}
+}
+
+func asChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func(), *atomic.Pointer[PanicError]) {
 	ctx, cancel := context.WithCancel(ctx)
 	ch := make(chan T)
+	failed := &atomic.Pointer[PanicError]{}
 	go func() {
+		// recorded before ch closes, so a receiver that saw the close
+		// sees the failure.
 		defer close(ch)
 		defer cancel()
+		defer func() {
+			if r := recover(); r != nil {
+				failed.Store(&PanicError{Value: r})
+			}
+		}()
 		flushTo(ctx, seq, ch)
 	}()
-	return ch, cancel
+	return ch, cancel, failed
 }
+
+// PanicError is the error reported when a source sequence panics in a
+// background goroutine.
+type PanicError struct{ Value any }
+
+func (e *PanicError) Error() string { return fmt.Sprint("recovered panic: ", e.Value) }
+
+// Unwrap returns the panic value if it was an error.
+func (e *PanicError) Unwrap() error { err, _ := e.Value.(error); return err }
 
 // Sink wraps yield so that concurrent workers can share it safely:
 // calls are serialized by an internal mutex, and once yield returns
@@ -1571,12 +1603,14 @@ func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, er
 // they passed to the first call to release the goroutine. Cancelling
 // the ctx of a later call only aborts that call; the stream continues.
 //
-// A panic in seq is not recovered and terminates the process, as there
-// is no caller frame to carry it to: recover inside seq.
+// A panic in seq is recovered in the background goroutine and
+// re-raised (with the original value) in the caller that observes the
+// end of the stream, once; later calls return false.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
 		once sync.Once
 		ch   <-chan T
+		fail *atomic.Pointer[PanicError]
 	)
 
 	return func(ctx context.Context) (out T, ok bool) {
@@ -1588,8 +1622,13 @@ func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 		if ctx.Err() != nil {
 			return
 		}
-		once.Do(func() { ch, _ = AsChannel(ctx, seq) })
-		return recieveFrom(ctx, ch)
+		once.Do(func() { ch, _, fail = asChannel(ctx, seq) })
+		if out, ok = recieveFrom(ctx, ch); !ok {
+			if p := fail.Swap(nil); p != nil {
+				panic(p.Value)
+			}
+		}
+		return
 	}
 }
 

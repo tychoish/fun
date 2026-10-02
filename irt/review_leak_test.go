@@ -33,7 +33,7 @@ func TestWithBufferLeakReview(t *testing.T) {
 func TestAsChannel(t *testing.T) {
 	t.Run("Abandonment", func(t *testing.T) {
 		base := runtime.NumGoroutine()
-		stops := make([]func(), 0, 10)
+		stops := make([]func() error, 0, 10)
 		for range 10 {
 			ch, stop := AsChannel(t.Context(), Monotonic())
 			<-ch // read one, then abandon
