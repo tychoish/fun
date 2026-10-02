@@ -88,8 +88,7 @@ func must2[T any](v T, err error) T { must(err); return v }
 
 // statefull function utilities
 
-func counter() func() int                             { return counterFrom(0) }
-func counterFrom[T ~int](next T) func() T             { return func() T { next++; return next } }
+func counter() func() int                             { next := 0; return func() int { next++; return next } }
 func seen[T comparable]() func(T) bool                { s := set[T]{}; return s.add }
 func seenkey[K comparable, V any]() func(K, V) bool   { return ignoreSecond[K, V](seen[K]()) }
 func seenvalue[K comparable, V any]() func(V, K) bool { s := seen[K](); return ignoreFirst[V](s) }
@@ -200,7 +199,6 @@ func threadzip[A, B, C, D any](op func(A) (B, C), merge func(B, C) D) func(A) D 
 func predLT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return value < n } }
 func predGT[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return value > n } }
 func predEQ[N cmp.Ordered](n N) func(N) bool  { return func(value N) bool { return value == n } }
-func predLTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return value <= n } }
 func predGTE[N cmp.Ordered](n N) func(N) bool { return func(value N) bool { return value >= n } }
 
 func equal[T comparable](lh, rh T) bool                  { return lh == rh }
