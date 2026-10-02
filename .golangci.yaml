@@ -20,7 +20,9 @@ linters:
     - funcorder
     - inamedparam
     - mnd
+    - gomodguard
   enable:
+    - gomodguard_v2
     - modernize
     - revive
   settings:
