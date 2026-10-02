@@ -1583,18 +1583,6 @@ func TestPredicateSemantics(t *testing.T) {
 			t.Error("isWithin out")
 		}
 	})
-
-	t.Run("withcheck", func(t *testing.T) {
-		err := errors.New("error")
-		v, ok := withcheck(42, err)
-		if !ok || v != 42 {
-			t.Errorf("withcheck err: %v, %v", v, ok)
-		}
-		v, ok = withcheck(42, nil)
-		if ok || v != 0 {
-			t.Errorf("withcheck nil: %v, %v", v, ok)
-		}
-	})
 }
 
 func TestResultManipulators(t *testing.T) {

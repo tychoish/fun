@@ -216,8 +216,6 @@ func isSuccess(err error) bool              { return err == nil }
 func isSuccess2[T any](_ T, err error) bool { return err == nil }
 func isWithin(index, length int) bool       { return index >= 0 && index < length }
 
-func withcheck[T any](v T, err error) (T, bool) { ok := isError(err); return ifelsedo(ok, v, zero), ok }
-
 // pointers and references
 
 func ptr[T any](in T) *T                       { return &in }
