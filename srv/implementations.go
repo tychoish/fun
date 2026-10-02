@@ -165,8 +165,11 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 	closer, waitForSignal := fnx.MAKE.Signal()
 
 	return &Service{
-		Run:      waitForSignal.WithErrorFilter(erc.NewFilter().WithoutContext()),
-		Shutdown: func() error { closer(); return pipe.Close() },
+		Run: waitForSignal.WithErrorFilter(erc.NewFilter().WithoutContext()),
+		// Shutdown only ends Run: the queue still holds the
+		// cleanup work, and Close would discard it. The Cleanup
+		// phase drains the queue and closes it afterward.
+		Shutdown: func() error { closer(); return nil },
 		Cleanup: func() error {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -174,6 +177,13 @@ func Cleanup(pipe *pubsub.Queue[fnx.Worker], timeout time.Duration) *Service {
 				ctx, cancel = context.WithTimeout(ctx, timeout)
 				defer cancel()
 			}
+
+			// Shutdown drains the queue (the pool below consumes it)
+			// and then closes it, which ends the iterator.
+			drained := make(chan struct{})
+			go func() { defer close(drained); _ = pipe.Shutdown(ctx) }()
+			defer func() { cancel(); <-drained; _ = pipe.Close() }()
+
 			if err := wpa.RunWithPool(
 				pipe.IteratorWaitPop(ctx),
 				wpa.WorkerGroupConfContinueOnError(),
