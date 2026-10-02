@@ -1318,7 +1318,6 @@ func TestBrokerIdleCPU(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestBrokerStatsState(t *testing.T) {
 	t.Run("ZeroValueIsUnknown", func(t *testing.T) {
 		check.Equal(t, BrokerStats{}.State, BrokerStateUnknown)
@@ -1364,6 +1363,7 @@ func TestBrokerStatsState(t *testing.T) {
 		check.Equal(t, BrokerState(99).String(), "unknown")
 	})
 }
+
 func TestBrokerStopKeepsBacklog(t *testing.T) {
 	const total = 5
 	cases := map[string]func(context.Context) (*Broker[int], func() int){
