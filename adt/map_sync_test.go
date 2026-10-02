@@ -73,65 +73,48 @@ func TestMap(t *testing.T) {
 	})
 	t.Run("DeleteItems", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+		const keys = 300
+		const rounds = 5
 		mp := &SyncMap[string, int]{}
-		passed := &atomic.Bool{}
-		wg := &sync.WaitGroup{}
 		count := &atomic.Int64{}
+		wg := &sync.WaitGroup{}
+
+		// concurrent phase: storers and deleters contend on the
+		// same keys for a fixed amount of work.
 		for range 32 {
 			wg.Go(func() {
-				for {
-					if ctx.Err() != nil || passed.Load() {
-						return
-					}
-
-					for i := range 300 {
+				for range rounds {
+					for i := range keys {
 						mp.Store(fmt.Sprint(i), rand.Int())
 						count.Add(1)
 					}
+					runtime.Gosched()
 				}
 			})
 			wg.Go(func() {
-				time.Sleep(100 * time.Millisecond)
-				for {
-					if ctx.Err() != nil || passed.Load() {
-						return
-					}
-					if mp.Len() == 0 {
-						continue
-					}
-					for i := range 300 {
+				for range rounds {
+					for i := range keys {
 						mp.Delete(fmt.Sprint(i))
 						count.Add(1)
 					}
+					runtime.Gosched()
 				}
 			})
-			for range 2 {
-				wg.Go(func() {
-					for {
-						time.Sleep(time.Millisecond)
-						if mp.Len() > 0 {
-							break
-						}
-					}
-
-					for {
-						if ctx.Err() != nil || passed.Load() {
-							return
-						}
-						if mp.Len() == 0 {
-							passed.Store(true)
-							cancel()
-							return
-						}
-					}
-				})
-			}
 		}
 		wg.Wait()
-		t.Log(mp.Len(), count.Load())
-		assert.True(t, passed.Load())
+		assert.True(t, mp.Len() <= keys)
+		assert.True(t, count.Load() == 2*32*rounds*keys)
+
+		// quiescent phase: with no concurrent writers, the
+		// result of deleting every key is deterministic.
+		for i := range keys {
+			mp.Store(fmt.Sprint(i), i)
+		}
+		assert.Equal(t, keys, mp.Len())
+		for i := range keys {
+			mp.Delete(fmt.Sprint(i))
+		}
+		assert.Equal(t, 0, mp.Len())
 	})
 	t.Run("EnsureSemantics", func(t *testing.T) {
 		mp := &SyncMap[int, int]{}
