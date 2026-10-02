@@ -931,47 +931,24 @@ func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 				return
 			}
 
-			var (
-				pulled    = 1
-				pending   = true
-				exhausted bool
-			)
-
-			inner := func(yield func(T) bool) {
-				for !exhausted {
-					value := first
-					if pending {
-						pending = false
-					} else if pulled < num {
-						if value, ok = next(); !ok {
-							exhausted = true
-							return
-						}
-						pulled++
-					} else {
-						return
-					}
-					if !yield(value) {
-						return
-					}
+			left := num
+			take := func() (v T, ok bool) {
+				if left == 0 {
+					return v, false
 				}
+				if left--; left == num-1 {
+					return first, true
+				}
+				return next()
 			}
 
-			if !yield(inner) {
+			if !yield(GenerateOk(take)) {
 				return
 			}
 
 			// the consumer may not have drained the chunk: skip the
 			// remainder so the next chunk starts at the boundary.
-			for !exhausted && pulled < num {
-				if _, ok = next(); !ok {
-					return
-				}
-				pulled++
-			}
-			if exhausted {
-				return
-			}
+			loopWhile(func() bool { return second(take()) })
 		}
 	}
 }
