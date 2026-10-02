@@ -23,22 +23,23 @@ import (
 // Broker is a simple message broker that provides a useable interface
 // for distributing messages to an arbitrary group of channels.
 type Broker[T any] struct {
-	wg      fnx.WaitGroup
-	subCh   chan subRequest[T]
-	unsubCh chan chan T
-	opts    BrokerOptions
-	stats   chan func(BrokerStats)
+	wg    fnx.WaitGroup
+	ctlCh chan ctlRequest[T]
+	opts  BrokerOptions
+	stats chan func(BrokerStats)
 
 	close context.CancelFunc
 	sink  func(context.Context, T) error
 	count atomic.Uint64
 }
 
-// subRequest registers a subscription; ack is closed once the
-// subscription is visible to dispatch.
-type subRequest[T any] struct {
-	ch  chan T
-	ack chan struct{}
+// ctlRequest is a subscription change processed in order by the
+// control loop. For subscriptions, ack is closed once the subscription
+// is visible to dispatch.
+type ctlRequest[T any] struct {
+	ch    chan T
+	ack   chan struct{}
+	unsub bool
 }
 
 // BrokerStats is a data struct used to report on the internal state
@@ -169,10 +170,9 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 
 	return &Broker[T]{
-		opts:    opts,
-		subCh:   make(chan subRequest[T], opts.BufferSize),
-		unsubCh: make(chan chan T, opts.BufferSize),
-		stats:   make(chan func(BrokerStats)),
+		opts:  opts,
+		ctlCh: make(chan ctlRequest[T], opts.BufferSize),
+		stats: make(chan func(BrokerStats)),
 	}
 }
 
@@ -191,17 +191,20 @@ func (b *Broker[T]) startQueueWorkers(
 			select {
 			case <-ctx.Done():
 				return
-			case req := <-b.subCh:
-				if !subs.Check(req.ch) {
+			case req := <-b.ctlCh:
+				switch {
+				case req.unsub:
+					// closing done releases any sender blocked
+					// on this subscriber.
+					if done, ok := subs.Load(req.ch); ok {
+						subs.Delete(req.ch)
+						close(done)
+					}
+				case !subs.Check(req.ch):
 					subs.Store(req.ch, make(chan struct{}))
-				}
-				close(req.ack)
-			case msgCh := <-b.unsubCh:
-				// closing done releases any sender blocked on
-				// this subscriber.
-				if done, ok := subs.Load(msgCh); ok {
-					subs.Delete(msgCh)
-					close(done)
+					close(req.ack)
+				default:
+					close(req.ack)
 				}
 			case fn := <-b.stats:
 				fn(BrokerStats{
@@ -298,16 +301,19 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 		return nil
 	}
 	msgCh := make(chan T, b.opts.BufferSize)
-	req := subRequest[T]{ch: msgCh, ack: make(chan struct{})}
+	req := ctlRequest[T]{ch: msgCh, ack: make(chan struct{})}
 	select {
 	case <-ctx.Done():
 		return nil
-	case b.subCh <- req:
+	case b.ctlCh <- req:
 	}
 	// wait for registration so that a Publish that follows Subscribe
 	// is delivered to this subscriber.
 	select {
 	case <-ctx.Done():
+		// the request is queued and will be processed; queue the
+		// matching removal behind it so the subscription isn't leaked.
+		b.Unsubscribe(context.Background(), msgCh)
 		return nil
 	case <-req.ack:
 		return msgCh
@@ -317,14 +323,8 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 // Unsubscribe removes a channel from the broker.
 func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 	select {
-	case b.unsubCh <- msgCh:
-		// try to unsubscribe if the channel isn't full (it
-		// really shouldn't be.)
-	default:
-		select {
-		case b.unsubCh <- msgCh:
-		case <-ctx.Done():
-		}
+	case b.ctlCh <- ctlRequest[T]{ch: msgCh, unsub: true}:
+	case <-ctx.Done():
 	}
 }
 
