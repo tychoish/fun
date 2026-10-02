@@ -2,6 +2,7 @@ package irt
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"iter"
 	"strings"
@@ -84,5 +85,52 @@ func TestJSONKeys(t *testing.T) {
 		if _, err := MarshalJSON2(keyed(1.5)); err == nil {
 			t.Fatal("expected error")
 		}
+	})
+}
+
+type textInt int
+
+func (n textInt) MarshalText() ([]byte, error) { return []byte("t" + strings.Repeat("x", int(n))), nil }
+
+// TestJSONKeysGo125 pins Go 1.25's encoding/json key rules with
+// hard-coded results, since Go 1.27 changed std's encoding of
+// TextMarshaler string-kind keys. Cases where every version agrees are
+// also compared with the live std library.
+func TestJSONKeysGo125(t *testing.T) {
+	t.Run("Pinned", func(t *testing.T) {
+		roundTripKeys(t, `{"a":0}`, "a")
+		roundTripKeys(t, `{"-3":0}`, -3)
+		roundTripKeys(t, `{"7":0}`, uint8(7))
+		// string kind wins over MarshalText: raw string, not lowercased
+		data, err := MarshalJSON2(keyed(textName("ABC")))
+		if err != nil || string(data) != `{"ABC":0}` {
+			t.Fatalf("got %s, %v", data, err)
+		}
+		// MarshalText on a non-string kind wins over integer encoding
+		data, err = MarshalJSON2(keyed(textInt(2)))
+		if err != nil || string(data) != `{"txx":0}` {
+			t.Fatalf("got %s, %v", data, err)
+		}
+		// decode honours UnmarshalText first
+		for kv, err := range UnmarshalJSON2[textName, int](strings.NewReader(`{"abc":1}`)) {
+			if err != nil || kv.Key != "ABC" {
+				t.Fatalf("got %v, %v", kv.Key, err)
+			}
+		}
+	})
+	t.Run("AgreesWithStd", func(t *testing.T) {
+		check := func(got []byte, err error, want any) {
+			t.Helper()
+			std, serr := json.Marshal(want)
+			if err != nil || serr != nil || !bytes.Equal(got, std) {
+				t.Fatalf("irt %s (%v), std %s (%v)", got, err, std, serr)
+			}
+		}
+		got, err := MarshalJSON2(keyed("b"))
+		check(got, err, map[string]int{"b": 0})
+		got, err = MarshalJSON2(keyed(-1))
+		check(got, err, map[int]int{-1: 0})
+		got, err = MarshalJSON2(keyed(textInt(1)))
+		check(got, err, map[textInt]int{1: 0})
 	})
 }
