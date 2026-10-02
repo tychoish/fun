@@ -138,8 +138,8 @@ func (q *Queue[T]) doAdd(item T) error {
 		q.nempty.Signal()
 	}
 
-	// for the iterator, signal for any updates
-	q.nupdates.Signal()
+	// for the iterators and WaitPush callers, which may be many
+	q.nupdates.Broadcast()
 
 	return nil
 }
@@ -266,26 +266,6 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	return nil
 }
 
-func (q *Queue[T]) waitForNew(ctx context.Context) error {
-	// when the function returns wake all other waiters.
-	defer wakeOnCancel(ctx, &q.mu, q.nupdates)()
-
-	head := q.back
-	for head == q.back && q.back.link != q.front {
-		if q.closed {
-			return ErrQueueClosed
-		}
-
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		q.nupdates.Wait()
-	}
-
-	return nil
-}
-
 // Close closes the queue. After closing, any further Add calls will
 // report an error, but items that were added to the queue prior to
 // closing will still be available for Pop and WaitPop. WaitPop will
@@ -336,6 +316,8 @@ func (q *Queue[T]) popFront() T {
 	if e == q.back {
 		q.back = q.front
 	}
+	item := e.item
+	*e = entry[T]{popped: true}
 
 	q.tracker.remove()
 	q.nupdates.Broadcast()
@@ -346,7 +328,7 @@ func (q *Queue[T]) popFront() T {
 		q.nempty.Broadcast()
 	}
 
-	return e.item
+	return item
 }
 
 // QueueOptions are the initial settings for a Queue or Deque.
@@ -393,8 +375,9 @@ func (opts *QueueOptions) Validate() error {
 }
 
 type entry[T any] struct {
-	item T
-	link *entry[T]
+	item   T
+	link   *entry[T]
+	popped bool
 }
 
 // IteratorWait produces an iteratorthat wraps the
@@ -406,29 +389,41 @@ type entry[T any] struct {
 //
 // For a consuming stream, use IteratorWaitPop.
 func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
-	var next *entry[T]
-	op := func() (o T, ok bool) {
+	var cursor *entry[T]
+	op := func() (o T, _ bool) {
 		defer q.with(q.lock())
 
-		if next == nil {
-			next = q.front
+		if cursor == nil {
+			cursor = q.front
 		}
 
-		if next.link == q.front || (next.link == nil && q.closed) || ctx.Err() != nil {
-			return o, false
-		} else if next.link != nil {
-			next = next.link
-			return next.item, true
-		} else {
-			if err := q.waitForNew(ctx); err != nil {
+		defer wakeOnCancel(ctx, &q.mu, q.nupdates)()
+		for {
+			if ctx.Err() != nil {
 				return o, false
 			}
-
-			next, ok = q.advance(next)
-			return next.item, ok
+			if next := q.after(cursor); next != nil {
+				cursor = next
+				return next.item, true
+			}
+			if q.closed {
+				return o, false
+			}
+			q.nupdates.Wait()
 		}
 	}
 	return irt.GenerateOk(op)
+}
+
+// after returns the entry following the cursor, or nil if the cursor is
+// at the end of the queue. Items only leave from the front, so every
+// live entry is newer than a popped cursor and the oldest live entry
+// is the one that follows it.
+func (q *Queue[T]) after(cursor *entry[T]) *entry[T] {
+	if cursor.popped {
+		return q.front.link
+	}
+	return cursor.link
 }
 
 // IteratorWaitPop returns a consuming iterator that removes items from the
@@ -455,11 +450,4 @@ func (q *Queue[T]) Iterator() iter.Seq[T] {
 			continue
 		}
 	}, q.mtx())
-}
-
-func (q *Queue[T]) advance(next *entry[T]) (_ *entry[T], ok bool) {
-	if next.link != q.front && next.link != nil {
-		next, ok = next.link, true
-	}
-	return next, ok
 }
