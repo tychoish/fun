@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"math/rand"
@@ -269,9 +270,6 @@ func TestBroker(t *testing.T) {
 		if broker.opts.BufferSize != 0 {
 			t.Fatal("buffer size can't be less than 0")
 		}
-		if cap(broker.publishCh) != 0 {
-			t.Fatal("channel capacity should be the buffer size")
-		}
 	})
 	t.Run("SubscribeBlocking", func(t *testing.T) {
 		broker := NewBroker[int](ctx, BrokerOptions{})
@@ -490,8 +488,8 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		droppedCount := 5
 		for i := 4; i < 4+droppedCount; i++ {
 			err := broker.Send(ctx, fmt.Sprintf("msg-%d", i))
-			// Send should succeed even though messages are dropped
-			check.NotError(t, err)
+			// Send reports the shed message
+			check.ErrorIs(t, err, ErrQueueFull)
 		}
 
 		// Give time for the publish goroutine to process
@@ -576,7 +574,9 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		// Publish more messages - these may hit ErrQueueNoCredit and be dropped
 		for i := 3; i < 8; i++ {
 			err := broker.Send(ctx, i)
-			check.NotError(t, err)
+			if err != nil {
+				check.ErrorIs(t, err, ErrQueueNoCredit)
+			}
 		}
 
 		time.Sleep(50 * time.Millisecond)
@@ -785,12 +785,16 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 
 		// the worker takes one message and blocks on the
 		// subscriber; the queue holds two more.
+		full := 0
 		for i := 0; i < 10; i++ {
 			sctx, scancel := context.WithTimeout(ctx, time.Second)
-			_ = b.Send(sctx, i)
+			if err := b.Send(sctx, i); errors.Is(err, ErrQueueFull) {
+				full++
+			}
 			scancel()
 			time.Sleep(5 * time.Millisecond)
 		}
+		check.Equal(t, full, 7)
 		got := 0
 	loop:
 		for {
@@ -804,6 +808,52 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 		check.Equal(t, got, 3)
 		check.Equal(t, queue.Len(), 0)
 	})
+}
+
+func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			b := mk(ctx)
+			defer b.Stop()
+
+			stuck := b.Subscribe(ctx)
+			// back the broker up: nobody reads from stuck.
+			for i := 0; i < 3; i++ {
+				go func() {
+					pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
+					defer pcancel()
+					b.Publish(pctx, i)
+				}()
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			uctx, ucancel := context.WithTimeout(ctx, time.Second)
+			defer ucancel()
+			b.Unsubscribe(uctx, stuck)
+			if uctx.Err() != nil {
+				t.Fatal("unsubscribe did not complete")
+			}
+
+			sctx, scancel := context.WithTimeout(ctx, time.Second)
+			defer scancel()
+			if n := b.Stats(sctx).Subscriptions; n != 0 {
+				t.Fatalf("expected no subscriptions, got %d", n)
+			}
+
+			live := b.Subscribe(ctx)
+			defer b.Unsubscribe(ctx, live)
+			pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
+			defer pcancel()
+			_ = b.Send(pctx, 99)
+			select {
+			case <-live:
+			case <-time.After(2 * time.Second):
+				t.Fatal("broker did not recover after unsubscribing blocked subscriber")
+			}
+		})
+	}
 }
 
 func TestBrokerStopWhileWaiting(t *testing.T) {
