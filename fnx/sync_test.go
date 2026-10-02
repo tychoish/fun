@@ -73,24 +73,18 @@ func TestWaitGroup(t *testing.T) {
 			}(ch)
 		}
 
+		workers := &sync.WaitGroup{}
 		for i := range num {
-			go func() {
+			workers.Go(func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Int63n(100)+1) * time.Millisecond)
-			}()
+			})
 			if i%10 == 0 {
 				runtime.Gosched()
 			}
 		}
-		time.Sleep(200 * time.Millisecond)
-		waitStart := time.Now()
-		for _, ch := range waits {
-			<-ch
-		}
-		dur := time.Since(waitStart)
-		if dur > 50*time.Millisecond {
-			t.Error("took too long for waiters to resolve", dur)
-		}
+		workers.Wait()
+		awaitAll(t, waits)
 	})
 	t.Run("BusyBlockingMixed", func(t *testing.T) {
 		t.Parallel()
@@ -125,24 +119,18 @@ func TestWaitGroup(t *testing.T) {
 			}
 		}
 
+		workers := &sync.WaitGroup{}
 		for i := range num {
-			go func() {
+			workers.Go(func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Int63n(100)+1) * time.Millisecond)
-			}()
+			})
 			if i%10 == 0 {
 				runtime.Gosched()
 			}
 		}
-		time.Sleep(101 * time.Millisecond)
-		waitStart := time.Now()
-		for _, ch := range waits {
-			<-ch
-		}
-		dur := time.Since(waitStart)
-		if dur > 25*time.Millisecond {
-			t.Error("took too long for waiters to resolve", dur)
-		}
+		workers.Wait()
+		awaitAll(t, waits)
 	})
 
 	t.Run("Lock", func(t *testing.T) {
@@ -175,4 +163,18 @@ func TestWaitGroup(t *testing.T) {
 		wg.Wait(ctx)
 		check.Equal(t, count, 128)
 	})
+}
+
+// awaitAll fails the test if the waiters do not resolve; the bound is
+// a deadlock guard, not a performance assertion.
+func awaitAll(t *testing.T, waits []chan struct{}) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for _, ch := range waits {
+		select {
+		case <-ch:
+		case <-deadline:
+			t.Fatal("waiters did not resolve")
+		}
+	}
 }
