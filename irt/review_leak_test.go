@@ -110,3 +110,60 @@ func TestAsChannel(t *testing.T) {
 		}
 	})
 }
+
+func TestAsGeneratorReview(t *testing.T) {
+	t.Run("TransientCancelKeepsStream", func(t *testing.T) {
+		next := AsGenerator(Slice([]int{1, 2, 3}))
+		if v, ok := next(t.Context()); !ok || v != 1 {
+			t.Fatalf("got %d, %v", v, ok)
+		}
+		cctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		if _, ok := next(cctx); ok {
+			t.Fatal("cancelled call yielded a value")
+		}
+		if v, ok := next(t.Context()); !ok || v != 2 {
+			t.Fatalf("stream lost after transient cancel: %d, %v", v, ok)
+		}
+	})
+	t.Run("CancelledFirstCallDoesNotStart", func(t *testing.T) {
+		next := AsGenerator(Slice([]int{1, 2, 3}))
+		cctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		if _, ok := next(cctx); ok {
+			t.Fatal("cancelled call yielded a value")
+		}
+		if v, ok := next(t.Context()); !ok || v != 1 {
+			t.Fatalf("stream lost after cancelled first call: %d, %v", v, ok)
+		}
+	})
+	t.Run("NilContext", func(t *testing.T) {
+		next := AsGenerator(Slice([]int{1}))
+		//nolint:staticcheck // deliberately nil
+		if v, ok := next(nil); !ok || v != 1 {
+			t.Fatalf("got %d, %v", v, ok)
+		}
+		if _, ok := next(nil); ok {
+			t.Fatal("expected exhaustion")
+		}
+	})
+	t.Run("ReCallAfterExhaustion", func(t *testing.T) {
+		next := AsGenerator(Slice([]int{1}))
+		next(t.Context())
+		for range 3 {
+			if _, ok := next(t.Context()); ok {
+				t.Fatal("expected exhaustion")
+			}
+		}
+	})
+	t.Run("AbandonmentReleasedByCancel", func(t *testing.T) {
+		base := runtime.NumGoroutine()
+		for range 10 {
+			ctx, cancel := context.WithCancel(t.Context())
+			next := AsGenerator(Monotonic())
+			next(ctx)
+			cancel()
+		}
+		goroutinesAtMost(t, base)
+	})
+}

@@ -1568,10 +1568,12 @@ func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, er
 // the sequence has been exhausted.
 //
 // The sequence is consumed by a background goroutine, started on the
-// first call with a context derived from that call's ctx. AsGenerator
-// cannot detect that the caller has stopped calling the function, so
-// callers that abandon the generator before exhaustion must cancel the
-// ctx they passed to release the goroutine.
+// first (non-cancelled) call with a context derived from that call's
+// ctx; a nil ctx is treated as context.Background. AsGenerator cannot
+// detect that the caller has stopped calling the function, so callers
+// that abandon the generator before exhaustion must cancel the ctx
+// they passed to the first call to release the goroutine. Cancelling
+// the ctx of a later call only aborts that call; the stream continues.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
 		once   sync.Once
@@ -1593,12 +1595,25 @@ func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	}
 
 	return func(ctx context.Context) (out T, ok bool) {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		// a cancelled call neither starts the producer (it would be
+		// born dead) nor stops a running one: the cancellation is
+		// local to this call.
+		if ctx.Err() != nil {
+			return
+		}
 		once.Do(func() {
-			ctx, cancel = context.WithCancel(ctx)
-			op(ctx)
+			var gctx context.Context
+			gctx, cancel = context.WithCancel(ctx)
+			op(gctx)
 		})
-		out, ok = recieveFrom(ctx, ch)
-		whencall(!ok, cancel)
+		select {
+		case <-ctx.Done():
+		case out, ok = <-ch:
+			whencall(!ok, cancel)
+		}
 		return
 	}
 }
