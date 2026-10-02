@@ -147,7 +147,9 @@ func (q *Queue[T]) doAdd(item T) error {
 // WaitPush attempts to add an item to the queue, as with Add, but
 // if the queue is full, blocks until the queue has capacity, is
 // closed, or the context is canceled. Returns an error if the context
-// is canceled or the queue is closed.
+// is canceled or the queue is closed. If the queue is closed or starts
+// draining while WaitPush is blocked, it returns ErrQueueClosed or
+// ErrQueueDraining rather than waiting out the context.
 func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	defer q.with(q.lock())
 	if q.drainers > 0 {
@@ -250,7 +252,8 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 // added, and then blocks until the queue is empty (or it's context is
 // canceled.) This does not close the queue: when Drain returns the
 // queue is empty, but new work can then be added. To Drain and
-// shutdown, use the Shutdown method.
+// shutdown, use the Shutdown method. If the queue is closed while
+// items remain, Drain returns ErrQueueClosed.
 func (q *Queue[T]) Drain(ctx context.Context) error {
 	defer q.with(q.lock())
 
@@ -295,7 +298,8 @@ func (q *Queue[T]) Close() error {
 
 // Shutdown drains the queue, waiting for all items to be removed from
 // the queue and then clsoes it so no additional work can be added to
-// the queue.
+// the queue. If the queue is closed while items remain, Shutdown
+// returns ErrQueueClosed.
 func (q *Queue[T]) Shutdown(ctx context.Context) error {
 	defer q.with(q.lock())
 	if err := q.waitForDrain(ctx); err != nil {
