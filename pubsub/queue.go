@@ -443,6 +443,9 @@ func (q *Queue[T]) after(cursor *entry[T]) *entry[T] {
 // removed from the queue (destructive read). Safe for concurrent access.
 func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(func() (z T, _ bool) {
+		if ctx.Err() != nil {
+			return z, false
+		}
 		msg, ok := q.Pop() // holds lock
 		if ok {
 			return msg, true

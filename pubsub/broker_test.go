@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/assert"
 	"github.com/tychoish/fun/assert/check"
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/fnx"
@@ -1317,6 +1318,7 @@ func TestBrokerIdleCPU(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestBrokerStatsState(t *testing.T) {
 	t.Run("ZeroValueIsUnknown", func(t *testing.T) {
 		check.Equal(t, BrokerStats{}.State, BrokerStateUnknown)
@@ -1361,4 +1363,62 @@ func TestBrokerStatsState(t *testing.T) {
 		check.Equal(t, BrokerStateClosed.String(), "closed")
 		check.Equal(t, BrokerState(99).String(), "unknown")
 	})
+}
+func TestBrokerStopKeepsBacklog(t *testing.T) {
+	const total = 5
+	cases := map[string]func(context.Context) (*Broker[int], func() int){
+		"Queue": func(ctx context.Context) (*Broker[int], func() int) {
+			q := NewUnlimitedQueue[int]()
+			return NewQueueBroker(ctx, q, BrokerOptions{}), q.Len
+		},
+		"Deque": func(ctx context.Context) (*Broker[int], func() int) {
+			dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+			assert.NotError(t, err)
+			return NewDequeBroker(ctx, dq, BrokerOptions{}), dq.Len
+		},
+	}
+	for name, mk := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			b, length := mk(ctx)
+			_ = mustSubscribe(t, b, ctx) // never read: dispatch blocks on it
+			for i := range total {
+				assert.NotError(t, b.Publish(ctx, i))
+			}
+			// the broker takes one message and blocks sending it.
+			deadline := time.Now().Add(5 * time.Second)
+			for length() != total-1 && time.Now().Before(deadline) {
+				time.Sleep(time.Millisecond)
+			}
+			assert.Equal(t, length(), total-1)
+
+			b.Stop()
+			b.Wait(ctx)
+			check.Equal(t, length(), total-1)
+		})
+	}
+}
+
+func TestIteratorWaitPopCancelledContextYieldsNothing(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	q := NewUnlimitedQueue[int]()
+	assert.NotError(t, q.Push(1))
+	for range q.IteratorWaitPop(ctx) {
+		t.Fatal("queue yielded under a cancelled context")
+	}
+	check.Equal(t, q.Len(), 1)
+
+	dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+	assert.NotError(t, err)
+	assert.NotError(t, dq.PushFront(1))
+	for range dq.IteratorWaitPopFront(ctx) {
+		t.Fatal("deque front yielded under a cancelled context")
+	}
+	for range dq.IteratorWaitPopBack(ctx) {
+		t.Fatal("deque back yielded under a cancelled context")
+	}
+	check.Equal(t, dq.Len(), 1)
 }

@@ -709,7 +709,9 @@ func TestQueueIterators(t *testing.T) {
 			for range queue.IteratorWaitPop(ctx) {
 				count++
 			}
-			assert.Equal(t, count, 1)
+			// a cancelled context takes nothing
+			assert.Equal(t, count, 0)
+			check.Equal(t, queue.Len(), 1)
 
 			check.NotError(t, queue.Close())
 			check.NotError(t, queue.Close())
