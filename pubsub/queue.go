@@ -55,7 +55,7 @@ type Queue[T any] struct {
 	mu       sync.Mutex // protects the fields below
 	once     sync.Once
 	tracker  queueLimitTracker
-	draining bool
+	drainers int // number of outstanding Drain calls
 	closed   bool
 	nempty   *sync.Cond
 	nupdates *sync.Cond
@@ -119,7 +119,7 @@ func (q *Queue[T]) Len() int {
 }
 
 func (q *Queue[T]) doAdd(item T) error {
-	if q.draining {
+	if q.drainers > 0 {
 		return ErrQueueDraining
 	}
 
@@ -150,7 +150,7 @@ func (q *Queue[T]) doAdd(item T) error {
 // is canceled or the queue is closed.
 func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	defer q.with(q.lock())
-	if q.draining {
+	if q.drainers > 0 {
 		return ErrQueueDraining
 	}
 
@@ -192,7 +192,7 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 	case 1:
 		out = q.popFront()
 		ok = true
-		if q.draining || q.closed {
+		if q.drainers > 0 || q.closed {
 			q.nempty.Broadcast()
 			break
 		}
@@ -200,7 +200,7 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 	default:
 		out = q.popFront()
 		ok = true
-		if q.draining || q.closed {
+		if q.drainers > 0 || q.closed {
 			q.nupdates.Broadcast()
 			break
 		}
@@ -254,8 +254,8 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
 	defer cancel()
-	q.draining = true
-	defer func() { q.draining = false }()
+	q.drainers++
+	defer func() { q.drainers-- }()
 
 	for q.tracker.len() > 0 {
 		if q.closed {
