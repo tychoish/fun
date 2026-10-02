@@ -443,13 +443,20 @@ func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 
 func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (out T, _ error) {
 	for {
-		if err := dq.root.getNextOrPrevious(direction).wait(ctx, direction); err != nil {
-			return out, err
+		if dq.closed {
+			return out, ErrQueueClosed
 		}
 
-		it, ok := dq.pop(dq.root.getNextOrPrevious(direction))
-		if ok {
+		// only wait when there is nothing to pop: waiting on the
+		// first element itself blocks until its neighbor changes,
+		// which strands items already in the deque.
+		if first := dq.root.getNextOrPrevious(direction); !first.isRoot() {
+			it, _ := dq.pop(first) // cannot fail: open and non-root
 			return it, nil
+		}
+
+		if err := dq.root.wait(ctx, direction); err != nil {
+			return out, err
 		}
 	}
 }
