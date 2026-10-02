@@ -437,6 +437,10 @@ func yieldFrom[T any](ctx context.Context, ch <-chan T, yield func(T) bool) bool
 }
 
 func recieveFrom[T any](ctx context.Context, ch <-chan T) (out T, ok bool) {
+	// select picks randomly among ready cases: check cancellation first.
+	if ctx.Err() != nil {
+		return
+	}
 	select {
 	case <-ctx.Done():
 	case out, ok = <-ch:
@@ -445,6 +449,9 @@ func recieveFrom[T any](ctx context.Context, ch <-chan T) (out T, ok bool) {
 }
 
 func sendTo[T any](ctx context.Context, value T, ch chan<- T) bool {
+	if ctx.Err() != nil {
+		return false
+	}
 	select {
 	case <-ctx.Done():
 		return false
