@@ -526,13 +526,13 @@ func TestFunStream(t *testing.T) {
 		ch <- "buddy"
 		cancel()
 		seenCondition := false
-		for i := range 10 {
-			t.Log(i)
+		// select picks randomly among ready cases, so retry until the cancellation wins.
+		for range 1000 {
 			_, err = stw.ChanBlocking(ch).Receive().Read(ctx)
 			if errors.Is(err, context.Canceled) {
 				seenCondition = true
+				break
 			}
-			t.Log(err)
 
 			select {
 			case ch <- "buddy":
@@ -573,12 +573,13 @@ func TestFunStream(t *testing.T) {
 			ch <- "buddy"
 			cancel()
 			seenCondition := false
-			for i := range 10 {
+			// select picks randomly among ready cases, so retry until the cancellation wins.
+			for range 1000 {
 				_, err = stw.ChanNonBlocking(ch).Receive().Read(ctx)
 				if errors.Is(err, context.Canceled) {
 					seenCondition = true
+					break
 				}
-				t.Log(i, err)
 
 				select {
 				case ch <- "buddy":
