@@ -426,13 +426,16 @@ func (dq *Deque[T]) await(ctx context.Context, direction dqDirection, ready func
 	}
 	defer wakeOnCancel(ctx, &dq.mutex, cond)()
 
-	for !ready() {
+	// check ctx before ready: a cancelled context must not take items.
+	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		if ready() {
+			return nil
+		}
 		cond.Wait()
 	}
-	return nil
 }
 
 // checkOpen reports why the deque cannot accept new items, if it can't.
