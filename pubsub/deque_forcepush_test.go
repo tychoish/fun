@@ -68,7 +68,7 @@ func TestDequeForcePushDoesNotLoseItems(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				if err := force(dq, i); err != nil {
 					t.Fatalf("force push %d: %v", i, err)
 				}
