@@ -159,11 +159,17 @@ func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
 	return nil
 }
 
-func (dq *Deque[T]) doClose() {
-	dq.closed = true
+// notify wakes every blocked waiter so it can re-check its own
+// condition. Waiters never re-signal one another, so idle waiters sleep.
+func (dq *Deque[T]) notify() {
 	dq.nfront.Broadcast()
 	dq.nback.Broadcast()
 	dq.updates.Broadcast()
+}
+
+func (dq *Deque[T]) doClose() {
+	dq.closed = true
+	dq.notify()
 }
 
 // PushFront adds an item to the front or head of the deque, and
@@ -266,9 +272,6 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	}
 
 	if dq.tracker.cap() > dq.tracker.len() {
-		if dq.tracker.len() == 0 {
-			defer dq.updates.Signal()
-		}
 		return dq.addAfter(it, afterGetter())
 	}
 
@@ -285,7 +288,6 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 		if dq.closed {
 			return ErrQueueClosed
 		}
-		cond.Signal()
 
 		select {
 		case <-ctx.Done():
@@ -391,13 +393,7 @@ func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
 	it.prev.next = it
 	it.next.prev = it
 
-	if after.isRoot() {
-		dq.nfront.Signal()
-	}
-	if after.prev.isRoot() {
-		dq.nback.Signal()
-	}
-	dq.updates.Signal()
+	dq.notify()
 	return nil
 }
 
@@ -410,19 +406,7 @@ func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 		return out, false
 	}
 
-	if it.prev.isRoot() {
-		defer dq.nfront.Signal()
-	}
-	if it.next.isRoot() {
-		defer dq.nback.Signal()
-	}
-
-	// If draining or closed, broadcast to wake all waiters
-	if dq.draining || dq.closed {
-		defer dq.updates.Broadcast()
-	} else {
-		defer dq.updates.Signal()
-	}
+	defer dq.notify()
 
 	dq.tracker.remove()
 

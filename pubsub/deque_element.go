@@ -56,7 +56,6 @@ func (it *element[T]) wait(ctx context.Context, direction dqDirection) error {
 		if it.list.closed {
 			return ErrQueueClosed
 		}
-		cond.Signal()
 
 		select {
 		case <-ctx.Done():

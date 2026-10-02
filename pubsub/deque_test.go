@@ -965,8 +965,12 @@ func TestDequeLIFO(t *testing.T) {
 		// Add both items together so they're both in the deque
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			check.NotError(t, dq.PushBack("first"))
-			check.NotError(t, dq.PushBack("second")) // Now "second" is at the back
+			// push both atomically so the consumer can't wake between them
+			mu := dq.mtx()
+			mu.Lock()
+			defer mu.Unlock()
+			check.NotError(t, dq.addAfter("first", dq.root.prev))
+			check.NotError(t, dq.addAfter("second", dq.root.prev)) // Now "second" is at the back
 		}()
 
 		// Get first item - should be from back since LIFO pops from back
