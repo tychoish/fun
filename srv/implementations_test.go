@@ -271,7 +271,7 @@ func TestHelpers(t *testing.T) {
 			}
 		}()
 
-		check.NotError(t, broker.Publish(ctx, 42))
+		check.NotError(t, broker.Send(ctx, 42))
 		fnx.WaitChannel(sig).Run(ctx)
 	})
 }

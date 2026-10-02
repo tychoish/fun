@@ -207,7 +207,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 			go func() {
 				defer wg.Done()
 				for idx := range elems {
-					_ = broker.Publish(ctx, elems[idx])
+					_ = broker.Send(ctx, elems[idx])
 					runtime.Gosched()
 				}
 				timer := time.NewTimer(250 * time.Millisecond)
@@ -293,7 +293,7 @@ func TestBroker(t *testing.T) {
 			sa := time.Now()
 			nctx, ncancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 			defer ncancel()
-			_ = broker.Publish(nctx, "foo")
+			_ = broker.Send(nctx, "foo")
 			dur := time.Since(sa)
 			if dur > 5*time.Millisecond {
 				t.Error(dur)
@@ -314,7 +314,7 @@ func TestBroker(t *testing.T) {
 			check.ErrorIs(t, broker.Send(nctx, "foo"), ErrBrokerClosed)
 			_, err := broker.Subscribe(nctx)
 			check.Error(t, err)
-			_ = broker.Publish(nctx, "foo")
+			_ = broker.Send(nctx, "foo")
 			if dur := time.Since(sa); dur > 50*time.Millisecond {
 				t.Error(dur)
 			}
@@ -738,7 +738,7 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 		const count = 10
 		go func() {
 			for i := range count {
-				_ = b.Publish(ctx, i)
+				_ = b.Send(ctx, i)
 			}
 		}()
 		for i := range count {
@@ -805,7 +805,7 @@ func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
 				go func() {
 					pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
 					defer pcancel()
-					_ = b.Publish(pctx, i)
+					_ = b.Send(pctx, i)
 				}()
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -893,7 +893,7 @@ func TestBrokerOperationsAfterStop(t *testing.T) {
 				defer close(done)
 				bg := context.Background()
 				sendErr = b.Send(bg, 1)
-				pubErr = b.Publish(bg, 2)
+				pubErr = b.Send(bg, 2)
 				subCh, subErr = b.Subscribe(bg)
 				unsubErr = b.Unsubscribe(bg, sub)
 				stats = b.Stats(bg)
@@ -920,7 +920,7 @@ func TestBrokerCanceledContextErrors(t *testing.T) {
 	cancel()
 	_, err := b.Subscribe(cctx)
 	check.ErrorIs(t, err, context.Canceled)
-	check.ErrorIs(t, b.Publish(cctx, 1), context.Canceled)
+	check.ErrorIs(t, b.Send(cctx, 1), context.Canceled)
 	// the control channel is unbuffered and the loop is idle, so the
 	// request may be accepted; a blocked one reports the ctx error.
 	check.ErrorIs(t, stalledBroker(0).Unsubscribe(cctx, nil), context.Canceled)
@@ -1258,17 +1258,45 @@ func TestBrokerPanics(t *testing.T) {
 	})
 }
 
-// Publish with a canceled caller context fails fast with that error and
+// Send with a canceled caller context fails fast with that error and
 // does not count as a message, for every broker.
-func TestBrokerPublishCanceledContext(t *testing.T) {
+func TestBrokerSendCanceledContext(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
 			b := mk(t.Context())
 			cctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			check.ErrorIs(t, b.Publish(cctx, 1), context.Canceled)
+			check.ErrorIs(t, b.Send(cctx, 1), context.Canceled)
 			check.Equal(t, b.Stats(t.Context()).MessageCount, 0)
 			b.Stop()
+		})
+	}
+}
+
+// Publish is deprecated but must keep behaving like Send. It is
+// called through a local interface so that the deprecation check does
+// not flag the call.
+func TestBrokerPublishDelegatesToSend(t *testing.T) {
+	type publisher interface {
+		Publish(context.Context, int) error
+	}
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			b := mk(t.Context())
+			var p publisher = b
+			sub := mustSubscribe(t, b, t.Context())
+			check.NotError(t, p.Publish(t.Context(), 7))
+			select {
+			case v := <-sub:
+				check.Equal(t, v, 7)
+			case <-time.After(time.Second):
+				t.Fatal("message not delivered")
+			}
+			cctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			check.ErrorIs(t, p.Publish(cctx, 1), context.Canceled)
+			b.Stop()
+			check.ErrorIs(t, p.Publish(t.Context(), 1), ErrBrokerClosed)
 		})
 	}
 }
