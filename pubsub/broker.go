@@ -242,6 +242,11 @@ func (b *Broker[T]) startQueueWorkers(
 // dispatchMessage delivers msg to every subscriber, iterating the live
 // subscription set (not a snapshot, so no per-message allocation).
 //
+// Because the set is live, a subscriber that registers while msg is
+// being dispatched may also receive msg, even though it was published
+// before that Subscribe call. Subscribers must tolerate one such
+// message at the start of a subscription.
+//
 // Delivery is subject to head-of-line blocking: with sequential
 // dispatch a slow subscriber delays every subscriber after it, and with
 // ParallelDispatch each message still waits for its slowest subscriber
