@@ -1110,9 +1110,22 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 		var (
 			mtx    sync.Mutex
 			remain = num
+			next   func() (T, bool)
+			stop   = func() {}
 		)
-		next, stop := iter.Pull(seq)
-		pull := func() (T, bool) { mtx.Lock(); defer mtx.Unlock(); return next() }
+		// the pull starts on first use, so unused shards cost nothing;
+		// checking ctx under the lock keeps it from starting after release.
+		pull := func() (out T, ok bool) {
+			mtx.Lock()
+			defer mtx.Unlock()
+			if ctx.Err() != nil {
+				return out, false
+			}
+			if next == nil {
+				next, stop = iter.Pull(seq)
+			}
+			return next()
+		}
 		// stop is idempotent, and next yields nothing once it has run.
 		release := func() { mtx.Lock(); defer mtx.Unlock(); stop() }
 		unwatch := context.AfterFunc(ctx, release)
@@ -1130,7 +1143,7 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 			})
 			shard := func(yield func(T) bool) {
 				defer finish()
-				for ctx.Err() == nil {
+				for {
 					if value, ok := pull(); !ok || !yield(value) {
 						return
 					}
