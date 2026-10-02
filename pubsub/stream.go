@@ -356,7 +356,8 @@ func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 
 		// the reduction is a single value: later reads end the stream.
 		if finished.Swap(true) {
-			return value, io.EOF
+			var zero T
+			return zero, io.EOF
 		}
 
 		for {
