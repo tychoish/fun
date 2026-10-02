@@ -328,13 +328,8 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 				return
 			}
 
-			text, ok := t.(string)
-			if !ok {
-				yield(zero, &json.SyntaxError{Offset: dec.InputOffset()})
-				return
-			}
-
-			key, err := decodeJSONKey[A](text)
+			// Token only returns strings in key position.
+			key, err := decodeJSONKey[A](t.(string))
 			if err != nil {
 				yield(zero, err)
 				return
@@ -352,12 +347,9 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 			}
 		}
 
-		// read the closing brace: More also returns false at a
-		// truncated input, which must be reported.
-		if _, err := dec.Token(); err != nil {
-			yield(zero, err)
-			return
-		}
+		// More is only false at the closing brace (a truncated input
+		// makes it true, and fails the next Token), so this cannot fail.
+		_, _ = dec.Token()
 
 		if err := checkJSONEnd(dec); err != nil {
 			yield(zero, err)

@@ -3,12 +3,27 @@ package irt
 import (
 	"bytes"
 	"errors"
+	"io"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 )
+
+func TestUnmarshalJSON2ReadErrorReview(t *testing.T) {
+	// a failing reader after a complete pair surfaces as an error.
+	boom := errors.New("boom")
+	in := io.MultiReader(strings.NewReader(`{"a":1 `), iotest.ErrReader(boom))
+	var got error
+	for _, err := range UnmarshalJSON2[string, int](in) {
+		got = err
+	}
+	if !errors.Is(got, boom) {
+		t.Errorf("got %v, want %v", got, boom)
+	}
+}
 
 // ---- AsGenerator abandonment is covered in review_leak_test.go ----
 
