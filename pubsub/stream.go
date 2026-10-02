@@ -437,7 +437,7 @@ func (st *Stream[T]) Slice(ctx context.Context) (out []T, _ error) {
 func (st *Stream[T]) Buffer(n int) *Stream[T] {
 	buf := stw.ChanBlocking(make(chan T, n))
 	pipe := st.Parallel(buf.Send().Write, wpa.WorkerGroupConfNumWorkers(n)).Operation(st.ErrorHandler()).PostHook(buf.Close).Go().Once()
-	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe))
+	return MakeStream(fnx.NewFuture(buf.Receive().Read).PreHook(pipe)).WithHook(st.CloseHook())
 }
 
 // BufferParallel processes the input queue and stores
