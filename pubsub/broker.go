@@ -62,6 +62,12 @@ type BrokerOptions struct {
 	// When this value is larger than 1, the order of messages
 	// observed by individual subscribers will not be consistent.
 	WorkerPoolSize int
+	// NonBlockingPush, when true, makes Queue-backed brokers
+	// (NewQueueBroker) insert messages with Queue.Push rather than
+	// Queue.WaitPush: when the queue is full the message is shed
+	// (ErrQueueFull) instead of applying back-pressure to
+	// publishers. It has no effect on other brokers.
+	NonBlockingPush bool
 }
 
 // NewBroker constructs with a simple distrubtion scheme: the incoming
@@ -105,17 +111,23 @@ func makeInternalBrokerImpl[T any](
 
 // NewQueueBroker constructs a broker that uses the queue object to
 // buffer incoming requests if subscribers are slow to process
-// requests. Queue have a system for sheding load when the queue's
-// limits have been exceeded. In general the messages are distributed
-// in FIFO order, and Publish calls will drop messages if the queue is
-// full.
+// requests. Messages are distributed in FIFO order and are removed
+// from the queue as they are dispatched.
+//
+// By default Publish and Send block (back-pressure) while the queue
+// is full, matching Queue.WaitPush, and all messages are delivered.
+// Set BrokerOptions.NonBlockingPush to use Queue.Push instead: when
+// the queue is full the message is dropped (ErrQueueFull).
 //
 // All brokers respect the BrokerOptions, which control the size of
-// the worker pool used to send messages to senders and if the Broker
-// should use non-blocking sends. All channels between the broker and
-// the subscribers are un-buffered.
+// the worker pool used to send messages to senders. All channels
+// between the broker and the subscribers are un-buffered.
 func NewQueueBroker[T any](ctx context.Context, queue *Queue[T], opts BrokerOptions) *Broker[T] {
-	return makeInternalBrokerImpl(ctx, queue.IteratorWait, queue.WaitPush, queue.Len, opts)
+	sink := queue.WaitPush
+	if opts.NonBlockingPush {
+		sink = func(_ context.Context, msg T) error { return queue.Push(msg) }
+	}
+	return makeInternalBrokerImpl(ctx, queue.IteratorWaitPop, sink, queue.Len, opts)
 }
 
 // NewDequeBroker constructs a broker that uses the queue object to
