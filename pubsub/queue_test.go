@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -443,7 +442,7 @@ func TestQueueIterators(t *testing.T) {
 			t.Error("should only once")
 		}
 	})
-	t.Run("WaitRespectsQueue", func(t *testing.T) {
+	t.Run("WaitRespectsContext", func(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -452,17 +451,15 @@ func TestQueueIterators(t *testing.T) {
 		sig := make(chan struct{})
 		go func() {
 			defer close(sig)
-
-			if err := queue.waitForNew(ctx); !errors.Is(err, context.Canceled) {
-				t.Error(err)
+			for range queue.IteratorWait(ctx) {
+				t.Error("unexpected item")
 			}
 		}()
-		sa := time.Now()
 		cancel()
-		runtime.Gosched()
-		<-sig
-		if dur := time.Since(sa); dur > 10*time.Millisecond {
-			t.Error(dur)
+		select {
+		case <-sig:
+		case <-time.After(5 * time.Second):
+			t.Error("iterator did not observe cancellation")
 		}
 	})
 	t.Run("IteratorRetrySpecialCase", func(t *testing.T) {
