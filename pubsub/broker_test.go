@@ -713,6 +713,34 @@ func brokerConstructors(t *testing.T) map[string]func(ctx context.Context) *Brok
 	}
 }
 
+func TestBrokerStatsWithExpiredContextDoesNotWedge(t *testing.T) {
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			b := mk(ctx)
+			defer b.Stop()
+
+			for i := 0; i < 200; i++ {
+				sctx, scancel := context.WithTimeout(ctx, time.Duration(i%5)*10*time.Microsecond)
+				_ = b.Stats(sctx)
+				scancel()
+			}
+			dead, dcancel := context.WithCancel(ctx)
+			dcancel()
+			for i := 0; i < 50; i++ {
+				_ = b.Stats(dead)
+			}
+
+			sendCtx, sendCancel := context.WithTimeout(ctx, time.Second)
+			defer sendCancel()
+			if err := b.Send(sendCtx, 1); err != nil {
+				t.Fatalf("broker wedged after Stats: %v", err)
+			}
+		})
+	}
+}
+
 func TestBrokerStopWhileWaiting(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
