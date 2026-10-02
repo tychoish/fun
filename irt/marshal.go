@@ -8,7 +8,29 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"reflect"
+	"strconv"
 )
+
+// encodeJSONKey encodes k as a JSON object key (always a quoted
+// string), following the rules encoding/json uses for map keys:
+// strings and encoding.TextMarshaler values are encoded as strings and
+// integer kinds are stringified. Any other key type is an error.
+func encodeJSONKey(k any) ([]byte, error) {
+	out, err := json.Marshal(k)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > 0 && out[0] == '"' {
+		return out, nil
+	}
+	switch reflect.ValueOf(k).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return strconv.AppendQuote(nil, string(out)), nil
+	}
+	return nil, fmt.Errorf("json: unsupported key type %T", k)
+}
 
 // trailingNewlineStripper strips the single trailing '\n' that json.Encoder
 // appends after every Encode call, so that the encoded value can be embedded
@@ -71,7 +93,11 @@ func MarshalToJSON2[K any, V any](seq iter.Seq2[K, V], w io.Writer) error {
 				return err
 			}
 		}
-		if err := enc.Encode(k); err != nil {
+		key, err := encodeJSONKey(k)
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write(key); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, ":"); err != nil {
@@ -154,7 +180,11 @@ func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 			must(buf.WriteByte(','))
 		}
 
-		must(enc.Encode(k))
+		key, err := encodeJSONKey(k)
+		if err != nil {
+			return nil, err
+		}
+		must2(buf.Write(key))
 		must(buf.WriteByte(':'))
 
 		if err := enc.Encode(v); err != nil {
@@ -288,6 +318,9 @@ func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
 		must2(buf.Write(payload))
 		payload = payload[:0]
 	}
+	if buf.Len() == 0 {
+		return []byte{}, nil
+	}
 	return buf.Bytes(), nil
 }
 
@@ -317,6 +350,9 @@ func MarshalBinary[T any](seq iter.Seq[T]) ([]byte, error) {
 		}
 		must2(buf.Write(payload))
 		payload = payload[:0]
+	}
+	if buf.Len() == 0 {
+		return []byte{}, nil
 	}
 	return buf.Bytes(), nil
 }
