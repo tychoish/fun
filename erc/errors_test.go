@@ -378,21 +378,21 @@ func TestError(t *testing.T) {
 				ticker := time.NewTicker(5 * time.Millisecond)
 				defer ticker.Stop()
 
-				var count int
-
 				for {
-					count++
-
 					select {
 					case <-fixtureTimeout.Done():
 						return
 					case <-ticker.C:
-						if err := catcher.Resolve(); err == nil {
-							if count > 10 {
-								t.Error("should have one by now")
+						// Resolve returns nil, the sole error unwrapped (when
+						// only one has been pushed so far), or the collector.
+						err := catcher.Resolve()
+						if err == nil {
+							continue
+						}
+						for _, e := range ers.Unwind(err) {
+							if e.Error() != errval {
+								t.Errorf("unexpected error %T: %v", e, e)
 							}
-						} else if _, ok := err.(*Collector); !ok {
-							t.Errorf("should be an error stack: %T", err)
 						}
 					}
 				}
