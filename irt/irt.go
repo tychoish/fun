@@ -752,8 +752,34 @@ func Channel[T any](ctx context.Context, ch <-chan T) iter.Seq[T] {
 // a plain channel, cannot observe a consumer that stops reading: if
 // you stop receiving before the channel is closed you must cancel ctx,
 // or the producer goroutine blocks forever.
+//
+// Deprecated: Pipe offers no way to release the producer other than
+// cancelling ctx. Use AsChannel, which returns a stop function, or
+// WithBuffer, which releases its producer when the consumer stops
+// iterating.
 func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 	return opwithstart(opwithch(func(ch chan T) { seqToChan(ctx, seq, ch) }))
+}
+
+// AsChannel returns an unbuffered channel that receives all elements
+// from the input sequence, and a stop function. The channel is closed
+// when the sequence is exhausted, when ctx is canceled, or when stop
+// is called, whichever happens first.
+//
+// The producer goroutine starts immediately. Calling stop (which is
+// safe to call any number of times, from any goroutine, including
+// after the channel has closed) releases the producer even if the
+// channel is never read. Callers that do not read the channel to
+// completion should call stop, typically with defer.
+func AsChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	ch := make(chan T)
+	go func() {
+		defer close(ch)
+		defer cancel()
+		flushTo(ctx, seq, ch)
+	}()
+	return ch, cancel
 }
 
 // Sink wraps yield so that concurrent workers can share it safely:
