@@ -196,8 +196,6 @@ func TestConverter(t *testing.T) {
 					check.Equal(t, 12, i)
 					count++
 					panic("24")
-					count++
-					return 24
 				}).WithContext()
 
 				out, err := f(t.Context(), 12)

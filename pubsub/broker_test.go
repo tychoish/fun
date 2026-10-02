@@ -702,14 +702,14 @@ func TestBrokerStatsWithExpiredContextDoesNotWedge(t *testing.T) {
 			b := mk(ctx)
 			defer b.Stop()
 
-			for i := 0; i < 200; i++ {
+			for i := range 200 {
 				sctx, scancel := context.WithTimeout(ctx, time.Duration(i%5)*10*time.Microsecond)
 				_ = b.Stats(sctx)
 				scancel()
 			}
 			dead, dcancel := context.WithCancel(ctx)
 			dcancel()
-			for i := 0; i < 50; i++ {
+			for range 50 {
 				_ = b.Stats(dead)
 			}
 
@@ -737,11 +737,11 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 
 		const count = 10
 		go func() {
-			for i := 0; i < count; i++ {
+			for i := range count {
 				_ = b.Publish(ctx, i)
 			}
 		}()
-		for i := 0; i < count; i++ {
+		for i := range count {
 			select {
 			case v := <-sub:
 				check.Equal(t, v, i)
@@ -767,7 +767,7 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 		// the worker takes one message and blocks on the
 		// subscriber; the queue holds two more.
 		full := 0
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			sctx, scancel := context.WithTimeout(ctx, time.Second)
 			if err := b.Send(sctx, i); errors.Is(err, ErrQueueFull) {
 				full++
@@ -801,7 +801,7 @@ func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
 
 			stuck := mustSubscribe(t, b, ctx)
 			// back the broker up: nobody reads from stuck.
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				go func() {
 					pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
 					defer pcancel()
@@ -858,21 +858,19 @@ func TestBrokerSubscribeUnsubscribeOrdering(t *testing.T) {
 			b := mk(ctx)
 			defer b.Stop()
 
-			for i := 0; i < 500; i++ {
+			for range 500 {
 				ch := mustSubscribe(t, b, ctx)
 				_ = b.Unsubscribe(ctx, ch)
 			}
 			// a concurrent burst, each goroutine ordered internally.
 			var wg sync.WaitGroup
-			for g := 0; g < 8; g++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for i := 0; i < 100; i++ {
+			for range 8 {
+				wg.Go(func() {
+					for range 100 {
 						ch := mustSubscribe(t, b, ctx)
 						_ = b.Unsubscribe(ctx, ch)
 					}
-				}()
+				})
 			}
 			wg.Wait()
 			check.Equal(t, b.Stats(ctx).Subscriptions, 0)
@@ -925,9 +923,7 @@ func TestBrokerCanceledContextErrors(t *testing.T) {
 	check.ErrorIs(t, b.Publish(cctx, 1), context.Canceled)
 	// the control channel is unbuffered and the loop is idle, so the
 	// request may be accepted; a blocked one reports the ctx error.
-	blocked := NewBroker[int](t.Context(), BrokerOptions{})
-	blocked.ctlCh = make(chan ctlRequest[int])
-	check.ErrorIs(t, blocked.Unsubscribe(cctx, nil), context.Canceled)
+	check.ErrorIs(t, stalledBroker(0).Unsubscribe(cctx, nil), context.Canceled)
 }
 
 func TestBrokerStopWhileWaiting(t *testing.T) {
@@ -1066,11 +1062,16 @@ func TestBrokerSendSemantics(t *testing.T) {
 		for i := range 50 {
 			sub := mustSubscribe(t, b, ctx)
 			check.NotError(t, b.Send(ctx, i))
-			select {
-			case got := <-sub:
-				check.Equal(t, got, i)
-			case <-time.After(time.Second):
-				t.Fatal("message sent after Subscribe was not delivered")
+			// dispatch iterates the live subscriber set, so a message
+			// still being dispatched when this Subscribe landed may
+			// arrive first: drain until the message sent after it.
+			for got := -1; got != i; {
+				select {
+				case got = <-sub:
+					check.True(t, got == i || got == i-1)
+				case <-time.After(time.Second):
+					t.Fatal("message sent after Subscribe was not delivered")
+				}
 			}
 			check.NotError(t, b.Unsubscribe(ctx, sub))
 		}
@@ -1104,9 +1105,7 @@ func TestBrokerDispatchConcurrentSubscriptionChanges(t *testing.T) {
 			b := NewBroker[int](ctx, BrokerOptions{ParallelDispatch: parallel, BufferSize: 4, WorkerPoolSize: 2})
 			var wg sync.WaitGroup
 			stop := make(chan struct{})
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for i := 0; ; i++ {
 					select {
 					case <-stop:
@@ -1115,11 +1114,9 @@ func TestBrokerDispatchConcurrentSubscriptionChanges(t *testing.T) {
 						_ = b.Send(ctx, i)
 					}
 				}
-			}()
+			})
 			for range 4 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for range 100 {
 						ch, err := b.Subscribe(ctx)
 						if err != nil {
@@ -1131,7 +1128,7 @@ func TestBrokerDispatchConcurrentSubscriptionChanges(t *testing.T) {
 						}
 						_ = b.Unsubscribe(ctx, ch)
 					}
-				}()
+				})
 			}
 			time.Sleep(200 * time.Millisecond)
 			close(stop)
@@ -1152,7 +1149,7 @@ func BenchmarkBrokerDispatch(b *testing.B) {
 				ch := make(chan int, 1)
 				m.Store(ch, make(chan struct{}))
 				go func() {
-					for range ch { //nolint:revive
+					for range ch {
 					}
 				}()
 			}
@@ -1175,7 +1172,7 @@ func BenchmarkBrokerDispatchSnapshot(b *testing.B) {
 				ch := make(chan int, 1)
 				m.Store(ch, make(chan struct{}))
 				go func() {
-					for range ch { //nolint:revive
+					for range ch {
 					}
 				}()
 			}
@@ -1184,10 +1181,7 @@ func BenchmarkBrokerDispatchSnapshot(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				snap := make(map[chan int]chan struct{}, subs)
-				for k, v := range m.Iterator() {
-					snap[k] = v
-				}
+				snap := maps.Collect(m.Iterator())
 				br.dispatchMessage(ctx, maps.All(snap), i)
 			}
 		})
