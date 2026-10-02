@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"iter"
+	"sync/atomic"
 
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fnx"
@@ -22,14 +23,22 @@ import (
 // Broker is a simple message broker that provides a useable interface
 // for distributing messages to an arbitrary group of channels.
 type Broker[T any] struct {
-	wg        fnx.WaitGroup
-	publishCh chan T
-	subCh     chan chan T
-	unsubCh   chan chan T
-	opts      BrokerOptions
-	stats     chan func(BrokerStats)
+	wg      fnx.WaitGroup
+	subCh   chan subRequest[T]
+	unsubCh chan chan T
+	opts    BrokerOptions
+	stats   chan func(BrokerStats)
 
 	close context.CancelFunc
+	sink  func(context.Context, T) error
+	count atomic.Uint64
+}
+
+// subRequest registers a subscription; ack is closed once the
+// subscription is visible to dispatch.
+type subRequest[T any] struct {
+	ch  chan T
+	ack chan struct{}
 }
 
 // BrokerStats is a data struct used to report on the internal state
@@ -160,11 +169,10 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	}
 
 	return &Broker[T]{
-		opts:      opts,
-		publishCh: make(chan T),
-		subCh:     make(chan chan T, opts.BufferSize),
-		unsubCh:   make(chan chan T, opts.BufferSize),
-		stats:     make(chan func(BrokerStats)),
+		opts:    opts,
+		subCh:   make(chan subRequest[T], opts.BufferSize),
+		unsubCh: make(chan chan T, opts.BufferSize),
+		stats:   make(chan func(BrokerStats)),
 	}
 }
 
@@ -174,41 +182,33 @@ func (b *Broker[T]) startQueueWorkers(
 	sink func(context.Context, T) error,
 	length func() int,
 ) {
-	subs := &adt.SyncMap[chan T, struct{}]{}
+	subs := &adt.SyncMap[chan T, chan struct{}]{}
+	b.sink = sink
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		var count uint64
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case msgCh := <-b.subCh:
-				subs.Ensure(msgCh)
+			case req := <-b.subCh:
+				if !subs.Check(req.ch) {
+					subs.Store(req.ch, make(chan struct{}))
+				}
+				close(req.ack)
 			case msgCh := <-b.unsubCh:
-				subs.Delete(msgCh)
+				// closing done releases any sender blocked on
+				// this subscriber.
+				if done, ok := subs.Load(msgCh); ok {
+					subs.Delete(msgCh)
+					close(done)
+				}
 			case fn := <-b.stats:
 				fn(BrokerStats{
 					Subscriptions: subs.Len(),
 					BufferDepth:   length(),
-					MessageCount:  count,
+					MessageCount:  b.count.Load(),
 				})
-			case msg := <-b.publishCh:
-				count++
-				if err := sink(ctx, msg); err != nil {
-					// ignore most push errors: either they're queue full issues, which are the
-					// result of user configuration (and we don't log anyway,) or
-					// the queue has been closed (return), but otherwise
-					// some amount of load shedding is fine here, and
-					// we should avoid exiting too soon.
-					switch {
-					case errors.Is(err, ErrQueueFull) || errors.Is(err, ErrQueueNoCredit):
-						continue
-					case errors.Is(err, ErrQueueClosed) || errors.Is(err, io.EOF):
-						b.close()
-						return
-					}
-				}
 			}
 		}
 	}()
@@ -223,27 +223,27 @@ func (b *Broker[T]) startQueueWorkers(
 		go func() {
 			defer b.wg.Done()
 			for msg := range source(ctx) {
-				b.dispatchMessage(ctx, subs.Keys(), msg)
+				b.dispatchMessage(ctx, subs.Iterator(), msg)
 			}
 		}()
 	}
 }
 
-func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq[chan T], msg T) {
+func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq2[chan T, chan struct{}], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
 		wg := &fnx.WaitGroup{}
-		for value := range seq {
+		for value, done := range seq {
 			wg.Add(1)
-			go func(msg T, ch chan T) {
+			go func(msg T, ch chan T, done chan struct{}) {
 				defer wg.Done()
-				b.sendMsg(ctx, msg, ch)
-			}(msg, value)
+				b.sendMsg(ctx, msg, ch, done)
+			}(msg, value, done)
 		}
 		wg.Wait(ctx)
 	} else {
-		for value := range seq {
-			b.sendMsg(ctx, msg, value)
+		for value, done := range seq {
+			b.sendMsg(ctx, msg, value, done)
 		}
 	}
 }
@@ -267,9 +267,10 @@ func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	return output
 }
 
-func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T) {
+func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T, done <-chan struct{}) {
 	select {
 	case <-ctx.Done():
+	case <-done:
 	case ch <- m:
 	}
 }
@@ -297,10 +298,18 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 		return nil
 	}
 	msgCh := make(chan T, b.opts.BufferSize)
+	req := subRequest[T]{ch: msgCh, ack: make(chan struct{})}
 	select {
 	case <-ctx.Done():
 		return nil
-	case b.subCh <- msgCh:
+	case b.subCh <- req:
+	}
+	// wait for registration so that a Publish that follows Subscribe
+	// is delivered to this subscriber.
+	select {
+	case <-ctx.Done():
+		return nil
+	case <-req.ack:
 		return msgCh
 	}
 }
@@ -322,12 +331,19 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 // Publish distributes a message to all subscribers.
 func (b *Broker[T]) Publish(ctx context.Context, msg T) { _ = b.Send(ctx, msg) }
 
-// Send distributes a message to all subscribers.
+// Send distributes a message to all subscribers. The message is
+// handed to the broker's sink on the calling goroutine, so
+// back-pressure (and, for queue-backed brokers with NonBlockingPush,
+// ErrQueueFull) is reported to the caller rather than stalling the
+// broker's control loop.
 func (b *Broker[T]) Send(ctx context.Context, msg T) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case b.publishCh <- msg:
-		return nil
+	if err := ctx.Err(); err != nil {
+		return err
 	}
+	b.count.Add(1)
+	err := b.sink(ctx, msg)
+	if errors.Is(err, ErrQueueClosed) || errors.Is(err, io.EOF) {
+		b.close()
+	}
+	return err
 }
