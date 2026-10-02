@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"maps"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -1052,4 +1053,142 @@ func TestBrokerSendStoppedWhileSinkBlocked(t *testing.T) {
 	err := b.Send(context.Background(), 1)
 	check.ErrorIs(t, err, ErrBrokerClosed)
 	check.ErrorIs(t, err, context.Canceled)
+}
+
+// Send runs the sink on the caller's goroutine and Subscribe waits for
+// registration: a Send after a successful Subscribe reaches that
+// subscriber, and queue-full errors come back from Send itself.
+func TestBrokerSendSemantics(t *testing.T) {
+	ctx := t.Context()
+	t.Run("SubscribeAckMeansNextSendIsDelivered", func(t *testing.T) {
+		b := NewBroker[int](ctx, BrokerOptions{BufferSize: 1})
+		for i := range 50 {
+			sub := mustSubscribe(t, b, ctx)
+			check.NotError(t, b.Send(ctx, i))
+			select {
+			case got := <-sub:
+				check.Equal(t, got, i)
+			case <-time.After(time.Second):
+				t.Fatal("message sent after Subscribe was not delivered")
+			}
+			check.NotError(t, b.Unsubscribe(ctx, sub))
+		}
+	})
+	t.Run("QueueFullReportedToCaller", func(t *testing.T) {
+		q, err := NewQueue[int](QueueOptions{HardLimit: 1, SoftQuota: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := NewQueueBroker(ctx, q, BrokerOptions{NonBlockingPush: true})
+		sub := mustSubscribe(t, b, ctx)
+		defer func() { _ = b.Unsubscribe(ctx, sub) }()
+		var full bool
+		for i := range 20 {
+			if err := b.Send(ctx, i); errors.Is(err, ErrQueueFull) {
+				full = true
+			}
+		}
+		// the unread subscriber blocks the worker, so the queue fills.
+		check.True(t, full)
+	})
+}
+
+// Dispatch iterates the live subscription map; concurrent subscribe
+// and unsubscribe during dispatch must be race-free (run with -race).
+func TestBrokerDispatchConcurrentSubscriptionChanges(t *testing.T) {
+	for _, parallel := range []bool{false, true} {
+		t.Run(fmt.Sprint("Parallel=", parallel), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			b := NewBroker[int](ctx, BrokerOptions{ParallelDispatch: parallel, BufferSize: 4, WorkerPoolSize: 2})
+			var wg sync.WaitGroup
+			stop := make(chan struct{})
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := 0; ; i++ {
+					select {
+					case <-stop:
+						return
+					default:
+						_ = b.Send(ctx, i)
+					}
+				}
+			}()
+			for range 4 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for range 100 {
+						ch, err := b.Subscribe(ctx)
+						if err != nil {
+							return
+						}
+						select {
+						case <-ch:
+						case <-time.After(5 * time.Millisecond):
+						}
+						_ = b.Unsubscribe(ctx, ch)
+					}
+				}()
+			}
+			time.Sleep(200 * time.Millisecond)
+			close(stop)
+			wg.Wait()
+			b.Stop()
+			b.Wait(ctx)
+		})
+	}
+}
+
+// BenchmarkBrokerDispatch measures dispatch over the live SyncMap; compare
+// with BenchmarkBrokerDispatchSnapshot, which copies the keys per message.
+func BenchmarkBrokerDispatch(b *testing.B) {
+	for _, subs := range []int{1, 16, 128} {
+		b.Run(fmt.Sprint("Subscribers=", subs), func(b *testing.B) {
+			m := &adt.SyncMap[chan int, chan struct{}]{}
+			for range subs {
+				ch := make(chan int, 1)
+				m.Store(ch, make(chan struct{}))
+				go func() {
+					for range ch { //nolint:revive
+					}
+				}()
+			}
+			br := stalledBroker(0)
+			ctx := b.Context()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				br.dispatchMessage(ctx, m.Iterator(), i)
+			}
+		})
+	}
+}
+
+func BenchmarkBrokerDispatchSnapshot(b *testing.B) {
+	for _, subs := range []int{1, 16, 128} {
+		b.Run(fmt.Sprint("Subscribers=", subs), func(b *testing.B) {
+			m := &adt.SyncMap[chan int, chan struct{}]{}
+			for range subs {
+				ch := make(chan int, 1)
+				m.Store(ch, make(chan struct{}))
+				go func() {
+					for range ch { //nolint:revive
+					}
+				}()
+			}
+			br := stalledBroker(0)
+			ctx := b.Context()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				snap := make(map[chan int]chan struct{}, subs)
+				for k, v := range m.Iterator() {
+					snap[k] = v
+				}
+				br.dispatchMessage(ctx, maps.All(snap), i)
+			}
+		})
+	}
 }
