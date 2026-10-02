@@ -238,13 +238,12 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq[chan T], m
 
 // Stats provides introspection into the current state of the broker.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
-	signal := make(chan BrokerStats)
+	signal := make(chan BrokerStats, 1)
 	var output BrokerStats
 	select {
 	case <-ctx.Done():
 		return output
 	case b.stats <- func(stats BrokerStats) {
-		defer close(signal)
 		signal <- stats
 	}:
 	}
