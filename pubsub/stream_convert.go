@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fn"
@@ -38,6 +39,9 @@ type converter[T any, O any] struct {
 func (converter[T, O]) zero() (v O) { return v }
 
 func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
+	// set when the source's failure (which already carries the
+	// source's collected errors) was returned through the outer Read.
+	var surfaced atomic.Bool
 	return MakeStream(func(ctx context.Context) (out O, _ error) {
 		for {
 			item, err := st.Read(ctx)
@@ -47,6 +51,9 @@ func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 				// signals here, but the Read method
 				// on the stream will do that making
 				// these unreachable.
+				if !ers.IsTerminating(err) && !ers.IsExpiredContext(err) {
+					surfaced.Store(true)
+				}
 				return c.zero(), err
 			}
 
@@ -60,7 +67,11 @@ func (c *converter[T, O]) Stream(st *Stream[T]) *Stream[O] {
 				return c.zero(), err
 			}
 		}
-	}).WithHook(func(outer *Stream[O]) { outer.AddError(st.Close()) })
+	}).WithHook(func(outer *Stream[O]) {
+		if err := st.Close(); !surfaced.Load() {
+			outer.AddError(err)
+		}
+	})
 }
 
 // Parallel runs the input stream through the transform
