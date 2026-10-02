@@ -14,23 +14,30 @@ import (
 )
 
 // encodeJSONKey encodes k as a JSON object key (always a quoted
-// string), following the rules encoding/json uses for map keys:
-// strings and encoding.TextMarshaler values are encoded as strings and
-// integer kinds are stringified. Any other key type is an error.
+// string). The rules are irt's own and do not depend on the Go
+// version: string kinds are written as-is, then encoding.TextMarshaler
+// values via MarshalText, then integer kinds in decimal. Any other key
+// type is an error. MarshalJSON is never consulted for keys.
 func encodeJSONKey(k any) ([]byte, error) {
-	out, err := json.Marshal(k)
-	if err != nil {
-		return nil, err
+	val := reflect.ValueOf(k)
+	var text string
+	switch tm, _ := k.(encoding.TextMarshaler); {
+	case val.Kind() == reflect.String:
+		text = val.String()
+	case tm != nil:
+		b, err := tm.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		text = string(b)
+	case val.CanInt():
+		text = strconv.FormatInt(val.Int(), 10)
+	case val.CanUint():
+		text = strconv.FormatUint(val.Uint(), 10)
+	default:
+		return nil, fmt.Errorf("json: unsupported key type %T", k)
 	}
-	if len(out) > 0 && out[0] == '"' {
-		return out, nil
-	}
-	switch reflect.ValueOf(k).Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return strconv.AppendQuote(nil, string(out)), nil
-	}
-	return nil, fmt.Errorf("json: unsupported key type %T", k)
+	return json.Marshal(text)
 }
 
 // trailingNewlineStripper strips the single trailing '\n' that json.Encoder
@@ -201,16 +208,16 @@ func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// decodeJSONKey converts a JSON object key into A following the rules
-// encoding/json uses for map keys: string kinds, integer kinds and
-// types implementing encoding.TextUnmarshaler (on *A) are supported;
-// interface types receive the key as a string. Anything else, or a key
-// that cannot be parsed, is an error.
+// decodeJSONKey converts a JSON object key into A using irt's own
+// rules, the inverse of encodeJSONKey: a type implementing
+// encoding.TextUnmarshaler (on *A) is honoured whatever its kind, then
+// string kinds, then integer kinds; interface types receive the key as
+// a string. Anything else, or a key that cannot be parsed, is an error.
 func decodeJSONKey[A any](text string) (key A, err error) {
 	val := reflect.ValueOf(&key).Elem()
 	kind := val.Kind()
 
-	if tu, ok := any(&key).(encoding.TextUnmarshaler); ok && kind != reflect.String {
+	if tu, ok := any(&key).(encoding.TextUnmarshaler); ok {
 		return key, tu.UnmarshalText([]byte(text))
 	}
 
