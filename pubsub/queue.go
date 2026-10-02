@@ -346,6 +346,12 @@ func (q *Queue[T]) popFront() T {
 	q.tracker.remove()
 	q.nupdates.Broadcast()
 
+	// Drain waits on nempty: wake it whenever any consumer empties the
+	// queue, rather than relying on the caller to do so.
+	if q.tracker.len() == 0 {
+		q.nempty.Broadcast()
+	}
+
 	return e.item
 }
 
