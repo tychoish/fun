@@ -1101,7 +1101,8 @@ func Keep2[A, B any, OP ~func(A, B) bool](seq iter.Seq2[A, B], prd OP) iter.Seq2
 // fastest, not as a static partition. A shard that stops early does
 // not affect the others: the shared iterator is released when the
 // input is exhausted, when every shard has finished, or when ctx is
-// canceled, even if some shards never started or never finish. num is
+// canceled, even if some shards never started or never finish, and
+// when the outer loop stops early. num is
 // clamped to at least 1. Once ctx is canceled, every shard stops
 // yielding new elements, the same way Pool's workers do.
 func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.Seq[T]] {
@@ -1130,17 +1131,20 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 		release := func() { mtx.Lock(); defer mtx.Unlock(); stop() }
 		unwatch := context.AfterFunc(ctx, release)
 
-		for range num {
-			finish := sync.OnceFunc(func() {
-				mtx.Lock()
-				remain--
-				last := remain == 0
-				mtx.Unlock()
-				if last {
-					unwatch()
-					release()
-				}
-			})
+		// done retires n shards; the last one releases the iterator.
+		done := func(n int) {
+			mtx.Lock()
+			remain -= n
+			last := remain == 0
+			mtx.Unlock()
+			if last {
+				unwatch()
+				release()
+			}
+		}
+
+		for i := range num {
+			finish := sync.OnceFunc(func() { done(1) })
 			shard := func(yield func(T) bool) {
 				defer finish()
 				for {
@@ -1150,6 +1154,9 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 				}
 			}
 			if !yield(shard) {
+				// shards never handed out can never finish.
+				finish()
+				done(num - i - 1)
 				return
 			}
 		}
