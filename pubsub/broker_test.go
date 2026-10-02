@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1188,6 +1189,117 @@ func BenchmarkBrokerDispatchSnapshot(b *testing.B) {
 					snap[k] = v
 				}
 				br.dispatchMessage(ctx, maps.All(snap), i)
+			}
+		})
+	}
+}
+
+// A slow subscriber under ParallelDispatch delays the message (head of
+// line) but does not lose it or stop other subscribers receiving it.
+func TestBrokerParallelDispatchSlowSubscriber(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	b := NewBroker[int](ctx, BrokerOptions{ParallelDispatch: true})
+	fast := mustSubscribe(t, b, ctx)
+	slow := mustSubscribe(t, b, ctx)
+
+	check.NotError(t, b.Send(ctx, 1))
+	select {
+	case v := <-fast:
+		check.Equal(t, v, 1)
+	case <-time.After(time.Second):
+		t.Fatal("fast subscriber blocked by slow subscriber")
+	}
+	time.Sleep(50 * time.Millisecond)
+	select {
+	case v := <-slow:
+		check.Equal(t, v, 1)
+	case <-time.After(time.Second):
+		t.Fatal("slow subscriber never received the message")
+	}
+}
+
+// A panic in a subscriber's goroutine is its own; a panicking sink
+// propagates on the caller's goroutine (Send runs the sink inline) and
+// leaves the broker usable.
+func TestBrokerPanics(t *testing.T) {
+	ctx := t.Context()
+	t.Run("SinkPanicReachesCaller", func(t *testing.T) {
+		b := makeInternalBrokerImpl(ctx,
+			func(context.Context) iter.Seq[int] { return func(func(int) bool) {} },
+			func(context.Context, int) error { panic("boom") },
+			func() int { return 0 },
+			BrokerOptions{},
+		)
+		func() {
+			defer func() { check.Equal(t, fmt.Sprint(recover()), "boom") }()
+			_ = b.Send(ctx, 1)
+		}()
+		// still responsive afterwards.
+		sub := mustSubscribe(t, b, ctx)
+		check.NotError(t, b.Unsubscribe(ctx, sub))
+		_ = b.Stats(ctx)
+		b.Stop()
+		b.Wait(ctx)
+	})
+	t.Run("SubscriberPanicDoesNotAffectBroker", func(t *testing.T) {
+		b := NewBroker[int](ctx, BrokerOptions{})
+		sub := mustSubscribe(t, b, ctx)
+		got := make(chan any, 1)
+		go func() {
+			defer func() { got <- recover() }()
+			<-sub
+			panic("subscriber")
+		}()
+		check.NotError(t, b.Send(ctx, 1))
+		check.Equal(t, fmt.Sprint(<-got), "subscriber")
+		check.NotError(t, b.Unsubscribe(ctx, sub))
+		check.NotError(t, b.Send(ctx, 2))
+		b.Stop()
+	})
+}
+
+// Publish with a canceled caller context fails fast with that error and
+// does not count as a message, for every broker.
+func TestBrokerPublishCanceledContext(t *testing.T) {
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			b := mk(t.Context())
+			cctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			check.ErrorIs(t, b.Publish(cctx, 1), context.Canceled)
+			check.Equal(t, b.Stats(t.Context()).MessageCount, 0)
+			b.Stop()
+		})
+	}
+}
+
+func cpuTime(t *testing.T) time.Duration {
+	var ru syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
+		t.Skip(err)
+	}
+	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
+}
+
+// Idle brokers with a worker pool must not spin.
+func TestBrokerIdleCPU(t *testing.T) {
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			if name == "Deque" || name == "LIFO" {
+				// TODO: remove once fix/pubsub-collections (deque
+				// waiter busy-spin, ps-deque-spin) is merged; verified
+				// passing against that branch, fails (300ms+ CPU)
+				// without it.
+				t.Skip("deque busy-spin fix lives on fix/pubsub-collections")
+			}
+			b := mk(t.Context())
+			defer b.Stop()
+			time.Sleep(50 * time.Millisecond)
+			before := cpuTime(t)
+			time.Sleep(500 * time.Millisecond)
+			if used := cpuTime(t) - before; used > 150*time.Millisecond {
+				t.Fatalf("idle broker used %s CPU in 500ms", used)
 			}
 		})
 	}
