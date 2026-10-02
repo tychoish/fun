@@ -14,10 +14,11 @@ import (
 )
 
 // encodeJSONKey encodes k as a JSON object key (always a quoted
-// string). The rules are irt's own and do not depend on the Go
-// version: string kinds are written as-is, then encoding.TextMarshaler
-// values via MarshalText, then integer kinds in decimal. Any other key
-// type is an error. MarshalJSON is never consulted for keys.
+// string). The rules follow Go 1.25's encoding/json map-key rules,
+// whatever toolchain builds irt: string kinds are written as-is, then
+// encoding.TextMarshaler values via MarshalText, then integer kinds in
+// decimal. Any other key type is an error. MarshalJSON is never
+// consulted for keys.
 func encodeJSONKey(k any) ([]byte, error) {
 	val := reflect.ValueOf(k)
 	var text string
@@ -175,7 +176,9 @@ func MarshalJSON[T any](seq iter.Seq[T]) ([]byte, error) {
 }
 
 // MarshalJSON2 consumes a pair sequence with string keys and
-// returns its JSON encoding as an object. Returns an error if any
+// returns its JSON encoding as an object. Keys are encoded by the Go
+// 1.25 encoding/json key rules on every toolchain (see encodeJSONKey),
+// so output does not change with the Go version. Returns an error if any
 // element fails to marshal.
 func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 	var buf bytes.Buffer
@@ -208,8 +211,9 @@ func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// decodeJSONKey converts a JSON object key into A using irt's own
-// rules, the inverse of encodeJSONKey: a type implementing
+// decodeJSONKey converts a JSON object key into A using the Go 1.25
+// encoding/json key rules on every toolchain, the inverse of
+// encodeJSONKey: a type implementing
 // encoding.TextUnmarshaler (on *A) is honoured whatever its kind, then
 // string kinds, then integer kinds; interface types receive the key as
 // a string. Anything else, or a key that cannot be parsed, is an error.
