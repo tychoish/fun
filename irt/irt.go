@@ -719,6 +719,11 @@ func Channel[T any](ctx context.Context, ch <-chan T) iter.Seq[T] {
 // Pipe returns a channel that receives all elements from the input
 // sequence.  The channel is closed when the sequence is exhausted or
 // the context is canceled.
+//
+// The producer goroutine starts immediately and, because Pipe returns
+// a plain channel, cannot observe a consumer that stops reading: if
+// you stop receiving before the channel is closed you must cancel ctx,
+// or the producer goroutine blocks forever.
 func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 	return opwithstart(opwithch(func(ch chan T) { seqToChan(ctx, seq, ch) }))
 }
@@ -1096,9 +1101,15 @@ func Shard2[A, B any](ctx context.Context, num int, seq iter.Seq2[A, B]) iter.Se
 
 // WithBuffer maintains a buffer of items read from the source
 // iterator, waiting for downstream consumers of the output iterator,
-// to consume them.
+// to consume them. The producer goroutine is released when the
+// consumer stops iterating, as well as when ctx is canceled.
 func WithBuffer[T any](ctx context.Context, seq iter.Seq[T], size int) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		// cancel when the consumer stops (early break or exhaustion) so
+		// the producer goroutine is never left blocked on a full buffer.
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		sink := make(chan T, size)
 
 		go func() { defer close(sink); flushTo(ctx, seq, sink) }()
@@ -1443,6 +1454,12 @@ func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, er
 // AsGenerator provides in inverse of the GenerateOk operation: the
 // function will yield values. When the boolean "ok" value is false
 // the sequence has been exhausted.
+//
+// The sequence is consumed by a background goroutine, started on the
+// first call with a context derived from that call's ctx. AsGenerator
+// cannot detect that the caller has stopped calling the function, so
+// callers that abandon the generator before exhaustion must cancel the
+// ctx they passed to release the goroutine.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
 		once   sync.Once
