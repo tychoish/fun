@@ -436,6 +436,8 @@ func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) error {
 // Publish distributes a message to all subscribers. It is equivalent
 // to Send, and returns ErrBrokerClosed after the broker has been
 // stopped.
+//
+// Deprecated: use Send.
 func (b *Broker[T]) Publish(ctx context.Context, msg T) error { return b.Send(ctx, msg) }
 
 // Send distributes a message to all subscribers. The message is
