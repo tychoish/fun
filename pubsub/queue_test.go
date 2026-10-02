@@ -1186,3 +1186,55 @@ func TestQueueDrain(t *testing.T) {
 		}
 	})
 }
+
+func TestQueueWaitPopTwoWaitersTwoPushes(t *testing.T) {
+	q := NewUnlimitedQueue[int]()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	got := make(chan int, 2)
+	for range 2 {
+		go func() {
+			v, err := q.WaitPop(ctx)
+			if err != nil {
+				v = -1
+			}
+			got <- v
+		}()
+	}
+	time.Sleep(time.Millisecond) // let the waiters (usually) block first
+	assert.NotError(t, q.Push(1))
+	assert.NotError(t, q.Push(2))
+
+	sum := 0
+	for range 2 {
+		select {
+		case v := <-got:
+			sum += v
+		case <-time.After(2 * time.Second):
+			t.Fatal("a WaitPop waiter slept with an item queued")
+		}
+	}
+	check.Equal(t, sum, 3)
+}
+
+func TestQueueBrokerParallelWorkersDeliverBothMessages(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	b := NewQueueBroker(ctx, NewUnlimitedQueue[int](), BrokerOptions{WorkerPoolSize: 2, ParallelDispatch: true})
+	defer b.Stop()
+	_ = mustSubscribe(t, b, ctx) // never read
+	fast := mustSubscribe(t, b, ctx)
+
+	assert.NotError(t, b.Publish(ctx, 1))
+	assert.NotError(t, b.Publish(ctx, 2))
+
+	for i := range 2 {
+		select {
+		case <-fast:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("fast subscriber got only %d of 2 messages", i)
+		}
+	}
+}

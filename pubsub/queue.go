@@ -134,9 +134,11 @@ func (q *Queue[T]) doAdd(item T) error {
 	e := &entry[T]{item: item}
 	q.back.link = e
 	q.back = e
-	if q.tracker.len() == 1 { // was empty
-		q.nempty.Signal()
-	}
+	// Wake every waiter on every add: nempty is shared by WaitPop
+	// and Drain waiters, so a single Signal on the 0->1 transition
+	// can be absorbed by the wrong waiter, or miss the second of
+	// two back-to-back adds.
+	q.nempty.Broadcast()
 
 	// for the iterators and WaitPush callers, which may be many
 	q.nupdates.Broadcast()
