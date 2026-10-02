@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // Collect consumes the sequence and returns a slice of all
@@ -860,44 +859,35 @@ func Pool[A, B any, OP ~func(A) B](ctx context.Context, num int, seq iter.Seq[A]
 // the first panic raised by a worker (or by seq) is re-raised on the
 // calling goroutine.
 func poolRun[A any](ctx context.Context, num int, seq iter.Seq[A], work func(A) bool) {
-	if ctx.Err() != nil {
-		return
-	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var (
 		mtx     sync.Mutex
-		halt    atomic.Bool
-		failure atomic.Pointer[any]
+		failure *any
 	)
 	next, stop := iter.Pull(seq)
-	pull := func() (A, bool) {
-		mtx.Lock()
-		defer mtx.Unlock()
-		return next()
-	}
+	defer stop()
+	pull := func() (A, bool) { mtx.Lock(); defer mtx.Unlock(); return next() }
 
 	wgdo(num, func() {
 		defer func() {
 			if r := recover(); r != nil {
-				failure.CompareAndSwap(nil, &r)
-				halt.Store(true)
+				mtx.Lock()
+				defer mtx.Unlock()
+				failure = cmp.Or(failure, &r)
+				cancel()
 			}
 		}()
-		for ctx.Err() == nil && !halt.Load() {
-			a, ok := pull()
-			if !ok || !work(a) {
-				halt.Store(true)
-				return
+		for ctx.Err() == nil {
+			if a, ok := pull(); !ok || !work(a) {
+				cancel()
 			}
 		}
 	})
 
-	mtx.Lock()
-	stop()
-	mtx.Unlock()
-
-	if r := failure.Load(); r != nil {
-		panic(*r)
+	if failure != nil {
+		panic(*failure)
 	}
 }
 
