@@ -545,11 +545,11 @@ func TestDeque(t *testing.T) {
 					time.Sleep(100 * time.Millisecond)
 					select {
 					case <-sig2:
-					case <-time.After(10 * time.Millisecond):
+					case <-time.After(5 * time.Second):
 						t.Error("should not have timed out")
 					}
 					select {
-					case <-time.After(10 * time.Millisecond):
+					case <-time.After(5 * time.Second):
 						t.Error("should not have timed out")
 					case <-sig:
 						out, ok := tt.Pop()

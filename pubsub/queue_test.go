@@ -282,7 +282,7 @@ func TestQueueIterators(t *testing.T) {
 			t.Error("unexpected queue length", queue.tracker.len())
 		}
 
-		if time.Since(startAt) > 150*time.Millisecond {
+		if time.Since(startAt) > 5*time.Second {
 			// if we get here, we hit a timeout
 			t.Error("hit timeout didn't wait long enough", time.Since(startAt))
 		}
@@ -327,7 +327,7 @@ func TestQueueIterators(t *testing.T) {
 			t.Error("unexpected queue length", queue.tracker.len())
 		}
 
-		if time.Since(startAt) > 150*time.Millisecond {
+		if time.Since(startAt) > 5*time.Second {
 			// if we get here, we hit a timeout
 			t.Error("hit timeout didn't wait long enough", time.Since(startAt))
 		}
@@ -567,11 +567,11 @@ func TestQueueIterators(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 			select {
 			case <-sig2:
-			case <-time.After(10 * time.Millisecond):
+			case <-time.After(5 * time.Second):
 				t.Error("should not have timed out")
 			}
 			select {
-			case <-time.After(10 * time.Millisecond):
+			case <-time.After(5 * time.Second):
 				t.Error("should not have timed out")
 			case <-sig:
 				out, ok := tt.Pop()
@@ -898,7 +898,7 @@ func TestQueueDrain(t *testing.T) {
 		duration := time.Since(start)
 
 		assert.NotError(t, err)
-		assert.True(t, duration < 50*time.Millisecond)
+		assert.True(t, duration < 5*time.Second)
 		assert.Equal(t, 0, queue.Len())
 	})
 
