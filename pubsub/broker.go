@@ -51,9 +51,50 @@ type ctlRequest[T any] struct {
 // BrokerStats is a data struct used to report on the internal state
 // of the broker.
 type BrokerStats struct {
+	// State reports the lifecycle state of the broker; see
+	// BrokerState. The counters below are only meaningful when State
+	// is BrokerStateEmpty or BrokerStateActive, and are zero otherwise.
+	State         BrokerState
 	Subscriptions int
 	BufferDepth   int
 	MessageCount  uint64
+}
+
+// BrokerState describes the lifecycle state of a Broker as reported
+// by Broker.Stats.
+type BrokerState int
+
+const (
+	// BrokerStateUnstarted is the zero value. It means the state is
+	// unknown or the control loop has not answered: a zero-value
+	// BrokerStats, or a Stats call whose caller context ended before
+	// a reply arrived. It does not claim the broker is closed.
+	BrokerStateUnstarted BrokerState = iota
+	// BrokerStateEmpty means the broker is running with no
+	// subscriptions and nothing buffered.
+	BrokerStateEmpty
+	// BrokerStateActive means the broker is running with at least
+	// one subscription or buffered message.
+	BrokerStateActive
+	// BrokerStateClosed means the broker was stopped or its context
+	// ended.
+	BrokerStateClosed
+)
+
+// String renders the state as a lowercase name.
+func (s BrokerState) String() string {
+	switch s {
+	case BrokerStateUnstarted:
+		return "unstarted"
+	case BrokerStateEmpty:
+		return "empty"
+	case BrokerStateActive:
+		return "active"
+	case BrokerStateClosed:
+		return "closed"
+	default:
+		return "unknown"
+	}
 }
 
 // BrokerOptions configures the semantics of a broker. The zero-values
@@ -201,11 +242,16 @@ func (b *Broker[T]) startQueueWorkers(
 				switch {
 				case req.stats != nil:
 					// ordered behind earlier subscribe/unsubscribe requests.
-					req.stats(BrokerStats{
+					st := BrokerStats{
+						State:         BrokerStateEmpty,
 						Subscriptions: subs.Len(),
 						BufferDepth:   length(),
 						MessageCount:  b.count.Load(),
-					})
+					}
+					if st.Subscriptions > 0 || st.BufferDepth > 0 {
+						st.State = BrokerStateActive
+					}
+					req.stats(st)
 				case req.unsub:
 					// closing done releases any sender blocked
 					// on this subscriber.
@@ -273,25 +319,36 @@ func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq2[chan T, c
 
 // Stats provides introspection into the current state of the broker.
 //
-// Stats has no error return: if ctx is canceled or the broker has been
-// stopped it returns promptly with the zero BrokerStats.
+// Stats has no error return; inspect BrokerStats.State instead. If the
+// broker has been stopped (or its context is done) Stats returns
+// promptly with State BrokerStateClosed and zero counters, even if ctx
+// is also canceled. If only the caller's ctx ends before the broker
+// replies, Stats returns promptly with the zero BrokerStats (State
+// BrokerStateUnstarted, i.e. unknown). Otherwise State is
+// BrokerStateEmpty or BrokerStateActive.
 func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
+	closed := BrokerStats{State: BrokerStateClosed}
+	if b.ctx.Err() != nil {
+		return closed
+	}
+
 	signal := make(chan BrokerStats, 1)
-	var output BrokerStats
 	select {
 	case <-ctx.Done():
-		return output
+		return BrokerStats{}
 	case <-b.ctx.Done():
-		return output
+		return closed
 	case b.ctlCh <- ctlRequest[T]{stats: func(stats BrokerStats) { signal <- stats }}:
 	}
 
 	select {
-	case <-ctx.Done():
 	case <-b.ctx.Done():
-	case output = <-signal:
+		return closed
+	case <-ctx.Done():
+		return BrokerStats{}
+	case output := <-signal:
+		return output
 	}
-	return output
 }
 
 func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T, done <-chan struct{}) {
