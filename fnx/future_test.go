@@ -952,3 +952,25 @@ func producerContinuesOnce[T any](out T, counter *atomic.Int64) Future[T] {
 		return out, err
 	}
 }
+
+func TestFutureJob(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	t.Run("Value", func(t *testing.T) {
+		val, err := MakeFuture(func() (int, error) { return 42, nil }).Job(ctx)
+		assert.NotError(t, err)
+		assert.Equal(t, val, 42)
+	})
+	t.Run("Error", func(t *testing.T) {
+		expected := errors.New("job error")
+		val, err := Future[int](func(context.Context) (int, error) { return 7, expected }).Job(ctx)
+		assert.ErrorIs(t, err, expected)
+		assert.Equal(t, val, 7)
+	})
+	t.Run("PanicBecomesError", func(t *testing.T) {
+		_, err := Future[int](func(context.Context) (int, error) { panic("boom") }).Job(ctx)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ers.ErrRecoveredPanic)
+	})
+}
