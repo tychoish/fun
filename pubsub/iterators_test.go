@@ -92,3 +92,33 @@ func TestRateLimit(t *testing.T) {
 		assert.True(t, dur >= time.Second)
 	})
 }
+
+func TestRateLimitIterationsAreIndependent(t *testing.T) {
+	ctx := t.Context()
+	window := time.Second
+	seq := RateLimit(ctx, irt.Slice(makeIntSlice(2)), 2, window)
+
+	for round := range 2 {
+		start := time.Now()
+		count := 0
+		for range seq {
+			count++
+		}
+		assert.Equal(t, 2, count)
+		// a shared timestamp queue would make later rounds wait out the window.
+		if d := time.Since(start); d > window/2 {
+			t.Fatalf("round %d was rate limited by an earlier iteration: %s", round, d)
+		}
+	}
+}
+
+func TestRateLimitConsumerBreak(t *testing.T) {
+	count := 0
+	for range RateLimit(t.Context(), irt.Slice(makeIntSlice(10)), 5, time.Second) {
+		count++
+		if count == 2 {
+			break
+		}
+	}
+	assert.Equal(t, 2, count)
+}

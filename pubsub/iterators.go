@@ -14,65 +14,43 @@ import (
 func RateLimit[T any](ctx context.Context, seq iter.Seq[T], num int, window time.Duration) iter.Seq[T] {
 	erc.InvariantOk(num > 0, "rate must be greater than zero")
 
-	timer := time.NewTimer(0)
-	queue := NewUnlimitedQueue[time.Time]()
-
-	type state int
-
-	const (
-		stateComplete       state = iota // early return
-		stateRateExceded                 // try prune
-		stateOverCapacity                // after prune: wait sleep
-		stateRetrySend                   // after prune: retry send
-		stateSendSuccessful              // under threshold
-	)
-
 	return func(yield func(T) bool) {
 		next, stop := iter.Pull(seq)
 		defer stop()
 
-		send := func(now time.Time) state {
-			if queue.Len() < num && queue.Push(now) == nil {
-				if val, ok := next(); !ok || !yield(val) {
-					return stateComplete
-				}
-				return stateSendSuccessful
-			}
-			return stateOverCapacity
-		}
-
-		prune := func(now time.Time) state {
-			ok := true
-			for ok && queue.Len() >= 0 && now.Sub(queue.getFront()) > window {
-				_, ok = queue.Pop()
-			}
-			if queue.Len() >= num {
-				return stateOverCapacity
-			}
-			return stateRetrySend
-		}
+		// send times within the current window, oldest first. This is
+		// state of one iteration: re-iterating starts with a clean slate.
+		sent := make([]time.Time, 0, num)
 
 		for ctx.Err() == nil {
-			now := time.Now()
-
-			switch send(now) {
-			case stateComplete:
+			// pull first so that exhausting the input never waits
+			// out a window.
+			val, ok := next()
+			if !ok {
 				return
-			case stateRetrySend, stateSendSuccessful:
-				continue
-			case stateOverCapacity:
-				switch prune(now) {
-				case stateRetrySend:
-					continue
-				case stateOverCapacity:
-					timer.Reset(max(time.Millisecond, time.Until(queue.getFront().Add(window))))
-					select {
-					case <-timer.C:
-						continue
-					case <-ctx.Done():
-						return
-					}
+			}
+
+			for {
+				now := time.Now()
+				for len(sent) > 0 && now.Sub(sent[0]) > window {
+					sent = sent[1:]
 				}
+				if len(sent) < num {
+					break
+				}
+
+				timer := time.NewTimer(max(time.Millisecond, time.Until(sent[0].Add(window))))
+				select {
+				case <-timer.C:
+				case <-ctx.Done():
+					timer.Stop()
+					return
+				}
+			}
+
+			sent = append(sent, time.Now())
+			if !yield(val) {
+				return
 			}
 		}
 	}
