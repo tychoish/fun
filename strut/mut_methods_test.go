@@ -276,8 +276,8 @@ func TestMutable_RepeatLine(t *testing.T) {
 		{"one", func(m *Mutable) { m.RepeatLine("hi", 1) }, "hi\n"},
 		{"three", func(m *Mutable) { m.RepeatLine("hi", 3) }, JOIN.WithConcat().Strings("hi\n", "hi\n", "hi\n")},
 		{"empty string", func(m *Mutable) { m.RepeatLine("", 2) }, "\n\n"},
-		{"unicode", func(m *Mutable) { m.RepeatLine("世界", 2) }, "世界\n世界\n"},
-		{"appends to existing", func(m *Mutable) { m.PushString("pre\n"); m.RepeatLine("x", 2) }, "pre\nx\nx\n"},
+		{"unicode", func(m *Mutable) { m.RepeatLine("世界", 2) }, "世界\n世界\n"},                                      //nolint:dupword
+		{"appends to existing", func(m *Mutable) { m.PushString("pre\n"); m.RepeatLine("x", 2) }, "pre\nx\nx\n"}, //nolint:dupword
 	})
 }
 

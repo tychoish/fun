@@ -224,7 +224,7 @@ func bindStructField(fs *flag.FlagSet, field reflect.StructField, fval reflect.V
 		return true, bindFlags(fs, fval, prefix, depth)
 	}
 	// If the exported pointer implements flag.Value, treat as a leaf.
-	if _, ok := fval.Addr().Interface().(flag.Value); ok {
+	if _, ok := reflect.TypeAssert[flag.Value](fval.Addr()); ok {
 		return false, nil
 	}
 	childPrefix := prefix
@@ -290,7 +290,7 @@ func checkStructField(field reflect.StructField, fval reflect.Value, prefix stri
 		return true, checkRequired(fval, prefix)
 	}
 	// If the exported pointer implements flag.Value, treat as a leaf.
-	if _, ok := fval.Addr().Interface().(flag.Value); ok {
+	if _, ok := reflect.TypeAssert[flag.Value](fval.Addr()); ok {
 		return false, nil
 	}
 	childPrefix := prefix
@@ -415,7 +415,7 @@ func collectUntilFlags(val reflect.Value, prefix string) map[string]bool {
 				maps.Copy(result, collectUntilFlags(fval, prefix))
 				continue
 			}
-			if _, ok := fval.Addr().Interface().(flag.Value); ok {
+			if _, ok := reflect.TypeAssert[flag.Value](fval.Addr()); ok {
 				continue
 			}
 			childPrefix := prefix
@@ -533,7 +533,7 @@ func applyEnvVarsWalk(fs *flag.FlagSet, val reflect.Value, prefix string, cliSet
 				}
 				continue
 			}
-			if _, ok := fval.Addr().Interface().(flag.Value); !ok {
+			if _, ok := reflect.TypeAssert[flag.Value](fval.Addr()); !ok {
 				childPrefix := prefix
 				if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
 					childPrefix = joinStr(prefix, ns, ".")

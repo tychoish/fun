@@ -187,7 +187,7 @@ func validateStructField(fs *flag.FlagSet, field reflect.StructField, fval refle
 	if !field.IsExported() {
 		return false, true, validateStruct(fs, fval, prefix, depth)
 	}
-	if _, ok := fval.Addr().Interface().(flag.Value); ok {
+	if _, ok := reflect.TypeAssert[flag.Value](fval.Addr()); ok {
 		return false, false, nil // treat as leaf
 	}
 	childPrefix := prefix

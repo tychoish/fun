@@ -358,7 +358,7 @@ func semanticEquivalenceTests[T stringWriter[T]]() []testCase[T] {
 			buildFn: func(w T) {
 				w.RepeatLine("test", 2)
 			},
-			expected: "test\ntest\n",
+			expected: "test\ntest\n", //nolint:dupword
 		},
 		{
 			name: "when methods - true conditions",

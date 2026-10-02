@@ -489,7 +489,7 @@ func repeatTests[T stringWriter[T]]() []testCase[T] {
 			buildFn: func(w T) {
 				w.RepeatLine("test", 2)
 			},
-			expected: "test\ntest\n",
+			expected: "test\ntest\n", //nolint:dupword
 		},
 		{
 			name: "RepeatLine zero",
@@ -1187,7 +1187,7 @@ func edgeCaseTests[T stringWriter[T]]() []validationTestCase[T] {
 				}
 			},
 			validate: func(t *testing.T, got string) {
-				expected := "even\neven\n"
+				expected := "even\neven\n" //nolint:dupword
 				if got != expected {
 					t.Errorf("expected %q, got %q", expected, got)
 				}
