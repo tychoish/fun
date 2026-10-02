@@ -127,7 +127,9 @@ func makeQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queue[fnx.Wo
 			return nil
 		}))
 	}
-	assert.NotError(t, queue.Close())
+	// Close no longer hands out the remaining items, so close the queue
+	// only once the consumer has drained it.
+	go func() { _ = queue.Shutdown(t.Context()) }()
 	return queue
 }
 
@@ -143,6 +145,8 @@ func makeErroringQueue(t *testing.T, size int, count *atomic.Int64) *pubsub.Queu
 			return fmt.Errorf("%d.%q", idx, t.Name())
 		}))
 	}
-	assert.NotError(t, queue.Close())
+	// Close no longer hands out the remaining items, so close the queue
+	// only once the consumer has drained it.
+	go func() { _ = queue.Shutdown(t.Context()) }()
 	return queue
 }
