@@ -923,9 +923,7 @@ func TestBrokerCanceledContextErrors(t *testing.T) {
 	check.ErrorIs(t, b.Publish(cctx, 1), context.Canceled)
 	// the control channel is unbuffered and the loop is idle, so the
 	// request may be accepted; a blocked one reports the ctx error.
-	blocked := NewBroker[int](t.Context(), BrokerOptions{})
-	blocked.ctlCh = make(chan ctlRequest[int])
-	check.ErrorIs(t, blocked.Unsubscribe(cctx, nil), context.Canceled)
+	check.ErrorIs(t, stalledBroker(0).Unsubscribe(cctx, nil), context.Canceled)
 }
 
 func TestBrokerStopWhileWaiting(t *testing.T) {
