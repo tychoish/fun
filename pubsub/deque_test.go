@@ -936,35 +936,36 @@ func TestDequeLIFO(t *testing.T) {
 	t.Run("ConsumesItems", func(t *testing.T) {
 		dq := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// Add items gradually (LIFO/FIFO - wait for new items between consumptions)
+		// Add items gradually; the consumer stops once it has them all.
 		go func() {
 			for i := 1; i <= 3; i++ {
-				time.Sleep(15 * time.Millisecond)
 				check.NotError(t, dq.PushBack(i))
+				runtime.Gosched()
 			}
 		}()
 
 		count := 0
 		for range dq.IteratorWaitPopBack(ctx) {
 			count++
+			if count == 3 {
+				cancel()
+			}
 		}
 
-		// Should have consumed items added during the window
-		assert.True(t, count >= 1)
+		assert.Equal(t, count, 3)
 	})
 
 	t.Run("RemovesFromBack", func(t *testing.T) {
 		dq := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		// Add both items together so they're both in the deque
 		go func() {
-			time.Sleep(10 * time.Millisecond)
 			// push both atomically so the consumer can't wake between them
 			mu := dq.mtx()
 			mu.Lock()
@@ -976,9 +977,8 @@ func TestDequeLIFO(t *testing.T) {
 		// Get first item - should be from back since LIFO pops from back
 		var firstVal string
 		for val := range dq.IteratorWaitPopBack(ctx) {
-			if firstVal == "" {
-				firstVal = val
-			}
+			firstVal = val
+			break
 		}
 
 		// Should consume "second" first (it's at the back)
@@ -1005,35 +1005,36 @@ func TestDequeFIFO(t *testing.T) {
 	t.Run("ConsumesItems", func(t *testing.T) {
 		dq := erc.Must(NewDeque[int](DequeOptions{Capacity: 10}))
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// Add items gradually (LIFO/IteratorWaitPopFront wait for new items between consumptions)
+		// Add items gradually; the consumer stops once it has them all.
 		go func() {
 			for i := 1; i <= 3; i++ {
-				time.Sleep(15 * time.Millisecond)
 				check.NotError(t, dq.PushBack(i))
+				runtime.Gosched()
 			}
 		}()
 
 		count := 0
 		for range dq.IteratorWaitPopFront(ctx) {
 			count++
+			if count == 3 {
+				cancel()
+			}
 		}
 
-		// Should have consumed items added during the window
-		assert.True(t, count >= 1)
+		assert.Equal(t, count, 3)
 	})
 
 	t.Run("RemovesFromFront", func(t *testing.T) {
 		dq := erc.Must(NewDeque[string](DequeOptions{Capacity: 10}))
 
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		// Add both items together so they're both in the deque
 		go func() {
-			time.Sleep(10 * time.Millisecond)
 			check.NotError(t, dq.PushBack("first"))
 			check.NotError(t, dq.PushBack("second")) // Now "second" is at the back
 		}()
@@ -1041,9 +1042,8 @@ func TestDequeFIFO(t *testing.T) {
 		// Get first item - should be from front since IteratorWaitPopFront pops from front
 		var firstVal string
 		for val := range dq.IteratorWaitPopFront(ctx) {
-			if firstVal == "" {
-				firstVal = val
-			}
+			firstVal = val
+			break
 		}
 
 		// Should consume "first" first (it's at the front)
@@ -1128,8 +1128,8 @@ func TestDequeDrain(t *testing.T) {
 			}
 		}()
 
-		// Give drain time to start
-		time.Sleep(50 * time.Millisecond)
+		// Wait for the drain to start
+		waitDequeDraining(t, deque)
 
 		// Try to add - should fail with ErrQueueDraining
 		err := deque.PushFront("blocked-front")
@@ -1421,8 +1421,8 @@ func TestDequeShutdown(t *testing.T) {
 			}
 		}()
 
-		// Give shutdown time to start draining
-		time.Sleep(50 * time.Millisecond)
+		// Wait for the shutdown to start draining
+		waitDequeDraining(t, deque)
 
 		// Try to add - should fail with ErrQueueDraining
 		err := deque.PushBack(100)
@@ -1516,8 +1516,8 @@ func TestDequeShutdown(t *testing.T) {
 			}
 		}()
 
-		// Give shutdown time to start draining
-		time.Sleep(50 * time.Millisecond)
+		// Wait for the shutdown to start draining
+		waitDequeDraining(t, deque)
 
 		// Try WaitPushBack - should fail immediately with ErrQueueDraining
 		err := deque.WaitPushBack(ctx, 100)
