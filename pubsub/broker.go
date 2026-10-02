@@ -8,7 +8,6 @@ import (
 	"errors"
 	"io"
 	"iter"
-	"sync"
 
 	"github.com/tychoish/fun/adt"
 	"github.com/tychoish/fun/fnx"
@@ -30,7 +29,6 @@ type Broker[T any] struct {
 	opts      BrokerOptions
 	stats     chan func(BrokerStats)
 
-	mu    sync.Mutex
 	close context.CancelFunc
 }
 
@@ -267,18 +265,12 @@ func (b *Broker[T]) sendMsg(ctx context.Context, m T, ch chan T) {
 
 // Stop cancels the broker, allowing background work to stop.
 func (b *Broker[T]) Stop() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	b.close()
 }
 
 // Wait blocks until either the context has been canceled, or all work
 // has been completed.
 func (b *Broker[T]) Wait(ctx context.Context) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	b.wg.Wait(ctx)
 }
 

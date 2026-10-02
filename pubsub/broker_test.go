@@ -713,6 +713,30 @@ func brokerConstructors(t *testing.T) map[string]func(ctx context.Context) *Brok
 	}
 }
 
+func TestBrokerStopWhileWaiting(t *testing.T) {
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			b := mk(context.Background())
+			waited := make(chan struct{})
+			go func() { defer close(waited); b.Wait(context.Background()) }()
+			time.Sleep(50 * time.Millisecond)
+
+			stopped := make(chan struct{})
+			go func() { defer close(stopped); b.Stop() }()
+			select {
+			case <-stopped:
+			case <-time.After(2 * time.Second):
+				t.Fatal("Stop deadlocked behind Wait")
+			}
+			select {
+			case <-waited:
+			case <-time.After(2 * time.Second):
+				t.Fatal("Wait did not return after Stop")
+			}
+		})
+	}
+}
+
 func TestBrokerStopReleasesWorkers(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
