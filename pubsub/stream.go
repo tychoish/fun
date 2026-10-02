@@ -338,8 +338,14 @@ func (st *Stream[T]) Filter(check func(T) bool) *Stream[T] {
 // for the type T.
 func (st *Stream[T]) Reduce(reducer func(T, T) (T, error)) *Stream[T] {
 	var value T
+	var finished atomic.Bool
 	return MakeStream(func(ctx context.Context) (_ T, err error) {
 		defer func() { err = erc.Join(err, erc.ParsePanic(recover())) }()
+
+		// the reduction is a single value: later reads end the stream.
+		if finished.Swap(true) {
+			return value, io.EOF
+		}
 
 		for {
 			item, err := st.Read(ctx)
