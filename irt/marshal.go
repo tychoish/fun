@@ -319,13 +319,16 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 			return
 		}
 
-		// Decode key-value pairs until we reach the end of the object
-		for dec.More() {
-			// Decode the key
+		// Read keys until the closing brace; a truncated object fails Token.
+		for {
 			t, err := dec.Token()
 			if err != nil {
 				yield(zero, err)
 				return
+			}
+
+			if t == json.Delim('}') {
+				break
 			}
 
 			// Token only returns strings in key position.
@@ -346,10 +349,6 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 				return
 			}
 		}
-
-		// More is only false at the closing brace (a truncated input
-		// makes it true, and fails the next Token), so this cannot fail.
-		_, _ = dec.Token()
 
 		if err := checkJSONEnd(dec); err != nil {
 			yield(zero, err)
