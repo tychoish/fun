@@ -286,3 +286,84 @@ func TestMarshalLargeStreamsReview(t *testing.T) {
 		}
 	})
 }
+
+type textKey struct{ v string }
+
+func (k *textKey) UnmarshalText(b []byte) error {
+	if string(b) == "bad" {
+		return errors.New("bad key")
+	}
+	k.v = "t:" + string(b)
+	return nil
+}
+
+func TestDecodeJSONKeyReview(t *testing.T) {
+	if k, err := decodeJSONKey[uint8]("200"); err != nil || k != 200 {
+		t.Errorf("uint: %v, %v", k, err)
+	}
+	if _, err := decodeJSONKey[uint8]("300"); err == nil {
+		t.Error("uint overflow should fail")
+	}
+	if _, err := decodeJSONKey[int]("x"); err == nil {
+		t.Error("bad int should fail")
+	}
+	if k, err := decodeJSONKey[any]("s"); err != nil || k != "s" {
+		t.Errorf("any: %v, %v", k, err)
+	}
+	if _, err := decodeJSONKey[error]("s"); err == nil {
+		t.Error("non-empty interface should fail")
+	}
+	if _, err := decodeJSONKey[float64]("1"); err == nil {
+		t.Error("float key should fail")
+	}
+	if k, err := decodeJSONKey[textKey]("a"); err != nil || k.v != "t:a" {
+		t.Errorf("text: %v, %v", k, err)
+	}
+	if _, err := decodeJSONKey[textKey]("bad"); err == nil {
+		t.Error("text unmarshaler error should propagate")
+	}
+}
+
+func TestUnmarshalJSON2ErrorsReview(t *testing.T) {
+	for name, in := range map[string]string{
+		"trailing":  `{"a":1} x`,
+		"badkey":    `{"bad":1}`,
+		"badvalue":  `{"a":"s"}`,
+		"truncated": `{"a":1`,
+		"notobject": `[1]`,
+		"empty":     ``,
+	} {
+		var sawErr bool
+		for _, err := range UnmarshalJSON2[textKey, int](strings.NewReader(in)) {
+			if err != nil {
+				sawErr = true
+			}
+		}
+		if !sawErr {
+			t.Errorf("%s: expected an error", name)
+		}
+	}
+}
+
+func TestShardReiterateShardReview(t *testing.T) {
+	shards := Collect(Shard(t.Context(), 2, Range(1, 4)))
+	Collect(shards[0])
+	if got := Collect(shards[0]); len(got) != 0 {
+		t.Fatalf("second iteration of a finished shard: %v", got)
+	}
+	Collect(shards[1])
+}
+
+func TestUnmarshalJSON2EarlyBreakReview(t *testing.T) {
+	var n int
+	for _, err := range UnmarshalJSON2[string, int](strings.NewReader(`{"a":1,"b":2,"c":3}`)) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		n++
+		break
+	}
+	if n != 1 {
+		t.Fatalf("n = %d", n)
+	}
+}
