@@ -451,7 +451,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		// Create broker using non-blocking Add which returns ErrQueueFull immediately
 		broker := makeInternalBrokerImpl(
 			ctx,
-			queue.IteratorWaitPop(ctx),
+			queue.IteratorWaitPop,
 			fnx.MakeHandler(queue.Push), // Non-blocking add
 			queue.Len,
 			BrokerOptions{
@@ -549,7 +549,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		// Create broker using non-blocking Add
 		broker := makeInternalBrokerImpl(
 			ctx,
-			queue.IteratorWaitPop(ctx),
+			queue.IteratorWaitPop,
 			fnx.MakeHandler(queue.Push),
 			queue.Len,
 			BrokerOptions{
@@ -621,7 +621,7 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 
 		broker := makeInternalBrokerImpl(
 			ctx,
-			queue.IteratorWaitPop(ctx),
+			queue.IteratorWaitPop,
 			fnx.MakeHandler(queue.Push),
 			queue.Len,
 			BrokerOptions{},
@@ -677,4 +677,59 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 			// Expected - no more messages
 		}
 	})
+}
+
+func settleGoroutines(base int) int {
+	n := runtime.NumGoroutine()
+	for i := 0; i < 100 && n > base; i++ {
+		time.Sleep(20 * time.Millisecond)
+		n = runtime.NumGoroutine()
+	}
+	return n
+}
+
+func brokerConstructors(t *testing.T) map[string]func(ctx context.Context) *Broker[int] {
+	return map[string]func(ctx context.Context) *Broker[int]{
+		"Channel": func(ctx context.Context) *Broker[int] {
+			return NewBroker[int](ctx, BrokerOptions{WorkerPoolSize: 3})
+		},
+		"Queue": func(ctx context.Context) *Broker[int] {
+			return NewQueueBroker(ctx, NewUnlimitedQueue[int](), BrokerOptions{WorkerPoolSize: 3})
+		},
+		"Deque": func(ctx context.Context) *Broker[int] {
+			dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return NewDequeBroker(ctx, dq, BrokerOptions{WorkerPoolSize: 3})
+		},
+		"LIFO": func(ctx context.Context) *Broker[int] {
+			dq, err := NewDeque[int](DequeOptions{Capacity: 10})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return NewLIFOBroker(ctx, dq, BrokerOptions{WorkerPoolSize: 3})
+		},
+	}
+}
+
+func TestBrokerStopReleasesWorkers(t *testing.T) {
+	for name, mk := range brokerConstructors(t) {
+		t.Run(name, func(t *testing.T) {
+			base := runtime.NumGoroutine()
+			b := mk(context.Background())
+			b.Stop()
+
+			done := make(chan struct{})
+			go func() { defer close(done); b.Wait(context.Background()) }()
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("Wait did not return after Stop")
+			}
+			if n := settleGoroutines(base); n > base {
+				t.Fatalf("goroutine leak: base=%d now=%d", base, n)
+			}
+		})
+	}
 }
