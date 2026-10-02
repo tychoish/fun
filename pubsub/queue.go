@@ -258,6 +258,9 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	defer func() { q.draining = false }()
 
 	for q.tracker.len() > 0 {
+		if q.closed {
+			return ErrQueueClosed
+		}
 		if err := ctx.Err(); err != nil {
 			return ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
 		}
