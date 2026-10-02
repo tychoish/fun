@@ -150,6 +150,9 @@ func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
 	dq.updates.Broadcast()
 
 	for dq.tracker.len() > 0 {
+		if dq.closed {
+			return ErrQueueClosed
+		}
 		if err := ctx.Err(); err != nil {
 			return ers.Wrapf(err, "Drain() returned early with %d items remaining", dq.tracker.len())
 		}
