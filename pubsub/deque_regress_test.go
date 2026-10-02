@@ -35,7 +35,7 @@ func TestDequeIdleWaitersDoNotSpin(t *testing.T) {
 			defer cancel()
 			start := cpuTime()
 			done := make(chan struct{})
-			for i := 0; i < 4; i++ {
+			for range 4 {
 				go func() {
 					if full {
 						_ = dq.WaitPushBack(ctx, 2)
@@ -45,7 +45,7 @@ func TestDequeIdleWaitersDoNotSpin(t *testing.T) {
 					done <- struct{}{}
 				}()
 			}
-			for i := 0; i < 4; i++ {
+			for range 4 {
 				<-done
 			}
 			if used := cpuTime() - start; used > 100*time.Millisecond {

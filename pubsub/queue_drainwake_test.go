@@ -8,7 +8,7 @@ import (
 
 func TestQueueDrainWakesOnWaitPop(t *testing.T) {
 	q := NewUnlimitedQueue[int]()
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := q.Push(i); err != nil {
 			t.Fatal(err)
 		}
@@ -20,7 +20,7 @@ func TestQueueDrainWakesOnWaitPop(t *testing.T) {
 	go func() { done <- q.Drain(ctx) }()
 	time.Sleep(20 * time.Millisecond)
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if _, err := q.WaitPop(ctx); err != nil {
 			t.Fatal(err)
 		}
