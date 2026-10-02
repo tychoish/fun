@@ -1032,8 +1032,11 @@ func TestParallelForEach(t *testing.T) {
 			t.Fatal("should not have errored", err)
 		}
 		check.True(t, paned.Load())
-		if seenCount.Load() != 9 {
-			t.Error("should have seen", 9, "saw", seenCount.Load())
+		// the panic aborts the run, so the last item (9) races with
+		// the abort: it may or may not be processed. Everything
+		// before the panicking item must have been.
+		if seen := seenCount.Load(); seen < 8 || seen > 9 {
+			t.Error("should have seen 8 or 9, saw", seen)
 		}
 		errs := ers.Unwind(err)
 		if len(errs) != 2 {
