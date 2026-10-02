@@ -98,19 +98,19 @@ func WithJustifiedParallelism(t *testing.T, reason string) {
 }
 
 // GoroutinesAtMost fails the test (with Fatal) unless the number of
-// running goroutines drops to max or below within wait. Goroutines
+// running goroutines drops to limit or below within wait. Goroutines
 // wind down asynchronously after a cancellation, so this polls until
 // the deadline rather than checking once.
-func GoroutinesAtMost(t testing.TB, max int, wait time.Duration) {
+func GoroutinesAtMost(t testing.TB, limit int, wait time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(wait)
 	n := runtime.NumGoroutine()
-	for n > max && time.Now().Before(deadline) {
+	for n > limit && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 		n = runtime.NumGoroutine()
 	}
-	if n > max {
-		t.Fatal("goroutine leak: have", n, "want at most", max)
+	if n > limit {
+		t.Fatal("goroutine leak: have", n, "want at most", limit)
 	}
 }
 
