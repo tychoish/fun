@@ -41,7 +41,7 @@ func Collect[T any](seq iter.Seq[T], args ...int) (s []T) {
 			panic("can only specify ONE non-zero capaciy argument to Collect.")
 		}
 
-		s = make([]T, 0, max(0, idxorz(args, 0)))
+		s = make([]T, 0, max(0, slices.Max(args)))
 	}
 	return slices.AppendSeq(s, seq)
 }
@@ -1002,10 +1002,13 @@ func Chain[T any](seq iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 }
 
 // Chain2 flattens a sequence of pair sequences into a single pair
-// sequence.
+// sequence. Like Chain, nil inner sequences are skipped.
 func Chain2[A, B any](seq iter.Seq[iter.Seq2[A, B]]) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		for inner := range seq {
+			if inner == nil {
+				continue
+			}
 			for key, value := range inner {
 				if !yield(key, value) {
 					return
