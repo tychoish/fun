@@ -828,12 +828,6 @@ func TestBrokerUnsubscribeBlockedSubscriber(t *testing.T) {
 			pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)
 			defer pcancel()
 			_ = b.Send(pctx, 99)
-			if name == "Deque" || name == "LIFO" {
-				// deque pollers can miss wakeups with several idle
-				// workers (deque.go, tracked separately), which
-				// makes delivery here nondeterministic.
-				return
-			}
 			select {
 			case <-live:
 			case <-time.After(2 * time.Second):
@@ -1313,13 +1307,6 @@ func brokerCPUTime(t *testing.T) time.Duration {
 func TestBrokerIdleCPU(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
-			if name == "Deque" || name == "LIFO" {
-				// TODO: remove once fix/pubsub-collections (deque
-				// waiter busy-spin, ps-deque-spin) is merged; verified
-				// passing against that branch, fails (300ms+ CPU)
-				// without it.
-				t.Skip("deque busy-spin fix lives on fix/pubsub-collections")
-			}
 			b := mk(t.Context())
 			defer b.Stop()
 			time.Sleep(50 * time.Millisecond)
