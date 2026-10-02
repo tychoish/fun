@@ -39,3 +39,29 @@ func TestShardCancelReleasesPull(t *testing.T) {
 		}
 	})
 }
+
+func TestShardStartsPullLazily(t *testing.T) {
+	t.Run("NeverIteratedShardsCostNothing", func(t *testing.T) {
+		base := runtime.NumGoroutine()
+		for range 10 {
+			for range Shard(context.Background(), 4, Monotonic()) {
+				break // the outer loop stops before any shard is iterated
+			}
+		}
+		goroutinesAtMost(t, base)
+	})
+	t.Run("CanceledBeforeFirstPullNeverStartsSource", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		started := false
+		source := func(yield func(int) bool) { started = true; yield(1) }
+		for s := range Shard(ctx, 2, source) {
+			for range s {
+				t.Fatal("shard yielded after cancel")
+			}
+		}
+		if started {
+			t.Fatal("source ran although ctx was canceled before the first pull")
+		}
+	})
+}
