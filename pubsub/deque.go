@@ -49,7 +49,9 @@ func (dq *Deque[T]) init() { dq.once.Do(dq.doInit) }
 
 // DequeOptions configure the semantics of the deque. The Validate()
 // method ensures that you do not produce a configuration that is
-// impossible.
+// impossible. A negative Capacity is an error (as is a non-positive
+// QueueOptions.HardLimit); a Capacity of zero with no QueueOptions is
+// unbounded, like the zero value of Deque and Queue.
 type DequeOptions struct {
 	Unlimited    bool
 	Capacity     int
@@ -69,8 +71,8 @@ func (opts *DequeOptions) Validate() error {
 		return opts.QueueOptions.Validate()
 	case opts.Unlimited:
 		return nil
-	case opts.Capacity <= 0:
-		opts.Capacity = 1
+	case opts.Capacity < 0:
+		return fmt.Errorf("negative capacity of %d: %w", opts.Capacity, ers.ErrMalformedConfiguration)
 	}
 	return nil
 }
@@ -90,8 +92,6 @@ func NewDeque[T any](opts DequeOptions) (*Deque[T], error) {
 		dq.tracker = newQueueLimitTracker(*opts.QueueOptions)
 	} else if opts.Capacity > 0 {
 		dq.tracker = &queueHardLimitTracker{capacity: opts.Capacity}
-	} else if opts.Unlimited {
-		dq.tracker = &queueNoLimitTrackerImpl{}
 	}
 	return dq, nil
 }
