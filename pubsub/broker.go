@@ -11,10 +11,15 @@ import (
 	"sync/atomic"
 
 	"github.com/tychoish/fun/adt"
+	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/fnx"
 	"github.com/tychoish/fun/irt"
 	"github.com/tychoish/fun/stw"
 )
+
+// ErrBrokerClosed is returned by Broker operations that are attempted
+// after the broker has been stopped (or its context canceled).
+const ErrBrokerClosed = ers.Error("broker is closed")
 
 // stole this from
 // https://stackoverflow.com/questions/36417199/how-to-broadcast-message-using-channel
@@ -26,9 +31,9 @@ type Broker[T any] struct {
 	wg    fnx.WaitGroup
 	ctlCh chan ctlRequest[T]
 	opts  BrokerOptions
-	stats chan func(BrokerStats)
 
 	close context.CancelFunc
+	ctx   context.Context
 	sink  func(context.Context, T) error
 	count atomic.Uint64
 }
@@ -40,6 +45,7 @@ type ctlRequest[T any] struct {
 	ch    chan T
 	ack   chan struct{}
 	unsub bool
+	stats func(BrokerStats)
 }
 
 // BrokerStats is a data struct used to report on the internal state
@@ -115,6 +121,7 @@ func makeInternalBrokerImpl[T any](
 ) *Broker[T] {
 	b := makeBroker[T](opts)
 	ctx, b.close = context.WithCancel(ctx)
+	b.ctx = ctx
 	b.startQueueWorkers(ctx, source, sink, length)
 	return b
 }
@@ -172,7 +179,6 @@ func makeBroker[T any](opts BrokerOptions) *Broker[T] {
 	return &Broker[T]{
 		opts:  opts,
 		ctlCh: make(chan ctlRequest[T], opts.BufferSize),
-		stats: make(chan func(BrokerStats)),
 	}
 }
 
@@ -193,6 +199,13 @@ func (b *Broker[T]) startQueueWorkers(
 				return
 			case req := <-b.ctlCh:
 				switch {
+				case req.stats != nil:
+					// ordered behind earlier subscribe/unsubscribe requests.
+					req.stats(BrokerStats{
+						Subscriptions: subs.Len(),
+						BufferDepth:   length(),
+						MessageCount:  b.count.Load(),
+					})
 				case req.unsub:
 					// closing done releases any sender blocked
 					// on this subscriber.
@@ -206,12 +219,6 @@ func (b *Broker[T]) startQueueWorkers(
 				default:
 					close(req.ack)
 				}
-			case fn := <-b.stats:
-				fn(BrokerStats{
-					Subscriptions: subs.Len(),
-					BufferDepth:   length(),
-					MessageCount:  b.count.Load(),
-				})
 			}
 		}
 	}()
@@ -258,13 +265,14 @@ func (b *Broker[T]) Stats(ctx context.Context) BrokerStats {
 	select {
 	case <-ctx.Done():
 		return output
-	case b.stats <- func(stats BrokerStats) {
-		signal <- stats
-	}:
+	case <-b.ctx.Done():
+		return output
+	case b.ctlCh <- ctlRequest[T]{stats: func(stats BrokerStats) { signal <- stats }}:
 	}
 
 	select {
 	case <-ctx.Done():
+	case <-b.ctx.Done():
 	case output = <-signal:
 	}
 	return output
@@ -297,13 +305,15 @@ func (b *Broker[T]) Wait(ctx context.Context) {
 // by the caller. Closing a subscription channel will cause an
 // unhandled panic.
 func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || b.ctx.Err() != nil {
 		return nil
 	}
 	msgCh := make(chan T, b.opts.BufferSize)
 	req := ctlRequest[T]{ch: msgCh, ack: make(chan struct{})}
 	select {
 	case <-ctx.Done():
+		return nil
+	case <-b.ctx.Done():
 		return nil
 	case b.ctlCh <- req:
 	}
@@ -315,6 +325,8 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 		// matching removal behind it so the subscription isn't leaked.
 		b.Unsubscribe(context.Background(), msgCh)
 		return nil
+	case <-b.ctx.Done():
+		return nil
 	case <-req.ack:
 		return msgCh
 	}
@@ -324,11 +336,13 @@ func (b *Broker[T]) Subscribe(ctx context.Context) chan T {
 func (b *Broker[T]) Unsubscribe(ctx context.Context, msgCh chan T) {
 	select {
 	case b.ctlCh <- ctlRequest[T]{ch: msgCh, unsub: true}:
+	case <-b.ctx.Done():
 	case <-ctx.Done():
 	}
 }
 
-// Publish distributes a message to all subscribers.
+// Publish distributes a message to all subscribers. Errors, including
+// ErrBrokerClosed, are discarded; use Send to observe them.
 func (b *Broker[T]) Publish(ctx context.Context, msg T) { _ = b.Send(ctx, msg) }
 
 // Send distributes a message to all subscribers. The message is
@@ -336,14 +350,32 @@ func (b *Broker[T]) Publish(ctx context.Context, msg T) { _ = b.Send(ctx, msg) }
 // back-pressure (and, for queue-backed brokers with NonBlockingPush,
 // ErrQueueFull) is reported to the caller rather than stalling the
 // broker's control loop.
+//
+// After the broker has been stopped, Send returns ErrBrokerClosed.
 func (b *Broker[T]) Send(ctx context.Context, msg T) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	b.count.Add(1)
-	err := b.sink(ctx, msg)
-	if errors.Is(err, ErrQueueClosed) || errors.Is(err, io.EOF) {
-		b.close()
+	if b.ctx.Err() != nil {
+		return ErrBrokerClosed
 	}
-	return err
+
+	// abort a blocked sink if the broker stops.
+	sctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer context.AfterFunc(b.ctx, cancel)()
+
+	b.count.Add(1)
+	err := b.sink(sctx, msg)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrQueueClosed) || errors.Is(err, io.EOF):
+		b.close()
+		return errors.Join(ErrBrokerClosed, err)
+	case ctx.Err() == nil && b.ctx.Err() != nil:
+		return errors.Join(ErrBrokerClosed, err)
+	default:
+		return err
+	}
 }
