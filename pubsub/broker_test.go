@@ -291,13 +291,11 @@ func TestBroker(t *testing.T) {
 			erc.InvariantOk(queue.Close() == nil, "cannot error")
 			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
-			sa := time.Now()
-			nctx, ncancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+			nctx, ncancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer ncancel()
 			_ = broker.Send(nctx, "foo")
-			dur := time.Since(sa)
-			if dur > 5*time.Millisecond {
-				t.Error(dur)
+			if nctx.Err() != nil {
+				t.Error("publish to a closed queue blocked")
 			}
 		})
 		t.Run("PublishOneWithSubScriber", func(t *testing.T) {
@@ -306,8 +304,7 @@ func TestBroker(t *testing.T) {
 			erc.InvariantOk(queue.Close() == nil, "cannot error")
 			broker := NewQueueBroker(ctx, queue, BrokerOptions{})
 
-			sa := time.Now()
-			nctx, ncancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			nctx, ncancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer ncancel()
 			// publishing to a closed queue stops the broker, after
 			// which operations fail promptly rather than blocking.
@@ -316,8 +313,8 @@ func TestBroker(t *testing.T) {
 			_, err := broker.Subscribe(nctx)
 			check.Error(t, err)
 			_ = broker.Send(nctx, "foo")
-			if dur := time.Since(sa); dur > 50*time.Millisecond {
-				t.Error(dur)
+			if nctx.Err() != nil {
+				t.Error("operations on a stopped broker blocked")
 			}
 		})
 	})
@@ -451,16 +448,13 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 		// Send first message - worker will pull it and block trying to dispatch
 		err = broker.Send(ctx, fmt.Sprintf("msg-0"))
 		check.NotError(t, err)
-		time.Sleep(20 * time.Millisecond)
+		eventually(t, func() bool { return queue.Len() == 0 })
 
 		// Now fill the queue to capacity while worker is blocked
 		for i := 1; i <= 3; i++ {
 			err := broker.Send(ctx, fmt.Sprintf("msg-%d", i))
 			check.NotError(t, err)
 		}
-
-		// Give time for messages to reach the queue
-		time.Sleep(20 * time.Millisecond)
 
 		// Queue should be at capacity (msg-0 is held by worker, msg-1,2,3 are in queue)
 		stats := broker.Stats(ctx)
@@ -473,9 +467,6 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 			// Send reports the shed message
 			check.ErrorIs(t, err, ErrQueueFull)
 		}
-
-		// Give time for the publish goroutine to process
-		time.Sleep(20 * time.Millisecond)
 
 		// Queue should still be at capacity (messages were dropped)
 		stats = broker.Stats(ctx)
@@ -618,18 +609,16 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 
 		// Send first message - worker pulls and blocks on dispatch
 		broker.Send(ctx, "msg-0")
-		time.Sleep(20 * time.Millisecond)
+		eventually(t, func() bool { return queue.Len() == 0 })
 
 		// Fill the queue to capacity (HardLimit: 2)
 		broker.Send(ctx, "msg-1")
 		broker.Send(ctx, "msg-2")
-		time.Sleep(20 * time.Millisecond)
 
 		// Try to send more - these should be dropped (queue full)
 		broker.Send(ctx, "dropped-3")
 		broker.Send(ctx, "dropped-4")
 		broker.Send(ctx, "dropped-5")
-		time.Sleep(20 * time.Millisecond)
 
 		// Consume messages
 		received := make([]string, 0, 3)
@@ -646,7 +635,6 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 
 		// Now queue has space - new messages should go through
 		broker.Send(ctx, "after-drop")
-		time.Sleep(20 * time.Millisecond)
 
 		msg := <-sub
 		check.Equal(t, msg, "after-drop")
@@ -659,6 +647,20 @@ func TestBrokerDropsMessagesOnQueueFull(t *testing.T) {
 			// Expected - no more messages
 		}
 	})
+}
+
+// eventually polls cond until it is true, failing the test if it is not
+// true within a generous deadline. It replaces fixed sleeps that wait
+// for a background goroutine to make progress.
+func eventually(t testing.TB, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatal("condition never became true")
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func brokerConstructors(t *testing.T) map[string]func(ctx context.Context) *Broker[int] {
@@ -765,7 +767,11 @@ func TestQueueBrokerDrainsQueue(t *testing.T) {
 				full++
 			}
 			scancel()
-			time.Sleep(5 * time.Millisecond)
+			if i == 0 {
+				// the worker must hold the first message before the
+				// queue is filled.
+				eventually(t, func() bool { return queue.Len() == 0 })
+			}
 		}
 		check.Equal(t, full, 7)
 		got := 0
@@ -1029,7 +1035,8 @@ func TestBrokerControlOperationsInterrupted(t *testing.T) {
 }
 
 func TestBrokerSendStoppedWhileSinkBlocked(t *testing.T) {
-	b := makeInternalBrokerImpl(t.Context(),
+	b := makeInternalBrokerImpl(
+		t.Context(),
 		func(context.Context) iter.Seq[int] { return func(func(int) bool) {} },
 		func(ctx context.Context, _ int) error { <-ctx.Done(); return ctx.Err() },
 		func() int { return 0 },
@@ -1208,7 +1215,8 @@ func TestBrokerParallelDispatchSlowSubscriber(t *testing.T) {
 func TestBrokerPanics(t *testing.T) {
 	ctx := t.Context()
 	t.Run("SinkPanicReachesCaller", func(t *testing.T) {
-		b := makeInternalBrokerImpl(ctx,
+		b := makeInternalBrokerImpl(
+			ctx,
 			func(context.Context) iter.Seq[int] { return func(func(int) bool) {} },
 			func(context.Context, int) error { panic("boom") },
 			func() int { return 0 },

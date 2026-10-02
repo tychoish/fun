@@ -702,7 +702,7 @@ func TestQueueIterators(t *testing.T) {
 				check.Error(t, err)
 				check.ErrorIs(t, err, context.Canceled)
 			}()
-			time.Sleep(10 * time.Millisecond)
+			<-sig
 			check.Equal(t, flag.Load(), 2)
 
 			count := 0
@@ -811,14 +811,12 @@ func TestQueueIteratorPop(t *testing.T) {
 		iter := queue.IteratorWaitPop(ctx)
 		values := make([]string, 0, 2)
 
-		go func() {
-			time.Sleep(20 * time.Millisecond)
-			queue.Close()
-		}()
-
+		// Close does not drain, so close once both items are consumed.
 		for val := range iter {
 			values = append(values, val)
-			time.Sleep(10 * time.Millisecond)
+			if len(values) == 2 {
+				queue.Close()
+			}
 		}
 
 		assert.Equal(t, len(values), 2)
@@ -864,7 +862,7 @@ func TestQueueIteratorPop(t *testing.T) {
 	})
 
 	t.Run("ConcurrentProducerConsumer", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		queue := NewUnlimitedQueue[int]()
@@ -877,16 +875,12 @@ func TestQueueIteratorPop(t *testing.T) {
 			}
 		}()
 
-		time.Sleep(10 * time.Millisecond)
-
 		for i := range 20 {
 			check.NotError(t, queue.Push(i))
-			time.Sleep(5 * time.Millisecond)
 		}
 
-		<-ctx.Done()
-		assert.True(t, consumed.Load() >= 10)
-		assert.True(t, queue.Len() < 10)
+		eventually(t, func() bool { return consumed.Load() == 20 })
+		assert.Equal(t, queue.Len(), 0)
 	})
 }
 
@@ -978,7 +972,11 @@ func TestQueueDrain(t *testing.T) {
 		}()
 
 		<-drainStarted
-		time.Sleep(10 * time.Millisecond)
+		eventually(t, func() bool {
+			queue.mu.Lock()
+			defer queue.mu.Unlock()
+			return queue.drainers > 0
+		})
 
 		// Try to add while draining - should fail
 		err := queue.Push(3)
