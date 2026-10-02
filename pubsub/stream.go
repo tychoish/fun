@@ -222,10 +222,16 @@ func (st *Stream[T]) Next(ctx context.Context) bool {
 }
 
 func (st *Stream[T]) readOneHandleError(err error) error {
-	if err != nil {
-		return erc.Join(err, st.Close())
+	if err == nil {
+		return nil
 	}
-	return nil
+
+	// the collected errors usually already contain err: don't repeat it.
+	collected := st.Close()
+	if errors.Is(collected, err) {
+		return collected
+	}
+	return erc.Join(err, collected)
 }
 
 // Read returns a single value from the stream. This operation IS safe

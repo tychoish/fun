@@ -1516,7 +1516,7 @@ func RunStreamStringAlgoTests(
 							t.Error("unexpected error:", err)
 						}
 						errs := ers.Unwind(err)
-						if len(errs) != 2 {
+						if len(errs) != 1 {
 							t.Error(len(errs), errs)
 						}
 
