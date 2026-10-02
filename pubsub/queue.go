@@ -168,6 +168,13 @@ func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	defer wakeOnCancel(ctx, &q.mu, cond)()
 
 	for q.tracker.cap() <= q.tracker.len() {
+		if q.drainers > 0 {
+			return ErrQueueDraining
+		}
+		if q.closed {
+			return ErrQueueClosed
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -252,6 +259,9 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	defer cancel()
 	q.drainers++
 	defer func() { q.drainers-- }()
+
+	// wake blocked pushers so they notice the drain.
+	q.nupdates.Broadcast()
 
 	for q.tracker.len() > 0 {
 		if q.closed {
