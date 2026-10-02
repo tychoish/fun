@@ -248,7 +248,7 @@ func RunBrokerTests[T comparable](pctx context.Context, t *testing.T, elems []T)
 				t.Error("should not subscribe with canceled context", cctx.Err())
 			}
 			_ = broker.Unsubscribe(cctx, ch1)
-			check.Zero(t, broker.Stats(cctx))
+			check.Equal(t, broker.Stats(cctx).State, BrokerStateClosed)
 		})
 	}
 }
@@ -908,7 +908,7 @@ func TestBrokerOperationsAfterStop(t *testing.T) {
 			check.ErrorIs(t, subErr, ErrBrokerClosed)
 			check.ErrorIs(t, unsubErr, ErrBrokerClosed)
 			check.True(t, subCh == nil)
-			check.Zero(t, stats)
+			check.Equal(t, stats, BrokerStats{State: BrokerStateClosed})
 		})
 	}
 }
@@ -1022,10 +1022,15 @@ func TestBrokerControlOperationsInterrupted(t *testing.T) {
 		time.AfterFunc(10*time.Millisecond, b.Stop)
 		check.ErrorIs(t, b.Unsubscribe(context.Background(), nil), ErrBrokerClosed)
 	})
+	t.Run("StatsStopWhileSending", func(t *testing.T) {
+		b := stalledBroker(0)
+		time.AfterFunc(10*time.Millisecond, b.Stop)
+		check.Equal(t, b.Stats(context.Background()), BrokerStats{State: BrokerStateClosed})
+	})
 	t.Run("StatsStopWhileAwaitingReply", func(t *testing.T) {
 		b := stalledBroker(1)
 		time.AfterFunc(10*time.Millisecond, b.Stop)
-		check.Zero(t, b.Stats(context.Background()))
+		check.Equal(t, b.Stats(context.Background()), BrokerStats{State: BrokerStateClosed})
 	})
 	t.Run("DuplicateSubscribeIsIdempotent", func(t *testing.T) {
 		b := NewBroker[int](t.Context(), BrokerOptions{})
@@ -1297,4 +1302,50 @@ func TestBrokerIdleCPU(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBrokerStatsState(t *testing.T) {
+	t.Run("ZeroValueIsUnstarted", func(t *testing.T) {
+		check.Equal(t, BrokerStats{}.State, BrokerStateUnstarted)
+	})
+	t.Run("Empty", func(t *testing.T) {
+		b := NewBroker[int](t.Context(), BrokerOptions{})
+		check.Equal(t, b.Stats(t.Context()).State, BrokerStateEmpty)
+	})
+	t.Run("Active", func(t *testing.T) {
+		b := NewBroker[int](t.Context(), BrokerOptions{})
+		mustSubscribe(t, b, t.Context())
+		check.Equal(t, b.Stats(t.Context()).State, BrokerStateActive)
+	})
+	t.Run("CallerCtxWhileAwaitingReply", func(t *testing.T) {
+		b := stalledBroker(1)
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+		defer cancel()
+		check.Equal(t, b.Stats(ctx), BrokerStats{})
+	})
+	t.Run("Closed", func(t *testing.T) {
+		b := NewBroker[int](t.Context(), BrokerOptions{})
+		b.Stop()
+		check.Equal(t, b.Stats(t.Context()), BrokerStats{State: BrokerStateClosed})
+	})
+	t.Run("ClosedWinsOverCanceledCaller", func(t *testing.T) {
+		b := NewBroker[int](t.Context(), BrokerOptions{})
+		b.Stop()
+		cctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		check.Equal(t, b.Stats(cctx).State, BrokerStateClosed)
+	})
+	t.Run("CanceledCallerOnRunningBrokerIsNotClosed", func(t *testing.T) {
+		b := NewBroker[int](t.Context(), BrokerOptions{})
+		cctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		check.Equal(t, b.Stats(cctx), BrokerStats{})
+	})
+	t.Run("String", func(t *testing.T) {
+		check.Equal(t, BrokerStateUnstarted.String(), "unstarted")
+		check.Equal(t, BrokerStateEmpty.String(), "empty")
+		check.Equal(t, BrokerStateActive.String(), "active")
+		check.Equal(t, BrokerStateClosed.String(), "closed")
+		check.Equal(t, BrokerState(99).String(), "unknown")
+	})
 }
