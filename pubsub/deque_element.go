@@ -47,9 +47,7 @@ func (it *element[T]) wait(ctx context.Context, direction dqDirection) error {
 	}
 
 	// If the context terminates, wake the waiter.
-	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); cond.Broadcast() }()
-	defer cancel()
+	defer wakeOnCancel(ctx, &it.list.mutex, cond)()
 
 	next := it.getNextOrPrevious(direction)
 	for next == it.getNextOrPrevious(direction) {
@@ -66,4 +64,17 @@ func (it *element[T]) wait(ctx context.Context, direction dqDirection) error {
 	}
 
 	return nil
+}
+
+// wakeOnCancel broadcasts on cond when ctx ends. The broadcast runs with
+// the mutex held, so it cannot fall between a waiter's ctx check and its
+// Cond.Wait (which releases the mutex atomically) and be lost. Callers
+// must hold mu and call the returned stop function when done.
+func wakeOnCancel(ctx context.Context, mu *sync.Mutex, cond *sync.Cond) (stop func()) {
+	cancel := context.AfterFunc(ctx, func() {
+		mu.Lock()
+		defer mu.Unlock()
+		cond.Broadcast()
+	})
+	return func() { cancel() }
 }

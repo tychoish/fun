@@ -141,7 +141,8 @@ func (dq *Deque[T]) Shutdown(ctx context.Context) error {
 func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); dq.updates.Broadcast() }()
+	stop := wakeOnCancel(ctx, &dq.mutex, dq.updates)
+	defer stop()
 	defer cancel()
 	dq.drainers++
 	defer func() { dq.drainers-- }()
@@ -288,9 +289,7 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 
 	cond := dq.updates
 	// If the context terminates, wake the waiter.
-	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); cond.Broadcast() }()
-	defer cancel()
+	defer wakeOnCancel(ctx, &dq.mutex, cond)()
 
 	for dq.tracker.cap() <= dq.tracker.len() {
 		if dq.drainers > 0 {

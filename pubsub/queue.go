@@ -165,9 +165,7 @@ func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	cond := q.nupdates
 
 	// If the context terminates, wake the waiter.
-	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); cond.Broadcast() }()
-	defer cancel()
+	defer wakeOnCancel(ctx, &q.mu, cond)()
 
 	for q.tracker.cap() <= q.tracker.len() {
 		select {
@@ -220,9 +218,7 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 	defer q.with(q.lock())
 
 	// If the context terminates, wake the waiter.
-	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
-	defer cancel()
+	defer wakeOnCancel(ctx, &q.mu, q.nempty)()
 
 	for q.tracker.len() == 0 {
 		if q.closed {
@@ -252,7 +248,7 @@ func (q *Queue[T]) Drain(ctx context.Context) error {
 func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); q.nempty.Broadcast() }()
+	defer wakeOnCancel(ctx, &q.mu, q.nempty)()
 	defer cancel()
 	q.drainers++
 	defer func() { q.drainers-- }()
@@ -272,9 +268,7 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 
 func (q *Queue[T]) waitForNew(ctx context.Context) error {
 	// when the function returns wake all other waiters.
-	ctx, cancel := context.WithCancel(ctx)
-	go func() { <-ctx.Done(); q.nupdates.Broadcast() }()
-	defer cancel()
+	defer wakeOnCancel(ctx, &q.mu, q.nupdates)()
 
 	head := q.back
 	for head == q.back && q.back.link != q.front {
