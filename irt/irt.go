@@ -819,17 +819,60 @@ func Pool3[A, B, C any, OP ~func(A) (B, C)](ctx context.Context, num int, seq it
 // the sequence is empty.
 func Chunk[T any](seq iter.Seq[T], num int) iter.Seq[iter.Seq[T]] {
 	return func(yield func(iter.Seq[T]) bool) {
+		if num <= 0 {
+			return
+		}
 		next, stop := iter.Pull(seq)
 		defer stop()
-		for shouldContinue := num > 0; shouldContinue && yield(func(yield func(T) bool) {
-			for range num {
-				if value, ok := next(); !ok || !yield(value) {
-					shouldContinue = false
-					return
+
+		for {
+			// peek: only emit a chunk if it has at least one element.
+			first, ok := next()
+			if !ok {
+				return
+			}
+
+			var (
+				pulled    = 1
+				pending   = true
+				exhausted bool
+			)
+
+			inner := func(yield func(T) bool) {
+				for !exhausted {
+					value := first
+					if pending {
+						pending = false
+					} else if pulled < num {
+						if value, ok = next(); !ok {
+							exhausted = true
+							return
+						}
+						pulled++
+					} else {
+						return
+					}
+					if !yield(value) {
+						return
+					}
 				}
 			}
-		}); {
-			continue
+
+			if !yield(inner) {
+				return
+			}
+
+			// the consumer may not have drained the chunk: skip the
+			// remainder so the next chunk starts at the boundary.
+			for !exhausted && pulled < num {
+				if _, ok = next(); !ok {
+					return
+				}
+				pulled++
+			}
+			if exhausted {
+				return
+			}
 		}
 	}
 }
