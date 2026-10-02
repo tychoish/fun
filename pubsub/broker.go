@@ -239,6 +239,14 @@ func (b *Broker[T]) startQueueWorkers(
 	}
 }
 
+// dispatchMessage delivers msg to every subscriber, iterating the live
+// subscription set (not a snapshot, so no per-message allocation).
+//
+// Delivery is subject to head-of-line blocking: with sequential
+// dispatch a slow subscriber delays every subscriber after it, and with
+// ParallelDispatch each message still waits for its slowest subscriber
+// before the next is dispatched. Use buffered subscriptions (BufferSize)
+// or Unsubscribe slow consumers to bound the delay.
 func (b *Broker[T]) dispatchMessage(ctx context.Context, seq iter.Seq2[chan T, chan struct{}], msg T) {
 	// do sendingmsg
 	if b.opts.ParallelDispatch {
