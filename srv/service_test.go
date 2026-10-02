@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
-	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -271,9 +271,7 @@ func TestService(t *testing.T) {
 	})
 	t.Run("HTTP", func(t *testing.T) {
 		t.Run("Ordering", func(t *testing.T) {
-			hs := &http.Server{
-				Addr: "127.0.0.2:2340",
-			}
+			hs, addr := newLoopbackServer(nil)
 			s := HTTP("test", time.Minute, hs)
 			testCheckOrderingEffects(t, s)
 
@@ -282,7 +280,7 @@ func TestService(t *testing.T) {
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			time.Sleep(10 * time.Millisecond)
+			<-addr
 			s.Close()
 			if err := s.Wait(); err != nil {
 				t.Fatal(err)
@@ -291,63 +289,57 @@ func TestService(t *testing.T) {
 		t.Run("ErrorStartup", func(t *testing.T) {
 			ctx := t.Context()
 
-			hs1 := &http.Server{
-				Addr: "127.0.0.2:2340",
-			}
+			hs1, addr1 := newLoopbackServer(nil)
 			s1 := HTTP("test", time.Second, hs1)
 			if err := s1.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
+			// the first server is listening once its address is published.
+			taken := <-addr1
 			if !s1.Running() {
 				t.Error("should be running")
 			}
-			time.Sleep(100 * time.Millisecond)
-			if !s1.Running() {
-				t.Error("should STILL be running")
-			}
-			hs2 := &http.Server{
-				Addr: "127.0.0.2:2340",
-			}
+			hs2 := &http.Server{Addr: taken}
 			s2 := HTTP("test", time.Second, hs2)
 			if err := s2.Start(ctx); err != nil {
 				t.Error(err)
 			}
 
-			time.Sleep(100 * time.Millisecond)
-			s2.Close()
+			// the address is in use, so the second service exits on its own with an error.
 			if err := s2.Wait(); err == nil {
 				t.Error("second service should have errored")
 			}
+			s2.Close()
 
+			if !s1.Running() {
+				t.Error("should STILL be running")
+			}
 			s1.Close()
 			if err := s1.Wait(); err != nil {
 				t.Error(err)
 			}
 		})
 		t.Run("ErrorShutdown", func(t *testing.T) {
-			hs := &http.Server{
-				Addr: "127.0.0.2:2340",
-				Handler: http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-					time.Sleep(20 * time.Millisecond)
-				}),
-			}
+			hs, addr := newLoopbackServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				time.Sleep(20 * time.Millisecond)
+			}))
 			s := HTTP("test", time.Millisecond, hs)
 			testCheckOrderingEffects(t, s)
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 
 			if err := s.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			time.Sleep(100 * time.Millisecond)
+			target := <-addr
 
 			sig := make(chan struct{})
 			go func() {
 				defer close(sig)
 				//nolint:bodyclose
 				resp, err := http.DefaultClient.Do(
-					erc.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.2:2340/", nil)),
+					erc.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://"+target+"/", nil)),
 				)
 				if err != nil {
 					t.Error(err)
@@ -362,7 +354,6 @@ func TestService(t *testing.T) {
 				}
 			}()
 
-			runtime.Gosched()
 			<-sig
 			s.Close()
 			if err := s.Wait(); err != nil {
@@ -412,4 +403,19 @@ func TestService(t *testing.T) {
 			assert.ErrorIs(t, err, expected)
 		})
 	})
+}
+
+// newLoopbackServer returns an http.Server bound to an ephemeral
+// loopback port. The returned channel (buffered) receives the actual
+// listen address once the server is accepting connections.
+func newLoopbackServer(h http.Handler) (*http.Server, <-chan string) {
+	addr := make(chan string, 1)
+	return &http.Server{
+		Addr:    "127.0.0.1:0",
+		Handler: h,
+		BaseContext: func(l net.Listener) context.Context {
+			addr <- l.Addr().String()
+			return context.Background()
+		},
+	}, addr
 }
