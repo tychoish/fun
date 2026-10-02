@@ -741,6 +741,71 @@ func TestBrokerStatsWithExpiredContextDoesNotWedge(t *testing.T) {
 	}
 }
 
+func TestQueueBrokerDrainsQueue(t *testing.T) {
+	t.Run("BlockingDefault", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		queue, err := NewQueue[int](QueueOptions{HardLimit: 2, SoftQuota: 2})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := NewQueueBroker(ctx, queue, BrokerOptions{})
+		defer b.Stop()
+		sub := b.Subscribe(ctx)
+		defer b.Unsubscribe(ctx, sub)
+
+		const count = 10
+		go func() {
+			for i := 0; i < count; i++ {
+				b.Publish(ctx, i)
+			}
+		}()
+		for i := 0; i < count; i++ {
+			select {
+			case v := <-sub:
+				check.Equal(t, v, i)
+			case <-ctx.Done():
+				t.Fatalf("timed out after %d messages", i)
+			}
+		}
+		check.Equal(t, queue.Len(), 0)
+		check.Equal(t, b.Stats(ctx).BufferDepth, 0)
+	})
+	t.Run("NonBlockingPushSheds", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		queue, err := NewQueue[int](QueueOptions{HardLimit: 2, SoftQuota: 2})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := NewQueueBroker(ctx, queue, BrokerOptions{NonBlockingPush: true})
+		defer b.Stop()
+		sub := b.Subscribe(ctx)
+		defer b.Unsubscribe(ctx, sub)
+
+		// the worker takes one message and blocks on the
+		// subscriber; the queue holds two more.
+		for i := 0; i < 10; i++ {
+			sctx, scancel := context.WithTimeout(ctx, time.Second)
+			_ = b.Send(sctx, i)
+			scancel()
+			time.Sleep(5 * time.Millisecond)
+		}
+		got := 0
+	loop:
+		for {
+			select {
+			case <-sub:
+				got++
+			case <-time.After(100 * time.Millisecond):
+				break loop
+			}
+		}
+		check.Equal(t, got, 3)
+		check.Equal(t, queue.Len(), 0)
+	})
+}
+
 func TestBrokerStopWhileWaiting(t *testing.T) {
 	for name, mk := range brokerConstructors(t) {
 		t.Run(name, func(t *testing.T) {
