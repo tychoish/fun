@@ -55,3 +55,14 @@ func TestChain2NilInnerReview(t *testing.T) {
 		t.Fatalf("got %v", out)
 	}
 }
+
+func TestSortBy2UsesRightValueReview(t *testing.T) {
+	in := Zip(Slice([]int{1, 2, 3}), Slice([]int{30, 10, 20}))
+	var got []int
+	for _, v := range SortBy2(in, func(_, v int) int { return v }) {
+		got = append(got, v)
+	}
+	if len(got) != 3 || got[0] != 10 || got[1] != 20 || got[2] != 30 {
+		t.Fatalf("got %v", got)
+	}
+}

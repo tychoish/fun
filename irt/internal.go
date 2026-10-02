@@ -361,7 +361,7 @@ func toCmp[T any, K cmp.Ordered](to func(T) K) func(T, T) int {
 }
 
 func toCmp2[A, B any, K cmp.Ordered](to func(A, B) K) func(KV[A, B], KV[A, B]) int {
-	return func(l KV[A, B], r KV[A, B]) int { return cmp.Compare(to(l.Key, l.Value), to(r.Key, l.Value)) }
+	return func(l KV[A, B], r KV[A, B]) int { return cmp.Compare(to(l.Key, l.Value), to(r.Key, r.Value)) }
 }
 
 ////////////////////////////////
