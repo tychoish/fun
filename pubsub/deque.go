@@ -31,6 +31,7 @@ type Deque[T any] struct {
 	tracker  queueLimitTracker
 	drainers int // number of outstanding Drain calls
 	closed   bool
+	lo, hi   int // sequence numbers assigned at the front and back
 }
 
 func (dq *Deque[T]) mtx() *sync.Mutex { dq.init(); return &dq.mutex }
@@ -181,7 +182,7 @@ func (dq *Deque[T]) doClose() {
 // limit.
 func (dq *Deque[T]) PushFront(it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
-	return dq.addAfter(it, dq.root)
+	return dq.add(it, dqNext)
 }
 
 // PushBack adds an item to the back or end of the deque, and
@@ -189,7 +190,7 @@ func (dq *Deque[T]) PushFront(it T) error {
 // limit.
 func (dq *Deque[T]) PushBack(it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
-	return dq.addAfter(it, dq.root.prev)
+	return dq.add(it, dqPrev)
 }
 
 // PopFront removes the first (head) item of the queue, with the
@@ -237,7 +238,7 @@ func (dq *Deque[T]) ForcePushFront(it T) error {
 		_, _ = dq.pop(dq.root.prev)
 	}
 
-	return dq.addAfter(it, dq.root)
+	return dq.add(it, dqNext)
 }
 
 // ForcePushBack is the same as PushBack, except, if the deque is at
@@ -255,7 +256,7 @@ func (dq *Deque[T]) ForcePushBack(it T) error {
 		_, _ = dq.pop(dq.root.next)
 	}
 
-	return dq.addAfter(it, dq.root.prev)
+	return dq.add(it, dqPrev)
 }
 
 // WaitPushFront performs a blocking add to the deque: if the deque is
@@ -265,7 +266,7 @@ func (dq *Deque[T]) ForcePushBack(it T) error {
 func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 
-	return dq.waitPushAfter(ctx, it, func() *element[T] { return dq.root })
+	return dq.waitPushAfter(ctx, it, dqNext)
 }
 
 // WaitPushBack performs a blocking add to the deque: if the deque is
@@ -275,16 +276,16 @@ func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
 func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 
-	return dq.waitPushAfter(ctx, it, func() *element[T] { return dq.root.prev })
+	return dq.waitPushAfter(ctx, it, dqPrev)
 }
 
-func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() *element[T]) error {
+func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, side dqDirection) error {
 	if dq.drainers > 0 {
 		return ErrQueueDraining
 	}
 
 	if dq.tracker.cap() > dq.tracker.len() {
-		return dq.addAfter(it, afterGetter())
+		return dq.add(it, side)
 	}
 
 	cond := dq.updates
@@ -307,7 +308,7 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 		}
 	}
 
-	return dq.addAfter(it, afterGetter())
+	return dq.add(it, side)
 }
 
 // IteratorFront starts at the front of the Deque and iterates towards
@@ -367,13 +368,18 @@ func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bo
 		if current == nil {
 			current = dq.root
 		}
-		if current.getNextOrPrevious(direction) == dq.root && blocking {
-			if err := current.wait(ctx, direction); err != nil {
+
+		if blocking {
+			err := dq.await(ctx, direction, func() bool {
+				return dq.closed || dq.neighbor(current, direction) != dq.root
+			})
+			if err != nil {
 				return dq.zero(), false
 			}
 		}
-		next := current.getNextOrPrevious(direction)
-		if next == nil || next == dq.root {
+
+		next := dq.neighbor(current, direction)
+		if next == dq.root {
 			return dq.zero(), false
 		}
 
@@ -381,6 +387,45 @@ func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bo
 		return current.item, true
 	}
 	return irt.GenerateOk(op)
+}
+
+// neighbor returns the live element after (or, for dqPrev, before) the
+// one given, or the root at the end of the list. Popped elements hold no
+// links, so their position is recovered from their sequence number.
+func (dq *Deque[T]) neighbor(from *element[T], direction dqDirection) *element[T] {
+	if !from.removed {
+		return from.getNextOrPrevious(direction)
+	}
+	if direction == dqPrev {
+		n := dq.root.prev
+		for n != dq.root && n.seq >= from.seq {
+			n = n.prev
+		}
+		return n
+	}
+	n := dq.root.next
+	for n != dq.root && n.seq <= from.seq {
+		n = n.next
+	}
+	return n
+}
+
+// await blocks (with the lock held, as a Cond does) until ready reports
+// true or ctx ends. Callers' ready funcs must account for closure.
+func (dq *Deque[T]) await(ctx context.Context, direction dqDirection, ready func() bool) error {
+	cond := dq.nfront
+	if direction == dqPrev {
+		cond = dq.nback
+	}
+	defer wakeOnCancel(ctx, &dq.mutex, cond)()
+
+	for !ready() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		cond.Wait()
+	}
+	return nil
 }
 
 // checkOpen reports why the deque cannot accept new items, if it can't.
@@ -395,7 +440,8 @@ func (dq *Deque[T]) checkOpen() error {
 	return nil
 }
 
-func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
+// add inserts at the front (dqNext) or back (dqPrev) of the list.
+func (dq *Deque[T]) add(value T, side dqDirection) error {
 	if err := dq.checkOpen(); err != nil {
 		return err
 	}
@@ -406,6 +452,15 @@ func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
 	}
 
 	it := &element[T]{item: value, list: dq}
+	after := dq.root
+	if side == dqPrev {
+		after = dq.root.prev
+		dq.hi++
+		it.seq = dq.hi
+	} else {
+		dq.lo--
+		it.seq = dq.lo
+	}
 	it.prev = after
 	it.next = after.next
 	it.prev.next = it
@@ -431,31 +486,23 @@ func (dq *Deque[T]) pop(it *element[T]) (out T, _ bool) {
 	it.prev.next = it.next
 	it.next.prev = it.prev
 
-	// don't reset poointers in the item in case we're using this
-	// item in an iterator
-	//
-	// it.next = nil
-	// it.prev = nil
+	out = it.item
+	it.release()
 
-	return it.item, true
+	return out, true
 }
 
 func (dq *Deque[T]) waitPop(ctx context.Context, direction dqDirection) (out T, _ error) {
-	for {
-		if dq.closed {
-			return out, ErrQueueClosed
-		}
-
-		// only wait when there is nothing to pop: waiting on the
-		// first element itself blocks until its neighbor changes,
-		// which strands items already in the deque.
-		if first := dq.root.getNextOrPrevious(direction); !first.isRoot() {
-			it, _ := dq.pop(first) // cannot fail: open and non-root
-			return it, nil
-		}
-
-		if err := dq.root.wait(ctx, direction); err != nil {
-			return out, err
-		}
+	err := dq.await(ctx, direction, func() bool {
+		return dq.closed || !dq.root.getNextOrPrevious(direction).isRoot()
+	})
+	if err != nil {
+		return out, err
 	}
+	if dq.closed {
+		return out, ErrQueueClosed
+	}
+
+	out, _ = dq.pop(dq.root.getNextOrPrevious(direction))
+	return out, nil
 }
