@@ -53,12 +53,28 @@ func TestDequePopOnClosedNonEmptyReturnsNothing(t *testing.T) {
 		t.Fatalf("closed deque lost items: len %d", dq.Len())
 	}
 
-	// contrast: a closed Queue still hands out what it holds.
+}
+
+func TestQueuePopOnClosedNonEmptyReturnsNothing(t *testing.T) {
 	q := NewUnlimitedQueue[int]()
 	_ = q.Push(1)
+	_ = q.Push(2)
 	_ = q.Close()
-	if v, ok := q.Pop(); !ok || v != 1 {
-		t.Fatal("closed non-empty Queue should still pop", v, ok)
+
+	if v, ok := q.Pop(); ok {
+		t.Fatalf("Pop on closed non-empty queue returned %d", v)
+	}
+	if _, err := q.WaitPop(t.Context()); err != ErrQueueClosed {
+		t.Fatalf("WaitPop: %v", err)
+	}
+	if q.Len() != 2 {
+		t.Fatalf("closed queue lost items: len %d", q.Len())
+	}
+	if err := q.Drain(t.Context()); err != ErrQueueClosed {
+		t.Fatalf("Drain: %v", err)
+	}
+	if err := q.Shutdown(t.Context()); err != ErrQueueClosed {
+		t.Fatalf("Shutdown: %v", err)
 	}
 }
 
@@ -184,4 +200,28 @@ func TestQueueIteratorPopInterleave(t *testing.T) {
 	}
 	_ = q.Close()
 	iterWG.Wait()
+}
+
+// Closing a queue under a broker does not drain it: sending reports the
+// closed queue, which stops the broker, and the remaining items stay in
+// the queue.
+func TestQueueBrokerStopsWhenQueueClosedWithItems(t *testing.T) {
+	ctx := t.Context()
+	q := NewUnlimitedQueue[int]()
+	_ = q.Push(1)
+	_ = q.Close()
+	b := NewQueueBroker(ctx, q, BrokerOptions{})
+
+	if err := b.Send(ctx, 2); !errors.Is(err, ErrBrokerClosed) || !errors.Is(err, ErrQueueClosed) {
+		t.Fatalf("Send: %v", err)
+	}
+	wctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	b.Wait(wctx)
+	if wctx.Err() != nil {
+		t.Fatal("broker did not stop after its queue closed")
+	}
+	if q.Len() != 1 {
+		t.Fatalf("queue len %d", q.Len())
+	}
 }

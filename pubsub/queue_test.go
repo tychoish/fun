@@ -132,10 +132,14 @@ func TestQueueClose(t *testing.T) {
 		t.Error("Add should have failed after Close")
 	}
 
-	// However, the remaining contents of the queue should still work.
-	q.mustRemove("alpha")
-	q.mustRemove("bravo")
-	q.mustRemove("charlie")
+	// Close does not drain: the remaining contents are not available.
+	if v, ok := q.Pop(); ok {
+		t.Errorf("Pop on a closed queue returned %q", v)
+	}
+	if v, err := q.WaitPop(t.Context()); !errors.Is(err, ErrQueueClosed) {
+		t.Errorf("WaitPop on a closed queue: %q, %v", v, err)
+	}
+	assert.Equal(t, q.Len(), 3)
 }
 
 func TestQueueWait(t *testing.T) {
@@ -725,12 +729,10 @@ func TestQueueIteratorPop(t *testing.T) {
 
 		assert.Equal(t, queue.Len(), 3)
 
+		// Close does not drain, so a closed queue yields nothing.
 		values := irt.Collect(queue.IteratorWaitPop(ctx))
-		assert.Equal(t, len(values), 3)
-		assert.Equal(t, values[0], "one")
-		assert.Equal(t, values[1], "two")
-		assert.Equal(t, values[2], "three")
-		assert.Equal(t, queue.Len(), 0)
+		assert.Equal(t, len(values), 0)
+		assert.Equal(t, queue.Len(), 3)
 	})
 
 	t.Run("BlocksWaitingForItems", func(t *testing.T) {

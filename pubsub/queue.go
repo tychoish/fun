@@ -186,10 +186,14 @@ func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 }
 
 // Pop removes and returns the frontmost (oldest) item in the queue and
-// reports whether an item was available.  If the queue is empty, Pop
-// returns T<zero>, false.
+// reports whether an item was available.  If the queue is empty or
+// closed, Pop returns T<zero>, false.
 func (q *Queue[T]) Pop() (out T, ok bool) {
 	defer q.with(q.lock())
+
+	if q.closed {
+		return
+	}
 
 	switch q.tracker.len() {
 	case 0:
@@ -197,7 +201,7 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 	case 1:
 		out = q.popFront()
 		ok = true
-		if q.drainers > 0 || q.closed {
+		if q.drainers > 0 {
 			q.nempty.Broadcast()
 			break
 		}
@@ -205,7 +209,7 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 	default:
 		out = q.popFront()
 		ok = true
-		if q.drainers > 0 || q.closed {
+		if q.drainers > 0 {
 			q.nupdates.Broadcast()
 			break
 		}
@@ -221,13 +225,14 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 // still, WaitPop returns nil, ErrQueueClosed.
 //
 // WaitPop is destructive: every item returned is removed from the queue.
+// A closed queue yields nothing, even if items remain.
 func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 	defer q.with(q.lock())
 
 	// If the context terminates, wake the waiter.
 	defer wakeOnCancel(ctx, &q.mu, q.nempty)()
 
-	for q.tracker.len() == 0 {
+	for q.tracker.len() == 0 || q.closed {
 		if q.closed {
 			return out, ErrQueueClosed
 		}
@@ -276,11 +281,10 @@ func (q *Queue[T]) waitForDrain(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the queue. After closing, any further Add calls will
-// report an error, but items that were added to the queue prior to
-// closing will still be available for Pop and WaitPop. WaitPop will
-// report an error without blocking if it is called on a closed, empty
-// queue.
+// Close closes the queue immediately, without draining it: further
+// pushes report ErrQueueClosed, Pop returns nothing and WaitPop
+// returns ErrQueueClosed, even if items remain. To get the items out
+// before closing, use Drain or Shutdown.
 func (q *Queue[T]) Close() error {
 	defer q.with(q.lock())
 
