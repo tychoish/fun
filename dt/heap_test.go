@@ -196,6 +196,27 @@ func TestSort(t *testing.T) {
 				t.Log("list not exhausted", heap.Len())
 			}
 		})
+		t.Run("Peek", func(t *testing.T) {
+			heap := &Heap[int]{CF: cmp.Compare[int]}
+			if _, ok := heap.Peek(); ok {
+				t.Fatal("empty heap should not peek")
+			}
+			heap.Push(5)
+			if v, ok := heap.Peek(); !ok || v != 5 {
+				t.Fatal("single element", v, ok)
+			}
+			for _, v := range []int{9, 3, 3, 7} {
+				heap.Push(v)
+			}
+			peeked, ok := heap.Peek()
+			if !ok || peeked != 3 || heap.Len() != 5 {
+				t.Fatal("unexpected peek", peeked, ok, heap.Len())
+			}
+			popped, ok := heap.Pop()
+			if !ok || popped != peeked || heap.Len() != 4 {
+				t.Fatal("pop should match peek", popped, peeked, heap.Len())
+			}
+		})
 		t.Run("Pop", func(t *testing.T) {
 			heap := &Heap[int]{CF: cmp.Compare[int]}
 

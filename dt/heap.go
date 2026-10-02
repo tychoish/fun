@@ -15,9 +15,15 @@ import (
 	"github.com/tychoish/fun/irt"
 )
 
-// Heap provides a min-order heap using the Heap.LT comparison
-// operator to sort from lowest to highest. Push operations will panic
-// if LT is not set.
+// Heap provides a priority queue ordered by the CF comparison
+// function from lowest to highest. Push operations will panic if CF is
+// not set.
+//
+// Heap is backed by a sorted linked list: Push is O(n) (a linear scan
+// for the insertion point), while Pop, Peek, and Len are O(1).
+// Iteration and JSON encoding yield a fully sorted sequence. For
+// O(log n) Push and Pop, use BinHeap, which does not guarantee sorted
+// iteration order.
 type Heap[T any] struct {
 	CF   func(T, T) int
 	data *List[T]
@@ -63,10 +69,14 @@ func (h *Heap[T]) Len() int { return h.list().Len() }
 // it, with an Ok value, which is true when the value returned is valid.
 func (h *Heap[T]) Pop() (T, bool) { e := h.list().PopFront(); return e.Value(), e.Ok() }
 
-// Iterator provides an iterator to the items in the heap.
-func (h *Heap[T]) Iterator() iter.Seq[T] { ; return h.list().IteratorFront() }
+// Peek returns the minimum element without removing it, with an Ok
+// value that is false when the heap is empty.
+func (h *Heap[T]) Peek() (T, bool) { e := h.list().Front(); return e.Value(), e.Ok() }
 
-// MarshalJSON encodes the heap as a JSON array in heap order.
+// Iterator provides an iterator to the items in the heap, in sorted order.
+func (h *Heap[T]) Iterator() iter.Seq[T] { return h.list().IteratorFront() }
+
+// MarshalJSON encodes the heap as a JSON array in sorted order.
 func (h *Heap[T]) MarshalJSON() ([]byte, error) { return irt.MarshalJSON(h.Iterator()) }
 
 // UnmarshalJSON decodes a JSON array and pushes each element onto the heap.
