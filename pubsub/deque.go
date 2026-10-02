@@ -225,6 +225,10 @@ func (dq *Deque[T]) WaitPopBack(ctx context.Context) (T, error) {
 func (dq *Deque[T]) ForcePushFront(it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 
+	if err := dq.checkOpen(); err != nil {
+		return err
+	}
+
 	if dq.tracker.cap() == dq.tracker.len() {
 		_, _ = dq.pop(dq.root.prev)
 	}
@@ -238,6 +242,10 @@ func (dq *Deque[T]) ForcePushFront(it T) error {
 // is closed.
 func (dq *Deque[T]) ForcePushBack(it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
+
+	if err := dq.checkOpen(); err != nil {
+		return err
+	}
 
 	if dq.tracker.cap() == dq.tracker.len() {
 		_, _ = dq.pop(dq.root.next)
@@ -373,13 +381,21 @@ func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bo
 	return irt.GenerateOk(op)
 }
 
-func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
+// checkOpen reports why the deque cannot accept new items, if it can't.
+func (dq *Deque[T]) checkOpen() error {
 	if dq.draining {
 		return ErrQueueDraining
 	}
 
 	if dq.closed {
 		return ErrQueueClosed
+	}
+	return nil
+}
+
+func (dq *Deque[T]) addAfter(value T, after *element[T]) error {
+	if err := dq.checkOpen(); err != nil {
+		return err
 	}
 
 	if err := dq.tracker.add(); err != nil {
