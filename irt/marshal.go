@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -200,6 +201,59 @@ func MarshalJSON2[A any, B any](seq iter.Seq2[A, B]) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// decodeJSONKey converts a JSON object key into A following the rules
+// encoding/json uses for map keys: string kinds, integer kinds and
+// types implementing encoding.TextUnmarshaler (on *A) are supported;
+// interface types receive the key as a string. Anything else, or a key
+// that cannot be parsed, is an error.
+func decodeJSONKey[A any](text string) (key A, err error) {
+	val := reflect.ValueOf(&key).Elem()
+	kind := val.Kind()
+
+	if tu, ok := any(&key).(encoding.TextUnmarshaler); ok && kind != reflect.String {
+		return key, tu.UnmarshalText([]byte(text))
+	}
+
+	switch kind {
+	case reflect.String:
+		val.SetString(text)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(text, 10, val.Type().Bits())
+		if err != nil {
+			return key, err
+		}
+		val.SetInt(n)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		n, err := strconv.ParseUint(text, 10, val.Type().Bits())
+		if err != nil {
+			return key, err
+		}
+		val.SetUint(n)
+	case reflect.Interface:
+		if val.NumMethod() != 0 {
+			return key, fmt.Errorf("json: unsupported key type %T", key)
+		}
+		val.Set(reflect.ValueOf(text))
+	default:
+		return key, fmt.Errorf("json: unsupported key type %T", key)
+	}
+	return key, nil
+}
+
+// checkJSONEnd reports an error if anything other than whitespace
+// follows the value the decoder has just finished reading.
+func checkJSONEnd(dec *json.Decoder) error {
+	_, err := dec.Token()
+	switch {
+	case errors.Is(err, io.EOF):
+		return nil
+	case err == nil:
+		return errors.New("irt: unexpected data after JSON value")
+	default:
+		return err
+	}
+}
+
 // UnmarshalJSON decodes a JSON stream from a reader and yields each
 // element with a potential error. The reader is wrapped with bufio for
 // efficient reading.
@@ -233,6 +287,11 @@ func UnmarshalJSON[T any](data io.Reader) iter.Seq2[T, error] {
 
 		// Read closing bracket
 		if _, err := dec.Token(); err != nil {
+			yield(zero, err)
+			return
+		}
+
+		if err := checkJSONEnd(dec); err != nil {
 			yield(zero, err)
 		}
 	}
@@ -269,7 +328,17 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 				return
 			}
 
-			key := cast[A](t)
+			text, ok := t.(string)
+			if !ok {
+				yield(zero, &json.SyntaxError{Offset: dec.InputOffset()})
+				return
+			}
+
+			key, err := decodeJSONKey[A](text)
+			if err != nil {
+				yield(zero, err)
+				return
+			}
 
 			// Decode the value
 			var value B
@@ -282,8 +351,17 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 				return
 			}
 		}
-		// we don't have to read the closing brace: more only returns false when the next
-		// character is a closing brace, so this can't error, unless Peek is broken
+
+		// read the closing brace: More also returns false at a
+		// truncated input, which must be reported.
+		if _, err := dec.Token(); err != nil {
+			yield(zero, err)
+			return
+		}
+
+		if err := checkJSONEnd(dec); err != nil {
+			yield(zero, err)
+		}
 	}
 }
 
