@@ -1274,7 +1274,7 @@ func TestBrokerPublishCanceledContext(t *testing.T) {
 	}
 }
 
-func cpuTime(t *testing.T) time.Duration {
+func brokerCPUTime(t *testing.T) time.Duration {
 	var ru syscall.Rusage
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
 		t.Skip(err)
@@ -1296,9 +1296,9 @@ func TestBrokerIdleCPU(t *testing.T) {
 			b := mk(t.Context())
 			defer b.Stop()
 			time.Sleep(50 * time.Millisecond)
-			before := cpuTime(t)
+			before := brokerCPUTime(t)
 			time.Sleep(500 * time.Millisecond)
-			if used := cpuTime(t) - before; used > 150*time.Millisecond {
+			if used := brokerCPUTime(t) - before; used > 150*time.Millisecond {
 				t.Fatalf("idle broker used %s CPU in 500ms", used)
 			}
 		})
