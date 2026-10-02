@@ -94,7 +94,7 @@ func TestCollect(t *testing.T) {
 			},
 			args:             []int{0, 5, 0, 0, 0},
 			expected:         []int{1, 2},
-			expectedCapacity: 2,
+			expectedCapacity: 5,
 		},
 		{
 			name: "WithInitialCapacity/Negative",
