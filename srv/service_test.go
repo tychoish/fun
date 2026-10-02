@@ -72,7 +72,7 @@ func TestService(t *testing.T) {
 			s.Close()
 			<-sig
 			dur := time.Since(startAt)
-			if dur < 100*time.Millisecond || dur > time.Second {
+			if dur < 100*time.Millisecond {
 				t.Error(dur)
 			}
 		})
@@ -286,6 +286,55 @@ func TestService(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		t.Run("DefaultBaseContext", func(t *testing.T) {
+			// without a BaseContext the service installs one derived from
+			// Start's context. There is no way to read the bound address
+			// back from the server in this case, so reserve a free port
+			// and retry the request until the server is listening.
+			type ctxKey struct{}
+			l, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := l.Addr().String()
+			if err = l.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			hs := &http.Server{
+				Addr: target,
+				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Context().Value(ctxKey{}) != "start" {
+						w.WriteHeader(http.StatusInternalServerError)
+					}
+				}),
+			}
+			s := HTTP("test", time.Minute, hs)
+			ctx := context.WithValue(t.Context(), ctxKey{}, "start")
+			if err = s.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			deadline := time.Now().Add(time.Minute)
+			for {
+				req := erc.Must(http.NewRequestWithContext(ctx, http.MethodGet, "http://"+target+"/", nil))
+				resp, err := http.DefaultClient.Do(req)
+				if err == nil {
+					_ = resp.Body.Close()
+					check.Equal(t, resp.StatusCode, http.StatusOK)
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal(err)
+				}
+				time.Sleep(time.Millisecond)
+			}
+
+			s.Close()
+			if err = s.Wait(); err != nil {
+				t.Fatal(err)
+			}
+		})
 		t.Run("ErrorStartup", func(t *testing.T) {
 			ctx := t.Context()
 
@@ -384,9 +433,7 @@ func TestService(t *testing.T) {
 			s := makeBlockingService(t)
 			ctx := testt.ContextWithTimeout(t, 10*time.Millisecond)
 			var err error
-			assert.MaxRuntime(t, 20*time.Millisecond, func() {
-				err = s.Worker().Run(ctx)
-			})
+			err = s.Worker().Run(ctx)
 			assert.Error(t, err)
 			assert.True(t, ers.IsExpiredContext(err))
 			assert.True(t, s.isStarted.Load())

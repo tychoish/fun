@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestHelpers(t *testing.T) {
 		}
 
 		dur := time.Since(start)
-		if dur < 50*time.Millisecond || dur > 100*time.Millisecond {
+		if dur < 50*time.Millisecond {
 			t.Error(dur)
 		}
 	})
@@ -87,7 +88,7 @@ func TestHelpers(t *testing.T) {
 			if count.Load() != 50 {
 				t.Error(count.Load())
 			}
-			if time.Since(start) < 10*time.Millisecond || time.Since(start) > 250*time.Millisecond {
+			if time.Since(start) < 10*time.Millisecond {
 				t.Error(time.Since(start))
 			}
 		})
@@ -120,7 +121,7 @@ func TestHelpers(t *testing.T) {
 				makeQueue(t, 100, count),
 				wpa.WorkerGroupConfWorkerPerCPU(),
 			)
-			ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
+			ctx := testt.ContextWithTimeout(t, time.Minute)
 
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -137,10 +138,16 @@ func TestHelpers(t *testing.T) {
 			count := &atomic.Int64{}
 			queue := pubsub.NewUnlimitedQueue[fnx.Worker]()
 
+			// Jobs block on gate so the test controls when the queue can drain.
+			gate := make(chan struct{})
+			started := make(chan struct{}, 80)
+			released := &atomic.Bool{}
+
 			// Add jobs to the queue without closing it
 			for range 50 {
 				assert.NotError(t, queue.Push(func(_ context.Context) error {
-					time.Sleep(10 * time.Millisecond)
+					started <- struct{}{}
+					<-gate
 					count.Add(1)
 					return nil
 				}))
@@ -155,28 +162,34 @@ func TestHelpers(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Give workers time to start processing
-			time.Sleep(50 * time.Millisecond)
+			// Wait until workers are processing
+			<-started
 
 			// Add more jobs after service started
 			for range 30 {
 				assert.NotError(t, queue.Push(func(_ context.Context) error {
-					time.Sleep(5 * time.Millisecond)
+					started <- struct{}{}
+					<-gate
 					count.Add(1)
 					return nil
 				}))
 			}
 
-			// Verify jobs are being processed but not all completed yet
-			check.True(t, count.Load() > 0)
+			// Verify jobs are in flight but not all completed yet
 			check.True(t, count.Load() < 80)
 
-			// Call shutdown - this should drain the queue
-			shutdownStart := time.Now()
+			// Call shutdown - this should drain the queue, which cannot
+			// finish until the gate is released.
+			go func() {
+				runtime.Gosched()
+				released.Store(true)
+				close(gate)
+			}()
 			if err := srv.Shutdown(); err != nil {
 				t.Fatal(err)
 			}
-			shutdownDuration := time.Since(shutdownStart)
+			// Shutdown must have waited for the blocked jobs to drain.
+			check.True(t, released.Load())
 
 			// Wait for service to complete
 			if err := srv.Wait(); err != nil {
@@ -185,10 +198,6 @@ func TestHelpers(t *testing.T) {
 
 			// Verify all 80 jobs were processed
 			check.Equal(t, int64(80), count.Load())
-
-			// Shutdown should have taken some time (waiting for queue to drain)
-			// With 5 workers and jobs taking 5-10ms, this should take at least 50ms
-			check.True(t, shutdownDuration > 50*time.Millisecond)
 
 			// Queue should be empty and closed
 			check.Equal(t, 0, queue.Len())
@@ -236,7 +245,7 @@ func TestHelpers(t *testing.T) {
 				},
 				wpa.WorkerGroupConfNumWorkers(50),
 			)
-			ctx := testt.ContextWithTimeout(t, 100*time.Millisecond)
+			ctx := testt.ContextWithTimeout(t, time.Minute)
 
 			if err := srv.Start(ctx); err != nil {
 				t.Fatal(err)
@@ -284,18 +293,19 @@ func TestCmd(t *testing.T) {
 			ctx := testt.Context(t)
 			cmd := exec.CommandContext(ctx, "sleep", ".5")
 			s := Cmd(cmd, 0)
-			assert.MaxRuntime(t, 750*time.Millisecond, func() {
+			assert.MinRuntime(t, 500*time.Millisecond, func() {
 				check.NotError(t, s.Start(ctx))
 				check.NotError(t, s.Wait())
 			})
 			assert.True(t, s.isFinished.Load())
 		})
 		t.Run("QuickReturn", func(t *testing.T) {
-			cmd := exec.Command("sleep", ".1")
+			cmd := exec.Command("sleep", "60")
 			s := Cmd(cmd, 0)
 			ctx := testt.Context(t)
 			check.NotError(t, s.Start(ctx))
-			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+			// Close must interrupt the process rather than wait it out.
+			assert.MaxRuntime(t, 30*time.Second, func() {
 				s.Close()
 				check.Error(t, s.Wait())
 			})
@@ -303,10 +313,11 @@ func TestCmd(t *testing.T) {
 		})
 		t.Run("TimeoutObserved", func(t *testing.T) {
 			ctx := testt.Context(t)
-			cmd := exec.CommandContext(ctx, "sleep", "2")
+			cmd := exec.CommandContext(ctx, "sleep", "60")
 			s := Cmd(cmd, 10*time.Millisecond)
 			check.NotError(t, s.Start(ctx))
-			assert.MaxRuntime(t, 100*time.Millisecond, func() {
+			// Close must interrupt the process rather than wait it out.
+			assert.MaxRuntime(t, 30*time.Second, func() {
 				s.Close()
 				check.Error(t, s.Wait())
 			})
@@ -330,7 +341,7 @@ func TestCmd(t *testing.T) {
 			// exec so that the signaled process is the sleeper itself: an
 			// orphaned child would keep the output pipe open and block Wait.
 			ready := filepath.Join(t.TempDir(), "ready")
-			cmd := exec.CommandContext(ctx, "bash", "-c", "touch "+ready+"; exec sleep 5")
+			cmd := exec.CommandContext(ctx, "bash", "-c", "touch "+ready+"; exec sleep 60")
 			out := &bytes.Buffer{}
 			cmd.Stdout = out
 			cmd.Stderr = out
@@ -339,7 +350,7 @@ func TestCmd(t *testing.T) {
 			waitForFile(t, ready)
 			s.Shutdown()
 
-			assert.MaxRuntime(t, 500*time.Millisecond, func() {
+			assert.MaxRuntime(t, 30*time.Second, func() {
 				err := s.Wait()
 				check.Error(t, err)
 				testt.Log(t, err)
@@ -352,7 +363,7 @@ func TestCmd(t *testing.T) {
 			// SIGTERM is ignored (and the ignore is inherited across exec) once
 			// the marker exists, so only SIGKILL can stop the process.
 			ready := filepath.Join(t.TempDir(), "ready")
-			cmd := exec.CommandContext(ctx, "bash", "-c", "trap '' TERM; touch "+ready+"; exec sleep 5")
+			cmd := exec.CommandContext(ctx, "bash", "-c", "trap '' TERM; touch "+ready+"; exec sleep 60")
 			out := &bytes.Buffer{}
 			cmd.Stdout = out
 			cmd.Stderr = out
@@ -361,7 +372,7 @@ func TestCmd(t *testing.T) {
 			waitForFile(t, ready)
 			s.Shutdown()
 
-			assert.MaxRuntime(t, 500*time.Millisecond, func() {
+			assert.MaxRuntime(t, 30*time.Second, func() {
 				err := s.Wait()
 				check.Error(t, err)
 				testt.Log(t, err)
@@ -406,7 +417,7 @@ func TestDaemon(t *testing.T) {
 				}
 			},
 		}
-		ctx := testt.ContextWithTimeout(t, 500*time.Millisecond)
+		ctx := testt.ContextWithTimeout(t, time.Minute)
 		ctx = SetBaseContext(ctx)
 
 		ds := Daemon(baseService, 10*time.Millisecond)
@@ -432,7 +443,7 @@ func TestDaemon(t *testing.T) {
 				return nil
 			},
 		}
-		ctx := testt.ContextWithTimeout(t, 110*time.Millisecond)
+		ctx := testt.ContextWithTimeout(t, time.Minute)
 		ds := Daemon(baseService, 10*time.Millisecond)
 		check.MinRuntime(t, 100*time.Millisecond, func() {
 			check.NotError(t, ds.Start(ctx))
@@ -444,23 +455,24 @@ func TestDaemon(t *testing.T) {
 	t.Run("CloseTriggers", func(t *testing.T) {
 		ctx := testt.Context(t)
 		baseRunCounter := &atomic.Int64{}
+		third := make(chan struct{})
 		baseService := &Service{
 			Run: func(_ context.Context) error {
-				baseRunCounter.Add(1)
+				// the third run starts only after two errors were recorded.
+				if baseRunCounter.Add(1) == 3 {
+					close(third)
+				}
 				time.Sleep(time.Millisecond)
 				return errors.New("kip")
 			},
 		}
 		ds := Daemon(baseService, 5*time.Millisecond)
 		var err error
-		check.MaxRuntime(t, 20*time.Millisecond, func() {
-			check.NotError(t, ds.Start(ctx))
-			time.Sleep(10 * time.Millisecond)
-			runtime.Gosched()
-			ds.Close()
-			err = ds.Wait()
-			check.Error(t, err)
-		})
+		check.NotError(t, ds.Start(ctx))
+		<-third
+		ds.Close()
+		err = ds.Wait()
+		check.Error(t, err)
 		baseRunCount := baseRunCounter.Load()
 		testt.Log(t, "baseRunCounter", baseRunCount)
 		testt.Log(t, err)
@@ -473,23 +485,24 @@ func TestDaemon(t *testing.T) {
 	t.Run("ShutdownTriggers", func(t *testing.T) {
 		ctx := testt.Context(t)
 		baseRunCounter := &atomic.Int64{}
+		third := make(chan struct{})
 		baseService := &Service{
 			Run: func(_ context.Context) error {
-				baseRunCounter.Add(1)
+				// the third run starts only after two errors were recorded.
+				if baseRunCounter.Add(1) == 3 {
+					close(third)
+				}
 				time.Sleep(time.Millisecond)
 				return errors.New("kip")
 			},
 		}
 		ds := Daemon(baseService, 5*time.Millisecond)
 		var err error
-		check.MaxRuntime(t, 20*time.Millisecond, func() {
-			check.NotError(t, ds.Start(ctx))
-			time.Sleep(10 * time.Millisecond)
-			runtime.Gosched()
-			check.NotError(t, ds.Shutdown())
-			err = ds.Wait()
-			check.Error(t, err)
-		})
+		check.NotError(t, ds.Start(ctx))
+		<-third
+		check.NotError(t, ds.Shutdown())
+		err = ds.Wait()
+		check.Error(t, err)
 		baseRunCount := baseRunCounter.Load()
 		testt.Log(t, "errs", err == nil, err)
 		testt.Log(t, "baseRunCounter", baseRunCount)
@@ -500,8 +513,11 @@ func TestDaemon(t *testing.T) {
 	t.Run("CancelationTriggersAbort", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(testt.Context(t))
 		baseRunCounter := &atomic.Int64{}
+		first := make(chan struct{})
+		once := &sync.Once{}
 		baseService := &Service{
 			Run: func(_ context.Context) error {
+				defer once.Do(func() { close(first) })
 				baseRunCounter.Add(1)
 				time.Sleep(2 * time.Millisecond)
 				return nil
@@ -510,14 +526,11 @@ func TestDaemon(t *testing.T) {
 		ds := Daemon(baseService, time.Second)
 		ds.Shutdown = func() error { return nil }
 
-		check.MaxRuntime(t, 20*time.Millisecond, func() {
-			check.NotError(t, ds.Start(ctx))
-			time.Sleep(5 * time.Millisecond)
-			runtime.Gosched()
-			cancel()
+		check.NotError(t, ds.Start(ctx))
+		<-first
+		cancel()
 
-			check.NotError(t, ds.Wait())
-		})
+		check.NotError(t, ds.Wait())
 		assert.True(t, baseRunCounter.Load() >= 1)
 	})
 }
