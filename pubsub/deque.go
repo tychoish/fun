@@ -29,7 +29,7 @@ type Deque[T any] struct {
 	root    *element[T]
 
 	tracker  queueLimitTracker
-	draining bool
+	drainers int // number of outstanding Drain calls
 	closed   bool
 }
 
@@ -143,8 +143,8 @@ func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() { <-ctx.Done(); dq.updates.Broadcast() }()
 	defer cancel()
-	dq.draining = true
-	defer func() { dq.draining = false }()
+	dq.drainers++
+	defer func() { dq.drainers-- }()
 
 	// Broadcast to wake up any waiting push operations so they can check draining flag
 	dq.updates.Broadcast()
@@ -278,7 +278,7 @@ func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 }
 
 func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() *element[T]) error {
-	if dq.draining {
+	if dq.drainers > 0 {
 		return ErrQueueDraining
 	}
 
@@ -293,7 +293,7 @@ func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, afterGetter func() 
 	defer cancel()
 
 	for dq.tracker.cap() <= dq.tracker.len() {
-		if dq.draining {
+		if dq.drainers > 0 {
 			return ErrQueueDraining
 		}
 		if dq.closed {
@@ -386,7 +386,7 @@ func (dq *Deque[T]) iter(ctx context.Context, direction dqDirection, blocking bo
 
 // checkOpen reports why the deque cannot accept new items, if it can't.
 func (dq *Deque[T]) checkOpen() error {
-	if dq.draining {
+	if dq.drainers > 0 {
 		return ErrQueueDraining
 	}
 

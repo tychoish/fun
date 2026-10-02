@@ -12,7 +12,7 @@ func waitDequeDraining[T any](t *testing.T, dq *Deque[T]) {
 	for time.Now().Before(deadline) {
 		mu := dq.mtx()
 		mu.Lock()
-		d := dq.draining
+		d := dq.drainers > 0
 		mu.Unlock()
 		if d {
 			return
