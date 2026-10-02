@@ -189,18 +189,45 @@ func Reverse[T any](seq iter.Seq[T]) iter.Seq[T] {
 }
 
 // Monotonic returns an infinite sequence of integers starting from 1.
-func Monotonic() iter.Seq[int] { return Generate(counter()) }
+//
+// The sequence is re-iterable: each iteration starts again from 1.
+func Monotonic() iter.Seq[int] { return MonotonicFrom(1) }
 
 // MonotonicFrom returns an infinite sequence of integers starting
-// from start.
-func MonotonicFrom[T ~int](start T) iter.Seq[T] { return Generate(counterFrom(start - 1)) }
+// from start. Each iteration starts again from start.
+func MonotonicFrom[T ~int](start T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for next := start; yield(next); next++ {
+			continue
+		}
+	}
+}
 
 // Range returns a sequence of integers from start to end (inclusive).
-func Range[T ~int](start T, end T) iter.Seq[T] { return While(MonotonicFrom(start), predLTE(end)) }
+// The sequence is re-iterable, and end may be the maximum int value.
+func Range[T ~int](start T, end T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for next := start; next <= end; next++ {
+			if !yield(next) || next == end {
+				return
+			}
+		}
+	}
+}
 
 // Index returns a iterator where each element from the input sequence
-// is paired with its 0-based index.
-func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] { return Flip(WithEach(seq, counterFrom(-1))) }
+// is paired with its 0-based index. Each iteration restarts at 0.
+func Index[T any](seq iter.Seq[T]) iter.Seq2[int, T] {
+	return func(yield func(int, T) bool) {
+		idx := 0
+		for value := range seq {
+			if !yield(idx, value) {
+				return
+			}
+			idx++
+		}
+	}
+}
 
 // Index2 returns a pair iterator where each element from the input
 // sequence is paired with its 0-based index.
@@ -1185,6 +1212,12 @@ func WithSetup[T any](seq iter.Seq[T], setup func()) iter.Seq[T] {
 
 // WithMutex returns a sequence that synchronizes all calls to the
 // underlying iterator using the provided mutex.
+//
+// All the WithMutex, WithRMutex and WithWMutex variants (and their
+// pair forms) are single-use: the underlying iter.Pull is created
+// eagerly and is stopped when the first iteration of the result ends,
+// so any later iteration yields nothing. Concurrent iterations share
+// the one underlying iterator.
 func WithMutex[T any](seq iter.Seq[T], mtx *sync.Mutex) iter.Seq[T] {
 	next, stop := iter.Pull(seq)
 
@@ -1270,13 +1303,15 @@ func Group[K comparable, V any](seq iter.Seq2[K, V]) iter.Seq2[K, []V] {
 
 // Unique returns a sequence containing only the first occurrence of
 // each unique element from the input sequence.
-func Unique[T comparable](seq iter.Seq[T]) iter.Seq[T] { return Remove(seq, seen[T]()) }
+func Unique[T comparable](seq iter.Seq[T]) iter.Seq[T] {
+	return func(yield func(T) bool) { Flush(Remove(seq, seen[T]()), yield) }
+}
 
 // UniqueBy returns a sequence containing only the first occurrence of
 // each element from the input sequence that produces a unique key
 // when passed to kfn.
 func UniqueBy[K comparable, V any, OP ~func(V) K](seq iter.Seq[V], kfn OP) iter.Seq[V] {
-	return First(Remove2(With(seq, kfn), seenvalue[K, V]()))
+	return func(yield func(V) bool) { Flush(First(Remove2(With(seq, kfn), seenvalue[K, V]())), yield) }
 }
 
 // Count consumes the sequence and returns the total number of
