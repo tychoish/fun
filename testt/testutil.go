@@ -80,3 +80,18 @@ func Must[T any](out T, err error) func(t testing.TB) T {
 		return out
 	}
 }
+
+// WithJustifiedParallelism marks the test as parallel by calling
+// t.Parallel(), but only if the caller supplies a non-empty reason
+// explaining why concurrency is worthwhile for this test.
+//
+// This checks reason only checked for presence: an empty string,
+// fails the test immediately via t.Fatal and does not call
+// t.Parallel.
+func WithJustifiedParallelism(t *testing.T, reason string) {
+	t.Helper()
+	if reason == "" {
+		t.Fatal("WithJustifiedParallelism requires a non-empty justification")
+	}
+	t.Parallel()
+}

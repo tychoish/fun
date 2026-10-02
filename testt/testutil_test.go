@@ -144,3 +144,33 @@ func TestTools(t *testing.T) {
 		}
 	})
 }
+
+func TestWithJustifiedParallelism(t *testing.T) {
+	t.Run("Reason", func(t *testing.T) {
+		ran := false
+		t.Run("sub", func(t *testing.T) {
+			WithJustifiedParallelism(t, "sleeps to observe expiration")
+			ran = true
+		})
+		// a parallel subtest only resumes after its parent function
+		// returns, so ran is checked from a cleanup.
+		t.Cleanup(func() {
+			if !ran {
+				t.Error("parallel subtest never resumed")
+			}
+		})
+	})
+	t.Run("EmptyReason", func(t *testing.T) {
+		inner := &testing.T{}
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			WithJustifiedParallelism(inner, "")
+			t.Error("unreachable: Fatal should have stopped the goroutine")
+		}()
+		<-done
+		if !inner.Failed() {
+			t.Error("empty reason should fail the test")
+		}
+	})
+}
