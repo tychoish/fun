@@ -119,14 +119,15 @@ func (dq *Deque[T]) Close() error {
 
 // Drain marks the deque as draining so that new items cannot be added, and then blocks until the deque is empty (or its
 // context is canceled.) This does not close the deque: when Drain returns the deque is empty, but new work can then be
-// added. To Drain and shutdown, use the Shutdown method.
+// added. To Drain and shutdown, use the Shutdown method. If the deque is closed while items remain, Drain returns
+// ErrQueueClosed.
 func (dq *Deque[T]) Drain(ctx context.Context) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.waitForDrain(ctx)
 }
 
 // Shutdown drains the deque, waiting for all items to be removed from the deque and then closes it so no additional work can be
-// added to the deque.
+// added to the deque. If the deque is closed while items remain, Shutdown returns ErrQueueClosed.
 func (dq *Deque[T]) Shutdown(ctx context.Context) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 
@@ -194,14 +195,16 @@ func (dq *Deque[T]) PushBack(it T) error {
 }
 
 // PopFront removes the first (head) item of the queue, with the
-// second value being false if the queue is empty or closed.
+// second value being false if the queue is empty or closed. A closed
+// deque yields nothing, even if items remain.
 func (dq *Deque[T]) PopFront() (T, bool) {
 	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.pop(dq.root.next)
 }
 
 // PopBack removes the last (tail) item of the queue, with the
-// second value being false if the queue is empty or closed.
+// second value being false if the queue is empty or closed. A closed
+// deque yields nothing, even if items remain.
 func (dq *Deque[T]) PopBack() (T, bool) {
 	defer adt.With(adt.Lock(dq.mtx()))
 	return dq.pop(dq.root.prev)
@@ -262,7 +265,8 @@ func (dq *Deque[T]) ForcePushBack(it T) error {
 // WaitPushFront performs a blocking add to the deque: if the deque is
 // at capacity, this operation blocks until the deque is closed or
 // there is capacity to add an item. The new item is added to the
-// front of the deque.
+// front of the deque. If the deque is closed or starts draining while
+// blocked, it returns ErrQueueClosed or ErrQueueDraining.
 func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 
@@ -272,7 +276,8 @@ func (dq *Deque[T]) WaitPushFront(ctx context.Context, it T) error {
 // WaitPushBack performs a blocking add to the deque: if the deque is
 // at capacity, this operation blocks until the deque is closed or
 // there is capacity to add an item. The new item is added to the
-// back of the deque.
+// back of the deque. If the deque is closed or starts draining while
+// blocked, it returns ErrQueueClosed or ErrQueueDraining.
 func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 	defer adt.With(adt.Lock(dq.mtx()))
 
@@ -328,7 +333,9 @@ func (dq *Deque[T]) IteratorWaitFront(ctx context.Context) iter.Seq[T] { return 
 
 // IteratorWaitBack yields items from the back of the Deque to the
 // front. When it reaches the first element, it waits for a new element
-// to be added. It does not modify the elements in the Deque.
+// to be added at the front (PushFront); items added to the back after
+// the iterator has started are behind it and are not yielded. It does
+// not modify the elements in the Deque.
 func (dq *Deque[T]) IteratorWaitBack(ctx context.Context) iter.Seq[T] { return dq.iterBackWait(ctx) }
 
 // IteratorWaitPopFront returns a sequence that removes
