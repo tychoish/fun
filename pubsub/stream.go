@@ -132,7 +132,10 @@ func MergeStreams[T any](iters *Stream[*Stream[T]]) *Stream[T] {
 				Add(ctx, wg)
 		})).Operation(ec.Push).Add(ctx, wg)
 
-		wg.Operation().PostHook(pipe.Close).Background(ctx)
+		// wait for the senders unconditionally: waiting with ctx
+		// would close the pipe under senders still unwinding
+		// after a cancellation.
+		go func() { fnx.WithContextCall(wg.Wait); pipe.Close() }()
 	}).Once()
 
 	return MakeStream(fnx.NewFuture(pipe.Receive().Read).
@@ -157,8 +160,11 @@ func JoinStreams[T any](iters ...*Stream[T]) *Stream[T] { return new(Stream[T]).
 func (st *Stream[T]) doClose() {
 	st.closer.once.Do(func() {
 		st.closer.state.Store(true)
-		fn.JoinHandlers(irt.Slice(st.closer.hooks)).Read(st)
+		// cancel first, so hooks that wait for background work
+		// (e.g. MergeStreams) are not waiting on workers that
+		// only stop when the stream's context is canceled.
 		irt.Apply(irt.Remove(irt.Slice(st.closer.ops), func(op func()) bool { return op == nil }), func(op func()) { op() })
+		fn.JoinHandlers(irt.Slice(st.closer.hooks)).Read(st)
 	})
 }
 
