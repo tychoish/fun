@@ -234,17 +234,28 @@ func TestUseCaseBrokerSendWithNoSubscribersNeverBlocks(t *testing.T) {
 			b := kind.mk(t.Context(), BrokerOptions{})
 			defer func() { b.Stop(); b.Wait(t.Context()) }()
 			ucGuard(t, "sends", func() { ucSendAll(t, b, 100) })
-			// subscribing afterwards works and receives only later traffic.
+			// subscribing afterwards works: a late subscriber may see
+			// backlog that was still queued, but it always sees the
+			// new message, and (for FIFO brokers) in order.
 			sub := ucSubscribe(t, b)
-			if err := b.Send(t.Context(), 1000); err != nil {
-				t.Fatal(err)
-			}
-			if got := ucCollect(t, sub, 1); got[0] != 1000 && kind.fifo {
-				// a late subscriber may observe one in-flight earlier
-				// message; it must never see more than that.
-				if next := ucCollect(t, sub, 1); next[0] != 1000 {
-					t.Fatalf("late subscriber saw %v then %v", got, next)
+			// sent concurrently: an unbuffered broker may still be
+			// handing backlog to this subscriber.
+			sent := ucAsync(func() error { return b.Send(t.Context(), 1000) })
+			defer func() {
+				if err := ucRecv(t, sent, "Send"); err != nil {
+					t.Error(err)
 				}
+			}()
+			prev := -1
+			for {
+				v := ucCollect(t, sub, 1)[0]
+				if kind.fifo && v <= prev {
+					t.Fatalf("late subscriber saw %d after %d", v, prev)
+				}
+				if v == 1000 {
+					return
+				}
+				prev = v
 			}
 		})
 	}

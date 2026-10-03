@@ -33,11 +33,13 @@ func TestUseCaseStreamEmptyAndSingleInputs(t *testing.T) {
 		"Join":           func(in []int) *Stream[int] { return JoinStreams(SliceStream(in)) },
 		"JoinNone":       func(in []int) *Stream[int] { return JoinStreams(SliceStream(in), SliceStream([]int{})) },
 		"Merge":          func(in []int) *Stream[int] { return MergeStreams(VariadicStream(SliceStream(in))) },
-		"MergeNone":      func(in []int) *Stream[int] { return MergeStreams(VariadicStream(SliceStream(in), SliceStream[int](nil))) },
-		"Split":          func(in []int) *Stream[int] { return SliceStream(in).Split(1)[0] },
-		"Filter":         func(in []int) *Stream[int] { return SliceStream(in).Filter(func(int) bool { return true }) },
-		"Convert":        func(in []int) *Stream[int] { return Convert(ucIdentity).Stream(SliceStream(in)) },
-		"ConvertPar":     func(in []int) *Stream[int] { return Convert(ucIdentity).Parallel(SliceStream(in)) },
+		"MergeNone": func(in []int) *Stream[int] {
+			return MergeStreams(VariadicStream(SliceStream(in), SliceStream[int](nil)))
+		},
+		"Split":      func(in []int) *Stream[int] { return SliceStream(in).Split(1)[0] },
+		"Filter":     func(in []int) *Stream[int] { return SliceStream(in).Filter(func(int) bool { return true }) },
+		"Convert":    func(in []int) *Stream[int] { return Convert(ucIdentity).Stream(SliceStream(in)) },
+		"ConvertPar": func(in []int) *Stream[int] { return Convert(ucIdentity).Parallel(SliceStream(in)) },
 	}
 	for name, mk := range streams {
 		t.Run(name+"/Empty", func(t *testing.T) {
