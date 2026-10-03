@@ -291,35 +291,25 @@ func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 }
 
 func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, side dqDirection) error {
-	if dq.drainers > 0 {
-		return ErrQueueDraining
-	}
-
-	if dq.tracker.cap() > dq.tracker.len() {
-		return dq.add(it, side)
-	}
-
-	cond := dq.updates
 	// If the context terminates, wake the waiter.
-	defer wakeOnCancel(ctx, &dq.mutex, cond)()
+	defer wakeOnCancel(ctx, &dq.mutex, dq.updates)()
 
-	for dq.tracker.cap() <= dq.tracker.len() {
+	// check ctx before capacity: a cancelled context must not insert.
+	for {
 		if dq.drainers > 0 {
 			return ErrQueueDraining
 		}
 		if dq.closed {
 			return ErrQueueClosed
 		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			cond.Wait()
+		if err := ctx.Err(); err != nil {
+			return err
 		}
+		if dq.tracker.cap() > dq.tracker.len() {
+			return dq.add(it, side)
+		}
+		dq.updates.Wait()
 	}
-
-	return dq.add(it, side)
 }
 
 // IteratorFront starts at the front of the Deque and iterates towards
