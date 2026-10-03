@@ -19,6 +19,12 @@ import (
 // safely handles multiple concurrent blocking operations (e.g. Wait,
 // WaitPop IteratorWait, IteratorWaitPop).
 //
+// Blocking operations (WaitPushFront/Back, WaitPopFront/Back, Drain,
+// Shutdown and the Wait iterators) follow one rule, shared with Queue:
+// a cancelled ctx wins over a ready item or slot. Under an
+// already-cancelled ctx they return the ctx error (or yield nothing)
+// and neither consume nor insert anything.
+//
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
 	once    sync.Once

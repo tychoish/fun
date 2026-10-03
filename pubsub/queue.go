@@ -50,6 +50,12 @@ var (
 // items from the queue adds additional credit if the resulting queue length is
 // less than the current soft quota. Burst credit is capped by the hard limit.
 //
+// Blocking operations (WaitPush, WaitPop, Drain, Shutdown and the Wait
+// iterators) follow one rule, shared with Deque: a cancelled ctx wins
+// over a ready item or slot. Under an already-cancelled ctx they
+// return the ctx error (or yield nothing) and neither consume nor
+// insert anything.
+//
 // A Queue is safe for concurrent use by multiple goroutines.
 type Queue[T any] struct {
 	mu       sync.Mutex // protects the fields below
@@ -224,8 +230,8 @@ func (q *Queue[T]) Pop() (out T, ok bool) {
 }
 
 // WaitPop blocks until q is non-empty or closed, and then returns the frontmost
-// (oldest) item from the queue. If ctx ends before an item is available, WaitPop
-// returns a nil value and a context error. If the queue is closed while it is
+// (oldest) item from the queue. If ctx has ended, WaitPop returns a zero value
+// and the context error, even when an item is ready (the item stays queued). If the queue is closed while it is
 // still, WaitPop returns nil, ErrQueueClosed.
 //
 // WaitPop is destructive: every item returned is removed from the queue.
@@ -236,18 +242,20 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 	// If the context terminates, wake the waiter.
 	defer wakeOnCancel(ctx, &q.mu, q.nempty)()
 
-	for q.tracker.len() == 0 || q.closed {
+	// check ctx before the queue: a cancelled context must not take
+	// items. This matches Deque.WaitPopFront/Back.
+	for {
+		if err := ctx.Err(); err != nil {
+			return out, err
+		}
 		if q.closed {
 			return out, ErrQueueClosed
 		}
-
-		if err := ctx.Err(); err != nil {
-			return out, ers.Wrap(err, "WaitPop() canceled while waiting for an item")
+		if q.tracker.len() > 0 {
+			return q.popFront(), nil
 		}
-
 		q.nempty.Wait()
 	}
-	return q.popFront(), nil
 }
 
 // Drain marks the queue as draining so that new items cannot be
