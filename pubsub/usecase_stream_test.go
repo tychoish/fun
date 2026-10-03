@@ -94,9 +94,7 @@ func TestUseCaseStreamSplitSizes(t *testing.T) {
 			var all []int
 			var wg sync.WaitGroup
 			for _, s := range split {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					out, err := s.Slice(t.Context())
 					if err != nil {
 						t.Error(err)
@@ -104,7 +102,7 @@ func TestUseCaseStreamSplitSizes(t *testing.T) {
 					mu.Lock()
 					all = append(all, out...)
 					mu.Unlock()
-				}()
+				})
 			}
 			ucGuard(t, "split consumers", wg.Wait)
 			slices.Sort(all)

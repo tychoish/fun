@@ -124,9 +124,7 @@ func TestUseCaseBrokerPerSubscriberOrdering(t *testing.T) {
 
 				var wg sync.WaitGroup
 				for i, ch := range chans {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
+					wg.Go(func() {
 						got := ucCollect(t, ch, msgs)
 						for j, v := range got {
 							if v != j {
@@ -134,7 +132,7 @@ func TestUseCaseBrokerPerSubscriberOrdering(t *testing.T) {
 								return
 							}
 						}
-					}()
+					})
 				}
 				ucGuard(t, "subscribers", wg.Wait)
 			})
@@ -178,14 +176,12 @@ func TestUseCaseBrokerManySubscribersEachGetEverything(t *testing.T) {
 	go ucSendAll(t, b, msgs)
 	var wg sync.WaitGroup
 	for _, ch := range chans {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			got := ucCollect(t, ch, msgs)
 			if !slices.IsSorted(got) || got[0] != 0 || got[msgs-1] != msgs-1 {
 				t.Errorf("got %v", got)
 			}
-		}()
+		})
 	}
 	ucGuard(t, "subscribers", wg.Wait)
 }
@@ -199,16 +195,14 @@ func TestUseCaseBrokerManyConcurrentSenders(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for s := range senders {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range per {
 				if err := b.Send(t.Context(), s*1000+i); err != nil {
 					t.Errorf("sender %d: %v", s, err)
 					return
 				}
 			}
-		}()
+		})
 	}
 	last := make([]int, senders)
 	for i := range last {
@@ -268,9 +262,7 @@ func TestUseCaseBrokerChurnThenStop(t *testing.T) {
 			b := kind.mk(t.Context(), BrokerOptions{BufferSize: 1})
 			var senders, churners sync.WaitGroup
 			stopSending := make(chan struct{})
-			senders.Add(1)
-			go func() {
-				defer senders.Done()
+			senders.Go(func() {
 				for i := 0; ; i++ {
 					select {
 					case <-stopSending:
@@ -281,11 +273,9 @@ func TestUseCaseBrokerChurnThenStop(t *testing.T) {
 						return
 					}
 				}
-			}()
+			})
 			for range 4 {
-				churners.Add(1)
-				go func() {
-					defer churners.Done()
+				churners.Go(func() {
 					for range 25 {
 						ch, err := b.Subscribe(t.Context())
 						if err != nil {
@@ -301,7 +291,7 @@ func TestUseCaseBrokerChurnThenStop(t *testing.T) {
 							return
 						}
 					}
-				}()
+				})
 			}
 			ucGuard(t, "churners", churners.Wait)
 			close(stopSending)

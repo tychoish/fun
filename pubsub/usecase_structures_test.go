@@ -82,16 +82,14 @@ func TestUseCaseContainerBlockedPushersAllLand(t *testing.T) {
 			const producers, per = 4, 25
 			var wg sync.WaitGroup
 			for p := range producers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for i := range per {
 						if err := b.WaitPush(t.Context(), p*1000+i); err != nil {
 							t.Errorf("producer %d: %v", p, err)
 							return
 						}
 					}
-				}()
+				})
 			}
 			last := make([]int, producers)
 			for i := range last {
@@ -126,15 +124,13 @@ func TestUseCaseContainerCompetingConsumersSeeEachItemOnce(t *testing.T) {
 			var seen []int
 			var wg sync.WaitGroup
 			for range consumers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for v := range b.Popping(t.Context()) {
 						mu.Lock()
 						seen = append(seen, v)
 						mu.Unlock()
 					}
-				}()
+				})
 			}
 			for i := range items {
 				if err := b.Push(i); err != nil {
