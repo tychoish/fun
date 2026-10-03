@@ -1175,10 +1175,12 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 
 		// done retires n shards; the last one releases the iterator.
 		done := func(n int) {
-			mtx.Lock()
-			remain -= n
-			last := remain == 0
-			mtx.Unlock()
+			last := func() bool {
+				mtx.Lock()
+				defer mtx.Unlock()
+				remain -= n
+				return remain == 0
+			}()
 			if last {
 				unwatch()
 				release()
