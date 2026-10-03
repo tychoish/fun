@@ -160,39 +160,26 @@ func (q *Queue[T]) doAdd(item T) error {
 // ErrQueueDraining rather than waiting out the context.
 func (q *Queue[T]) WaitPush(ctx context.Context, item T) error {
 	defer q.with(q.lock())
-	if q.drainers > 0 {
-		return ErrQueueDraining
-	}
-
-	if q.closed {
-		return ErrQueueClosed
-	}
-
-	if q.tracker.cap() > q.tracker.len() {
-		return q.doAdd(item)
-	}
-
-	cond := q.nupdates
 
 	// If the context terminates, wake the waiter.
-	defer wakeOnCancel(ctx, &q.mu, cond)()
+	defer wakeOnCancel(ctx, &q.mu, q.nupdates)()
 
-	for q.tracker.cap() <= q.tracker.len() {
+	// check ctx before capacity: a cancelled context must not insert.
+	for {
 		if q.drainers > 0 {
 			return ErrQueueDraining
 		}
 		if q.closed {
 			return ErrQueueClosed
 		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			cond.Wait()
+		if err := ctx.Err(); err != nil {
+			return err
 		}
+		if q.tracker.cap() > q.tracker.len() {
+			return q.doAdd(item)
+		}
+		q.nupdates.Wait()
 	}
-	return q.doAdd(item)
 }
 
 // Pop removes and returns the frontmost (oldest) item in the queue and
