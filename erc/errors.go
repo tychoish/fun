@@ -175,15 +175,16 @@ func (ec *Collector) As(target any) bool { defer ec.with(ec.lock()); return ec.l
 // the iteration order.
 func (ec *Collector) Iterator() iter.Seq[error] {
 	return func(yield func(err error) bool) {
-		ec.mu.Lock()
-		for err := range ec.list.FIFO() {
-			ec.mu.Unlock()
-			if !yield(err) {
+		next, stop := iter.Pull(ec.list.FIFO())
+		defer stop()
+		// the lock is held only while stepping the list, never across yield.
+		step := func() (error, bool) { defer ec.with(ec.lock()); return next() }
+		for {
+			err, ok := step()
+			if !ok || !yield(err) {
 				return
 			}
-			ec.mu.Lock()
 		}
-		ec.mu.Unlock()
 	}
 }
 
