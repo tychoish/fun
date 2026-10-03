@@ -147,6 +147,11 @@ func (dq *Deque[T]) Shutdown(ctx context.Context) error {
 }
 
 func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
+	// a cancelled context wins over an already-empty queue.
+	if err := ctx.Err(); err != nil {
+		return ers.Wrapf(err, "Drain() returned early with %d items remaining", dq.tracker.len())
+	}
+
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
 	stop := wakeOnCancel(ctx, &dq.mutex, dq.updates)

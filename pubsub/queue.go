@@ -258,6 +258,11 @@ func (q *Queue[T]) Drain(ctx context.Context) error {
 }
 
 func (q *Queue[T]) waitForDrain(ctx context.Context) error {
+	// a cancelled context wins over an already-empty queue.
+	if err := ctx.Err(); err != nil {
+		return ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
+	}
+
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
 	defer wakeOnCancel(ctx, &q.mu, q.nempty)()
