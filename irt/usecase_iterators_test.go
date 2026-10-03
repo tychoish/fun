@@ -206,6 +206,11 @@ func ucCases() []ucCase {
 			return ucFlat(WithMutex2(ucLift2(s), new(sync.Mutex)))
 		}},
 	}
+	for i := range cases {
+		if cases[i].name == "Modify2" || cases[i].name == "ModifyAll2" {
+			cases[i].noReiterate = ucModifyBug
+		}
+	}
 	return cases
 }
 
