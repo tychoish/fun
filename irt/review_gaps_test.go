@@ -296,8 +296,12 @@ func TestMarshalLargeStreamsReview(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(data) != n+1 || strings.Trim(string(data), "x") != "" {
-			t.Fatalf("len %d", len(data))
+		// n+1 elements joined by n newline separators.
+		if want := 2*(n+1) - 1; len(data) != want {
+			t.Fatalf("len %d, want %d", len(data), want)
+		}
+		if strings.Trim(string(data), "x\n") != "" {
+			t.Fatalf("unexpected content %q", data)
 		}
 	})
 }

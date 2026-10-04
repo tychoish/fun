@@ -459,11 +459,38 @@ func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	})
 }
 
-// Iterator returns an iterator for all items in the queue. Does not block.
+// Iterator returns an iterator for all items in the queue. Does not
+// block. The returned iter.Seq is reusable: ranging over it more than
+// once starts over from the front of the queue each time, and each
+// range call tracks its own cursor, so concurrent ranges over the same
+// iter.Seq (or separate calls to Iterator) do not interfere with one
+// another. The lock is only held while stepping the cursor, never
+// across a yield, so this is safe to range over while the queue is
+// concurrently pushed to or popped from.
 func (q *Queue[T]) Iterator() iter.Seq[T] {
-	return irt.WithMutex(func(yield func(T) bool) {
-		for next := q.front.link; !q.closed && next != nil && q.front != q.back && q.front != next && yield(next.item); next = next.link {
-			continue
+	return func(yield func(T) bool) {
+		var cursor *entry[T]
+		step := func() (o T, _ bool) {
+			defer q.with(q.lock())
+
+			if cursor == nil {
+				cursor = q.front
+			}
+			if q.closed {
+				return o, false
+			}
+			next := q.after(cursor)
+			if next == nil {
+				return o, false
+			}
+			cursor = next
+			return next.item, true
 		}
-	}, q.mtx())
+		for {
+			item, ok := step()
+			if !ok || !yield(item) {
+				return
+			}
+		}
+	}
 }
