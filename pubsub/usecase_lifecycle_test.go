@@ -303,12 +303,12 @@ func TestUseCaseContainerShutdownAfterShutdown(t *testing.T) {
 				}
 			})
 			ucGuard(t, "second Shutdown", func() {
-				if err := b.Shutdown(t.Context()); err != nil {
-					t.Errorf("second Shutdown on an empty closed container: %v", err)
+				if err := b.Shutdown(t.Context()); !errors.Is(err, ErrQueueClosed) {
+					t.Errorf("second Shutdown on an empty closed container: got %v, want ErrQueueClosed", err)
 				}
 			})
-			if err := b.Drain(t.Context()); err != nil {
-				t.Fatalf("Drain of empty closed container: %v", err)
+			if err := b.Drain(t.Context()); !errors.Is(err, ErrQueueClosed) {
+				t.Fatalf("Drain of empty closed container: got %v, want ErrQueueClosed", err)
 			}
 		})
 	}
@@ -341,8 +341,15 @@ func TestUseCaseContainerConcurrentShutdownCallers(t *testing.T) {
 			if !slices.IsSorted(got) {
 				t.Fatalf("FIFO order lost: %v", got)
 			}
+			// Shutdown/Drain are not synchronized to start together, so a
+			// caller that reaches the container after a sibling has
+			// already drained and closed it legitimately observes
+			// ErrQueueClosed (closed is reported before ctx and before
+			// any wait, per the closed-first precedence rule); a caller
+			// that starts while the container is still open and only
+			// racing the drain itself completes with nil.
 			for _, r := range results {
-				if err := ucRecv(t, r, "Shutdown/Drain caller"); err != nil {
+				if err := ucRecv(t, r, "Shutdown/Drain caller"); err != nil && !errors.Is(err, ErrQueueClosed) {
 					t.Fatalf("a drainer reported %v after the container emptied", err)
 				}
 			}
