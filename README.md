@@ -14,6 +14,13 @@ dependencies and _all_ of the code is well-tested. You can (and
 should!) always adopt the tools that make the most sense to use for
 your project.
 
+## Go Version Support
+
+- The minimum supported Go version is `1.26`, as of the `v0.15.0` release.
+- CI tests against Go `1.26` and `stable`.
+- The next floor bump, to Go `1.27`, is planned for the `v0.16.0`
+  release, targeted for approximately April 2027.
+
 ## Highlights
 
 - Every **iterator** tool you always wish you had in the `irt` (ha!)
