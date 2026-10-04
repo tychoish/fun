@@ -89,8 +89,6 @@ type ucCase struct {
 	build     func(t *testing.T, src iter.Seq[int]) iter.Seq[int]
 	unordered bool // output order is not deterministic
 	single    bool // documented single-use: later iterations may be empty
-	// noReiterate skips the re-iteration check for a known bug.
-	noReiterate string
 }
 
 func ucNorm(c ucCase, in []int) []int {
@@ -109,8 +107,6 @@ func ucPair(a, b int) (int, int) { return a, b }
 func ucPairOK(int, int) bool     { return true }
 func ucPairNo(int, int) bool     { return false }
 
-const ucModifyBug = "known bug: Modify/ModifyAll/Modify2/ModifyAll2 reassign the captured seq inside the returned closure, so every further iteration stacks another copy of the transformation"
-
 func ucCases() []ucCase {
 	one := func(name string, f func(src iter.Seq[int]) iter.Seq[int]) ucCase {
 		return ucCase{name: name, build: func(_ *testing.T, src iter.Seq[int]) iter.Seq[int] { return f(src) }}
@@ -122,8 +118,8 @@ func ucCases() []ucCase {
 		one("Limit", func(s iter.Seq[int]) iter.Seq[int] { return Limit(s, 100) }),
 		one("Convert", func(s iter.Seq[int]) iter.Seq[int] { return Convert(s, ucInc) }),
 		one("Cast", func(s iter.Seq[int]) iter.Seq[int] { return Cast[int, int](s) }),
-		{name: "Modify", noReiterate: ucModifyBug, build: func(_ *testing.T, s iter.Seq[int]) iter.Seq[int] { return Modify(s, ucInc) }},
-		{name: "ModifyAll", noReiterate: ucModifyBug, build: func(_ *testing.T, s iter.Seq[int]) iter.Seq[int] { return ModifyAll(s, ucInc, ucInc) }},
+		one("Modify", func(s iter.Seq[int]) iter.Seq[int] { return Modify(s, ucInc) }),
+		one("ModifyAll", func(s iter.Seq[int]) iter.Seq[int] { return ModifyAll(s, ucInc, ucInc) }),
 		one("ForEach", func(s iter.Seq[int]) iter.Seq[int] { return ForEach(s, func(int) {}) }),
 		one("ForEachWhile", func(s iter.Seq[int]) iter.Seq[int] { return ForEachWhile(s, ucTrue) }),
 		one("Keep", func(s iter.Seq[int]) iter.Seq[int] { return Keep(s, ucTrue) }),
@@ -206,11 +202,6 @@ func ucCases() []ucCase {
 			return ucFlat(WithMutex2(ucLift2(s), new(sync.Mutex)))
 		}},
 	}
-	for i := range cases {
-		if cases[i].name == "Modify2" || cases[i].name == "ModifyAll2" {
-			cases[i].noReiterate = ucModifyBug
-		}
-	}
 	return cases
 }
 
@@ -247,9 +238,6 @@ func TestUseCaseIteratorsEarlyBreakAtEveryPosition(t *testing.T) {
 func TestUseCaseIteratorsReiterateTwice(t *testing.T) {
 	for _, c := range ucCases() {
 		t.Run(c.name, func(t *testing.T) {
-			if c.noReiterate != "" {
-				t.Skip(c.noReiterate)
-			}
 			src := new(ucSource)
 			seq := c.build(t, src.seq(5))
 			first, v1 := ucDrive(seq, 0)
@@ -410,7 +398,6 @@ func TestUseCaseGeneratorsEarlyBreak(t *testing.T) {
 // TestUseCaseModifyReiteration documents that the Modify family
 // applies its transformation once per pass.
 func TestUseCaseModifyReiteration(t *testing.T) {
-	t.Skip(ucModifyBug)
 	src := Args(1, 2, 3)
 	cases := map[string]iter.Seq[int]{
 		"Modify":     Modify(src, ucInc),

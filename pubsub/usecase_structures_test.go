@@ -276,7 +276,6 @@ func TestUseCaseContainerIteratorsEarlyBreakEveryPosition(t *testing.T) {
 }
 
 func TestUseCaseQueueIteratorReiteration(t *testing.T) {
-	t.Skip("known bug: Queue.Iterator is built on irt.WithMutex, which is single-use, so a second range over the same iter.Seq yields nothing")
 	q := NewUnlimitedQueue[int]()
 	for i := range 3 {
 		_ = q.Push(i)
@@ -290,7 +289,6 @@ func TestUseCaseQueueIteratorReiteration(t *testing.T) {
 }
 
 func TestUseCaseQueueIteratorNeverRangedDoesNotLeak(t *testing.T) {
-	t.Skip("known bug: Queue.Iterator eagerly calls iter.Pull (via irt.WithMutex); an iterator that is created but never ranged leaks a goroutine")
 	q := NewUnlimitedQueue[int]()
 	defer testt.NoGoroutineLeak(t, 5*time.Second)()
 	for range 5 {
@@ -339,7 +337,6 @@ func TestUseCaseZeroValueContainers(t *testing.T) {
 		}
 	})
 	t.Run("QueueIteratorOnFreshValue", func(t *testing.T) {
-		t.Skip("known bug: Queue.Iterator on a zero-value Queue dereferences the nil front sentinel (init is never run)")
 		q := &Queue[int]{}
 		for range q.Iterator() {
 			t.Fatal("zero queue yielded")
