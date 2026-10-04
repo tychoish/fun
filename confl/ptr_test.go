@@ -75,7 +75,7 @@ func Test_conflagure_pointer_bool(t *testing.T) {
 		want *bool
 	}{
 		{name: "unset is nil", args: nil, want: nil},
-		{name: "flag passed sets true", args: []string{"-validate-only"}, want: boolPtr(true)},
+		{name: "flag passed sets true", args: []string{"-validate-only"}, want: new(true)},
 	}
 
 	for tt := range slices.Values(tests) {
@@ -246,7 +246,8 @@ func Test_conflagure_pointer_default(t *testing.T) {
 	})
 }
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
 
 // Test_registerPointerFlag_invalid_default verifies a malformed default:
 // on a pointer field surfaces as ErrInvalidSpecification rather than

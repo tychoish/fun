@@ -36,8 +36,7 @@ func collectSubcommands(val reflect.Value, programName string) ([]subcommandEntr
 	t0 := val.Type()
 	var restFieldName string
 	hasCmdField := false
-	for i := range t0.NumField() {
-		f := t0.Field(i)
+	for f := range t0.Fields() {
 		if f.Tag.Get("cmd") != "" {
 			hasCmdField = true
 		}

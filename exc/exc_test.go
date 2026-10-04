@@ -633,8 +633,7 @@ func TestError_IsAsUnwrap(t *testing.T) {
 				StdError:  new(bytes.Buffer),
 				StdOutput: new(bytes.Buffer),
 			}
-			var target *testCustomErr
-			if errors.As(excErr, &target) {
+			if _, ok := errors.AsType[*testCustomErr](excErr); ok {
 				t.Errorf("errors.As returned true, expected false for nil Err")
 			}
 		})
@@ -646,8 +645,7 @@ func TestError_IsAsUnwrap(t *testing.T) {
 				StdError:  new(bytes.Buffer),
 				StdOutput: new(bytes.Buffer),
 			}
-			var target *testCustomErr
-			if errors.As(excErr, &target) {
+			if _, ok := errors.AsType[*testCustomErr](excErr); ok {
 				t.Errorf("errors.As returned true, expected false for mismatched type")
 			}
 		})

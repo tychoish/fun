@@ -239,8 +239,7 @@ func (e *Error) Error() string { return fmt.Sprintf("[%s] got %v: err=%q", e.Nam
 // error chain. Returns the *Error and true on success, or nil and false if err
 // is nil or contains no *Error.
 func ResolveError(err error) (*Error, bool) {
-	var e *Error
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*Error](err); ok {
 		return e, true
 	}
 	return nil, false

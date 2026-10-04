@@ -31,7 +31,9 @@ func Default[T comparable](input T, defaultValue T) T {
 // value that is a pointer (e.x. *string), then Ptr returns
 // **string. If the input object is a nil pointer, then Ptr returns a
 // non-nil pointer to a nil pointer.
-func Ptr[T any](in T) *T { return &in }
+//
+//go:fix inline
+func Ptr[T any](in T) *T { return new(in) }
 
 // DerefOk takes a pointer to an value and returns the concrete type for
 // that pointer. If the pointer is nil, DerefOk returns the zero value
