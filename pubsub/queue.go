@@ -471,14 +471,9 @@ func (q *Queue[T]) after(cursor *entry[T]) *entry[T] {
 // removed from the queue (destructive read). Safe for concurrent access.
 func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(func() (z T, _ bool) {
-		// a closed queue is reported regardless of ctx state, and must
-		// not be short-circuited by the ctx precheck below: Pop already
-		// reports nothing for a closed queue, with or without a
-		// cancelled ctx.
-		if q.isClosed() {
-			msg, ok := q.Pop() // holds lock
-			return msg, ok
-		}
+		// Pop already reports nothing for a closed queue, with or
+		// without a cancelled ctx, so a closed queue needs no
+		// separate check here.
 		if ctx.Err() != nil {
 			return z, false
 		}
@@ -491,12 +486,6 @@ func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 		}
 		return z, false
 	})
-}
-
-// isClosed reports whether the queue has been closed.
-func (q *Queue[T]) isClosed() bool {
-	defer q.with(q.lock())
-	return q.closed
 }
 
 // Iterator returns an iterator for all items in the queue. Does not
