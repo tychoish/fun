@@ -20,10 +20,20 @@ import (
 // WaitPop IteratorWait, IteratorWaitPop).
 //
 // Blocking operations (WaitPushFront/Back, WaitPopFront/Back, Drain,
-// Shutdown and the Wait iterators) follow one rule, shared with Queue:
-// a cancelled ctx wins over a ready item or slot. Under an
-// already-cancelled ctx they return the ctx error (or yield nothing)
-// and neither consume nor insert anything.
+// Shutdown and the Wait iterators) report a closed or draining deque
+// before a context cancellation error: once the deque is closed, they
+// return ErrQueueClosed (or stop yielding) regardless of ctx state,
+// even if items remain or zero items remain. On an open deque, a
+// cancelled ctx still wins over a ready item or slot, shared with
+// Queue: under an already-cancelled ctx they return the ctx error (or
+// yield nothing) and neither consume nor insert anything.
+//
+// Shutdown has its own precedence: ctx, then drain, then close. Given
+// an already-cancelled ctx on an open deque, Shutdown returns the ctx
+// error and leaves the deque open (a subsequent push succeeds, and an
+// explicit Close still works). On an already-closed deque, Shutdown
+// returns ErrQueueClosed immediately, matching the closed-first rule
+// above.
 //
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
@@ -147,6 +157,13 @@ func (dq *Deque[T]) Shutdown(ctx context.Context) error {
 }
 
 func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
+	// closed is reported unconditionally, before ctx, and independent of
+	// whether any items remain: an already-closed, already-empty deque
+	// must still report ErrQueueClosed rather than nil.
+	if dq.closed {
+		return ErrQueueClosed
+	}
+
 	// a cancelled context wins over an already-empty queue.
 	if err := ctx.Err(); err != nil {
 		return ers.Wrapf(err, "Drain() returned early with %d items remaining", dq.tracker.len())
@@ -419,7 +436,11 @@ func (dq *Deque[T]) neighbor(from *element[T], direction dqDirection) *element[T
 }
 
 // await blocks (with the lock held, as a Cond does) until ready reports
-// true or ctx ends. Callers' ready funcs must account for closure.
+// true, the deque is closed, or ctx ends. Callers' ready funcs may also
+// account for closure (several do, redundantly with the check here),
+// since a true ready() report, like a closed deque, ends the wait with
+// a nil error; callers that need to react to closure specifically
+// re-check dq.closed themselves (see waitPop).
 func (dq *Deque[T]) await(ctx context.Context, direction dqDirection, ready func() bool) error {
 	cond := dq.nfront
 	if direction == dqPrev {
@@ -427,8 +448,13 @@ func (dq *Deque[T]) await(ctx context.Context, direction dqDirection, ready func
 	}
 	defer wakeOnCancel(ctx, &dq.mutex, cond)()
 
-	// check ctx before ready: a cancelled context must not take items.
+	// closed is checked before ctx: a closed deque ends the wait
+	// regardless of ctx state. On an open deque, ctx is still checked
+	// before an item is taken.
 	for {
+		if dq.closed {
+			return nil
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}

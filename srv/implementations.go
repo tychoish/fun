@@ -212,8 +212,15 @@ func WorkerPool(workQueue *pubsub.Queue[fnx.Worker], optp ...opt.Provider[*wpa.W
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			// Shutdown drains the queue (waits for all jobs to complete) and then closes it
-			return workQueue.Shutdown(ctx)
+			// Shutdown drains the queue (waits for all jobs to complete) and
+			// then closes it. The service lifecycle may call Shutdown after
+			// Run has already drained and closed the queue on its own (e.g.
+			// once the queue's own producer closed it): that's not an error
+			// here, so ErrQueueClosed is not propagated.
+			if err := workQueue.Shutdown(ctx); err != nil && !errors.Is(err, pubsub.ErrQueueClosed) {
+				return err
+			}
+			return nil
 		},
 	}
 }
@@ -251,8 +258,14 @@ func WorkerPoolWithErrorHandler(
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			// Shutdown drains the queue (waits for all jobs to complete) and then closes it
-			return workQueue.Shutdown(ctx)
+			// Shutdown drains the queue (waits for all jobs to complete) and
+			// then closes it. As with WorkerPool, a redundant Shutdown call
+			// after the queue has already drained and closed itself is not
+			// an error here, so ErrQueueClosed is not propagated.
+			if err := workQueue.Shutdown(ctx); err != nil && !errors.Is(err, pubsub.ErrQueueClosed) {
+				return err
+			}
+			return nil
 		},
 	}
 	s.ErrorHandler.Set(observer)
