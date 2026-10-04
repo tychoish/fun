@@ -369,11 +369,17 @@ func UnmarshalJSON2[A any, B any](data io.Reader) iter.Seq2[KV[A, B], error] {
 
 // MarshalText marshals a sequence to bytes by trying TextMarshaler, JSONMarshaler,
 // MarshalYAML, Marshal, string/[]byte conversions, or falling back to JSON encoding.
+//
+// Per-element payloads are joined with a single newline ("\n") separator between
+// elements; there is no leading or trailing separator, and a single-element
+// sequence is emitted unchanged. The empty sequence produces a non-nil, empty
+// byte slice.
 func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
 	var buf bytes.Buffer
 	var (
 		payload []byte
 		err     error
+		first   = true
 	)
 	for value := range seq {
 		switch vt := any(value).(type) {
@@ -395,6 +401,11 @@ func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		if first {
+			first = false
+		} else {
+			must2(buf.Write([]byte{'\n'}))
+		}
 		must2(buf.Write(payload))
 		payload = payload[:0]
 	}
@@ -406,11 +417,19 @@ func MarshalText[T any](seq iter.Seq[T]) ([]byte, error) {
 
 // MarshalBinary marshals a sequence to bytes by trying BinaryMarshaler, Marshal,
 // MarshalBSON, or []byte conversions. Returns an error for unsupported types.
+//
+// Per-element payloads are joined with a single newline ("\n") separator between
+// elements; there is no leading or trailing separator, and a single-element
+// sequence is emitted unchanged. The empty sequence produces a non-nil, empty
+// byte slice. This format is NOT self-delimiting: if an element's marshaled
+// payload itself contains a 0x0A (newline) byte, the output cannot be
+// unambiguously split back into the original elements.
 func MarshalBinary[T any](seq iter.Seq[T]) ([]byte, error) {
 	var buf bytes.Buffer
 	var (
 		payload []byte
 		err     error
+		first   = true
 	)
 	for value := range seq {
 		switch vt := any(value).(type) {
@@ -427,6 +446,11 @@ func MarshalBinary[T any](seq iter.Seq[T]) ([]byte, error) {
 		}
 		if err != nil {
 			return nil, err
+		}
+		if first {
+			first = false
+		} else {
+			must2(buf.Write([]byte{'\n'}))
 		}
 		must2(buf.Write(payload))
 		payload = payload[:0]
