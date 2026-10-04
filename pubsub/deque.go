@@ -19,21 +19,10 @@ import (
 // safely handles multiple concurrent blocking operations (e.g. Wait,
 // WaitPop IteratorWait, IteratorWaitPop).
 //
-// Blocking operations (WaitPushFront/Back, WaitPopFront/Back, Drain,
-// Shutdown and the Wait iterators) report a closed or draining deque
-// before a context cancellation error: once the deque is closed, they
-// return ErrQueueClosed (or stop yielding) regardless of ctx state,
-// even if items remain or zero items remain. On an open deque, a
-// cancelled ctx still wins over a ready item or slot, shared with
-// Queue: under an already-cancelled ctx they return the ctx error (or
-// yield nothing) and neither consume nor insert anything.
-//
-// Shutdown has its own precedence: ctx, then drain, then close. Given
-// an already-cancelled ctx on an open deque, Shutdown returns the ctx
-// error and leaves the deque open (a subsequent push succeeds, and an
-// explicit Close still works). On an already-closed deque, Shutdown
-// returns ErrQueueClosed immediately, matching the closed-first rule
-// above.
+// Deque shares its closed/draining/context precedence rules with
+// Queue: see the Close/Shutdown precedence note on Queue's doc comment
+// for the invariant that governs WaitPushFront/Back, WaitPopFront/Back,
+// Drain, Shutdown, and the Wait iterators here.
 //
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
