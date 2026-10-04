@@ -16,6 +16,11 @@ func TestUseCaseConcurrentIterationOfOneSequence(t *testing.T) {
 	for _, c := range ucCases() {
 		t.Run(c.name, func(t *testing.T) {
 			if c.single {
+				// confirmed against the doc comments on WithMutex and
+				// WithMutex2 in irt.go: both are documented single-use
+				// (the underlying iter.Pull is stopped after the first
+				// iteration ends), so skipping concurrent-reiteration
+				// coverage here is intentional, not a gap.
 				t.Skip("documented single-use")
 			}
 			src := new(ucSource)

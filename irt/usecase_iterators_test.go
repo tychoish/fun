@@ -276,7 +276,13 @@ func TestUseCaseIteratorsConsumerPanicReleasesSource(t *testing.T) {
 				})
 			})
 			if calls < 2 {
-				t.Skipf("combinator yielded only %d items", calls)
+				// every case in ucCases() forwards at least 5 items from a
+				// 5-element source before any consumer-side stop, so the
+				// panic on the 2nd call is always reached; verified with
+				// `go test -race -count=20`, which never skipped. Treat
+				// fewer than 2 calls as a real regression (a combinator
+				// that now stops delivering early) rather than skip it.
+				t.Fatalf("combinator yielded only %d items, want at least 2", calls)
 			}
 			if got != "consumer boom" {
 				t.Fatalf("recovered %v, want the consumer's panic", got)
