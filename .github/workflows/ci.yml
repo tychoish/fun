@@ -2,13 +2,9 @@ name: ci
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - "**.go"
     branches:
       - main
   push:
-    paths:
-      - "**.go"
     branches:
       - main
 
