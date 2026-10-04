@@ -218,7 +218,9 @@ func isWithin(index, length int) bool       { return index >= 0 && index < lengt
 
 // pointers and references
 
-//go:fix inline
+// ptr is kept as a named function (rather than inlined to new(in))
+// because it is passed as a first-class function value to Convert in
+// Ptrs below; new is a builtin and cannot be used as a function value.
 func ptr[T any](in T) *T                       { return new(in) }
 func ptrznil[T comparable](in T) *T            { return ifelsedo(isZero(in), nil, ptrlazy(in)) }
 func ptrznillazy[T comparable](in T) func() *T { return func() *T { return ptrznil(in) } }

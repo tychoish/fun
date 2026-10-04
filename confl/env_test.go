@@ -796,8 +796,3 @@ func Test_env_string_slice(t *testing.T) {
 	assert.Equal(t, c.Tags[1], "b")
 	assert.Equal(t, c.Tags[2], "c")
 }
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-//go:fix inline
-func ptrStr(s string) *string { return new(s) }
