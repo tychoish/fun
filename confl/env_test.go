@@ -148,11 +148,11 @@ func Test_env_nonempty_only(t *testing.T) {
 		setB *string
 		want string
 	}{
-		{name: "A empty, B set — B used", setA: ptrStr(""), setB: ptrStr("from-B"), want: "from-B"},
-		{name: "A set, non-empty — A used", setA: ptrStr("from-A"), setB: ptrStr("from-B"), want: "from-A"},
-		{name: "both empty — zero", setA: ptrStr(""), setB: ptrStr(""), want: ""},
+		{name: "A empty, B set — B used", setA: new(""), setB: new("from-B"), want: "from-B"},
+		{name: "A set, non-empty — A used", setA: new("from-A"), setB: new("from-B"), want: "from-A"},
+		{name: "both empty — zero", setA: new(""), setB: new(""), want: ""},
 		{name: "neither set — zero", want: ""},
-		{name: "A empty, B unset — zero", setA: ptrStr(""), want: ""},
+		{name: "A empty, B unset — zero", setA: new(""), want: ""},
 	}
 
 	for tt := range slices.Values(tests) {
@@ -341,12 +341,12 @@ func Test_env_nonempty_last_wins(t *testing.T) {
 		setB *string
 		want string
 	}{
-		{name: "both non-empty — B wins (last)", setA: ptrStr("from-A"), setB: ptrStr("from-B"), want: "from-B"},
-		{name: "B empty, A non-empty — A used (last non-empty)", setA: ptrStr("from-A"), setB: ptrStr(""), want: "from-A"},
-		{name: "A empty, B non-empty — B wins", setA: ptrStr(""), setB: ptrStr("from-B"), want: "from-B"},
-		{name: "both empty — zero", setA: ptrStr(""), setB: ptrStr(""), want: ""},
-		{name: "only A set non-empty — A used", setA: ptrStr("from-A"), want: "from-A"},
-		{name: "only B set non-empty — B used", setB: ptrStr("from-B"), want: "from-B"},
+		{name: "both non-empty — B wins (last)", setA: new("from-A"), setB: new("from-B"), want: "from-B"},
+		{name: "B empty, A non-empty — A used (last non-empty)", setA: new("from-A"), setB: new(""), want: "from-A"},
+		{name: "A empty, B non-empty — B wins", setA: new(""), setB: new("from-B"), want: "from-B"},
+		{name: "both empty — zero", setA: new(""), setB: new(""), want: ""},
+		{name: "only A set non-empty — A used", setA: new("from-A"), want: "from-A"},
+		{name: "only B set non-empty — B used", setB: new("from-B"), want: "from-B"},
 		{name: "neither set — zero", want: ""},
 	}
 
@@ -402,9 +402,9 @@ func Test_env_nonempty_or_cli(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "non-empty env, no cli — ok", envVal: ptrStr("from-env"), want: "from-env"},
-		{name: "non-empty env + cli — error", envVal: ptrStr("from-env"), args: []string{"-host", "from-cli"}, wantErr: true},
-		{name: "empty env + cli — cli used (empty env treated as unset)", envVal: ptrStr(""), args: []string{"-host", "from-cli"}, want: "from-cli"},
+		{name: "non-empty env, no cli — ok", envVal: new("from-env"), want: "from-env"},
+		{name: "non-empty env + cli — error", envVal: new("from-env"), args: []string{"-host", "from-cli"}, wantErr: true},
+		{name: "empty env + cli — cli used (empty env treated as unset)", envVal: new(""), args: []string{"-host", "from-cli"}, want: "from-cli"},
 		{name: "only cli, no env — ok", args: []string{"-host", "from-cli"}, want: "from-cli"},
 		{name: "neither — zero", want: ""},
 	}
@@ -440,9 +440,9 @@ func Test_env_nonempty_takes_priority(t *testing.T) {
 		args   []string
 		want   string
 	}{
-		{name: "non-empty env + cli — env wins", envVal: ptrStr("from-env"), args: []string{"-host", "from-cli"}, want: "from-env"},
-		{name: "empty env + cli — cli wins (empty env skipped)", envVal: ptrStr(""), args: []string{"-host", "from-cli"}, want: "from-cli"},
-		{name: "non-empty env, no cli — env used", envVal: ptrStr("from-env"), want: "from-env"},
+		{name: "non-empty env + cli — env wins", envVal: new("from-env"), args: []string{"-host", "from-cli"}, want: "from-env"},
+		{name: "empty env + cli — cli wins (empty env skipped)", envVal: new(""), args: []string{"-host", "from-cli"}, want: "from-cli"},
+		{name: "non-empty env, no cli — env used", envVal: new("from-env"), want: "from-env"},
 		{name: "neither — zero", want: ""},
 	}
 
@@ -472,11 +472,11 @@ func Test_env_nonempty_exclusive(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "non-empty env, no cli — ok", envVal: ptrStr("from-env"), want: "from-env"},
-		{name: "empty env, no cli — zero (empty skipped)", envVal: ptrStr(""), want: ""},
+		{name: "non-empty env, no cli — ok", envVal: new("from-env"), want: "from-env"},
+		{name: "empty env, no cli — zero (empty skipped)", envVal: new(""), want: ""},
 		{name: "cli set, no env — error", args: []string{"-host", "from-cli"}, wantErr: true},
-		{name: "cli set, empty env — error (cli still rejected)", envVal: ptrStr(""), args: []string{"-host", "from-cli"}, wantErr: true},
-		{name: "cli set, non-empty env — error", envVal: ptrStr("from-env"), args: []string{"-host", "from-cli"}, wantErr: true},
+		{name: "cli set, empty env — error (cli still rejected)", envVal: new(""), args: []string{"-host", "from-cli"}, wantErr: true},
+		{name: "cli set, non-empty env — error", envVal: new("from-env"), args: []string{"-host", "from-cli"}, wantErr: true},
 	}
 
 	for tt := range slices.Values(tests) {
@@ -799,4 +799,5 @@ func Test_env_string_slice(t *testing.T) {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-func ptrStr(s string) *string { return &s }
+//go:fix inline
+func ptrStr(s string) *string { return new(s) }

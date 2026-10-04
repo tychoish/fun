@@ -272,7 +272,7 @@ func TestPtrHelper(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ptr(tt.input)
+			result := new(tt.input)
 			if result == nil {
 				t.Errorf("ptr(%v) returned nil", tt.input)
 			}
@@ -565,11 +565,11 @@ func TestWithlimitHelper(t *testing.T) {
 			idx := 0
 			op := func() (int, *bool) {
 				if idx >= len(tt.input) {
-					return 0, ptr(false)
+					return 0, new(false)
 				}
 				val := tt.input[idx]
 				idx++
-				return val, ptr(true)
+				return val, new(true)
 			}
 
 			fn := repeat2(tt.limit, op)

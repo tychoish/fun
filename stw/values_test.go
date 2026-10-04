@@ -10,7 +10,7 @@ import (
 )
 
 func TestPtr(t *testing.T) {
-	out := Ptr(123)
+	out := new(123)
 	assert.True(t, out != nil)
 	check.Equal(t, *out, 123)
 
@@ -29,7 +29,7 @@ func TestPtr(t *testing.T) {
 	// this is gross, but we have a pointer (non-nil) to an object
 	// that is a pointer, which is nil.
 	var dptr *string
-	st := Ptr(dptr)
+	st := new(dptr)
 	assert.True(t, st != nil)
 	assert.True(t, *st == nil)
 	assert.Type[**string](t, st)
@@ -43,12 +43,12 @@ func TestPtr(t *testing.T) {
 		assert.True(t, strptr == nil)
 		assert.Equal(t, "", DerefZ(strptr))
 
-		strptr = Ptr("")
+		strptr = new("")
 		assert.True(t, strptr != nil)
 		assert.Equal(t, "", Deref(strptr))
 		assert.Equal(t, "", DerefZ(strptr))
 
-		strptr = Ptr("hello")
+		strptr = new("hello")
 		assert.True(t, strptr != nil)
 		assert.Equal(t, "hello", Deref(strptr))
 	})

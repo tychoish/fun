@@ -218,10 +218,11 @@ func isWithin(index, length int) bool       { return index >= 0 && index < lengt
 
 // pointers and references
 
-func ptr[T any](in T) *T                       { return &in }
+//go:fix inline
+func ptr[T any](in T) *T                       { return new(in) }
 func ptrznil[T comparable](in T) *T            { return ifelsedo(isZero(in), nil, ptrlazy(in)) }
 func ptrznillazy[T comparable](in T) func() *T { return func() *T { return ptrznil(in) } }
-func ptrlazy[T any](in T) func() *T            { return func() *T { return ptr(in) } }
+func ptrlazy[T any](in T) func() *T            { return func() *T { return new(in) } }
 func deref[T any](in *T) T                     { return *in }
 func dereflazy[T any](in *T) func() T          { return func() T { return deref(in) } }
 func derefzlazy[T any](in *T) func() T         { return func() T { return derefz(in) } }
@@ -393,7 +394,7 @@ func repeatok[T any](limit int, op func() (T, bool)) func() (T, *bool) {
 		if limit > 0 {
 			limit--
 			v, ok := op()
-			return v, ptr(ok)
+			return v, new(ok)
 		}
 		return
 	}

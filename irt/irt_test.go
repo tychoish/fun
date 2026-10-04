@@ -1126,8 +1126,8 @@ func TestPtrsWithNils(t *testing.T) {
 		expected []*int
 	}{
 		{"empty", []int{}, []*int{}},
-		{"NoZeros", []int{1, 2, 3}, []*int{ptr(1), ptr(2), ptr(3)}},
-		{"WithZeros", []int{1, 0, 3}, []*int{ptr(1), nil, ptr(3)}},
+		{"NoZeros", []int{1, 2, 3}, []*int{new(1), new(2), new(3)}},
+		{"WithZeros", []int{1, 0, 3}, []*int{new(1), nil, new(3)}},
 		{"AllZeros", []int{0, 0}, []*int{nil, nil}},
 	}
 
@@ -1160,8 +1160,8 @@ func TestDeref(t *testing.T) {
 		expected []int
 	}{
 		{"Empty", []*int{}, []int{}},
-		{"NoNils", []*int{ptr(1), ptr(2)}, []int{1, 2}},
-		{"WithNils", []*int{ptr(1), nil, ptr(3)}, []int{1, 3}},
+		{"NoNils", []*int{new(1), new(2)}, []int{1, 2}},
+		{"WithNils", []*int{new(1), nil, new(3)}, []int{1, 3}},
 		{"AllNils", []*int{nil, nil}, []int{}},
 	}
 
@@ -1183,8 +1183,8 @@ func TestDerefWithZeros(t *testing.T) {
 		expected []int
 	}{
 		{"Empty", []*int{}, []int{}},
-		{"NoNils", []*int{ptr(1), ptr(2)}, []int{1, 2}},
-		{"with nils", []*int{ptr(1), nil, ptr(3)}, []int{1, 0, 3}},
+		{"NoNils", []*int{new(1), new(2)}, []int{1, 2}},
+		{"with nils", []*int{new(1), nil, new(3)}, []int{1, 0, 3}},
 		{"all nils", []*int{nil, nil}, []int{0, 0}},
 	}
 
@@ -3799,7 +3799,7 @@ func TestEarlyReturnBehavior(t *testing.T) {
 				callCount.Add(1)
 				var p *int
 				if i%2 != 0 {
-					p = ptr(i)
+					p = new(i)
 				}
 				if !yield(p) {
 					return
@@ -4302,7 +4302,7 @@ func TestApplyAll2(t *testing.T) {
 
 func TestUntilNil(t *testing.T) {
 	t.Run("NormalOperation", func(t *testing.T) {
-		input := Slice([]*int{ptr(1), ptr(2), ptr(3), nil, ptr(4)})
+		input := Slice([]*int{new(1), new(2), new(3), nil, new(4)})
 		output := Collect(UntilNil(input))
 		expected := []int{1, 2, 3}
 		if !slices.Equal(output, expected) {
@@ -4311,7 +4311,7 @@ func TestUntilNil(t *testing.T) {
 	})
 
 	t.Run("EarlyReturn", func(t *testing.T) {
-		input := Slice([]*int{ptr(1), ptr(2), nil, ptr(3)})
+		input := Slice([]*int{new(1), new(2), nil, new(3)})
 		output := Collect(UntilNil(input))
 		expected := []int{1, 2}
 		if !slices.Equal(output, expected) {
@@ -5092,13 +5092,13 @@ func TestRemoveNils(t *testing.T) {
 		},
 		{
 			name:     "NoNils",
-			seq:      Args(ptr(1), ptr(2)),
-			expected: []*int{ptr(1), ptr(2)},
+			seq:      Args(new(1), new(2)),
+			expected: []*int{new(1), new(2)},
 		},
 		{
 			name:     "WithNils",
-			seq:      Args(ptr(1), nil, ptr(2)),
-			expected: []*int{ptr(1), ptr(2)},
+			seq:      Args(new(1), nil, new(2)),
+			expected: []*int{new(1), new(2)},
 		},
 		{
 			name:     "AllNils",
@@ -9802,16 +9802,16 @@ func TestPtrExpectations(t *testing.T) {
 
 	t.Run("PtrSlice", func(t *testing.T) {
 		items := []inner{
-			{3, ptr(-1)},
-			{33, ptr(-11)},
-			{333, ptr(-111)},
+			{3, new(-1)},
+			{33, new(-11)},
+			{333, new(-111)},
 		}
 
 		t.Log("initial:", items)
 
 		for mval := range Ptrs(Slice(items)) {
 			mval.Concrete += 1
-			mval.Referential = ptr(deref(mval.Referential) * -1)
+			mval.Referential = new(deref(mval.Referential) * -1)
 		}
 		for _, val := range items {
 			if derefz(val.Referential)*-3 != val.Concrete {
@@ -9823,16 +9823,16 @@ func TestPtrExpectations(t *testing.T) {
 
 	t.Run("SlicePtr", func(t *testing.T) {
 		items := []inner{
-			{3, ptr(-1)},
-			{33, ptr(-11)},
-			{333, ptr(-111)},
+			{3, new(-1)},
+			{33, new(-11)},
+			{333, new(-111)},
 		}
 
 		t.Log("initial:", items)
 
 		for mval := range Mutable(items) {
 			mval.Concrete += 1
-			mval.Referential = ptr(deref(mval.Referential) * -1)
+			mval.Referential = new(deref(mval.Referential) * -1)
 		}
 		for _, val := range items {
 			if derefz(val.Referential)*-3 == val.Concrete {
@@ -9848,7 +9848,7 @@ func TestPtrExpectations(t *testing.T) {
 		}
 		for mval := range Mutable(items) {
 			mval.Concrete = 33
-			mval.Referential = ptr(42)
+			mval.Referential = new(42)
 			break
 		}
 		var zero inner
