@@ -143,12 +143,10 @@ func TestModifyConcurrentIteration(t *testing.T) {
 				start := make(chan struct{})
 				var wg sync.WaitGroup
 				for range 2 {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
+					wg.Go(func() {
 						<-start
 						iterate()
-					}()
+					})
 				}
 				close(start)
 				wg.Wait()
