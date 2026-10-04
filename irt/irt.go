@@ -399,11 +399,12 @@ func Cast2[A, B, C, D any](seq iter.Seq2[A, B]) iter.Seq2[C, D] {
 // unchanged.
 func Modify2[A, B any, OP ~func(A, B) (A, B)](seq iter.Seq2[A, B], op OP) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
-		if op != nil {
-			seq = Convert2(seq, op)
+		if op == nil {
+			Flush2(seq, yield)
+			return
 		}
 
-		Flush2(seq, yield)
+		Flush2(Convert2(seq, op), yield)
 	}
 }
 
@@ -414,16 +415,17 @@ func Modify2[A, B any, OP ~func(A, B) (A, B)](seq iter.Seq2[A, B], op OP) iter.S
 func ModifyAll2[A, B any](seq iter.Seq2[A, B], ops ...func(A, B) (A, B)) iter.Seq2[A, B] {
 	return func(yield func(A, B) bool) {
 		operations := Collect(Remove(Slice(ops), func(op func(A, B) (A, B)) bool { return op == nil }), 0, len(ops))
-		if len(operations) > 0 {
-			seq = Convert2(seq, func(a A, b B) (A, B) {
-				for op := range Slice(operations) {
-					a, b = op(a, b)
-				}
-				return a, b
-			})
+		if len(operations) == 0 {
+			Flush2(seq, yield)
+			return
 		}
 
-		Flush2(seq, yield)
+		Flush2(Convert2(seq, func(a A, b B) (A, B) {
+			for op := range Slice(operations) {
+				a, b = op(a, b)
+			}
+			return a, b
+		}), yield)
 	}
 }
 
@@ -432,11 +434,12 @@ func ModifyAll2[A, B any](seq iter.Seq2[A, B], ops ...func(A, B) (A, B)) iter.Se
 // unchanged.
 func Modify[T any, OP ~func(T) T](seq iter.Seq[T], op OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
-		if op != nil {
-			seq = Convert(seq, op)
+		if op == nil {
+			Flush(seq, yield)
+			return
 		}
 
-		Flush(seq, yield)
+		Flush(Convert(seq, op), yield)
 	}
 }
 
@@ -447,16 +450,17 @@ func Modify[T any, OP ~func(T) T](seq iter.Seq[T], op OP) iter.Seq[T] {
 func ModifyAll[T any, OP ~func(T) T](seq iter.Seq[T], ops ...OP) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		operations := Collect(Remove(Slice(ops), func(op OP) bool { return op == nil }), 0, len(ops))
-		if len(operations) > 0 {
-			seq = Convert(seq, func(in T) T {
-				for op := range Slice(operations) {
-					in = op(in)
-				}
-				return in
-			})
+		if len(operations) == 0 {
+			Flush(seq, yield)
+			return
 		}
 
-		Flush(seq, yield)
+		Flush(Convert(seq, func(in T) T {
+			for op := range Slice(operations) {
+				in = op(in)
+			}
+			return in
+		}), yield)
 	}
 }
 
