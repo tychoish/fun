@@ -51,10 +51,20 @@ var (
 // less than the current soft quota. Burst credit is capped by the hard limit.
 //
 // Blocking operations (WaitPush, WaitPop, Drain, Shutdown and the Wait
-// iterators) follow one rule, shared with Deque: a cancelled ctx wins
-// over a ready item or slot. Under an already-cancelled ctx they
-// return the ctx error (or yield nothing) and neither consume nor
-// insert anything.
+// iterators) report a closed or draining queue before a context
+// cancellation error: once the queue is closed, they return
+// ErrQueueClosed (or stop yielding) regardless of ctx state, even if
+// items remain or zero items remain. On an open queue, a cancelled ctx
+// still wins over a ready item or slot, shared with Deque: under an
+// already-cancelled ctx they return the ctx error (or yield nothing)
+// and neither consume nor insert anything.
+//
+// Shutdown has its own precedence: ctx, then drain, then close. Given
+// an already-cancelled ctx on an open queue, Shutdown returns the ctx
+// error and leaves the queue open (a subsequent Push succeeds, and an
+// explicit Close still works). On an already-closed queue, Shutdown
+// returns ErrQueueClosed immediately, matching the closed-first rule
+// above.
 //
 // A Queue is safe for concurrent use by multiple goroutines.
 type Queue[T any] struct {
@@ -229,14 +239,15 @@ func (q *Queue[T]) WaitPop(ctx context.Context) (out T, _ error) {
 	// If the context terminates, wake the waiter.
 	defer wakeOnCancel(ctx, &q.mu, q.nempty)()
 
-	// check ctx before the queue: a cancelled context must not take
-	// items. This matches Deque.WaitPopFront/Back.
+	// check closed before ctx: a closed queue is reported regardless of
+	// ctx state. On an open queue, ctx is still checked before taking an
+	// item. This matches Deque.WaitPopFront/Back.
 	for {
-		if err := ctx.Err(); err != nil {
-			return out, err
-		}
 		if q.closed {
 			return out, ErrQueueClosed
+		}
+		if err := ctx.Err(); err != nil {
+			return out, err
 		}
 		if q.tracker.len() > 0 {
 			return q.popFront(), nil
@@ -258,6 +269,13 @@ func (q *Queue[T]) Drain(ctx context.Context) error {
 }
 
 func (q *Queue[T]) waitForDrain(ctx context.Context) error {
+	// closed is reported unconditionally, before ctx, and independent of
+	// whether any items remain: an already-closed, already-empty queue
+	// must still report ErrQueueClosed rather than nil.
+	if q.closed {
+		return ErrQueueClosed
+	}
+
 	// a cancelled context wins over an already-empty queue.
 	if err := ctx.Err(); err != nil {
 		return ers.Wrapf(err, "Drain() returned early with %d items remaining", q.tracker.len())
@@ -411,16 +429,24 @@ func (q *Queue[T]) IteratorWait(ctx context.Context) iter.Seq[T] {
 		}
 
 		defer wakeOnCancel(ctx, &q.mu, q.nupdates)()
+		// closed is checked before ctx: once closed, remaining items are
+		// still yielded (this iterator is non-destructive and drains the
+		// backlog) regardless of ctx state; it only stops once exhausted.
+		// On an open queue, ctx is still checked before yielding.
 		for {
+			if q.closed {
+				if next := q.after(cursor); next != nil {
+					cursor = next
+					return next.item, true
+				}
+				return o, false
+			}
 			if ctx.Err() != nil {
 				return o, false
 			}
 			if next := q.after(cursor); next != nil {
 				cursor = next
 				return next.item, true
-			}
-			if q.closed {
-				return o, false
 			}
 			q.nupdates.Wait()
 		}
@@ -445,6 +471,14 @@ func (q *Queue[T]) after(cursor *entry[T]) *entry[T] {
 // removed from the queue (destructive read). Safe for concurrent access.
 func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(func() (z T, _ bool) {
+		// a closed queue is reported regardless of ctx state, and must
+		// not be short-circuited by the ctx precheck below: Pop already
+		// reports nothing for a closed queue, with or without a
+		// cancelled ctx.
+		if q.isClosed() {
+			msg, ok := q.Pop() // holds lock
+			return msg, ok
+		}
 		if ctx.Err() != nil {
 			return z, false
 		}
@@ -457,6 +491,12 @@ func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 		}
 		return z, false
 	})
+}
+
+// isClosed reports whether the queue has been closed.
+func (q *Queue[T]) isClosed() bool {
+	defer q.with(q.lock())
+	return q.closed
 }
 
 // Iterator returns an iterator for all items in the queue. Does not

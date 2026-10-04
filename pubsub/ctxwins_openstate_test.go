@@ -7,13 +7,23 @@ import (
 	"testing"
 )
 
+// These tests pin the part of the error-precedence rule that is
+// unchanged by the uniform closed/draining-before-ctx decision
+// (see errorprecedence_queue_test.go and errorprecedence_deque_test.go):
+// on an OPEN queue or deque, a cancelled ctx still wins over a ready
+// item or slot. The former cancelfirst_pop_test.go and
+// cancelfirst_push_test.go covered this before the precedence rule
+// changed; their open-state cases are preserved here under a name that
+// no longer implies ctx always wins.
+
 func cancelled() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	return ctx
 }
 
-// A cancelled ctx wins over a ready item: nothing is consumed.
+// A cancelled ctx wins over a ready item on an open queue/deque:
+// nothing is consumed.
 func TestCancelledContextWinsOverReadyItemPop(t *testing.T) {
 	t.Run("QueueWaitPop", func(t *testing.T) {
 		q := NewUnlimitedQueue[int]()
@@ -62,4 +72,22 @@ func TestCancelledContextWinsOverReadyItemPop(t *testing.T) {
 			}
 		}
 	})
+}
+
+// A cancelled ctx wins over a ready slot on an open queue/deque:
+// nothing is inserted.
+func TestCancelledContextWinsOverReadySlotPush(t *testing.T) {
+	q := NewUnlimitedQueue[int]()
+	if err := q.WaitPush(cancelled(), 1); !errors.Is(err, context.Canceled) || q.Len() != 0 {
+		t.Fatalf("queue: %v len=%d", err, q.Len())
+	}
+	for name, op := range map[string]func(*Deque[int]) error{
+		"front": func(d *Deque[int]) error { return d.WaitPushFront(cancelled(), 1) },
+		"back":  func(d *Deque[int]) error { return d.WaitPushBack(cancelled(), 1) },
+	} {
+		dq := NewUnlimitedDeque[int]()
+		if err := op(dq); !errors.Is(err, context.Canceled) || dq.Len() != 0 {
+			t.Fatalf("%s: %v len=%d", name, err, dq.Len())
+		}
+	}
 }
