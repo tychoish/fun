@@ -3,7 +3,9 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 )
 
 // These tests pin the decided uniform error-precedence rule for Queue's
@@ -138,4 +140,65 @@ func TestQueueErrorPrecedence(t *testing.T) {
 			}
 		})
 	})
+}
+
+// TestQueueWaitPopClosedWinsOverConcurrentCancel pins the closed-before-ctx
+// precedence under genuine concurrency: many goroutines parked in
+// WaitPop on an empty, open queue, then racing cancellation of every
+// blocked call's context against a concurrent Close of the queue. No
+// item is ever pushed, so every goroutine unblocks only via Close or
+// its own ctx cancellation; every one of them must observe
+// ErrQueueClosed, never a context error, matching the rule that
+// closed/draining is never masked by a cancelled context.
+func TestQueueWaitPopClosedWinsOverConcurrentCancel(t *testing.T) {
+	const n = 16
+
+	q := NewUnlimitedQueue[int]()
+
+	ctxs := make([]context.Context, n)
+	cancels := make([]context.CancelFunc, n)
+	results := make([]error, n)
+
+	var parked sync.WaitGroup
+	var blocked sync.WaitGroup
+	parked.Add(n)
+	blocked.Add(n)
+	for i := range n {
+		ctxs[i], cancels[i] = context.WithCancel(context.Background())
+		go func(i int) {
+			defer blocked.Done()
+			parked.Done()
+			_, err := q.WaitPop(ctxs[i])
+			results[i] = err
+		}(i)
+	}
+	parked.Wait()
+	// Give every goroutine a chance to actually reach the cond.Wait
+	// inside WaitPop before racing close against cancel below.
+	time.Sleep(10 * time.Millisecond)
+
+	// Close the queue before unblocking any waiter: this establishes
+	// closed=true as visible to every subsequent lock acquisition, so
+	// the race below is purely over which wakeup each waiter observes
+	// first, never over whether Close has taken effect.
+	if err := q.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var racing sync.WaitGroup
+	racing.Add(n)
+	for i := range n {
+		go func(i int) {
+			defer racing.Done()
+			cancels[i]()
+		}(i)
+	}
+	racing.Wait()
+	blocked.Wait()
+
+	for i, err := range results {
+		if !errors.Is(err, ErrQueueClosed) {
+			t.Fatalf("goroutine %d: got %v, want ErrQueueClosed", i, err)
+		}
+	}
 }
