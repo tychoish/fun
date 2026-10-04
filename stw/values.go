@@ -32,6 +32,9 @@ func Default[T comparable](input T, defaultValue T) T {
 // **string. If the input object is a nil pointer, then Ptr returns a
 // non-nil pointer to a nil pointer.
 //
+// Deprecated: use the builtin new(expr) instead, which does the same
+// thing without a function call.
+//
 //go:fix inline
 func Ptr[T any](in T) *T { return new(in) }
 

@@ -260,29 +260,6 @@ func TestIsZeroHelper(t *testing.T) {
 	}
 }
 
-func TestPtrHelper(t *testing.T) {
-	tests := []struct {
-		name  string
-		input int
-	}{
-		{"zero", 0},
-		{"positive", 42},
-		{"negative", -1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := new(tt.input)
-			if result == nil {
-				t.Errorf("ptr(%v) returned nil", tt.input)
-			}
-			if *result != tt.input {
-				t.Errorf("*ptr(%v) = %v, want %v", tt.input, *result, tt.input)
-			}
-		})
-	}
-}
-
 func TestDerefHelper(t *testing.T) {
 	tests := []struct {
 		name  string

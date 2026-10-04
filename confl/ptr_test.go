@@ -246,9 +246,6 @@ func Test_conflagure_pointer_default(t *testing.T) {
 	})
 }
 
-//go:fix inline
-func boolPtr(b bool) *bool { return new(b) }
-
 // Test_registerPointerFlag_invalid_default verifies a malformed default:
 // on a pointer field surfaces as ErrInvalidSpecification rather than
 // panicking or silently leaving the pointer nil.
