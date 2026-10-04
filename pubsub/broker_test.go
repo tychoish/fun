@@ -1400,6 +1400,122 @@ func TestBrokerStopKeepsBacklog(t *testing.T) {
 	}
 }
 
+// TestBrokerBlockedSendReleasedByClose covers a Send that is blocked
+// in the sink (queue/deque push), not merely in dispatch: a
+// non-reading subscriber stalls the dispatch worker mid-message,
+// which backs up the queue/deque to its hard limit, and a subsequent
+// Send then blocks in WaitPush/WaitPushFront waiting for room.
+//
+// Two release paths are exercised for both Queue- and Deque-backed
+// brokers:
+//
+//   - Stop(): the broker's own shutdown must release the blocked Send
+//     promptly with ErrBrokerClosed.
+//   - closing the underlying Queue/Deque directly, bypassing the
+//     broker's Stop(): this must also release the blocked Send
+//     promptly (with ErrQueueClosed), and the broker itself must
+//     transition to BrokerStateClosed.
+func TestBrokerBlockedSendReleasedByClose(t *testing.T) {
+	const releaseTimeout = 2 * time.Second
+
+	type harness struct {
+		broker  *Broker[int]
+		length  func() int
+		closeCh func() error // closes the underlying queue/deque directly
+	}
+
+	cases := map[string]func(t *testing.T) harness{
+		"Queue": func(t *testing.T) harness {
+			queue, err := NewQueue[int](QueueOptions{HardLimit: 1, SoftQuota: 1})
+			assert.NotError(t, err)
+			b := NewQueueBroker(context.Background(), queue, BrokerOptions{})
+			return harness{broker: b, length: queue.Len, closeCh: queue.Close}
+		},
+		"Deque": func(t *testing.T) harness {
+			dq, err := NewDeque[int](DequeOptions{Capacity: 1})
+			assert.NotError(t, err)
+			b := NewDequeBroker(context.Background(), dq, BrokerOptions{})
+			return harness{broker: b, length: dq.Len, closeCh: dq.Close}
+		},
+	}
+
+	// blockSend subscribes a channel that is never read (so the
+	// dispatch worker stalls delivering the first message), then
+	// sends enough messages to fill the queue/deque to its hard
+	// limit of 1. It returns a channel that will receive the result
+	// of a further Send call, which must block because the
+	// queue/deque is full and nothing is draining it.
+	blockSend := func(t *testing.T, h harness) <-chan error {
+		t.Helper()
+		ctx := context.Background()
+		_ = mustSubscribe(t, h.broker, ctx) // never read: dispatch stalls on it
+
+		// first message: the worker pulls it immediately and then
+		// blocks forever trying to deliver it to the subscriber.
+		assert.NotError(t, h.broker.Send(ctx, 1))
+		eventually(t, func() bool { return h.length() == 0 })
+
+		// second message: fills the queue/deque to its hard limit
+		// of 1, since nothing is draining it anymore.
+		assert.NotError(t, h.broker.Send(ctx, 2))
+		eventually(t, func() bool { return h.length() == 1 })
+
+		// third message: must block, since the queue/deque is full.
+		result := make(chan error, 1)
+		go func() { result <- h.broker.Send(ctx, 3) }()
+
+		// give the goroutine a moment to actually enter the blocking
+		// WaitPush/WaitPushFront call before we trigger a release.
+		time.Sleep(50 * time.Millisecond)
+		select {
+		case err := <-result:
+			t.Fatalf("Send did not block on the full queue/deque: %v", err)
+		default:
+		}
+		return result
+	}
+
+	for name, mk := range cases {
+		t.Run(name+"/StopReleasesBlockedSend", func(t *testing.T) {
+			h := mk(t)
+			defer h.broker.Stop()
+			result := blockSend(t, h)
+
+			h.broker.Stop()
+			select {
+			case err := <-result:
+				check.ErrorIs(t, err, ErrBrokerClosed)
+			case <-time.After(releaseTimeout):
+				t.Fatal("Stop() did not release a Send blocked on a full queue/deque")
+			}
+		})
+
+		t.Run(name+"/ExternalCloseReleasesBlockedSend", func(t *testing.T) {
+			h := mk(t)
+			defer h.broker.Stop()
+			result := blockSend(t, h)
+
+			assert.NotError(t, h.closeCh())
+			select {
+			case err := <-result:
+				check.ErrorIs(t, err, ErrQueueClosed)
+				check.ErrorIs(t, err, ErrBrokerClosed)
+			case <-time.After(releaseTimeout):
+				t.Fatal("closing the underlying queue/deque did not release a blocked Send")
+			}
+
+			// the broker itself must observe the external close and
+			// transition to closed, not just the one blocked Send.
+			select {
+			case <-h.broker.ctx.Done():
+			case <-time.After(releaseTimeout):
+				t.Fatal("broker did not transition to closed after the underlying queue/deque closed")
+			}
+			check.Equal(t, h.broker.Stats(context.Background()), BrokerStats{State: BrokerStateClosed})
+		})
+	}
+}
+
 func TestIteratorWaitPopCancelledContextYieldsNothing(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
