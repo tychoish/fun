@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 )
 
 func panicAfter[T any](n int, v T, r any) iter.Seq[T] {
@@ -32,7 +33,7 @@ func TestAsChannelPanic(t *testing.T) {
 			t.Fatalf("got %d items", n)
 		}
 		err := stop()
-		var pe *PanicError
+		var pe *panicError
 		if !errors.Is(err, boom) || !errors.As(err, &pe) || pe.Value != boom {
 			t.Fatalf("unexpected error %v", err)
 		}
@@ -46,7 +47,7 @@ func TestAsChannelPanic(t *testing.T) {
 		for range ch {
 		}
 		err := stop()
-		var pe *PanicError
+		var pe *panicError
 		if !errors.As(err, &pe) || pe.Value != "oops" || pe.Unwrap() != nil {
 			t.Fatalf("unexpected error %v", err)
 		}
@@ -62,18 +63,20 @@ func TestAsChannelPanic(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("StopBeforePanic", func(t *testing.T) {
+	t.Run("StopWaitsForPanic", func(t *testing.T) {
 		release := make(chan struct{})
 		seq := func(yield func(int) bool) { <-release; panic("late") }
-		ch, stop := AsChannel(t.Context(), seq)
-		if err := stop(); err != nil {
-			t.Fatal(err)
+		_, stop := AsChannel(t.Context(), seq)
+		res := make(chan error, 1)
+		go func() { res <- stop() }()
+		select {
+		case err := <-res:
+			t.Fatalf("stop returned before producer exited: %v", err)
+		case <-time.After(20 * time.Millisecond):
 		}
 		close(release)
-		for range ch {
-		}
-		if err := stop(); err == nil {
-			t.Fatal("panic after stop not reported")
+		if err := <-res; err == nil {
+			t.Fatal("panic not reported")
 		}
 	})
 }

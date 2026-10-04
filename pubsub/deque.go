@@ -19,6 +19,12 @@ import (
 // safely handles multiple concurrent blocking operations (e.g. Wait,
 // WaitPop IteratorWait, IteratorWaitPop).
 //
+// Blocking operations (WaitPushFront/Back, WaitPopFront/Back, Drain,
+// Shutdown and the Wait iterators) follow one rule, shared with Queue:
+// a cancelled ctx wins over a ready item or slot. Under an
+// already-cancelled ctx they return the ctx error (or yield nothing)
+// and neither consume nor insert anything.
+//
 // Use the NewDeque constructor to instantiate a Deque object.
 type Deque[T any] struct {
 	once    sync.Once
@@ -141,6 +147,11 @@ func (dq *Deque[T]) Shutdown(ctx context.Context) error {
 }
 
 func (dq *Deque[T]) waitForDrain(ctx context.Context) error {
+	// a cancelled context wins over an already-empty queue.
+	if err := ctx.Err(); err != nil {
+		return ers.Wrapf(err, "Drain() returned early with %d items remaining", dq.tracker.len())
+	}
+
 	// when the function returns wake all other waiters.
 	ctx, cancel := context.WithCancel(ctx)
 	stop := wakeOnCancel(ctx, &dq.mutex, dq.updates)
@@ -285,35 +296,25 @@ func (dq *Deque[T]) WaitPushBack(ctx context.Context, it T) error {
 }
 
 func (dq *Deque[T]) waitPushAfter(ctx context.Context, it T, side dqDirection) error {
-	if dq.drainers > 0 {
-		return ErrQueueDraining
-	}
-
-	if dq.tracker.cap() > dq.tracker.len() {
-		return dq.add(it, side)
-	}
-
-	cond := dq.updates
 	// If the context terminates, wake the waiter.
-	defer wakeOnCancel(ctx, &dq.mutex, cond)()
+	defer wakeOnCancel(ctx, &dq.mutex, dq.updates)()
 
-	for dq.tracker.cap() <= dq.tracker.len() {
+	// check ctx before capacity: a cancelled context must not insert.
+	for {
 		if dq.drainers > 0 {
 			return ErrQueueDraining
 		}
 		if dq.closed {
 			return ErrQueueClosed
 		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			cond.Wait()
+		if err := ctx.Err(); err != nil {
+			return err
 		}
+		if dq.tracker.cap() > dq.tracker.len() {
+			return dq.add(it, side)
+		}
+		dq.updates.Wait()
 	}
-
-	return dq.add(it, side)
 }
 
 // IteratorFront starts at the front of the Deque and iterates towards

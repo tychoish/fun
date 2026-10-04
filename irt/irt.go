@@ -769,52 +769,46 @@ func Pipe[T any](ctx context.Context, seq iter.Seq[T]) <-chan T {
 //
 // The producer goroutine starts immediately. Calling stop (which is
 // safe to call any number of times, from any goroutine, including
-// after the channel has closed) releases the producer even if the
-// channel is never read. Callers that do not read the channel to
-// completion should call stop, typically with defer.
+// after the channel has closed) cancels the producer, waits for it to
+// exit, and returns its final result. It blocks if seq itself is
+// blocked without observing ctx. Callers that do not read the channel
+// to completion should call stop, typically with defer.
 //
 // A panic in seq is recovered in the producer goroutine: the channel
-// is closed and stop (now and on every later call) returns a
-// *PanicError describing it, or nil if seq did not panic. Check the
-// result of stop after the channel closes.
+// is closed and stop (every call, since stop waits) returns an error
+// describing it (errors.Is/As see the panic value), or nil if seq did
+// not panic.
 func AsChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func() error) {
-	ch, cancel, failed := asChannel(ctx, seq)
-	return ch, func() error {
-		cancel()
-		if p := failed.Load(); p != nil {
-			return p
-		}
-		return nil
-	}
-}
-
-func asChannel[T any](ctx context.Context, seq iter.Seq[T]) (<-chan T, func(), *atomic.Pointer[PanicError]) {
 	ctx, cancel := context.WithCancel(ctx)
 	ch := make(chan T)
-	failed := &atomic.Pointer[PanicError]{}
+	done := make(chan struct{})
+	var failure error // written before done closes, read only after
 	go func() {
-		// recorded before ch closes, so a receiver that saw the close
-		// sees the failure.
 		defer close(ch)
+		defer close(done)
 		defer cancel()
 		defer func() {
 			if r := recover(); r != nil {
-				failed.Store(&PanicError{Value: r})
+				failure = &panicError{Value: r}
 			}
 		}()
 		flushTo(ctx, seq, ch)
 	}()
-	return ch, cancel, failed
+	return ch, func() error {
+		cancel()
+		<-done
+		return failure
+	}
 }
 
-// PanicError is the error reported when a source sequence panics in a
+// panicError is the error reported when a source sequence panics in a
 // background goroutine.
-type PanicError struct{ Value any }
+type panicError struct{ Value any }
 
-func (e *PanicError) Error() string { return fmt.Sprint("recovered panic: ", e.Value) }
+func (e *panicError) Error() string { return fmt.Sprint("recovered panic: ", e.Value) }
 
 // Unwrap returns the panic value if it was an error.
-func (e *PanicError) Unwrap() error { err, _ := e.Value.(error); return err }
+func (e *panicError) Unwrap() error { err, _ := e.Value.(error); return err }
 
 // Sink wraps yield so that concurrent workers can share it safely:
 // calls are serialized by an internal mutex, and once yield returns
@@ -1175,10 +1169,12 @@ func Shard[T any](ctx context.Context, num int, seq iter.Seq[T]) iter.Seq[iter.S
 
 		// done retires n shards; the last one releases the iterator.
 		done := func(n int) {
-			mtx.Lock()
-			remain -= n
-			last := remain == 0
-			mtx.Unlock()
+			last := func() bool {
+				mtx.Lock()
+				defer mtx.Unlock()
+				remain -= n
+				return remain == 0
+			}()
 			if last {
 				unwatch()
 				release()
@@ -1608,9 +1604,10 @@ func fromReader(reader io.Reader, splitter bufio.SplitFunc) iter.Seq2[string, er
 // end of the stream, once; later calls return false.
 func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 	var (
-		once sync.Once
-		ch   <-chan T
-		fail *atomic.Pointer[PanicError]
+		once     sync.Once
+		ch       <-chan T
+		closer   func() error
+		reported atomic.Bool
 	)
 
 	return func(ctx context.Context) (out T, ok bool) {
@@ -1622,10 +1619,13 @@ func AsGenerator[T any](seq iter.Seq[T]) func(context.Context) (T, bool) {
 		if ctx.Err() != nil {
 			return
 		}
-		once.Do(func() { ch, _, fail = asChannel(ctx, seq) })
+		once.Do(func() { ch, closer = AsChannel(ctx, seq) })
 		if out, ok = recieveFrom(ctx, ch); !ok {
-			if p := fail.Swap(nil); p != nil {
-				panic(p.Value)
+			var err *panicError
+			// only a closed channel means the producer is finished; on
+			// cancellation closer would wait for a seq that may be stuck.
+			if ctx.Err() == nil && errors.As(closer(), &err) && reported.CompareAndSwap(false, true) {
+				panic(err.Value)
 			}
 		}
 		return
