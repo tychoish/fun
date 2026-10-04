@@ -18,9 +18,6 @@ func TestUseCaseConcurrentIterationOfOneSequence(t *testing.T) {
 			if c.single {
 				t.Skip("documented single-use")
 			}
-			if c.noReiterate != "" {
-				t.Skip(c.noReiterate)
-			}
 			src := new(ucSource)
 			seq := c.build(t, src.seq(20))
 			want, _ := ucDrive(c.build(t, new(ucSource).seq(20)), 0)
