@@ -1471,6 +1471,9 @@ func TestCommand_InheritEnv(t *testing.T) {
 		// PATH must exist in every test environment.
 		parentPath := os.Getenv("PATH")
 		if parentPath == "" {
+			// CI (.github/workflows/ci.yml, ubuntu-latest) never strips or
+			// overrides PATH, so this skip is dead there; it only guards
+			// unusual local/sandboxed environments with no PATH set.
 			t.Skip("PATH not set; cannot verify parent env inheritance")
 		}
 		cmd := (&exc.Command{}).WithName("true").WithInheritEnv()
