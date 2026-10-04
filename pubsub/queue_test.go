@@ -642,7 +642,20 @@ func TestQueueIterators(t *testing.T) {
 				defer cancel()
 				check.NotError(t, queue.Shutdown(ctx))
 			}()
-			time.Sleep(time.Millisecond)
+			// make sure the goroutine above has actually entered
+			// the draining state before probing it: a fixed sleep
+			// here is not a reliable signal under scheduler
+			// contention (e.g. full-suite -race runs), and an
+			// early, unsynchronized Push can land before draining
+			// starts, succeeding when the test expects
+			// ErrQueueDraining and leaving a stray item that wedges
+			// the Shutdown call for the rest of the test.
+			defer func() { <-sig }()
+			eventually(t, func() bool {
+				queue.mu.Lock()
+				defer queue.mu.Unlock()
+				return queue.drainers > 0
+			})
 			assert.ErrorIs(t, queue.Push("bar"), ErrQueueDraining)
 			assert.Equal(t, flag.Load(), 1)
 			for val := range listener {
@@ -668,7 +681,15 @@ func TestQueueIterators(t *testing.T) {
 				defer cancel()
 				check.NotError(t, queue.Shutdown(ctx))
 			}()
-			time.Sleep(time.Millisecond)
+			// see the comment in the Shutdown subtest above: wait
+			// for the goroutine to actually be draining before
+			// probing it, rather than relying on a fixed sleep.
+			defer func() { <-sig }()
+			eventually(t, func() bool {
+				queue.mu.Lock()
+				defer queue.mu.Unlock()
+				return queue.drainers > 0
+			})
 			assert.ErrorIs(t, queue.WaitPush(ctx, "bar"), ErrQueueDraining)
 			assert.Equal(t, flag.Load(), 1)
 			for val := range listener {

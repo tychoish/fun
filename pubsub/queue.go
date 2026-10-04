@@ -50,21 +50,23 @@ var (
 // items from the queue adds additional credit if the resulting queue length is
 // less than the current soft quota. Burst credit is capped by the hard limit.
 //
-// Blocking operations (WaitPush, WaitPop, Drain, Shutdown and the Wait
-// iterators) report a closed or draining queue before a context
-// cancellation error: once the queue is closed, they return
-// ErrQueueClosed (or stop yielding) regardless of ctx state, even if
-// items remain or zero items remain. On an open queue, a cancelled ctx
-// still wins over a ready item or slot, shared with Deque: under an
-// already-cancelled ctx they return the ctx error (or yield nothing)
-// and neither consume nor insert anything.
+// Close/Shutdown precedence: this rule governs every blocking
+// operation on both Queue and Deque (WaitPush, WaitPop,
+// WaitPushFront/Back, WaitPopFront/Back, Drain, Shutdown, and the Wait
+// iterators). A closed or draining queue is reported before a context
+// cancellation error: once the queue is closed, these operations
+// return ErrQueueClosed (or stop yielding) regardless of ctx state,
+// whether or not items remain. On an open queue, a cancelled ctx still
+// wins over a ready item or slot: under an already-cancelled ctx they
+// return the ctx error (or yield nothing) and neither consume nor
+// insert anything.
 //
-// Shutdown has its own precedence: ctx, then drain, then close. Given
-// an already-cancelled ctx on an open queue, Shutdown returns the ctx
-// error and leaves the queue open (a subsequent Push succeeds, and an
-// explicit Close still works). On an already-closed queue, Shutdown
-// returns ErrQueueClosed immediately, matching the closed-first rule
-// above.
+// Shutdown has its own precedence within this rule: ctx, then drain,
+// then close. Given an already-cancelled ctx on an open queue,
+// Shutdown returns the ctx error and leaves the queue open (a
+// subsequent Push succeeds, and an explicit Close still works). On an
+// already-closed queue, Shutdown returns ErrQueueClosed immediately,
+// matching the closed-first rule above.
 //
 // A Queue is safe for concurrent use by multiple goroutines.
 type Queue[T any] struct {
@@ -471,14 +473,9 @@ func (q *Queue[T]) after(cursor *entry[T]) *entry[T] {
 // removed from the queue (destructive read). Safe for concurrent access.
 func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 	return irt.GenerateOk(func() (z T, _ bool) {
-		// a closed queue is reported regardless of ctx state, and must
-		// not be short-circuited by the ctx precheck below: Pop already
-		// reports nothing for a closed queue, with or without a
-		// cancelled ctx.
-		if q.isClosed() {
-			msg, ok := q.Pop() // holds lock
-			return msg, ok
-		}
+		// Pop already reports nothing for a closed queue, with or
+		// without a cancelled ctx, so a closed queue needs no
+		// separate check here.
 		if ctx.Err() != nil {
 			return z, false
 		}
@@ -491,12 +488,6 @@ func (q *Queue[T]) IteratorWaitPop(ctx context.Context) iter.Seq[T] {
 		}
 		return z, false
 	})
-}
-
-// isClosed reports whether the queue has been closed.
-func (q *Queue[T]) isClosed() bool {
-	defer q.with(q.lock())
-	return q.closed
 }
 
 // Iterator returns an iterator for all items in the queue. Does not

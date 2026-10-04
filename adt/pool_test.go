@@ -18,14 +18,6 @@ type poolTestType struct{ value int }
 
 func TestPool(t *testing.T) {
 	t.Parallel()
-	t.Run("PanicsWithoutConstructor", func(t *testing.T) {
-		t.Skip("default constructor now provided, maybe questionable")
-		assert.Panic(t, func() {
-			p := &Pool[*poolTestType]{}
-			_ = p.Get()
-		})
-	})
-
 	t.Run("Init", func(t *testing.T) {
 		p := &Pool[*poolTestType]{}
 		p.SetConstructor(func() *poolTestType { return &poolTestType{} })

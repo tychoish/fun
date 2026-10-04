@@ -1297,6 +1297,11 @@ func TestBrokerPublishDelegatesToSend(t *testing.T) {
 func brokerCPUTime(t *testing.T) time.Duration {
 	var ru syscall.Rusage
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
+		// syscall.Getrusage/RUSAGE_SELF exist on linux/darwin/bsd (this
+		// file doesn't even compile on windows: syscall.Getrusage is
+		// undefined there). CI (ubuntu-latest) always succeeds here, so
+		// this only guards unusual unix-like sandboxes where the syscall
+		// is restricted.
 		t.Skip(err)
 	}
 	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
