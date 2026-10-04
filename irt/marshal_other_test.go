@@ -94,8 +94,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("foobarbaz")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "foobarbaz")
+		if !bytes.Equal(result, []byte("foo\nbar\nbaz")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "foo\nbar\nbaz")
 		}
 	})
 
@@ -104,8 +104,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("")) {
-			t.Errorf("MarshalText() = %q, want empty", result)
+		if !bytes.Equal(result, []byte("\n\n")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "\n\n")
 		}
 	})
 
@@ -128,8 +128,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("chunk1chunk2chunk3")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "chunk1chunk2chunk3")
+		if !bytes.Equal(result, []byte("chunk1\nchunk2\nchunk3")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "chunk1\nchunk2\nchunk3")
 		}
 	})
 
@@ -154,8 +154,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("firstsecondthird")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "firstsecondthird")
+		if !bytes.Equal(result, []byte("first\nsecond\nthird")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "first\nsecond\nthird")
 		}
 	})
 
@@ -244,8 +244,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("123")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "123")
+		if !bytes.Equal(result, []byte("1\n2\n3")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "1\n2\n3")
 		}
 	})
 
@@ -268,8 +268,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("hello世界🌍")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "hello世界🌍")
+		if !bytes.Equal(result, []byte("hello\n世界\n🌍")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "hello\n世界\n🌍")
 		}
 	})
 
@@ -302,8 +302,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("truefalse")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "truefalse")
+		if !bytes.Equal(result, []byte("true\nfalse")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "true\nfalse")
 		}
 	})
 
@@ -312,8 +312,8 @@ func TestMarshalText(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalText() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte("1.52.73.14")) {
-			t.Errorf("MarshalText() = %q, want %q", result, "1.52.73.14")
+		if !bytes.Equal(result, []byte("1.5\n2.7\n3.14")) {
+			t.Errorf("MarshalText() = %q, want %q", result, "1.5\n2.7\n3.14")
 		}
 	})
 }
@@ -349,7 +349,7 @@ func TestMarshalBinary(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalBinary() error = %v", err)
 		}
-		expected := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+		expected := []byte{0x01, 0x02, '\n', 0x03, 0x04, '\n', 0x05, 0x06}
 		if !bytes.Equal(result, expected) {
 			t.Errorf("MarshalBinary() = %v, want %v", result, expected)
 		}
@@ -377,7 +377,7 @@ func TestMarshalBinary(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalBinary() error = %v", err)
 		}
-		expected := []byte{0x01, 0x02, 0x03}
+		expected := []byte{0x01, '\n', 0x02, '\n', 0x03}
 		if !bytes.Equal(result, expected) {
 			t.Errorf("MarshalBinary() = %v, want %v", result, expected)
 		}
@@ -523,8 +523,9 @@ func TestMarshalBinary(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarshalBinary() error = %v", err)
 		}
-		if !bytes.Equal(result, []byte{}) {
-			t.Errorf("MarshalBinary() = %v, want empty", result)
+		expected := []byte{'\n', '\n'}
+		if !bytes.Equal(result, expected) {
+			t.Errorf("MarshalBinary() = %v, want %v", result, expected)
 		}
 	})
 }
@@ -591,8 +592,8 @@ func TestMarshalBinaryEdgeCases(t *testing.T) {
 			t.Fatalf("MarshalBinary() error = %v", err)
 		}
 
-		if len(result) != 10000 {
-			t.Errorf("MarshalBinary() len = %d, want 10000", len(result))
+		if want := 10000 + 9999; len(result) != want {
+			t.Errorf("MarshalBinary() len = %d, want %d", len(result), want)
 		}
 	})
 
@@ -769,7 +770,7 @@ func TestMarshalTextTableDriven(t *testing.T) {
 		{
 			name:     "MixedMarshalers",
 			input:    Slice([]any{"str", mockTextMarshaler{data: []byte("tm")}, []byte("bytes")}),
-			expected: []byte("strtmbytes"),
+			expected: []byte("str\ntm\nbytes"),
 			wantErr:  false,
 		},
 		{
@@ -814,7 +815,7 @@ func TestMarshalBinaryTableDriven(t *testing.T) {
 				mockBinaryMarshaler{data: []byte{0x02}},
 				mockGenericMarshaler{data: []byte{0x03}},
 			}),
-			expected: []byte{0x01, 0x02, 0x03},
+			expected: []byte{0x01, '\n', 0x02, '\n', 0x03},
 			wantErr:  false,
 		},
 		{
