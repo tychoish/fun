@@ -4,6 +4,7 @@ import (
 	"flag"
 	"iter"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/tychoish/fun/ers"
@@ -89,6 +90,33 @@ type flagSpec struct {
 	Format  string
 	Sep     string // separator for slice element splitting; "" means no splitting
 	SepSet  bool   // true when the sep: tag was explicitly present
+
+	Enum          []string // raw enum: entries; meaningful only when EnumSet
+	EnumSet       bool     // true when the enum: tag was explicitly present
+	EnumExactCase bool     // true when case-sensitive:"true" accompanies enum:
+}
+
+// enumTags reads the enum: and case-sensitive: tags from field into spec. It
+// rejects case-sensitive: without enum:.
+func enumTags(field reflect.StructField, spec flagSpec) (flagSpec, error) {
+	tag, ok := field.Tag.Lookup("enum")
+	cs, hasCS := field.Tag.Lookup("case-sensitive")
+	if hasCS && cs != "true" && cs != "false" {
+		return spec, ers.Wrapf(ErrInvalidSpecification,
+			"field %q has case-sensitive:%q; must be \"true\" or \"false\"", field.Name, cs)
+	}
+	if !ok {
+		if hasCS {
+			return spec, ers.Wrapf(ErrInvalidSpecification,
+				"field %q has case-sensitive: tag but no enum: tag", field.Name)
+		}
+		return spec, nil
+	}
+	exact := cs == "true"
+	spec.Enum = slices.Collect(splitTrimmed(tag, ","))
+	spec.EnumSet = true
+	spec.EnumExactCase = exact
+	return spec, nil
 }
 
 // validate checks structural constraints that can be verified without a

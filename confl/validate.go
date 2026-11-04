@@ -138,7 +138,17 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 		// ── default value parseability ────────────────────────────────────────
 		defStr := field.Tag.Get("default")
 		ptr := fval.Addr().Interface()
-		if err := validateDefault(ptr, defStr, sepVal, sepSet, field.Tag.Get("format"), fullName); err != nil {
+		spec, err := enumTags(field, flagSpec{Name: fullName, Default: defStr, Sep: sepVal, SepSet: sepSet})
+		if err != nil {
+			return err
+		}
+		if spec.EnumSet {
+			// registerFlag checks the kind, the table, each option against
+			// Validate(), and the default in one pass.
+			if err := registerFlag(flag.NewFlagSet("validate-enum", flag.ContinueOnError), ptr, spec); err != nil {
+				return err
+			}
+		} else if err := validateDefault(ptr, defStr, sepVal, sepSet, field.Tag.Get("format"), fullName); err != nil {
 			return err
 		}
 

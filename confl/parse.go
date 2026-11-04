@@ -197,7 +197,7 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 		if err := checkSepTag(field, fval, sepSet); err != nil {
 			return err
 		}
-		if err := registerFlag(fs, fval.Addr().Interface(), flagSpec{
+		spec, err := enumTags(field, flagSpec{
 			Name:    strut.JOIN.WithConcat().Strings(prefix, name),
 			Short:   field.Tag.Get("short"),
 			Default: field.Tag.Get("default"),
@@ -205,7 +205,11 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 			Help:    field.Tag.Get("help"),
 			Sep:     sepVal,
 			SepSet:  sepSet,
-		}); err != nil {
+		})
+		if err != nil {
+			return err
+		}
+		if err := registerFlag(fs, fval.Addr().Interface(), spec); err != nil {
 			return erc.Join(ErrInvalidSpecification, err)
 		}
 	}
