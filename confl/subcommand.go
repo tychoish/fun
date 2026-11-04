@@ -13,6 +13,7 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/strut"
 )
 
 // Commander is the interface for subcommand structs used with ParseCommand.
@@ -31,10 +32,19 @@ type subcommandEntry struct {
 	help string
 }
 
+// newSubFlagSet returns the FlagSet of the subcommand name of parent, which
+// writes where parent does.
+func newSubFlagSet(parent *flag.FlagSet, name string) *flag.FlagSet {
+	fs := flag.NewFlagSet(joinStr(parent.Name(), " ", name), flag.ContinueOnError)
+	fs.SetOutput(parent.Output())
+	return fs
+}
+
 // collectSubcommands scans the top-level struct val for fields tagged cmd: and
 // returns one entry per field with a dedicated FlagSet already bound to the
-// field's flags. programName is used as the FlagSet name prefix.
-func collectSubcommands(val reflect.Value, programName string) ([]subcommandEntry, error) {
+// field's flags. The name of parent is the FlagSet name prefix. When there are
+// any, a help subcommand is added unless the struct declares its own.
+func collectSubcommands(val reflect.Value, parent *flag.FlagSet) ([]subcommandEntry, error) {
 	// Pre-scan for narg:"rest" fields. rest + cmd: fields are incompatible.
 	t0 := val.Type()
 	var restFieldName string
@@ -78,7 +88,7 @@ func collectSubcommands(val reflect.Value, programName string) ([]subcommandEntr
 				field.Name, fval.Kind())
 		}
 
-		subcmdFS := flag.NewFlagSet(joinStr(programName, " ", name), flag.ContinueOnError)
+		subcmdFS := newSubFlagSet(parent, name)
 		if err := bindFlags(subcmdFS, fval, "", 1); err != nil {
 			return nil, err
 		}
@@ -89,7 +99,17 @@ func collectSubcommands(val reflect.Value, programName string) ([]subcommandEntr
 			help: field.Tag.Get("help"),
 		})
 	}
-	return entries, nil
+	if len(entries) == 0 || slices.ContainsFunc(entries, func(e subcommandEntry) bool { return e.name == helpCommand }) {
+		return entries, nil
+	}
+	help := &helpCmd{parent: parent}
+	help.entries = append(entries, subcommandEntry{
+		name: helpCommand,
+		val:  reflect.ValueOf(help).Elem(),
+		fs:   newSubFlagSet(parent, helpCommand),
+		help: "print usage, of every subcommand or of the ones named",
+	})
+	return help.entries, nil
 }
 
 // validateCommanders checks that every subcommand entry implements Commander,
@@ -103,7 +123,7 @@ func validateCommanders(entries []subcommandEntry) error {
 				"subcommand %q type %s does not implement Commander",
 				e.name, e.val.Type())
 		}
-		innerEntries, err := collectSubcommands(e.val, e.fs.Name())
+		innerEntries, err := collectSubcommands(e.val, e.fs)
 		if err != nil {
 			return err
 		}
@@ -162,7 +182,7 @@ func selectSubcommand(entries []subcommandEntry, remaining []string) (any, error
 	// fields and a further subcommand name appears in the remaining args, select
 	// it. A ErrNotFound result means no nested subcommand was named; return the
 	// current level instead.
-	innerEntries, err := collectSubcommands(matched.val, matched.fs.Name())
+	innerEntries, err := collectSubcommands(matched.val, matched.fs)
 	if err != nil {
 		return nil, err
 	}
@@ -188,20 +208,13 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 		return nil, err
 	}
 
-	entries, err := collectSubcommands(val, fs.Name())
+	entries, err := collectSubcommands(val, fs)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := parseAndCheck(fs, val, args); err != nil {
 		return nil, err
-	}
-
-	if args := fs.Args(); wantsHelp(entries, args) {
-		if err := writeHelp(fs, entries, args[1:]); err != nil {
-			return nil, err
-		}
-		return nil, ErrHelpShown
 	}
 
 	result, err := selectSubcommand(entries, fs.Args())
@@ -216,12 +229,15 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 
 const helpCommand = "help"
 
-// wantsHelp reports whether args name the built-in help subcommand, which a
-// program's own cmd:"help" field takes precedence over.
-func wantsHelp(entries []subcommandEntry, args []string) bool {
-	return len(entries) > 0 && len(args) > 0 && args[0] == helpCommand &&
-		!slices.ContainsFunc(entries, func(e subcommandEntry) bool { return e.name == helpCommand })
+// helpCmd is the help subcommand collectSubcommands adds. It prints the usage
+// of parent and the subcommands entries, or of the subcommand Topics name.
+type helpCmd struct {
+	Topics  []string `narg:"rest"`
+	parent  *flag.FlagSet
+	entries []subcommandEntry
 }
+
+func (h *helpCmd) Run(context.Context) error { return writeHelp(h.parent, h.entries, h.Topics) }
 
 func printSubcommands(w io.Writer, entries []subcommandEntry) {
 	fmt.Fprintf(w, "\nSubcommands:\n")
@@ -234,9 +250,9 @@ func printSubcommands(w io.Writer, entries []subcommandEntry) {
 	}
 }
 
-// writeHelp implements the help subcommand. With no names it prints the flags
-// of fs, its subcommands, and the flags of every subcommand under a "## name"
-// heading. With names it prints the usage of the subcommand they name.
+// writeHelp prints the flags of fs, its subcommands, and the flags of every
+// subcommand under a "## name" heading. With names it prints the usage of the
+// subcommand they name.
 //
 // Program names are base names, so the output is the same wherever the binary
 // ran, as under go run. That is why the root usage is printed here and not by
@@ -254,12 +270,11 @@ func writeHelp(fs *flag.FlagSet, entries []subcommandEntry, names []string) erro
 	}
 	e := entries[i]
 	e.fs.Init(filepath.Base(e.fs.Name()), e.fs.ErrorHandling())
-	e.fs.SetOutput(fs.Output())
 	if len(names) == 1 {
 		e.fs.Usage()
 		return nil
 	}
-	inner, err := collectSubcommands(e.val, e.fs.Name())
+	inner, err := collectSubcommands(e.val, e.fs)
 	if err != nil {
 		return err
 	}
@@ -267,17 +282,20 @@ func writeHelp(fs *flag.FlagSet, entries []subcommandEntry, names []string) erro
 }
 
 // writeEntries prints the flags of each entry and of its nested subcommands,
-// each under a heading of its full command name.
+// each under a heading of its full command name. The help subcommands have no
+// flags to print.
 func writeEntries(fs *flag.FlagSet, entries []subcommandEntry, prefix string) error {
 	for _, e := range entries {
-		fmt.Fprintf(fs.Output(), "\n## %s%s\n", prefix, e.name)
-		e.fs.SetOutput(fs.Output())
+		if _, ok := e.val.Addr().Interface().(*helpCmd); ok {
+			continue
+		}
+		fmt.Fprintf(fs.Output(), "\n## %s\n", strut.JOIN.WithConcat().Strings(prefix, e.name))
 		e.fs.PrintDefaults()
-		inner, err := collectSubcommands(e.val, e.fs.Name())
+		inner, err := collectSubcommands(e.val, e.fs)
 		if err != nil {
 			return err
 		}
-		if err := writeEntries(fs, inner, prefix+e.name+" "); err != nil {
+		if err := writeEntries(fs, inner, strut.JOIN.WithConcat().Strings(prefix, e.name, " ")); err != nil {
 			return err
 		}
 	}
@@ -298,7 +316,7 @@ func conflagureCmd(fs *flag.FlagSet, conf any, args []string) (Commander, error)
 		return nil, err
 	}
 
-	entries, err := collectSubcommands(val, fs.Name())
+	entries, err := collectSubcommands(val, fs)
 	if err != nil {
 		return nil, err
 	}

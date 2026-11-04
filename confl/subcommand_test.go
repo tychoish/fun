@@ -4,8 +4,6 @@ import (
 	"context"
 	"flag"
 	"io"
-	"os"
-	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -314,7 +312,7 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
 		}
 		var c cfg
-		_, err := collectSubcommands(reflectVal(&c), "test")
+		_, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
@@ -324,7 +322,7 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			deploy testDeployCmd `cmd:"deploy"` //nolint:unused
 		}
 		var c cfg
-		_, err := collectSubcommands(reflectVal(&c), "test")
+		_, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
@@ -334,7 +332,7 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			Deploy string `cmd:"deploy"`
 		}
 		var c cfg
-		_, err := collectSubcommands(reflectVal(&c), "test")
+		_, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
@@ -347,9 +345,9 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			Deploy notCmd `cmd:"deploy"`
 		}
 		var c cfg
-		entries, err := collectSubcommands(reflectVal(&c), "test")
+		entries, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.NotError(t, err)
-		assert.Equal(t, len(entries), 1)
+		assert.Equal(t, len(entries), 2) // deploy and help
 	})
 }
 
@@ -360,9 +358,9 @@ func Test_collectSubcommands_nested_cmd(t *testing.T) {
 		Deploy testCmdWithNestedCmd `cmd:"deploy"`
 	}
 	var c cfg
-	entries, err := collectSubcommands(reflectVal(&c), "test")
+	entries, err := collectSubcommands(reflectVal(&c), newTestFS())
 	assert.NotError(t, err)
-	assert.Equal(t, len(entries), 1)
+	assert.Equal(t, len(entries), 2) // deploy and help
 	assert.Equal(t, entries[0].name, "deploy")
 }
 
@@ -377,7 +375,7 @@ func Test_collectSubcommands_bindflags_err(t *testing.T) {
 		Deploy badSub `cmd:"deploy"`
 	}
 	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
+	_, err := collectSubcommands(reflectVal(&c), newTestFS())
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, ErrInvalidSpecification)
 }
@@ -391,7 +389,7 @@ func Test_validateCommanders_inner_collectSubcommands_err(t *testing.T) {
 		Deploy testRestAndCmdSub `cmd:"deploy"`
 	}
 	var c cfg
-	entries, err := collectSubcommands(reflectVal(&c), "test")
+	entries, err := collectSubcommands(reflectVal(&c), newTestFS())
 	assert.NotError(t, err)
 	err = validateCommanders(entries)
 	assert.Error(t, err)
@@ -525,9 +523,29 @@ func Test_tryCastCommander(t *testing.T) {
 	})
 }
 
-// ── built-in help subcommand ──────────────────────────────────────────────────
+// ── help subcommand ───────────────────────────────────────────────────────────
 
-func Test_conflagureCmd_help_subcommand(t *testing.T) {
+type testGroupCmd struct {
+	Name string        `flag:"name" help:"group name"`
+	Sub  testDeployCmd `cmd:"sub"`
+}
+
+func (testGroupCmd) Run(context.Context) error { return nil }
+
+// runCommand parses args under a flag set named name, runs the selected
+// command, and returns what it wrote and its error.
+func runCommand(t *testing.T, name string, conf any, args ...string) (string, error) {
+	t.Helper()
+	var out strings.Builder
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(&out)
+	cmd, err := conflagureCmd(fs, conf, args)
+	assert.NotError(t, err)
+	err = cmd.Run(t.Context())
+	return out.String(), err
+}
+
+func Test_help_subcommand(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
@@ -543,14 +561,15 @@ func Test_conflagureCmd_help_subcommand(t *testing.T) {
 		notWant []string
 	}{
 		{
-			name: "all subcommands, each under a heading",
-			args: []string{"help"},
-			want: []string{"-verbose", "Subcommands:", "\n## deploy\n", "-target", "\n## rollback\n", "-version"},
+			name:    "every subcommand, each under a heading",
+			args:    []string{"help"},
+			want:    []string{"Usage of prog:", "-verbose", "Subcommands:", "  help ", "\n## deploy\n", "-target", "\n## rollback\n", "-version"},
+			notWant: []string{"## help"},
 		},
 		{
 			name:    "one subcommand",
 			args:    []string{"help", "deploy"},
-			want:    []string{"-target"},
+			want:    []string{"Usage of prog deploy:", "-target"},
 			notWant: []string{"## ", "-verbose", "-version"},
 		},
 		{
@@ -558,41 +577,33 @@ func Test_conflagureCmd_help_subcommand(t *testing.T) {
 			args: []string{"-verbose", "help", "rollback"},
 			want: []string{"-version"},
 		},
+		{
+			name: "help about help",
+			args: []string{"help", "help"},
+			want: []string{"Usage of prog help:"},
+		},
 	}
-
 	for tt := range slices.Values(tests) {
 		t.Run(tt.name, func(t *testing.T) {
-			var out strings.Builder
-			fs := newTestFS()
-			fs.SetOutput(&out)
-			var c cfg
-			_, err := conflagureCmd(fs, &c, tt.args)
-			assert.ErrorIs(t, err, ErrHelpShown)
+			out, err := runCommand(t, "/tmp/go-build123/b001/exe/prog", &cfg{}, tt.args...)
+			assert.NotError(t, err)
 			for want := range slices.Values(tt.want) {
-				assert.True(t, strings.Contains(out.String(), want))
+				assert.True(t, strings.Contains(out, want))
 			}
 			for bad := range slices.Values(tt.notWant) {
-				assert.True(t, !strings.Contains(out.String(), bad))
+				assert.True(t, !strings.Contains(out, bad))
 			}
+			assert.True(t, !strings.Contains(out, "/tmp"))
 		})
 	}
+
+	t.Run("unknown subcommand", func(t *testing.T) {
+		_, err := runCommand(t, "prog", &cfg{}, "help", "nope")
+		assert.ErrorIs(t, err, ErrInvalidInput)
+	})
 }
 
-func Test_conflagureCmd_help_unknown_subcommand(t *testing.T) {
-	t.Parallel()
-
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy"`
-	}
-	var c cfg
-	fs := newTestFS()
-	fs.SetOutput(io.Discard)
-	_, err := conflagureCmd(fs, &c, []string{"help", "nope"})
-	assert.ErrorIs(t, err, ErrInvalidInput)
-}
-
-// A program's own help subcommand is dispatched, not shadowed.
-func Test_conflagureCmd_help_user_defined(t *testing.T) {
+func Test_help_subcommand_user_defined(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
@@ -606,46 +617,20 @@ func Test_conflagureCmd_help_user_defined(t *testing.T) {
 	assert.Equal(t, c.Help.Target, "x")
 }
 
-// With no subcommands declared, "help" is an ordinary positional argument.
-func Test_dispatch_help_without_subcommands(t *testing.T) {
+func Test_help_subcommand_absent_without_subcommands(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
 		Verbose bool `flag:"verbose"`
 	}
-	var c cfg
-	_, err := dispatch(newTestFS(), &c, []string{"help"})
-	assert.True(t, !isErr(err, ErrHelpShown))
+	entries, err := collectSubcommands(reflectVal(&cfg{}), newTestFS())
+	assert.NotError(t, err)
+	assert.Equal(t, len(entries), 0)
+	_, err = dispatch(newTestFS(), &cfg{}, []string{"help"})
+	assert.ErrorIs(t, err, ErrDispatchNoSelection)
 }
 
-// The program name in help output is the base name, so a binary built into a
-// temporary directory by go run produces the same text on every run.
-func Test_conflagureCmd_help_stable_program_name(t *testing.T) {
-	t.Parallel()
-
-	type cfg struct {
-		Deploy testDeployCmd `cmd:"deploy"`
-	}
-	for _, args := range [][]string{{"help"}, {"help", "deploy"}} {
-		var out strings.Builder
-		fs := flag.NewFlagSet("/tmp/go-build123/b001/exe/prog", flag.ContinueOnError)
-		fs.SetOutput(&out)
-		var c cfg
-		_, err := conflagureCmd(fs, &c, args)
-		assert.ErrorIs(t, err, ErrHelpShown)
-		assert.True(t, strings.Contains(out.String(), "Usage of prog"))
-		assert.True(t, !strings.Contains(out.String(), "/tmp"))
-	}
-}
-
-type testGroupCmd struct {
-	Name string        `flag:"name" help:"group name"`
-	Sub  testDeployCmd `cmd:"sub"`
-}
-
-func (testGroupCmd) Run(context.Context) error { return nil }
-
-func Test_help_nested_subcommands(t *testing.T) {
+func Test_help_subcommand_nested(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
@@ -658,29 +643,25 @@ func Test_help_nested_subcommands(t *testing.T) {
 		{[]string{"help"}, []string{"\n## group\n", "-name", "\n## group sub\n", "-target"}},
 		{[]string{"help", "group"}, []string{"Usage of prog group:", "-name"}},
 		{[]string{"help", "group", "sub"}, []string{"Usage of prog group sub:", "-target"}},
+		{[]string{"group", "help"}, []string{"Usage of prog group:", "-name", "Subcommands:", "\n## sub\n", "-target"}},
+		{[]string{"group", "help", "sub"}, []string{"Usage of prog group sub:", "-target"}},
 	}
 	for tt := range slices.Values(tests) {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			var out strings.Builder
-			fs := flag.NewFlagSet("/tmp/x/prog", flag.ContinueOnError)
-			fs.SetOutput(&out)
-			_, err := conflagureCmd(fs, &cfg{}, tt.args)
-			assert.ErrorIs(t, err, ErrHelpShown)
+			out, err := runCommand(t, "prog", &cfg{}, tt.args...)
+			assert.NotError(t, err)
 			for want := range slices.Values(tt.want) {
-				assert.True(t, strings.Contains(out.String(), want))
+				assert.True(t, strings.Contains(out, want))
 			}
 		})
 	}
 
-	var out strings.Builder
-	fs := newTestFS()
-	fs.SetOutput(&out)
-	_, err := conflagureCmd(fs, &cfg{}, []string{"help", "group", "nope"})
+	_, err := runCommand(t, "prog", &cfg{}, "help", "group", "nope")
 	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 // dispatch does not validate nested specifications, so help meets them.
-func Test_help_invalid_nested_specification(t *testing.T) {
+func Test_help_subcommand_invalid_nested_specification(t *testing.T) {
 	t.Parallel()
 
 	type group struct {
@@ -709,35 +690,9 @@ func Test_help_invalid_nested_specification(t *testing.T) {
 	for tt := range slices.Values(tests) {
 		fs := newTestFS()
 		fs.SetOutput(io.Discard)
-		_, err := dispatch(fs, tt.conf, tt.args)
-		assert.ErrorIs(t, err, ErrInvalidSpecification)
-	}
-}
-
-// ParseCommand and Dispatch exit with status 0 after the help subcommand
-// prints, as for -help. The test re-runs itself to observe the exit; the
-// testing package has already parsed flag.CommandLine, so "help" is left in
-// its arguments.
-func Test_help_subcommand_exits_zero(t *testing.T) {
-	t.Parallel()
-
-	if entry := os.Getenv("CONFL_HELP_EXIT"); entry != "" {
-		type cfg struct {
-			Deploy testDeployCmd `cmd:"deploy"`
-		}
-		if entry == "dispatch" {
-			_, _ = Dispatch(&cfg{})
-		} else {
-			_, _ = ParseCommand(&cfg{})
-		}
-		os.Exit(3)
-	}
-
-	for _, entry := range []string{"dispatch", "parsecommand"} {
-		cmd := exec.Command(os.Args[0], "-test.run=^Test_help_subcommand_exits_zero$", "help")
-		cmd.Env = append(os.Environ(), "CONFL_HELP_EXIT="+entry)
-		out, err := cmd.CombinedOutput()
+		cmd, err := dispatch(fs, tt.conf, tt.args)
 		assert.NotError(t, err)
-		assert.True(t, strings.Contains(string(out), "## deploy"))
+		err = cmd.(Commander).Run(t.Context())
+		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	}
 }
