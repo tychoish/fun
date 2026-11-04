@@ -1,8 +1,11 @@
 package confl
 
 import (
+	"context"
+	"flag"
 	"io"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/tychoish/fun/assert"
@@ -309,7 +312,7 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			Deploy testDeployCmd `cmd:"deploy" flag:"deploy"`
 		}
 		var c cfg
-		_, err := collectSubcommands(reflectVal(&c), "test")
+		_, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
@@ -319,7 +322,7 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			deploy testDeployCmd `cmd:"deploy"` //nolint:unused
 		}
 		var c cfg
-		_, err := collectSubcommands(reflectVal(&c), "test")
+		_, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
@@ -329,7 +332,7 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			Deploy string `cmd:"deploy"`
 		}
 		var c cfg
-		_, err := collectSubcommands(reflectVal(&c), "test")
+		_, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
@@ -342,9 +345,9 @@ func Test_collectSubcommands_errors(t *testing.T) {
 			Deploy notCmd `cmd:"deploy"`
 		}
 		var c cfg
-		entries, err := collectSubcommands(reflectVal(&c), "test")
+		entries, err := collectSubcommands(reflectVal(&c), newTestFS())
 		assert.NotError(t, err)
-		assert.Equal(t, len(entries), 1)
+		assert.Equal(t, len(entries), 2) // deploy and help
 	})
 }
 
@@ -355,9 +358,9 @@ func Test_collectSubcommands_nested_cmd(t *testing.T) {
 		Deploy testCmdWithNestedCmd `cmd:"deploy"`
 	}
 	var c cfg
-	entries, err := collectSubcommands(reflectVal(&c), "test")
+	entries, err := collectSubcommands(reflectVal(&c), newTestFS())
 	assert.NotError(t, err)
-	assert.Equal(t, len(entries), 1)
+	assert.Equal(t, len(entries), 2) // deploy and help
 	assert.Equal(t, entries[0].name, "deploy")
 }
 
@@ -372,7 +375,7 @@ func Test_collectSubcommands_bindflags_err(t *testing.T) {
 		Deploy badSub `cmd:"deploy"`
 	}
 	var c cfg
-	_, err := collectSubcommands(reflectVal(&c), "test")
+	_, err := collectSubcommands(reflectVal(&c), newTestFS())
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, ErrInvalidSpecification)
 }
@@ -386,7 +389,7 @@ func Test_validateCommanders_inner_collectSubcommands_err(t *testing.T) {
 		Deploy testRestAndCmdSub `cmd:"deploy"`
 	}
 	var c cfg
-	entries, err := collectSubcommands(reflectVal(&c), "test")
+	entries, err := collectSubcommands(reflectVal(&c), newTestFS())
 	assert.NotError(t, err)
 	err = validateCommanders(entries)
 	assert.Error(t, err)
@@ -518,4 +521,178 @@ func Test_tryCastCommander(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrInvalidSpecification)
 	})
+}
+
+// ── help subcommand ───────────────────────────────────────────────────────────
+
+type testGroupCmd struct {
+	Name string        `flag:"name" help:"group name"`
+	Sub  testDeployCmd `cmd:"sub"`
+}
+
+func (testGroupCmd) Run(context.Context) error { return nil }
+
+// runCommand parses args under a flag set named name, runs the selected
+// command, and returns what it wrote and its error.
+func runCommand(t *testing.T, name string, conf any, args ...string) (string, error) {
+	t.Helper()
+	var out strings.Builder
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(&out)
+	cmd, err := conflagureCmd(fs, conf, args)
+	assert.NotError(t, err)
+	err = cmd.Run(t.Context())
+	return out.String(), err
+}
+
+func Test_help_subcommand(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Verbose  bool            `flag:"verbose" help:"chatty output"`
+		Deploy   testDeployCmd   `cmd:"deploy"   help:"deploy to target"`
+		Rollback testRollbackCmd `cmd:"rollback" help:"roll back a release"`
+	}
+
+	tests := []struct {
+		name    string
+		args    []string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "every subcommand, each under a heading",
+			args:    []string{"help"},
+			want:    []string{"Usage of prog:", "-verbose", "Subcommands:", "  help ", "\n## deploy\n", "-target", "\n## rollback\n", "-version"},
+			notWant: []string{"## help"},
+		},
+		{
+			name:    "one subcommand",
+			args:    []string{"help", "deploy"},
+			want:    []string{"Usage of prog deploy:", "-target"},
+			notWant: []string{"## ", "-verbose", "-version"},
+		},
+		{
+			name: "after global flags",
+			args: []string{"-verbose", "help", "rollback"},
+			want: []string{"-version"},
+		},
+		{
+			name: "help about help",
+			args: []string{"help", "help"},
+			want: []string{"Usage of prog help:"},
+		},
+	}
+	for tt := range slices.Values(tests) {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := runCommand(t, "/tmp/go-build123/b001/exe/prog", &cfg{}, tt.args...)
+			assert.NotError(t, err)
+			for want := range slices.Values(tt.want) {
+				assert.True(t, strings.Contains(out, want))
+			}
+			for bad := range slices.Values(tt.notWant) {
+				assert.True(t, !strings.Contains(out, bad))
+			}
+			assert.True(t, !strings.Contains(out, "/tmp"))
+		})
+	}
+
+	t.Run("unknown subcommand", func(t *testing.T) {
+		_, err := runCommand(t, "prog", &cfg{}, "help", "nope")
+		assert.ErrorIs(t, err, ErrInvalidInput)
+	})
+}
+
+func Test_help_subcommand_user_defined(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Help testDeployCmd `cmd:"help"`
+	}
+	var c cfg
+	cmd, err := conflagureCmd(newTestFS(), &c, []string{"help", "-target=x"})
+	assert.NotError(t, err)
+	_, ok := cmd.(*testDeployCmd)
+	assert.True(t, ok)
+	assert.Equal(t, c.Help.Target, "x")
+}
+
+func Test_help_subcommand_absent_without_subcommands(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Verbose bool `flag:"verbose"`
+	}
+	entries, err := collectSubcommands(reflectVal(&cfg{}), newTestFS())
+	assert.NotError(t, err)
+	assert.Equal(t, len(entries), 0)
+	_, err = dispatch(newTestFS(), &cfg{}, []string{"help"})
+	assert.ErrorIs(t, err, ErrDispatchNoSelection)
+}
+
+func Test_help_subcommand_nested(t *testing.T) {
+	t.Parallel()
+
+	type cfg struct {
+		Group testGroupCmd `cmd:"group" help:"a group"`
+	}
+	tests := []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"help"}, []string{"\n## group\n", "-name", "\n## group sub\n", "-target"}},
+		{[]string{"help", "group"}, []string{"Usage of prog group:", "-name"}},
+		{[]string{"help", "group", "sub"}, []string{"Usage of prog group sub:", "-target"}},
+		{[]string{"group", "help"}, []string{"Usage of prog group:", "-name", "Subcommands:", "\n## sub\n", "-target"}},
+		{[]string{"group", "help", "sub"}, []string{"Usage of prog group sub:", "-target"}},
+	}
+	for tt := range slices.Values(tests) {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			out, err := runCommand(t, "prog", &cfg{}, tt.args...)
+			assert.NotError(t, err)
+			for want := range slices.Values(tt.want) {
+				assert.True(t, strings.Contains(out, want))
+			}
+		})
+	}
+
+	_, err := runCommand(t, "prog", &cfg{}, "help", "group", "nope")
+	assert.ErrorIs(t, err, ErrInvalidInput)
+}
+
+// dispatch does not validate nested specifications, so help meets them.
+func Test_help_subcommand_invalid_nested_specification(t *testing.T) {
+	t.Parallel()
+
+	type group struct {
+		Bad int `cmd:"bad"`
+	}
+	type mid struct {
+		Bad int `cmd:"bad"`
+	}
+	type deep struct {
+		Mid mid `cmd:"mid"`
+	}
+	type shallowCfg struct {
+		Group group `cmd:"group"`
+	}
+	type deepCfg struct {
+		Deep deep `cmd:"deep"`
+	}
+	tests := []struct {
+		conf any
+		args []string
+	}{
+		{&shallowCfg{}, []string{"help"}},
+		{&shallowCfg{}, []string{"help", "group", "bad"}},
+		{&deepCfg{}, []string{"help"}},
+	}
+	for tt := range slices.Values(tests) {
+		fs := newTestFS()
+		fs.SetOutput(io.Discard)
+		cmd, err := dispatch(fs, tt.conf, tt.args)
+		assert.NotError(t, err)
+		err = cmd.(Commander).Run(t.Context())
+		assert.ErrorIs(t, err, ErrInvalidSpecification)
+	}
 }

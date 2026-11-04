@@ -6,29 +6,6 @@ import (
 	"github.com/tychoish/fun/assert"
 )
 
-// ── joinStr ───────────────────────────────────────────────────────────────────
-
-func Test_joinStr(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{name: "empty args returns empty string", args: nil, want: ""},
-		{name: "single element", args: []string{"hello"}, want: "hello"},
-		{name: "two elements concatenated", args: []string{"foo", "bar"}, want: "foobar"},
-		{name: "three elements", args: []string{"a", "b", "c"}, want: "abc"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, joinStr(tt.args...), tt.want)
-		})
-	}
-}
-
 // ── callWhen ─────────────────────────────────────────────────────────────────
 
 func Test_callWhen(t *testing.T) {

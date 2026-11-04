@@ -14,6 +14,7 @@ import (
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/strut"
 )
 
 const (
@@ -197,7 +198,7 @@ func bindFlags(fs *flag.FlagSet, val reflect.Value, prefix string, depth int) er
 			return err
 		}
 		if err := registerFlag(fs, fval.Addr().Interface(), flagSpec{
-			Name:    joinStr(prefix, name),
+			Name:    strut.JOIN.WithConcat().Strings(prefix, name),
 			Short:   field.Tag.Get("short"),
 			Default: field.Tag.Get("default"),
 			Format:  field.Tag.Get("format"),
@@ -229,7 +230,7 @@ func bindStructField(fs *flag.FlagSet, field reflect.StructField, fval reflect.V
 	}
 	childPrefix := prefix
 	if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
-		childPrefix = joinStr(prefix, ns, ".")
+		childPrefix = strut.JOIN.WithConcat().Strings(prefix, ns, ".")
 	}
 	return true, bindFlags(fs, fval, childPrefix, depth)
 }
@@ -296,7 +297,7 @@ func checkStructField(field reflect.StructField, fval reflect.Value, prefix stri
 	childPrefix := prefix
 	if !field.Anonymous {
 		if ns := field.Tag.Get("flag"); ns != "" {
-			childPrefix = joinStr(prefix, ns, ".")
+			childPrefix = strut.JOIN.WithConcat().Strings(prefix, ns, ".")
 		}
 	}
 	return true, checkRequired(fval, childPrefix)
@@ -420,7 +421,7 @@ func collectUntilFlags(val reflect.Value, prefix string) map[string]bool {
 			}
 			childPrefix := prefix
 			if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
-				childPrefix = joinStr(prefix, ns, ".")
+				childPrefix = strut.JOIN.WithConcat().Strings(prefix, ns, ".")
 			}
 			maps.Copy(result, collectUntilFlags(fval, childPrefix))
 			continue
@@ -433,7 +434,7 @@ func collectUntilFlags(val reflect.Value, prefix string) map[string]bool {
 		if name == "" {
 			continue // validation already caught this in bindFlags
 		}
-		fullName := joinStr(prefix, name)
+		fullName := strut.JOIN.WithConcat().Strings(prefix, name)
 		result[fullName] = true
 		if short := field.Tag.Get("short"); short != "" {
 			result[short] = true
@@ -498,7 +499,7 @@ func expandUntilArgs(args []string, untilFlags map[string]bool) []string {
 
 		// Collect subsequent non-flag tokens, emitting each as -flagName <val>.
 		for i < len(args) && !isFlag(args[i]) {
-			result = append(result, joinStr("-", flagName), args[i])
+			result = append(result, strut.JOIN.WithConcat().Strings("-", flagName), args[i])
 			i++
 		}
 	}
@@ -536,7 +537,7 @@ func applyEnvVarsWalk(fs *flag.FlagSet, val reflect.Value, prefix string, cliSet
 			if _, ok := reflect.TypeAssert[flag.Value](fval.Addr()); !ok {
 				childPrefix := prefix
 				if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
-					childPrefix = joinStr(prefix, ns, ".")
+					childPrefix = strut.JOIN.WithConcat().Strings(prefix, ns, ".")
 				}
 				if err := applyEnvVarsWalk(fs, fval, childPrefix, cliSet); err != nil {
 					return err
@@ -551,7 +552,7 @@ func applyEnvVarsWalk(fs *flag.FlagSet, val reflect.Value, prefix string, cliSet
 		if name == "" || envTag == "" {
 			continue
 		}
-		fullName := joinStr(prefix, name)
+		fullName := strut.JOIN.WithConcat().Strings(prefix, name)
 		opts := parseEnvOpts(field.Tag.Get("opts"))
 
 		short := field.Tag.Get("short")

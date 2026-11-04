@@ -17,6 +17,13 @@
 //   - env:"VAR1,VAR2"  env var names to check; requires flag:
 //   - opts:"..."       comma-separated options controlling env var behaviour
 //
+// # Help
+//
+// A program with cmd: fields has a help subcommand. "prog help" prints the
+// usage of the program and the flags of every subcommand, each under a
+// "## name" heading. "prog help name" prints the usage of one subcommand. Programs
+// can override by declaring a cmd:"help" subcommand.
+//
 // # Environment variables
 //
 // A field tagged env:"VAR" is populated from the environment when no CLI flag
