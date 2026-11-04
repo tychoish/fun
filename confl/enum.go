@@ -20,6 +20,33 @@ type enumEntry struct {
 	val  reflect.Value // of the enum element type
 }
 
+// enumTable is the ordered set of accepted names. Names match
+// case-insensitively unless exact is set.
+type enumTable struct {
+	entries []enumEntry
+	exact   bool
+}
+
+// byName returns the entry whose name matches s.
+func (t *enumTable) byName(s string) (enumEntry, bool) {
+	for _, e := range t.entries {
+		if e.name == s || !t.exact && strings.EqualFold(e.name, s) {
+			return e, true
+		}
+	}
+	return enumEntry{}, false
+}
+
+// byValue returns the entry holding v.
+func (t *enumTable) byValue(v reflect.Value) (enumEntry, bool) {
+	for _, e := range t.entries {
+		if e.val.Equal(v) {
+			return e, true
+		}
+	}
+	return enumEntry{}, false
+}
+
 // enumCounter tracks the iota-style running value while an integer enum tag is
 // parsed. next holds the value for the next unnamed entry; unsigned kinds
 // reinterpret it as a uint64.
@@ -71,7 +98,7 @@ func (c *enumCounter) assign(v reflect.Value, valStr string, hasVal bool) error 
 // Integer kinds number entries like iota, with name=N overriding the running
 // value. It rejects empty and duplicate names, duplicate values, and values
 // that overflow t.
-func parseEnumTag(raw []string, t reflect.Type, exact bool) ([]enumEntry, error) {
+func parseEnumTag(raw []string, t reflect.Type, exact bool) (*enumTable, error) {
 	isString := t.Kind() == reflect.String
 	if probe := reflect.New(t).Elem(); !isString && !probe.CanInt() && !probe.CanUint() {
 		return nil, ers.Wrapf(ErrInvalidSpecification,
@@ -79,7 +106,7 @@ func parseEnumTag(raw []string, t reflect.Type, exact bool) ([]enumEntry, error)
 	}
 
 	var counter enumCounter
-	entries := make([]enumEntry, 0, len(raw))
+	table := &enumTable{entries: make([]enumEntry, 0, len(raw)), exact: exact}
 	for _, item := range raw {
 		name, valStr, hasVal := item, "", false
 		if !isString { // "=" is not special in string names
@@ -97,25 +124,16 @@ func parseEnumTag(raw []string, t reflect.Type, exact bool) ([]enumEntry, error)
 			return nil, ers.Wrapf(ErrInvalidSpecification, "enum entry %q: %w", item, err)
 		}
 
-		for _, e := range entries {
-			switch {
-			case enumNameEqual(e.name, name, exact):
-				return nil, ers.Wrapf(ErrInvalidSpecification,
-					"enum names %q and %q are duplicates; add case-sensitive:\"true\" if they differ only by case", e.name, name)
-			case e.val.Equal(v):
-				return nil, ers.Wrapf(ErrInvalidSpecification, "enum entries %q and %q have the same value", e.name, name)
-			}
+		if e, dup := table.byName(name); dup {
+			return nil, ers.Wrapf(ErrInvalidSpecification,
+				"enum names %q and %q are duplicates; add case-sensitive:\"true\" if they differ only by case", e.name, name)
 		}
-		entries = append(entries, enumEntry{name: name, val: v})
+		if e, dup := table.byValue(v); dup {
+			return nil, ers.Wrapf(ErrInvalidSpecification, "enum entries %q and %q have the same value", e.name, name)
+		}
+		table.entries = append(table.entries, enumEntry{name: name, val: v})
 	}
-	return entries, nil
-}
-
-func enumNameEqual(a, b string, exact bool) bool {
-	if exact {
-		return a == b
-	}
-	return strings.EqualFold(a, b)
+	return table, nil
 }
 
 // enumValue is the flag.Value for a field carrying an enum: tag. target is
@@ -123,9 +141,8 @@ func enumNameEqual(a, b string, exact bool) bool {
 type enumValue struct {
 	target       reflect.Value
 	elem         reflect.Type
-	entries      []enumEntry
+	table        *enumTable
 	choices      string // the entry names, for usage and error text
-	exact        bool
 	sep          string
 	sepSet       bool
 	clearOnFirst bool // the slice holds defaults that the first Set discards
@@ -154,12 +171,8 @@ func callEnumValidate(v reflect.Value) error {
 
 // nameOf returns the tag name of v, or "" when v is not in the table.
 func (e *enumValue) nameOf(v reflect.Value) string {
-	for _, en := range e.entries {
-		if en.val.Equal(v) {
-			return en.name
-		}
-	}
-	return ""
+	entry, _ := e.table.byValue(v)
+	return entry.name
 }
 
 func (e *enumValue) notAChoice() error {
@@ -180,11 +193,11 @@ func (e *enumValue) parse(s string) (reflect.Value, error) {
 			return v, e.notAChoice()
 		}
 	} else {
-		i := slices.IndexFunc(e.entries, func(en enumEntry) bool { return enumNameEqual(en.name, s, e.exact) })
-		if i < 0 {
+		entry, ok := e.table.byName(s)
+		if !ok {
 			return v, e.notAChoice()
 		}
-		v = e.entries[i].val
+		v = entry.val
 	}
 	if err := callEnumValidate(v); err != nil {
 		return v, ers.Wrapf(ErrInvalidInput, "%w", err)
@@ -269,12 +282,12 @@ func registerEnumFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 	target := reflect.ValueOf(ptr).Elem()
 	elem := enumElemType(target.Type())
 
-	entries, err := parseEnumTag(spec.Enum, elem, spec.EnumExactCase)
+	table, err := parseEnumTag(spec.Enum, elem, spec.EnumExactCase)
 	if err != nil {
 		return ers.Wrapf(err, "field %q", spec.Name)
 	}
-	names := make([]string, len(entries))
-	for i, en := range entries {
+	names := make([]string, len(table.entries))
+	for i, en := range table.entries {
 		if err := callEnumValidate(en.val); err != nil {
 			return ers.Wrapf(ErrInvalidSpecification, "field %q: enum option %q is not valid: %w", spec.Name, en.name, err)
 		}
@@ -284,9 +297,8 @@ func registerEnumFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 	val := &enumValue{
 		target:  target,
 		elem:    elem,
-		entries: entries,
+		table:   table,
 		choices: strut.JOIN.With(", ").Strings(names...),
-		exact:   spec.EnumExactCase,
 		sep:     spec.Sep,
 		sepSet:  spec.SepSet,
 	}
