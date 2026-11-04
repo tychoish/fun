@@ -72,10 +72,10 @@
 //	type Format string
 //
 //	type CLI struct {
-//		Level  Level    `flag:"level"  enum:"debug,info,warn" default:"info"`
-//		Format Format   `flag:"format" enum:"json,yaml,text"`
-//		Code   Level    `flag:"code"   enum:"debug=-4,info=0,warn=4"`
-//		Only   []Format `flag:"only"   enum:"json,yaml,text" sep:","`
+//		Verbosity Level    `flag:"level"  enum:"debug,info,warn" default:"info"`
+//		Output    Format   `flag:"format" enum:"json,yaml,text"`
+//		Code      Level    `flag:"code"   enum:"debug=-4,info=0,warn=4"`
+//		Only      []Format `flag:"only"   enum:"json,yaml,text" sep:","`
 //	}
 //
 // For integer types names take values like iota: the first is zero, each

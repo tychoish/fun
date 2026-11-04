@@ -80,9 +80,9 @@ func Test_enum_scalar(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		Level  enumLevel  `flag:"level" enum:"debug,info,warn" default:"info"`
-		Format enumFormat `flag:"format" enum:"json,yaml,text"`
-		Code   enumLevel  `flag:"code" enum:"debug=-4,info,warn=4"`
+		Level  enumLevel  `default:"info"              enum:"debug,info,warn" flag:"level"`
+		Format enumFormat `enum:"json,yaml,text"       flag:"format"`
+		Code   enumLevel  `enum:"debug=-4,info,warn=4" flag:"code"`
 	}
 
 	tests := []struct {
@@ -120,7 +120,7 @@ func Test_enum_exactCase(t *testing.T) {
 	t.Parallel()
 
 	type cfg struct {
-		F enumFormat `flag:"f" enum:"json,yaml" case-sensitive:"true"`
+		F enumFormat `case-sensitive:"true" enum:"json,yaml" flag:"f"`
 	}
 	var c cfg
 	assert.Error(t, conflagure(newTestFS(), &c, []string{"-f=JSON"}))
@@ -129,20 +129,20 @@ func Test_enum_exactCase(t *testing.T) {
 
 	// Names differing only by case are legal only with the opt-in.
 	type both struct {
-		F enumFormat `flag:"f" enum:"a,A" case-sensitive:"true"`
+		F enumFormat `case-sensitive:"true" enum:"a,A" flag:"f"`
 	}
 	var b both
 	assert.NotError(t, conflagure(newTestFS(), &b, []string{"-f=A"}))
 	assert.Equal(t, b.F, "A")
 
 	type folded struct {
-		F enumFormat `flag:"f" enum:"a,A"`
+		F enumFormat `enum:"a,A" flag:"f"`
 	}
 	err := conflagure(newTestFS(), &folded{}, nil)
 	assert.ErrorIs(t, err, ErrInvalidSpecification)
 
 	type orphan struct {
-		F enumFormat `flag:"f" case-sensitive:"true"`
+		F enumFormat `case-sensitive:"true" flag:"f"`
 	}
 	assert.ErrorIs(t, Validate(&orphan{}), ErrInvalidSpecification)
 }
@@ -155,43 +155,43 @@ func Test_enum_specErrors(t *testing.T) {
 		cfg  any
 	}{
 		{"empty tag", &struct {
-			F enumFormat `flag:"f" enum:""`
+			F enumFormat `enum:"" flag:"f"`
 		}{}},
 		{"empty entry", &struct {
-			F enumFormat `flag:"f" enum:"a,,b"`
+			F enumFormat `enum:"a,,b" flag:"f"`
 		}{}},
 		{"duplicate name", &struct {
-			F enumFormat `flag:"f" enum:"a,b,a"`
+			F enumFormat `enum:"a,b,a" flag:"f"`
 		}{}},
 		{"duplicate value", &struct {
-			F enumLevel `flag:"f" enum:"a=1,b=1"`
+			F enumLevel `enum:"a=1,b=1" flag:"f"`
 		}{}},
 		{"bad integer value", &struct {
-			F enumLevel `flag:"f" enum:"a=x"`
+			F enumLevel `enum:"a=x" flag:"f"`
 		}{}},
 		{"overflow", &struct {
-			F int8 `flag:"f" enum:"a=200"`
+			F int8 `enum:"a=200" flag:"f"`
 		}{}},
 		{"continuation overflow", &struct {
-			F uint8 `flag:"f" enum:"a=255,b"`
+			F uint8 `enum:"a=255,b" flag:"f"`
 		}{}},
 		{"unsupported kind float", &struct {
-			F float64 `flag:"f" enum:"a,b"`
+			F float64 `enum:"a,b" flag:"f"`
 		}{}},
 		{"unsupported kind struct slice", &struct {
-			F []bool `flag:"f" enum:"a,b"`
+			F []bool `enum:"a,b" flag:"f"`
 		}{}},
 		{"flag.Value", &struct {
-			F enumFlagValue `flag:"f" enum:"a,b"`
+			F enumFlagValue `enum:"a,b" flag:"f"`
 		}{}},
 		{"default not in set", &struct {
-			F enumFormat `flag:"f" enum:"a,b" default:"c"`
+			F enumFormat `default:"c" enum:"a,b" flag:"f"`
 		}{}},
 		{"option fails Validate", &struct {
-			F enumStrict `flag:"f" enum:"ok,bad"`
+			F enumStrict `enum:"ok,bad" flag:"f"`
 		}{}},
 		{"slice default without sep", &struct {
-			F []enumFormat `flag:"f" enum:"a,b" default:"a"`
+			F []enumFormat `default:"a" enum:"a,b" flag:"f"`
 		}{}},
 	}
 	for _, tt := range tests {
@@ -205,8 +205,8 @@ func Test_enum_specErrors(t *testing.T) {
 func Test_enum_validateOK(t *testing.T) {
 	t.Parallel()
 	type cfg struct {
-		L enumLevel    `flag:"l" enum:"debug,info" default:"debug"`
-		S []enumFormat `flag:"s" enum:"a,b" sep:"," default:"a,b"`
+		L enumLevel    `default:"debug" enum:"debug,info" flag:"l"`
+		S []enumFormat `default:"a,b"   enum:"a,b"        flag:"s" sep:","`
 	}
 	assert.NotError(t, Validate(&cfg{}))
 }
@@ -216,7 +216,7 @@ func Test_enum_validateInterface(t *testing.T) {
 
 	t.Run("pointer receiver option rejected", func(t *testing.T) {
 		type cfg struct {
-			F enumPtrValidate `flag:"f" enum:"a,b,c"`
+			F enumPtrValidate `enum:"a,b,c" flag:"f"`
 		}
 		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
 	})
@@ -225,7 +225,7 @@ func Test_enum_validateInterface(t *testing.T) {
 		// Options pass at registration; Validate then starts rejecting, as a
 		// type with state-dependent rules might.
 		type cfg struct {
-			F enumToggle `flag:"f" enum:"a,b"`
+			F enumToggle `enum:"a,b" flag:"f"`
 		}
 		var c cfg
 		assert.NotError(t, Validate(&c))
@@ -241,7 +241,7 @@ func Test_enum_validateInterface(t *testing.T) {
 
 	t.Run("text unmarshaler is used", func(t *testing.T) {
 		type cfg struct {
-			F enumText `flag:"f" enum:"a,b"`
+			F enumText `enum:"a,b" flag:"f"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-f=BETA"}))
@@ -253,7 +253,7 @@ func Test_enum_validateInterface(t *testing.T) {
 
 	t.Run("text unmarshaler still requires membership", func(t *testing.T) {
 		type cfg struct {
-			F enumText `flag:"f" enum:"a"`
+			F enumText `enum:"a" flag:"f"`
 		}
 		fs := newTestFS()
 		fs.SetOutput(&bytes.Buffer{})
@@ -264,7 +264,7 @@ func Test_enum_validateInterface(t *testing.T) {
 func Test_enum_unsetPrefilledUnchecked(t *testing.T) {
 	t.Parallel()
 	type cfg struct {
-		L enumLevel `flag:"l" enum:"debug,info"`
+		L enumLevel `enum:"debug,info" flag:"l"`
 	}
 	c := cfg{L: 99}
 	assert.NotError(t, conflagure(newTestFS(), &c, nil))
@@ -274,7 +274,7 @@ func Test_enum_unsetPrefilledUnchecked(t *testing.T) {
 func Test_enum_env(t *testing.T) {
 	t.Setenv("CONFL_ENUM_LEVEL", "WARN")
 	type cfg struct {
-		L enumLevel `flag:"l" enum:"debug,info,warn" env:"CONFL_ENUM_LEVEL"`
+		L enumLevel `enum:"debug,info,warn" env:"CONFL_ENUM_LEVEL" flag:"l"`
 	}
 	var c cfg
 	assert.NotError(t, conflagure(newTestFS(), &c, nil))
@@ -290,7 +290,7 @@ func Test_enum_sliceAndPointer(t *testing.T) {
 
 	t.Run("slice with sep", func(t *testing.T) {
 		type cfg struct {
-			S []enumLevel `flag:"s" enum:"debug,info,warn" sep:","`
+			S []enumLevel `enum:"debug,info,warn" flag:"s" sep:","`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=debug, warn", "-s", "info"}))
@@ -299,7 +299,7 @@ func Test_enum_sliceAndPointer(t *testing.T) {
 
 	t.Run("slice element rejected", func(t *testing.T) {
 		type cfg struct {
-			S []enumLevel `flag:"s" enum:"debug,info" sep:","`
+			S []enumLevel `enum:"debug,info" flag:"s" sep:","`
 		}
 		fs := newTestFS()
 		fs.SetOutput(&bytes.Buffer{})
@@ -308,7 +308,7 @@ func Test_enum_sliceAndPointer(t *testing.T) {
 
 	t.Run("slice default cleared on first use", func(t *testing.T) {
 		type cfg struct {
-			S []enumFormat `flag:"s" short:"x" enum:"a,b,c" sep:"," default:"a,b"`
+			S []enumFormat `default:"a,b" enum:"a,b,c" flag:"s" sep:"," short:"x"`
 		}
 		var d cfg
 		assert.NotError(t, conflagure(newTestFS(), &d, nil))
@@ -321,7 +321,7 @@ func Test_enum_sliceAndPointer(t *testing.T) {
 
 	t.Run("pointer nil vs set", func(t *testing.T) {
 		type cfg struct {
-			P *enumLevel `flag:"p" enum:"debug,info,warn"`
+			P *enumLevel `enum:"debug,info,warn" flag:"p"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, nil))
@@ -333,7 +333,7 @@ func Test_enum_sliceAndPointer(t *testing.T) {
 
 	t.Run("pointer default", func(t *testing.T) {
 		type cfg struct {
-			P *enumFormat `flag:"p" enum:"a,b" default:"b"`
+			P *enumFormat `default:"b" enum:"a,b" flag:"p"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, nil))
@@ -344,8 +344,8 @@ func Test_enum_sliceAndPointer(t *testing.T) {
 func Test_enum_help(t *testing.T) {
 	t.Parallel()
 	type cfg struct {
-		L enumLevel `flag:"level" short:"l" enum:"debug,info,warn" default:"info" help:"log level"`
-		N enumLevel `flag:"nohelp" enum:"debug,info"`
+		L enumLevel `default:"info"    enum:"debug,info,warn" flag:"level" help:"log level" short:"l"`
+		N enumLevel `enum:"debug,info" flag:"nohelp"`
 	}
 	fs := newTestFS()
 	var buf bytes.Buffer
@@ -373,7 +373,7 @@ func Test_enum_zeroValueString(t *testing.T) {
 func Test_enum_subcommand(t *testing.T) {
 	t.Parallel()
 	type sub struct {
-		L enumLevel `flag:"level" enum:"debug,info,warn"`
+		L enumLevel `enum:"debug,info,warn" flag:"level"`
 	}
 	type root struct {
 		Sub sub `cmd:"run"`
@@ -389,11 +389,11 @@ func Test_enum_reviewRegressions(t *testing.T) {
 
 	t.Run("string kind treats = literally", func(t *testing.T) {
 		type dup struct {
-			F enumFormat `flag:"f" enum:"k=v,k=v"`
+			F enumFormat `enum:"k=v,k=v" flag:"f"`
 		}
 		assert.ErrorIs(t, Validate(&dup{}), ErrInvalidSpecification)
 		type ok struct {
-			F enumFormat `flag:"f" enum:"a=b,a=c,=x"`
+			F enumFormat `enum:"a=b,a=c,=x" flag:"f"`
 		}
 		var c ok
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-f=a=c"}))
@@ -402,13 +402,13 @@ func Test_enum_reviewRegressions(t *testing.T) {
 
 	t.Run("64-bit continuation overflow", func(t *testing.T) {
 		type u struct {
-			F uint64 `flag:"f" enum:"x=18446744073709551615,y"`
+			F uint64 `enum:"x=18446744073709551615,y" flag:"f"`
 		}
 		type i struct {
-			F int64 `flag:"f" enum:"x=9223372036854775807,y"`
+			F int64 `enum:"x=9223372036854775807,y" flag:"f"`
 		}
 		type okU struct {
-			F uint64 `flag:"f" enum:"x=18446744073709551615,y=1"`
+			F uint64 `enum:"x=18446744073709551615,y=1" flag:"f"`
 		}
 		assert.ErrorIs(t, Validate(&u{}), ErrInvalidSpecification)
 		assert.ErrorIs(t, Validate(&i{}), ErrInvalidSpecification)
@@ -417,21 +417,21 @@ func Test_enum_reviewRegressions(t *testing.T) {
 
 	t.Run("bad uint value", func(t *testing.T) {
 		type cfg struct {
-			F uint `flag:"f" enum:"x=-1"`
+			F uint `enum:"x=-1" flag:"f"`
 		}
 		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
 	})
 
 	t.Run("bad case-sensitive value", func(t *testing.T) {
 		type cfg struct {
-			F enumFormat `flag:"f" enum:"a" case-sensitive:"yes"`
+			F enumFormat `case-sensitive:"yes" enum:"a" flag:"f"`
 		}
 		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
 	})
 
 	t.Run("failed Set leaves slice and default intact", func(t *testing.T) {
 		type cfg struct {
-			S []enumFormat `flag:"s" enum:"a,b,c" sep:"," default:"a"`
+			S []enumFormat `default:"a" enum:"a,b,c" flag:"s" sep:","`
 		}
 		var c cfg
 		fs := newTestFS()
@@ -445,7 +445,7 @@ func Test_enum_reviewRegressions(t *testing.T) {
 }
 
 type enumRunCmd struct {
-	Level enumLevel `flag:"level" enum:"debug,info,warn"`
+	Level enumLevel `enum:"debug,info,warn" flag:"level"`
 }
 
 func (c *enumRunCmd) Run(context.Context) error { return nil }
@@ -455,14 +455,14 @@ type enumUint uint8
 func Test_enum_edgeCases(t *testing.T) {
 	t.Run("bad case-sensitive value through bind", func(t *testing.T) {
 		type cfg struct {
-			F enumFormat `flag:"f" enum:"a" case-sensitive:"maybe"`
+			F enumFormat `case-sensitive:"maybe" enum:"a" flag:"f"`
 		}
 		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidSpecification)
 	})
 
 	t.Run("case-sensitive false folds", func(t *testing.T) {
 		type cfg struct {
-			F enumFormat `flag:"f" enum:"a" case-sensitive:"false"`
+			F enumFormat `case-sensitive:"false" enum:"a" flag:"f"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-f=A"}))
@@ -471,14 +471,14 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("case-sensitive without enum through bind", func(t *testing.T) {
 		type cfg struct {
-			F enumFormat `flag:"f" case-sensitive:"true"`
+			F enumFormat `case-sensitive:"true" flag:"f"`
 		}
 		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidSpecification)
 	})
 
 	t.Run("String after the pointer is reset", func(t *testing.T) {
 		type cfg struct {
-			P *enumLevel `flag:"p" enum:"debug,info"`
+			P *enumLevel `enum:"debug,info" flag:"p"`
 		}
 		var c cfg
 		fs := newTestFS()
@@ -491,7 +491,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("String of unset and set slice", func(t *testing.T) {
 		type cfg struct {
-			S []enumLevel `flag:"s" enum:"debug,info,warn"`
+			S []enumLevel `enum:"debug,info,warn" flag:"s"`
 		}
 		var c cfg
 		fs := newTestFS()
@@ -504,8 +504,8 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("String shows only the default before parsing", func(t *testing.T) {
 		type cfg struct {
-			L enumLevel `flag:"l" enum:"debug,info,warn" default:"warn"`
-			N enumLevel `flag:"n" enum:"debug,info,warn"`
+			L enumLevel `default:"warn"         enum:"debug,info,warn" flag:"l"`
+			N enumLevel `enum:"debug,info,warn" flag:"n"`
 		}
 		var c cfg
 		fs := newTestFS()
@@ -518,7 +518,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("unsigned enum with iota and explicit values", func(t *testing.T) {
 		type cfg struct {
-			U enumUint `flag:"u" enum:"a,b=10,c"`
+			U enumUint `enum:"a,b=10,c" flag:"u"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-u=c"}))
@@ -527,7 +527,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("whitespace around entries and values", func(t *testing.T) {
 		type cfg struct {
-			L enumLevel `flag:"l" enum:" a = 5 , b "`
+			L enumLevel `enum:" a = 5 , b " flag:"l"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-l=b"}))
@@ -536,21 +536,21 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("empty name with a value", func(t *testing.T) {
 		type cfg struct {
-			L enumLevel `flag:"l" enum:"=5"`
+			L enumLevel `enum:"=5" flag:"l"`
 		}
 		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
 	})
 
 	t.Run("empty value after =", func(t *testing.T) {
 		type cfg struct {
-			L enumLevel `flag:"l" enum:"a="`
+			L enumLevel `enum:"a=" flag:"l"`
 		}
 		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
 	})
 
 	t.Run("namespaced field and short alias", func(t *testing.T) {
 		type inner struct {
-			L enumLevel `flag:"level" short:"l" enum:"debug,info,warn"`
+			L enumLevel `enum:"debug,info,warn" flag:"level" short:"l"`
 		}
 		type cfg struct {
 			Log inner `flag:"log"`
@@ -559,7 +559,7 @@ func Test_enum_edgeCases(t *testing.T) {
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-log.level=warn"}))
 		assert.Equal(t, c.Log.L, enumWarn)
 		type short struct {
-			L enumLevel `flag:"level" short:"l" enum:"debug,info,warn"`
+			L enumLevel `enum:"debug,info,warn" flag:"level" short:"l"`
 		}
 		var s short
 		assert.NotError(t, conflagure(newTestFS(), &s, []string{"-l=info"}))
@@ -568,7 +568,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("required enum", func(t *testing.T) {
 		type cfg struct {
-			L enumLevel `flag:"l" enum:"debug,info" required:"true"`
+			L enumLevel `enum:"debug,info" flag:"l" required:"true"`
 		}
 		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidInput)
 		assert.NotError(t, conflagure(newTestFS(), &cfg{}, []string{"-l=info"}))
@@ -577,7 +577,7 @@ func Test_enum_edgeCases(t *testing.T) {
 	t.Run("env slice replaces defaults", func(t *testing.T) {
 		t.Setenv("CONFL_ENUM_SLICE", "b,c")
 		type cfg struct {
-			S []enumFormat `flag:"s" enum:"a,b,c" sep:"," default:"a" env:"CONFL_ENUM_SLICE"`
+			S []enumFormat `default:"a" enum:"a,b,c" env:"CONFL_ENUM_SLICE" flag:"s" sep:","`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, nil))
@@ -586,7 +586,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("slice without sep appends once per flag", func(t *testing.T) {
 		type cfg struct {
-			S []enumFormat `flag:"s" enum:"a,b,c"`
+			S []enumFormat `enum:"a,b,c" flag:"s"`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=a", "-s=c"}))
@@ -598,7 +598,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("slice sep empty keeps whole value", func(t *testing.T) {
 		type cfg struct {
-			S []enumFormat `flag:"s" enum:"a,b" sep:""`
+			S []enumFormat `enum:"a,b" flag:"s" sep:""`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=a", "-s=b"}))
@@ -607,7 +607,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("empty element in a sep list", func(t *testing.T) {
 		type cfg struct {
-			S []enumFormat `flag:"s" enum:"a,b" sep:","`
+			S []enumFormat `enum:"a,b" flag:"s" sep:","`
 		}
 		fs := newTestFS()
 		fs.SetOutput(&bytes.Buffer{})
@@ -616,8 +616,8 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("TextUnmarshaler default and slice", func(t *testing.T) {
 		type cfg struct {
-			F enumText   `flag:"f" enum:"a,b" default:"BETA"`
-			S []enumText `flag:"s" enum:"a,b" sep:","`
+			F enumText   `default:"BETA" enum:"a,b" flag:"f"`
+			S []enumText `enum:"a,b"     flag:"s"   sep:","`
 		}
 		var c cfg
 		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=alpha,b"}))
@@ -628,15 +628,15 @@ func Test_enum_edgeCases(t *testing.T) {
 	t.Run("exact case with env", func(t *testing.T) {
 		t.Setenv("CONFL_ENUM_EXACT", "JSON")
 		type cfg struct {
-			F enumFormat `flag:"f" enum:"json" case-sensitive:"true" env:"CONFL_ENUM_EXACT"`
+			F enumFormat `case-sensitive:"true" enum:"json" env:"CONFL_ENUM_EXACT" flag:"f"`
 		}
 		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidInput)
 	})
 
 	t.Run("duplicate flag across enum fields", func(t *testing.T) {
 		type cfg struct {
-			A enumLevel `flag:"x" enum:"a"`
-			B enumLevel `flag:"x" enum:"a"`
+			A enumLevel `enum:"a" flag:"x"`
+			B enumLevel `enum:"a" flag:"x"`
 		}
 		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
 	})
@@ -660,7 +660,7 @@ func Test_enum_edgeCases(t *testing.T) {
 
 	t.Run("error lists choices and wraps ErrInvalidInput", func(t *testing.T) {
 		type cfg struct {
-			L enumLevel `flag:"l" enum:"debug,info"`
+			L enumLevel `enum:"debug,info" flag:"l"`
 		}
 		fs := newTestFS()
 		var b bytes.Buffer
