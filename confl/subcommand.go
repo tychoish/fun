@@ -286,7 +286,7 @@ func writeHelp(fs *flag.FlagSet, entries []subcommandEntry, names []string) erro
 // flags to print.
 func writeEntries(fs *flag.FlagSet, entries []subcommandEntry, prefix string) error {
 	for _, e := range entries {
-		if _, ok := e.val.Addr().Interface().(*helpCmd); ok {
+		if _, ok := reflect.TypeAssert[*helpCmd](e.val.Addr()); ok {
 			continue
 		}
 		fmt.Fprintf(fs.Output(), "\n## %s\n", strut.JOIN.WithConcat().Strings(prefix, e.name))
