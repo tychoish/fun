@@ -5,8 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"reflect"
+	"slices"
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
@@ -194,6 +197,13 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 		return nil, err
 	}
 
+	if args := fs.Args(); wantsHelp(entries, args) {
+		if err := writeHelp(fs, entries, args[1:]); err != nil {
+			return nil, err
+		}
+		return nil, ErrHelpShown
+	}
+
 	result, err := selectSubcommand(entries, fs.Args())
 	if err != nil {
 		if errors.Is(err, ers.ErrNotFound) {
@@ -202,6 +212,76 @@ func dispatch(fs *flag.FlagSet, conf any, args []string) (any, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+const helpCommand = "help"
+
+// wantsHelp reports whether args name the built-in help subcommand, which a
+// program's own cmd:"help" field takes precedence over.
+func wantsHelp(entries []subcommandEntry, args []string) bool {
+	return len(entries) > 0 && len(args) > 0 && args[0] == helpCommand &&
+		!slices.ContainsFunc(entries, func(e subcommandEntry) bool { return e.name == helpCommand })
+}
+
+func printSubcommands(w io.Writer, entries []subcommandEntry) {
+	fmt.Fprintf(w, "\nSubcommands:\n")
+	for _, e := range entries {
+		if e.help != "" {
+			fmt.Fprintf(w, "  %-16s %s\n", e.name, e.help)
+		} else {
+			fmt.Fprintf(w, "  %s\n", e.name)
+		}
+	}
+}
+
+// writeHelp implements the help subcommand. With no names it prints the flags
+// of fs, its subcommands, and the flags of every subcommand under a "## name"
+// heading. With names it prints the usage of the subcommand they name.
+//
+// Program names are base names, so the output is the same wherever the binary
+// ran, as under go run. That is why the root usage is printed here and not by
+// fs.Usage, whose default names the full path.
+func writeHelp(fs *flag.FlagSet, entries []subcommandEntry, names []string) error {
+	if len(names) == 0 {
+		fmt.Fprintf(fs.Output(), "Usage of %s:\n", filepath.Base(fs.Name()))
+		fs.PrintDefaults()
+		printSubcommands(fs.Output(), entries)
+		return writeEntries(fs, entries, "")
+	}
+	i := slices.IndexFunc(entries, func(e subcommandEntry) bool { return e.name == names[0] })
+	if i < 0 {
+		return ers.Wrapf(ErrInvalidInput, "unknown subcommand %q", names[0])
+	}
+	e := entries[i]
+	e.fs.Init(filepath.Base(e.fs.Name()), e.fs.ErrorHandling())
+	e.fs.SetOutput(fs.Output())
+	if len(names) == 1 {
+		e.fs.Usage()
+		return nil
+	}
+	inner, err := collectSubcommands(e.val, e.fs.Name())
+	if err != nil {
+		return err
+	}
+	return writeHelp(e.fs, inner, names[1:])
+}
+
+// writeEntries prints the flags of each entry and of its nested subcommands,
+// each under a heading of its full command name.
+func writeEntries(fs *flag.FlagSet, entries []subcommandEntry, prefix string) error {
+	for _, e := range entries {
+		fmt.Fprintf(fs.Output(), "\n## %s%s\n", prefix, e.name)
+		e.fs.SetOutput(fs.Output())
+		e.fs.PrintDefaults()
+		inner, err := collectSubcommands(e.val, e.fs.Name())
+		if err != nil {
+			return err
+		}
+		if err := writeEntries(fs, inner, prefix+e.name+" "); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // conflagureCmd performs the full two-phase parse: global flags then subcommand
@@ -236,14 +316,7 @@ func conflagureCmd(fs *flag.FlagSet, conf any, args []string) (Commander, error)
 				fmt.Fprintf(fs.Output(), "Usage of %s:\n", fs.Name())
 				fs.PrintDefaults()
 			}
-			fmt.Fprintf(fs.Output(), "\nSubcommands:\n")
-			for _, e := range entries {
-				if e.help != "" {
-					fmt.Fprintf(fs.Output(), "  %-16s %s\n", e.name, e.help)
-				} else {
-					fmt.Fprintf(fs.Output(), "  %s\n", e.name)
-				}
-			}
+			printSubcommands(fs.Output(), entries)
 		}
 	}
 

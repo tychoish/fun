@@ -17,6 +17,13 @@
 //   - env:"VAR1,VAR2"  env var names to check; requires flag:
 //   - opts:"..."       comma-separated options controlling env var behaviour
 //
+// # Help
+//
+// A program with cmd: fields has a help subcommand. "prog help" prints the
+// usage of the program and the flags of every subcommand, each under a
+// "## name" heading. "prog help name" prints the usage of one subcommand. A
+// program that declares its own cmd:"help" field keeps it.
+//
 // # Environment variables
 //
 // A field tagged env:"VAR" is populated from the environment when no CLI flag
@@ -105,6 +112,7 @@
 package confl
 
 import (
+	"errors"
 	"flag"
 	"os"
 	"reflect"
@@ -120,6 +128,9 @@ const (
 	// ErrDispatchNoSelection is returned by Dispatch and ParseCommand when
 	// the caller provided no subcommand name.
 	ErrDispatchNoSelection = ers.Error("no subcommand selected")
+	// ErrHelpShown reports that the help subcommand printed usage. Dispatch
+	// and ParseCommand exit with status 0 instead of returning it.
+	ErrHelpShown = ers.Error("help shown")
 )
 
 // commandLineArgs returns os.Args[1:], or flag.CommandLine.Args() when a prior
@@ -188,7 +199,9 @@ func Parse(cfg any) error {
 // identify the selected subcommand. Subcommand types need not implement
 // Commander; use ParseCommand to require that guarantee.
 func Dispatch(cfg any) (any, error) {
-	return dispatch(flag.CommandLine, cfg, commandLineArgs())
+	result, err := dispatch(flag.CommandLine, cfg, commandLineArgs())
+	callWhen(errors.Is(err, ErrHelpShown), os.Exit, 0)
+	return result, err
 }
 
 // ParseCommand parses global flags and selects a subcommand, returning it as a
@@ -197,5 +210,7 @@ func Dispatch(cfg any) (any, error) {
 // Commander, ParseCommand returns cfg. ParseCommand returns ErrDispatchNoSelection
 // when no subcommand is named and cfg does not implement Commander.
 func ParseCommand(cfg any) (Commander, error) {
-	return conflagureCmd(flag.CommandLine, cfg, commandLineArgs())
+	cmd, err := conflagureCmd(flag.CommandLine, cfg, commandLineArgs())
+	callWhen(errors.Is(err, ErrHelpShown), os.Exit, 0)
+	return cmd, err
 }
