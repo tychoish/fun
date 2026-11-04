@@ -2,6 +2,7 @@ package confl
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"strings"
@@ -440,5 +441,234 @@ func Test_enum_reviewRegressions(t *testing.T) {
 		assert.EqualItems(t, c.S, []enumFormat{"a"})
 		assert.NotError(t, fs.Set("s", "b,c"))
 		assert.EqualItems(t, c.S, []enumFormat{"b", "c"})
+	})
+}
+
+type enumRunCmd struct {
+	Level enumLevel `flag:"level" enum:"debug,info,warn"`
+}
+
+func (c *enumRunCmd) Run(context.Context) error { return nil }
+
+type enumUint uint8
+
+func Test_enum_edgeCases(t *testing.T) {
+	t.Run("bad case-sensitive value through bind", func(t *testing.T) {
+		type cfg struct {
+			F enumFormat `flag:"f" enum:"a" case-sensitive:"maybe"`
+		}
+		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidSpecification)
+	})
+
+	t.Run("case-sensitive false folds", func(t *testing.T) {
+		type cfg struct {
+			F enumFormat `flag:"f" enum:"a" case-sensitive:"false"`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-f=A"}))
+		assert.Equal(t, c.F, "a")
+	})
+
+	t.Run("case-sensitive without enum through bind", func(t *testing.T) {
+		type cfg struct {
+			F enumFormat `flag:"f" case-sensitive:"true"`
+		}
+		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidSpecification)
+	})
+
+	t.Run("String after the pointer is reset", func(t *testing.T) {
+		type cfg struct {
+			P *enumLevel `flag:"p" enum:"debug,info"`
+		}
+		var c cfg
+		fs := newTestFS()
+		assert.NotError(t, bindFlags(fs, reflectVal(&c), "", 0))
+		assert.NotError(t, fs.Set("p", "info"))
+		assert.Equal(t, fs.Lookup("p").Value.String(), "info")
+		c.P = nil
+		assert.Equal(t, fs.Lookup("p").Value.String(), "")
+	})
+
+	t.Run("String of unset and set slice", func(t *testing.T) {
+		type cfg struct {
+			S []enumLevel `flag:"s" enum:"debug,info,warn"`
+		}
+		var c cfg
+		fs := newTestFS()
+		assert.NotError(t, bindFlags(fs, reflectVal(&c), "", 0))
+		assert.Equal(t, fs.Lookup("s").Value.String(), "")
+		assert.NotError(t, fs.Set("s", "warn"))
+		assert.NotError(t, fs.Set("s", "debug"))
+		assert.Equal(t, fs.Lookup("s").Value.String(), "warn,debug")
+	})
+
+	t.Run("String shows only the default before parsing", func(t *testing.T) {
+		type cfg struct {
+			L enumLevel `flag:"l" enum:"debug,info,warn" default:"warn"`
+			N enumLevel `flag:"n" enum:"debug,info,warn"`
+		}
+		var c cfg
+		fs := newTestFS()
+		assert.NotError(t, bindFlags(fs, reflectVal(&c), "", 0))
+		assert.Equal(t, fs.Lookup("l").Value.String(), "warn")
+		assert.Equal(t, fs.Lookup("n").Value.String(), "")
+		assert.Equal(t, fs.Lookup("l").DefValue, "warn")
+		assert.Equal(t, fs.Lookup("n").DefValue, "")
+	})
+
+	t.Run("unsigned enum with iota and explicit values", func(t *testing.T) {
+		type cfg struct {
+			U enumUint `flag:"u" enum:"a,b=10,c"`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-u=c"}))
+		assert.Equal(t, c.U, 11)
+	})
+
+	t.Run("whitespace around entries and values", func(t *testing.T) {
+		type cfg struct {
+			L enumLevel `flag:"l" enum:" a = 5 , b "`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-l=b"}))
+		assert.Equal(t, c.L, 6)
+	})
+
+	t.Run("empty name with a value", func(t *testing.T) {
+		type cfg struct {
+			L enumLevel `flag:"l" enum:"=5"`
+		}
+		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
+	})
+
+	t.Run("empty value after =", func(t *testing.T) {
+		type cfg struct {
+			L enumLevel `flag:"l" enum:"a="`
+		}
+		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
+	})
+
+	t.Run("namespaced field and short alias", func(t *testing.T) {
+		type inner struct {
+			L enumLevel `flag:"level" short:"l" enum:"debug,info,warn"`
+		}
+		type cfg struct {
+			Log inner `flag:"log"`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-log.level=warn"}))
+		assert.Equal(t, c.Log.L, enumWarn)
+		type short struct {
+			L enumLevel `flag:"level" short:"l" enum:"debug,info,warn"`
+		}
+		var s short
+		assert.NotError(t, conflagure(newTestFS(), &s, []string{"-l=info"}))
+		assert.Equal(t, s.L, enumInfo)
+	})
+
+	t.Run("required enum", func(t *testing.T) {
+		type cfg struct {
+			L enumLevel `flag:"l" enum:"debug,info" required:"true"`
+		}
+		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidInput)
+		assert.NotError(t, conflagure(newTestFS(), &cfg{}, []string{"-l=info"}))
+	})
+
+	t.Run("env slice replaces defaults", func(t *testing.T) {
+		t.Setenv("CONFL_ENUM_SLICE", "b,c")
+		type cfg struct {
+			S []enumFormat `flag:"s" enum:"a,b,c" sep:"," default:"a" env:"CONFL_ENUM_SLICE"`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, nil))
+		assert.EqualItems(t, c.S, []enumFormat{"b", "c"})
+	})
+
+	t.Run("slice without sep appends once per flag", func(t *testing.T) {
+		type cfg struct {
+			S []enumFormat `flag:"s" enum:"a,b,c"`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=a", "-s=c"}))
+		assert.EqualItems(t, c.S, []enumFormat{"a", "c"})
+		fs := newTestFS()
+		fs.SetOutput(&bytes.Buffer{})
+		assert.Error(t, conflagure(fs, &cfg{}, []string{"-s=a,c"}))
+	})
+
+	t.Run("slice sep empty keeps whole value", func(t *testing.T) {
+		type cfg struct {
+			S []enumFormat `flag:"s" enum:"a,b" sep:""`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=a", "-s=b"}))
+		assert.EqualItems(t, c.S, []enumFormat{"a", "b"})
+	})
+
+	t.Run("empty element in a sep list", func(t *testing.T) {
+		type cfg struct {
+			S []enumFormat `flag:"s" enum:"a,b" sep:","`
+		}
+		fs := newTestFS()
+		fs.SetOutput(&bytes.Buffer{})
+		assert.Error(t, conflagure(fs, &cfg{}, []string{"-s=a,"}))
+	})
+
+	t.Run("TextUnmarshaler default and slice", func(t *testing.T) {
+		type cfg struct {
+			F enumText   `flag:"f" enum:"a,b" default:"BETA"`
+			S []enumText `flag:"s" enum:"a,b" sep:","`
+		}
+		var c cfg
+		assert.NotError(t, conflagure(newTestFS(), &c, []string{"-s=alpha,b"}))
+		assert.Equal(t, c.F, 1)
+		assert.Equal(t, len(c.S), 2)
+	})
+
+	t.Run("exact case with env", func(t *testing.T) {
+		t.Setenv("CONFL_ENUM_EXACT", "JSON")
+		type cfg struct {
+			F enumFormat `flag:"f" enum:"json" case-sensitive:"true" env:"CONFL_ENUM_EXACT"`
+		}
+		assert.ErrorIs(t, conflagure(newTestFS(), &cfg{}, nil), ErrInvalidInput)
+	})
+
+	t.Run("duplicate flag across enum fields", func(t *testing.T) {
+		type cfg struct {
+			A enumLevel `flag:"x" enum:"a"`
+			B enumLevel `flag:"x" enum:"a"`
+		}
+		assert.ErrorIs(t, Validate(&cfg{}), ErrInvalidSpecification)
+	})
+
+	t.Run("real subcommand dispatch", func(t *testing.T) {
+		type cfg struct {
+			Run enumRunCmd `cmd:"run"`
+		}
+		var c cfg
+		cmd, err := conflagureCmd(newTestFS(), &c, []string{"run", "-level=warn"})
+		assert.NotError(t, err)
+		assert.True(t, cmd != nil)
+		assert.Equal(t, c.Run.Level, enumWarn)
+
+		fs := newTestFS()
+		fs.SetOutput(&bytes.Buffer{})
+		_, err = conflagureCmd(fs, &cfg{}, []string{"run", "-level=loud"})
+		assert.Error(t, err)
+		assert.Substring(t, err.Error(), "must be one of debug, info, warn")
+	})
+
+	t.Run("error lists choices and wraps ErrInvalidInput", func(t *testing.T) {
+		type cfg struct {
+			L enumLevel `flag:"l" enum:"debug,info"`
+		}
+		fs := newTestFS()
+		var b bytes.Buffer
+		fs.SetOutput(&b)
+		var c cfg
+		assert.NotError(t, bindFlags(fs, reflectVal(&c), "", 0))
+		err := fs.Lookup("l").Value.Set("zzz")
+		assert.ErrorIs(t, err, ErrInvalidInput)
+		assert.Substring(t, err.Error(), "must be one of debug, info")
 	})
 }
