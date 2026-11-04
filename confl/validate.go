@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/strut"
 )
 
 // Validate checks cfg's struct tags for specification errors without parsing
@@ -120,11 +121,11 @@ func validateStruct(fs *flag.FlagSet, val reflect.Value, prefix string, depth in
 		short := field.Tag.Get("short")
 		if short != "" && len(short) != 1 {
 			return ers.Wrapf(ErrInvalidSpecification,
-				"short flag for %q must be exactly one character, got %q", joinStr(prefix, name), short)
+				"short flag for %q must be exactly one character, got %q", strut.JOIN.WithConcat().Strings(prefix, name), short)
 		}
 
 		// ── duplicate flag detection ──────────────────────────────────────────
-		fullName := joinStr(prefix, name)
+		fullName := strut.JOIN.WithConcat().Strings(prefix, name)
 		if fs.Lookup(fullName) != nil {
 			return ers.Wrapf(ErrInvalidSpecification,
 				"flag %q already registered (duplicate field or flat-namespace collision)", fullName)
@@ -192,7 +193,7 @@ func validateStructField(fs *flag.FlagSet, field reflect.StructField, fval refle
 	}
 	childPrefix := prefix
 	if ns := field.Tag.Get("flag"); ns != "" && !field.Anonymous {
-		childPrefix = joinStr(prefix, ns, ".")
+		childPrefix = strut.JOIN.WithConcat().Strings(prefix, ns, ".")
 	}
 	return false, true, validateStruct(fs, fval, childPrefix, depth)
 }

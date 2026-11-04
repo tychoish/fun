@@ -9,6 +9,7 @@ import (
 
 	"github.com/tychoish/fun/erc"
 	"github.com/tychoish/fun/ers"
+	"github.com/tychoish/fun/strut"
 )
 
 // registerFuncFlag registers a scalar flag for types with no native FlagSet
@@ -126,9 +127,9 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 				*p = !b
 				return nil
 			}
-			fs.BoolFunc(joinStr("no-", spec.Name), spec.Help, fn)
+			fs.BoolFunc(strut.JOIN.WithConcat().Strings("no-", spec.Name), spec.Help, fn)
 			if spec.Short != "" {
-				fs.BoolFunc(joinStr("no-", spec.Short), joinStr("short for -no-", spec.Name), fn)
+				fs.BoolFunc(strut.JOIN.WithConcat().Strings("no-", spec.Short), strut.JOIN.WithConcat().Strings("short for -no-", spec.Name), fn)
 			}
 		case "false", "f", "no", "n", "", "0", "-1":
 			registerAlias(spec, func(n, u string) { fs.BoolVar(p, n, false, u) })
@@ -208,9 +209,9 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 				b, err := strconv.ParseBool(s)
 				return !b, err
 			}, true, spec.Sep, spec.SepSet)
-			fs.BoolFunc(joinStr("no-", spec.Name), spec.Help, fn)
+			fs.BoolFunc(strut.JOIN.WithConcat().Strings("no-", spec.Name), spec.Help, fn)
 			if spec.Short != "" {
-				fs.BoolFunc(joinStr("no-", spec.Short), joinStr("short for -no-", spec.Name), fn)
+				fs.BoolFunc(strut.JOIN.WithConcat().Strings("no-", spec.Short), strut.JOIN.WithConcat().Strings("short for -no-", spec.Name), fn)
 			}
 		case "false":
 			fallthrough

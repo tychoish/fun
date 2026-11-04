@@ -35,7 +35,7 @@ type subcommandEntry struct {
 // newSubFlagSet returns the FlagSet of the subcommand name of parent, which
 // writes where parent does.
 func newSubFlagSet(parent *flag.FlagSet, name string) *flag.FlagSet {
-	fs := flag.NewFlagSet(joinStr(parent.Name(), " ", name), flag.ContinueOnError)
+	fs := flag.NewFlagSet(strut.JOIN.WithConcat().Strings(parent.Name(), " ", name), flag.ContinueOnError)
 	fs.SetOutput(parent.Output())
 	return fs
 }

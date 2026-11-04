@@ -8,9 +8,9 @@ import (
 
 	"github.com/tychoish/fun/ers"
 	"github.com/tychoish/fun/irt"
+	"github.com/tychoish/fun/strut"
 )
 
-func joinStr(args ...string) string { return strings.Join(args, "") }
 func callWhen[T any](cond bool, op func(T), num T) {
 	if cond {
 		op(num)
@@ -114,7 +114,7 @@ func (s flagSpec) validate(fs *flag.FlagSet) error {
 func registerAlias(spec flagSpec, register func(name, usage string)) {
 	register(spec.Name, spec.Help)
 	if spec.Short != "" {
-		register(spec.Short, joinStr("short for -", spec.Name))
+		register(spec.Short, strut.JOIN.WithConcat().Strings("short for -", spec.Name))
 	}
 }
 
