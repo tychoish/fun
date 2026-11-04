@@ -14,6 +14,8 @@
 //   - narg:"until"     collect args until the next flag (requires flag:)
 //   - cmd:"name"       declare a subcommand field (use ParseCommand or Dispatch)
 //   - format:"layout"  Go reference-time layout string for time.Time fields
+//   - enum:"a,b,c"     restrict a named string or integer field to the listed names
+//   - case-sensitive:"true"  match enum names exactly; requires enum:
 //   - env:"VAR1,VAR2"  env var names to check; requires flag:
 //   - opts:"..."       comma-separated options controlling env var behaviour
 //
@@ -50,7 +52,48 @@
 // # Supported types
 //
 // string, bool, int, int64, uint, uint64, float64, time.Duration, time.Time,
-// any type implementing flag.Value, and slices of each scalar type.
+// any type implementing flag.Value, and slices of each scalar type. Named
+// string and integer types are supported with an enum: tag.
+//
+// # Enums
+//
+// A field of named string or integer type with an enum:"a,b,c" tag accepts
+// only the listed names, from flags, env vars, and default:. Anything else is
+// an ErrInvalidInput error that lists the choices, and -help shows them.
+//
+//	type Level int
+//
+//	const (
+//		Debug Level = iota
+//		Info
+//		Warn
+//	)
+//
+//	type Format string
+//
+//	type CLI struct {
+//		Level  Level    `flag:"level"  enum:"debug,info,warn" default:"info"`
+//		Format Format   `flag:"format" enum:"json,yaml,text"`
+//		Code   Level    `flag:"code"   enum:"debug=-4,info=0,warn=4"`
+//		Only   []Format `flag:"only"   enum:"json,yaml,text" sep:","`
+//	}
+//
+// For integer types names take values like iota: the first is zero, each
+// later one is the previous plus one, and name=N sets a value explicitly.
+// Users type names, never numbers. String types use the names themselves.
+// Slices ([]T) and pointers (*T) of enum types work like their scalar forms.
+//
+// Names match case-insensitively; the field always receives the spelling in
+// the tag. Add case-sensitive:"true" to match exactly, which also permits
+// names that differ only by case.
+//
+// A type may implement Validate() error (value or pointer receiver). confl
+// calls it on every tag option when the struct is parsed or checked with
+// Validate, and on every parsed value. A type whose pointer implements
+// encoding.TextUnmarshaler parses input with it instead of the name table;
+// the result must still equal one of the tag's values. Fields never set by a
+// flag, env var, or default are not checked. enum: cannot be combined with a
+// flag.Value type.
 //
 // # Namespacing
 //
