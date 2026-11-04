@@ -108,6 +108,9 @@ func registerFlag(fs *flag.FlagSet, ptr any, spec flagSpec) error {
 	if err := spec.validate(fs); err != nil {
 		return err
 	}
+	if spec.EnumSet {
+		return registerEnumFlag(fs, ptr, spec)
+	}
 
 	switch p := ptr.(type) {
 	// ── scalar types ──────────────────────────────────────────────────────────
